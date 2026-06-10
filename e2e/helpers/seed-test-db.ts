@@ -129,6 +129,7 @@ async function seedTestDatabase() {
     await prisma.artistUrl.deleteMany({});
     await prisma.releaseUrl.deleteMany({});
     await prisma.bannerNotification.deleteMany({});
+    await prisma.siteSettings.deleteMany({});
     await prisma.image.deleteMany({});
     await prisma.url.deleteMany({});
     await prisma.featuredArtist.deleteMany({});
@@ -397,11 +398,33 @@ async function seedTestDatabase() {
       },
     });
 
+    // Pin the carousel rotation to the service-clamped minimum (3s — see
+    // BannerNotificationService.getRotationInterval, which rejects values
+    // below 3). The 6.5s default leaves only ~1.5s of margin inside the
+    // auto-cycle test's 8s expect timeout on a loaded CI shard.
+    await prisma.siteSettings.create({
+      data: {
+        key: 'carousel-rotation-interval',
+        value: '3',
+      },
+    });
+
     await Promise.all([
+      // Slot 1 is the carousel's INITIAL (server-rendered) active strip, so it
+      // carries the markup the sanitization chain must handle: an allowed
+      // <strong> + <a>, plus a raw <script> and a javascript: link written
+      // straight to the DB (bypassing the admin write action). The e2e test
+      // asserts this strip WITHOUT navigating the carousel — placing it on
+      // slot 1 means the read-boundary sanitizer's output is in the SSR HTML
+      // and visible on load, independent of client hydration/rotation timing.
       prisma.bannerNotification.create({
         data: {
           slotNumber: 1,
-          content: 'E2E Test Banner One — First test notification',
+          content:
+            'E2E Linked Banner <strong>bold</strong> ' +
+            '<a href="https://example.com/promo">Promo link</a>' +
+            '<script>window.__e2eBannerPwned = true</script>' +
+            '<a href="javascript:window.__e2eBannerPwned2=true">evil</a>',
           textColor: '#ffffff',
           backgroundColor: '#16213e',
           displayFrom: now,

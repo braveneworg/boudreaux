@@ -25,7 +25,7 @@ describe('ChatLoadMoreButton', () => {
 
   it('fires onLoadMore exactly once per click', async () => {
     const onLoadMore = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatLoadMoreButton onLoadMore={onLoadMore} isLoading={false} />);
     await user.click(screen.getByRole('button', { name: /load older messages/i }));

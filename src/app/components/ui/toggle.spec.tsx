@@ -34,7 +34,7 @@ describe('Toggle', () => {
   });
 
   it('can be pressed', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<Toggle aria-label="Toggle">Toggle</Toggle>);
 
     const toggle = screen.getByRole('button');
@@ -47,7 +47,7 @@ describe('Toggle', () => {
   });
 
   it('can be unpressed', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <Toggle aria-label="Toggle" defaultPressed>
         Toggle
@@ -141,7 +141,7 @@ describe('Toggle', () => {
   });
 
   it('toggles via keyboard', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<Toggle aria-label="Toggle">Toggle</Toggle>);
 
     const toggle = screen.getByRole('button');

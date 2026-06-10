@@ -56,7 +56,7 @@ describe('ChatReactionBar', () => {
 
   it('invokes onToggle with the emoji when a pill is clicked', async () => {
     const onToggle = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <ChatReactionBar

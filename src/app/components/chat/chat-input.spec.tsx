@@ -49,7 +49,7 @@ describe('ChatInput', () => {
   });
 
   it('enables the send button once the textarea has non-whitespace content', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatInput {...baseProps} {...noopHandlers()} />);
 
     await user.type(screen.getByLabelText('Chat message'), 'hi');
@@ -63,7 +63,7 @@ describe('ChatInput', () => {
       success: true,
       data: { id: 'msg-1' } as never,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
@@ -79,7 +79,7 @@ describe('ChatInput', () => {
 
   it('inserts a newline (no send) on Shift+Enter', async () => {
     const handlers = noopHandlers();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
@@ -97,7 +97,7 @@ describe('ChatInput', () => {
       error: 'rate_limited',
       retryAfterSeconds: 12,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -112,7 +112,7 @@ describe('ChatInput', () => {
       success: false,
       error: 'disabled',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -124,7 +124,7 @@ describe('ChatInput', () => {
 
   it('does not send when the fingerprint is not yet ready', async () => {
     const handlers = noopHandlers();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} fingerprint={null} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -135,7 +135,7 @@ describe('ChatInput', () => {
 
   it('does not send a whitespace-only body', async () => {
     const handlers = noopHandlers();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     const textarea = screen.getByLabelText('Chat message');
@@ -155,7 +155,7 @@ describe('ChatInput', () => {
       success: false,
       error: 'unauthorized',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -171,7 +171,7 @@ describe('ChatInput', () => {
       success: false,
       error: 'unknown',
     } as never);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -184,7 +184,7 @@ describe('ChatInput', () => {
   it('shows a generic error toast when the action throws', async () => {
     const handlers = noopHandlers();
     vi.mocked(sendChatMessageAction).mockRejectedValue(new Error('boom'));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} />);
     await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
@@ -196,7 +196,7 @@ describe('ChatInput', () => {
   it('calls onTyping when typing non-whitespace content', async () => {
     const handlers = noopHandlers();
     const onTyping = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatInput {...baseProps} {...handlers} onTyping={onTyping} />);
     await user.type(screen.getByLabelText('Chat message'), 'a');
@@ -233,7 +233,7 @@ describe('ChatInput', () => {
     });
 
     it('opens the autocomplete when typing @', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<ChatInput {...baseProps} {...noopHandlers()} />);
 
       await user.type(screen.getByLabelText('Chat message'), '@al');
@@ -242,7 +242,7 @@ describe('ChatInput', () => {
     });
 
     it('cycles down through matches with ArrowDown and inserts on Enter', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<ChatInput {...baseProps} {...noopHandlers()} />);
       const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
 
@@ -254,7 +254,7 @@ describe('ChatInput', () => {
     });
 
     it('cycles up with ArrowUp (wraps around)', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<ChatInput {...baseProps} {...noopHandlers()} />);
       const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
 
@@ -266,7 +266,7 @@ describe('ChatInput', () => {
     });
 
     it('closes the autocomplete on Escape', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<ChatInput {...baseProps} {...noopHandlers()} />);
 
       await user.type(screen.getByLabelText('Chat message'), '@a');
@@ -279,7 +279,7 @@ describe('ChatInput', () => {
     });
 
     it('closes the autocomplete on blur', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <>
           <ChatInput {...baseProps} {...noopHandlers()} />

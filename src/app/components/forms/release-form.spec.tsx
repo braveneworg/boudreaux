@@ -125,7 +125,7 @@ describe('ReleaseForm — suggestedPrice field', () => {
   });
 
   it('should accept a valid price input', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ReleaseForm />);
 
     const input = await screen.findByLabelText('Suggested price in dollars');

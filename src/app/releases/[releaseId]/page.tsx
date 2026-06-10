@@ -20,6 +20,7 @@ import { ReleaseService } from '@/lib/services/release-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 interface ReleasePlayerPageProps {
   params: Promise<{ releaseId: string }>;
@@ -75,11 +76,23 @@ export default async function ReleasePlayerPage({ params, searchParams }: Releas
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.releases.related(releaseId, primaryArtistId),
-      queryFn: () => {
-        const relatedUrl = primaryArtistId
-          ? `/api/releases/${encodeURIComponent(releaseId)}/related?artistId=${encodeURIComponent(primaryArtistId)}`
-          : `/api/releases/${encodeURIComponent(releaseId)}/related`;
-        return fetchApi(relatedUrl);
+      // Call the service directly instead of self-fetching /api/.../related.
+      // The internal HTTP roundtrip fails silently under load on the
+      // standalone server (prefetchQuery swallows the error), leaving the
+      // carousel un-hydrated and forcing a client refetch that races — the
+      // historical artist-carousel E2E flake. Mirrors the route exactly:
+      // no artistId → empty; success → releases; failure → throw (client
+      // refetch remains the fallback). serializeForResponse matches the
+      // route's JSON shape (Date → ISO string).
+      queryFn: async () => {
+        if (!primaryArtistId) {
+          return { releases: [] };
+        }
+        const result = await ReleaseService.getArtistOtherReleases(primaryArtistId, releaseId);
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+        return { releases: serializeForResponse(result.data) };
       },
     }),
   ]);

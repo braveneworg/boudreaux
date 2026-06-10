@@ -4,8 +4,11 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import { fetchApi } from '@/lib/utils/fetch-api';
+import { BannerNotificationService } from '@/lib/services/banner-notification-service';
+import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { getQueryClient } from '@/lib/utils/get-query-client';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 import { HomeContent } from './components/home-content';
 import { PageContainer } from './components/ui/page-container';
@@ -44,16 +47,37 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   const queryClient = getQueryClient();
 
+  // Both prefetches call the services directly rather than fetching our own
+  // API routes over HTTP — same data, same shapes as the routes the client
+  // hooks hit, minus a self-HTTP round-trip per query on this force-dynamic
+  // page. Server-side caching is preserved: both services cache via
+  // `withCache`, and `attachStreamUrls` signs URLs at request time (see the
+  // `force-dynamic` comment above).
   await Promise.all([
     queryClient.prefetchQuery({
       queryKey: queryKeys.featuredArtists.active(),
-      // No `revalidate` here on purpose — see the `force-dynamic` comment
-      // above. Caching the response would cache the signed streamUrl too.
-      queryFn: () => fetchApi('/api/featured-artists?active=true&limit=7'),
+      queryFn: async () => {
+        const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), 7);
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+        // Mirror /api/featured-artists?active=true: BigInt → Number, then
+        // attach fresh CloudFront-signed stream URLs.
+        return {
+          featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
+          count: result.data.length,
+        };
+      },
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.banners.active(),
-      queryFn: () => fetchApi('/api/notification-banners', { revalidate: 60 }),
+      queryFn: async () => {
+        const result = await BannerNotificationService.getActiveBanners();
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+        return result.data;
+      },
     }),
   ]);
 

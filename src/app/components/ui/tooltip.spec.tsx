@@ -58,7 +58,7 @@ describe('Tooltip Components', () => {
     });
 
     it('shows tooltip on hover', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -78,7 +78,7 @@ describe('Tooltip Components', () => {
     });
 
     it('tooltip can be shown and verified', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -136,7 +136,7 @@ describe('Tooltip Components', () => {
 
   describe('TooltipContent', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -153,7 +153,7 @@ describe('Tooltip Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -172,7 +172,7 @@ describe('Tooltip Components', () => {
     });
 
     it('renders children', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -189,7 +189,7 @@ describe('Tooltip Components', () => {
     });
 
     it('uses default sideOffset of 0', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -206,7 +206,7 @@ describe('Tooltip Components', () => {
     });
 
     it('accepts custom sideOffset', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -227,7 +227,7 @@ describe('Tooltip Components', () => {
 
   describe('integration', () => {
     it('renders complete tooltip structure with pointer interaction', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tooltip>
@@ -250,7 +250,7 @@ describe('Tooltip Components', () => {
     });
 
     it('multiple tooltips can coexist', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <>

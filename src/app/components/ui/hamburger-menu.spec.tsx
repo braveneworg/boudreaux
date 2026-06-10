@@ -55,7 +55,7 @@ describe('HamburgerMenu', () => {
   });
 
   it('toggles screen reader text when clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
 
     expect(screen.getByText('Open menu')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('HamburgerMenu', () => {
   });
 
   it('screen reader text toggles back to open after double click', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
 
     await user.click(screen.getByRole('button'));
@@ -104,7 +104,7 @@ describe('HamburgerMenu', () => {
   });
 
   it('shares the full nav item set with the desktop menu', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
     await user.click(screen.getByRole('button'));
 
@@ -122,7 +122,7 @@ describe('HamburgerMenu', () => {
       update: vi.fn(),
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
     await user.click(screen.getByRole('button'));
 
@@ -130,7 +130,7 @@ describe('HamburgerMenu', () => {
   });
 
   it('does not show My Collection link when user is unauthenticated', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
     await user.click(screen.getByRole('button'));
 

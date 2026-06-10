@@ -84,7 +84,6 @@ The following are excluded from coverage as per project guidelines:
 
 | File/Area                        | Statements | Branches | Notes                      |
 | -------------------------------- | ---------- | -------- | -------------------------- |
-| `src/middleware.ts`              | 93.10%     | 88.88%   | Lines 49, 62 uncovered     |
 | `src/app/api/tracks/metadata`    | 100%       | 90%      | Line 19 branch uncovered   |
 | `src/app/components` (aggregate) | 97.49%     | 87.31%   | Various component branches |
 

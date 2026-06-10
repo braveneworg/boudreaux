@@ -41,7 +41,7 @@ describe('Collapsible Components', () => {
     });
 
     it('toggles content on click', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Collapsible>
@@ -111,7 +111,7 @@ describe('Collapsible Components', () => {
 
   describe('integration', () => {
     it('expands and collapses content', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Collapsible>

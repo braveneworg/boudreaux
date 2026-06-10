@@ -119,10 +119,10 @@ describe('FormatBundleDownload', () => {
     await user.click(selectAllOption as HTMLElement);
   };
 
-  beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-  });
-
+  // Real timers by default: RTL waitFor/findBy then settle via MutationObserver
+  // (microtask-fast) instead of being quantized to shouldAdvanceTime ticks.
+  // The two tests that advance the component reset timer opt into fake timers
+  // locally; afterEach restores real timers for the rest.
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -145,7 +145,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should select a single format from the combobox', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await user.click(screen.getByRole('combobox'));
@@ -156,7 +156,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should select all formats via "Select all"', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
@@ -172,7 +172,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should deselect all formats via "Deselect all"', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
@@ -188,7 +188,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should update the download button label when a format is deselected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
@@ -202,7 +202,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should show singular "format" when only one is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await user.click(screen.getByRole('combobox'));
@@ -262,7 +262,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('triggers a streaming download via anchor click on paid mode', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', mockFetch);
 
@@ -284,7 +284,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should show "Preparing..." while downloads are in progress', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
     render(
@@ -305,7 +305,8 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should show per-format progress and "Download started!" on completion', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -328,7 +329,7 @@ describe('FormatBundleDownload', () => {
     // event downgraded every per-format `done` back to a blue spinner —
     // visible as green-check → blue-spinner → spin-forever for premium
     // (lossless) bundles whose upload phase takes a long time.
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const eventsThroughUploading: Array<{ event: string; data: Record<string, unknown> }> = [
       { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
       { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'zipping' } },
@@ -379,7 +380,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should trigger a single download for the combined ZIP', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', mockFetch);
 
@@ -399,7 +400,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should not POST to confirm endpoint (server handles count)', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValueOnce(makeFreeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -419,7 +420,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should call onDownloadComplete when download completes', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const onDownloadComplete = vi.fn();
     const mockFetch = vi.fn().mockResolvedValueOnce(makeFreeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
@@ -442,7 +443,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should not error when onDownloadComplete is not provided', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValueOnce(makeFreeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -457,7 +458,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should show error message when download fetch fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     render(<FormatBundleDownload {...freeOnlyProps} mode="free" />, {
@@ -471,7 +472,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should show error message when download fetch throws', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
     render(<FormatBundleDownload {...freeOnlyProps} mode="free" />, {
@@ -485,7 +486,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('shows an error when preflight rejects with a CAP_REACHED-style failure', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -513,7 +514,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('does not start a second request while download is already in progress', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockImplementation(() => new Promise(() => {}));
     vi.stubGlobal('fetch', mockFetch);
 
@@ -531,7 +532,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('treats SSE read errors after ready as success', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const onDownloadComplete = vi.fn();
     vi.stubGlobal(
       'fetch',
@@ -556,7 +557,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should display unknown formatType when no label is found', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <FormatBundleDownload
         {...defaultProps}
@@ -570,7 +571,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should remove a format when clicking the X on its pill', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
@@ -609,7 +610,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('shows the server-supplied error message when preflight returns a non-ok response', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -643,7 +644,7 @@ describe('FormatBundleDownload', () => {
     // not in FREE_FORMAT_TYPES). We use the paid SSE pathway by leaving
     // mode as default and stubbing fetch to satisfy the existing
     // SSE-style click handler.
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation(() => new Promise(() => {}))
@@ -668,7 +669,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('clears pending reset timer on unmount after successful download', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(makeFreeSSEResponse()));
 
@@ -686,7 +687,8 @@ describe('FormatBundleDownload', () => {
   });
 
   it('does not call triggerDownload after unmount during preflight (T063 regression)', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     // Preflight that never resolves — simulates a slow network where the
     // user navigates away before the gating check completes.
     vi.stubGlobal(
@@ -723,7 +725,7 @@ describe('FormatBundleDownload', () => {
     };
 
     it('restricts combobox options to FREE_FORMAT_TYPES intersected with availableFormats', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatBundleDownload {...freeProps} mode="free" />, {
         wrapper: createQueryWrapper(),
       });
@@ -737,7 +739,7 @@ describe('FormatBundleDownload', () => {
     });
 
     it('appends &mode=free to the bundle fetch URL', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
       vi.stubGlobal('fetch', mockFetch);
 
@@ -760,7 +762,7 @@ describe('FormatBundleDownload', () => {
     });
 
     it('defaults to paid mode when prop omitted (uses streaming, not SSE)', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const mockFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
       vi.stubGlobal('fetch', mockFetch);
 

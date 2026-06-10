@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
+import { updateFeaturedArtistCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
 export interface UpdateFeaturedArtistCoverArtResult {
   success: boolean;
@@ -29,24 +29,15 @@ export const updateFeaturedArtistCoverArtAction = async (
 ): Promise<UpdateFeaturedArtistCoverArtResult> => {
   await requireRole('admin');
 
-  if (!OBJECT_ID_REGEX.test(featuredArtistId)) {
-    return { success: false, error: 'Invalid featured artist ID' };
-  }
-
-  if (typeof coverArt !== 'string' || coverArt.trim().length === 0) {
-    return { success: false, error: 'Cover art URL is required' };
-  }
-
-  // Reject data URIs at the boundary — they crush SSR HTML payload and were
-  // the original source of the LCP regression on /.
-  if (!/^https?:\/\//.test(coverArt)) {
-    return { success: false, error: 'Cover art must be an HTTP(S) URL' };
+  const parsed = updateFeaturedArtistCoverArtSchema.safeParse({ featuredArtistId, coverArt });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
   }
 
   try {
     await prisma.featuredArtist.update({
-      where: { id: featuredArtistId },
-      data: { coverArt },
+      where: { id: parsed.data.featuredArtistId },
+      data: { coverArt: parsed.data.coverArt },
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update cover art';

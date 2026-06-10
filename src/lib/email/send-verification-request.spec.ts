@@ -27,6 +27,12 @@ vi.mock('nodemailer', () => ({
   },
 }));
 
+const limiterCheckMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({ check: limiterCheckMock }),
+}));
+
 vi.mock('./login-verification-email-html', () => ({
   buildLoginVerificationEmailHtml: vi.fn().mockReturnValue('<html>login</html>'),
 }));
@@ -54,12 +60,40 @@ describe('sendVerificationRequest', () => {
     mockFindUnique.mockResolvedValue({ id: 'user-1' });
     mockSendMail.mockResolvedValue({});
     mockCreateTransport.mockReturnValue({ sendMail: mockSendMail });
+    limiterCheckMock.mockResolvedValue(undefined);
     vi.mocked(buildLoginVerificationEmailHtml).mockReturnValue('<html>login</html>');
     vi.mocked(buildLoginVerificationEmailText).mockReturnValue('login text');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe('per-recipient rate limit', () => {
+    it('throws and does not send when the recipient is over the limit', async () => {
+      limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+      await expect(sendVerificationRequest(validParams)).rejects.toThrow(
+        'Too many sign-in emails requested. Please try again later.'
+      );
+      expect(mockSendMail).not.toHaveBeenCalled();
+    });
+
+    it('keys the limit on the lowercased recipient address', async () => {
+      await sendVerificationRequest({ ...validParams, identifier: 'Fan@Example.COM' });
+
+      expect(limiterCheckMock).toHaveBeenCalledWith(5, 'fan@example.com');
+    });
+
+    it('skips the limiter in E2E mode', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+      await sendVerificationRequest(validParams);
+
+      expect(limiterCheckMock).not.toHaveBeenCalled();
+      expect(mockSendMail).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('EMAIL_FROM guard', () => {

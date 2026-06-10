@@ -345,7 +345,7 @@ describe('ChatBody — pin flow', () => {
   });
 
   it('calls togglePinChatMessageAction and updates the pinned cache on success', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const updated: ChatMessageDto = {
       id: 'pinnable',
       body: 'hello',
@@ -368,7 +368,7 @@ describe('ChatBody — pin flow', () => {
   });
 
   it('toasts the limit-reached message when the cap is hit', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.mocked(togglePinChatMessageAction).mockResolvedValue({
       success: false,
       error: 'limit_reached',
@@ -389,7 +389,7 @@ describe('ChatBody — pin flow', () => {
     ['not_found', 'Message no longer exists.'],
     ['invalid', 'Could not update pin.'],
   ])('toasts the right copy when the action errors with %s', async (error, expected) => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.mocked(togglePinChatMessageAction).mockResolvedValue({
       success: false,
       error: error as never,
@@ -444,7 +444,7 @@ describe('ChatBody — delete flow', () => {
   });
 
   it('opens the delete dialog when an admin clicks the trash icon', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatBody session={buildSession('admin')} enabled />);
     await user.click(screen.getByTestId('chat-delete-message'));
     expect(screen.getByTestId('delete-dialog')).toBeInTheDocument();
@@ -452,7 +452,7 @@ describe('ChatBody — delete flow', () => {
   });
 
   it('clears the pending delete when the dialog is closed', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatBody session={buildSession('admin')} enabled />);
     await user.click(screen.getByTestId('chat-delete-message'));
     expect(screen.getByTestId('delete-dialog')).toBeInTheDocument();
@@ -462,7 +462,7 @@ describe('ChatBody — delete flow', () => {
   });
 
   it('confirming "message" scope calls the action and short-circuits if no pending target', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.mocked(deleteChatMessageAction).mockResolvedValue({
       success: true,
       deletedIds: ['msg-1'],
@@ -484,7 +484,7 @@ describe('ChatBody — delete flow', () => {
   });
 
   it('confirming "user" scope passes the scope through and re-removes returned ids', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.mocked(deleteChatMessageAction).mockResolvedValue({
       success: true,
       deletedIds: ['msg-1', 'msg-2'],
@@ -505,7 +505,7 @@ describe('ChatBody — delete flow', () => {
     ['not_found', 'Message no longer exists.'],
     ['invalid', 'Could not delete message.'],
   ])('toasts the right copy when the action errors with %s', async (error, expected) => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.mocked(deleteChatMessageAction).mockResolvedValue({
       success: false,
       error: error as never,
@@ -573,7 +573,7 @@ describe('ChatBody — pinned strip indicators + channel wiring', () => {
 
 describe('ChatBody — unpin button', () => {
   it('clicking the pinned-strip unpin button triggers togglePinChatMessageAction', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     useChatPinnedMessagesQueryMock.mockReturnValue({
       data: [
         makeMessage({
@@ -721,7 +721,7 @@ describe('ChatBody — list + input plumbing', () => {
   });
 
   it('does nothing when ChatDeleteMessageDialog reports open=true (only false closes pending)', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     useChatMessagesQueryMock.mockReturnValue({
       messages: [makeMessage({ id: 'msg-1' })],
       isPending: false,
@@ -759,7 +759,7 @@ describe('ChatBody — list + input plumbing', () => {
       // omit `limit` to exercise the ?? 3 fallback
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatBody session={buildSession('admin')} enabled />);
     await user.click(screen.getByTestId('chat-pin-message'));
 

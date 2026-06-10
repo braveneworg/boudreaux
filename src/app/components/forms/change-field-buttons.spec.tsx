@@ -103,7 +103,7 @@ describe('ChangeFieldButtons', () => {
     });
 
     it('should call handleEditFieldButtonClick when Change button is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const handleClick = vi.fn();
 
       render(
@@ -121,7 +121,7 @@ describe('ChangeFieldButtons', () => {
     });
 
     it('should call handleEditFieldButtonClick when Cancel button is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const handleClick = vi.fn();
 
       render(

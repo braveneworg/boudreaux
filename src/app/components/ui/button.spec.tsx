@@ -133,7 +133,7 @@ describe('Button', () => {
   describe('interactions', () => {
     it('should call onClick handler when clicked', async () => {
       const handleClick = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Button onClick={handleClick}>Click me</Button>);
 
@@ -143,7 +143,7 @@ describe('Button', () => {
 
     it('should not call onClick when disabled', async () => {
       const handleClick = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Button onClick={handleClick} disabled>
@@ -157,7 +157,7 @@ describe('Button', () => {
 
     it('should handle keyboard interactions', async () => {
       const handleClick = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Button onClick={handleClick}>Keyboard</Button>);
 

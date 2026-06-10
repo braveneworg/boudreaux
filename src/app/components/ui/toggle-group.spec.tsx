@@ -39,7 +39,7 @@ describe('ToggleGroup', () => {
     });
 
     it('supports single selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <ToggleGroup type="single">
           <ToggleGroupItem value="a">A</ToggleGroupItem>
@@ -64,7 +64,7 @@ describe('ToggleGroup', () => {
     });
 
     it('supports multiple selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <ToggleGroup type="multiple">
           <ToggleGroupItem value="a">A</ToggleGroupItem>
@@ -171,7 +171,7 @@ describe('ToggleGroup', () => {
 
   describe('keyboard navigation', () => {
     it('navigates with arrow keys in single mode', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <ToggleGroup type="single">
           <ToggleGroupItem value="a">A</ToggleGroupItem>

@@ -4,6 +4,10 @@
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import {
+  publishedReleaseDetailInclude,
+  publishedReleaseListingSelect,
+} from '@/lib/types/media-models';
 import type { Format } from '@/lib/types/media-models';
 
 import { ReleaseService } from './release-service';
@@ -914,26 +918,14 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('should include images, artistReleases with artist, and releaseUrls', async () => {
+    it('should select only the listing projection fields', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
 
       await ReleaseService.getPublishedReleases();
 
       expect(prisma.release.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          include: expect.objectContaining({
-            images: expect.anything(),
-            artistReleases: expect.objectContaining({
-              include: expect.objectContaining({
-                artist: true,
-              }),
-            }),
-            releaseUrls: expect.objectContaining({
-              include: expect.objectContaining({
-                url: true,
-              }),
-            }),
-          }),
+          select: publishedReleaseListingSelect,
         })
       );
     });
@@ -1054,24 +1046,19 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('should query digital format files ordered by trackNumber', async () => {
+    it('should query with the detail projection, files ordered by trackNumber', async () => {
       vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
 
       await ReleaseService.getReleaseWithTracks('release-123');
 
       expect(prisma.release.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          include: expect.objectContaining({
-            digitalFormats: {
-              include: {
-                files: {
-                  orderBy: { trackNumber: 'asc' },
-                },
-              },
-            },
-          }),
+          include: publishedReleaseDetailInclude,
         })
       );
+      expect(publishedReleaseDetailInclude.digitalFormats.include.files.orderBy).toEqual({
+        trackNumber: 'asc',
+      });
     });
 
     it('should return error when release not found', async () => {

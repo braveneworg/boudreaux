@@ -95,7 +95,7 @@ describe('MobileMenu', () => {
 
   it('calls onNavigate when a menu link is clicked', async () => {
     const onNavigate = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<MobileMenu menuItems={menuItems} onNavigate={onNavigate} />);
 
     await user.click(screen.getByRole('link', { name: 'Home' }));
@@ -105,7 +105,7 @@ describe('MobileMenu', () => {
 
   it('wires onNavigate into the auth toolbar', async () => {
     const onNavigate = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<MobileMenu menuItems={menuItems} onNavigate={onNavigate} />);
 
     await user.click(screen.getByTestId('auth-toolbar-action'));

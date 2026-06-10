@@ -29,6 +29,13 @@ vi.mock('@/lib/repositories/chat-user-repository', () => ({
   ChatUserRepository: { findByUserId: vi.fn() },
 }));
 
+const limiterCheckMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  pollingLimiter: { check: limiterCheckMock },
+  POLLING_LIMIT: 20,
+}));
+
 const authorizeChannelMock = vi.fn();
 
 vi.mock('@/lib/utils/pusher-server', () => ({
@@ -49,9 +56,21 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(ChatUserRepository.findByUserId).mockResolvedValue(null);
   authorizeChannelMock.mockReturnValue({ auth: 'signed' });
+  limiterCheckMock.mockResolvedValue(undefined);
 });
 
 describe('POST /api/chat/pusher-auth', () => {
+  it('returns 429 when the rate limit is exceeded', async () => {
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+    const response = await POST(buildRequest({ socket_id: 'sock-1', channel_name: CHAT_CHANNEL }), {
+      params: Promise.resolve({}),
+    });
+
+    expect(response.status).toBe(429);
+    expect(authorizeChannelMock).not.toHaveBeenCalled();
+  });
+
   it('returns 403 when the ChatUser is disabled', async () => {
     vi.mocked(ChatUserRepository.findByUserId).mockResolvedValue({
       disabled: true,

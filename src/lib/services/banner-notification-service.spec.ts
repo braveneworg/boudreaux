@@ -283,6 +283,36 @@ describe('BannerNotificationService', () => {
         300
       );
     });
+
+    it('should disable caching (TTL 0) in E2E mode', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      mockFindMany.mockResolvedValue([]);
+      mockSettingsFindUnique.mockResolvedValue(null);
+
+      await BannerNotificationService.getActiveBanners();
+
+      expect(mockWithCache).toHaveBeenCalledWith(
+        'banner-notifications:2026-04-07',
+        expect.any(Function),
+        0
+      );
+      vi.unstubAllEnvs();
+    });
+
+    it('should disable caching (TTL 0) in development', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      mockFindMany.mockResolvedValue([]);
+      mockSettingsFindUnique.mockResolvedValue(null);
+
+      await BannerNotificationService.getActiveBanners();
+
+      expect(mockWithCache).toHaveBeenCalledWith(
+        'banner-notifications:2026-04-07',
+        expect.any(Function),
+        0
+      );
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('getAllNotifications', () => {

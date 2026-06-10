@@ -9,7 +9,7 @@ import { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from './popove
 describe('Popover Components', () => {
   describe('Popover', () => {
     it('should render a popover with trigger and content', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>
@@ -55,7 +55,7 @@ describe('Popover Components', () => {
 
   describe('PopoverContent', () => {
     it('should render content when popover is open', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>
@@ -72,7 +72,7 @@ describe('Popover Components', () => {
     });
 
     it('should have data-slot attribute on content', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>
@@ -88,7 +88,7 @@ describe('Popover Components', () => {
     });
 
     it('should apply custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>
@@ -106,7 +106,7 @@ describe('Popover Components', () => {
     });
 
     it('should merge custom className with default classes', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>
@@ -154,7 +154,7 @@ describe('Popover Components', () => {
 
   describe('Popover open/close behavior', () => {
     it('should close when clicking outside', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <div>
           <div data-testid="outside">Outside</div>
@@ -181,7 +181,7 @@ describe('Popover Components', () => {
     });
 
     it('should close when trigger is clicked again', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Popover>
           <PopoverTrigger data-testid="trigger">Open</PopoverTrigger>

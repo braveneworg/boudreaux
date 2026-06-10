@@ -86,7 +86,7 @@ describe('IosInstallPrompt', () => {
   });
 
   it('hides and remembers dismissal when the close button is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const { unmount } = render(<IosInstallPrompt />);
 
     await user.click(screen.getByRole('button', { name: /dismiss/i }));

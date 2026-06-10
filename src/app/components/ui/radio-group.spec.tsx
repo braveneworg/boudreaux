@@ -39,7 +39,7 @@ describe('RadioGroup', () => {
     });
 
     it('allows selecting a radio item', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <RadioGroup>
           <RadioGroupItem value="a" id="option-a" />
@@ -59,7 +59,7 @@ describe('RadioGroup', () => {
     });
 
     it('only allows one selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <RadioGroup>
           <RadioGroupItem value="a" />
@@ -149,7 +149,7 @@ describe('RadioGroup', () => {
     });
 
     it('shows indicator when checked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <RadioGroup>
           <RadioGroupItem value="a" data-testid="radio-item" />
@@ -164,7 +164,7 @@ describe('RadioGroup', () => {
 
   describe('keyboard navigation', () => {
     it('navigates with arrow keys', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <RadioGroup>
           <RadioGroupItem value="a" />
@@ -182,7 +182,7 @@ describe('RadioGroup', () => {
     });
 
     it('selects with Space key', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <RadioGroup>
           <RadioGroupItem value="a" />

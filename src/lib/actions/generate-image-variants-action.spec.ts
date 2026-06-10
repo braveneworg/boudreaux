@@ -250,6 +250,22 @@ describe('generateImageVariantsAction', () => {
     expect(mockS3Send).not.toHaveBeenCalled();
   });
 
+  it('returns "Invalid image key" for an empty CDN URL', async () => {
+    const result = await generateImageVariantsAction('');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid image key');
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it('returns "Invalid image key" for an absurdly long CDN URL', async () => {
+    const result = await generateImageVariantsAction(`https://cdn.example.com/${'a'.repeat(2100)}`);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid image key');
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
   it('treats non-URL strings as raw S3 keys', async () => {
     // The catch in extractS3Key falls back to stripping the leading slash —
     // so a bare/relative key is still validated and rejected for not having

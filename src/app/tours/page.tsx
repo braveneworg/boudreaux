@@ -3,11 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
-import type { ToursResponse } from '@/app/hooks/use-tours-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
-import { fetchApi } from '@/lib/utils/fetch-api';
+import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { getQueryClient } from '@/lib/utils/get-query-client';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 import { ToursContent } from './components/tours-content';
 
@@ -20,7 +20,15 @@ export default async function ToursPage() {
 
   await queryClient.prefetchQuery({
     queryKey: queryKeys.tours.list(),
-    queryFn: () => fetchApi<ToursResponse>('/api/tours'),
+    // Read the repository directly instead of self-fetching /api/tours. The
+    // internal HTTP roundtrip fails silently under load on the standalone
+    // server (prefetchQuery swallows the error), leaving the list un-hydrated
+    // so the client must refetch — the source of the flaky "0 tour cards"
+    // E2E failures. Mirror the route's JSON shape (Date → ISO string).
+    queryFn: async () => {
+      const tours = await TourRepository.findAll({ limit: 100 });
+      return serializeForResponse({ tours, count: tours.length });
+    },
   });
 
   return (

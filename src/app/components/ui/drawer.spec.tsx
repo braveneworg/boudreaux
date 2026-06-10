@@ -59,7 +59,7 @@ describe('Drawer', () => {
 
   describe('DrawerContent', () => {
     it('opens drawer on trigger click', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -70,7 +70,7 @@ describe('Drawer', () => {
     });
 
     it('has data-slot attribute when open', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -83,7 +83,7 @@ describe('Drawer', () => {
 
   describe('DrawerHeader', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -94,7 +94,7 @@ describe('Drawer', () => {
     });
 
     it('renders children', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -108,7 +108,7 @@ describe('Drawer', () => {
 
   describe('DrawerFooter', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -119,7 +119,7 @@ describe('Drawer', () => {
     });
 
     it('renders children', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -132,7 +132,7 @@ describe('Drawer', () => {
 
   describe('DrawerTitle', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -145,7 +145,7 @@ describe('Drawer', () => {
 
   describe('DrawerDescription', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
@@ -158,7 +158,7 @@ describe('Drawer', () => {
 
   describe('DrawerClose', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Drawer>
           <DrawerTrigger>Open</DrawerTrigger>
@@ -180,7 +180,7 @@ describe('Drawer', () => {
 
   describe('integration', () => {
     it('renders complete drawer with all parts', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderDrawer();
 
       await user.click(screen.getByRole('button', { name: 'Open Drawer' }));

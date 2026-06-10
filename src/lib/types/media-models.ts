@@ -290,59 +290,91 @@ export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
 // =============================================================================
 
 /**
+ * Prisma projection for the public releases grid page. Only the fields the
+ * listing UI consumes (release cards + search combobox) are selected, keeping
+ * both the Mongo read and the API payload small — this is the single source
+ * of truth for `PublishedReleaseListing`.
+ */
+export const publishedReleaseListingSelect = {
+  id: true,
+  title: true,
+  coverArt: true,
+  releasedOn: true,
+  images: {
+    orderBy: { sortOrder: 'asc' },
+    take: 1,
+    select: { src: true, altText: true },
+  },
+  artistReleases: {
+    select: {
+      artist: {
+        select: { id: true, firstName: true, surname: true, displayName: true },
+      },
+    },
+  },
+  releaseUrls: {
+    select: {
+      url: { select: { platform: true, url: true } },
+    },
+  },
+} as const satisfies Prisma.ReleaseSelect;
+
+/**
  * Published release listing for the public releases grid page.
- * Includes artist info, first image (for cover art fallback), and URLs (for Bandcamp link).
+ * Includes artist display-name fields, first image (for cover art fallback),
+ * and URLs (for Bandcamp link).
  */
 export type PublishedReleaseListing = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-    artistReleases: {
-      include: {
-        artist: true;
-      };
-    };
-    releaseUrls: {
-      include: {
-        url: true;
-      };
-    };
-  };
+  select: typeof publishedReleaseListingSelect;
 }>;
+
+/**
+ * Prisma projection for the media player page at /releases/[releaseId].
+ * Artist rows are narrowed to display-name fields — the player never renders
+ * artist images/labels/urls or the artist's other releases, and the full
+ * nested include shipped every artist document (plus all of its releases)
+ * in the page payload. Single source of truth for `PublishedReleaseDetail`.
+ */
+export const publishedReleaseDetailInclude = {
+  images: {
+    orderBy: { sortOrder: 'asc' },
+  },
+  artistReleases: {
+    select: {
+      artist: {
+        // The full name-part set consumed by `getArtistDisplayName`.
+        select: {
+          id: true,
+          firstName: true,
+          middleName: true,
+          surname: true,
+          displayName: true,
+          title: true,
+          suffix: true,
+        },
+      },
+    },
+  },
+  digitalFormats: {
+    include: {
+      files: {
+        orderBy: { trackNumber: 'asc' },
+      },
+    },
+  },
+  releaseUrls: {
+    include: {
+      url: true,
+    },
+  },
+} as const satisfies Prisma.ReleaseInclude;
 
 /**
  * Published release detail for the media player page at /releases/[releaseId].
  * Includes MP3_320KBPS digital format files for audio playback, images, artist info, and URLs.
  */
 export type PublishedReleaseDetail = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-    artistReleases: {
-      include: {
-        artist: {
-          include: {
-            images: true;
-            labels: true;
-            releases: {
-              include: {
-                release: true;
-              };
-            };
-            urls: true;
-          };
-        };
-      };
-    };
-    digitalFormats: {
-      include: {
-        files: true;
-      };
-    };
-    releaseUrls: {
-      include: {
-        url: true;
-      };
-    };
-  };
+  include: typeof publishedReleaseDetailInclude;
 }>;
 
 /**

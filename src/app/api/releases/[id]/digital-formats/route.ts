@@ -8,12 +8,8 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { type DigitalFormatType, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-
-/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
-function serializeForResponse<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
-}
 
 /**
  * GET /api/releases/[id]/digital-formats

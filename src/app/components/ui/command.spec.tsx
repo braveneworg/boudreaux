@@ -253,7 +253,7 @@ describe('Command', () => {
     });
 
     it('handles onSelect callback', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const onSelect = vi.fn();
 
       render(
@@ -452,7 +452,7 @@ describe('Command', () => {
     });
 
     it('handles onOpenChange callback', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const onOpenChange = vi.fn();
 
       render(
@@ -469,7 +469,7 @@ describe('Command', () => {
 
   describe('integration', () => {
     it('filters items based on input', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Command>

@@ -192,7 +192,7 @@ describe('CarouselItem', () => {
   });
 
   it('handles click events', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const handleClick = vi.fn();
 
     render(
@@ -307,7 +307,7 @@ describe('useCarousel hook error', () => {
 
 describe('Carousel keyboard navigation', () => {
   it('scrolls to previous slide on ArrowLeft key press', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockScrollPrev = vi.fn();
     const mockScrollNext = vi.fn();
 
@@ -347,7 +347,7 @@ describe('Carousel keyboard navigation', () => {
   });
 
   it('scrolls to next slide on ArrowRight key press', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel>
@@ -426,7 +426,7 @@ describe('Carousel vertical orientation', () => {
 
 describe('CarouselPrevious button click', () => {
   it('calls scrollPrev when clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel>
@@ -447,7 +447,7 @@ describe('CarouselPrevious button click', () => {
 
 describe('CarouselNext button click', () => {
   it('calls scrollNext when clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel>
@@ -565,7 +565,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('wraps to the first slide when clicking next at the end with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -589,7 +589,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('wraps to the last slide when clicking previous at the beginning with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -614,7 +614,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('scrolls normally when canScrollNext is true even with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -635,7 +635,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('scrolls normally when canScrollPrev is true even with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -733,7 +733,7 @@ describe('Carousel loop cycling behavior', () => {
   // Therefore, fireEvent.keyDown is the appropriate testing tool here.
 
   it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -755,7 +755,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('wraps via keyboard ArrowLeft at the beginning with loop enabled', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <Carousel opts={{ loop: true }}>
@@ -777,7 +777,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('does not call scrollTo when empty carousel with loop enabled on previous', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     // Mock empty carousel (no items)
     mockApi.scrollSnapList.mockReturnValue([]);
@@ -798,7 +798,7 @@ describe('Carousel loop cycling behavior', () => {
   });
 
   it('does not call scrollTo when empty carousel with loop enabled on next', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     // Mock empty carousel (no items)
     mockApi.scrollSnapList.mockReturnValue([]);

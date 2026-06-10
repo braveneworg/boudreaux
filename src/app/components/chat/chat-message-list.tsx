@@ -3,12 +3,41 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 
 import { ChatLoadMoreButton } from './chat-load-more-button';
 import { ChatMessageRow } from './chat-message-row';
+
+/**
+ * Memoized row wrapper. Render props are invoked inside the memo boundary so
+ * a Pusher event that touches one message (new message, reaction, typing)
+ * re-renders only that row instead of every visible row. This relies on two
+ * stable identities: unchanged message objects keep their reference in
+ * useOptimisticChat's updates, and the render props are useCallback-stable
+ * in chat-body.
+ */
+const MemoizedMessageRow = memo(function MemoizedMessageRow({
+  message,
+  align,
+  renderReactionBar,
+  renderPinIndicator,
+}: {
+  message: OptimisticChatMessage;
+  align?: 'left' | 'right';
+  renderReactionBar?: (message: OptimisticChatMessage) => React.ReactNode;
+  renderPinIndicator?: (message: OptimisticChatMessage) => React.ReactNode;
+}) {
+  return (
+    <ChatMessageRow
+      message={message}
+      align={align}
+      reactionBar={renderReactionBar?.(message)}
+      pinIndicator={renderPinIndicator?.(message)}
+    />
+  );
+});
 
 interface ChatMessageListProps {
   messages: OptimisticChatMessage[];
@@ -136,10 +165,10 @@ export const ChatMessageList = ({
           <ul className="divide-y">
             {pinnedMessages.map((message) => (
               <li key={`pinned-${message.id}`}>
-                <ChatMessageRow
+                <MemoizedMessageRow
                   message={message}
-                  reactionBar={renderReactionBar?.(message)}
-                  pinIndicator={renderPinIndicator?.(message)}
+                  renderReactionBar={renderReactionBar}
+                  renderPinIndicator={renderPinIndicator}
                 />
               </li>
             ))}
@@ -175,10 +204,10 @@ export const ChatMessageList = ({
           <ul className="divide-y">
             {rows.map(({ message, align }) => (
               <li key={message.tempId ?? message.id}>
-                <ChatMessageRow
+                <MemoizedMessageRow
                   message={message}
                   align={align}
-                  reactionBar={renderReactionBar?.(message)}
+                  renderReactionBar={renderReactionBar}
                 />
               </li>
             ))}

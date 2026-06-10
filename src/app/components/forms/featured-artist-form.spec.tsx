@@ -366,7 +366,7 @@ describe('FeaturedArtistForm', () => {
     it('navigates to admin featured artist list when cancel is clicked', async () => {
       render(<FeaturedArtistForm />);
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       await user.click(screen.getByRole('button', { name: /cancel/i }));
 
       expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist');

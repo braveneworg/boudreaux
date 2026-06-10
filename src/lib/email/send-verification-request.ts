@@ -8,9 +8,21 @@ import path from 'path';
 import nodemailer from 'nodemailer';
 
 import { prisma } from '@/lib/prisma';
+import { rateLimit } from '@/lib/utils/rate-limit';
 
 import { buildLoginVerificationEmailHtml } from './login-verification-email-html';
 import { buildLoginVerificationEmailText } from './login-verification-email-text';
+
+// Throttle outbound sign-in emails per recipient address. This is the single
+// chokepoint for BOTH the signin Server Action and the raw /api/auth/signin
+// HTTP endpoint (which has no other rate limit), closing an email-bombing /
+// SES-cost amplification vector. 5 per 10 minutes comfortably covers a real
+// user retrying a lost email.
+const verificationEmailLimiter = rateLimit({
+  interval: 10 * 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+const VERIFICATION_EMAILS_PER_INTERVAL = 5;
 
 interface SmtpServer {
   host?: string;
@@ -48,6 +60,15 @@ export async function sendVerificationRequest(
   const fromAddress = provider.from ?? process.env.EMAIL_FROM;
   if (!fromAddress) {
     throw new Error('[sendVerificationRequest] EMAIL_FROM is not configured');
+  }
+
+  if (process.env.E2E_MODE !== 'true') {
+    try {
+      await verificationEmailLimiter.check(VERIFICATION_EMAILS_PER_INTERVAL, email.toLowerCase());
+    } catch {
+      // Auth.js surfaces thrown errors as a sign-in failure without sending.
+      throw new Error('Too many sign-in emails requested. Please try again later.');
+    }
   }
 
   // Determine whether this is a first-time user for the conditional greeting.

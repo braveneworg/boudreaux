@@ -129,7 +129,7 @@ describe('Tabs Components', () => {
     });
 
     it('changes tab on click', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Tabs defaultValue="tab1">

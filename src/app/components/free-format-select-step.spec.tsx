@@ -31,7 +31,7 @@ describe('FreeFormatSelectStep', () => {
   });
 
   it('restricts combobox options to FREE_FORMAT_TYPES intersected with publishedFormats', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <FreeFormatSelectStep releaseId="release-123" availableFreeFormats={['MP3_320KBPS']} />,
       { wrapper: createQueryWrapper() }
@@ -60,7 +60,7 @@ describe('FreeFormatSelectStep', () => {
   });
 
   it('enables the download button after selecting one free format', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <FreeFormatSelectStep
         releaseId="release-123"

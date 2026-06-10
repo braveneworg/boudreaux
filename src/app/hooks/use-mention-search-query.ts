@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
@@ -36,5 +36,6 @@ export function useMentionSearchQuery(prefix: string, enabled: boolean) {
     },
     enabled: enabled && trimmed.length > 0,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }

@@ -79,9 +79,9 @@ interface MockFormData {
 describe('GenerateUsernameButton', () => {
   let mockForm: UseFormReturn<MockFormData>;
 
+  // Real timers by default; the multi-click test that advances the 500ms
+  // isGenerating timeout opts into fake timers locally (afterEach restores).
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-
     // Reset mockGenerateUsername to clear any mockReturnValueOnce calls
     mockGenerateUsername.mockReset();
 
@@ -269,6 +269,7 @@ describe('GenerateUsernameButton', () => {
     });
 
     it('should generate different usernames on multiple clicks', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockGenerateUsername
         .mockReturnValueOnce('username-1111')

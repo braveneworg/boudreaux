@@ -19,6 +19,12 @@ vi.mock('@auth/core/jwt', () => ({
 const mockCookiesSet = vi.fn();
 vi.mock('next/headers', () => ({
   cookies: () => Promise.resolve({ set: mockCookiesSet }),
+  headers: () => Promise.resolve(new Headers({ 'x-real-ip': '203.0.113.7' })),
+}));
+
+const limiterCheckMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({ check: limiterCheckMock }),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -77,6 +83,7 @@ describe('createPurchaseSessionAction', () => {
     vi.stubEnv('AUTH_SECRET', 'test-secret-that-is-long-enough-for-encryption');
     vi.stubEnv('NODE_ENV', 'development');
     mockEncode.mockResolvedValue('encrypted-jwt-token');
+    limiterCheckMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -91,6 +98,28 @@ describe('createPurchaseSessionAction', () => {
     expect(result).toEqual({ success: true });
     expect(PurchaseRepository.findBySessionId).not.toHaveBeenCalled();
     expect(mockCookiesSet).not.toHaveBeenCalled();
+  });
+
+  it('returns rate_limited for unauthenticated callers over the limit', async () => {
+    mockAuth.mockResolvedValue(null);
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+    const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
+
+    expect(result).toEqual({ success: false, error: 'rate_limited' });
+    expect(PurchaseRepository.findBySessionId).not.toHaveBeenCalled();
+  });
+
+  it('skips the rate limit in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    mockAuth.mockResolvedValue(null);
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+    const result = await createPurchaseSessionAction({ sessionId: 'invalid_id' });
+
+    // Falls through to normal validation instead of rate limiting.
+    expect(result).toEqual({ success: false, error: 'invalid_session_id' });
+    expect(limiterCheckMock).not.toHaveBeenCalled();
   });
 
   it('rejects invalid session IDs', async () => {

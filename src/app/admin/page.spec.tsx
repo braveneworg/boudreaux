@@ -68,7 +68,7 @@ vi.mock('./data-views/featured-artist-data-view', () => ({
 }));
 
 describe('AdminPage', () => {
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   it('renders breadcrumb with Admin link', () => {
     render(<AdminPage />);
 

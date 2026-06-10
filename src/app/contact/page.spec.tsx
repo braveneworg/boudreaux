@@ -108,7 +108,7 @@ describe('ContactPage', () => {
   });
 
   function importAndRender() {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const result = render(<ContactPage />);
     return { ...result, user };
   }

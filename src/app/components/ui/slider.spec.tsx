@@ -248,7 +248,7 @@ describe('Slider', () => {
 
   describe('keyboard navigation', () => {
     it('increases value with ArrowRight', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
       const slider = screen.getByRole('slider');
@@ -260,7 +260,7 @@ describe('Slider', () => {
     });
 
     it('decreases value with ArrowLeft', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
       const slider = screen.getByRole('slider');
@@ -272,7 +272,7 @@ describe('Slider', () => {
     });
 
     it('jumps to min with Home key', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
       const slider = screen.getByRole('slider');
@@ -284,7 +284,7 @@ describe('Slider', () => {
     });
 
     it('jumps to max with End key', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
       const slider = screen.getByRole('slider');

@@ -22,8 +22,17 @@ const createTourViaUi = async (adminPage: Page, title: string): Promise<string> 
   await adminPage.getByRole('button', { name: 'Create Tour', exact: true }).click();
   await expect(adminPage).toHaveURL('/admin/tours');
 
+  // The create action revalidates /admin/tours, but the redirected SSR
+  // render can lag under heavy parallel CI load. The list is server-rendered
+  // (no client refetch to wait on), so reload-and-retry to force a fresh
+  // render that includes the just-created tour rather than polling stale DOM.
   const tourLink = adminPage.getByRole('link', { name: title }).first();
-  await expect(tourLink).toBeVisible();
+  await expect(async () => {
+    if (!(await tourLink.isVisible())) {
+      await adminPage.reload();
+    }
+    await expect(tourLink).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 25_000 });
   const href = await tourLink.getAttribute('href');
   expect(href).toBeTruthy();
   return href!.split('/').at(-1)!;

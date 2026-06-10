@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
+import { updateReleaseCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
 export interface UpdateReleaseCoverArtResult {
   success: boolean;
@@ -32,24 +32,15 @@ export const updateReleaseCoverArtAction = async (
 ): Promise<UpdateReleaseCoverArtResult> => {
   await requireRole('admin');
 
-  if (!OBJECT_ID_REGEX.test(releaseId)) {
-    return { success: false, error: 'Invalid release ID' };
-  }
-
-  if (typeof coverArt !== 'string' || coverArt.trim().length === 0) {
-    return { success: false, error: 'Cover art URL is required' };
-  }
-
-  // Accept HTTP(S) CDN URLs only — prevents storing data: URIs (which crush
-  // SSR HTML payload) or anything else weird from the upload boundary.
-  if (!/^https?:\/\//.test(coverArt)) {
-    return { success: false, error: 'Cover art must be an HTTP(S) URL' };
+  const parsed = updateReleaseCoverArtSchema.safeParse({ releaseId, coverArt });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
   }
 
   try {
     await prisma.release.update({
-      where: { id: releaseId },
-      data: { coverArt },
+      where: { id: parsed.data.releaseId },
+      data: { coverArt: parsed.data.coverArt },
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update cover art';

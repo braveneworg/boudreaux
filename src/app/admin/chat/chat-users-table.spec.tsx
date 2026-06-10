@@ -128,7 +128,7 @@ describe('ChatUsersTable', () => {
       data: { rows: [sampleRow], total: 1, page: 1, perPage: 50 },
     });
     vi.mocked(updateChatUserAction).mockResolvedValue({ success: true });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatUsersTable />);
     await user.click(screen.getByRole('switch'));
@@ -154,7 +154,7 @@ describe('ChatUsersTable', () => {
       },
     });
     vi.mocked(updateChatUserAction).mockResolvedValue({ success: true });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatUsersTable />);
     await user.click(screen.getByRole('button', { name: /clear flag/i }));
@@ -172,7 +172,7 @@ describe('ChatUsersTable', () => {
       data: { rows: [sampleRow], total: 1, page: 1, perPage: 50 },
     });
     vi.mocked(updateChatUserAction).mockResolvedValue({ success: false, error: 'unauthorized' });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatUsersTable />);
     await user.click(screen.getByRole('switch'));

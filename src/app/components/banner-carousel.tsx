@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -15,8 +15,11 @@ import {
   DEFAULT_ROTATION_INTERVAL,
 } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
-
-import { BannerNotificationStrip } from './banner-notification-strip';
+import { isDarkColor } from '@/lib/utils/color';
+import {
+  addLinkAttributes,
+  sanitizeNotificationHtml,
+} from '@/lib/validation/banner-notification-schema';
 
 export interface BannerSlotData {
   slotNumber: number;
@@ -184,6 +187,25 @@ export function BannerCarousel({
   const activeNotification = isTransitioning ? incomingNotification : outgoingNotification;
   const stripVisible = activeNotification !== null && isTabVisible;
 
+  // Sanitize each notification once per banners payload rather than on every
+  // rotation tick — the regex chain is pure string work on unchanging input.
+  // (Content is already sanitized server-side at the read boundary; this
+  // client pass stays as defense-in-depth.)
+  const sanitizedHtmlByIndex = useMemo(
+    () =>
+      banners.map((banner) =>
+        banner.notification
+          ? addLinkAttributes(sanitizeNotificationHtml(banner.notification.content))
+          : null
+      ),
+    [banners]
+  );
+  const outgoingHtml = sanitizedHtmlByIndex[currentIndex] ?? null;
+  const activeHtml =
+    isTransitioning && incomingIndex !== null
+      ? (sanitizedHtmlByIndex[incomingIndex] ?? null)
+      : outgoingHtml;
+
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -324,19 +346,60 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Notification strip — synced to the active slide. Always reserves
-          height (inside the strip) so toggling a notification never shifts
-          layout. Slides left-to-right on each swap. */}
-      <BannerNotificationStrip
-        active={activeNotification}
-        outgoing={outgoingNotification}
-        isTransitioning={isTransitioning}
-        visible={stripVisible}
-        transitionDurationMs={TRANSITION_DURATION}
-        easing={EASING}
-        activeKey={isTransitioning ? `in-${incomingIndex}` : `${currentIndex}`}
-        outgoingKey={`out-${currentIndex}`}
-      />
+      {/* Notification strip — always reserves 2.5rem to prevent CLS */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          minHeight: '2.5rem',
+          opacity: stripVisible ? 1 : 0,
+          transition: `opacity 300ms ${EASING}`,
+        }}
+      >
+        {/* Outgoing strip — slides out to the right during transitions */}
+        {isTransitioning && outgoingNotification && (
+          <div
+            key={`strip-out-${currentIndex}`}
+            className={cn(
+              'banner-strip-slide absolute inset-0 w-full px-4 py-2 text-center text-sm',
+              isDarkColor(outgoingNotification.backgroundColor)
+                ? 'banner-strip-dark'
+                : 'banner-strip-light'
+            )}
+            style={{
+              color: outgoingNotification.textColor ?? undefined,
+              backgroundColor: outgoingNotification.backgroundColor ?? 'transparent',
+              animation: `banner-strip-exit-right ${TRANSITION_DURATION}ms ${EASING} forwards`,
+            }}
+            dangerouslySetInnerHTML={{
+              __html: outgoingHtml ?? '',
+            }}
+          />
+        )}
+        {/* Incoming strip — slides in from the left; static strip when not transitioning */}
+        {activeNotification && (
+          <div
+            key={`strip-${isTransitioning ? `in-${incomingIndex}` : currentIndex}`}
+            className={cn(
+              'banner-strip-slide w-full px-4 py-2 text-center text-sm',
+              isDarkColor(activeNotification.backgroundColor)
+                ? 'banner-strip-dark'
+                : 'banner-strip-light'
+            )}
+            style={{
+              color: activeNotification.textColor ?? undefined,
+              backgroundColor: activeNotification.backgroundColor ?? 'transparent',
+              ...(isTransitioning
+                ? {
+                    animation: `banner-strip-slide-right ${TRANSITION_DURATION}ms ${EASING}`,
+                  }
+                : {}),
+            }}
+            dangerouslySetInnerHTML={{
+              __html: activeHtml ?? '',
+            }}
+          />
+        )}
+      </div>
 
       {/* Banner image track */}
       <div

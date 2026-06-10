@@ -26,7 +26,7 @@ describe('Switch', () => {
   });
 
   it('can be toggled on', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<Switch aria-label="Toggle" />);
 
     const switchEl = screen.getByRole('switch');
@@ -39,7 +39,7 @@ describe('Switch', () => {
   });
 
   it('can be toggled off', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<Switch aria-label="Toggle" defaultChecked />);
 
     const switchEl = screen.getByRole('switch');
@@ -87,7 +87,7 @@ describe('Switch', () => {
   });
 
   it('toggles via keyboard', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<Switch aria-label="Toggle" />);
 
     const switchEl = screen.getByRole('switch');

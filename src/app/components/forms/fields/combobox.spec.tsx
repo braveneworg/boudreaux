@@ -49,7 +49,7 @@ describe('Combobox', () => {
   });
 
   it('opens popover on click', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -60,7 +60,7 @@ describe('Combobox', () => {
   });
 
   it('shows all options when opened', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -72,7 +72,7 @@ describe('Combobox', () => {
   });
 
   it('shows search input with placeholder', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -82,7 +82,7 @@ describe('Combobox', () => {
   });
 
   it('calls onSelectAction when option is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -96,7 +96,7 @@ describe('Combobox', () => {
   });
 
   it('updates displayed value when option is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -111,7 +111,7 @@ describe('Combobox', () => {
   });
 
   it('closes popover after selection', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 
@@ -125,7 +125,7 @@ describe('Combobox', () => {
   });
 
   it('shows check icon for selected option', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<Combobox options={mockOptions} onSelectAction={mockOnSelectAction} />);
 

@@ -8,12 +8,9 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 export const dynamic = 'force-dynamic';
-
-function serializeForResponse<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
-}
 
 /**
  * GET /api/artist/slug/[slug]

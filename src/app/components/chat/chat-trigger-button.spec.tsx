@@ -18,7 +18,7 @@ describe('ChatTriggerButton', () => {
 
   it('invokes onOpen when clicked', async () => {
     const onOpen = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatTriggerButton onOpen={onOpen} />);
 
     await user.click(screen.getByRole('button', { name: /open chat/i }));

@@ -107,7 +107,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should render DownloadDialog after clicking the trigger button', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<DeferredDownloadDialog {...defaultProps} />);
 
@@ -122,7 +122,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should pass default values when userStatus is undefined', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     mockUseReleaseUserStatusQuery.mockReturnValue({ data: undefined });
 
     render(<DeferredDownloadDialog {...defaultProps} />);
@@ -137,7 +137,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should pass purchase data from userStatus to DownloadDialog', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     mockUseReleaseUserStatusQuery.mockReturnValue({
       data: {
         hasPurchase: true,
@@ -163,7 +163,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should pass null purchasedAt when userStatus has no purchasedAt', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     mockUseReleaseUserStatusQuery.mockReturnValue({
       data: {
         hasPurchase: false,
@@ -183,7 +183,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should keep the trigger mounted as a sibling of the dialog so it never unmounts during chunk load', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<DeferredDownloadDialog {...defaultProps} />);
     const trigger = screen.getByTestId('download-trigger');
@@ -198,7 +198,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should re-mount the dialog on each tap so re-opens fire openOnMount', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<DeferredDownloadDialog {...defaultProps} />);
 
@@ -214,7 +214,7 @@ describe('DeferredDownloadDialog', () => {
   });
 
   it('should forward existing onClick on a custom trigger', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const customClick = vi.fn();
 
     render(

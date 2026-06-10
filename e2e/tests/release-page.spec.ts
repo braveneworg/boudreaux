@@ -113,10 +113,13 @@ test.describe('Release Page — Purchase State Awareness', () => {
 
 test.describe('Release Page — Artist Carousel', () => {
   test('shows artist releases carousel with other albums', async ({ userPage }) => {
-    // E2E Album One is linked to E2E Artist who has 3 albums
+    // E2E Album One is linked to E2E Artist who has 3 albums. Related releases
+    // are SSR-prefetched via a direct service call (see the release detail
+    // page), so the carousel is hydrated into the initial HTML rather than
+    // depending on a flaky self-HTTP roundtrip under parallel CI load.
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    // The carousel should be a region labeled "Other releases by E2E Artist"
+    // The carousel is a region labeled "Other releases by E2E Artist".
     await expect(
       userPage.getByRole('region', { name: /Other releases by E2E Artist/ })
     ).toBeVisible({ timeout: 10_000 });
