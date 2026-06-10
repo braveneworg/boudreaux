@@ -47,7 +47,7 @@ describe('ChatLauncher', () => {
 
   it('opens the drawer and shows the auth gate for unauthenticated users', async () => {
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
@@ -62,7 +62,7 @@ describe('ChatLauncher', () => {
       status: 'authenticated',
       data: { user: { id: 'user-1', email: 'octo@example.com', name: 'Octo' } },
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));

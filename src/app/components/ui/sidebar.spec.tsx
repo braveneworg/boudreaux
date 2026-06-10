@@ -271,7 +271,7 @@ describe('SidebarInput', () => {
   });
 
   it('accepts input', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <SidebarProvider>
@@ -492,7 +492,7 @@ describe('SidebarMenuButton', () => {
   });
 
   it('handles click events', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const handleClick = vi.fn();
 
     render(

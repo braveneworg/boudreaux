@@ -81,7 +81,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should display "No releases found" when search matches nothing', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ReleaseSearchCombobox releases={mockReleases} />);
 
     // Click the trigger to open the popover
@@ -110,7 +110,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should navigate to release page when a result is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ReleaseSearchCombobox releases={mockReleases} />);
 
     await user.click(screen.getByLabelText('Search releases'));
@@ -125,7 +125,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should render cover art thumbnail when coverArt is present', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ReleaseSearchCombobox releases={mockReleases} />);
 
     await user.click(screen.getByLabelText('Search releases'));
@@ -136,7 +136,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should render placeholder icon when no cover art is available', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const releasesNoCoverArt = [
       {
         id: 'release-nc',
@@ -173,7 +173,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should not display artist name when artistReleases is empty', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const releasesNoArtist = [
       {
         id: 'release-na',
@@ -196,7 +196,7 @@ describe('ReleaseSearchCombobox', () => {
   });
 
   it('should display the artist displayName when present', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ReleaseSearchCombobox releases={mockReleases} />);
 
     await user.click(screen.getByLabelText('Search releases'));

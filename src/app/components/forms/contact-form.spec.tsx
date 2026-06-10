@@ -93,7 +93,7 @@ function renderContactForm(overrides?: Partial<React.ComponentProps<typeof Conta
     );
   }
 
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(<TestHarness />);
   return { ...result, user };
 }

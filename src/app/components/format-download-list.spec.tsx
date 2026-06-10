@@ -99,7 +99,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -130,7 +130,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -154,7 +154,7 @@ describe('FormatDownloadList', () => {
         return Promise.reject(new Error('Network error'));
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -192,7 +192,7 @@ describe('FormatDownloadList', () => {
       const openSpy = vi.fn();
       window.open = openSpy;
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -227,7 +227,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -454,7 +454,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -497,7 +497,7 @@ describe('FormatDownloadList', () => {
         return downloadPromise;
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -545,7 +545,7 @@ describe('FormatDownloadList', () => {
         return downloadPromise;
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -599,7 +599,7 @@ describe('FormatDownloadList', () => {
       const openSpy = vi.fn();
       window.open = openSpy;
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -636,7 +636,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });
@@ -677,7 +677,7 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
         wrapper: createQueryWrapper(),
       });

@@ -117,7 +117,7 @@ describe('PlaylistPlayer', () => {
   });
 
   it('changes track when playlist item is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<PlaylistPlayer tracks={mockTracks} />);
 
@@ -131,7 +131,7 @@ describe('PlaylistPlayer', () => {
   });
 
   it('updates highlighted track after clicking', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(<PlaylistPlayer tracks={mockTracks} />);
 

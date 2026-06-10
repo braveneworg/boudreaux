@@ -516,7 +516,7 @@ describe('FeaturedArtistDataView', () => {
     });
 
     it('should call the publish action and show success toast on click', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({ success: true });
       vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
         isPending: false,
@@ -538,7 +538,7 @@ describe('FeaturedArtistDataView', () => {
     });
 
     it('should show error toast when publish action fails', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
         success: false,
         error: 'Failed to publish',
@@ -562,7 +562,7 @@ describe('FeaturedArtistDataView', () => {
     });
 
     it('should show fallback error toast when publish action fails without an error message', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
         success: false,
       });

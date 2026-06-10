@@ -204,7 +204,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should open the dialog when the trigger is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -219,7 +219,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should render the free download radio option', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -233,7 +233,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should render the premium download radio option with price', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -247,7 +247,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should show custom amount input when premium is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -270,7 +270,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should not show custom amount input when free is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -288,7 +288,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should show validation error when submitting without selecting an option', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -308,7 +308,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should use default premium price of $8', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog artistName="Some Artist" releaseId="release-123">
@@ -325,7 +325,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should show custom premium price when provided', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog artistName="Some Artist" releaseId="release-123" premiumPrice={12}>
@@ -342,7 +342,7 @@ describe('DownloadDialog', () => {
   });
 
   it('should strip non-numeric characters from custom amount input', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -377,7 +377,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
   });
 
   it('should advance to the free-format-select step when the free option is submitted', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -403,7 +403,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
   });
 
   it('should reset the form when the dialog is closed and reopened', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -443,7 +443,7 @@ describe('DownloadTriggerButton', () => {
   });
 
   it('should call the onClick prop when clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const handleClick = vi.fn();
 
     render(<DownloadTriggerButton onClick={handleClick} />);
@@ -454,7 +454,7 @@ describe('DownloadTriggerButton', () => {
   });
 
   it('should stop propagation so parent click handlers are not called', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const parentHandler = vi.fn();
 
     render(
@@ -500,7 +500,7 @@ describe('DownloadTriggerButton', () => {
 describe('DownloadDialog — custom amount input behavior', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
   it('should show the placeholder with the premium price', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -517,7 +517,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
   });
 
   it('should limit to two decimal places while typing', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -540,7 +540,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
   });
 
   it('should strip multiple decimal points', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -563,7 +563,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
   });
 
   it('should format the value on blur', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -587,7 +587,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
   });
 
   it('should show "Pay" label and suggested price text', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -604,7 +604,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
   });
 
   it('should show suggested price (not $NaN) in button when only a lone dot is typed', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -633,7 +633,7 @@ describe('DownloadDialog — submit button label', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   it('should show "Download" when no option is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -647,7 +647,7 @@ describe('DownloadDialog — submit button label', () => {
   });
 
   it('should show "Download" when free option is selected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -662,7 +662,7 @@ describe('DownloadDialog — submit button label', () => {
   });
 
   it('should show "Buy & Download for $8.00" when premium is selected without a custom amount', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -681,7 +681,7 @@ describe('DownloadDialog — submit button label', () => {
   });
 
   it('should show "Buy & Download for $5.00" when premium is selected with a custom amount', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -716,7 +716,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
   });
 
   it('should show sign-in link on download step when hasPurchase=true and not signed in', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -747,7 +747,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -778,7 +778,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps} hasPurchase downloadCount={5} resetInHours={3}>
@@ -804,7 +804,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps} hasPurchase downloadCount={7}>
@@ -827,7 +827,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -865,7 +865,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps} hasPurchase downloadCount={2} availableFormats={[]}>
@@ -901,7 +901,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -921,7 +921,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
   });
 
   it('should set purchaseMode and navigate to email-step when unauthenticated user submits premium', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -941,7 +941,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
   });
 
   it('should show a form error when cents < 50 (amount less than $0.50)', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -976,7 +976,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1003,7 +1003,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
   });
 
   it('should show a validation error and not advance when a non-numeric amount (lone dot) is submitted', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1054,7 +1054,7 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   };
 
   it('should go back to download step when onCancel is called from email step', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1077,7 +1077,7 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
       resetInHours: null,
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1102,7 +1102,7 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
       resetInHours: null,
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1139,7 +1139,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1165,7 +1165,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1197,7 +1197,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1230,7 +1230,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1263,7 +1263,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1301,7 +1301,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1342,7 +1342,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1411,7 +1411,7 @@ describe('DownloadDialog — returning-download step', () => {
   };
 
   it('should show sign-in link when guestAtCap is false', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1428,7 +1428,7 @@ describe('DownloadDialog — returning-download step', () => {
   });
 
   it('should show sign-in link when guestAtCap is false even with formats available', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1451,7 +1451,7 @@ describe('DownloadDialog — returning-download step', () => {
   });
 
   it('should show disabled "Download limit reached" button when guestAtCap is true', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1468,7 +1468,7 @@ describe('DownloadDialog — returning-download step', () => {
   });
 
   it('should show singular hour text when guest cap resetInHours is 1', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1483,7 +1483,7 @@ describe('DownloadDialog — returning-download step', () => {
   });
 
   it('should omit reset-hours text for guest cap when resetInHours is null', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1504,7 +1504,7 @@ describe('DownloadDialog — suggestedPrice prop', () => {
   });
 
   it('should use suggestedPrice over premiumPrice when provided', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1529,7 +1529,7 @@ describe('DownloadDialog — suggestedPrice prop', () => {
   });
 
   it('should fall back to premiumPrice when suggestedPrice is null', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1559,7 +1559,7 @@ describe('DownloadDialog — onBlur with empty input', () => {
   });
 
   it('should not change the input value when blurring with an empty input', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...defaultProps}>
@@ -1596,7 +1596,7 @@ describe('DownloadDialog — dialog auto-dismiss after download', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1632,7 +1632,7 @@ describe('DownloadDialog — dialog auto-dismiss after download', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog artistName="Test Artist" premiumPrice={8} releaseId="release-123">
@@ -1665,7 +1665,7 @@ describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
   });
 
   it('should fall back to default premiumPrice ($8) when both suggestedPrice and premiumPrice are undefined', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1689,7 +1689,7 @@ describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
   });
 
   it('should fall back to $5 when suggestedPrice and premiumPrice are both null', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog
@@ -1738,7 +1738,7 @@ describe('DownloadDialog — hasPurchase on download step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...purchaseProps}>
@@ -1758,7 +1758,7 @@ describe('DownloadDialog — hasPurchase on download step', () => {
   });
 
   it('should show Sign in link when not signed in with hasPurchase', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...purchaseProps}>
@@ -1781,7 +1781,7 @@ describe('DownloadDialog — hasPurchase on download step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...purchaseProps} downloadCount={5}>
@@ -1804,7 +1804,7 @@ describe('DownloadDialog — hasPurchase on download step', () => {
       status: 'authenticated',
     });
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <DownloadDialog {...purchaseProps} downloadCount={5} resetInHours={1}>
@@ -1834,7 +1834,7 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
   });
 
   it('advances to free-format-select step when free radio is submitted', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <DownloadDialog {...defaultProps}>
         <button>Open Download</button>
@@ -1852,7 +1852,7 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
 
   it('passes availableFreeFormats from the free-status query into FreeFormatSelectStep', async () => {
     currentFreeStatusData = { availableFreeFormats: ['MP3_320KBPS'] };
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <DownloadDialog {...defaultProps}>
         <button>Open Download</button>
@@ -1867,7 +1867,7 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
   });
 
   it('back navigation returns to the download step', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <DownloadDialog {...defaultProps}>
         <button>Open Download</button>
@@ -1885,7 +1885,7 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
   });
 
   it('closing the dialog mid-download resets the step state', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <DownloadDialog {...defaultProps}>
         <button>Open Download</button>
@@ -1906,7 +1906,7 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
 
   it('disables the free radio with hint when no free formats are published', async () => {
     currentFreeStatusData = { availableFreeFormats: [] };
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <DownloadDialog {...defaultProps}>
         <button>Open Download</button>

@@ -77,7 +77,7 @@ describe('Label', () => {
   describe('interactions', () => {
     it('should call onClick handler when clicked', async () => {
       const handleClick = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Label onClick={handleClick}>Clickable Label</Label>);
 
@@ -86,7 +86,7 @@ describe('Label', () => {
     });
 
     it('should focus associated input when clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <div>
@@ -102,7 +102,7 @@ describe('Label', () => {
     });
 
     it('should work with nested inputs', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Label>
@@ -194,7 +194,7 @@ describe('Label', () => {
 
   describe('form integration', () => {
     it('should work with checkbox inputs', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Label htmlFor="agree">
@@ -209,7 +209,7 @@ describe('Label', () => {
     });
 
     it('should work with radio inputs', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <div>

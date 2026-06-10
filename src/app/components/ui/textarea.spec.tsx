@@ -84,7 +84,7 @@ describe('Textarea', () => {
 
   describe('events', () => {
     it('should handle onChange events', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const handleChange = vi.fn();
       render(<Textarea data-testid="textarea" onChange={handleChange} />);
 
@@ -95,7 +95,7 @@ describe('Textarea', () => {
     });
 
     it('should handle onFocus events', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const handleFocus = vi.fn();
       render(<Textarea data-testid="textarea" onFocus={handleFocus} />);
 
@@ -106,7 +106,7 @@ describe('Textarea', () => {
     });
 
     it('should handle onBlur events', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const handleBlur = vi.fn();
       render(<Textarea data-testid="textarea" onBlur={handleBlur} />);
 

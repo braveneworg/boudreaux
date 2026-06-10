@@ -47,7 +47,7 @@ export const renderWithUser = (
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ): CustomRenderResult => {
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(ui, options);
   return { ...result, user };
 };
@@ -66,7 +66,7 @@ export const renderWithProviders = (
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ): CustomRenderResult => {
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(ui, { wrapper: AllProviders, ...options });
   return { ...result, user };
 };
@@ -119,7 +119,7 @@ export function renderWithForm<T extends FieldValues = FieldValues>(
   const capturedFormRef: { current: UseFormReturn<T> | null } = { current: null };
   const FormCapture = createFormCapture(capturedFormRef, defaultValues, onSubmit);
 
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(ui, { wrapper: FormCapture, ...renderOptions });
 
   return {

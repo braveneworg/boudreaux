@@ -88,7 +88,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should display format descriptions when accordion items are expanded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Expand MP3 item to reveal description
@@ -113,7 +113,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should expand accordion item on click', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -128,7 +128,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Drag and drop zone', () => {
     it('should render drag and drop zone when accordion is expanded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -141,7 +141,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show accepted formats in drag zone', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -157,7 +157,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -207,7 +207,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show error when dropped folder has no matching files', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -262,7 +262,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('File input interaction', () => {
     it('should show file input when accordion item is expanded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const flacTrigger = screen.getByText('FLAC');
@@ -277,7 +277,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should have webkitdirectory attribute for folder selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // MP3 format
@@ -298,7 +298,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should handle file selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -357,7 +357,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -418,7 +418,7 @@ describe('DigitalFormatsAccordion', () => {
       // Never-resolving fetch keeps component in uploading state
       global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -441,7 +441,7 @@ describe('DigitalFormatsAccordion', () => {
       // Never-resolving fetch keeps component in uploading state
       global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -466,7 +466,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -492,7 +492,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -508,7 +508,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should show error toast on upload failure', async () => {
       global.fetch = mockFetchError('File too large');
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -532,7 +532,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -551,7 +551,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -609,7 +609,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
@@ -644,7 +644,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -663,7 +663,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'DB error',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -684,7 +684,7 @@ describe('DigitalFormatsAccordion', () => {
         success: false,
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -709,7 +709,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show "Upload MP3 320kbps first" message in non-MP3_320 drag zones', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -722,7 +722,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should disable upload button for non-MP3_320 formats in create mode', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -734,7 +734,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should not lock MP3_320KBPS drag zone in create mode', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -747,7 +747,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Drag over visual state', () => {
     it('should show drag highlight on dragover and clear on dragleave', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -772,7 +772,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should handle fetch throwing an exception', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network down'));
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -797,7 +797,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'DB write failed',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -821,7 +821,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -843,7 +843,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should reject single file drop with wrong MIME type', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -868,7 +868,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should reject single file drop when extension matches but MIME type is invalid', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -900,7 +900,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { formatId: 'format123', fileCount: 2 },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -917,7 +917,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show error when folder has no matching files', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -942,7 +942,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Accessibility', () => {
     it('should have proper ARIA labels on file inputs', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -955,7 +955,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should announce errors with role="alert"', async () => {
       global.fetch = mockFetchError('File too large');
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       const mp3Trigger = screen.getByText('MP3 320kbps');
@@ -975,7 +975,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show error when wrong file type is uploaded via file input', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -996,7 +996,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should not start upload when file extension does not match format', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('WAV'));
@@ -1021,7 +1021,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -1039,7 +1039,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should support keyboard navigation', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Tab to first accordion trigger
@@ -1059,7 +1059,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1093,7 +1093,7 @@ describe('DigitalFormatsAccordion', () => {
       });
 
       const onMetadataExtracted = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <DigitalFormatsAccordion
@@ -1135,7 +1135,7 @@ describe('DigitalFormatsAccordion', () => {
 
       const onMetadataExtracted = vi.fn();
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
@@ -1164,7 +1164,7 @@ describe('DigitalFormatsAccordion', () => {
 
       const onMetadataExtracted = vi.fn();
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
@@ -1187,7 +1187,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Upload error scenarios', () => {
     it('should reject wrong extension selected via file input before upload', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -1209,7 +1209,7 @@ describe('DigitalFormatsAccordion', () => {
       global.fetch = vi.fn().mockRejectedValue('string error');
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1229,7 +1229,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should show error icon and status text for failed uploads', async () => {
       global.fetch = mockFetchError('Server error');
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -1248,7 +1248,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should show remove button for errored uploads', async () => {
       global.fetch = mockFetchError('Upload error');
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1267,7 +1267,7 @@ describe('DigitalFormatsAccordion', () => {
         json: vi.fn().mockResolvedValue({ success: true, s3Key: undefined }),
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1289,7 +1289,7 @@ describe('DigitalFormatsAccordion', () => {
         json: vi.fn().mockResolvedValue({ success: false }),
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1329,7 +1329,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { formatId: 'format123', fileCount: 2 },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1391,7 +1391,7 @@ describe('DigitalFormatsAccordion', () => {
         });
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1415,7 +1415,7 @@ describe('DigitalFormatsAccordion', () => {
         json: () => Promise.resolve({ success: false, message: 'Server error' }),
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1434,7 +1434,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('File input edge cases', () => {
     it('should not start upload when file input change has no files', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1452,7 +1452,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Drop handler edge cases', () => {
     it('should handle folder read failure gracefully', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -1485,7 +1485,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should ignore drop when no file is present', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('FLAC'));
@@ -1540,7 +1540,7 @@ describe('DigitalFormatsAccordion', () => {
         },
       ];
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion releaseId={mockReleaseId} existingFormats={existingFormats} />
       );
@@ -1563,7 +1563,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Upload a file first
@@ -1595,7 +1595,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { deletedCount: 1 },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Upload a file first
@@ -1637,7 +1637,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'S3 error',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Upload a file first
@@ -1674,7 +1674,7 @@ describe('DigitalFormatsAccordion', () => {
       });
       vi.mocked(deleteFormatFilesAction).mockRejectedValue(new Error('Network error'));
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Upload, then re-upload confirm
@@ -1703,7 +1703,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { id: 'format123' },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Upload a file first
@@ -1744,7 +1744,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'DB confirm error',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1770,7 +1770,7 @@ describe('DigitalFormatsAccordion', () => {
         success: false,
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1801,7 +1801,7 @@ describe('DigitalFormatsAccordion', () => {
         data: { formatId: 'format123', fileCount: 2 },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
@@ -1832,7 +1832,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'Batch create error',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1855,7 +1855,7 @@ describe('DigitalFormatsAccordion', () => {
         success: false,
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1885,7 +1885,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'Confirm fail',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1914,7 +1914,7 @@ describe('DigitalFormatsAccordion', () => {
         success: false,
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1959,7 +1959,7 @@ describe('DigitalFormatsAccordion', () => {
         });
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -1984,7 +1984,7 @@ describe('DigitalFormatsAccordion', () => {
         error: 'Edit batch confirm fail',
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -2022,7 +2022,7 @@ describe('DigitalFormatsAccordion', () => {
         },
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
@@ -2059,7 +2059,7 @@ describe('DigitalFormatsAccordion', () => {
         json: vi.fn().mockResolvedValue({ success: true, s3Key: 'uploads/empty-key' }),
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -2080,7 +2080,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Upload with empty file type', () => {
     it('should use default mime type when file.type is empty', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
@@ -2109,7 +2109,7 @@ describe('DigitalFormatsAccordion', () => {
 
       vi.mocked(confirmDigitalFormatUploadAction).mockReturnValue(new Promise(() => {}));
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       // Expand FLAC accordion and upload a file

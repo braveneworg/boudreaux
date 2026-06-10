@@ -39,7 +39,7 @@ describe('ChatDeleteMessageDialog', () => {
   });
 
   it('invokes onConfirm("message") when the per-message button is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const { onConfirm } = renderDialog();
 
     await user.click(screen.getByRole('button', { name: /delete this message/i }));
@@ -48,7 +48,7 @@ describe('ChatDeleteMessageDialog', () => {
   });
 
   it('invokes onConfirm("user") when the per-user button is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const { onConfirm } = renderDialog();
 
     await user.click(screen.getByRole('button', { name: /delete all by octo/i }));
@@ -57,7 +57,7 @@ describe('ChatDeleteMessageDialog', () => {
   });
 
   it('closes via onOpenChange(false) when Cancel is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const { onOpenChange, onConfirm } = renderDialog();
 
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));

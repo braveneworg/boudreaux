@@ -138,7 +138,7 @@ describe('Input', () => {
 
   describe('interactions', () => {
     it('should handle text input', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Input />);
 
       const input = screen.getByRole('textbox');
@@ -149,7 +149,7 @@ describe('Input', () => {
 
     it('should call onChange handler', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Input onChange={handleChange} />);
 
@@ -162,7 +162,7 @@ describe('Input', () => {
 
     it('should call onFocus handler', async () => {
       const handleFocus = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Input onFocus={handleFocus} />);
 
@@ -174,7 +174,7 @@ describe('Input', () => {
 
     it('should call onBlur handler', async () => {
       const handleBlur = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Input onBlur={handleBlur} />);
 
@@ -188,7 +188,7 @@ describe('Input', () => {
     it('should not call handlers when disabled', async () => {
       const handleChange = vi.fn();
       const handleFocus = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Input disabled onChange={handleChange} onFocus={handleFocus} />);
 
@@ -305,7 +305,7 @@ describe('Input', () => {
 
   describe('input types', () => {
     it('should handle email type with validation', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Input type="email" />);
 
       const input = screen.getByRole('textbox');
@@ -316,7 +316,7 @@ describe('Input', () => {
     });
 
     it('should handle password type', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Input type="password" />);
 
       const input = document.querySelector('input[type="password"]') as HTMLInputElement; // password inputs don't have accessible role
@@ -326,7 +326,7 @@ describe('Input', () => {
     });
 
     it('should handle number type', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Input type="number" />);
 
       const input = screen.getByRole('spinbutton');

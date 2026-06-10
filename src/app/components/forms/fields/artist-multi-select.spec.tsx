@@ -353,7 +353,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('popover behavior', () => {
     it('opens popover when trigger is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -375,7 +375,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('fetches artists when popover opens', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -399,7 +399,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('search functionality', () => {
     it('renders search input with placeholder', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -427,7 +427,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('artist display', () => {
     it('displays artist items when loaded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -450,7 +450,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('shows display name when available', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -472,7 +472,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('shows firstName surname when displayName is empty', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -496,7 +496,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('selection behavior', () => {
     it('shows selected count when artists are selected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -522,7 +522,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('shows plural count for multiple selected artists', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -551,7 +551,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('create artist link', () => {
     it('includes returnTo parameter when releaseId is provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -579,7 +579,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('includes releaseId parameter when releaseId is provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -607,7 +607,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('has no query params when releaseId is not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -633,7 +633,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('toggle selection', () => {
     it('deselects artist when clicking on already selected item', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -665,7 +665,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('badge removal', () => {
     it('removes artist when clicking badge remove button', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const mockSetValue = vi.fn();
 
       render(
@@ -726,7 +726,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('popover state management', () => {
     it('clears search value when popover closes', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -763,7 +763,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('fetch error handling', () => {
     it('handles non-ok response from fetch', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockResolvedValueOnce({
         ok: false,
         json: () => Promise.resolve({}),
@@ -790,7 +790,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('handles network error during fetch', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       render(
@@ -814,7 +814,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('handles non-Error exception during fetch', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockRejectedValueOnce('String error');
 
       render(
@@ -841,7 +841,7 @@ describe('ArtistMultiSelect', () => {
   describe('search with parameter', () => {
     it('fetches with search parameter when searching', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -877,7 +877,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('does not skip initial fetch when artists are empty', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -956,7 +956,7 @@ describe('ArtistMultiSelect', () => {
     });
 
     it('preserves badges after selecting an artist via the dropdown', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -1046,7 +1046,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('escape key handler', () => {
     it('calls stopPropagation on escape key inside popover content', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       // Override mock to expose onEscapeKeyDown
       render(
@@ -1077,7 +1077,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('onEscapeKeyDown handler', () => {
     it('calls stopPropagation when escape key is pressed inside popover', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -1109,7 +1109,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('handleSelect without setValue', () => {
     it('toggles selection via field.onChange when setValue is not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -1133,7 +1133,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('handleRemove without setValue', () => {
     it('removes artist via field.onChange when setValue is not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -1211,7 +1211,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('fetch response with empty array', () => {
     it('falls back to empty array when response returns no artists', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ artists: [], count: 0 }),
@@ -1243,7 +1243,7 @@ describe('ArtistMultiSelect', () => {
 
   describe('(no name) fallback', () => {
     it('shows (no name) when displayName, firstName, and surname are all empty', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>

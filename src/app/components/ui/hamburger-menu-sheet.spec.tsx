@@ -81,7 +81,7 @@ describe('HamburgerMenuSheet', () => {
   });
 
   it('calls onOpenChange when menu item is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
@@ -234,7 +234,7 @@ describe('HamburgerMenuSheet', () => {
   });
 
   it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>

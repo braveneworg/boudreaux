@@ -44,7 +44,7 @@ describe('Accordion', () => {
     });
 
     it('supports single type - only one item open', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderAccordion({ type: 'single' });
 
       const triggers = screen.getAllByRole('button');
@@ -61,7 +61,7 @@ describe('Accordion', () => {
     });
 
     it('supports multiple type - multiple items open', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderAccordion({ type: 'multiple' });
 
       const triggers = screen.getAllByRole('button');
@@ -74,7 +74,7 @@ describe('Accordion', () => {
     });
 
     it('supports collapsible prop', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderAccordion({ type: 'single', collapsible: true });
 
       const triggers = screen.getAllByRole('button');
@@ -201,7 +201,7 @@ describe('Accordion', () => {
 
   describe('AccordionContent', () => {
     it('has data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Accordion type="single">
           <AccordionItem value="item-1">
@@ -220,7 +220,7 @@ describe('Accordion', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Accordion type="single">
           <AccordionItem value="item-1">
@@ -238,7 +238,7 @@ describe('Accordion', () => {
     });
 
     it('shows content when expanded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <Accordion type="single">
           <AccordionItem value="item-1">
@@ -258,7 +258,7 @@ describe('Accordion', () => {
 
   describe('keyboard navigation', () => {
     it('toggles with Enter key', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderAccordion({ type: 'single', collapsible: true });
 
       const trigger = screen.getAllByRole('button')[0];
@@ -274,7 +274,7 @@ describe('Accordion', () => {
     });
 
     it('toggles with Space key', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       renderAccordion({ type: 'single', collapsible: true });
 
       const trigger = screen.getAllByRole('button')[0];

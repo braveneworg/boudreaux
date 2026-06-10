@@ -445,7 +445,7 @@ describe('ComboboxField', () => {
 
   it('calls setValue with correct parameters when option is selected', async () => {
     const setValue = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <TestWrapper>
@@ -471,7 +471,7 @@ describe('ComboboxField', () => {
 
   it('calls both setValue and field.onChange when option selected', async () => {
     const setValue = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <TestWrapper>
@@ -768,7 +768,7 @@ describe('ComboboxField', () => {
     });
 
     it('does not call setValue when not provided but option is selected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -810,7 +810,7 @@ describe('ComboboxField', () => {
     });
 
     it('handles selecting an option without setValue provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -833,7 +833,7 @@ describe('ComboboxField', () => {
     });
 
     it('calls field.onChange even when setValue is not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>

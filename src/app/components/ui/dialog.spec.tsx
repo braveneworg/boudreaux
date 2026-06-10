@@ -36,7 +36,7 @@ describe('Dialog Components', () => {
 
   describe('DialogTrigger', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Dialog>
@@ -100,7 +100,7 @@ describe('Dialog Components', () => {
     });
 
     it('closes dialog when clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const onOpenChange = vi.fn();
 
       render(
@@ -192,7 +192,7 @@ describe('Dialog Components', () => {
     });
 
     it('close button closes dialog', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const onOpenChange = vi.fn();
 
       render(
@@ -356,7 +356,7 @@ describe('Dialog Components', () => {
 
   describe('integration', () => {
     it('renders a complete dialog structure', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Dialog>

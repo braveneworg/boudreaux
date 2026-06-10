@@ -152,7 +152,7 @@ describe('Checkbox', () => {
 
   describe('interactions', () => {
     it('should toggle when clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<Checkbox />);
 
       const checkbox = screen.getByRole('checkbox');
@@ -168,7 +168,7 @@ describe('Checkbox', () => {
 
     it('should call onCheckedChange handler', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Checkbox onCheckedChange={handleChange} />);
 
@@ -181,7 +181,7 @@ describe('Checkbox', () => {
 
     it('should call onCheckedChange with false when unchecking', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Checkbox defaultChecked onCheckedChange={handleChange} />);
 
@@ -193,7 +193,7 @@ describe('Checkbox', () => {
 
     it('should work as controlled component', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       const ControlledCheckbox = () => {
         const [checked, setChecked] = React.useState(false);
@@ -221,7 +221,7 @@ describe('Checkbox', () => {
 
     it('should not toggle when disabled', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Checkbox disabled onCheckedChange={handleChange} />);
 
@@ -234,7 +234,7 @@ describe('Checkbox', () => {
 
     it('should handle keyboard interactions', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Checkbox onCheckedChange={handleChange} />);
 
@@ -323,7 +323,7 @@ describe('Checkbox', () => {
     });
 
     it('should work with form labels', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <div>
@@ -387,7 +387,7 @@ describe('Checkbox', () => {
   describe('edge cases', () => {
     it('should handle rapid clicks', async () => {
       const handleChange = vi.fn();
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(<Checkbox onCheckedChange={handleChange} />);
 

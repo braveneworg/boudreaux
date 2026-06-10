@@ -33,7 +33,7 @@ describe('ChatReportAbusePopover', () => {
   });
 
   it('opens the form state when the trigger is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
@@ -43,7 +43,7 @@ describe('ChatReportAbusePopover', () => {
   });
 
   it('disables submit until a non-empty username is typed', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
@@ -56,7 +56,7 @@ describe('ChatReportAbusePopover', () => {
 
   it('shows the confirmation state on a successful submit', async () => {
     submitMock.mockResolvedValue({ success: true });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
@@ -76,7 +76,7 @@ describe('ChatReportAbusePopover', () => {
       error: 'rate_limited',
       retryAfterSeconds: 30,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
@@ -89,7 +89,7 @@ describe('ChatReportAbusePopover', () => {
 
   it("toasts a self-report message when the server rejects the user's own username", async () => {
     submitMock.mockResolvedValue({ success: false, error: 'self_report' });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
@@ -101,7 +101,7 @@ describe('ChatReportAbusePopover', () => {
   });
 
   it('closes via the X button', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);
 
     await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));

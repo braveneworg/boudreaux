@@ -68,7 +68,7 @@ function buildPurchase(overrides: Record<string, unknown> = {}) {
 }
 
 describe('CollectionList', () => {
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
   beforeEach(() => {
     vi.mocked(getReleaseCoverArt).mockReturnValue({
@@ -326,8 +326,10 @@ describe('CollectionDownloadDialog', () => {
     });
   }
 
+  // Real timers by default so waitFor/findBy settle via MutationObserver
+  // instead of shouldAdvanceTime ticks; the one test that advances the
+  // reset timer opts into fake timers locally (afterEach restores).
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
@@ -341,7 +343,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('opens download dialog when download button is clicked', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
     });
@@ -352,7 +354,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows all format toggle buttons', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
     });
@@ -364,7 +366,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows download limit message when at limit', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [
       {
@@ -386,7 +388,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('does not show reset hours when at limit and lastDownloadedAt is unavailable', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [{ downloadCount: 5, lastDownloadedAt: null }];
 
@@ -401,7 +403,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows singular reset hour when reset is exactly one hour away', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [
       {
@@ -421,7 +423,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows no formats message when no digital formats', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [];
 
@@ -435,7 +437,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('calls fetch with respond=json on submit', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(makeSSEResponse())
@@ -459,7 +461,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows Preparing while fetch is in flight', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -473,7 +475,8 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows Downloads started and re-enables the download button after timeout', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(makeSSEResponse())
@@ -497,7 +500,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('triggers a single download for the combined ZIP', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -518,7 +521,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('does not POST to confirm endpoint (server handles count)', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -538,7 +541,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows singular "format" for single selection', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
@@ -552,7 +555,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows download count usage', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
     });
@@ -563,7 +566,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows raw formatType when no label mapping exists', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [
       { formatType: 'CUSTOM_XYZ', files: [{ fileName: 'custom.zip' }] },
@@ -579,7 +582,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('disables download button when all formats are deselected', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
@@ -595,7 +598,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('resets the download state when dialog reopens', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(makeSSEResponse())
@@ -618,7 +621,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows error message when download fetch fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -632,7 +635,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows error message when download fetch throws', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -646,7 +649,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('treats SSE read errors after ready as success', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(makeThrowAfterReadyResponse()));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -661,7 +664,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('keeps the download dialog open when escape is pressed during an active download', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -679,7 +682,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('preserves per-format error status when ready is emitted later', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const events: Array<{ event: string; data: Record<string, unknown> }> = [
       { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
       { event: 'error', data: { formatType: 'FLAC' } },
@@ -709,7 +712,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('keeps errored format status when global uploading progress arrives', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const events: Array<{ event: string; data: Record<string, unknown> }> = [
       { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
       { event: 'error', data: { formatType: 'FLAC' } },
@@ -734,7 +737,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('uses raw formatType as progress label when label mapping is missing', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [
       { formatType: 'CUSTOM_XYZ', files: [{ fileName: 'custom.zip' }] },

@@ -52,7 +52,7 @@ describe('Sheet Components', () => {
 
   describe('SheetClose', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -71,7 +71,7 @@ describe('Sheet Components', () => {
     });
 
     it('closes sheet when clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -97,7 +97,7 @@ describe('Sheet Components', () => {
 
   describe('SheetContent', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -116,7 +116,7 @@ describe('Sheet Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -135,7 +135,7 @@ describe('Sheet Components', () => {
     });
 
     it('defaults to right side', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -154,7 +154,7 @@ describe('Sheet Components', () => {
     });
 
     it('renders on left side', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -173,7 +173,7 @@ describe('Sheet Components', () => {
     });
 
     it('renders on top', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -192,7 +192,7 @@ describe('Sheet Components', () => {
     });
 
     it('renders on bottom', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -213,7 +213,7 @@ describe('Sheet Components', () => {
 
   describe('SheetHeader', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -232,7 +232,7 @@ describe('Sheet Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -255,7 +255,7 @@ describe('Sheet Components', () => {
 
   describe('SheetFooter', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -274,7 +274,7 @@ describe('Sheet Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -297,7 +297,7 @@ describe('Sheet Components', () => {
 
   describe('SheetTitle', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -316,7 +316,7 @@ describe('Sheet Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -339,7 +339,7 @@ describe('Sheet Components', () => {
 
   describe('SheetDescription', () => {
     it('renders with data-slot attribute', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -359,7 +359,7 @@ describe('Sheet Components', () => {
     });
 
     it('applies custom className', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>
@@ -383,7 +383,7 @@ describe('Sheet Components', () => {
 
   describe('integration', () => {
     it('renders a complete sheet', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <Sheet>

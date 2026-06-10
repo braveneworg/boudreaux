@@ -50,7 +50,7 @@ describe('ChatMessageList', () => {
 
   it('invokes onLoadMore when the Load more button is clicked', async () => {
     const onLoadMore = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     render(
       <ChatMessageList

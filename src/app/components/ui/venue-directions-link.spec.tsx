@@ -35,7 +35,7 @@ describe('VenueDirectionsLink', () => {
   });
 
   it('should open Google Maps on click for desktop browsers', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
@@ -56,7 +56,7 @@ describe('VenueDirectionsLink', () => {
   });
 
   it('should open Apple Maps on iOS devices', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
@@ -77,7 +77,7 @@ describe('VenueDirectionsLink', () => {
   });
 
   it('should open Google Maps on Android devices', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)',

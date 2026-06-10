@@ -103,7 +103,7 @@ describe('EmailStep', () => {
   });
 
   it('should enable Continue to Checkout after Turnstile verification', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -113,7 +113,7 @@ describe('EmailStep', () => {
   });
 
   it('should call onCancel when Back button is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -123,7 +123,7 @@ describe('EmailStep', () => {
   });
 
   it('should show validation error when submitting without email', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -138,7 +138,7 @@ describe('EmailStep', () => {
   });
 
   it('should show validation error when terms are not accepted', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -152,7 +152,7 @@ describe('EmailStep', () => {
   });
 
   it('should call onConfirm with the entered email after successful Turnstile verification', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const onConfirm = vi.fn();
 
     renderInDialog(<EmailStep onCancel={defaultProps.onCancel} onConfirm={onConfirm} />);
@@ -167,7 +167,7 @@ describe('EmailStep', () => {
   });
 
   it('should show error and not call onConfirm when Turnstile verification fails', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const onConfirm = vi.fn();
     mockVerifyTurnstile.mockResolvedValue({
       success: false,
@@ -187,7 +187,7 @@ describe('EmailStep', () => {
   });
 
   it('should show default error message when Turnstile verification fails without error string', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     mockVerifyTurnstile.mockResolvedValue({ success: false });
 
     renderInDialog(<EmailStep {...defaultProps} />);
