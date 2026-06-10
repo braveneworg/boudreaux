@@ -61,6 +61,12 @@ vi.mock('./banner-carousel', () => ({
   ),
 }));
 
+vi.mock('./banner-strip', () => ({
+  BannerStrip: ({ banners }: { banners: Array<{ slotNumber: number }> }) => (
+    <div data-testid="banner-strip" data-count={banners.length} />
+  ),
+}));
+
 vi.mock('./artist-search-input', () => ({
   ArtistSearchInput: () => <div data-testid="artist-search" />,
 }));
@@ -156,5 +162,23 @@ describe('HomeContent', () => {
     render(<HomeContent />);
 
     expect(screen.getByTestId('featured-count')).toHaveTextContent('0');
+  });
+
+  it('renders both banner treatments so the visible one is correct from first paint', () => {
+    useBannersQueryMock.mockReturnValue({
+      data: {
+        rotationInterval: 5,
+        banners: [{ slotNumber: 1, imageFilename: 'one.webp', notification: null }],
+      },
+    });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // Both render unconditionally; each component self-gates by breakpoint
+    // (asserted in banner-carousel.spec / banner-strip.spec), so CSS picks the
+    // visible one with no JS swap.
+    expect(screen.getByTestId('banner-carousel')).toBeInTheDocument();
+    expect(screen.getByTestId('banner-strip')).toBeInTheDocument();
   });
 });

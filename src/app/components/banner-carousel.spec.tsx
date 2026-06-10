@@ -860,16 +860,19 @@ describe('BannerCarousel', () => {
     });
   });
 
-  /* ---- custom className ---- */
-
-  describe('className prop', () => {
-    it('applies custom className to the outer section', () => {
-      const { container } = render(
-        <BannerCarousel banners={THREE_BANNERS} className="my-custom-class" />
-      );
+  describe('responsive gating', () => {
+    it('is gated to mobile — visible below md, hidden at md and up', () => {
+      const { container } = render(<BannerCarousel banners={THREE_BANNERS} />);
 
       const section = container.querySelector('section');
-      expect(section).toHaveClass('my-custom-class');
+      expect(section).toHaveClass('md:hidden');
+    });
+
+    it('keeps the empty-state placeholder gated to mobile too', () => {
+      const { container } = render(<BannerCarousel banners={[]} />);
+
+      const section = container.querySelector('section');
+      expect(section).toHaveClass('md:hidden');
     });
   });
 });

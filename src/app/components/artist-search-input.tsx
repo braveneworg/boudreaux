@@ -60,8 +60,8 @@ export const ArtistSearchInput = () => {
   return (
     <Popover open={open && showDropdown} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
-        <div className="relative mt-2.5 w-full" role="group">
-          <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-zinc-950" />
+        <div className="relative mt-2.5" role="group">
+          <Search className="pointer-events-none absolute top-1/2 left-6 size-4 -translate-y-1/2 text-zinc-900" />
           <input
             id="artist-search-input"
             name="artist-search"
@@ -79,7 +79,7 @@ export const ArtistSearchInput = () => {
                 setOpen(true);
               }
             }}
-            className="selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring h-10 w-full min-w-0 rounded-md border border-zinc-950 bg-transparent px-3 py-1 pl-8 shadow-xs transition-[color,box-shadow] focus-visible:ring-[3px]"
+            className="selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring mx-4 h-10 w-[calc(100%-2rem)] rounded-md border border-zinc-500 bg-transparent px-3 py-1 pl-8 shadow-xs transition-[color,box-shadow] focus-visible:ring-[3px]"
             aria-label="Search artists and releases"
             aria-expanded={open && showDropdown}
             aria-controls="artist-search-listbox"

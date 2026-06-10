@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.109.0] - 2026-06-09
+
+### Added
+
+- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n
+
 ## [4.108.0] - 2026-06-09
 
 ### Added

@@ -4,26 +4,16 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-
-interface BannersResponse {
-  banners: Array<{
-    id: string;
-    message: string;
-    linkUrl: string | null;
-    linkText: string | null;
-    type: string;
-  }>;
-  rotationInterval: number;
-}
+import type { BannersApiResponse } from '@/lib/services/banner-notification-service';
 
 const disableCache = process.env.NEXT_PUBLIC_DISABLE_BANNERS_CACHE === 'true';
 
-const fetchBanners = async (): Promise<BannersResponse> => {
+const fetchBanners = async (): Promise<BannersApiResponse> => {
   const response = await fetch('/api/notification-banners');
   if (!response.ok) {
     throw Error('Failed to fetch banners');
   }
-  return response.json() as Promise<BannersResponse>;
+  return response.json() as Promise<BannersApiResponse>;
 };
 
 export const useBannersQuery = () => {
