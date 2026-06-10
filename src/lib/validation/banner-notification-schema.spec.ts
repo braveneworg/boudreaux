@@ -260,6 +260,30 @@ describe('addLinkAttributes', () => {
     );
   });
 
+  it('strips javascript: hrefs as a last line of defense', () => {
+    const result = addLinkAttributes('<a href="javascript:alert(1)">x</a>');
+    expect(result).toBe('<a target="_blank" rel="noopener noreferrer">x</a>');
+  });
+
+  it('strips data: hrefs while keeping the link text', () => {
+    const result = addLinkAttributes('<a href="data:text/html;base64,PHNjcmlwdD4=">x</a>');
+    expect(result).toBe('<a target="_blank" rel="noopener noreferrer">x</a>');
+  });
+
+  it('strips whitespace-obfuscated javascript: hrefs', () => {
+    const result = addLinkAttributes('<a href="java\nscript:alert(1)">x</a>');
+    expect(result).toBe('<a target="_blank" rel="noopener noreferrer">x</a>');
+  });
+
+  it('keeps relative and fragment hrefs intact', () => {
+    expect(addLinkAttributes('<a href="/releases">x</a>')).toBe(
+      '<a href="/releases" target="_blank" rel="noopener noreferrer">x</a>'
+    );
+    expect(addLinkAttributes('<a href="#section">x</a>')).toBe(
+      '<a href="#section" target="_blank" rel="noopener noreferrer">x</a>'
+    );
+  });
+
   it('should replace existing target and rel attributes', () => {
     const result = addLinkAttributes(
       '<a href="https://example.com" target="_self" rel="nofollow">link</a>'

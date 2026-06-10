@@ -17,6 +17,13 @@ vi.mock('@/lib/decorators/with-auth', () => ({
     handler(request, context, mockSession),
 }));
 
+const limiterCheckMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  publicLimiter: { check: limiterCheckMock },
+  PUBLIC_LIMIT: 30,
+}));
+
 const mockPrismaUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
@@ -50,6 +57,20 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 }
 
 describe('POST /api/user/username', () => {
+  beforeEach(() => {
+    limiterCheckMock.mockResolvedValue(undefined);
+  });
+
+  it('returns 429 when the rate limit is exceeded', async () => {
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+    const request = createRequest({ username: 'newuser', confirmUsername: 'newuser' });
+    const response = await POST(request, { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(429);
+    expect(mockPrismaUpdate).not.toHaveBeenCalled();
+  });
+
   it('should update username successfully and return 200 with available:true', async () => {
     mockPrismaUpdate.mockResolvedValue({ id: 'user-123', username: 'newuser' });
 

@@ -68,6 +68,13 @@ vi.mock('undici', () => ({
 
 const mockFetch = vi.fn();
 
+const limiterCheckMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  pollingLimiter: { check: limiterCheckMock },
+  POLLING_LIMIT: 20,
+}));
+
 describe('GET /api/proxy-image', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch);
@@ -76,6 +83,7 @@ describe('GET /api/proxy-image', () => {
     capturedLookupRef.current = undefined;
     mockAgentClose.mockReset();
     mockAgentClose.mockResolvedValue(undefined);
+    limiterCheckMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -89,6 +97,18 @@ describe('GET /api/proxy-image', () => {
     const searchParams = url ? `?url=${encodeURIComponent(url)}` : '';
     return new NextRequest(`http://localhost:3000/api/proxy-image${searchParams}`);
   }
+
+  it('returns 429 when the rate limit is exceeded', async () => {
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+
+    const response = await GET(
+      createRequest('https://cdn.fakefourrecords.com/a.jpg'),
+      dummyContext
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 
   it('should return 400 when URL parameter is missing', async () => {
     const request = createRequest();

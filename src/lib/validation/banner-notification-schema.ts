@@ -110,10 +110,18 @@ export const hexColorSchema = z
 
 /**
  * Add target="_blank" and rel="noopener noreferrer" to all <a> tags at render time.
+ *
+ * Defense-in-depth: this is the last function to touch banner HTML before
+ * `dangerouslySetInnerHTML`, so it also strips any `href` whose protocol
+ * fails `isSafeHref` — even though the server-side parser sanitizer and
+ * `sanitizeNotificationHtml` should have already rejected it upstream.
  */
 export const addLinkAttributes = (html: string): string => {
   return html.replace(/<a(\s[^>]*)?\/?>/g, (match) => {
     const cleaned = match
+      .replace(/\s*href\s*=\s*["']([^"']*)["']/gi, (hrefAttr, href: string) =>
+        isSafeHref(href) ? hrefAttr : ''
+      )
       .replace(/\s*target\s*=\s*["'][^"']*["']/gi, '')
       .replace(/\s*rel\s*=\s*["'][^"']*["']/gi, '')
       .replace(/\/?>$/, '');

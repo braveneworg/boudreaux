@@ -17,6 +17,7 @@ import {
 } from '@/lib/constants/image-variants';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { generateImageVariantsSchema } from '@/lib/validation/admin-asset-schemas';
 
 /** Extensions that cannot be raster-resized. */
 const SKIP_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
@@ -102,8 +103,17 @@ export const generateImageVariantsAction = async (
 ): Promise<GenerateImageVariantsResult> => {
   await requireRole('admin');
 
+  const parsed = generateImageVariantsSchema.safeParse({ cdnUrl });
+  if (!parsed.success) {
+    return {
+      success: false,
+      variantsGenerated: 0,
+      error: parsed.error.issues[0].message,
+    };
+  }
+
   try {
-    const s3Key = extractS3Key(cdnUrl);
+    const s3Key = extractS3Key(parsed.data.cdnUrl);
     const keyValidation = validateSourceKey(s3Key);
 
     if (!keyValidation.isValid) {

@@ -8,7 +8,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 import { Agent } from 'undici';
 
+import { POLLING_LIMIT, pollingLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAuth } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 
 import type { LookupAddress, LookupOptions } from 'node:dns';
 
@@ -62,170 +64,178 @@ function isDisallowedAddress(address: string): boolean {
 /**
  * Proxy endpoint to fetch remote images and return them as blobs.
  * Used by the image cropper to sidestep CORS on CDN-hosted originals.
+ * Rate-limited per IP: each request can pull up to 20MB from the upstream
+ * CDN/S3, so an unthrottled authed client is a bandwidth-amplification
+ * vector. The cropper loads one original per edit — 20/min is ample.
  */
-export const GET = withAuth(async (request: NextRequest) => {
-  const url = request.nextUrl.searchParams.get('url');
+export const GET = withRateLimit(
+  pollingLimiter,
+  POLLING_LIMIT
+)(
+  withAuth(async (request: NextRequest) => {
+    const url = request.nextUrl.searchParams.get('url');
 
-  if (!url) {
-    return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
-  }
-
-  // Allowlist of hostnames. Exact match, or "<sub>.<allowed>" suffix match.
-  // S3 is included because image cropper uses S3-hosted originals, but the
-  // SSRF-via-redirect + DNS IP checks below still apply.
-  const allowedDomains = new Set<string>([
-    'cdn.fakefourrecords.com',
-    's3.amazonaws.com',
-    's3.us-east-1.amazonaws.com',
-    's3.us-west-2.amazonaws.com',
-    'fakefourrecords.com',
-  ]);
-  const cdnDomain = process.env.CDN_DOMAIN;
-  if (cdnDomain) {
-    try {
-      allowedDomains.add(new URL(cdnDomain).hostname);
-    } catch {
-      // Ignore malformed CDN_DOMAIN
+    if (!url) {
+      return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
     }
-  }
 
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
-  }
+    // Allowlist of hostnames. Exact match, or "<sub>.<allowed>" suffix match.
+    // S3 is included because image cropper uses S3-hosted originals, but the
+    // SSRF-via-redirect + DNS IP checks below still apply.
+    const allowedDomains = new Set<string>([
+      'cdn.fakefourrecords.com',
+      's3.amazonaws.com',
+      's3.us-east-1.amazonaws.com',
+      's3.us-west-2.amazonaws.com',
+      'fakefourrecords.com',
+    ]);
+    const cdnDomain = process.env.CDN_DOMAIN;
+    if (cdnDomain) {
+      try {
+        allowedDomains.add(new URL(cdnDomain).hostname);
+      } catch {
+        // Ignore malformed CDN_DOMAIN
+      }
+    }
 
-  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    return NextResponse.json({ error: 'Unsupported protocol' }, { status: 400 });
-  }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    }
 
-  const hostname = parsedUrl.hostname;
-  const isAllowedHost = [...allowedDomains].some(
-    (domain) => hostname === domain || hostname.endsWith('.' + domain)
-  );
-  if (!isAllowedHost) {
-    console.warn('[proxy-image] Blocked request to non-allowed domain:', hostname);
-    return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
-  }
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      return NextResponse.json({ error: 'Unsupported protocol' }, { status: 400 });
+    }
 
-  // Resolve DNS ourselves and reject private/metadata addresses before fetch.
-  // Reject literal IP hostnames too — allowlist is strictly DNS-name based.
-  if (isIP(parsedUrl.hostname) !== 0) {
-    return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
-  }
-  let vettedAddress: string;
-  let vettedFamily: number;
-  try {
-    const { address, family } = await lookup(parsedUrl.hostname);
-    if (isDisallowedAddress(address)) {
-      console.warn('[proxy-image] Blocked request resolving to disallowed IP:', address);
+    const hostname = parsedUrl.hostname;
+    const isAllowedHost = [...allowedDomains].some(
+      (domain) => hostname === domain || hostname.endsWith('.' + domain)
+    );
+    if (!isAllowedHost) {
+      console.warn('[proxy-image] Blocked request to non-allowed domain:', hostname);
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
-    vettedAddress = address;
-    vettedFamily = family;
-  } catch (error) {
-    console.error('[proxy-image] DNS lookup failed:', error);
-    return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
-  }
 
-  // Pin the TCP connection to the exact address we just validated. Node's
-  // global fetch re-resolves DNS independently of the check above, leaving a
-  // DNS-rebinding window where an allowlisted hostname could flip to an
-  // internal IP between validation and socket connect. A dispatcher with a
-  // fixed lookup closes that window; TLS SNI still uses the original hostname,
-  // so certificate validation for the allowlisted CDN/S3 domain is
-  // unaffected. (M2)
-  const pinnedLookup = (
-    _hostname: string,
-    options: LookupOptions,
-    callback: (
-      err: NodeJS.ErrnoException | null,
-      address: string | LookupAddress[],
-      family?: number
-    ) => void
-  ): void => {
-    if (options.all) {
-      callback(null, [{ address: vettedAddress, family: vettedFamily }]);
-    } else {
-      callback(null, vettedAddress, vettedFamily);
+    // Resolve DNS ourselves and reject private/metadata addresses before fetch.
+    // Reject literal IP hostnames too — allowlist is strictly DNS-name based.
+    if (isIP(parsedUrl.hostname) !== 0) {
+      return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
-  };
-  const pinnedDispatcher = new Agent({ connect: { lookup: pinnedLookup } });
+    let vettedAddress: string;
+    let vettedFamily: number;
+    try {
+      const { address, family } = await lookup(parsedUrl.hostname);
+      if (isDisallowedAddress(address)) {
+        console.warn('[proxy-image] Blocked request resolving to disallowed IP:', address);
+        return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
+      }
+      vettedAddress = address;
+      vettedFamily = family;
+    } catch (error) {
+      console.error('[proxy-image] DNS lookup failed:', error);
+      return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
+    }
 
-  try {
-    // redirect: 'manual' prevents follow-on requests to attacker-controlled
-    // Location headers (e.g. 302 → 169.254.169.254). Redirects = treated as an error.
-    // `dispatcher` is a Node/undici fetch extension (not in the DOM RequestInit
-    // type); passing it via a variable lets the extra property through without
-    // naming a DOM lib global that `no-undef` would flag.
-    const fetchInit = {
-      headers: { Accept: 'image/*' },
-      redirect: 'manual' as const,
-      signal: AbortSignal.timeout(10_000),
-      dispatcher: pinnedDispatcher,
+    // Pin the TCP connection to the exact address we just validated. Node's
+    // global fetch re-resolves DNS independently of the check above, leaving a
+    // DNS-rebinding window where an allowlisted hostname could flip to an
+    // internal IP between validation and socket connect. A dispatcher with a
+    // fixed lookup closes that window; TLS SNI still uses the original hostname,
+    // so certificate validation for the allowlisted CDN/S3 domain is
+    // unaffected. (M2)
+    const pinnedLookup = (
+      _hostname: string,
+      options: LookupOptions,
+      callback: (
+        err: NodeJS.ErrnoException | null,
+        address: string | LookupAddress[],
+        family?: number
+      ) => void
+    ): void => {
+      if (options.all) {
+        callback(null, [{ address: vettedAddress, family: vettedFamily }]);
+      } else {
+        callback(null, vettedAddress, vettedFamily);
+      }
     };
-    const response = await fetch(url, fetchInit);
+    const pinnedDispatcher = new Agent({ connect: { lookup: pinnedLookup } });
 
-    if (response.status >= 300 && response.status < 400) {
-      return NextResponse.json({ error: 'Upstream redirect rejected' }, { status: 502 });
-    }
+    try {
+      // redirect: 'manual' prevents follow-on requests to attacker-controlled
+      // Location headers (e.g. 302 → 169.254.169.254). Redirects = treated as an error.
+      // `dispatcher` is a Node/undici fetch extension (not in the DOM RequestInit
+      // type); passing it via a variable lets the extra property through without
+      // naming a DOM lib global that `no-undef` would flag.
+      const fetchInit = {
+        headers: { Accept: 'image/*' },
+        redirect: 'manual' as const,
+        signal: AbortSignal.timeout(10_000),
+        dispatcher: pinnedDispatcher,
+      };
+      const response = await fetch(url, fetchInit);
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch image: ${response.statusText}` },
-        { status: response.status }
-      );
-    }
+      if (response.status >= 300 && response.status < 400) {
+        return NextResponse.json({ error: 'Upstream redirect rejected' }, { status: 502 });
+      }
 
-    const contentType = response.headers.get('content-type') ?? 'image/jpeg';
-    if (!contentType.startsWith('image/')) {
-      return NextResponse.json({ error: 'Upstream is not an image' }, { status: 415 });
-    }
+      if (!response.ok) {
+        return NextResponse.json(
+          { error: `Failed to fetch image: ${response.statusText}` },
+          { status: response.status }
+        );
+      }
 
-    const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
-    if (Number.isFinite(contentLength) && contentLength > MAX_PROXY_BODY_BYTES) {
-      return NextResponse.json({ error: 'Image too large' }, { status: 413 });
-    }
+      const contentType = response.headers.get('content-type') ?? 'image/jpeg';
+      if (!contentType.startsWith('image/')) {
+        return NextResponse.json({ error: 'Upstream is not an image' }, { status: 415 });
+      }
 
-    // Stream into a capped buffer so a missing/lying Content-Length can't OOM us.
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return NextResponse.json({ error: 'Empty upstream body' }, { status: 502 });
-    }
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      received += value.byteLength;
-      if (received > MAX_PROXY_BODY_BYTES) {
-        await reader.cancel();
+      const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+      if (Number.isFinite(contentLength) && contentLength > MAX_PROXY_BODY_BYTES) {
         return NextResponse.json({ error: 'Image too large' }, { status: 413 });
       }
-      chunks.push(value);
-    }
-    const buffer = Buffer.concat(chunks, received);
 
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'private, no-store',
-      },
-    });
-  } catch (error) {
-    console.error('[proxy-image] Error proxying image:', error);
-    return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
-  } finally {
-    // Each request builds a fresh pinned dispatcher; close its connection
-    // pool so it does not leak. The body is fully buffered before any return
-    // above, so closing here cannot truncate the response.
-    try {
-      await pinnedDispatcher.close();
-    } catch {
-      // Best-effort cleanup — a close failure must not affect the response.
+      // Stream into a capped buffer so a missing/lying Content-Length can't OOM us.
+      const reader = response.body?.getReader();
+      if (!reader) {
+        return NextResponse.json({ error: 'Empty upstream body' }, { status: 502 });
+      }
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        received += value.byteLength;
+        if (received > MAX_PROXY_BODY_BYTES) {
+          await reader.cancel();
+          return NextResponse.json({ error: 'Image too large' }, { status: 413 });
+        }
+        chunks.push(value);
+      }
+      const buffer = Buffer.concat(chunks, received);
+
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'private, no-store',
+        },
+      });
+    } catch (error) {
+      console.error('[proxy-image] Error proxying image:', error);
+      return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
+    } finally {
+      // Each request builds a fresh pinned dispatcher; close its connection
+      // pool so it does not leak. The body is fully buffered before any return
+      // above, so closing here cannot truncate the response.
+      try {
+        await pinnedDispatcher.close();
+      } catch {
+        // Best-effort cleanup — a close failure must not affect the response.
+      }
     }
-  }
-});
+  })
+);

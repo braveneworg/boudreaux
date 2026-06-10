@@ -102,6 +102,12 @@ const config = {
     inlineCss: process.env.NODE_ENV === 'production',
     optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
+      // 50mb is required: raw digital files (FLAC/WAV) go through the
+      // upload proxy API route (not governed by this limit), BUT the admin
+      // release form can carry multi-MB base64 cover art extracted from
+      // audio metadata (release-form.tsx handleMetadataExtracted) through
+      // its Server Action submit. Do not lower without first routing that
+      // cover art through the presigned-upload path.
       bodySizeLimit: '50mb',
     },
   },
@@ -113,12 +119,12 @@ const config = {
     //   - 'unsafe-inline' on script-src/style-src: Next.js inlines small runtime
     //     scripts and CSS-in-JS. Moving to a nonce-based CSP requires wiring
     //     `headers()` into middleware so the nonce is per-request.
-    //   - 'unsafe-eval' historically required by Stripe.js feature detection
-    //     and Next.js HMR in dev. Keeping it behind an env flag so the value
-    //     can be flipped off in production once verified in a staging soak.
-    //     Default: allow in dev; require STRICT_CSP=true in production to drop.
+    //   - 'unsafe-eval' is required by Next.js HMR in dev only. Production
+    //     drops it by default (modern Stripe.js no longer needs eval).
+    //     Escape hatch: set CSP_ALLOW_UNSAFE_EVAL=true to restore the legacy
+    //     widening without a code change if a third-party script regresses.
     const isDev = process.env.NODE_ENV !== 'production';
-    const allowUnsafeEval = isDev || process.env.STRICT_CSP !== 'true';
+    const allowUnsafeEval = isDev || process.env.CSP_ALLOW_UNSAFE_EVAL === 'true';
 
     const scriptSrc = [
       "'self'",

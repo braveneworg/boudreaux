@@ -5,15 +5,25 @@
 
 import 'server-only';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 import { encode } from '@auth/core/jwt';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
+import { rateLimit } from '@/lib/utils/rate-limit';
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+
+// This action mints a session cookie from a Stripe checkout session ID with
+// no prior authentication — the same posture as signin, so it gets the same
+// 5/min/IP throttle to shut down session-ID guessing and DB-lookup floods.
+const limiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
 
 /**
  * Resolves the session cookie name and attributes to match the configuration
@@ -58,6 +68,17 @@ export async function createPurchaseSessionAction(
   const existingSession = await auth();
   if (existingSession?.user?.id) {
     return { success: true };
+  }
+
+  // Rate limit unauthenticated callers (E2E shards share one IP, so the
+  // harness opts out the same way withRateLimit does).
+  if (process.env.E2E_MODE !== 'true') {
+    const ip = extractClientIpFromHeaders(await headers());
+    try {
+      await limiter.check(5, ip);
+    } catch {
+      return { success: false, error: 'rate_limited' };
+    }
   }
 
   if (!sessionId || !sessionId.startsWith('cs_')) {

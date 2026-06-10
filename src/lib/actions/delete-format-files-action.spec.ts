@@ -44,16 +44,39 @@ describe('deleteFormatFilesAction', () => {
 
   it('rejects when the caller is not an admin', async () => {
     requireRoleMock.mockRejectedValue(new Error('forbidden'));
-    await expect(deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' })).rejects.toThrow(
-      'forbidden'
-    );
+    await expect(
+      deleteFormatFilesAction({ releaseId: '507f1f77bcf86cd799439011', formatType: 'FLAC' })
+    ).rejects.toThrow('forbidden');
+    expect(findByReleaseAndFormatMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed release IDs before touching the repository', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    const result = await deleteFormatFilesAction({
+      releaseId: 'not-an-objectid',
+      formatType: 'FLAC',
+    });
+    expect(result).toEqual({ success: false, error: 'Invalid release ID' });
+    expect(findByReleaseAndFormatMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown format types before touching the repository', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'EXE' as never,
+    });
+    expect(result).toEqual({ success: false, error: 'Invalid format type' });
     expect(findByReleaseAndFormatMock).not.toHaveBeenCalled();
   });
 
   it('returns failure when the format is not found', async () => {
     requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
     findByReleaseAndFormatMock.mockResolvedValue(null);
-    const result = await deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' });
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'FLAC',
+    });
     expect(result).toEqual({
       success: false,
       error: 'Digital format not found for this release',
@@ -68,7 +91,10 @@ describe('deleteFormatFilesAction', () => {
     deleteAllByFormatIdMock.mockResolvedValue(2);
     updateTrackCountsMock.mockResolvedValue(undefined);
 
-    const result = await deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' });
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'FLAC',
+    });
     expect(result).toEqual({ success: true, data: { deletedCount: 2 } });
     expect(deleteS3ObjectMock).toHaveBeenCalledTimes(2);
     expect(deleteAllByFormatIdMock).toHaveBeenCalledWith('fmt1');
@@ -83,7 +109,10 @@ describe('deleteFormatFilesAction', () => {
     deleteAllByFormatIdMock.mockResolvedValue(2);
     updateTrackCountsMock.mockResolvedValue(undefined);
 
-    const result = await deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' });
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'FLAC',
+    });
     expect(result.success).toBe(true);
   });
 
@@ -95,7 +124,7 @@ describe('deleteFormatFilesAction', () => {
     deleteAllByFormatIdMock.mockResolvedValue(1);
     updateTrackCountsMock.mockResolvedValue(undefined);
 
-    await deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' });
+    await deleteFormatFilesAction({ releaseId: '507f1f77bcf86cd799439011', formatType: 'FLAC' });
     expect(deleteS3ObjectMock).toHaveBeenCalledTimes(1);
     expect(deleteS3ObjectMock).toHaveBeenCalledWith('x');
   });
@@ -103,7 +132,10 @@ describe('deleteFormatFilesAction', () => {
   it('returns failure when the repository throws', async () => {
     requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
     findByReleaseAndFormatMock.mockRejectedValue(new Error('boom'));
-    const result = await deleteFormatFilesAction({ releaseId: 'r1', formatType: 'FLAC' });
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'FLAC',
+    });
     expect(result).toEqual({ success: false, error: 'boom' });
   });
 });
