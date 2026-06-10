@@ -57,7 +57,13 @@ export interface SearchNotificationResult {
   createdAt: Date;
 }
 
-const CACHE_TTL_SECONDS = 300; // 5 minutes
+// Cache for 5 minutes; disabled in development and E2E. In E2E, Playwright's
+// webServer readiness probe GETs `/` BEFORE globalSetup seeds the database
+// (plugin setup precedes global setup), and `loading.tsx` streaming lets that
+// pre-seed render race the seed — caching an empty-notifications payload for
+// longer than the whole suite. Same pattern as FeaturedArtistsService.
+const getCacheTtlSeconds = (): number =>
+  process.env.NODE_ENV === 'development' || process.env.E2E_MODE === 'true' ? 0 : 300;
 
 const getCacheKey = (): string => {
   const today = new Date().toISOString().split('T')[0];
@@ -114,7 +120,7 @@ export class BannerNotificationService {
 
           return { banners, rotationInterval };
         },
-        CACHE_TTL_SECONDS
+        getCacheTtlSeconds()
       );
 
       return { success: true, data };
