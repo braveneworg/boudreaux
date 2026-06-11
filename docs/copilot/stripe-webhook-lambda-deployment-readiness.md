@@ -140,7 +140,10 @@ aws iam attach-role-policy --role-name GitHubActionsDeployRole \
 AWS_ACCOUNT_ID='<your-aws-account-id>'
 AWS_REGION='<your-aws-region>'
 
-# CloudWatch alarm management (scoped to RefreshIpAllowlist alarms created by this stack)
+# CloudWatch alarm management. Resource is "*" because CloudFormation
+# auto-generates alarm names with a stack prefix + random suffix
+# (fakefour-stripe-webhook-<LogicalId>-<random>), so a name-scoped ARN
+# never matches.
 aws iam put-role-policy \
   --role-name GitHubActionsDeployRole \
   --policy-name CloudWatchAlarms \
@@ -156,7 +159,35 @@ aws iam put-role-policy \
         \"cloudwatch:UntagResource\",
         \"cloudwatch:ListTagsForResource\"
       ],
-      \"Resource\": \"arn:aws:cloudwatch:${AWS_REGION}:${AWS_ACCOUNT_ID}:alarm:RefreshIpAllowlist*\"
+      \"Resource\": \"*\"
+    }]
+  }"
+
+# SNS topic management (scoped to the alarm-notification topic this stack
+# creates; required by AlarmTopic / StripeWebhookErrorAlarm)
+aws iam put-role-policy \
+  --role-name GitHubActionsDeployRole \
+  --policy-name SnsAlarmTopic \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [{
+      \"Effect\": \"Allow\",
+      \"Action\": [
+        \"sns:CreateTopic\",
+        \"sns:DeleteTopic\",
+        \"sns:GetTopicAttributes\",
+        \"sns:SetTopicAttributes\",
+        \"sns:Subscribe\",
+        \"sns:Unsubscribe\",
+        \"sns:ListSubscriptionsByTopic\",
+        \"sns:TagResource\",
+        \"sns:UntagResource\",
+        \"sns:ListTagsForResource\"
+      ],
+      \"Resource\": [
+        \"arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:fakefour-stripe-webhook-alarms\",
+        \"arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:fakefour-stripe-webhook-alarms:*\"
+      ]
     }]
   }"
 
