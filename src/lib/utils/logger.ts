@@ -5,6 +5,8 @@ import 'server-only';
 
 import winston from 'winston';
 
+import { getRequestId } from './request-context';
+
 /**
  * Structured Winston logger for server-side operations.
  *
@@ -239,6 +241,20 @@ export const getLogLevelState = (): LogLevelState => ({
 });
 
 /**
+ * Merge the active request id (when inside a request scope) into log meta
+ * so every line of a request can be correlated with one LogQL query.
+ */
+const withRequestId = (
+  meta: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined => {
+  const requestId = getRequestId();
+  if (requestId === undefined) {
+    return meta;
+  }
+  return { requestId, ...meta };
+};
+
+/**
  * Logger class providing structured logging with consistent formatting
  */
 class Logger {
@@ -254,28 +270,28 @@ class Logger {
    * Log a debug message (global debug level or LOG_DEBUG_MODULES opt-in)
    */
   debug(message: string, data?: Record<string, unknown>): void {
-    this.winston.debug(message, data ? safeSerialize(data) : undefined);
+    this.winston.debug(message, withRequestId(data ? safeSerialize(data) : undefined));
   }
 
   /**
    * Log an informational message
    */
   info(message: string, data?: Record<string, unknown>): void {
-    this.winston.info(message, data ? safeSerialize(data) : undefined);
+    this.winston.info(message, withRequestId(data ? safeSerialize(data) : undefined));
   }
 
   /**
    * Log a warning message
    */
   warn(message: string, data?: Record<string, unknown>): void {
-    this.winston.warn(message, data ? safeSerialize(data) : undefined);
+    this.winston.warn(message, withRequestId(data ? safeSerialize(data) : undefined));
   }
 
   /**
    * Log an error message; includes the stack trace as structured data
    */
   error(message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
-    const meta: Record<string, unknown> = safeSerialize(data ?? {});
+    const meta: Record<string, unknown> = withRequestId(safeSerialize(data ?? {})) ?? {};
 
     if (error instanceof Error) {
       meta.error = error.message;

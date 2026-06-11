@@ -16,6 +16,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/auth';
 import { extractRequestMetadata, logSecurityEvent } from '@/lib/utils/audit-log';
 import { loggers } from '@/lib/utils/logger';
+import { resolveRequestId, runWithRequestContext } from '@/lib/utils/request-context';
 
 interface Session {
   user: {
@@ -54,43 +55,45 @@ const logUnauthorized = (request: NextRequest, status: 401 | 403, userId?: strin
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
 export function withAuth<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
-  return async (request: NextRequest, context: { params: Promise<unknown> }) => {
-    const session = await auth();
+  return async (request: NextRequest, context: { params: Promise<unknown> }) =>
+    runWithRequestContext(resolveRequestId(request.headers), async () => {
+      const session = await auth();
 
-    // Check authentication and validate session structure
-    if (!session?.user?.id) {
-      logUnauthorized(request, 401);
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+      // Check authentication and validate session structure
+      if (!session?.user?.id) {
+        logUnauthorized(request, 401);
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
 
-    // Call the original handler with session
-    return handler(request, context as { params: Promise<TParams> }, session as Session);
-  };
+      // Call the original handler with session
+      return handler(request, context as { params: Promise<TParams> }, session as Session);
+    });
 }
 
 // Admin role decorator
 // Usage: Wrap API route handlers that require admin role
 // Example: export const GET = withAdmin(async (req, res, session) => { ... });
 export function withAdmin<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
-  return async (request: NextRequest, context: { params: Promise<unknown> }) => {
-    const session = await auth();
-    const role = 'admin';
+  return async (request: NextRequest, context: { params: Promise<unknown> }) =>
+    runWithRequestContext(resolveRequestId(request.headers), async () => {
+      const session = await auth();
+      const role = 'admin';
 
-    // Check authentication first and validate session structure
-    if (!session?.user?.id) {
-      logUnauthorized(request, 401);
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+      // Check authentication first and validate session structure
+      if (!session?.user?.id) {
+        logUnauthorized(request, 401);
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
 
-    // Check role authorization
-    if (session.user?.role !== role) {
-      logUnauthorized(request, 403, session.user.id);
-      return NextResponse.json(
-        { error: 'Insufficient permissions', required: role },
-        { status: 403 }
-      );
-    }
+      // Check role authorization
+      if (session.user?.role !== role) {
+        logUnauthorized(request, 403, session.user.id);
+        return NextResponse.json(
+          { error: 'Insufficient permissions', required: role },
+          { status: 403 }
+        );
+      }
 
-    return handler(request, context as { params: Promise<TParams> }, session as Session);
-  };
+      return handler(request, context as { params: Promise<TParams> }, session as Session);
+    });
 }

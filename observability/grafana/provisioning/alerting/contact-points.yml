@@ -1,0 +1,14 @@
+# Alert notifications go to the ops email via the SES SMTP settings
+# configured on the Grafana container (GF_SMTP_*). The recipient comes from
+# the GRAFANA_ALERT_EMAIL env var (GitHub secret -> .env.deploy -> container).
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: ops-email
+    receivers:
+      - uid: ops-email-receiver
+        type: email
+        settings:
+          addresses: $GRAFANA_ALERT_EMAIL
+          singleEmail: true

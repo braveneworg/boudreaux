@@ -50,6 +50,19 @@ Next.js (winston JSON → stdout)        nginx (access/error → stdout)
   `POST /api/client-errors` (rate-limited 5/min/IP, 2 KB cap, Zod-validated,
   no stacks or PII).
 
+### Request correlation
+
+Every request gets a `requestId` (nginx `$request_id`, forwarded as
+`X-Request-Id`, echoed in the response header, written to the nginx access
+log as `reqid=`, and merged into every structured log line via
+AsyncLocalStorage — see `src/lib/utils/request-context.ts`). Server Actions
+mint their own UUID. To reconstruct one request end to end:
+
+```logql
+{container="website"} | json | requestId="<id>"   # all app lines for a request
+{container="nginx"} |= "reqid=<id>"               # the matching access-log line
+```
+
 ### Useful LogQL queries
 
 ```logql
@@ -59,6 +72,44 @@ Next.js (winston JSON → stdout)        nginx (access/error → stdout)
 {container="website", module="PAYMENTS"}                      # checkout flow
 sum by (module) (count_over_time({container="website", level="error"}[5m]))
 ```
+
+## Alerting
+
+Grafana's built-in alerting is provisioned from
+`observability/grafana/provisioning/alerting/` and emails the address in the
+`GRAFANA_ALERT_EMAIL` GitHub secret via the existing SES SMTP credentials
+(`GF_SMTP_*` on the grafana container). Re-notification at most every 4 h.
+
+| Rule                        | Fires when                                     |
+| --------------------------- | ---------------------------------------------- |
+| High server error rate      | > 5 `level=error` lines in 5 m (sustained 5 m) |
+| Uncaught server error       | any `module=UNCAUGHT` entry                    |
+| Authorization failure spike | > 30 401/403 warns in 5 m                      |
+| Rate limit spike            | > 50 429 warns in 5 m                          |
+| Payment flow error          | any `module=PAYMENTS` error in 10 m            |
+
+`noDataState: OK` (quiet site is normal); `execErrState: Alerting` so a
+broken Loki or query surfaces instead of failing silently.
+
+### External blind spots (off-box monitoring)
+
+- **Uptime**: `.github/workflows/uptime-check.yml` curls
+  `https://fakefourrecords.com/api/health` every 15 min from GitHub's
+  runners (via `scripts/ci/verify-health.sh`); GitHub emails the workflow
+  author on failure. Catches whole-box outages the on-box Grafana cannot see.
+  Note: GitHub disables cron schedules after 60 days without repo activity.
+- **Stripe webhook Lambda**: production payment webhooks run in AWS Lambda
+  and log to CloudWatch, not Loki. A CloudWatch alarm
+  (`StripeWebhookErrorAlarm`, ≥ 1 error in 5 min) notifies an SNS topic
+  subscribed to the `ALERT_EMAIL` GitHub secret (may equal
+  `GRAFANA_ALERT_EMAIL`). The SNS email subscription requires a **one-time
+  confirmation click** after the first deploy; with the secret unset, alarms
+  deploy without notifications.
+
+Dashboards: **"Boudreaux — Request Latency"** (p50/p95/p99 overall and per
+module from the `durationMs` field, request rate, slow-request log panel with
+`requestId`). Caveat: 2xx responses are sampled 1-in-20, so percentiles are
+estimates weighted toward errors under low traffic.
 
 ## Retention & volume limits
 
@@ -79,12 +130,26 @@ and `grafana-data` survive low-disk cleanups.
 
 ### Resource budget (t3.large: 2 vCPU / 8 GB)
 
-| Container | CPU limit | Memory limit |
-| --------- | --------- | ------------ |
-| website   | 2.0       | 2048 M       |
-| loki      | 0.5       | 512 M        |
-| grafana   | 0.5       | 384 M        |
-| alloy     | 0.25      | 256 M        |
+| Container     | CPU limit | Memory limit |
+| ------------- | --------- | ------------ |
+| website       | 2.0       | 2048 M       |
+| loki          | 0.5       | 512 M        |
+| grafana       | 0.5       | 384 M        |
+| alloy         | 0.25      | 256 M        |
+| prometheus    | 0.5       | 512 M        |
+| cadvisor      | 0.25      | 192 M        |
+| node-exporter | 0.1       | 64 M         |
+
+Total caps ≈ 3.97 GB of 8 GB (CPU limits are ceilings, not reservations).
+
+## System metrics
+
+Prometheus (15-day retention, 1 GB size cap on the `prometheus-data` volume)
+scrapes node_exporter (host CPU/mem/disk/load/network) and cAdvisor
+(per-container usage) every 30 s. Grafana dashboard **"Boudreaux — System
+Metrics"** shows host and per-container usage against the compose limits.
+Alert **"Host disk space low"** fires at > 85 % root-filesystem usage
+(sustained 10 m). None of these containers publish ports to the host.
 
 ## Developer experience
 
@@ -98,6 +163,19 @@ pnpm dev                       # quiet (warn+ only)
 | `SHOW_DEV_LOGS`     | `true` → debug-level colorized dev output                 |
 | `LOG_LEVEL`         | `debug\|info\|warn\|error` override (prod default `info`) |
 | `LOG_DEBUG_MODULES` | Comma list (e.g. `CHAT,PRESIGNED_URLS`) forced to debug   |
+| `SLOW_QUERY_MS`     | Prisma slow-query warn threshold in ms (default 200)      |
+
+### Slow-query logging
+
+The Prisma singleton is `$extends`-ed with app-side query timing
+(`src/lib/utils/slow-query-extension.ts`): any operation slower than
+`SLOW_QUERY_MS` logs `module=DATABASE level=warn` with model, operation, and
+duration — never query arguments. This adds zero load to MongoDB Atlas and is
+the visible symptom when the M0 free tier throttles under load:
+
+```logql
+{container="website", module="DATABASE", level="warn"}   # slow queries
+```
 
 ### Runtime level override (admin)
 

@@ -594,6 +594,33 @@ describe('Logger', () => {
     });
   });
 
+  describe('request id correlation', () => {
+    it('merges the active request id into log meta', async () => {
+      const { createLogger } = await importLogger();
+      const { runWithRequestContext } = await import('./request-context');
+      const logger = createLogger('TEST');
+
+      runWithRequestContext('req-42', () => {
+        logger.info('inside request', { count: 1 });
+        logger.error('failed inside request', new Error('boom'));
+      });
+
+      const infoCall = harness.logCalls.find((c) => c.message === 'inside request');
+      const errorCall = harness.logCalls.find((c) => c.message === 'failed inside request');
+      expect(infoCall?.meta).toEqual({ requestId: 'req-42', count: 1 });
+      expect(errorCall?.meta).toMatchObject({ requestId: 'req-42', error: 'boom' });
+    });
+
+    it('omits requestId outside a request scope', async () => {
+      const { createLogger } = await importLogger();
+      const logger = createLogger('TEST');
+
+      logger.info('outside request', { count: 1 });
+
+      expect(harness.logCalls.at(-1)?.meta).toEqual({ count: 1 });
+    });
+  });
+
   describe('pre-configured loggers', () => {
     it('provides pre-configured loggers for common modules', async () => {
       const { loggers } = await importLogger();

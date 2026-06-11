@@ -7,8 +7,9 @@ import type * as PrismaModule from '@/lib/prisma';
 // mocks '@/lib/prisma', so this spec loads the real singleton via
 // `vi.importActual` below to exercise its actual construction/singleton logic.
 vi.mock('@prisma/client', () => ({
+  Prisma: { defineExtension: (extension: unknown) => extension },
   PrismaClient: vi.fn(function PrismaClient(config: { log?: string[] }) {
-    return {
+    const client: Record<string, unknown> = {
       $connect: vi.fn(),
       $disconnect: vi.fn(),
       user: {},
@@ -17,6 +18,9 @@ vi.mock('@prisma/client', () => ({
       account: {},
       _config: config,
     };
+    // The singleton applies the slow-query extension via $extends
+    client.$extends = vi.fn(() => client);
+    return client;
   }),
 }));
 
