@@ -7,6 +7,7 @@ import type { NextRequest, NextResponse } from 'next/server';
 
 import { extractClientIp } from '@/lib/utils/extract-client-ip';
 import { createLogger, shouldSample } from '@/lib/utils/logger';
+import { resolveRequestId, runWithRequestContext } from '@/lib/utils/request-context';
 
 type LoggedHandler<TParams = unknown> = (
   request: NextRequest,
@@ -40,26 +41,27 @@ export function withLogging<TParams = unknown>(moduleName: string) {
   const logger = createLogger(moduleName);
 
   return (handler: LoggedHandler<TParams>): LoggedHandler<TParams> => {
-    return async (request, context) => {
-      const start = performance.now();
+    return async (request, context) =>
+      runWithRequestContext(resolveRequestId(request.headers), async () => {
+        const start = performance.now();
 
-      try {
-        const response = await handler(request, context);
+        try {
+          const response = await handler(request, context);
 
-        if (response.status >= 500) {
-          logger.error('Request failed', undefined, requestMeta(request, start, response.status));
-        } else if (response.status >= 400) {
-          logger.warn('Request rejected', requestMeta(request, start, response.status));
-        } else if (shouldSample(`${moduleName}.request.ok`, SUCCESS_SAMPLE_RATE)) {
-          logger.info('Request ok', requestMeta(request, start, response.status));
+          if (response.status >= 500) {
+            logger.error('Request failed', undefined, requestMeta(request, start, response.status));
+          } else if (response.status >= 400) {
+            logger.warn('Request rejected', requestMeta(request, start, response.status));
+          } else if (shouldSample(`${moduleName}.request.ok`, SUCCESS_SAMPLE_RATE)) {
+            logger.info('Request ok', requestMeta(request, start, response.status));
+          }
+
+          return response;
+        } catch (error) {
+          logger.error('Unhandled route error', error, requestMeta(request, start));
+          throw error;
         }
-
-        return response;
-      } catch (error) {
-        logger.error('Unhandled route error', error, requestMeta(request, start));
-        throw error;
-      }
-    };
+      });
   };
 }
 
@@ -88,28 +90,33 @@ export async function logAction<TResult>(
   action: () => Promise<TResult>
 ): Promise<TResult> {
   const logger = createLogger(moduleName);
-  const start = performance.now();
 
-  try {
-    const result = await action();
+  // Server Actions have no Request to read a proxy header from — mint an id
+  // (runWithRequestContext reuses any context already established upstream).
+  return runWithRequestContext(crypto.randomUUID(), async () => {
+    const start = performance.now();
 
-    if (shouldSample(`${moduleName}.${actionName}.ok`, SUCCESS_SAMPLE_RATE)) {
-      logger.info(`Action completed: ${actionName}`, {
+    try {
+      const result = await action();
+
+      if (shouldSample(`${moduleName}.${actionName}.ok`, SUCCESS_SAMPLE_RATE)) {
+        logger.info(`Action completed: ${actionName}`, {
+          action: actionName,
+          durationMs: Math.round(performance.now() - start),
+          ...(context.userId !== undefined && { userId: context.userId }),
+          ...context.data,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      logger.error(`Action failed: ${actionName}`, error, {
         action: actionName,
         durationMs: Math.round(performance.now() - start),
         ...(context.userId !== undefined && { userId: context.userId }),
         ...context.data,
       });
+      throw error;
     }
-
-    return result;
-  } catch (error) {
-    logger.error(`Action failed: ${actionName}`, error, {
-      action: actionName,
-      durationMs: Math.round(performance.now() - start),
-      ...(context.userId !== undefined && { userId: context.userId }),
-      ...context.data,
-    });
-    throw error;
-  }
+  });
 }

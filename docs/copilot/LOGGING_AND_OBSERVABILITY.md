@@ -50,6 +50,19 @@ Next.js (winston JSON → stdout)        nginx (access/error → stdout)
   `POST /api/client-errors` (rate-limited 5/min/IP, 2 KB cap, Zod-validated,
   no stacks or PII).
 
+### Request correlation
+
+Every request gets a `requestId` (nginx `$request_id`, forwarded as
+`X-Request-Id`, echoed in the response header, written to the nginx access
+log as `reqid=`, and merged into every structured log line via
+AsyncLocalStorage — see `src/lib/utils/request-context.ts`). Server Actions
+mint their own UUID. To reconstruct one request end to end:
+
+```logql
+{container="website"} | json | requestId="<id>"   # all app lines for a request
+{container="nginx"} |= "reqid=<id>"               # the matching access-log line
+```
+
 ### Useful LogQL queries
 
 ```logql
