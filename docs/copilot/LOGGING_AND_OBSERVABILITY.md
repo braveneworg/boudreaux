@@ -115,12 +115,26 @@ and `grafana-data` survive low-disk cleanups.
 
 ### Resource budget (t3.large: 2 vCPU / 8 GB)
 
-| Container | CPU limit | Memory limit |
-| --------- | --------- | ------------ |
-| website   | 2.0       | 2048 M       |
-| loki      | 0.5       | 512 M        |
-| grafana   | 0.5       | 384 M        |
-| alloy     | 0.25      | 256 M        |
+| Container     | CPU limit | Memory limit |
+| ------------- | --------- | ------------ |
+| website       | 2.0       | 2048 M       |
+| loki          | 0.5       | 512 M        |
+| grafana       | 0.5       | 384 M        |
+| alloy         | 0.25      | 256 M        |
+| prometheus    | 0.5       | 512 M        |
+| cadvisor      | 0.25      | 192 M        |
+| node-exporter | 0.1       | 64 M         |
+
+Total caps ≈ 3.97 GB of 8 GB (CPU limits are ceilings, not reservations).
+
+## System metrics
+
+Prometheus (15-day retention, 1 GB size cap on the `prometheus-data` volume)
+scrapes node_exporter (host CPU/mem/disk/load/network) and cAdvisor
+(per-container usage) every 30 s. Grafana dashboard **"Boudreaux — System
+Metrics"** shows host and per-container usage against the compose limits.
+Alert **"Host disk space low"** fires at > 85 % root-filesystem usage
+(sustained 10 m). None of these containers publish ports to the host.
 
 ## Developer experience
 

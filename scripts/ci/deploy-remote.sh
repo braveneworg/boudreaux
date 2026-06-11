@@ -328,10 +328,10 @@ if [ "$RUNNING_CONTAINERS" -lt 2 ]; then
 fi
 echo "✓ Both containers are running"
 
-# Logging stack (loki/alloy/grafana) is best-effort: warn, never fail.
-LOGGING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -cE '^(loki|alloy|grafana)$' || true)
-if [ "$LOGGING_CONTAINERS" -lt 3 ]; then
-  echo "⚠️  WARNING: logging stack incomplete ($LOGGING_CONTAINERS/3 containers running)"
+# Observability stack (logs + metrics) is best-effort: warn, never fail.
+LOGGING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -cE '^(loki|alloy|grafana|prometheus|node-exporter|cadvisor)$' || true)
+if [ "$LOGGING_CONTAINERS" -lt 6 ]; then
+  echo "⚠️  WARNING: observability stack incomplete ($LOGGING_CONTAINERS/6 containers running)"
 else
   # Loki is not published to the host; probe it over the compose network
   # via the nginx container (which ships curl).
