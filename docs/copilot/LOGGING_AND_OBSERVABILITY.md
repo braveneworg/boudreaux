@@ -91,6 +91,21 @@ Grafana's built-in alerting is provisioned from
 `noDataState: OK` (quiet site is normal); `execErrState: Alerting` so a
 broken Loki or query surfaces instead of failing silently.
 
+### External blind spots (off-box monitoring)
+
+- **Uptime**: `.github/workflows/uptime-check.yml` curls
+  `https://fakefourrecords.com/api/health` every 15 min from GitHub's
+  runners (via `scripts/ci/verify-health.sh`); GitHub emails the workflow
+  author on failure. Catches whole-box outages the on-box Grafana cannot see.
+  Note: GitHub disables cron schedules after 60 days without repo activity.
+- **Stripe webhook Lambda**: production payment webhooks run in AWS Lambda
+  and log to CloudWatch, not Loki. A CloudWatch alarm
+  (`StripeWebhookErrorAlarm`, ≥ 1 error in 5 min) notifies an SNS topic
+  subscribed to the `ALERT_EMAIL` GitHub secret (may equal
+  `GRAFANA_ALERT_EMAIL`). The SNS email subscription requires a **one-time
+  confirmation click** after the first deploy; with the secret unset, alarms
+  deploy without notifications.
+
 Dashboards: **"Boudreaux — Request Latency"** (p50/p95/p99 overall and per
 module from the `durationMs` field, request rate, slow-request log panel with
 `requestId`). Caveat: 2xx responses are sampled 1-in-20, so percentiles are

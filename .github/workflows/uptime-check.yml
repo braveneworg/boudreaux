@@ -1,0 +1,32 @@
+name: Uptime Check
+
+# External uptime monitoring: the on-box Grafana stack dies with the box, so
+# this watches from outside. GitHub emails the workflow author when a
+# scheduled run fails. Note: GitHub may delay scheduled runs by a few minutes,
+# and disables schedules after 60 days without repo activity.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: uptime-check
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Check production health endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout health-check script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci/verify-health.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Verify https://fakefourrecords.com/api/health
+        run: bash scripts/ci/verify-health.sh

@@ -113,7 +113,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --stack-name fakefour-stripe-webhook \
             --region us-east-1 \
-            --parameter-overrides Environment=production
+            --parameter-overrides Environment=production "AlarmEmail=${{ secrets.ALERT_EMAIL }}"
 
       - name: Print webhook URL
         run: |

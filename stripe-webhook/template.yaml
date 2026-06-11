@@ -18,6 +18,13 @@ Parameters:
     Type: String
     Default: production
     AllowedValues: [production, staging]
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: Email for Lambda error alarm notifications (empty disables them)
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
 
 Resources:
   StripeWebhookFunction:
@@ -139,6 +146,37 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], []]
+
+  # Email notifications for Lambda error alarms. The subscription requires a
+  # one-time confirmation click in the recipient's inbox after first deploy.
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      TopicName: fakefour-stripe-webhook-alarms
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  # Production payment webhooks are handled by this Lambda — its errors mean
+  # purchases may not be recorded. Fires on the first error in any 5 minutes.
+  StripeWebhookErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Stripe webhook Lambda is failing - purchases may not be recorded
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref StripeWebhookFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], []]
 
   PrismaEngineLayer:
     Type: AWS::Serverless::LayerVersion
