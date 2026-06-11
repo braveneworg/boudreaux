@@ -235,8 +235,7 @@ echo "🧪 Running tests before push..."
 stage="tests + coverage (pnpm run test:coverage:check)"
 
 # Suppress console output during tests to reduce verbosity
-# SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
-pnpm run test:coverage:check --reporter=dot
+SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
 
 if [ $? -ne 0 ]; then
   echo ""
