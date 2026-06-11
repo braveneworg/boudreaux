@@ -5,12 +5,17 @@ import 'server-only';
 
 import { PrismaClient } from '@prisma/client';
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+import { createSlowQueryExtension } from '@/lib/utils/slow-query-extension';
 
-export const prisma =
-  globalForPrisma.prisma ||
+const createPrismaClient = () =>
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
+  }).$extends(createSlowQueryExtension());
+
+type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+
+const globalForPrisma = globalThis as unknown as { prisma: ExtendedPrismaClient };
+
+export const prisma = globalForPrisma.prisma || createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

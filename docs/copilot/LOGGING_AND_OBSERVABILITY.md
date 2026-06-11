@@ -134,6 +134,19 @@ pnpm dev                       # quiet (warn+ only)
 | `SHOW_DEV_LOGS`     | `true` → debug-level colorized dev output                 |
 | `LOG_LEVEL`         | `debug\|info\|warn\|error` override (prod default `info`) |
 | `LOG_DEBUG_MODULES` | Comma list (e.g. `CHAT,PRESIGNED_URLS`) forced to debug   |
+| `SLOW_QUERY_MS`     | Prisma slow-query warn threshold in ms (default 200)      |
+
+### Slow-query logging
+
+The Prisma singleton is `$extends`-ed with app-side query timing
+(`src/lib/utils/slow-query-extension.ts`): any operation slower than
+`SLOW_QUERY_MS` logs `module=DATABASE level=warn` with model, operation, and
+duration — never query arguments. This adds zero load to MongoDB Atlas and is
+the visible symptom when the M0 free tier throttles under load:
+
+```logql
+{container="website", module="DATABASE", level="warn"}   # slow queries
+```
 
 ### Runtime level override (admin)
 
