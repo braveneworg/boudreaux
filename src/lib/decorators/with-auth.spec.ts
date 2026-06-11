@@ -13,6 +13,17 @@ vi.mock('@/auth', () => ({
   auth: mockAuth,
 }));
 
+// Mock structured logging
+const authWarnMock = vi.hoisted(() => vi.fn());
+const logSecurityEventMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { auth: { warn: authWarnMock } },
+}));
+vi.mock('@/lib/utils/audit-log', () => ({
+  logSecurityEvent: logSecurityEventMock,
+  extractRequestMetadata: vi.fn(() => ({ ip: '203.0.113.7', userAgent: 'vitest' })),
+}));
+
 // Mock NextResponse
 vi.mock('next/server', async () => {
   const actual = await vi.importActual('next/server');
@@ -36,6 +47,7 @@ describe('withAuth decorator', () => {
       url,
       method: 'GET',
       headers: new Headers(),
+      nextUrl: new URL(url),
     }) as NextRequest;
 
   const createMockContext = (params = {}) => ({ params: Promise.resolve(params) });
@@ -256,6 +268,7 @@ describe('withAdmin decorator', () => {
       url,
       method: 'GET',
       headers: new Headers(),
+      nextUrl: new URL(url),
     }) as NextRequest;
 
   const createMockContext = (params = {}) => ({ params: Promise.resolve(params) });
@@ -529,5 +542,69 @@ describe('withAdmin decorator', () => {
         });
       }
     );
+  });
+});
+
+describe('unauthorized access logging', () => {
+  const request = {
+    url: 'https://example.com/api/admin/test',
+    method: 'GET',
+    headers: new Headers(),
+    nextUrl: new URL('https://example.com/api/admin/test'),
+  } as NextRequest;
+  const context = { params: Promise.resolve({}) };
+
+  it('logs a warning and security event on 401', async () => {
+    mockAuth.mockResolvedValue(null);
+    const wrappedHandler = withAuth(vi.fn());
+
+    await wrappedHandler(request, context);
+
+    expect(authWarnMock).toHaveBeenCalledWith(
+      'Unauthorized API access',
+      expect.objectContaining({
+        status: 401,
+        path: '/api/admin/test',
+        method: 'GET',
+        ip: '203.0.113.7',
+      })
+    );
+    expect(logSecurityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'api.unauthorized_access',
+        ip: '203.0.113.7',
+        userAgent: 'vitest',
+        metadata: expect.objectContaining({ status: 401 }),
+      })
+    );
+  });
+
+  it('logs the acting user on 403', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-9', email: 'u@example.com', name: 'U', role: 'user' },
+    });
+    const wrappedHandler = withAdmin(vi.fn());
+
+    await wrappedHandler(request, context);
+
+    expect(authWarnMock).toHaveBeenCalledWith(
+      'Unauthorized API access',
+      expect.objectContaining({ status: 403, userId: 'user-9' })
+    );
+    expect(logSecurityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'api.unauthorized_access', userId: 'user-9' })
+    );
+  });
+
+  it('does not log when the request is authorized', async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: 'admin-1', email: 'a@example.com', name: 'A', role: 'admin' },
+    });
+    const wrappedHandler = withAdmin(vi.fn().mockResolvedValue({ status: 200 }));
+
+    await wrappedHandler(request, context);
+
+    expect(authWarnMock).not.toHaveBeenCalled();
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
   });
 });

@@ -3,34 +3,37 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { logSecurityEvent, extractRequestMetadata, type AuditEvent } from './audit-log';
+import { loggers } from './logger';
+
+vi.mock('server-only', () => ({}));
+
+vi.mock('./logger', () => ({
+  loggers: {
+    audit: {
+      info: vi.fn(),
+    },
+  },
+}));
+
+const auditInfo = vi.mocked(loggers.audit.info);
 
 describe('Audit Log', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-  });
-
   describe('logSecurityEvent', () => {
-    it('should log security events with timestamp', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
+    it('should log security events through the AUDIT logger', () => {
       logSecurityEvent({
         event: 'auth.signin.success',
         userId: 'user123',
         email: 'test@example.com',
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[0]).toBe('[SECURITY_AUDIT]');
-      expect(logCall[1]).toHaveProperty('event', 'auth.signin.success');
-      expect(logCall[1]).toHaveProperty('userId', 'user123');
-      expect(logCall[1]).toHaveProperty('email', 'test@example.com');
-      expect(logCall[1]).toHaveProperty('timestamp');
-      expect(logCall[1].timestamp).toBeInstanceOf(Date);
+      expect(auditInfo).toHaveBeenCalledWith('auth.signin.success', {
+        event: 'auth.signin.success',
+        userId: 'user123',
+        email: 'test@example.com',
+      });
     });
 
     it('should log all audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const events: AuditEvent[] = [
         'auth.signin.success',
         'auth.signin.failed',
@@ -49,11 +52,10 @@ describe('Audit Log', () => {
         logSecurityEvent({ event });
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(events.length);
+      expect(auditInfo).toHaveBeenCalledTimes(events.length);
     });
 
     it('should include optional metadata', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const metadata = {
         action: 'update',
         previousValue: 'old@example.com',
@@ -66,27 +68,26 @@ describe('Audit Log', () => {
         metadata,
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('metadata', metadata);
+      expect(auditInfo).toHaveBeenCalledWith(
+        'user.email.changed',
+        expect.objectContaining({ metadata })
+      );
     });
 
     it('should include IP address when provided', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
       logSecurityEvent({
         event: 'auth.signin.success',
         userId: 'user123',
         ip: '192.168.1.1',
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('ip', '192.168.1.1');
+      expect(auditInfo).toHaveBeenCalledWith(
+        'auth.signin.success',
+        expect.objectContaining({ ip: '192.168.1.1' })
+      );
     });
 
     it('should include user agent when provided', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 
       logSecurityEvent({
@@ -95,40 +96,34 @@ describe('Audit Log', () => {
         userAgent,
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('userAgent', userAgent);
+      expect(auditInfo).toHaveBeenCalledWith(
+        'auth.signin.success',
+        expect.objectContaining({ userAgent })
+      );
     });
 
     it('should work without optional fields', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
       logSecurityEvent({
         event: 'api.rate_limit.exceeded',
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('event', 'api.rate_limit.exceeded');
-      expect(logCall[1]).toHaveProperty('timestamp');
+      expect(auditInfo).toHaveBeenCalledWith('api.rate_limit.exceeded', {
+        event: 'api.rate_limit.exceeded',
+      });
     });
 
-    it('should use JSON.stringify in production mode', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      const consoleInfoSpy = vi.spyOn(console, 'info');
-
+    it('should omit undefined optional fields from the payload', () => {
       logSecurityEvent({
-        event: 'auth.signin.success',
-        userId: 'user123',
+        event: 'admin.access',
+        userId: 'admin-1',
+        email: undefined,
+        ip: undefined,
       });
 
-      expect(consoleInfoSpy).toHaveBeenCalled();
-      const logCall = consoleInfoSpy.mock.calls[0];
-      expect(logCall[0]).toBe('[SECURITY_AUDIT]');
-      expect(typeof logCall[1]).toBe('string');
-      expect(() => JSON.parse(logCall[1] as string)).not.toThrow();
-
-      vi.unstubAllEnvs();
+      expect(auditInfo).toHaveBeenCalledWith('admin.access', {
+        event: 'admin.access',
+        userId: 'admin-1',
+      });
     });
   });
 
@@ -217,7 +212,6 @@ describe('Audit Log', () => {
 
   describe('Event Type Coverage', () => {
     it('should support all defined audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const eventTypes: AuditEvent[] = [
         'auth.signin.success',
         'auth.signin.failed',
@@ -239,11 +233,10 @@ describe('Audit Log', () => {
         });
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(eventTypes.length);
+      expect(auditInfo).toHaveBeenCalledTimes(eventTypes.length);
     });
 
     it('should support all media audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const mediaEventTypes: AuditEvent[] = [
         'media.artist.created',
         'media.artist.found',
@@ -276,11 +269,10 @@ describe('Audit Log', () => {
         });
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(mediaEventTypes.length);
+      expect(auditInfo).toHaveBeenCalledTimes(mediaEventTypes.length);
     });
 
     it('should support notification banner audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const notificationEventTypes: AuditEvent[] = [
         'notification.banner.created',
         'notification.banner.updated',
@@ -296,11 +288,10 @@ describe('Audit Log', () => {
         });
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(notificationEventTypes.length);
+      expect(auditInfo).toHaveBeenCalledTimes(notificationEventTypes.length);
     });
 
     it('should support UI audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
       const uiEventTypes: AuditEvent[] = ['ui.artist.form.submitted'];
 
       uiEventTypes.forEach((eventType) => {
@@ -310,12 +301,10 @@ describe('Audit Log', () => {
         });
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(uiEventTypes.length);
+      expect(auditInfo).toHaveBeenCalledTimes(uiEventTypes.length);
     });
 
     it('should log media.artist.found with proper metadata', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
       logSecurityEvent({
         event: 'media.artist.found',
         userId: 'admin-123',
@@ -327,21 +316,21 @@ describe('Audit Log', () => {
         },
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('event', 'media.artist.found');
-      expect(logCall[1]).toHaveProperty('metadata');
-      expect(logCall[1].metadata).toEqual({
-        artistId: 'artist-456',
-        artistName: 'Test Artist',
-        searchedName: 'test artist',
-        artistReleaseCreated: true,
-      });
+      expect(auditInfo).toHaveBeenCalledWith(
+        'media.artist.found',
+        expect.objectContaining({
+          event: 'media.artist.found',
+          metadata: {
+            artistId: 'artist-456',
+            artistName: 'Test Artist',
+            searchedName: 'test artist',
+            artistReleaseCreated: true,
+          },
+        })
+      );
     });
 
     it('should log media.tracks.bulk_created with proper metadata', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
       logSecurityEvent({
         event: 'media.tracks.bulk_created',
         userId: 'admin-123',
@@ -356,17 +345,19 @@ describe('Audit Log', () => {
         },
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('event', 'media.tracks.bulk_created');
-      expect(logCall[1]).toHaveProperty('metadata');
-      expect(logCall[1].metadata).toMatchObject({
-        totalTracks: 10,
-        successCount: 8,
-        failedCount: 2,
-        autoCreateRelease: true,
-        artistsCreated: 2,
-      });
+      expect(auditInfo).toHaveBeenCalledWith(
+        'media.tracks.bulk_created',
+        expect.objectContaining({
+          event: 'media.tracks.bulk_created',
+          metadata: expect.objectContaining({
+            totalTracks: 10,
+            successCount: 8,
+            failedCount: 2,
+            autoCreateRelease: true,
+            artistsCreated: 2,
+          }),
+        })
+      );
     });
   });
 });

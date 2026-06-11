@@ -12,6 +12,16 @@ import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
 
+const { downloadsLoggerMock } = vi.hoisted(() => ({
+  downloadsLoggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  createLogger: vi.fn(() => downloadsLoggerMock),
+  shouldSample: vi.fn(() => true),
+  loggers: new Proxy({}, { get: () => downloadsLoggerMock }),
+}));
+
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
   extractClientIp: () => '127.0.0.1',
 }));
@@ -474,8 +484,9 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const response = await GET(makeRequest(), makeParams());
 
     expect(response.status).toBe(302);
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
       'Failed to record bundle download analytics (cache hit, 302 path)',
+      expect.any(Error),
       expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
     );
 
@@ -855,10 +866,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
       'Bundle post-upload error (cached ZIP retained)',
+      postUploadError,
       expect.objectContaining({
-        postUploadError,
         tempS3Key: expect.stringContaining('tmp/bundles/cache/'),
       })
     );
@@ -1291,8 +1302,9 @@ describe('GET /api/releases/[id]/download/bundle', () => {
         downloadUrl: 'https://s3.example.com/presigned-bundle-url',
       })
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
       'Failed to record bundle download analytics',
+      expect.any(Error),
       expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
     );
 
@@ -1316,7 +1328,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(errorEvent?.data).toEqual(
       expect.objectContaining({ message: 'An unexpected error occurred.' })
     );
-    expect(consoleSpy).toHaveBeenCalledWith('Bundle SSE stream error', expect.anything());
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle SSE stream error',
+      expect.anything()
+    );
 
     consoleSpy.mockRestore();
   });

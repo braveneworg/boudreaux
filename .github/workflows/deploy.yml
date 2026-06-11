@@ -454,6 +454,8 @@ jobs:
           NEXT_PUBLIC_PUSHER_CLUSTER=${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
           UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
           EOF
 
       - name: Upload compose + env
@@ -463,7 +465,16 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yml,.env.deploy
+          source: docker-compose.prod.yml,docker-compose.logging.yml,.env.deploy
+          target: ~/boudreaux
+
+      - name: Upload observability configs (Loki, Alloy, Grafana provisioning)
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: observability
           target: ~/boudreaux
 
       - name: Upload deploy script

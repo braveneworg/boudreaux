@@ -1,0 +1,128 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "sum by (module) (count_over_time({container=\"website\", level=\"error\"}[5m]))",
+          "legendFormat": "{{module}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Server errors by module (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "sum by (module) (count_over_time({container=\"website\", level=\"warn\"} |= `Unauthorized API access` [5m]))",
+          "legendFormat": "401/403 {{module}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki" },
+          "expr": "sum (count_over_time({container=\"website\"} |= `Rate limit exceeded` [5m]))",
+          "legendFormat": "429",
+          "refId": "B"
+        }
+      ],
+      "title": "Unauthorized + rate-limited requests (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "{container=\"website\", module=\"AUDIT\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Security audit events",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "sum (count_over_time({container=\"nginx\"} |~ `\" 5\\\\d\\\\d ` [5m]))",
+          "legendFormat": "nginx 5xx",
+          "refId": "A"
+        }
+      ],
+      "title": "nginx 5xx responses (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 17 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "{container=\"website\", level=~\"warn|error\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Live tail — warnings and errors",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["boudreaux", "logs"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Boudreaux — Application Logs",
+  "uid": "boudreaux-app-logs",
+  "version": 1
+}

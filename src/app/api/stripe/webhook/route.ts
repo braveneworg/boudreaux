@@ -12,10 +12,13 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseService } from '@/lib/services/release-service';
 import { UserService } from '@/lib/services/user-service';
 import { stripe } from '@/lib/stripe';
+import { loggers } from '@/lib/utils/logger';
 
 import type Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
+
+const logger = loggers.stripe;
 
 /** Zod schema for validating webhook metadata on release purchases */
 const releaseMetadataSchema = z.object({
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
       const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
       const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
       if (!isAllowed) {
-        console.warn(`Stripe webhook rejected: IP ${remoteIp} not in allowlist`);
+        logger.warn('Webhook rejected: IP not in allowlist', { ip: remoteIp });
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET is not configured');
+    logger.error('STRIPE_WEBHOOK_SECRET is not configured');
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
   }
 
@@ -70,10 +73,9 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
-    console.error(
-      'Webhook signature verification failed:',
-      err instanceof Error ? err.message : err
-    );
+    logger.warn('Webhook signature verification failed', {
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -89,10 +91,11 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (error) {
-    console.error(`Error handling webhook event ${event.type}:`, error);
+    logger.error('Webhook handler failed', error, { eventType: event.type, eventId: event.id });
     return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
   }
 
+  logger.info('Webhook processed', { eventType: event.type, eventId: event.id });
   return NextResponse.json({ received: true });
 }
 
@@ -111,10 +114,10 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   // Security: validate webhook metadata with Zod before using in queries
   const metadataResult = releaseMetadataSchema.safeParse(retrievedSession.metadata);
   if (!metadataResult.success) {
-    console.error('release_purchase webhook has invalid metadata', {
-      sessionId: retrievedSession.id,
-      metadata: retrievedSession.metadata,
-      errors: metadataResult.error.issues,
+    logger.error('release_purchase webhook has invalid metadata', undefined, {
+      checkoutId: retrievedSession.id,
+      metadata: retrievedSession.metadata ?? undefined,
+      issues: metadataResult.error.issues,
     });
     return;
   }
@@ -136,8 +139,8 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
       : retrievedSession.payment_intent?.id;
 
   if (!releaseId || !paymentIntentId) {
-    console.error('release_purchase webhook missing required metadata', {
-      sessionId: retrievedSession.id,
+    logger.error('release_purchase webhook missing required metadata', undefined, {
+      checkoutId: retrievedSession.id,
       releaseId,
       paymentIntentId,
     });
@@ -161,10 +164,14 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   }
 
   if (!userId) {
-    console.error('release_purchase webhook: could not resolve userId (no email available)', {
-      sessionId: retrievedSession.id,
-      releaseId,
-    });
+    logger.error(
+      'release_purchase webhook: could not resolve userId (no email available)',
+      undefined,
+      {
+        checkoutId: retrievedSession.id,
+        releaseId,
+      }
+    );
     return;
   }
 
@@ -224,8 +231,8 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   }
 
   if (!purchase) {
-    console.error('release_purchase webhook: failed to create or find purchase', {
-      sessionId: retrievedSession.id,
+    logger.error('release_purchase webhook: failed to create or find purchase', undefined, {
+      checkoutId: retrievedSession.id,
       paymentIntentId,
     });
     return;
@@ -253,14 +260,14 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
       releaseId,
     });
     if (!emailSent) {
-      console.warn('release_purchase webhook: sendPurchaseConfirmationEmail returned false', {
+      logger.warn('release_purchase webhook: sendPurchaseConfirmationEmail returned false', {
         purchaseId: purchase.id,
         customerEmail: emailForConfirmation,
       });
     }
   } else {
-    console.error('release_purchase webhook: no email available for confirmation', {
-      sessionId: retrievedSession.id,
+    logger.error('release_purchase webhook: no email available for confirmation', undefined, {
+      checkoutId: retrievedSession.id,
       purchaseId: purchase.id,
       userId,
     });
@@ -272,15 +279,15 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
 
   if (!paymentIntentId) {
-    console.error('charge.refunded missing payment_intent', { chargeId: charge.id });
+    logger.error('charge.refunded missing payment_intent', undefined, { chargeId: charge.id });
     return;
   }
 
   const marked = await PurchaseRepository.markRefunded(paymentIntentId);
   if (marked) {
-    console.info('charge.refunded: purchase marked as refunded', { paymentIntentId });
+    logger.info('charge.refunded: purchase marked as refunded', { paymentIntentId });
   } else {
-    console.warn('charge.refunded: no matching un-refunded purchase found', { paymentIntentId });
+    logger.warn('charge.refunded: no matching un-refunded purchase found', { paymentIntentId });
   }
 }
 

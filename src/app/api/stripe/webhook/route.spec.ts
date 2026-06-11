@@ -7,6 +7,14 @@ import { POST } from './route';
 
 vi.mock('server-only', () => ({}));
 
+const { stripeLoggerMock } = vi.hoisted(() => ({
+  stripeLoggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { stripe: stripeLoggerMock },
+}));
+
 const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
   class MockPrismaClientKnownRequestError extends Error {
     code: string;
@@ -695,11 +703,11 @@ describe('POST /api/stripe/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
-      expect(console.error).toHaveBeenCalledWith(
+      expect(stripeLoggerMock.error).toHaveBeenCalledWith(
         'release_purchase webhook: no email available for confirmation',
+        undefined,
         expect.objectContaining({ purchaseId: 'purchase-new', userId: validUserId })
       );
-      vi.mocked(console.error).mockRestore();
     });
 
     it('falls back to customer_email when customer_details.email is null', async () => {
@@ -903,16 +911,14 @@ describe('POST /api/stripe/webhook', () => {
 
     it('logs warning when sendPurchaseConfirmationEmail returns false', async () => {
       mockSendPurchaseConfirmationEmail.mockResolvedValue(false);
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const response = await POST(createRequest('{}'));
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(stripeLoggerMock.warn).toHaveBeenCalledWith(
         'release_purchase webhook: sendPurchaseConfirmationEmail returned false',
         expect.objectContaining({ purchaseId: 'purchase-new' })
       );
-      consoleSpy.mockRestore();
     });
   });
 
@@ -1016,17 +1022,15 @@ describe('POST /api/stripe/webhook', () => {
         data: { object: { id: 'ch_refund_1', payment_intent: 'pi_refund_123' } },
       });
       mockMarkRefunded.mockResolvedValue(true);
-      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
       const response = await POST(createRequest('{}'));
 
       expect(response.status).toBe(200);
       expect(mockMarkRefunded).toHaveBeenCalledWith('pi_refund_123');
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(stripeLoggerMock.info).toHaveBeenCalledWith(
         'charge.refunded: purchase marked as refunded',
         expect.objectContaining({ paymentIntentId: 'pi_refund_123' })
       );
-      consoleSpy.mockRestore();
     });
 
     it('logs warning when no matching un-refunded purchase is found', async () => {
@@ -1035,16 +1039,14 @@ describe('POST /api/stripe/webhook', () => {
         data: { object: { id: 'ch_refund_2', payment_intent: 'pi_no_match' } },
       });
       mockMarkRefunded.mockResolvedValue(false);
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const response = await POST(createRequest('{}'));
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(stripeLoggerMock.warn).toHaveBeenCalledWith(
         'charge.refunded: no matching un-refunded purchase found',
         expect.objectContaining({ paymentIntentId: 'pi_no_match' })
       );
-      consoleSpy.mockRestore();
     });
 
     it('extracts payment_intent ID from object form', async () => {
@@ -1067,17 +1069,15 @@ describe('POST /api/stripe/webhook', () => {
         type: 'charge.refunded',
         data: { object: { id: 'ch_no_pi', payment_intent: null } },
       });
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const response = await POST(createRequest('{}'));
 
       expect(response.status).toBe(200);
       expect(mockMarkRefunded).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(stripeLoggerMock.error).toHaveBeenCalledWith(
         'charge.refunded missing payment_intent',
+        undefined,
         expect.objectContaining({ chargeId: 'ch_no_pi' })
       );
-      consoleSpy.mockRestore();
     });
   });
 });

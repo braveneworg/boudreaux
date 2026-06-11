@@ -39,3 +39,10 @@ export const pollingLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const POLLING_LIMIT = 20;
+
+/** Client error reports — 5 requests per minute */
+export const clientErrorLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const CLIENT_ERROR_LIMIT = 5;

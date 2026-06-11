@@ -11,6 +11,7 @@ import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
+import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
@@ -140,7 +141,7 @@ export const POST = withAuth<{ id: string }>(async (request, context, session) =
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    console.error('Download confirm error', { error });
+    loggers.downloads.error('Download confirm error', error);
 
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },

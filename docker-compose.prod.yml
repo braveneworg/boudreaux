@@ -67,10 +67,20 @@ services:
       # Upstash Redis (rate limiting)
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}
       UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+      # Structured logging (winston → stdout JSON → Alloy → Loki)
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     expose:
       - "3000"
     networks:
       - app-network
+    # Cap local JSON log files (the durable store is Loki; these are the
+    # short-term buffer Alloy tails and `docker logs` forensics).
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        tag: "{{.Name}}"
 
   nginx:
     image: "${NEXT_APP_NGINX_IMAGE}"
@@ -108,6 +118,12 @@ services:
     secrets:
       - ssl_cert
       - ssl_key
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        tag: "{{.Name}}"
 
 networks:
   app-network:

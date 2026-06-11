@@ -35,11 +35,24 @@ export default function AdminPage() {
       router.push('/admin/chat');
       return;
     }
+    // Logging controls have their own dedicated page
+    if (selectedView === 'logging') {
+      router.push('/admin/logging');
+      return;
+    }
     setView(selectedView);
   };
 
   const getEntityOptions = useCallback(() => {
-    const entities = ['artist', 'release', 'featured artist', 'notifications', 'tours', 'chat'];
+    const entities = [
+      'artist',
+      'release',
+      'featured artist',
+      'notifications',
+      'tours',
+      'chat',
+      'logging',
+    ];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
       label: toTitleCase(entity),

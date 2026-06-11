@@ -7,6 +7,7 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { VisitorIdentityRepository } from '@/lib/repositories/visitor-identity-repository';
+import { loggers } from '@/lib/utils/logger';
 import type { DownloadSubject } from '@/types/download-subject';
 
 /**
@@ -202,6 +203,13 @@ export class FreeDownloadQuotaService {
     if (count >= FREE_DOWNLOAD_CAP) {
       // resetsAt is non-null whenever count > 0; safe to cast via local guard.
       const reset = resetsAt ?? new Date(now.getTime() + FREE_DOWNLOAD_WINDOW_MS);
+      loggers.downloads.warn('Per-release free download cap reached', {
+        subjectKind: params.subject.kind,
+        ...(params.subject.kind === 'user' && { userId: params.subject.userId }),
+        releaseId: params.releaseId,
+        count,
+        resetsAt: reset.toISOString(),
+      });
       throw new CapReachedError(reset);
     }
 

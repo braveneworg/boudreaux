@@ -4,7 +4,13 @@
 /**
  * Security audit logging
  * Log security-sensitive operations for monitoring and forensics
+ *
+ * Events are emitted through the structured Winston logger under the AUDIT
+ * module, so in production they ship as JSON to Loki (queryable via
+ * `{container="website"} | json | module="AUDIT"`). Logs are never persisted
+ * to MongoDB.
  */
+import { loggers } from './logger';
 
 export type AuditEvent =
   | 'media.artist.created'
@@ -55,6 +61,7 @@ export type AuditEvent =
   | 'user.created'
   | 'user.signup.duplicate_email_silent_signin'
   | 'admin.access'
+  | 'admin.log_level.changed'
   | 'api.rate_limit.exceeded'
   | 'api.unauthorized_access'
   | 'ui.artist.form.submitted';
@@ -71,24 +78,22 @@ interface AuditLogEntry {
 
 /**
  * Log a security audit event
- * In production, this should write to a secure logging service
+ * Emitted via the structured logger (timestamp is added by the logger)
  */
 export function logSecurityEvent(entry: Omit<AuditLogEntry, 'timestamp'>): void {
-  const logEntry: AuditLogEntry = {
-    ...entry,
-    timestamp: new Date(),
-  };
+  const { event, userId, email, ip, userAgent, metadata } = entry;
 
-  // In production, send to logging service (e.g., CloudWatch, Datadog, etc.)
-  if (process.env.NODE_ENV === 'production') {
-    // TODO: Implement production logging
-    console.info('[SECURITY_AUDIT]', JSON.stringify(logEntry));
-  } else {
-    console.info('[SECURITY_AUDIT]', logEntry);
-  }
+  loggers.audit.info(event, {
+    event,
+    ...(userId !== undefined && { userId }),
+    ...(email !== undefined && { email }),
+    ...(ip !== undefined && { ip }),
+    ...(userAgent !== undefined && { userAgent }),
+    ...(metadata !== undefined && { metadata }),
+  });
 
   // Consider also storing critical events in database for compliance
-  if (shouldPersistEvent(entry.event)) {
+  if (shouldPersistEvent(event)) {
     // TODO: Store in audit_logs table
   }
 }

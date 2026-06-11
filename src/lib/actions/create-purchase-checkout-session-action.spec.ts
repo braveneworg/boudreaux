@@ -9,6 +9,14 @@ import { createPurchaseCheckoutSessionAction } from './create-purchase-checkout-
 
 vi.mock('server-only', () => ({}));
 
+const { paymentsLoggerMock } = vi.hoisted(() => ({
+  paymentsLoggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: new Proxy({}, { get: () => paymentsLoggerMock }),
+}));
+
 const { mockRateLimitCheck } = vi.hoisted(() => ({
   mockRateLimitCheck: vi.fn().mockResolvedValue(undefined),
 }));
@@ -242,16 +250,14 @@ describe('createPurchaseCheckoutSessionAction', () => {
         id: 'cs_xxx',
         client_secret: null,
       } as never);
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({ success: false, error: 'stripe_error' });
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(paymentsLoggerMock.error).toHaveBeenCalledWith(
         'Checkout session missing client_secret',
-        expect.objectContaining({ sessionId: 'cs_xxx' })
+        undefined,
+        expect.objectContaining({ checkoutId: 'cs_xxx' })
       );
-      consoleErrorSpy.mockRestore();
     });
 
     it('should succeed even when payment_intent is null (deferred in dahlia API)', async () => {
@@ -344,13 +350,10 @@ describe('createPurchaseCheckoutSessionAction', () => {
       vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(
         new Error('Stripe network error')
       );
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({ success: false, error: 'stripe_error' });
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      expect(paymentsLoggerMock.error).toHaveBeenCalled();
     });
 
     it('should use localhost fallback for return_url when AUTH_URL is not set', async () => {

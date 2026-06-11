@@ -5,6 +5,7 @@ import { sendVerificationRequest } from '@/lib/email/send-verification-request';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { BannedIdentityRepository } from '@/lib/repositories/banned-identity-repository';
+import { loggers } from '@/lib/utils/logger';
 
 import type { User } from 'next-auth';
 import type { AdapterUser } from 'next-auth/adapters';
@@ -99,16 +100,16 @@ const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const match = await BannedIdentityRepository.findActiveMatch({ userId, email });
         if (match) {
-          console.warn('[auth.signIn] sign-in rejected for banned identity', {
-            email: email ? `${email[0]}***` : null,
-            userId: userId ?? null,
+          loggers.auth.warn('Sign-in rejected for banned identity', {
+            maskedEmail: email ? `${email[0]}***` : null,
+            userId: userId ?? undefined,
           });
           return false;
         }
       } catch (error) {
         // Fail-open on transient DB errors so a temporary outage does
         // not lock everyone out. The chat-time check still gates abuse.
-        console.error('[auth.signIn] ban check failed; allowing sign-in', error);
+        loggers.auth.error('Ban check failed; allowing sign-in', error);
       }
       return true;
     },
@@ -183,13 +184,11 @@ const { handlers, auth, signIn, signOut } = NextAuth({
             // Security: Check if role has changed - force re-authentication if so
             const oldRole = (token.user as { role?: string }).role;
             if (oldRole && freshUser.role !== oldRole) {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('User role changed - re-authentication required', {
-                  userId: freshUser.id,
-                  oldRole,
-                  newRole: freshUser.role,
-                });
-              }
+              loggers.auth.warn('User role changed - re-authentication required', {
+                userId: freshUser.id,
+                oldRole,
+                newRole: freshUser.role,
+              });
               // Remove the embedded user from the JWT to force re-login without
               // leaving a token where `token.user` is explicitly `null`.
               const { user: _user, ...tokenWithoutUser } = token;
@@ -199,15 +198,8 @@ const { handlers, auth, signIn, signOut } = NextAuth({
             token.user = freshUser;
           }
         } catch (error) {
-          // Log error safely without exposing sensitive data
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Error fetching user data:', error);
-          } else {
-            console.error(
-              'Error fetching user data:',
-              error instanceof Error ? error.message : 'Unknown error'
-            );
-          }
+          // Logger redacts sensitive fields; stack is structured data
+          loggers.auth.error('Error fetching user data', error);
           // Keep existing token data if database fetch fails
         }
       }

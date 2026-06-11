@@ -33,6 +33,7 @@ import { PurchaseService } from '@/lib/services/purchase-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
 import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
+import { loggers } from '@/lib/utils/logger';
 import {
   generatePresignedDownloadUrl,
   getS3BucketName,
@@ -469,7 +470,9 @@ export async function GET(
               userAgent: auditUserAgent,
             });
           } catch (auditError) {
-            console.error('Failed to write CAP_REACHED audit event', { auditError, releaseId });
+            loggers.downloads.error('Failed to write CAP_REACHED audit event', auditError, {
+              releaseId,
+            });
           }
           return Response.json(
             {
@@ -537,7 +540,9 @@ export async function GET(
           userAgent: auditUserAgent,
         });
       } catch (recordError) {
-        console.error('Failed to record successful free download', { recordError, releaseId });
+        loggers.downloads.error('Failed to record successful free download', recordError, {
+          releaseId,
+        });
       }
     };
 
@@ -560,7 +565,9 @@ export async function GET(
           userAgent: auditUserAgent,
         });
       } catch (auditError) {
-        console.error('Failed to write STREAM_FAILED audit event', { auditError, releaseId });
+        loggers.downloads.error('Failed to write STREAM_FAILED audit event', auditError, {
+          releaseId,
+        });
       }
     };
 
@@ -664,11 +671,14 @@ export async function GET(
                   );
                 }
               } catch (analyticsError) {
-                console.error('Failed to record bundle download analytics (cache hit)', {
-                  completedFormats,
+                loggers.downloads.error(
+                  'Failed to record bundle download analytics (cache hit)',
                   analyticsError,
-                  releaseId,
-                });
+                  {
+                    completedFormats,
+                    releaseId,
+                  }
+                );
               }
 
               send('complete', {});
@@ -773,10 +783,9 @@ export async function GET(
                 // fully drain.
                 archiveForSse.append(buffer, { name: entry.entryName });
               } catch (formatError) {
-                console.error(`Failed to append entry to archive`, {
+                loggers.downloads.error('Failed to append entry to archive', formatError, {
                   formatType: entry.formatType,
                   s3Key: entry.s3Key,
-                  formatError,
                 });
                 if (!formatHasError.has(entry.formatType)) {
                   formatHasError.add(entry.formatType);
@@ -846,16 +855,15 @@ export async function GET(
                 );
               }
             } catch (error) {
-              console.error('Failed to record bundle download analytics', {
+              loggers.downloads.error('Failed to record bundle download analytics', error, {
                 completedFormats,
-                error,
                 releaseId,
               });
             }
           } catch (streamError) {
             await abortSseUpload();
             await recordFreeStreamFailure();
-            console.error('Bundle SSE stream error', { streamError });
+            loggers.downloads.error('Bundle SSE stream error', streamError);
             send('error', { message: 'An unexpected error occurred.' });
           }
 
@@ -916,10 +924,11 @@ export async function GET(
           );
         }
       } catch (analyticsError) {
-        console.error('Failed to record bundle download analytics (cache hit, 302 path)', {
+        loggers.downloads.error(
+          'Failed to record bundle download analytics (cache hit, 302 path)',
           analyticsError,
-          releaseId,
-        });
+          { releaseId }
+        );
       }
 
       return new Response(null, {
@@ -992,7 +1001,9 @@ export async function GET(
       const cacheUploadPromise = cacheUpload.done().then(
         () => true,
         (cacheError: unknown) => {
-          console.error('Bundle cache upload failed (stream path)', { tempS3Key, cacheError });
+          loggers.downloads.error('Bundle cache upload failed (stream path)', cacheError, {
+            tempS3Key,
+          });
           return false;
         }
       );
@@ -1053,7 +1064,7 @@ export async function GET(
           }
           archive.finalize();
         } catch (driveError) {
-          console.error('Bundle stream drive error', { driveError, releaseId });
+          loggers.downloads.error('Bundle stream drive error', driveError, { releaseId });
           archive.abort();
           if (!cachePass.destroyed) cachePass.destroy(driveError as Error);
           if (!teeToCache.destroyed) teeToCache.destroy(driveError as Error);
@@ -1103,10 +1114,13 @@ export async function GET(
               )
             );
           } catch (analyticsError) {
-            console.error('Failed to record bundle download analytics (stream path)', {
+            loggers.downloads.error(
+              'Failed to record bundle download analytics (stream path)',
               analyticsError,
-              releaseId,
-            });
+              {
+                releaseId,
+              }
+            );
           }
         });
       }
@@ -1274,16 +1288,13 @@ export async function GET(
       // subsequent requests. The 24-hour S3 lifecycle rule on the
       // `tmp/bundles/` prefix still bounds its lifetime, and a future
       // request will simply reuse it via the cache hit fast path.
-      console.error('Bundle post-upload error (cached ZIP retained)', {
+      loggers.downloads.error('Bundle post-upload error (cached ZIP retained)', postUploadError, {
         tempS3Key,
-        postUploadError,
       });
       throw postUploadError;
     }
   } catch (error) {
-    console.error('Bundle download error', {
-      error,
-    });
+    loggers.downloads.error('Bundle download error', error);
 
     return Response.json(
       { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },

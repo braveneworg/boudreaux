@@ -4,6 +4,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { GET } from './route';
 
+// Minimal request shape for the withAdmin decorator's unauthorized logging
+const mockRequest = {
+  method: 'GET',
+  headers: new Headers(),
+  nextUrl: new URL('http://localhost:3000/api/debug/session'),
+} as never;
+
 const mockAuth = vi.fn();
 
 vi.mock('@/auth', () => ({
@@ -26,7 +33,7 @@ describe('GET /api/debug/session', () => {
   it('should return 404 in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
 
-    const response = await GET(undefined as never, undefined as never);
+    const response = await GET(mockRequest, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -36,7 +43,7 @@ describe('GET /api/debug/session', () => {
   });
 
   it('should return 200 with full session data for admin users', async () => {
-    const response = await GET(undefined as never, undefined as never);
+    const response = await GET(mockRequest, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -52,7 +59,7 @@ describe('GET /api/debug/session', () => {
   it('should return 401 when session is null (withAdmin)', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await GET(undefined as never, undefined as never);
+    const response = await GET(mockRequest, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -64,7 +71,7 @@ describe('GET /api/debug/session', () => {
       user: { id: 'user-1', email: 'user@test.com', role: 'user' },
     });
 
-    const response = await GET(undefined as never, undefined as never);
+    const response = await GET(mockRequest, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -81,7 +88,7 @@ describe('GET /api/debug/session', () => {
       },
     });
 
-    const response = await GET(undefined as never, undefined as never);
+    const response = await GET(mockRequest, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(200);

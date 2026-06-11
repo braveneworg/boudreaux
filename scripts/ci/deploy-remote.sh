@@ -32,7 +32,11 @@ echo "Available disk space: ${AVAILABLE_GB}GB"
 if [ "$AVAILABLE_GB" -lt 2 ]; then
   echo "⚠️  WARNING: Low disk space (${AVAILABLE_GB}GB available)"
   echo "Running Docker cleanup to free space..."
-  docker system prune -af --volumes || true
+  # NOTE: never use --volumes here — it would destroy the loki-data and
+  # grafana-data named volumes (log history + Grafana state) when the
+  # logging stack is stopped.
+  docker system prune -af || true
+  docker builder prune -af || true
 
   AVAILABLE_GB=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
   echo "After cleanup: ${AVAILABLE_GB}GB available"
@@ -298,7 +302,7 @@ fi
 # Container restart
 # ---------------------------------------------------------------------------
 echo "Stopping existing containers..."
-$DOCKER_CMD compose -f docker-compose.prod.yml down --remove-orphans || true
+$DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml down --remove-orphans || true
 
 echo "Removing old containers..."
 $DOCKER_CMD rm -f website nginx 2>/dev/null || true
@@ -310,7 +314,7 @@ echo "  Website image ID: $CURRENT_WEBSITE_ID"
 echo "  Nginx image ID:   $CURRENT_NGINX_ID"
 
 echo "Starting containers with fresh images..."
-$DOCKER_CMD compose -f docker-compose.prod.yml up -d --force-recreate
+$DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d --force-recreate
 
 # Verify containers are running
 echo "Verifying containers started successfully..."
@@ -319,10 +323,24 @@ RUNNING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -E 'website|ngi
 if [ "$RUNNING_CONTAINERS" -lt 2 ]; then
   echo "ERROR: Expected 2 containers (website, nginx) but found $RUNNING_CONTAINERS"
   $DOCKER_CMD ps -a
-  $DOCKER_CMD compose -f docker-compose.prod.yml logs --tail=50
+  $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml logs --tail=50
   exit 1
 fi
 echo "✓ Both containers are running"
+
+# Logging stack (loki/alloy/grafana) is best-effort: warn, never fail.
+LOGGING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -cE '^(loki|alloy|grafana)$' || true)
+if [ "$LOGGING_CONTAINERS" -lt 3 ]; then
+  echo "⚠️  WARNING: logging stack incomplete ($LOGGING_CONTAINERS/3 containers running)"
+else
+  # Loki is not published to the host; probe it over the compose network
+  # via the nginx container (which ships curl).
+  if $DOCKER_CMD exec nginx curl -fsS --max-time 5 http://loki:3100/ready > /dev/null 2>&1; then
+    echo "✓ Logging stack running (Loki ready)"
+  else
+    echo "⚠️  WARNING: Loki not answering /ready yet (non-fatal)"
+  fi
+fi
 
 # Give containers time to fully start serving content
 sleep 5
@@ -350,7 +368,7 @@ if ! curl $CURL_OPTS https://fakefourrecords.com/api/health; then
     $DOCKER_CMD tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
   fi
 
-  $DOCKER_CMD compose -f docker-compose.prod.yml up -d --force-recreate
+  $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d --force-recreate
   sleep 5
   if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
     echo 'Rollback health check failed - manual intervention required'
