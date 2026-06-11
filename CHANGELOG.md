@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.111.0] - 2026-06-11
+
+### Added
+
+- feat: add structured logging and observability (#481)\n- feat: add structured logging and observability (#481)\n- feat: add structured logging and observability (#481)\n
+
 ## [4.110.0] - 2026-06-10
 
 ### Added
