@@ -13,6 +13,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
@@ -87,7 +88,7 @@ export async function createPurchaseSessionAction(
 
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
-    console.error('[createPurchaseSession] AUTH_SECRET is not configured');
+    loggers.payments.error('createPurchaseSession: AUTH_SECRET is not configured');
     return { success: false, error: 'server_error' };
   }
 
@@ -148,11 +149,7 @@ export async function createPurchaseSessionAction(
 
     return { success: true };
   } catch (error) {
-    console.error(error);
-    console.error(
-      '[createPurchaseSession] Failed to create session:',
-      error instanceof Error ? error.message : error
-    );
+    loggers.payments.error('createPurchaseSession: failed to create session', error);
     return { success: false, error: 'server_error' };
   }
 }

@@ -6,7 +6,9 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { extractClientIp } from '@/lib/utils/extract-client-ip';
+import { loggers } from '@/lib/utils/logger';
 
 export { extractClientIp };
 
@@ -36,6 +38,16 @@ export function withRateLimit<TParams = unknown>(limiter: RateLimiter, limit: nu
         try {
           await limiter.check(limit, ip);
         } catch {
+          loggers.http.warn('Rate limit exceeded', {
+            path: request.nextUrl.pathname,
+            method: request.method,
+            ip,
+          });
+          logSecurityEvent({
+            event: 'api.rate_limit.exceeded',
+            ip,
+            metadata: { path: request.nextUrl.pathname, method: request.method },
+          });
           return NextResponse.json(
             { error: 'Too many requests. Please try again later.' },
             { status: 429 }

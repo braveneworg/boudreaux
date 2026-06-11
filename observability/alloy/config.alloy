@@ -1,0 +1,70 @@
+// Grafana Alloy pipeline: Docker container logs → Loki.
+//
+// Label discipline: only `container`, `level`, and `module` become Loki
+// labels (bounded cardinality ≈ 5 containers × 4 levels × ~15 modules).
+// Everything else stays in the JSON log line, queryable with `| json`.
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  // Only ship logs from this stack's containers.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(website|nginx|loki|grafana|alloy)"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.process.pipeline.receiver]
+}
+
+loki.process "pipeline" {
+  // Lift level + module from the app's JSON lines into labels.
+  stage.match {
+    selector = "{container=\"website\"}"
+
+    stage.json {
+      expressions = {
+        level  = "level",
+        module = "module",
+      }
+    }
+
+    stage.labels {
+      values = {
+        level  = "",
+        module = "",
+      }
+    }
+  }
+
+  // Drop health-check noise from the nginx access log.
+  stage.match {
+    selector = "{container=\"nginx\"}"
+
+    stage.drop {
+      expression = ".*GET /(health|api/health).*"
+    }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

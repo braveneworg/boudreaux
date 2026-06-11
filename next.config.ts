@@ -91,7 +91,7 @@ const config = {
   // Note: For API routes like /api/tracks/metadata that need larger uploads,
   // the nginx config has location-specific client_max_body_size settings.
   // For local development, Next.js uses Node.js defaults which should handle larger files.
-  serverExternalPackages: ['node-id3'],
+  serverExternalPackages: ['node-id3', 'winston'],
   experimental: {
     // Inline initial route CSS in production to remove the stylesheet
     // request waterfall on first visit. This targets the render-blocking

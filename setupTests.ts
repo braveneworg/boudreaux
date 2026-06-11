@@ -36,21 +36,26 @@ vi.mock('next/server', () => {
       this.nextUrl = new URL(url);
     }
   }
+  // Class (not plain object) so `new NextResponse(null, { status: 204 })` works too.
+  // Statics are attached via Object.assign because their simplified return
+  // shapes are intentionally narrower than the native Response statics.
+  class MockNextResponse extends Response {}
+  Object.assign(MockNextResponse, {
+    // eslint-disable-next-line no-undef
+    json: vi.fn((data: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
+      json: async () => data,
+      status: init?.status ?? 200,
+      headers: new Headers(init?.headers),
+    })),
+    next: vi.fn(() => ({ type: 'next' })),
+    redirect: vi.fn((url: string | URL, init?: { status?: number }) => ({
+      headers: new Headers({ Location: String(url) }),
+      status: init?.status ?? 307,
+    })),
+  });
   return {
     NextRequest: MockNextRequest,
-    NextResponse: {
-      // eslint-disable-next-line no-undef
-      json: vi.fn((data: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
-        json: async () => data,
-        status: init?.status ?? 200,
-        headers: new Headers(init?.headers),
-      })),
-      next: vi.fn(() => ({ type: 'next' })),
-      redirect: vi.fn((url: string | URL, init?: { status?: number }) => ({
-        headers: new Headers({ Location: String(url) }),
-        status: init?.status ?? 307,
-      })),
-    },
+    NextResponse: MockNextResponse,
   };
 });
 

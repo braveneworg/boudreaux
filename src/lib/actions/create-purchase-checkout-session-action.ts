@@ -9,6 +9,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
 
@@ -113,12 +114,19 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     });
 
     if (!session.client_secret) {
-      console.error('Checkout session missing client_secret', {
-        sessionId: session.id,
+      loggers.payments.error('Checkout session missing client_secret', undefined, {
+        checkoutId: session.id,
         uiMode: 'elements',
       });
       return { success: false, error: 'stripe_error' };
     }
+
+    loggers.payments.info('Purchase checkout session created', {
+      checkoutId: session.id,
+      releaseId,
+      ...(userId ? { userId } : {}),
+      amountCents: session.amount_total ?? undefined,
+    });
 
     return {
       success: true,
@@ -126,7 +134,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       sessionId: session.id,
     };
   } catch (error) {
-    console.error('Failed to create purchase checkout session:', error);
+    loggers.payments.error('Failed to create purchase checkout session', error);
     return { success: false, error: 'stripe_error' };
   }
 }

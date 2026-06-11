@@ -8,6 +8,16 @@ import { extractClientIp, withRateLimit } from './with-rate-limit';
 
 vi.mock('server-only', () => ({}));
 
+// Mock structured logging
+const httpWarnMock = vi.hoisted(() => vi.fn());
+const logSecurityEventMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { http: { warn: httpWarnMock } },
+}));
+vi.mock('@/lib/utils/audit-log', () => ({
+  logSecurityEvent: logSecurityEventMock,
+}));
+
 vi.mock('next/server', () => {
   class MockNextResponse {
     body: unknown;
@@ -28,6 +38,8 @@ vi.mock('next/server', () => {
 const createMockRequest = (headers: Record<string, string> = {}): NextRequest => {
   const headerMap = new Map(Object.entries(headers));
   return {
+    method: 'GET',
+    nextUrl: new URL('http://localhost:3000/api/test'),
     headers: {
       get: (name: string) => headerMap.get(name) ?? null,
     },
@@ -88,6 +100,35 @@ describe('withRateLimit', () => {
 
     expect(response).toMatchObject({ status: 429 });
     expect(mockHandler).not.toHaveBeenCalled();
+  });
+
+  it('should log a warning and security event on 429', async () => {
+    mockLimiter.check.mockRejectedValue(new Error('Rate limit exceeded'));
+    const wrapped = withRateLimit(mockLimiter, 10)(mockHandler);
+
+    await wrapped(createMockRequest({ 'x-real-ip': '1.2.3.4' }), mockContext);
+
+    expect(httpWarnMock).toHaveBeenCalledWith(
+      'Rate limit exceeded',
+      expect.objectContaining({ path: '/api/test', method: 'GET', ip: '1.2.3.4' })
+    );
+    expect(logSecurityEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'api.rate_limit.exceeded',
+        ip: '1.2.3.4',
+        metadata: expect.objectContaining({ path: '/api/test' }),
+      })
+    );
+  });
+
+  it('should not log when the rate limit is not exceeded', async () => {
+    mockLimiter.check.mockResolvedValue(undefined);
+    const wrapped = withRateLimit(mockLimiter, 10)(mockHandler);
+
+    await wrapped(createMockRequest({ 'x-real-ip': '1.2.3.4' }), mockContext);
+
+    expect(httpWarnMock).not.toHaveBeenCalled();
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
   });
 
   it('should skip rate limiting when E2E_MODE is true', async () => {

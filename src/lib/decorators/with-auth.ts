@@ -14,6 +14,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 import { auth } from '@/auth';
+import { extractRequestMetadata, logSecurityEvent } from '@/lib/utils/audit-log';
+import { loggers } from '@/lib/utils/logger';
 
 interface Session {
   user: {
@@ -30,6 +32,24 @@ type AuthenticatedHandler<TParams = unknown> = (
   session: Session
 ) => Promise<NextResponse> | NextResponse;
 
+const logUnauthorized = (request: NextRequest, status: 401 | 403, userId?: string): void => {
+  const { ip, userAgent } = extractRequestMetadata(request);
+  loggers.auth.warn('Unauthorized API access', {
+    status,
+    path: request.nextUrl.pathname,
+    method: request.method,
+    ip,
+    ...(userId !== undefined && { userId }),
+  });
+  logSecurityEvent({
+    event: 'api.unauthorized_access',
+    ...(userId !== undefined && { userId }),
+    ip,
+    userAgent,
+    metadata: { status, path: request.nextUrl.pathname, method: request.method },
+  });
+};
+
 // Authentication decorator
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
@@ -39,6 +59,7 @@ export function withAuth<TParams = unknown>(handler: AuthenticatedHandler<TParam
 
     // Check authentication and validate session structure
     if (!session?.user?.id) {
+      logUnauthorized(request, 401);
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
@@ -57,11 +78,13 @@ export function withAdmin<TParams = unknown>(handler: AuthenticatedHandler<TPara
 
     // Check authentication first and validate session structure
     if (!session?.user?.id) {
+      logUnauthorized(request, 401);
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Check role authorization
     if (session.user?.role !== role) {
+      logUnauthorized(request, 403, session.user.id);
       return NextResponse.json(
         { error: 'Insufficient permissions', required: role },
         { status: 403 }

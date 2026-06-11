@@ -1,0 +1,127 @@
+# Log aggregation stack: Grafana Alloy (collector) → Loki (store) → Grafana (UI).
+#
+# Deployed alongside the app:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d
+#
+# Sized for a single t3.large (2 vCPU / 8 GB) next to the app's 2 CPU / 2 GB cap:
+# hard limits total 1.25 CPU / ~1.15 GB for the whole stack. A failure here must
+# never take the app down — nginx reaches Grafana through a Docker-DNS variable
+# upstream, and deploy health checks only gate on website+nginx.
+services:
+  loki:
+    image: grafana/loki:3.7.2
+    container_name: loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    # Official image's loki user; required so the read-only rootfs + named
+    # volume permissions line up.
+    user: '10001:10001'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    # Never published to the host — only reachable on the compose network.
+    expose:
+      - '3100'
+    networks:
+      - app-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  alloy:
+    image: grafana/alloy:v1.16.3
+    container_name: alloy
+    restart: unless-stopped
+    command: ['run', '/etc/alloy/config.alloy', '--storage.path=/tmp/alloy']
+    # Runs as root (image default) because it needs the docker.sock; mitigated
+    # by the read-only socket mount, cap_drop ALL, no-new-privileges, and no
+    # published ports. Follow-up hardening: a docker-socket-proxy container.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    depends_on:
+      - loki
+    networks:
+      - app-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  grafana:
+    image: grafana/grafana-oss:12.4.3
+    container_name: grafana
+    restart: unless-stopped
+    user: '472'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      # Served at a subpath behind nginx; the /grafana/ prefix must NOT be
+      # stripped by the proxy (see nginx/nginx.conf).
+      GF_SERVER_ROOT_URL: https://fakefourrecords.com/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    depends_on:
+      - loki
+    expose:
+      - '3000'
+    networks:
+      - app-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+volumes:
+  # State volumes — excluded from low-disk pruning (deploy-remote.sh must not
+  # use `docker system prune --volumes`).
+  loki-data:
+  grafana-data:

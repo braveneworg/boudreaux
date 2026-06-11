@@ -8,10 +8,12 @@ import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_FREE_DOWNLOAD_QUOTA, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { withAuth } from '@/lib/decorators/with-auth';
+import { withLogging } from '@/lib/decorators/with-logging';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { DownloadAuthorizationService } from '@/lib/services/download-authorization-service';
 import { QuotaEnforcementService } from '@/lib/services/quota-enforcement-service';
+import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /**
@@ -27,8 +29,8 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
  * 5. Log download event
  * 6. Return signed URL
  */
-export const GET = withAuth<{ id: string; formatType: string }>(
-  async (request, context, session) => {
+export const GET = withLogging<{ id: string; formatType: string }>('DOWNLOADS')(
+  withAuth<{ id: string; formatType: string }>(async (request, context, session) => {
     try {
       // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
       // matching the `withRateLimit` decorator on the sibling free-status route.
@@ -200,7 +202,7 @@ export const GET = withAuth<{ id: string; formatType: string }>(
         { status: 200 }
       );
     } catch (error) {
-      console.error('Download authorization error:', error);
+      loggers.downloads.error('Download authorization error', error);
 
       return NextResponse.json(
         {
@@ -211,5 +213,5 @@ export const GET = withAuth<{ id: string; formatType: string }>(
         { status: 500 }
       );
     }
-  }
+  })
 );

@@ -6,6 +6,7 @@ import 'server-only';
 
 import { MAX_FREE_DOWNLOAD_QUOTA } from '@/lib/constants/digital-formats';
 import { UserDownloadQuotaRepository } from '@/lib/repositories/user-download-quota-repository';
+import { loggers } from '@/lib/utils/logger';
 import type { DownloadSubject } from '@/types/download-subject';
 
 export interface QuotaCheckResult {
@@ -58,6 +59,12 @@ export class QuotaEnforcementService {
     }
 
     if (uniqueDownloads >= this.maxQuota) {
+      loggers.downloads.warn('Free download quota exhausted', {
+        subjectKind: subject.kind,
+        ...(subject.kind === 'user' && { userId: subject.userId }),
+        releaseId,
+        uniqueDownloads,
+      });
       return {
         allowed: false,
         reason: 'QUOTA_EXCEEDED',
