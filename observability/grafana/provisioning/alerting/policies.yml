@@ -1,0 +1,12 @@
+# Route every alert to the ops email; re-notify at most every 4 hours while
+# an alert stays firing.
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: ops-email
+    group_by:
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

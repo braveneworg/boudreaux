@@ -73,6 +73,29 @@ mint their own UUID. To reconstruct one request end to end:
 sum by (module) (count_over_time({container="website", level="error"}[5m]))
 ```
 
+## Alerting
+
+Grafana's built-in alerting is provisioned from
+`observability/grafana/provisioning/alerting/` and emails the address in the
+`GRAFANA_ALERT_EMAIL` GitHub secret via the existing SES SMTP credentials
+(`GF_SMTP_*` on the grafana container). Re-notification at most every 4 h.
+
+| Rule                        | Fires when                                     |
+| --------------------------- | ---------------------------------------------- |
+| High server error rate      | > 5 `level=error` lines in 5 m (sustained 5 m) |
+| Uncaught server error       | any `module=UNCAUGHT` entry                    |
+| Authorization failure spike | > 30 401/403 warns in 5 m                      |
+| Rate limit spike            | > 50 429 warns in 5 m                          |
+| Payment flow error          | any `module=PAYMENTS` error in 10 m            |
+
+`noDataState: OK` (quiet site is normal); `execErrState: Alerting` so a
+broken Loki or query surfaces instead of failing silently.
+
+Dashboards: **"Boudreaux — Request Latency"** (p50/p95/p99 overall and per
+module from the `durationMs` field, request rate, slow-request log panel with
+`requestId`). Caveat: 2xx responses are sampled 1-in-20, so percentiles are
+estimates weighted toward errors under low traffic.
+
 ## Retention & volume limits
 
 | Layer                        | Limit                                              |

@@ -1,0 +1,180 @@
+# Loki-based alert rules. Quiet periods are normal for this site, so
+# noDataState is OK everywhere; execErrState is Alerting so a broken Loki
+# (or broken query) surfaces instead of failing silently.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: boudreaux-log-alerts
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: app-error-rate
+        title: High server error rate
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: More than 5 server errors in 5 minutes
+          description: 'Check Grafana: {container="website", level="error"} and group by module.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", level="error"}[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 5
+
+      - uid: app-uncaught-error
+        title: Uncaught server error
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: An unhandled server/RSC error reached onRequestError
+          description: 'Query {container="website", module="UNCAUGHT"} for the digest and requestId.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", module="UNCAUGHT"}[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+
+      - uid: app-auth-abuse
+        title: Authorization failure spike
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: More than 30 401/403 responses in 5 minutes
+          description: Possible credential stuffing or endpoint probing — check ips in the AUTH warns.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", level="warn"} |= `Unauthorized API access` [5m]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 30
+
+      - uid: app-rate-limit-spike
+        title: Rate limit spike
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: More than 50 rate-limited requests in 5 minutes
+          description: Sustained 429s — likely a scraper or abuse; check ips in the HTTP warns.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", level="warn"} |= `Rate limit exceeded` [5m]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 50
+
+      - uid: app-payments-error
+        title: Payment flow error
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: An error was logged in the payments module
+          description: 'Checkout/purchase path failed — query {container="website", module="PAYMENTS", level="error"}.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", module="PAYMENTS", level="error"}[10m]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0

@@ -455,6 +455,7 @@ jobs:
           UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_ALERT_EMAIL=${{ secrets.GRAFANA_ALERT_EMAIL }}
           LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
           EOF
 
