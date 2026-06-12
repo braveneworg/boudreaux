@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.112.0] - 2026-06-12
+
+### Added
+
+- Feature/add logging and observability (#484)\n- Feature/add logging and observability (#484)\n- Feature/add logging and observability (#484)\n- docs: add SNS policy to deploy-role IAM setup (#483)\n- docs: add SNS policy to deploy-role IAM setup (#483)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- Feature/add logging and observability (#484)\n
+
 ## [4.111.0] - 2026-06-11
 
 ### Added
