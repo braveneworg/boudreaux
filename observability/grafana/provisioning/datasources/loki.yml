@@ -1,5 +1,13 @@
 apiVersion: 1
 
+# The first deploy provisioned this datasource without an explicit uid;
+# Grafana cannot change the uid of an existing provisioned datasource
+# (boot fails with "data source not found"). Delete by name so the entry
+# below recreates it with the stable uid. No-op on fresh volumes.
+deleteDatasources:
+  - name: Loki
+    orgId: 1
+
 datasources:
   - name: Loki
     type: loki
