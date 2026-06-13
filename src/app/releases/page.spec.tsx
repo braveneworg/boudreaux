@@ -10,7 +10,7 @@ import ReleasesPage from './page';
 vi.mock('server-only', () => ({}));
 
 // Mock TanStack Query SSR utilities
-const mockPrefetchQuery = vi
+const mockPrefetchInfiniteQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
@@ -25,12 +25,15 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
-    prefetchQuery: mockPrefetchQuery,
+    prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
   }),
 }));
 
-vi.mock('@/lib/utils/fetch-api', () => ({
-  fetchApi: vi.fn(),
+const mockGetPublishedReleases = vi.fn().mockResolvedValue({ success: true, data: [] });
+vi.mock('@/lib/services/release-service', () => ({
+  ReleaseService: {
+    getPublishedReleases: (...args: unknown[]) => mockGetPublishedReleases(...args),
+  },
 }));
 
 // Mock child components
@@ -97,15 +100,29 @@ describe('ReleasesPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
-  it('should prefetch published releases data', async () => {
+  it('should prefetch the first published-releases page as an infinite query', async () => {
+    mockGetPublishedReleases.mockResolvedValue({
+      success: true,
+      data: [{ id: 'release-1', title: 'E2E Release' }],
+    });
+
     const Page = await ReleasesPage();
     render(Page);
 
-    expect(mockPrefetchQuery).toHaveBeenCalledExactlyOnceWith(
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['releases', 'published'],
+        queryKey: ['releases', 'publishedInfinite', ''],
+        initialPageParam: 0,
       })
     );
+    // Reads the service directly (no self-HTTP) for the first page.
+    expect(mockGetPublishedReleases).toHaveBeenCalledWith({ skip: 0, take: 24 });
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({
+      rows: [{ id: 'release-1', title: 'E2E Release' }],
+      nextSkip: null,
+    });
   });
 
   it('should render ReleasesContent within HydrationBoundary', async () => {

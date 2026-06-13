@@ -55,31 +55,39 @@ const createWrapper = () => {
   return Wrapper;
 };
 
+/** Wraps an array of release rows in the infinite-query page shape. */
+const toInfiniteResult = (rows: unknown[]) => ({
+  isPending: false,
+  error: null,
+  data: { pages: [{ rows, nextSkip: null }] },
+  refetch: vi.fn(),
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+});
+
 describe('ReleaseDataView', () => {
-  const mockReleases = {
-    releases: [
-      {
-        id: 'release-123',
-        title: 'Test Album',
-        releasedOn: '2024-01-15',
-        catalogNumber: 'TEST-001',
-        coverArt: 'https://example.com/cover.jpg',
-        formats: ['DIGITAL', 'VINYL'],
-        images: [],
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-        publishedAt: null,
-        deletedOn: null,
-      },
-    ],
-    count: 1,
-  };
+  const mockReleaseRows = [
+    {
+      id: 'release-123',
+      title: 'Test Album',
+      releasedOn: '2024-01-15',
+      catalogNumber: 'TEST-001',
+      coverArt: 'https://example.com/cover.jpg',
+      formats: ['DIGITAL', 'VINYL'],
+      images: [],
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+      publishedAt: null,
+      deletedOn: null,
+    },
+  ];
+
   it('should render loading state when pending', () => {
     vi.mocked(useReleasesQuery).mockReturnValue({
+      ...toInfiniteResult([]),
       isPending: true,
-      error: null,
-      data: null,
-      refetch: vi.fn(),
+      data: undefined,
     } as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
@@ -89,10 +97,9 @@ describe('ReleaseDataView', () => {
 
   it('should render error state when error occurs', () => {
     vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
+      ...toInfiniteResult([]),
       error: Error('Failed to fetch'),
-      data: null,
-      refetch: vi.fn(),
+      data: undefined,
     } as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
@@ -101,12 +108,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should render releases when data is loaded', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: mockReleases,
-      refetch: vi.fn(),
-    } as never);
+    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -116,12 +118,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should display release fields correctly', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: mockReleases,
-      refetch: vi.fn(),
-    } as never);
+    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -133,9 +130,7 @@ describe('ReleaseDataView', () => {
   it('should call refetch function from hook', async () => {
     const mockRefetch = vi.fn();
     vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: mockReleases,
+      ...toInfiniteResult(mockReleaseRows),
       refetch: mockRefetch,
     } as never);
 
@@ -145,17 +140,11 @@ describe('ReleaseDataView', () => {
       expect(screen.getByText('Test Album')).toBeInTheDocument();
     });
 
-    // The refetch should be available to the DataView component
     expect(mockRefetch).toBeDefined();
   });
 
   it('should render with empty releases array', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: { releases: [], count: 0 },
-      refetch: vi.fn(),
-    } as never);
+    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult([]) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -166,41 +155,25 @@ describe('ReleaseDataView', () => {
 
   describe('albumArtist computation', () => {
     it('should display album artist from artistReleases', async () => {
-      const releasesWithArtist = {
-        releases: [
-          {
-            id: 'release-123',
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            catalogNumber: 'TEST-001',
-            coverArt: null,
-            formats: ['DIGITAL'],
-            images: [],
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01',
-            publishedAt: null,
-            deletedOn: null,
-            artistReleases: [
-              {
-                id: 'ar-1',
-                artist: {
-                  id: 'artist-1',
-                  name: 'john-smith',
-                  displayName: 'John Smith',
-                },
+      const rows = [
+        {
+          ...mockReleaseRows[0],
+          coverArt: null,
+          formats: ['DIGITAL'],
+          artistReleases: [
+            {
+              id: 'ar-1',
+              artist: {
+                id: 'artist-1',
+                name: 'john-smith',
+                displayName: 'John Smith',
               },
-            ],
-          },
-        ],
-        count: 1,
-      };
+            },
+          ],
+        },
+      ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: releasesWithArtist,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -210,49 +183,27 @@ describe('ReleaseDataView', () => {
     });
 
     it('should display multiple album artists joined by comma', async () => {
-      const releasesWithMultipleArtists = {
-        releases: [
-          {
-            id: 'release-123',
-            title: 'Collab Album',
-            releasedOn: '2024-01-15',
-            catalogNumber: 'COLLAB-001',
-            coverArt: null,
-            formats: ['DIGITAL'],
-            images: [],
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01',
-            publishedAt: null,
-            deletedOn: null,
-            artistReleases: [
-              {
-                id: 'ar-1',
-                artist: {
-                  id: 'artist-1',
-                  name: 'john-lennon',
-                  displayName: 'John Lennon',
-                },
-              },
-              {
-                id: 'ar-2',
-                artist: {
-                  id: 'artist-2',
-                  name: 'paul-mccartney',
-                  displayName: 'Paul McCartney',
-                },
-              },
-            ],
-          },
-        ],
-        count: 1,
-      };
+      const rows = [
+        {
+          ...mockReleaseRows[0],
+          title: 'Collab Album',
+          catalogNumber: 'COLLAB-001',
+          coverArt: null,
+          formats: ['DIGITAL'],
+          artistReleases: [
+            {
+              id: 'ar-1',
+              artist: { id: 'artist-1', name: 'john-lennon', displayName: 'John Lennon' },
+            },
+            {
+              id: 'ar-2',
+              artist: { id: 'artist-2', name: 'paul-mccartney', displayName: 'Paul McCartney' },
+            },
+          ],
+        },
+      ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: releasesWithMultipleArtists,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -262,80 +213,44 @@ describe('ReleaseDataView', () => {
     });
 
     it('should display dash when no artistReleases exist', async () => {
-      const releasesWithoutArtist = {
-        releases: [
-          {
-            id: 'release-123',
-            title: 'No Artist Album',
-            releasedOn: '2024-01-15',
-            catalogNumber: 'NONE-001',
-            coverArt: null,
-            formats: ['DIGITAL'],
-            images: [],
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01',
-            publishedAt: null,
-            deletedOn: null,
-            artistReleases: [],
-          },
-        ],
-        count: 1,
-      };
+      const rows = [
+        {
+          ...mockReleaseRows[0],
+          title: 'No Artist Album',
+          catalogNumber: 'NONE-001',
+          coverArt: null,
+          formats: ['DIGITAL'],
+          artistReleases: [],
+        },
+      ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: releasesWithoutArtist,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
       await waitFor(() => {
-        // Title should render
         expect(screen.getByText('No Artist Album')).toBeInTheDocument();
-        // The dash should appear somewhere in the rendered output (multiple dashes for different fields)
         const dashes = screen.getAllByText('-');
         expect(dashes.length).toBeGreaterThan(0);
       });
     });
 
     it('should use artist name when displayName is null', async () => {
-      const releasesWithNameOnly = {
-        releases: [
-          {
-            id: 'release-123',
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            catalogNumber: 'TEST-001',
-            coverArt: null,
-            formats: ['DIGITAL'],
-            images: [],
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01',
-            publishedAt: null,
-            deletedOn: null,
-            artistReleases: [
-              {
-                id: 'ar-1',
-                artist: {
-                  id: 'artist-1',
-                  name: 'the-band',
-                  displayName: null,
-                },
-              },
-            ],
-          },
-        ],
-        count: 1,
-      };
+      const rows = [
+        {
+          ...mockReleaseRows[0],
+          coverArt: null,
+          formats: ['DIGITAL'],
+          artistReleases: [
+            {
+              id: 'ar-1',
+              artist: { id: 'artist-1', name: 'the-band', displayName: null },
+            },
+          ],
+        },
+      ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: releasesWithNameOnly,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -345,89 +260,47 @@ describe('ReleaseDataView', () => {
     });
 
     it('should handle undefined artistReleases', async () => {
-      const releasesWithUndefinedArtists = {
-        releases: [
-          {
-            id: 'release-123',
-            title: 'Test Album Undefined',
-            releasedOn: '2024-01-15',
-            catalogNumber: 'TEST-001',
-            coverArt: null,
-            formats: ['DIGITAL'],
-            images: [],
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01',
-            publishedAt: null,
-            deletedOn: null,
-            // artistReleases is undefined
-          },
-        ],
-        count: 1,
-      };
+      const rows = [
+        {
+          ...mockReleaseRows[0],
+          title: 'Test Album Undefined',
+          coverArt: null,
+          formats: ['DIGITAL'],
+          // artistReleases is undefined
+        },
+      ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: releasesWithUndefinedArtists,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
       await waitFor(() => {
-        // Title should render
         expect(screen.getByText('Test Album Undefined')).toBeInTheDocument();
-        // The dash should appear somewhere for undefined artistReleases (multiple dashes for different fields)
         const dashes = screen.getAllByText('-');
         expect(dashes.length).toBeGreaterThan(0);
       });
     });
 
     it('should include albumArtist in fieldsToShow', async () => {
-      vi.mocked(useReleasesQuery).mockReturnValue({
-        isPending: false,
-        error: null,
-        data: mockReleases,
-        refetch: vi.fn(),
-      } as never);
+      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
       await waitFor(() => {
-        // The DataView should render the albumArtist column header
         expect(screen.getByText('Album Artist')).toBeInTheDocument();
       });
     });
   });
 
-  it('should handle null data when not pending and no error', () => {
+  it('should handle empty data when not pending and no error', () => {
     vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: null,
-      refetch: vi.fn(),
+      ...toInfiniteResult([]),
+      data: undefined,
     } as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
-    // transformedData will be null since !data?.releases is true
-    // Component should render DataView with null data (no crash)
-    expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
-    expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
-  });
-
-  it('should handle data with undefined releases property', () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: { count: 0 },
-      refetch: vi.fn(),
-    } as never);
-
-    render(<ReleaseDataView />, { wrapper: createWrapper() });
-
-    // data exists but data.releases is undefined, so !data?.releases is true
-    // transformedData will be null
+    // No pages → flattened rows are empty; renders without crashing.
     expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
     expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
   });

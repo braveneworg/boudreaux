@@ -66,23 +66,61 @@ describe('TourRepository', () => {
       });
     });
 
-    it('applies search and pagination', async () => {
+    it('applies search across tour, venue, and headliner fields with page/limit pagination', async () => {
       vi.mocked(prisma.tour.findMany).mockResolvedValue([mockTour] as never);
 
       await TourRepository.findAll({ search: 'Summer', page: 2, limit: 25 });
 
+      const contains = { contains: 'Summer', mode: 'insensitive' };
       expect(prisma.tour.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 25,
           take: 25,
           where: {
             OR: [
-              { title: { contains: 'Summer', mode: 'insensitive' } },
-              { subtitle: { contains: 'Summer', mode: 'insensitive' } },
-              { description: { contains: 'Summer', mode: 'insensitive' } },
+              { title: contains },
+              { subtitle: contains },
+              { subtitle2: contains },
+              { description: contains },
+              {
+                tourDates: {
+                  some: {
+                    OR: [
+                      {
+                        venue: {
+                          OR: [{ name: contains }, { city: contains }, { state: contains }],
+                        },
+                      },
+                      {
+                        headliners: {
+                          some: {
+                            artist: {
+                              OR: [
+                                { firstName: contains },
+                                { surname: contains },
+                                { displayName: contains },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
             ],
           },
         })
+      );
+    });
+
+    it('applies skip/take pagination in preference to page/limit', async () => {
+      vi.mocked(prisma.tour.findMany).mockResolvedValue([mockTour] as never);
+
+      await TourRepository.findAll({ skip: 24, take: 24 });
+
+      expect(prisma.tour.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 24, take: 24 })
       );
     });
   });
@@ -213,12 +251,38 @@ describe('TourRepository', () => {
 
       await TourRepository.count({ search: 'Summer' });
 
+      const contains = { contains: 'Summer', mode: 'insensitive' };
       expect(prisma.tour.count).toHaveBeenCalledWith({
         where: {
           OR: [
-            { title: { contains: 'Summer', mode: 'insensitive' } },
-            { subtitle: { contains: 'Summer', mode: 'insensitive' } },
-            { description: { contains: 'Summer', mode: 'insensitive' } },
+            { title: contains },
+            { subtitle: contains },
+            { subtitle2: contains },
+            { description: contains },
+            {
+              tourDates: {
+                some: {
+                  OR: [
+                    {
+                      venue: { OR: [{ name: contains }, { city: contains }, { state: contains }] },
+                    },
+                    {
+                      headliners: {
+                        some: {
+                          artist: {
+                            OR: [
+                              { firstName: contains },
+                              { surname: contains },
+                              { displayName: contains },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
           ],
         },
       });

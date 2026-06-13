@@ -3,8 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
+import { useDebounce } from '@/app/hooks/use-debounce';
 import { useReleasesQuery } from '@/app/hooks/use-releases-query';
 import { ENTITIES } from '@/lib/constants';
 import type { Release } from '@/lib/types/media-models';
@@ -37,19 +38,27 @@ export const ReleaseDataView = () => {
     'updatedAt',
     'publishedAt',
   ];
-  const { isPending, error, data, refetch } = useReleasesQuery();
 
-  // Transform data to add computed albumArtist field
-  const transformedData = useMemo(() => {
-    if (!data?.releases) return null;
+  const [search, setSearch] = useState('');
+  const [showPublished, setShowPublished] = useState(true);
+  const [showUnpublished, setShowUnpublished] = useState(true);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const debouncedSearch = useDebounce(search);
 
-    const releasesWithArtist = data.releases.map((release: Release) => ({
-      ...release,
-      albumArtist: getAlbumArtist(release),
-    }));
+  // Both same → no publish filter; otherwise the enabled one.
+  const published = showPublished === showUnpublished ? null : showPublished;
 
-    return { releases: releasesWithArtist };
-  }, [data]);
+  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
+
+  // Flatten the infinite pages and add the computed albumArtist field.
+  const rows = useMemo(
+    () =>
+      data?.pages
+        .flatMap((page) => page.rows)
+        .map((release) => ({ ...release, albumArtist: getAlbumArtist(release) })) ?? [],
+    [data]
+  );
 
   if (error) {
     return <div>Error loading releases</div>;
@@ -62,12 +71,24 @@ export const ReleaseDataView = () => {
   return (
     <DataView<Release & { albumArtist: string }>
       entity={ENTITIES.release}
-      data={transformedData}
+      data={{ releases: rows }}
       fieldsToShow={fieldsToShow}
       imageField="images"
       forceHardDelete
       refetch={refetch}
       isPending={isPending}
+      error={null}
+      hasNextPage={hasNextPage}
+      fetchNextPage={fetchNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      searchValue={search}
+      onSearchChange={setSearch}
+      showPublished={showPublished}
+      onShowPublishedChange={setShowPublished}
+      showUnpublished={showUnpublished}
+      onShowUnpublishedChange={setShowUnpublished}
+      showDeleted={showDeleted}
+      onShowDeletedChange={setShowDeleted}
     />
   );
 };

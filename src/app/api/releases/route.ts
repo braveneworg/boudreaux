@@ -7,12 +7,16 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_TAKE = 24;
+const MAX_TAKE = 100;
 
 /**
  * GET /api/releases
@@ -28,7 +32,14 @@ export async function GET(request: NextRequest) {
     const listing = searchParams.get('listing');
 
     if (listing === 'published') {
-      const result = await ReleaseService.getPublishedReleases();
+      const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
+      const take = Math.min(
+        Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+        MAX_TAKE
+      );
+      const search = searchParams.get('search') ?? undefined;
+
+      const result = await ReleaseService.getPublishedReleases({ skip, take, search });
 
       if (!result.success) {
         return NextResponse.json(
@@ -38,33 +49,41 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { releases: result.data, count: result.data.length },
+        { rows: result.data, nextSkip: computeNextSkip(result.data.length, skip, take) },
         {
           headers: {
-            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+            // Search/offset pages vary per request; do not share-cache them.
+            'Cache-Control': 'no-store',
           },
         }
       );
     }
 
-    const skip = searchParams.get('skip');
-    const take = searchParams.get('take');
+    const skipParam = searchParams.get('skip');
+    const takeParam = searchParams.get('take');
     const search = searchParams.get('search');
     const artistIds = searchParams.getAll('artistIds');
     const published = searchParams.get('published');
+    const deleted = searchParams.get('deleted') === 'true';
 
     const session = await auth();
     if (!session?.user?.id || session.user?.role !== 'admin') {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const MAX_TAKE = 100;
+    const skip = Math.max(0, parseInt(skipParam ?? '0', 10) || 0);
+    const take = Math.min(
+      Math.max(1, parseInt(takeParam ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+      MAX_TAKE
+    );
+
     const params = {
-      ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
-      ...(take && { take: Math.min(Math.max(1, parseInt(take, 10)), MAX_TAKE) }),
+      skip,
+      take,
       ...(search && { search }),
       ...(artistIds.length > 0 && { artistIds }),
       ...(published !== null && { published: published === 'true' }),
+      ...(deleted && { deleted }),
     };
 
     const result = await ReleaseService.getReleases(params);
@@ -78,8 +97,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        releases: result.data,
-        count: result.data.length,
+        rows: result.data,
+        nextSkip: computeNextSkip(result.data.length, skip, take),
       },
       {
         headers: {

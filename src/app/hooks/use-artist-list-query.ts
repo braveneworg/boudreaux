@@ -44,8 +44,8 @@ const fetchArtistList = async (
   if (!response.ok) {
     throw Error('Failed to fetch artists');
   }
-  const json = (await response.json()) as { artists: ArtistListItem[] };
-  return json.artists;
+  const json = (await response.json()) as { rows: ArtistListItem[] };
+  return json.rows;
 };
 
 /**

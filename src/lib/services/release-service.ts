@@ -21,6 +21,13 @@ import { withCache } from '@/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
 
+/**
+ * Default page size for the public published-releases listing. Mirrors the
+ * client-side `PUBLISHED_RELEASES_PAGE_SIZE` in `use-published-releases-query`
+ * (kept as a separate constant because this module is `server-only`).
+ */
+const PUBLISHED_RELEASES_PAGE_SIZE = 24;
+
 export class ReleaseService {
   /**
    * Create a new release
@@ -115,25 +122,51 @@ export class ReleaseService {
   }
 
   /**
-   * Get all releases with optional filters
+   * Get all releases with optional filters.
+   *
+   * Supports server-side `search` plus `published`/`deleted` filtering for the
+   * admin listing. The search OR and the deletedOn OR are combined under `AND`
+   * so the two `OR` keys never collide (Prisma 6 + MongoDB null-safe pattern).
+   *
+   * - `published === true` → only releases with a `publishedAt` date.
+   * - `published === false` → only releases without a `publishedAt` date.
+   * - `published == null` → no publish filter.
+   * - `deleted` falsy → exclude soft-deleted releases; `deleted === true` → include them.
    */
   static async getReleases(params?: {
     skip?: number;
     take?: number;
     search?: string;
     artistIds?: string[];
+    published?: boolean;
+    deleted?: boolean;
   }): Promise<ServiceResponse<Release[]>> {
     try {
-      const { skip = 0, take = 50, search, artistIds } = params || {};
+      const { skip = 0, take = 50, search, artistIds, published, deleted } = params || {};
+
+      const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+      const and: Prisma.ReleaseWhereInput[] = [];
+
+      if (!deleted) {
+        and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
+      }
+      if (published === true) {
+        and.push({ publishedAt: { not: null } });
+      } else if (published === false) {
+        and.push({ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] });
+      }
+      if (search) {
+        and.push({
+          OR: [
+            { title: contains(search) },
+            { catalogNumber: contains(search) },
+            { description: contains(search) },
+          ],
+        });
+      }
 
       const where: Prisma.ReleaseWhereInput = {
-        ...(search && {
-          OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { catalogNumber: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ],
-        }),
+        ...(and.length > 0 && { AND: and }),
         ...(artistIds &&
           artistIds.length > 0 && {
             artistReleases: {
@@ -441,23 +474,63 @@ export class ReleaseService {
   // ===========================================================================
 
   /**
-   * Get all published releases for the public listing page.
-   * Includes artist info for display name and search,
-   * images for cover art fallback, and URLs for Bandcamp links.
-   * Results are cached for 10 minutes in production.
+   * Get a page of published releases for the public listing page.
+   * Includes artist info for display name and search, images for cover art
+   * fallback, and URLs for Bandcamp links.
+   *
+   * Supports skip/offset pagination and an optional server-side `search` term
+   * (title, catalog number, description, or artist name). Only the default,
+   * unsearched first page is cached (10 min in production) — searched/offset
+   * pages vary too much to share a cache entry.
    */
-  static async getPublishedReleases(): Promise<ServiceResponse<PublishedReleaseListing[]>> {
+  static async getPublishedReleases(params?: {
+    skip?: number;
+    take?: number;
+    search?: string;
+  }): Promise<ServiceResponse<PublishedReleaseListing[]>> {
+    const { skip = 0, take = PUBLISHED_RELEASES_PAGE_SIZE, search } = params ?? {};
+
     const fetchReleases = async (): Promise<ServiceResponse<PublishedReleaseListing[]>> => {
       try {
+        const contains = { contains: search ?? '', mode: 'insensitive' as const };
         const releases = await prisma.release.findMany({
           where: {
             publishedAt: { not: null },
             // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-            // set to null, not missing fields. Use OR to handle both cases.
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            // set to null, not missing fields. Use OR to handle both cases. The
+            // deletedOn OR and the search OR are combined under AND so they don't
+            // collide on the same `OR` key.
+            AND: [
+              { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+              ...(search
+                ? [
+                    {
+                      OR: [
+                        { title: contains },
+                        { catalogNumber: contains },
+                        { description: contains },
+                        {
+                          artistReleases: {
+                            some: {
+                              artist: {
+                                OR: [
+                                  { firstName: contains },
+                                  { surname: contains },
+                                  { displayName: contains },
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+            ],
           },
           orderBy: { releasedOn: 'desc' },
-          take: 200,
+          skip,
+          take,
           select: publishedReleaseListingSelect,
         });
 
@@ -476,11 +549,12 @@ export class ReleaseService {
       }
     };
 
-    if (process.env.NODE_ENV === 'development') {
+    // Only the default first page (no search, skip 0) is cacheable.
+    if (process.env.NODE_ENV === 'development' || search || skip > 0) {
       return fetchReleases();
     }
 
-    return withCache('published-releases', fetchReleases, 600);
+    return withCache(`published-releases:${take}`, fetchReleases, 600);
   }
 
   /**

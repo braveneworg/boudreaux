@@ -10,7 +10,7 @@ import ToursPage from './page';
 vi.mock('server-only', () => ({}));
 
 // Mock TanStack Query SSR utilities — execute each queryFn so coverage sees the arrow functions
-const mockPrefetchQuery = vi
+const mockPrefetchInfiniteQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
@@ -25,7 +25,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
-    prefetchQuery: mockPrefetchQuery,
+    prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
   }),
 }));
 
@@ -53,29 +53,31 @@ describe('ToursPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should prefetch tours data', async () => {
+  it('should prefetch the first tours page as an infinite query', async () => {
     const Page = await ToursPage();
     render(Page);
 
-    expect(mockPrefetchQuery).toHaveBeenCalledExactlyOnceWith(
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['tours', 'list'],
+        queryKey: ['tours', 'infinite', ''],
+        initialPageParam: 0,
       })
     );
   });
 
-  it('prefetches via the repository (no self-HTTP) returning the route shape', async () => {
+  it('prefetches via the repository (no self-HTTP) returning the paginated shape', async () => {
     mockFindAll.mockResolvedValue([{ id: 'tour-1', title: 'E2E Tour' }]);
 
     const Page = await ToursPage();
     render(Page);
 
-    expect(mockFindAll).toHaveBeenCalledWith({ limit: 100 });
+    expect(mockFindAll).toHaveBeenCalledWith({ skip: 0, take: 24 });
 
-    const [opts] = mockPrefetchQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual({
-      tours: [{ id: 'tour-1', title: 'E2E Tour' }],
-      count: 1,
+      rows: [{ id: 'tour-1', title: 'E2E Tour' }],
+      // A short page (< take) signals the end of the list.
+      nextSkip: null,
     });
   });
 

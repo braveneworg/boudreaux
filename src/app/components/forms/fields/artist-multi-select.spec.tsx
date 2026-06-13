@@ -293,7 +293,7 @@ describe('ArtistMultiSelect', () => {
     });
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ artists: mockArtists, count: mockArtists.length }),
+      json: () => Promise.resolve({ rows: mockArtists, count: mockArtists.length }),
     });
   });
   describe('rendering', () => {
@@ -1223,7 +1223,7 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ artists: [], count: 0 }),
+        json: () => Promise.resolve({ rows: [], count: 0 }),
       });
 
       render(
@@ -1257,7 +1257,7 @@ describe('ArtistMultiSelect', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            artists: [
+            rows: [
               {
                 id: 'artist-empty',
                 displayName: null,

@@ -29,47 +29,71 @@ vi.mock('@/lib/repositories/tours/tour-repository', () => ({
 }));
 
 describe('GET /api/tours', () => {
-  const dummyRequest = new NextRequest('http://localhost/api/tours');
   const dummyContext = { params: Promise.resolve({}) };
+  const makeRequest = (query = '') => new NextRequest(`http://localhost/api/tours${query}`);
   const mockTours = [
     { id: 'tour-1', name: 'Summer Tour', tourDates: [] },
     { id: 'tour-2', name: 'Winter Tour', tourDates: [] },
   ];
 
-  it('should return all tours', async () => {
+  it('returns a page of tours with a nextSkip cursor', async () => {
     vi.mocked(TourRepository.findAll).mockResolvedValue(mockTours as never);
 
-    const response = await GET(dummyRequest, dummyContext);
+    const response = await GET(makeRequest('?skip=0&take=2'), dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual({ tours: mockTours, count: 2 });
-    expect(TourRepository.findAll).toHaveBeenCalledWith({ limit: 100 });
+    // A full page (rows.length === take) yields the next offset.
+    expect(data).toEqual({ rows: mockTours, nextSkip: 2 });
+    expect(TourRepository.findAll).toHaveBeenCalledWith({ skip: 0, take: 2, search: undefined });
   });
 
-  it('should include Cache-Control header', async () => {
-    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
+  it('returns nextSkip null when a short page signals the end', async () => {
+    vi.mocked(TourRepository.findAll).mockResolvedValue(mockTours as never);
 
-    const response = await GET(dummyRequest, dummyContext);
-
-    expect(response.headers.get('Cache-Control')).toBe(
-      'public, s-maxage=60, stale-while-revalidate=300'
-    );
-  });
-
-  it('should return empty array when no tours', async () => {
-    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
-
-    const response = await GET(dummyRequest, dummyContext);
+    const response = await GET(makeRequest('?skip=0&take=24'), dummyContext);
     const data = await response.json();
 
-    expect(data).toEqual({ tours: [], count: 0 });
+    expect(data.nextSkip).toBeNull();
   });
 
-  it('should return 500 when an exception is thrown', async () => {
+  it('forwards the search term and defaults skip to 0', async () => {
+    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
+
+    await GET(makeRequest('?search=Summer'), dummyContext);
+
+    expect(TourRepository.findAll).toHaveBeenCalledWith({ skip: 0, take: 24, search: 'Summer' });
+  });
+
+  it('clamps take to the maximum of 100', async () => {
+    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
+
+    await GET(makeRequest('?take=500'), dummyContext);
+
+    expect(TourRepository.findAll).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
+  });
+
+  it('sets a no-store Cache-Control header', async () => {
+    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
+
+    const response = await GET(makeRequest(), dummyContext);
+
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('returns an empty page when there are no tours', async () => {
+    vi.mocked(TourRepository.findAll).mockResolvedValue([] as never);
+
+    const response = await GET(makeRequest(), dummyContext);
+    const data = await response.json();
+
+    expect(data).toEqual({ rows: [], nextSkip: null });
+  });
+
+  it('returns 500 when an exception is thrown', async () => {
     vi.mocked(TourRepository.findAll).mockRejectedValue(new Error('DB error'));
 
-    const response = await GET(dummyRequest, dummyContext);
+    const response = await GET(makeRequest(), dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(500);

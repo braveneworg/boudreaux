@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 
 import Link from 'next/link';
 
@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useReportedUsersQuery } from '@/hooks/use-reported-users-query';
 import {
   disableChatUserAction,
@@ -44,26 +46,26 @@ const formatTimestamp = (iso: string): string => {
  */
 export const ReportedUsersTable = () => {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search);
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const {
     data,
     isPending: isLoading,
     isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useReportedUsersQuery({
     windowDays: null,
-    search: '',
+    search: debouncedSearch,
   });
 
-  const filteredRows = useMemo(() => {
-    if (!data) return [];
-    const term = search.trim().toLowerCase();
-    if (!term) return data.rows;
-    return data.rows.filter(
-      (row) => row.username?.toLowerCase().includes(term) || row.email.toLowerCase().includes(term)
-    );
-  }, [data, search]);
+  useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
+
+  const rows = data?.pages.flatMap((page) => page.rows) ?? [];
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.chat.all });
@@ -115,13 +117,13 @@ export const ReportedUsersTable = () => {
         />
       </div>
 
-      {filteredRows.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="text-muted-foreground py-8 text-center text-sm">
           No reported users {search ? 'match your search' : 'yet'}.
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filteredRows.map((row) => {
+          {rows.map((row) => {
             const displayName = row.username ?? '—';
             return (
               <Card key={row.userId} className="gap-3 py-4">
@@ -177,6 +179,16 @@ export const ReportedUsersTable = () => {
           })}
         </div>
       )}
+
+      <div
+        ref={sentinelRef}
+        className="flex min-h-8 items-center justify-center"
+        aria-hidden={!hasNextPage}
+      >
+        {isFetchingNextPage ? (
+          <Loader2 aria-label="Loading more reported users" className="size-5 animate-spin" />
+        ) : null}
+      </div>
 
       <div className="text-muted-foreground text-xs">
         <Button type="button" variant="outline" size="sm" onClick={invalidate} disabled={isPending}>

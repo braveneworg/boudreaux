@@ -188,13 +188,51 @@ describe('FeaturedArtistsService', () => {
       expect(mockFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            OR: [
-              { displayName: { contains: 'jazz', mode: 'insensitive' } },
-              { description: { contains: 'jazz', mode: 'insensitive' } },
+            AND: [
+              {
+                OR: [
+                  { displayName: { contains: 'jazz', mode: 'insensitive' } },
+                  { description: { contains: 'jazz', mode: 'insensitive' } },
+                ],
+              },
             ],
           },
         })
       );
+    });
+
+    it('should apply publishedOn filter when published=true', async () => {
+      mockFindMany.mockResolvedValue([]);
+
+      await FeaturedArtistsService.getAllFeaturedArtists({ published: true });
+
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{ publishedOn: { not: null } }] },
+        })
+      );
+    });
+
+    it('should apply unpublished filter when published=false', async () => {
+      mockFindMany.mockResolvedValue([]);
+
+      await FeaturedArtistsService.getAllFeaturedArtists({ published: false });
+
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
+          },
+        })
+      );
+    });
+
+    it('should not add any soft-delete constraint (model has no deletedOn)', async () => {
+      mockFindMany.mockResolvedValue([]);
+
+      await FeaturedArtistsService.getAllFeaturedArtists({ deleted: false });
+
+      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
     });
 
     it('should apply pagination when provided', async () => {

@@ -13,8 +13,16 @@ export const queryKeys = {
   },
   releases: {
     all: ['releases'] as const,
-    list: () => [...queryKeys.releases.all, 'list'] as const,
-    published: () => [...queryKeys.releases.all, 'published'] as const,
+    publishedInfinite: (search: string) =>
+      [...queryKeys.releases.all, 'publishedInfinite', search.trim().toLowerCase()] as const,
+    adminInfinite: (params: { search: string; published: boolean | null; deleted: boolean }) =>
+      [
+        ...queryKeys.releases.all,
+        'adminInfinite',
+        params.search.trim().toLowerCase(),
+        params.published,
+        params.deleted,
+      ] as const,
     detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
     related: (id: string, artistId?: string | null) =>
@@ -33,7 +41,14 @@ export const queryKeys = {
   },
   artists: {
     all: ['artists'] as const,
-    list: () => [...queryKeys.artists.all, 'list'] as const,
+    adminInfinite: (params: { search: string; published: boolean | null; deleted: boolean }) =>
+      [
+        ...queryKeys.artists.all,
+        'adminInfinite',
+        params.search.trim().toLowerCase(),
+        params.published,
+        params.deleted,
+      ] as const,
     bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
     filteredList: (params: { search?: string; take?: number }) =>
@@ -47,6 +62,14 @@ export const queryKeys = {
   featuredArtists: {
     all: ['featuredArtists'] as const,
     list: () => [...queryKeys.featuredArtists.all, 'list'] as const,
+    adminInfinite: (params: { search: string; published: boolean | null; deleted: boolean }) =>
+      [
+        ...queryKeys.featuredArtists.all,
+        'adminInfinite',
+        params.search.trim().toLowerCase(),
+        params.published,
+        params.deleted,
+      ] as const,
     active: () => [...queryKeys.featuredArtists.all, 'active'] as const,
   },
   collection: {
@@ -55,7 +78,8 @@ export const queryKeys = {
   },
   tours: {
     all: ['tours'] as const,
-    list: () => [...queryKeys.tours.all, 'list'] as const,
+    infinite: (search: string) =>
+      [...queryKeys.tours.all, 'infinite', search.trim().toLowerCase()] as const,
     detail: (id: string) => [...queryKeys.tours.all, 'detail', id] as const,
     dates: (tourId: string) => [...queryKeys.tours.all, 'dates', tourId] as const,
   },
@@ -97,10 +121,10 @@ export const queryKeys = {
       [...queryKeys.chat.all, 'adminUsers', page, sortBy, sortDirection] as const,
     mentionSearch: (query: string) => [...queryKeys.chat.all, 'mentionSearch', query] as const,
     me: () => [...queryKeys.chat.all, 'me'] as const,
-    reportedUsers: (windowDays: number | 'all', search?: string) =>
+    reportedUsersInfinite: (windowDays: number | 'all', search?: string) =>
       [
         ...queryKeys.chat.all,
-        'reportedUsers',
+        'reportedUsersInfinite',
         windowDays,
         search?.trim().toLowerCase() ?? '',
       ] as const,

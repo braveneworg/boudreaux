@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { EyeOff, Loader2 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useAdminUserMessagesQuery } from '@/hooks/use-admin-user-messages-query';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   disableChatUserAction,
@@ -61,20 +62,7 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !hasNextPage || isFetchingNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          void fetchNextPage();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
   const invalidateMessages = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.chat.userMessages(userId) });

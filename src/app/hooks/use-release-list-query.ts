@@ -56,8 +56,8 @@ const fetchReleaseList = async (
   if (!response.ok) {
     throw Error('Failed to fetch releases');
   }
-  const json = (await response.json()) as { releases: ReleaseListItem[] };
-  return json.releases;
+  const json = (await response.json()) as { rows: ReleaseListItem[] };
+  return json.rows;
 };
 
 /**

@@ -124,11 +124,40 @@ export class ChatAdminService {
   }
 
   /**
-   * Group abuse reports by target for the moderation table's default
-   * "reported users" view. Pass `windowDays: null` for all-time.
+   * Returns one skip/offset page of reported users for the moderation table's
+   * default view, newest report first. Pass `windowDays: null` for all-time.
+   *
+   * The underlying repository computes a grouped + globally-sorted array (a
+   * MongoDB `groupBy` that doesn't paginate cleanly at the DB), so the
+   * case-insensitive username/email search and the skip/take slice are applied
+   * here in memory. Report volume is small, so this is acceptable.
    */
-  static async listReportedUsers(windowDays: number | null = null): Promise<ReportedUserSummary[]> {
-    return AbuseReportRepository.listReportedUsers({ windowDays });
+  static async listReportedUsers({
+    windowDays = null,
+    search,
+    skip = 0,
+    take = 24,
+  }: {
+    windowDays?: number | null;
+    search?: string;
+    skip?: number;
+    take?: number;
+  } = {}): Promise<{ rows: ReportedUserSummary[]; nextSkip: number | null }> {
+    const all = await AbuseReportRepository.listReportedUsers({ windowDays });
+
+    const term = search?.trim().toLowerCase();
+    const filtered = term
+      ? all.filter(
+          (row) =>
+            (row.username?.toLowerCase().includes(term) ?? false) ||
+            row.email.toLowerCase().includes(term)
+        )
+      : all;
+
+    const rows = filtered.slice(skip, skip + take);
+    const nextSkip = skip + take < filtered.length ? skip + take : null;
+
+    return { rows, nextSkip };
   }
 
   /** Per-message admin hide (stays hidden even after author re-enable). */
