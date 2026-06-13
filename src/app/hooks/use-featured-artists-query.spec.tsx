@@ -71,7 +71,10 @@ describe('useFeaturedArtistsQuery', () => {
 
     expect(result.current.data).toEqual(mockFeaturedArtists);
     expect(result.current.error).toBeNull();
-    expect(global.fetch).toHaveBeenCalledWith('/api/featured-artists');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/featured-artists',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('should handle fetch error', async () => {

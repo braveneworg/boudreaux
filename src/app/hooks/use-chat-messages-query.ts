@@ -21,6 +21,18 @@ const PAGE_SIZE = 20;
 /** Hard cap on total messages held in memory (matches spec's 200 ceiling). */
 export const MAX_TOTAL_MESSAGES = 200;
 
+/**
+ * Fetches a single page of chat history from the `/api/chat/messages` route
+ * handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param params - The infinite-query page context: the `pageParam` cursor and
+ * the `signal` forwarded to `fetch`.
+ * @returns The parsed JSON response containing one page of messages.
+ * @throws If the response status is not OK.
+ */
 const fetchPage = async ({
   pageParam,
   signal,
@@ -50,11 +62,19 @@ const fetchPage = async ({
  *
  * The flattened ordering — oldest → newest — is exposed via `messages`
  * on the returned object; UI code never has to think about pages.
+ *
+ * Wraps {@link fetchPage}; cancellation is handled automatically via the
+ * forwarded `AbortSignal`.
+ *
+ * @param options - Optional settings; `enabled` defers the request.
+ * @returns The flattened `messages` plus paging/request state:
+ * `isPending`, `isError`, `error`, `hasNextPage`, `isFetchingNextPage`,
+ * `fetchNextPage`, and `refetch`.
  */
 export function useChatMessagesQuery(options?: { enabled?: boolean }) {
   const result = useInfiniteQuery({
     queryKey: queryKeys.chat.messages(),
-    queryFn: fetchPage,
+    queryFn: ({ pageParam, signal }) => fetchPage({ pageParam, signal }),
     initialPageParam: undefined as ChatCursor | undefined,
     getNextPageParam: (lastPage) => {
       if (lastPage.messages.length < PAGE_SIZE) return undefined;

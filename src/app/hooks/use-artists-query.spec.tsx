@@ -66,7 +66,10 @@ describe('useArtistsQuery', () => {
 
     expect(result.current.data).toEqual(mockArtists);
     expect(result.current.error).toBeNull();
-    expect(global.fetch).toHaveBeenCalledWith('/api/artists');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/artists',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('handles fetch error when response is not ok', async () => {

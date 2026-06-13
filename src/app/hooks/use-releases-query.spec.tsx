@@ -69,7 +69,10 @@ describe('useReleasesQuery', () => {
     });
 
     expect(result.current.data).toEqual(mockReleases);
-    expect(global.fetch).toHaveBeenCalledWith('/api/releases');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/releases',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('should return error when fetch fails', async () => {

@@ -1,18 +1,30 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 
-const fetchHealthStatus = async (): Promise<HealthStatus> => {
+/**
+ * Fetches the application health status from the `/api/health` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` (combined with a
+ * 5s timeout signal) so the request is cancelled automatically on unmount,
+ * invalidation, or a superseding refetch.
+ *
+ * @param context - The TanStack Query function context, providing the `signal`.
+ * @returns The parsed JSON response containing the health status.
+ * @throws If the response status is not OK.
+ */
+const fetchHealthStatus = async ({ signal }: QueryFunctionContext): Promise<HealthStatus> => {
   const baseUrl = getApiBaseUrl();
   const apiUrl = `${baseUrl}/api/health`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 
   try {
     const response = await fetch(apiUrl, {
@@ -22,7 +34,7 @@ const fetchHealthStatus = async (): Promise<HealthStatus> => {
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
       },
-      signal: controller.signal,
+      signal: combinedSignal,
     });
 
     clearTimeout(timeoutId);
@@ -44,6 +56,16 @@ const fetchHealthStatus = async (): Promise<HealthStatus> => {
   }
 };
 
+/**
+ * React Query hook for fetching the application health status.
+ *
+ * Wraps {@link fetchHealthStatus} with a stable query key and exposes the
+ * request state. Cancellation is handled automatically via the forwarded
+ * `AbortSignal`.
+ *
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useHealthStatusQuery = () => {
   const {
     isPending,

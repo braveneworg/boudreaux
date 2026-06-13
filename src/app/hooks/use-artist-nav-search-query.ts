@@ -16,14 +16,41 @@ interface ArtistNavSearchResponse {
   results: ArtistNavSearchResult[];
 }
 
-const fetchArtistNavSearch = async (query: string): Promise<ArtistNavSearchResponse> => {
-  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}`);
+/**
+ * Searches artists for the nav typeahead via the `/api/artists/search` route
+ * handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param query - The search term to match artists against.
+ * @param signal - The TanStack Query `AbortSignal` used to cancel the request.
+ * @returns The parsed JSON response containing the search results.
+ * @throws If the response status is not OK.
+ */
+const fetchArtistNavSearch = async (
+  query: string,
+  signal?: AbortSignal
+): Promise<ArtistNavSearchResponse> => {
+  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}`, { signal });
   if (!response.ok) {
     throw Error('Failed to search artists');
   }
   return response.json() as Promise<ArtistNavSearchResponse>;
 };
 
+/**
+ * React Query hook for the nav artist-search typeahead.
+ *
+ * Wraps {@link fetchArtistNavSearch} with a stable query key and exposes the
+ * request state. Cancellation is handled automatically via the forwarded
+ * `AbortSignal`.
+ *
+ * @param query - The search term; the query is disabled until at least 3
+ * characters are entered.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useArtistNavSearchQuery = (query: string) => {
   const {
     isPending,
@@ -32,7 +59,7 @@ export const useArtistNavSearchQuery = (query: string) => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.artists.search(query),
-    queryFn: () => fetchArtistNavSearch(query),
+    queryFn: ({ signal }) => fetchArtistNavSearch(query, signal),
     enabled: query.length >= 3,
     placeholderData: keepPreviousData,
   });
