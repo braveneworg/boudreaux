@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.116.0] - 2026-06-13
+
+### Added
+
+- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n
+
 ## [4.115.0] - 2026-06-13
 
 ### Added
