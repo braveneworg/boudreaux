@@ -2,13 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import type { ChatMeResponse } from '@/app/api/chat/me/route';
 import { queryKeys } from '@/lib/query-keys';
 
-const fetchMe = async (): Promise<ChatMeResponse> => {
-  const response = await fetch('/api/chat/me', { cache: 'no-store' });
+/**
+ * Fetches the viewer's chat status from the `/api/chat/me` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param context - The TanStack Query function context, providing the `signal`.
+ * @returns The parsed JSON response containing the viewer's chat status.
+ * @throws If the response status is not OK.
+ */
+const fetchMe = async ({ signal }: QueryFunctionContext): Promise<ChatMeResponse> => {
+  const response = await fetch('/api/chat/me', { cache: 'no-store', signal });
   if (!response.ok) {
     throw Error('Failed to load chat status');
   }
@@ -22,6 +32,8 @@ const fetchMe = async (): Promise<ChatMeResponse> => {
  * when a {@link BannedIdentity} matches their session).
  *
  * `enabled` lets the caller defer the request until the drawer opens.
+ * Wraps {@link fetchMe}; cancellation is handled automatically via the
+ * forwarded `AbortSignal`.
  */
 export function useChatMeQuery({ enabled }: { enabled: boolean }) {
   return useQuery({

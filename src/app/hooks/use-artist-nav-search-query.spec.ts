@@ -55,14 +55,16 @@ describe('useArtistNavSearchQuery', () => {
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
       enabled: boolean;
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
 
+    const { signal } = new AbortController();
+
     expect(options.enabled).toBe(true);
-    await expect(options.queryFn()).resolves.toEqual({
+    await expect(options.queryFn({ signal })).resolves.toEqual({
       results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [] }],
     });
-    expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=artist');
+    expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=artist', { signal });
   });
 
   it('throws when the search request fails', async () => {
@@ -71,9 +73,11 @@ describe('useArtistNavSearchQuery', () => {
     renderHook(() => useArtistNavSearchQuery('artist'));
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
 
-    await expect(options.queryFn()).rejects.toThrow('Failed to search artists');
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to search artists');
   });
 });

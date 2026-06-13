@@ -3,9 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
+import { TOURS_PAGE_SIZE } from '@/app/hooks/use-tours-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
@@ -18,16 +20,23 @@ import { ToursContent } from './components/tours-content';
 export default async function ToursPage() {
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery({
-    queryKey: queryKeys.tours.list(),
+  // Prefetch the first (unsearched) page as an infinite query. The query key and
+  // initialPageParam must exactly match the client `useToursQuery('')` hook or
+  // hydration misses and the client refetches.
+  await queryClient.prefetchInfiniteQuery({
+    queryKey: queryKeys.tours.infinite(''),
+    initialPageParam: 0,
     // Read the repository directly instead of self-fetching /api/tours. The
     // internal HTTP roundtrip fails silently under load on the standalone
-    // server (prefetchQuery swallows the error), leaving the list un-hydrated
-    // so the client must refetch — the source of the flaky "0 tour cards"
-    // E2E failures. Mirror the route's JSON shape (Date → ISO string).
+    // server (prefetch swallows the error), leaving the list un-hydrated so the
+    // client must refetch — the source of the flaky "0 tour cards" E2E
+    // failures. Mirror the route's JSON shape (Date → ISO string).
     queryFn: async () => {
-      const tours = await TourRepository.findAll({ limit: 100 });
-      return serializeForResponse({ tours, count: tours.length });
+      const rows = await TourRepository.findAll({ skip: 0, take: TOURS_PAGE_SIZE });
+      return serializeForResponse({
+        rows,
+        nextSkip: computeNextSkip(rows.length, 0, TOURS_PAGE_SIZE),
+      });
     },
   });
 

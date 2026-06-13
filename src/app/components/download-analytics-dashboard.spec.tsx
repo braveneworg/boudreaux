@@ -212,7 +212,8 @@ describe('DownloadAnalyticsDashboard', () => {
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
-          `/api/releases/${mockReleaseId}/download-analytics`
+          `/api/releases/${mockReleaseId}/download-analytics`,
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
         );
       });
     });
@@ -242,7 +243,10 @@ describe('DownloadAnalyticsDashboard', () => {
       });
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(mockReleaseId));
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining(mockReleaseId),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
     });
 

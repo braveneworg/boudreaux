@@ -1,8 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, ReactElement } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ReactElement } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -37,6 +37,7 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { Switch } from '@/app/components/ui/switch';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 import { toDisplayLabel, toEntityUrlPath, toPascalCase } from '@/lib/utils/string-utils';
 
@@ -83,7 +84,14 @@ export function DataView<T extends Record<string, unknown>>({
   fetchNextPage,
   isFetchingNextPage,
   getItemDisplayName,
-  getSearchableText,
+  searchValue,
+  onSearchChange,
+  showPublished,
+  onShowPublishedChange,
+  showUnpublished,
+  onShowUnpublishedChange,
+  showDeleted,
+  onShowDeletedChange,
 }: {
   entity: AdminEntity;
   data: Record<string, T[]> | null;
@@ -105,13 +113,23 @@ export function DataView<T extends Record<string, unknown>>({
   isFetchingNextPage?: boolean;
   /** Custom display name resolver for entity-specific name formatting */
   getItemDisplayName?: (item: T) => string;
-  /** Custom searchable text builder for searching nested/related fields */
-  getSearchableText?: (item: T) => string;
+  /** Controlled, server-side search term. */
+  searchValue: string;
+  /** Called when the search input changes. */
+  onSearchChange: (value: string) => void;
+  /** Controlled "show published" toggle. */
+  showPublished: boolean;
+  /** Called when the "show published" toggle changes. */
+  onShowPublishedChange: (value: boolean) => void;
+  /** Controlled "show unpublished" toggle. */
+  showUnpublished: boolean;
+  /** Called when the "show unpublished" toggle changes. */
+  onShowUnpublishedChange: (value: boolean) => void;
+  /** Controlled "show deleted" toggle. */
+  showDeleted: boolean;
+  /** Called when the "show deleted" toggle changes. */
+  onShowDeletedChange: (value: boolean) => void;
 }) {
-  const [showDeleted, setShowDeleted] = useState(false);
-  const [showPublished, setShowPublished] = useState(true);
-  const [showUnpublished, setShowUnpublished] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -121,63 +139,12 @@ export function DataView<T extends Record<string, unknown>>({
     [getItemDisplayName]
   );
 
-  // Infinite scroll observer
-  useEffect(() => {
-    if (!hasNextPage || !fetchNextPage) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      const [entry] = entries;
-      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
-      }
-    });
-
-    const currentRef = loadMoreRef.current;
-    if (currentRef) {
-      observer.observe(currentRef);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
-
-  const searchData = useMemo(() => {
-    const baseData = data?.[`${String(entity)}s`] as T[];
-    if (!baseData) {
-      return null;
-    }
-
-    return baseData.filter((item) => {
-      // Filter by deleted status
-      const isDeleted = item.deletedOn !== null && item.deletedOn !== undefined;
-      if (!showDeleted && isDeleted) return false;
-
-      // Filter by published status (inclusive)
-      // Note: releases use publishedAt while other entities use publishedOn
-      const isPublished =
-        (item.publishedOn !== null && item.publishedOn !== undefined) ||
-        (item.publishedAt !== null && item.publishedAt !== undefined);
-      const publishedMatch = showPublished && isPublished;
-      const unpublishedMatch = showUnpublished && !isPublished;
-
-      // If no toggle is on, don't show anything
-      if (!showPublished && !showUnpublished && !showDeleted) return false;
-      // If at least one toggle is on, check if item matches
-      if (!publishedMatch && !unpublishedMatch && !isDeleted) return false;
-
-      // Filter by search query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        if (getSearchableText) {
-          return getSearchableText(item).toLowerCase().includes(query);
-        }
-        return Object.values(item).some((value) => String(value).toLowerCase().includes(query));
-      }
-
-      return true;
-    });
-  }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery, getSearchableText]);
+  useInfiniteScroll(loadMoreRef, {
+    hasNextPage,
+    isFetchingNextPage: isFetchingNextPage ?? false,
+    fetchNextPage: fetchNextPage ?? (() => {}),
+    enabled: !!fetchNextPage,
+  });
 
   // Get the URL-friendly path for the entity (e.g., "featuredArtist" -> "featured-artists")
   const entityUrlPath = toEntityUrlPath(entity);
@@ -226,10 +193,6 @@ export function DataView<T extends Record<string, unknown>>({
 
   const handleCreateEntityButtonClick = () => {
     router?.push(`/admin/${entityUrlPath}/new`);
-  };
-
-  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
   };
 
   const handleClickPublishButton = useCallback(
@@ -338,19 +301,24 @@ export function DataView<T extends Record<string, unknown>>({
       <Input
         className="my-4 w-full"
         type="search"
-        onChange={handleSearchChange}
+        value={searchValue}
+        onChange={(e) => onSearchChange(e.target.value)}
         placeholder={`Search ${entityDisplayLabel}s...`}
       />
       {supportsSoftDelete && (
         <div className="mb-2 flex items-center gap-2">
-          <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
+          <Switch id="show-deleted" checked={showDeleted} onCheckedChange={onShowDeletedChange} />
           <Label htmlFor="show-deleted" className="cursor-pointer">
             Show deleted
           </Label>
         </div>
       )}
       <div className="mb-2 flex items-center gap-2">
-        <Switch id="show-published" checked={showPublished} onCheckedChange={setShowPublished} />
+        <Switch
+          id="show-published"
+          checked={showPublished}
+          onCheckedChange={onShowPublishedChange}
+        />
         <Label htmlFor="show-published" className="cursor-pointer">
           Show published
         </Label>
@@ -359,7 +327,7 @@ export function DataView<T extends Record<string, unknown>>({
         <Switch
           id="show-unpublished"
           checked={showUnpublished}
-          onCheckedChange={setShowUnpublished}
+          onCheckedChange={onShowUnpublishedChange}
         />
         <Label htmlFor="show-unpublished" className="cursor-pointer">
           Show unpublished
@@ -368,7 +336,7 @@ export function DataView<T extends Record<string, unknown>>({
       {data && (data[`${entity}s`] as T[]).length > 0 ? (
         <>
           <ul>
-            {((searchData ?? data[`${String(entity)}s`]) as T[]).map((item) => {
+            {(data[`${String(entity)}s`] as T[]).map((item) => {
               const id = item.id as string;
 
               return (

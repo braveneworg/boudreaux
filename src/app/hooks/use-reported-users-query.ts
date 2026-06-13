@@ -2,28 +2,49 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import type { ReportedUsersResponse } from '@/app/api/admin/chat/reported-users/route';
 import { queryKeys } from '@/lib/query-keys';
 
+/** Page size requested per fetch. */
+export const REPORTED_USERS_PAGE_SIZE = 24;
+
 interface UseReportedUsersQueryParams {
   /** `null` = all-time. */
   windowDays: number | null;
-  /** Case-insensitive substring filter on username (server-side). */
+  /** Case-insensitive substring filter on username/email (server-side). */
   search?: string;
 }
 
-const fetchReportedUsers = async ({
-  windowDays,
-  search,
-}: UseReportedUsersQueryParams): Promise<ReportedUsersResponse> => {
-  const params = new URLSearchParams();
+/**
+ * Fetches one page of reported users from the
+ * `/api/admin/chat/reported-users` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param params - The window and search filters for the query.
+ * @param skip - Offset of the page to fetch.
+ * @param signal - The `AbortSignal` forwarded from TanStack Query.
+ * @returns The page of reported users plus the `nextSkip` cursor.
+ * @throws If the response status is not OK.
+ */
+const fetchReportedUsersPage = async (
+  { windowDays, search }: UseReportedUsersQueryParams,
+  skip: number,
+  signal?: AbortSignal
+): Promise<ReportedUsersResponse> => {
+  const params = new URLSearchParams({
+    skip: String(skip),
+    take: String(REPORTED_USERS_PAGE_SIZE),
+  });
   if (windowDays !== null) params.set('windowDays', String(windowDays));
   if (search) params.set('search', search);
-  const query = params.toString();
-  const response = await fetch(`/api/admin/chat/reported-users${query ? `?${query}` : ''}`, {
+
+  const response = await fetch(`/api/admin/chat/reported-users?${params.toString()}`, {
     cache: 'no-store',
+    signal,
   });
   if (!response.ok) {
     throw Error('Failed to load reported users');
@@ -31,9 +52,23 @@ const fetchReportedUsers = async ({
   return (await response.json()) as ReportedUsersResponse;
 };
 
+/**
+ * React Query infinite hook for the admin reported-users list.
+ *
+ * Pages through `/api/admin/chat/reported-users` via skip/offset. `search` is
+ * applied server-side and is part of the query key, so changing it resets
+ * pagination; `keepPreviousData` keeps results visible during a search
+ * transition. Cancellation is automatic via the forwarded `AbortSignal`.
+ *
+ * @param params - The window and search filters for the query.
+ * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
+ */
 export function useReportedUsersQuery(params: UseReportedUsersQueryParams) {
-  return useQuery({
-    queryKey: queryKeys.chat.reportedUsers(params.windowDays ?? 'all', params.search),
-    queryFn: () => fetchReportedUsers(params),
+  return useInfiniteQuery({
+    queryKey: queryKeys.chat.reportedUsersInfinite(params.windowDays ?? 'all', params.search),
+    queryFn: ({ pageParam, signal }) => fetchReportedUsersPage(params, pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextSkip,
+    placeholderData: keepPreviousData,
   });
 }

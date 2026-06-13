@@ -3,9 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * ReleaseSearchCombobox — a client-side combobox dropdown for searching
- * published releases by artist name, release title, or group name.
- * Uses shadcn/ui Popover + Command (cmdk) for keyboard-navigable search.
+ * ReleaseSearchCombobox — a combobox dropdown for searching published releases
+ * by artist name, release title, or catalog number. Search runs server-side
+ * (debounced), so it covers the full catalog rather than only loaded pages.
+ * Uses shadcn/ui Popover + Command (cmdk) for keyboard-navigable results.
  * Selecting a result navigates to the release's media player page.
  */
 'use client';
@@ -24,26 +25,23 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import type { PublishedReleaseListing } from '@/lib/types/media-models';
-import {
-  buildReleaseSearchValue,
-  getArtistDisplayNameForRelease,
-  getReleaseCoverArt,
-} from '@/lib/utils/release-helpers';
-
-interface ReleaseSearchComboboxProps {
-  /** Array of published releases to make searchable */
-  releases: PublishedReleaseListing[];
-}
+import { usePublishedReleaseSearchQuery } from '@/app/hooks/use-published-releases-query';
+import { useDebounce } from '@/hooks/use-debounce';
+import { getArtistDisplayNameForRelease, getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 /**
- * A combobox dropdown that lets users search releases by typing.
- * Each result shows a cover art thumbnail, artist name, and title.
- * Selecting a result navigates to `/releases/{releaseId}`.
+ * A combobox dropdown that lets users search releases by typing. Results are
+ * fetched from the server as the user types and each shows a cover art
+ * thumbnail, artist name, and title. Selecting a result navigates to
+ * `/releases/{releaseId}`.
  */
-export const ReleaseSearchCombobox = ({ releases }: ReleaseSearchComboboxProps) => {
+export const ReleaseSearchCombobox = () => {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebounce(search, 300);
+
+  const { data: releases, isFetching } = usePublishedReleaseSearchQuery(debouncedSearch);
 
   const handleSelect = React.useCallback(
     (releaseId: string) => {
@@ -52,6 +50,9 @@ export const ReleaseSearchCombobox = ({ releases }: ReleaseSearchComboboxProps) 
     },
     [router]
   );
+
+  const hasQuery = debouncedSearch.trim().length > 0;
+  const results = releases ?? [];
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -65,25 +66,29 @@ export const ReleaseSearchCombobox = ({ releases }: ReleaseSearchComboboxProps) 
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-        <Command>
+        {/* Server provides the matches; disable cmdk's client-side filtering. */}
+        <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search by artist, title, or group..."
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search by artist, title, or catalog number..."
             aria-label="Search releases"
           />
           <CommandList>
-            <CommandEmpty>No releases found.</CommandEmpty>
+            <CommandEmpty>
+              {hasQuery && !isFetching ? 'No releases found.' : 'Type to search releases.'}
+            </CommandEmpty>
             <CommandGroup>
-              {releases.map((release) => {
+              {results.map((release) => {
                 const coverArt = getReleaseCoverArt(release);
                 const artistName = release.artistReleases[0]
                   ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
                   : null;
-                const searchValue = buildReleaseSearchValue(release);
 
                 return (
                   <CommandItem
                     key={release.id}
-                    value={searchValue}
+                    value={release.id}
                     onSelect={() => handleSelect(release.id)}
                     className="flex items-center gap-3 px-2 py-1.5"
                   >

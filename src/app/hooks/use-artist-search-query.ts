@@ -16,14 +16,41 @@ interface ArtistSearchResponse {
   }>;
 }
 
-const fetchArtistSearch = async (query: string): Promise<ArtistSearchResponse> => {
-  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}&format=full`);
+/**
+ * Searches artists (full format) via the `/api/artists/search` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param query - The search term to match artists against.
+ * @param signal - The TanStack Query `AbortSignal` used to cancel the request.
+ * @returns The parsed JSON response containing the search results.
+ * @throws If the response status is not OK.
+ */
+const fetchArtistSearch = async (
+  query: string,
+  signal?: AbortSignal
+): Promise<ArtistSearchResponse> => {
+  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}&format=full`, {
+    signal,
+  });
   if (!response.ok) {
     throw Error('Failed to search artists');
   }
   return response.json() as Promise<ArtistSearchResponse>;
 };
 
+/**
+ * React Query hook for full-format artist search.
+ *
+ * Wraps {@link fetchArtistSearch} with a stable query key and exposes the
+ * request state. Cancellation is handled automatically via the forwarded
+ * `AbortSignal`.
+ *
+ * @param query - The search term; the query is disabled while empty.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useArtistSearchQuery = (query: string) => {
   const {
     isPending,
@@ -32,7 +59,7 @@ export const useArtistSearchQuery = (query: string) => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.artists.search(query),
-    queryFn: () => fetchArtistSearch(query),
+    queryFn: ({ signal }) => fetchArtistSearch(query, signal),
     enabled: query.length > 0,
     placeholderData: keepPreviousData,
   });

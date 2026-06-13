@@ -16,8 +16,19 @@ interface VenueDetail {
   timeZone: string | null;
 }
 
-const fetchVenueDetail = async (venueId: string): Promise<VenueDetail> => {
-  const response = await fetch(`/api/venues/${venueId}`);
+/**
+ * Fetches a single venue from the `/api/venues/[venueId]` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param venueId - The venue identifier to fetch.
+ * @param signal - The `AbortSignal` forwarded from TanStack Query.
+ * @returns The parsed venue detail.
+ * @throws If the response status is not OK.
+ */
+const fetchVenueDetail = async (venueId: string, signal?: AbortSignal): Promise<VenueDetail> => {
+  const response = await fetch(`/api/venues/${venueId}`, { signal });
   if (!response.ok) {
     throw Error('Failed to fetch venue details');
   }
@@ -25,6 +36,17 @@ const fetchVenueDetail = async (venueId: string): Promise<VenueDetail> => {
   return json.venue;
 };
 
+/**
+ * React Query hook for fetching a single venue's details.
+ *
+ * Wraps {@link fetchVenueDetail} with a stable query key and exposes the
+ * request state. Cancellation is handled automatically via the forwarded
+ * `AbortSignal`.
+ *
+ * @param venueId - The venue identifier to fetch.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useVenueDetailQuery = (venueId: string) => {
   const {
     isPending,
@@ -33,7 +55,7 @@ export const useVenueDetailQuery = (venueId: string) => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.venues.detail(venueId),
-    queryFn: () => fetchVenueDetail(venueId),
+    queryFn: ({ signal }) => fetchVenueDetail(venueId, signal),
     enabled: !!venueId,
   });
 

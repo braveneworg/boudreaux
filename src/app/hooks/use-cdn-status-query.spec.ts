@@ -53,11 +53,16 @@ describe('useCdnStatusQuery', () => {
     renderHook(() => useCdnStatusQuery());
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
 
-    await expect(options.queryFn()).resolves.toEqual({ status: 'ready', message: 'done' });
-    expect(global.fetch).toHaveBeenCalledWith('/api/cdn-status', { cache: 'no-store' });
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).resolves.toEqual({
+      status: 'ready',
+      message: 'done',
+    });
+    expect(global.fetch).toHaveBeenCalledWith('/api/cdn-status', { cache: 'no-store', signal });
   });
 
   it('throws when status endpoint returns a failure response', async () => {
@@ -66,9 +71,11 @@ describe('useCdnStatusQuery', () => {
     renderHook(() => useCdnStatusQuery());
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
 
-    await expect(options.queryFn()).rejects.toThrow('Failed to fetch CDN status');
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to fetch CDN status');
   });
 });

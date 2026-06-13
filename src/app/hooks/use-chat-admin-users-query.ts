@@ -14,12 +14,22 @@ interface UseChatAdminUsersQueryParams {
   sortDirection: 'asc' | 'desc';
 }
 
-const fetchPage = async ({
-  page,
-  perPage,
-  sortBy,
-  sortDirection,
-}: UseChatAdminUsersQueryParams): Promise<ListChatUsersResult> => {
+/**
+ * Fetches a page of admin chat users from the `/api/admin/chat/users` route
+ * handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param params - The page, pagination, and sort parameters for the request.
+ * @param signal - The TanStack Query `AbortSignal` used to cancel the request.
+ * @returns The parsed JSON response containing the chat users page.
+ * @throws If the response status is not OK.
+ */
+const fetchPage = async (
+  { page, perPage, sortBy, sortDirection }: UseChatAdminUsersQueryParams,
+  signal?: AbortSignal
+): Promise<ListChatUsersResult> => {
   const params = new URLSearchParams({
     page: String(page),
     perPage: String(perPage),
@@ -28,6 +38,7 @@ const fetchPage = async ({
   });
   const response = await fetch(`/api/admin/chat/users?${params.toString()}`, {
     cache: 'no-store',
+    signal,
   });
   if (!response.ok) {
     throw Error('Failed to load chat users');
@@ -35,9 +46,18 @@ const fetchPage = async ({
   return (await response.json()) as ListChatUsersResult;
 };
 
+/**
+ * React Query hook for fetching a paginated list of admin chat users.
+ *
+ * Wraps {@link fetchPage} with a stable query key and exposes the request
+ * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
+ *
+ * @param params - The page, pagination, and sort parameters for the request.
+ * @returns The full TanStack Query result for the chat users page.
+ */
 export function useChatAdminUsersQuery(params: UseChatAdminUsersQueryParams) {
   return useQuery({
     queryKey: queryKeys.chat.adminUsers(params.page, params.sortBy, params.sortDirection),
-    queryFn: () => fetchPage(params),
+    queryFn: ({ signal }) => fetchPage(params, signal),
   });
 }

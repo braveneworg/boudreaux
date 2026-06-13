@@ -194,20 +194,66 @@ describe('ChatAdminService.enableChatUser', () => {
 });
 
 describe('ChatAdminService.listReportedUsers', () => {
-  it('defaults to all-time (windowDays: null)', async () => {
+  const makeSummary = (id: string, username: string, email: string) => ({
+    userId: id,
+    username,
+    email,
+    reportCount: 1,
+    latestReportedAt: new Date('2026-01-01'),
+    chatDisabled: false,
+  });
+
+  it('defaults to all-time (windowDays: null) and returns a paginated shape', async () => {
     vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([]);
 
-    await ChatAdminService.listReportedUsers();
+    const result = await ChatAdminService.listReportedUsers();
 
     expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: null });
+    expect(result).toEqual({ rows: [], nextSkip: null });
   });
 
   it('forwards an explicit windowDays value', async () => {
     vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([]);
 
-    await ChatAdminService.listReportedUsers(7);
+    await ChatAdminService.listReportedUsers({ windowDays: 7 });
 
     expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: 7 });
+  });
+
+  it('filters by a case-insensitive username/email search term', async () => {
+    vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([
+      makeSummary('u1', 'Spammer', 'spam@example.com'),
+      makeSummary('u2', 'Goodie', 'good@example.com'),
+    ]);
+
+    const result = await ChatAdminService.listReportedUsers({ search: 'SPAM' });
+
+    expect(result.rows.map((r) => r.userId)).toEqual(['u1']);
+  });
+
+  it('slices to the requested page and reports the next offset', async () => {
+    vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([
+      makeSummary('u1', 'a', 'a@example.com'),
+      makeSummary('u2', 'b', 'b@example.com'),
+      makeSummary('u3', 'c', 'c@example.com'),
+    ]);
+
+    const result = await ChatAdminService.listReportedUsers({ skip: 0, take: 2 });
+
+    expect(result.rows.map((r) => r.userId)).toEqual(['u1', 'u2']);
+    expect(result.nextSkip).toBe(2);
+  });
+
+  it('returns nextSkip null on the last page', async () => {
+    vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([
+      makeSummary('u1', 'a', 'a@example.com'),
+      makeSummary('u2', 'b', 'b@example.com'),
+    ]);
+
+    const result = await ChatAdminService.listReportedUsers({ skip: 2, take: 2 });
+
+    expect(result.rows).toEqual([]);
+    expect(result.nextSkip).toBeNull();
   });
 });
 

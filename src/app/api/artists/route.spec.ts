@@ -100,7 +100,7 @@ describe('Artist API Routes', () => {
       expect(ArtistService.getArtists).not.toHaveBeenCalled();
     });
 
-    it('should return all artists with default parameters', async () => {
+    it('should return a paginated page of artists with default parameters', async () => {
       const mockArtists = [mockArtist];
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,
@@ -112,11 +112,26 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      // A short page (rows.length < take) yields nextSkip null.
       expect(data).toEqual({
-        artists: mockArtists,
-        count: 1,
+        rows: mockArtists,
+        nextSkip: null,
       });
-      expect(ArtistService.getArtists).toHaveBeenCalledWith({});
+      expect(ArtistService.getArtists).toHaveBeenCalledWith({ skip: 0, take: 24 });
+    });
+
+    it('should return the next offset when a full page is returned', async () => {
+      const fullPage = Array.from({ length: 2 }, (_, i) => ({ ...mockArtist, id: `artist-${i}` }));
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: fullPage as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists?skip=0&take=2');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.nextSkip).toBe(2);
     });
 
     it('should include Cache-Control: private, no-store header on successful GET response', async () => {
@@ -159,8 +174,55 @@ describe('Artist API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
+        skip: 0,
+        take: 24,
         search: 'john',
       });
+    });
+
+    it('should parse published=true into a boolean filter', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists?published=true');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.getArtists).toHaveBeenCalledWith(
+        expect.objectContaining({ published: true })
+      );
+    });
+
+    it('should parse published=false into a boolean filter', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists?published=false');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.getArtists).toHaveBeenCalledWith(
+        expect.objectContaining({ published: false })
+      );
+    });
+
+    it('should pass deleted=true when requested', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists?deleted=true');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.getArtists).toHaveBeenCalledWith(
+        expect.objectContaining({ deleted: true })
+      );
     });
 
     it('should handle multiple query parameters', async () => {
@@ -194,8 +256,8 @@ describe('Artist API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        artists: [],
-        count: 0,
+        rows: [],
+        nextSkip: null,
       });
     });
 
@@ -249,6 +311,7 @@ describe('Artist API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
+        skip: 0,
         take: 100,
       });
     });
@@ -265,10 +328,11 @@ describe('Artist API Routes', () => {
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
         skip: 0,
+        take: 24,
       });
     });
 
-    it('should handle invalid numeric parameters gracefully', async () => {
+    it('should fall back to defaults for invalid numeric parameters', async () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,
         data: [mockArtist] as never,
@@ -279,8 +343,8 @@ describe('Artist API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
-        skip: NaN,
-        take: NaN,
+        skip: 0,
+        take: 24,
       });
     });
   });

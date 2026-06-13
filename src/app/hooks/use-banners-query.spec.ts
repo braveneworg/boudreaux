@@ -43,10 +43,14 @@ describe('useBannersQuery', () => {
 
     renderHook(() => useBannersQuery());
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { queryFn: () => Promise<unknown> };
+    const options = mockUseQuery.mock.calls[0]?.[0] as {
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
+    };
 
-    await expect(options.queryFn()).resolves.toEqual(payload);
-    expect(global.fetch).toHaveBeenCalledWith('/api/notification-banners');
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).resolves.toEqual(payload);
+    expect(global.fetch).toHaveBeenCalledWith('/api/notification-banners', { signal });
   });
 
   it('throws when the endpoint returns a failure response', async () => {
@@ -54,9 +58,13 @@ describe('useBannersQuery', () => {
 
     renderHook(() => useBannersQuery());
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { queryFn: () => Promise<unknown> };
+    const options = mockUseQuery.mock.calls[0]?.[0] as {
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
+    };
 
-    await expect(options.queryFn()).rejects.toThrow('Failed to fetch banners');
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to fetch banners');
   });
 
   it('passes through the query data and refetch from the underlying query', () => {

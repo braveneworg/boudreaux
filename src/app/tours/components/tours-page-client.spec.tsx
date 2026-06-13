@@ -22,15 +22,6 @@ type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
-const createMockArtist = (overrides?: Partial<Artist>): Artist =>
-  ({
-    id: 'artist-1',
-    firstName: 'John',
-    surname: 'Doe',
-    displayName: 'John Doe',
-    ...overrides,
-  }) as Artist;
-
 const createMockVenue = (overrides?: Partial<Venue>): Venue =>
   ({
     id: 'venue-1',
@@ -44,26 +35,6 @@ const createMockVenue = (overrides?: Partial<Venue>): Venue =>
     updatedAt: new Date(),
     ...overrides,
   }) as Venue;
-
-const createMockHeadliner = (
-  overrides?: Partial<
-    TourDateHeadliner & {
-      artist: Artist | null;
-    }
-  >
-): TourDateHeadliner & {
-  artist: Artist | null;
-} =>
-  ({
-    id: 'th-1',
-    tourDateId: 'tour-date-1',
-    artistId: 'artist-1',
-    sortOrder: 0,
-    artist: createMockArtist(),
-    ...overrides,
-  }) as TourDateHeadliner & {
-    artist: Artist | null;
-  };
 
 const createMockTourDate = (
   overrides?: Partial<
@@ -135,460 +106,98 @@ describe('ToursPageClient', () => {
     vi.useRealTimers();
   });
 
-  /** Type into the search input and flush the 300ms debounce */
-  const typeAndFlush = async (
-    user: ReturnType<typeof userEvent.setup>,
-    input: HTMLElement,
-    text: string
-  ) => {
-    await user.type(input, text);
-    await act(async () => {
-      vi.advanceTimersByTime(350);
-    });
-  };
-
   const setupUser = () => userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
-  it('renders all tours when no search query', () => {
+  const renderClient = (props: Partial<React.ComponentProps<typeof ToursPageClient>> = {}) =>
+    render(
+      <ToursPageClient
+        tours={props.tours ?? []}
+        search={props.search ?? ''}
+        onSearchChange={props.onSearchChange ?? vi.fn()}
+        hasNextPage={props.hasNextPage ?? false}
+        isFetchingNextPage={props.isFetchingNextPage ?? false}
+        fetchNextPage={props.fetchNextPage ?? vi.fn()}
+      />
+    );
+
+  it('renders the provided tours', () => {
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Tour 1' }),
       createMockTour({ id: 'tour-2', title: 'Tour 2' }),
     ];
 
-    render(<ToursPageClient tours={tours} />);
+    renderClient({ tours });
 
     expect(screen.getByText('Tour 1')).toBeInTheDocument();
     expect(screen.getByText('Tour 2')).toBeInTheDocument();
   });
 
-  it('filters tours by title', async () => {
+  it('calls onSearchChange with the debounced search term', async () => {
     const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
+    const onSearchChange = vi.fn();
 
-    render(<ToursPageClient tours={tours} />);
+    renderClient({ onSearchChange });
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Rock');
-
-    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by subtitle', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Tour 1', subtitle: 'Summer Edition' }),
-      createMockTour({ id: 'tour-2', title: 'Tour 2', subtitle: 'Winter Edition' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Summer');
-
-    expect(screen.getByText('Tour 1')).toBeInTheDocument();
-    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by artist display name', async () => {
-    const user = setupUser();
-    const artist1 = createMockArtist({ id: 'artist-1', displayName: 'The Beatles' });
-    const artist2 = createMockArtist({ id: 'artist-2', displayName: 'Rolling Stones' });
-
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Tour 1',
-        tourDates: [createMockTourDate({ headliners: [createMockHeadliner({ artist: artist1 })] })],
-      }),
-      createMockTour({
-        id: 'tour-2',
-        title: 'Tour 2',
-        tourDates: [
-          createMockTourDate({
-            id: 'td-2',
-            headliners: [createMockHeadliner({ id: 'th-2', artist: artist2 })],
-          }),
-        ],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Beatles');
-
-    expect(screen.getByText('Tour 1')).toBeInTheDocument();
-    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by artist first and last name when no display name', async () => {
-    const user = setupUser();
-    const artist = createMockArtist({
-      id: 'artist-1',
-      firstName: 'John',
-      surname: 'Lennon',
-      displayName: null,
+    await user.type(searchInput, 'Rock');
+    await act(async () => {
+      vi.advanceTimersByTime(350);
     });
 
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Tour 1',
-        tourDates: [createMockTourDate({ headliners: [createMockHeadliner({ artist })] })],
-      }),
-      createMockTour({
-        id: 'tour-2',
-        title: 'Tour 2',
-        tourDates: [createMockTourDate({ id: 'td-2' })],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Lennon');
-
-    expect(screen.getByText('Tour 1')).toBeInTheDocument();
-    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
+    expect(onSearchChange).toHaveBeenCalledWith('Rock');
   });
 
-  it('performs case-insensitive search', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'ROCK');
-
-    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-  });
-
-  it('performs partial match search', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Roc');
-
-    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-  });
-
-  it('shows count of filtered tours', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert 1' }),
-      createMockTour({ id: 'tour-2', title: 'Rock Concert 2' }),
-      createMockTour({ id: 'tour-3', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Rock');
-
-    expect(screen.getByText('2 tours found')).toBeInTheDocument();
-  });
-
-  it('shows singular count for one tour', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Rock');
-
-    expect(screen.getByText('1 tour found')).toBeInTheDocument();
-  });
-
-  it('shows empty state when no tours match search', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Classical');
-
-    expect(screen.getByText('No tours found')).toBeInTheDocument();
-    expect(screen.getByText(/Try adjusting your search/)).toBeInTheDocument();
-  });
-
-  it('shows all tours when search is cleared', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
-      createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Rock');
-
-    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-
-    const clearButton = screen.getByLabelText('Clear search');
-    await user.click(clearButton);
-
-    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-    expect(screen.getByText('Jazz Night')).toBeInTheDocument();
-  });
-
-  it('handles tours with multiple headliners', async () => {
-    const user = setupUser();
-    const artist1 = createMockArtist({ id: 'artist-1', displayName: 'The Beatles' });
-    const artist2 = createMockArtist({ id: 'artist-2', displayName: 'Rolling Stones' });
-
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Double Headline',
-        tourDates: [
-          createMockTourDate({
-            headliners: [
-              createMockHeadliner({ id: 'th-1', artist: artist1 }),
-              createMockHeadliner({ id: 'th-2', artist: artist2 }),
-            ],
-          }),
-        ],
-      }),
-      createMockTour({ id: 'tour-2', title: 'Solo Show' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    // Search for first headliner
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Beatles');
-
-    expect(screen.getByText('Double Headline')).toBeInTheDocument();
-    expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
-
-    // Clear and search for second headliner
-    const clearButton = screen.getByLabelText('Clear search');
-    await user.click(clearButton);
-    await typeAndFlush(user, searchInput, 'Stones');
-
-    expect(screen.getByText('Double Headline')).toBeInTheDocument();
-    expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by venue name in tour dates', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'West Coast Run',
-        tourDates: [
-          createMockTourDate({ venue: createMockVenue({ name: 'Madison Square Garden' }) }),
-        ],
-      }),
-      createMockTour({
-        id: 'tour-2',
-        title: 'South Run',
-        tourDates: [
-          createMockTourDate({ id: 'td-2', venue: createMockVenue({ name: 'Ryman Auditorium' }) }),
-        ],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Madison');
-
-    expect(screen.getByText('West Coast Run')).toBeInTheDocument();
-    expect(screen.queryByText('South Run')).not.toBeInTheDocument();
-  });
-
-  it('does not show count when no search query', () => {
+  it('does not show a count when there is no search term', () => {
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Tour 1' }),
       createMockTour({ id: 'tour-2', title: 'Tour 2' }),
     ];
 
-    render(<ToursPageClient tours={tours} />);
+    renderClient({ tours, search: '' });
 
-    expect(screen.queryByText(/tours found/)).not.toBeInTheDocument();
+    // The loaded-count chip only renders when a search is active.
+    expect(screen.queryByText(/tours? found/)).not.toBeInTheDocument();
   });
 
-  it('filters tours by subtitle2', async () => {
-    const user = setupUser();
+  it('shows a plural loaded count when searching', () => {
     const tours = [
-      createMockTour({ id: 'tour-1', title: 'Tour 1', subtitle2: 'An Acoustic Evening' }),
-      createMockTour({ id: 'tour-2', title: 'Tour 2', subtitle2: null }),
+      createMockTour({ id: 'tour-1', title: 'Rock 1' }),
+      createMockTour({ id: 'tour-2', title: 'Rock 2' }),
     ];
 
-    render(<ToursPageClient tours={tours} />);
+    renderClient({ tours, search: 'Rock' });
 
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Acoustic');
-
-    expect(screen.getByText('Tour 1')).toBeInTheDocument();
-    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
+    expect(screen.getByText('2 tours found')).toBeInTheDocument();
   });
 
-  it('filters tours by description', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Tour 1',
-        description: 'A landmark farewell run across North America',
-      }),
-      createMockTour({ id: 'tour-2', title: 'Tour 2', description: null }),
-    ];
+  it('shows a singular loaded count when one tour is loaded', () => {
+    renderClient({ tours: [createMockTour({ id: 'tour-1', title: 'Rock' })], search: 'Rock' });
 
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'farewell');
-
-    expect(screen.getByText('Tour 1')).toBeInTheDocument();
-    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
+    expect(screen.getByText('1 tour found')).toBeInTheDocument();
   });
 
-  it('filters tours by artist first/last name when displayName is absent', async () => {
-    const user = setupUser();
-    const artistNoDisplay = createMockArtist({
-      id: 'artist-nodisplay',
-      displayName: null,
-      firstName: 'Billie',
-      surname: 'Holiday',
+  it('shows the empty state when a search returns no tours', () => {
+    renderClient({ tours: [], search: 'Classical' });
+
+    expect(screen.getByText('No tours found')).toBeInTheDocument();
+    expect(screen.getByText(/Try adjusting your search/)).toBeInTheDocument();
+  });
+
+  it('reflects the controlled search value in the input', () => {
+    renderClient({ search: 'Jazz' });
+
+    expect(screen.getByLabelText('Search tours by artist name')).toHaveValue('Jazz');
+  });
+
+  it('shows a loading spinner while fetching the next page', () => {
+    renderClient({
+      tours: [createMockTour({ id: 'tour-1', title: 'Tour 1' })],
+      hasNextPage: true,
+      isFetchingNextPage: true,
     });
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Jazz Tour',
-        tourDates: [
-          createMockTourDate({
-            headliners: [
-              createMockHeadliner({ artist: artistNoDisplay, artistId: artistNoDisplay.id }),
-            ],
-          }),
-        ],
-      }),
-      createMockTour({ id: 'tour-2', title: 'Rock Tour' }),
-    ];
 
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Holiday');
-
-    expect(screen.getByText('Jazz Tour')).toBeInTheDocument();
-    expect(screen.queryByText('Rock Tour')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by venue city', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Nashville Tour',
-        tourDates: [
-          createMockTourDate({ venue: createMockVenue({ city: 'Nashville', state: 'TN' }) }),
-        ],
-      }),
-      createMockTour({
-        id: 'tour-2',
-        title: 'Chicago Tour',
-        tourDates: [
-          createMockTourDate({
-            id: 'td-2',
-            venue: createMockVenue({ city: 'Chicago', state: 'IL' }),
-          }),
-        ],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Nashville');
-
-    expect(screen.getByText('Nashville Tour')).toBeInTheDocument();
-    expect(screen.queryByText('Chicago Tour')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by venue state', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Texas Tour',
-        tourDates: [
-          createMockTourDate({ venue: createMockVenue({ city: 'Austin', state: 'TX' }) }),
-        ],
-      }),
-      createMockTour({
-        id: 'tour-2',
-        title: 'Florida Tour',
-        tourDates: [
-          createMockTourDate({
-            id: 'td-2',
-            venue: createMockVenue({ city: 'Miami', state: 'FL' }),
-          }),
-        ],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'TX');
-
-    expect(screen.getByText('Texas Tour')).toBeInTheDocument();
-    expect(screen.queryByText('Florida Tour')).not.toBeInTheDocument();
-  });
-
-  it('handles null venue city and state without crashing', async () => {
-    const user = setupUser();
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Mystery Tour',
-        tourDates: [
-          createMockTourDate({
-            venue: createMockVenue({
-              name: 'Secret Venue',
-              // Intentionally testing defensive null handling even though city is
-              // non-nullable in the DB schema (runtime data may be inconsistent)
-              city: null as unknown as string,
-              state: null,
-            }),
-          }),
-        ],
-      }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Secret');
-
-    expect(screen.getByText('Mystery Tour')).toBeInTheDocument();
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    // The spinner has no accessible name; assert the SVG is present.
+    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
   });
 });

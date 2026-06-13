@@ -22,13 +22,22 @@ vi.mock('./data-view', () => ({
   ),
 }));
 
+const baseInfiniteResult = {
+  isPending: false,
+  error: null,
+  data: { pages: [{ rows: [], nextSkip: null }] },
+  refetch: vi.fn(),
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+};
+
 describe('ArtistDataView', () => {
   it('renders loading state when isPending is true', () => {
     mockUseArtistsQuery.mockReturnValue({
+      ...baseInfiniteResult,
       isPending: true,
-      error: null,
       data: undefined,
-      refetch: vi.fn(),
     });
 
     render(<ArtistDataView />);
@@ -37,10 +46,9 @@ describe('ArtistDataView', () => {
 
   it('renders error state when error is truthy', () => {
     mockUseArtistsQuery.mockReturnValue({
-      isPending: false,
+      ...baseInfiniteResult,
       error: new Error('Fetch failed'),
       data: undefined,
-      refetch: vi.fn(),
     });
 
     render(<ArtistDataView />);
@@ -48,12 +56,11 @@ describe('ArtistDataView', () => {
   });
 
   it('renders DataView when data is loaded successfully', () => {
-    const mockData = [{ id: '1', firstName: 'John', surname: 'Doe' }];
     mockUseArtistsQuery.mockReturnValue({
-      isPending: false,
-      error: null,
-      data: mockData,
-      refetch: vi.fn(),
+      ...baseInfiniteResult,
+      data: {
+        pages: [{ rows: [{ id: '1', firstName: 'John', surname: 'Doe' }], nextSkip: null }],
+      },
     });
 
     render(<ArtistDataView />);
@@ -62,10 +69,10 @@ describe('ArtistDataView', () => {
 
   it('prioritizes error state over pending state', () => {
     mockUseArtistsQuery.mockReturnValue({
+      ...baseInfiniteResult,
       isPending: true,
       error: new Error('Error'),
       data: undefined,
-      refetch: vi.fn(),
     });
 
     render(<ArtistDataView />);

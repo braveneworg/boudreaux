@@ -222,7 +222,10 @@ describe('ArtistSearchInput', () => {
     fireEvent.change(input, { target: { value: 'test' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=test');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/artists/search?q=test',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
   });
 
@@ -455,7 +458,10 @@ describe('ArtistSearchInput', () => {
 
     // TanStack Query handles cancellation internally; verify the latest query is used
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=testing');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/artists/search?q=testing',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
   });
 
@@ -466,7 +472,10 @@ describe('ArtistSearchInput', () => {
     fireEvent.change(input, { target: { value: 'test & foo' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=test%20%26%20foo');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/artists/search?q=test%20%26%20foo',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
   });
 

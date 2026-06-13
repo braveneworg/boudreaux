@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 
 import { Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/app/components/ui/button';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
+import { useDebounce } from '@/app/hooks/use-debounce';
 import { useFeaturedArtistsQuery } from '@/app/hooks/use-featured-artists-query';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { ENTITIES } from '@/lib/constants';
@@ -30,19 +31,20 @@ export const FeaturedArtistDataView = () => {
     'updatedAt',
     'publishedOn',
   ];
-  const { isPending, error, data, refetch } = useFeaturedArtistsQuery();
 
-  const getSearchableText = useCallback((item: FeaturedArtist) => {
-    const parts: string[] = [];
-    if (item.displayName) parts.push(item.displayName);
-    if (item.description) parts.push(item.description);
-    if (item.artists) {
-      for (const artist of item.artists) {
-        if (artist.displayName) parts.push(artist.displayName);
-      }
-    }
-    return parts.join(' ');
-  }, []);
+  const [search, setSearch] = useState('');
+  const [showPublished, setShowPublished] = useState(true);
+  const [showUnpublished, setShowUnpublished] = useState(true);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const debouncedSearch = useDebounce(search);
+
+  // Both same → no publish filter; otherwise the enabled one.
+  const published = showPublished === showUnpublished ? null : showPublished;
+
+  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useFeaturedArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+
+  const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
   const handlePublish = useCallback(() => {
     startPublishTransition(async () => {
@@ -79,12 +81,23 @@ export const FeaturedArtistDataView = () => {
       </div>
       <DataView<FeaturedArtist>
         entity={ENTITIES.featuredArtist}
-        data={data}
+        data={{ featuredArtists: rows }}
         fieldsToShow={fieldsToShow}
         refetch={refetch}
         isPending={isPending}
+        error={null}
+        hasNextPage={hasNextPage}
+        fetchNextPage={fetchNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        searchValue={search}
+        onSearchChange={setSearch}
+        showPublished={showPublished}
+        onShowPublishedChange={setShowPublished}
+        showUnpublished={showUnpublished}
+        onShowUnpublishedChange={setShowUnpublished}
+        showDeleted={showDeleted}
+        onShowDeletedChange={setShowDeleted}
         getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
-        getSearchableText={getSearchableText}
       />
     </>
   );

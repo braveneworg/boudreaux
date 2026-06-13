@@ -136,7 +136,10 @@ describe('PurchaseSuccessStep — fetches formats from API', () => {
       expect(screen.getByTestId('format-bundle-download')).toBeDefined();
     });
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/releases/release-123/digital-formats');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/releases/release-123/digital-formats',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expect(screen.getByTestId('format-bundle-download')).toHaveAttribute('data-format-count', '2');
   });
 
