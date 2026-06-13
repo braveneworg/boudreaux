@@ -3,9 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useRef } from 'react';
 
-import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
+import { Loader2 } from 'lucide-react';
+
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 
 import { TourList } from './tour-list';
 import { TourSearch } from './tour-search';
@@ -26,80 +28,52 @@ export interface ToursPageClientProps {
     >;
     images: TourImage[];
   })[];
+  /** Current server-side search term. */
+  search: string;
+  /** Called when the search term changes. */
+  onSearchChange: (value: string) => void;
+  /** Whether more pages remain to load. */
+  hasNextPage: boolean;
+  /** Whether the next page is currently loading. */
+  isFetchingNextPage: boolean;
+  /** Loads the next page of tours. */
+  fetchNextPage: () => void;
 }
 
 /**
- * Client-side wrapper for tours page with search functionality
- * Implements case-insensitive partial match filtering by artist name
+ * Presentational tours listing: a controlled search box plus an
+ * infinite-scrolling list. Search is applied server-side by the parent; this
+ * component only renders results and triggers `fetchNextPage` as the sentinel
+ * scrolls into view.
  */
-export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
+export const ToursPageClient = ({
+  tours,
+  search,
+  onSearchChange,
+  hasNextPage,
+  isFetchingNextPage,
+  fetchNextPage,
+}: ToursPageClientProps) => {
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Filter tours based on search query
-  const filteredTours = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return tours;
-    }
-
-    const query = searchQuery.toLowerCase();
-
-    return tours.filter((tour) => {
-      // Search in tour title
-      if (tour.title.toLowerCase().includes(query)) {
-        return true;
-      }
-
-      // Search in tour subtitle
-      if (tour.subtitle?.toLowerCase().includes(query)) {
-        return true;
-      }
-
-      // Search in tour subtitle2
-      if (tour.subtitle2?.toLowerCase().includes(query)) {
-        return true;
-      }
-
-      // Search in tour description
-      if (tour.description?.toLowerCase().includes(query)) {
-        return true;
-      }
-
-      const hasHeadlinerMatch = tour.tourDates.some((tourDate) =>
-        tourDate.headliners.some((headliner) => {
-          const artistName = getArtistDisplayNameForTour(headliner.artist);
-          return artistName?.toLowerCase().includes(query) ?? false;
-        })
-      );
-
-      if (hasHeadlinerMatch) {
-        return true;
-      }
-
-      return tour.tourDates.some((tourDate) => {
-        const venueName = tourDate.venue.name.toLowerCase();
-        const city = tourDate.venue.city?.toLowerCase() || '';
-        const state = tourDate.venue.state?.toLowerCase() || '';
-        return venueName.includes(query) || city.includes(query) || state.includes(query);
-      });
-    });
-  }, [tours, searchQuery]);
+  useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
   return (
     <div className="space-y-6">
       {/* Search Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1 sm:max-w-md">
-          <TourSearch value={searchQuery} onChange={setSearchQuery} />
+          <TourSearch value={search} onChange={onSearchChange} />
         </div>
-        {searchQuery && (
+        {search && (
           <div className="text-zinc-950-foreground text-sm">
-            {filteredTours.length === 1 ? '1 tour found' : `${filteredTours.length} tours found`}
+            {tours.length === 1 ? '1 tour found' : `${tours.length} tours found`}
           </div>
         )}
       </div>
 
       {/* Tour List */}
-      {filteredTours.length === 0 && searchQuery ? (
+      {tours.length === 0 && search ? (
         <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
           <div className="text-center">
             <h3 className="text-zinc-950-foreground text-lg font-semibold">No tours found</h3>
@@ -109,7 +83,18 @@ export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
           </div>
         </div>
       ) : (
-        <TourList tours={filteredTours} />
+        <>
+          <TourList tours={tours} />
+          <div
+            ref={sentinelRef}
+            className="flex min-h-12 items-center justify-center py-6"
+            aria-hidden={!hasNextPage}
+          >
+            {isFetchingNextPage ? (
+              <Loader2 className="text-zinc-950-foreground h-6 w-6 animate-spin" />
+            ) : null}
+          </div>
+        </>
       )}
     </div>
   );

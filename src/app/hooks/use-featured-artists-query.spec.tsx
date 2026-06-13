@@ -1,116 +1,95 @@
+// @vitest-environment jsdom
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ReactNode } from 'react';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 
-import { useFeaturedArtistsQuery } from './use-featured-artists-query';
+import {
+  FEATURED_ARTISTS_PAGE_SIZE,
+  useFeaturedArtistsQuery,
+  type FeaturedArtistsQueryParams,
+} from './use-featured-artists-query';
 
-const createQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
+const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 
-const createWrapper = () => {
-  const queryClient = createQueryClient();
-  const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-  Wrapper.displayName = 'TestWrapper';
-  return Wrapper;
+vi.mock('@tanstack/react-query', () => ({
+  keepPreviousData: Symbol('keepPreviousData'),
+  useInfiniteQuery: (options: unknown) => useInfiniteQueryMock(options),
+}));
+
+interface FeaturedArtistsQueryOptions {
+  queryKey: unknown[];
+  initialPageParam: number;
+  refetchOnMount: string;
+  queryFn: (ctx: { pageParam: number; signal?: AbortSignal }) => Promise<unknown>;
+  getNextPageParam: (lastPage: { nextSkip: number | null }) => number | null;
+}
+
+const getOptions = (params: FeaturedArtistsQueryParams): FeaturedArtistsQueryOptions => {
+  useInfiniteQueryMock.mockReturnValue({ isPending: true });
+  renderHook(() => useFeaturedArtistsQuery(params));
+  return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as FeaturedArtistsQueryOptions;
 };
 
+beforeEach(() => useInfiniteQueryMock.mockReset());
+
+afterEach(() => vi.unstubAllGlobals());
+
 describe('useFeaturedArtistsQuery', () => {
-  const mockFeaturedArtists = {
-    featuredArtists: [
-      {
-        id: 'featured-123',
-        displayName: 'Featured Artist Name',
-        featuredOn: '2024-01-15T00:00:00.000Z',
-        position: 1,
-        description: 'A featured artist description',
-        coverArt: 'https://example.com/cover.jpg',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        publishedOn: null,
-        deletedOn: null,
-      },
-    ],
-    count: 1,
-  };
+  it('keys the query by the admin-infinite params and starts at skip 0', () => {
+    const opts = getOptions({ search: 'Jazz', published: null, deleted: false });
 
-  beforeEach(() => {
-    global.fetch = vi.fn();
+    expect(opts.queryKey).toEqual(['featuredArtists', 'adminInfinite', 'jazz', null, false]);
+    expect(opts.initialPageParam).toBe(0);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('always refetches on mount', () => {
+    const opts = getOptions({ search: '', published: null, deleted: false });
+
+    expect(opts.refetchOnMount).toBe('always');
   });
 
-  it('should fetch featured artists successfully', async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockFeaturedArtists,
-    } as Response);
+  it('derives the next page param from nextSkip', () => {
+    const opts = getOptions({ search: '', published: null, deleted: false });
 
-    const { result } = renderHook(() => useFeaturedArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.isPending).toBe(true);
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.data).toEqual(mockFeaturedArtists);
-    expect(result.current.error).toBeNull();
-    expect(global.fetch).toHaveBeenCalledWith('/api/featured-artists');
+    expect(opts.getNextPageParam({ nextSkip: 48 })).toBe(48);
+    expect(opts.getNextPageParam({ nextSkip: null })).toBeNull();
   });
 
-  it('should handle fetch error', async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-    } as Response);
+  it('fetches a page with skip/take and forwards the signal', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: '', published: null, deleted: false });
+    const { signal } = new AbortController();
 
-    const { result } = renderHook(() => useFeaturedArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
+    await opts.queryFn({ pageParam: 24, signal });
 
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe('Failed to fetch featured artists');
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/featured-artists?skip=24&take=${FEATURED_ARTISTS_PAGE_SIZE}`,
+      { signal }
+    );
   });
 
-  it('should provide refetch function', async () => {
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: async () => mockFeaturedArtists,
-    } as Response);
+  it('includes the search and published params when set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: 'Soul', published: false, deleted: false });
 
-    const { result } = renderHook(() => useFeaturedArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
+    await opts.queryFn({ pageParam: 0 });
 
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/featured-artists?skip=0&take=${FEATURED_ARTISTS_PAGE_SIZE}&search=Soul&published=false`,
+      { signal: undefined }
+    );
+  });
 
-    expect(typeof result.current.refetch).toBe('function');
+  it('throws when the response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const opts = getOptions({ search: '', published: null, deleted: false });
 
-    // Call refetch and verify it works
-    await result.current.refetch();
-
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    await expect(opts.queryFn({ pageParam: 0 })).rejects.toThrow(
+      'Failed to fetch featured artists'
+    );
   });
 });

@@ -128,24 +128,43 @@ export class FeaturedArtistsService {
   }
 
   /**
-   * Get all featured artists for admin (no date filter, includes all)
+   * Get all featured artists for admin (no date filter, includes all).
+   *
+   * Supports server-side `search` plus a `published` filter. The
+   * FeaturedArtist model has no `deletedOn` field, so the `deleted` param is
+   * accepted for a uniform admin API but applies no soft-delete constraint.
+   * The search OR and the published OR are combined under `AND` so the two
+   * `OR` keys never collide (Prisma 6 + MongoDB null-safe pattern).
+   *
+   * - `published === true` → only featured artists with a `publishedOn` date.
+   * - `published === false` → only featured artists without a `publishedOn` date.
+   * - `published == null` → no publish filter.
    */
   static async getAllFeaturedArtists(params?: {
     skip?: number;
     take?: number;
     search?: string;
+    published?: boolean;
+    deleted?: boolean;
   }): Promise<ServiceResponse<FeaturedArtist[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
+      const { skip = 0, take = 50, search, published } = params || {};
 
-      const where: Prisma.FeaturedArtistWhereInput = {
-        ...(search && {
-          OR: [
-            { displayName: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ],
-        }),
-      };
+      const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+      const and: Prisma.FeaturedArtistWhereInput[] = [];
+
+      if (published === true) {
+        and.push({ publishedOn: { not: null } });
+      } else if (published === false) {
+        and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
+      }
+      if (search) {
+        and.push({
+          OR: [{ displayName: contains(search) }, { description: contains(search) }],
+        });
+      }
+
+      const where: Prisma.FeaturedArtistWhereInput = and.length > 0 ? { AND: and } : {};
 
       const featuredArtists = await prisma.featuredArtist.findMany({
         where,

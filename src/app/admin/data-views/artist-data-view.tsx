@@ -3,7 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useMemo, useState } from 'react';
+
 import { useArtistsQuery } from '@/app/hooks/use-artists-query';
+import { useDebounce } from '@/app/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 
@@ -20,7 +23,20 @@ export const ArtistDataView = () => {
     'updatedAt',
     'publishedOn',
   ];
-  const { isPending, error, data, refetch } = useArtistsQuery();
+
+  const [search, setSearch] = useState('');
+  const [showPublished, setShowPublished] = useState(true);
+  const [showUnpublished, setShowUnpublished] = useState(true);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const debouncedSearch = useDebounce(search);
+
+  // Both same → no publish filter; otherwise the enabled one.
+  const published = showPublished === showUnpublished ? null : showPublished;
+
+  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+
+  const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
   if (error) {
     return <div>Error loading artists</div>;
@@ -33,11 +49,23 @@ export const ArtistDataView = () => {
   return (
     <DataView<Artist>
       entity={ENTITIES.artist}
-      data={data}
+      data={{ artists: rows }}
       fieldsToShow={fieldsToShow}
       imageField="images"
       refetch={refetch}
       isPending={isPending}
+      error={null}
+      hasNextPage={hasNextPage}
+      fetchNextPage={fetchNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      searchValue={search}
+      onSearchChange={setSearch}
+      showPublished={showPublished}
+      onShowPublishedChange={setShowPublished}
+      showUnpublished={showUnpublished}
+      onShowUnpublishedChange={setShowUnpublished}
+      showDeleted={showDeleted}
+      onShowDeletedChange={setShowDeleted}
     />
   );
 };

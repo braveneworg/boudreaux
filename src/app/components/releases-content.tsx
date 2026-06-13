@@ -3,11 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useRef } from 'react';
+
 import Link from 'next/link';
 
 import { Loader2 } from 'lucide-react';
 
 import { usePublishedReleasesQuery } from '@/app/hooks/use-published-releases-query';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import {
   getArtistDisplayNameForRelease,
@@ -37,10 +40,17 @@ const toCardRelease = (release: PublishedReleaseListing) => {
 
 /**
  * Client content wrapper for the releases listing page.
- * Uses TanStack Query to fetch published releases (hydrated from SSR prefetch).
+ *
+ * Pages through published releases with infinite scroll (the first page is
+ * hydrated from the SSR prefetch). The search combobox is self-contained and
+ * queries the server directly, so it is not coupled to the loaded pages.
  */
 export const ReleasesContent = () => {
-  const { isPending, error, data } = usePublishedReleasesQuery();
+  const { data, isPending, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    usePublishedReleasesQuery();
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
   if (isPending) {
     return (
@@ -64,13 +74,22 @@ export const ReleasesContent = () => {
     );
   }
 
-  const releases = (data?.releases ?? []) as unknown as PublishedReleaseListing[];
+  const releases = data?.pages.flatMap((page) => page.rows) ?? [];
   const cardReleases = releases.map(toCardRelease);
 
   return (
     <div className="flex flex-col gap-6 px-4 py-4">
-      <ReleaseSearchCombobox releases={releases} />
+      <ReleaseSearchCombobox />
       <ReleaseCardGrid releases={cardReleases} />
+      <div
+        ref={sentinelRef}
+        className="flex min-h-12 items-center justify-center py-2"
+        aria-hidden={!hasNextPage}
+      >
+        {isFetchingNextPage ? (
+          <Loader2 className="text-zinc-950-foreground h-6 w-6 animate-spin" />
+        ) : null}
+      </div>
     </div>
   );
 };

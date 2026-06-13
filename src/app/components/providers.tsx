@@ -23,8 +23,8 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: disableCache ? 0 : 60 * 1000,
-            gcTime: disableCache ? 0 : 5 * 60 * 1000,
+            staleTime: disableCache ? 0 : 5 * 60 * 1000,
+            gcTime: disableCache ? 0 : 10 * 60 * 1000,
             refetchOnWindowFocus: false,
             retry: 1,
           },

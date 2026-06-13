@@ -19,6 +19,14 @@ interface MentionSearchResponse {
  * Prefix-search usernames for the chat composer autocomplete. The query
  * is gated on a non-empty prefix so the popover stays idle until the
  * user has typed at least one character after `@`.
+ *
+ * The inline `queryFn` hits the `/api/chat/mention-search` route handler and
+ * forwards the TanStack Query {@link AbortSignal} to `fetch`, so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param prefix - The username prefix typed after `@`.
+ * @param enabled - Whether the query should run.
+ * @returns The full TanStack Query result for the matched mentions.
  */
 export function useMentionSearchQuery(prefix: string, enabled: boolean) {
   const trimmed = prefix.trim().slice(0, 32);

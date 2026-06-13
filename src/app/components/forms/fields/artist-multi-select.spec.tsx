@@ -293,7 +293,7 @@ describe('ArtistMultiSelect', () => {
     });
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ artists: mockArtists, count: mockArtists.length }),
+      json: () => Promise.resolve({ rows: mockArtists, count: mockArtists.length }),
     });
   });
   describe('rendering', () => {
@@ -392,7 +392,10 @@ describe('ArtistMultiSelect', () => {
       await user.click(screen.getByTestId('popover-trigger'));
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/artists'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/artists'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
     });
   });
@@ -870,7 +873,10 @@ describe('ArtistMultiSelect', () => {
       await vi.advanceTimersByTimeAsync(350);
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('search=test'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('search=test'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
 
       vi.useRealTimers();
@@ -895,7 +901,10 @@ describe('ArtistMultiSelect', () => {
       await user.click(screen.getByTestId('popover-trigger'));
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/artists'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/artists'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
     });
   });
@@ -1214,7 +1223,7 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ artists: [], count: 0 }),
+        json: () => Promise.resolve({ rows: [], count: 0 }),
       });
 
       render(
@@ -1248,7 +1257,7 @@ describe('ArtistMultiSelect', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            artists: [
+            rows: [
               {
                 id: 'artist-empty',
                 displayName: null,

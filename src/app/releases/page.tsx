@@ -14,10 +14,13 @@ import { ReleasesContent } from '@/app/components/releases-content';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/app/hooks/use-published-releases-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
-import { fetchApi } from '@/lib/utils/fetch-api';
+import { ReleaseService } from '@/lib/services/release-service';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 import type { Metadata } from 'next';
 
@@ -35,9 +38,25 @@ const breadcrumbItems = [{ anchorText: 'Releases', url: '/releases', isActive: t
 export default async function ReleasesPage() {
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery({
-    queryKey: queryKeys.releases.published(),
-    queryFn: () => fetchApi('/api/releases?listing=published'),
+  // Prefetch the first (unsearched) page as an infinite query. The query key and
+  // initialPageParam must exactly match the client `usePublishedReleasesQuery('')`
+  // hook or hydration misses and the client refetches. Read the service directly
+  // instead of self-fetching /api/releases — the internal HTTP roundtrip fails
+  // silently under load on the standalone server.
+  await queryClient.prefetchInfiniteQuery({
+    queryKey: queryKeys.releases.publishedInfinite(''),
+    initialPageParam: 0,
+    queryFn: async () => {
+      const result = await ReleaseService.getPublishedReleases({
+        skip: 0,
+        take: PUBLISHED_RELEASES_PAGE_SIZE,
+      });
+      const rows = result.success ? result.data : [];
+      return serializeForResponse({
+        rows,
+        nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_RELEASES_PAGE_SIZE),
+      });
+    },
   });
 
   return (

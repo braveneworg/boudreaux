@@ -249,14 +249,16 @@ describe('ArtistService', () => {
       },
     ];
 
-    it('should retrieve all artists with default parameters', async () => {
+    const deletedOnClause = { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] };
+
+    it('should retrieve all artists with default parameters (excludes deleted)', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue(mockArtists);
 
       const result = await ArtistService.getArtists();
 
       expect(result).toMatchObject({ success: true, data: mockArtists });
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { AND: [deletedOnClause] },
         skip: 0,
         take: 50,
         orderBy: { createdAt: 'desc' },
@@ -276,7 +278,7 @@ describe('ArtistService', () => {
 
       expect(result.success).toBe(true);
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { AND: [deletedOnClause] },
         skip: 10,
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -297,11 +299,16 @@ describe('ArtistService', () => {
       expect(result.success).toBe(true);
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { firstName: { contains: 'john', mode: 'insensitive' } },
-            { surname: { contains: 'john', mode: 'insensitive' } },
-            { displayName: { contains: 'john', mode: 'insensitive' } },
-            { slug: { contains: 'john', mode: 'insensitive' } },
+          AND: [
+            deletedOnClause,
+            {
+              OR: [
+                { firstName: { contains: 'john', mode: 'insensitive' } },
+                { surname: { contains: 'john', mode: 'insensitive' } },
+                { displayName: { contains: 'john', mode: 'insensitive' } },
+                { slug: { contains: 'john', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
         skip: 0,
@@ -328,11 +335,16 @@ describe('ArtistService', () => {
       expect(result.success).toBe(true);
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { firstName: { contains: 'doe', mode: 'insensitive' } },
-            { surname: { contains: 'doe', mode: 'insensitive' } },
-            { displayName: { contains: 'doe', mode: 'insensitive' } },
-            { slug: { contains: 'doe', mode: 'insensitive' } },
+          AND: [
+            deletedOnClause,
+            {
+              OR: [
+                { firstName: { contains: 'doe', mode: 'insensitive' } },
+                { surname: { contains: 'doe', mode: 'insensitive' } },
+                { displayName: { contains: 'doe', mode: 'insensitive' } },
+                { slug: { contains: 'doe', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
         skip: 5,
@@ -345,6 +357,37 @@ describe('ArtistService', () => {
           },
         },
       });
+    });
+
+    it('should add publishedOn filter when published=true', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+
+      await ArtistService.getArtists({ published: true });
+
+      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where;
+      expect(passedWhere).toEqual({
+        AND: [deletedOnClause, { publishedOn: { not: null } }],
+      });
+    });
+
+    it('should add unpublished filter when published=false', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+
+      await ArtistService.getArtists({ published: false });
+
+      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where;
+      expect(passedWhere).toEqual({
+        AND: [deletedOnClause, { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
+      });
+    });
+
+    it('should omit the deletedOn constraint when deleted=true', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+
+      await ArtistService.getArtists({ deleted: true });
+
+      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      expect(passedWhere).toEqual({});
     });
 
     it('should return empty array when no artists found', async () => {

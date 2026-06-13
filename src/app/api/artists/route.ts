@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
@@ -14,10 +15,16 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+const DEFAULT_TAKE = 24;
+const MAX_TAKE = 100;
+
 /**
  * GET /api/artists
- * Get all artists or search for artists
- * Query params: skip, take, isActive, search
+ * Returns a skip/offset page of artists for the admin listing, optionally
+ * filtered by a server-side `search` term and `published`/`deleted` state.
+ *
+ * Query params: `skip` (default 0), `take` (default 24, clamped to 100),
+ * `search`, `published` ('true'/'false'), `deleted` ('true').
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,15 +34,23 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const skip = searchParams.get('skip');
-    const take = searchParams.get('take');
+    const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
+    const take = Math.min(
+      Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+      MAX_TAKE
+    );
     const search = searchParams.get('search');
+    const publishedParam = searchParams.get('published');
+    const published =
+      publishedParam === 'true' ? true : publishedParam === 'false' ? false : undefined;
+    const deleted = searchParams.get('deleted') === 'true';
 
-    const MAX_TAKE = 100;
     const params = {
-      ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
-      ...(take && { take: Math.min(Math.max(1, parseInt(take, 10)), MAX_TAKE) }),
+      skip,
+      take,
       ...(search && { search }),
+      ...(published !== undefined && { published }),
+      ...(deleted && { deleted }),
     };
 
     const result = await ArtistService.getArtists(params);
@@ -49,8 +64,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        artists: result.data,
-        count: result.data.length,
+        rows: result.data,
+        nextSkip: computeNextSkip(result.data.length, skip, take),
       },
       {
         headers: {

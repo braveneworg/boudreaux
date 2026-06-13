@@ -94,7 +94,7 @@ describe('Featured Artists API Routes', () => {
       expect(FeaturedArtistsService.getAllFeaturedArtists).not.toHaveBeenCalled();
     });
 
-    it('should return all featured artists with default parameters', async () => {
+    it('should return a paginated page of featured artists with default parameters', async () => {
       const mockFeaturedArtists = [mockFeaturedArtist];
       vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
         success: true,
@@ -107,10 +107,47 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        featuredArtists: JSON.parse(JSON.stringify(mockFeaturedArtists)),
-        count: 1,
+        rows: JSON.parse(JSON.stringify(mockFeaturedArtists)),
+        nextSkip: null,
       });
-      expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({});
+      expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
+        skip: 0,
+        take: 24,
+      });
+    });
+
+    it('should return the next offset when a full page is returned', async () => {
+      const fullPage = Array.from({ length: 2 }, (_, i) => ({
+        ...mockFeaturedArtist,
+        id: `featured-${i}`,
+      }));
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: fullPage as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists?skip=0&take=2');
+      const response = await GET(request, dummyContext);
+      const data = await response.json();
+
+      expect(data.nextSkip).toBe(2);
+    });
+
+    it('should parse published and deleted params', async () => {
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: [mockFeaturedArtist] as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists?published=true&deleted=true'
+      );
+      const response = await GET(request, dummyContext);
+
+      expect(response.status).toBe(200);
+      expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith(
+        expect.objectContaining({ published: true, deleted: true })
+      );
     });
 
     it('should include Cache-Control: private, no-store header on admin GET response', async () => {
@@ -153,6 +190,8 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
+        skip: 0,
+        take: 24,
         search: 'featured',
       });
     });
@@ -168,6 +207,7 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
+        skip: 0,
         take: 100,
       });
     });
@@ -184,6 +224,7 @@ describe('Featured Artists API Routes', () => {
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
         skip: 0,
+        take: 24,
       });
     });
 
@@ -202,8 +243,8 @@ describe('Featured Artists API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.featuredArtists[0].position).toBe(1);
-      expect(typeof data.featuredArtists[0].position).toBe('number');
+      expect(data.rows[0].position).toBe(1);
+      expect(typeof data.rows[0].position).toBe('number');
     });
 
     it('should return empty array when no featured artists found', async () => {
@@ -218,8 +259,8 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        featuredArtists: [],
-        count: 0,
+        rows: [],
+        nextSkip: null,
       });
     });
 

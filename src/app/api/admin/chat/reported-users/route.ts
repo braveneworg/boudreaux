@@ -8,8 +8,12 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
+import type { PaginatedResponse } from '@/lib/types/pagination';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_TAKE = 24;
+const MAX_TAKE = 100;
 
 export interface ReportedUserDto {
   userId: string;
@@ -20,22 +24,20 @@ export interface ReportedUserDto {
   chatDisabled: boolean;
 }
 
-export interface ReportedUsersResponse {
-  rows: ReportedUserDto[];
-}
+export type ReportedUsersResponse = PaginatedResponse<ReportedUserDto>;
 
 /**
  * GET /api/admin/chat/reported-users
  *
- * Returns one row per reported user with the report count and most
- * recent report timestamp. Reporter identity is deliberately absent
+ * Returns one skip/offset page of reported users, each with the report count
+ * and most recent report timestamp. Reporter identity is deliberately absent
  * from this DTO — admins moderate the target, not the source.
  *
  * Query params:
  *   windowDays – when set, only includes reports within the last N days.
  *                Omit for all-time.
- *   search     – substring match (case-insensitive) on username; applied
- *                after grouping for simplicity.
+ *   search     – substring match (case-insensitive) on username/email.
+ *   skip, take – pagination (take defaults to 24, clamped to 100).
  */
 export const GET = withAdmin(async (request: NextRequest): Promise<NextResponse> => {
   const params = request.nextUrl.searchParams;
@@ -44,15 +46,22 @@ export const GET = withAdmin(async (request: NextRequest): Promise<NextResponse>
     windowDaysRaw !== null && Number.isFinite(Number.parseInt(windowDaysRaw, 10))
       ? Math.max(1, Number.parseInt(windowDaysRaw, 10))
       : null;
-  const search = params.get('search')?.trim().toLowerCase() ?? '';
+  const search = params.get('search') ?? undefined;
+  const skip = Math.max(0, parseInt(params.get('skip') ?? '0', 10) || 0);
+  const take = Math.min(
+    Math.max(1, parseInt(params.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+    MAX_TAKE
+  );
 
-  const rows = await ChatAdminService.listReportedUsers(windowDays);
-  const filtered = search
-    ? rows.filter((row) => row.username?.toLowerCase().includes(search) ?? false)
-    : rows;
+  const { rows, nextSkip } = await ChatAdminService.listReportedUsers({
+    windowDays,
+    search,
+    skip,
+    take,
+  });
 
   const body: ReportedUsersResponse = {
-    rows: filtered.map((row) => ({
+    rows: rows.map((row) => ({
       userId: row.userId,
       username: row.username,
       email: row.email,
@@ -60,6 +69,7 @@ export const GET = withAdmin(async (request: NextRequest): Promise<NextResponse>
       latestReportedAt: row.latestReportedAt.toISOString(),
       chatDisabled: row.chatDisabled,
     })),
+    nextSkip,
   };
   return NextResponse.json(body);
 });

@@ -47,10 +47,13 @@ describe('useChatPinnedMessagesQuery', () => {
     renderHook(() => useChatPinnedMessagesQuery({ enabled: true }));
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
-    await expect(options.queryFn()).resolves.toEqual([{ id: 'msg-1' }]);
-    expect(global.fetch).toHaveBeenCalledWith('/api/chat/pinned', { cache: 'no-store' });
+
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).resolves.toEqual([{ id: 'msg-1' }]);
+    expect(global.fetch).toHaveBeenCalledWith('/api/chat/pinned', { cache: 'no-store', signal });
   });
 
   it('throws when the endpoint returns a failure response', async () => {
@@ -59,8 +62,11 @@ describe('useChatPinnedMessagesQuery', () => {
     renderHook(() => useChatPinnedMessagesQuery({ enabled: true }));
 
     const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: () => Promise<unknown>;
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
     };
-    await expect(options.queryFn()).rejects.toThrow('Failed to load pinned messages');
+
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to load pinned messages');
   });
 });
