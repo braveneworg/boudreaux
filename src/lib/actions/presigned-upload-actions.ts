@@ -200,57 +200,59 @@ export const getPresignedUploadUrlsAction = async (
       userId: session.user.id,
     });
 
-    const results: PresignedUrlResult[] = [];
-
-    for (const file of files) {
-      // Security: validate existingS3Key belongs to the expected entity path
-      let s3Key: string;
-      if (file.existingS3Key) {
-        const expectedPrefix = `media/${entityType}/${entityId}/`;
-        if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {
-          throw new Error(`Invalid S3 key: must start with ${expectedPrefix}`);
+    // Each file's presigned URL is independent; generate them concurrently.
+    // Promise.all preserves input order in the returned results array.
+    const results: PresignedUrlResult[] = await Promise.all(
+      files.map(async (file) => {
+        // Security: validate existingS3Key belongs to the expected entity path
+        let s3Key: string;
+        if (file.existingS3Key) {
+          const expectedPrefix = `media/${entityType}/${entityId}/`;
+          if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {
+            throw new Error(`Invalid S3 key: must start with ${expectedPrefix}`);
+          }
+          s3Key = file.existingS3Key;
+        } else {
+          s3Key = generateS3Key(entityType, entityId, file.fileName);
         }
-        s3Key = file.existingS3Key;
-      } else {
-        s3Key = generateS3Key(entityType, entityId, file.fileName);
-      }
 
-      const putCommand = new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: s3Key,
-        ContentType: file.contentType,
-        ContentLength: file.fileSize,
-        CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: {
-          entityType,
-          entityId,
-          originalFileName: file.fileName,
-          uploadedAt: new Date().toISOString(),
-        },
-      });
+        const putCommand = new PutObjectCommand({
+          Bucket: s3Bucket,
+          Key: s3Key,
+          ContentType: file.contentType,
+          ContentLength: file.fileSize,
+          CacheControl: 'public, max-age=31536000, immutable',
+          Metadata: {
+            entityType,
+            entityId,
+            originalFileName: file.fileName,
+            uploadedAt: new Date().toISOString(),
+          },
+        });
 
-      // Generate presigned URL with 15 minute expiry
-      const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
+        // Generate presigned URL with 15 minute expiry
+        const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
 
-      // Construct the CDN URL
-      const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
-      const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
+        // Construct the CDN URL
+        const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
+        const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
 
-      logger.debug('Generated presigned URL', {
-        s3Key,
-        cdnUrl,
-        s3DirectUrl,
-        uploadUrlHost: new URL(uploadUrl).hostname,
-        bucket: s3Bucket,
-        region: awsRegion,
-      });
+        logger.debug('Generated presigned URL', {
+          s3Key,
+          cdnUrl,
+          s3DirectUrl,
+          uploadUrlHost: new URL(uploadUrl).hostname,
+          bucket: s3Bucket,
+          region: awsRegion,
+        });
 
-      results.push({
-        uploadUrl,
-        s3Key,
-        cdnUrl,
-      });
-    }
+        return {
+          uploadUrl,
+          s3Key,
+          cdnUrl,
+        };
+      })
+    );
 
     logger.operationComplete(operation, {
       entityType,
