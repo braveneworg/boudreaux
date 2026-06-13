@@ -74,7 +74,7 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Auth**: gate routes and actions with `withAuth` / `withAdmin` from `src/lib/decorators/with-auth.ts`; rate-limit with `withRateLimit`.
 - **Data layer**: all Prisma access goes through the repository pattern in `src/lib/repositories/` — keep DB logic out of components and routes. Use transactions for multi-step ops; handle connection failures gracefully.
 - **Validation**: validate all external input (user input, API responses, Server Action args) with Zod before use. Schemas live in `src/lib/validation/`.
-- **Fetching**: TanStack Query on the client; explicit cache options on Server Component fetches (`{ cache: 'no-store' }` for fresh data).
+- **Fetching**: TanStack Query on the client, with `fetch` to API routes that forward the `AbortSignal` for automatic cancellation. Use stable query keys from `src/lib/query-keys.ts`. Never call API routes directly from components — always wrap in a custom hook (e.g. `useArtistsQuery`) that forwards the signal and abstracts the query logic. Always use jsdocs to explain the fetch function and hook's behavior and return value. Only use `{ cache: 'no-store' }` for requests that must never be cached (e.g. auth status); otherwise, rely on TanStack Query's caching and invalidation.
 - **node**: use the node version specified by .nvmrc (24); never a global install. Use `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
 
 ## TypeScript
@@ -131,10 +131,10 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 
 ## Application security & conventions
 
-- Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Never use `localStorage` / `sessionStorage` for anything.
+- Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Only use `localStorage` / `sessionStorage` for non-sensitive client state; never store secrets or auth tokens there. Use `httpOnly`, `secure`, `sameSite` cookies for auth sessions.
 - Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Keep dependencies patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
-- No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
+- No ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
 
 ## Spec Kit feature naming
 
