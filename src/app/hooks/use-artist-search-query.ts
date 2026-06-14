@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ArtistSearchResponse {
   artists: Array<{
     id: string;
@@ -48,10 +50,15 @@ const fetchArtistSearch = async (
  * `AbortSignal`.
  *
  * @param query - The search term; the query is disabled while empty.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-query gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useArtistSearchQuery = (query: string) => {
+export const useArtistSearchQuery = (
+  query: string,
+  options: QueryOptionsOverride<ArtistSearchResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -60,8 +67,9 @@ export const useArtistSearchQuery = (query: string) => {
   } = useQuery({
     queryKey: queryKeys.artists.search(query),
     queryFn: ({ signal }) => fetchArtistSearch(query, signal),
-    enabled: query.length > 0,
     placeholderData: keepPreviousData,
+    ...options,
+    enabled: (options.enabled ?? true) && query.length > 0,
   });
 
   return { isPending, error, data, refetch };

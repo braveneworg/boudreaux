@@ -88,7 +88,7 @@ export function ReleaseSelect<
       artistIds: artistIds?.length ? artistIds : undefined,
       take: 50,
     },
-    open
+    { enabled: open }
   );
   const releases = data ?? [];
   const error = fetchError?.message ?? null;

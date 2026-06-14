@@ -42,7 +42,9 @@ export function NotificationSearch({ onSelect }: NotificationSearchProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const debouncedSearch = useDebounce(searchValue, 300);
-  const { isPending: isLoading, data } = useNotificationBannerSearchQuery(debouncedSearch, open);
+  const { isPending: isLoading, data } = useNotificationBannerSearchQuery(debouncedSearch, {
+    enabled: open,
+  });
   const results = data?.notifications ?? [];
 
   const handleSelect = (notification: SearchResult) => {

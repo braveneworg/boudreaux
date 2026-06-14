@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ReleaseListItem {
   id: string;
   title: string;
@@ -68,11 +70,15 @@ const fetchReleaseList = async (
  * `AbortSignal`.
  *
  * @param params - The search, artist, and pagination filters for the request.
- * @param enabled - Whether the query should run.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); they take precedence over the defaults below.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useReleaseListQuery = (params: ReleaseListParams, enabled = true) => {
+export const useReleaseListQuery = (
+  params: ReleaseListParams,
+  options: QueryOptionsOverride<ReleaseListItem[]> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -81,8 +87,8 @@ export const useReleaseListQuery = (params: ReleaseListParams, enabled = true) =
   } = useQuery({
     queryKey: queryKeys.releases.filteredList(params),
     queryFn: ({ signal }) => fetchReleaseList(params, signal),
-    enabled,
     placeholderData: keepPreviousData,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Artist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Filters that drive the admin artists infinite query. */
 export interface ArtistsQueryParams {
   search: string;
@@ -15,7 +17,7 @@ export interface ArtistsQueryParams {
 }
 
 /** One skip/offset page of artists returned by `/api/artists`. */
-export type ArtistsPage = PaginatedResponse<Artist>;
+export type ArtistsPaginatedResponse = PaginatedResponse<Artist>;
 
 /** Page size requested per fetch. */
 export const ARTISTS_PAGE_SIZE = 24;
@@ -36,7 +38,7 @@ const fetchArtistsPage = async (
   params: ArtistsQueryParams,
   skip: number,
   signal?: AbortSignal
-): Promise<ArtistsPage> => {
+): Promise<ArtistsPaginatedResponse> => {
   const searchParams = new URLSearchParams({
     skip: String(skip),
     take: String(ARTISTS_PAGE_SIZE),
@@ -49,7 +51,7 @@ const fetchArtistsPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch artists');
   }
-  return response.json() as Promise<ArtistsPage>;
+  return response.json() as Promise<ArtistsPaginatedResponse>;
 };
 
 /**
@@ -62,13 +64,19 @@ const fetchArtistsPage = async (
  * filter transition. Cancellation is automatic via the forwarded `AbortSignal`.
  *
  * @param params - The server-side search/published/deleted filters.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useArtistsQuery = (params: ArtistsQueryParams) =>
+export const useArtistsQuery = (
+  params: ArtistsQueryParams,
+  options: InfiniteQueryOptionsOverride<ArtistsPaginatedResponse> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.artists.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchArtistsPage(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });

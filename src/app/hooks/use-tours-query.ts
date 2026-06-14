@@ -6,6 +6,7 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
 import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
@@ -23,7 +24,7 @@ type TourWithRelations = Tour & {
 };
 
 /** One skip/offset page of tours returned by `/api/tours`. */
-export type ToursPage = PaginatedResponse<TourWithRelations>;
+export type ToursPaginatedResponse = PaginatedResponse<TourWithRelations>;
 
 /** Page size requested per fetch — kept in sync with the SSR prefetch. */
 export const TOURS_PAGE_SIZE = 24;
@@ -44,7 +45,7 @@ const fetchToursPage = async (
   search: string,
   skip: number,
   signal?: AbortSignal
-): Promise<ToursPage> => {
+): Promise<ToursPaginatedResponse> => {
   const params = new URLSearchParams({ skip: String(skip), take: String(TOURS_PAGE_SIZE) });
   if (search) params.set('search', search);
 
@@ -52,7 +53,7 @@ const fetchToursPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch tours');
   }
-  return response.json() as Promise<ToursPage>;
+  return response.json() as Promise<ToursPaginatedResponse>;
 };
 
 /**
@@ -65,13 +66,19 @@ const fetchToursPage = async (
  * forwarded `AbortSignal`.
  *
  * @param search - Debounced, server-side search term.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useToursQuery = (search: string) =>
+export const useToursQuery = (
+  search: string,
+  options: InfiniteQueryOptionsOverride<ToursPaginatedResponse> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.tours.infinite(search),
     queryFn: ({ pageParam, signal }) => fetchToursPage(search, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });

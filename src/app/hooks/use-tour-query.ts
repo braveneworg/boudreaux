@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
 import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export type TourWithRelations = Tour & {
@@ -54,10 +55,15 @@ const fetchTour = async (
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param tourId - The tour identifier to fetch.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-tourId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useTourQuery = (tourId: string) => {
+export const useTourQuery = (
+  tourId: string,
+  options: QueryOptionsOverride<TourWithRelations | null> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -66,7 +72,8 @@ export const useTourQuery = (tourId: string) => {
   } = useQuery({
     queryKey: queryKeys.tours.detail(tourId),
     queryFn: ({ signal }) => fetchTour(tourId, signal),
-    enabled: !!tourId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!tourId,
   });
 
   return { isPending, error, data, refetch };

@@ -39,7 +39,7 @@ export const ChatMentionAutocomplete = ({
   // Debounce the prefix so typing `@username` fires one request per pause,
   // not one per keystroke (matching the other search inputs in the app).
   const debouncedQuery = useDebounce(query, 200);
-  const { data: matches, isFetching } = useMentionSearchQuery(debouncedQuery, true);
+  const { data: matches, isFetching } = useMentionSearchQuery(debouncedQuery, { enabled: true });
 
   useEffect(() => {
     onMatchesChange(matches ?? []);

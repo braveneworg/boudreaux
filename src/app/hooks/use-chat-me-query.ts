@@ -7,6 +7,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import type { ChatMeResponse } from '@/app/api/chat/me/route';
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 /**
  * Fetches the viewer's chat status from the `/api/chat/me` route handler.
  *
@@ -31,19 +33,21 @@ const fetchMe = async ({ signal }: QueryFunctionContext): Promise<ChatMeResponse
  * disabled-user UX when the user has been reported and disabled (or
  * when a {@link BannedIdentity} matches their session).
  *
- * `enabled` lets the caller defer the request until the drawer opens.
+ * Pass `enabled` via `options` to defer the request until the drawer opens.
  * Wraps {@link fetchMe}; cancellation is handled automatically via the
  * forwarded `AbortSignal`.
+ *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); they take precedence over the defaults below.
  */
-export function useChatMeQuery({ enabled }: { enabled: boolean }) {
-  return useQuery({
+export const useChatMeQuery = (options: QueryOptionsOverride<ChatMeResponse> = {}) =>
+  useQuery({
     queryKey: queryKeys.chat.me(),
     queryFn: fetchMe,
-    enabled,
     // Status is read-mostly; cache it for a minute so opening and
     // closing the drawer doesn't slam the endpoint, but refresh on
     // window focus so a freshly disabled user sees the gate quickly.
     staleTime: 60_000,
     refetchOnWindowFocus: true,
+    ...options,
   });
-}

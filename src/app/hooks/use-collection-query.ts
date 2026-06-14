@@ -5,6 +5,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface CollectionResponse {
   purchases: Array<{
     id: string;
@@ -71,10 +73,12 @@ const fetchCollection = async ({ signal }: QueryFunctionContext): Promise<Collec
  * Wraps {@link fetchCollection} with a stable query key and exposes the request
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, `staleTime`).
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useCollectionQuery = () => {
+export const useCollectionQuery = (options: QueryOptionsOverride<CollectionResponse> = {}) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -83,6 +87,7 @@ export const useCollectionQuery = () => {
   } = useQuery({
     queryKey: queryKeys.collection.list(),
     queryFn: fetchCollection,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

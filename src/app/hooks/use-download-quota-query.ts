@@ -5,6 +5,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface DownloadQuotaResponse {
   success: boolean;
   remainingQuota: number;
@@ -39,11 +41,14 @@ const fetchDownloadQuota = async ({
  * request state. Cancellation is handled automatically via the forwarded
  * `AbortSignal`.
  *
- * @param enabled - Whether the query should run (defaults to `true`).
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); they take precedence over the defaults below.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useDownloadQuotaQuery = (enabled = true) => {
+export const useDownloadQuotaQuery = (
+  options: QueryOptionsOverride<DownloadQuotaResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -52,7 +57,7 @@ export const useDownloadQuotaQuery = (enabled = true) => {
   } = useQuery({
     queryKey: queryKeys.downloadQuota.user(),
     queryFn: fetchDownloadQuota,
-    enabled,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

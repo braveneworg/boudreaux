@@ -6,6 +6,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 export interface MentionMatch {
   id: string;
   username: string;
@@ -25,10 +27,14 @@ interface MentionSearchResponse {
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
  *
  * @param prefix - The username prefix typed after `@`.
- * @param enabled - Whether the query should run.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the gate on a non-empty prefix is always applied on top.
  * @returns The full TanStack Query result for the matched mentions.
  */
-export function useMentionSearchQuery(prefix: string, enabled: boolean) {
+export const useMentionSearchQuery = (
+  prefix: string,
+  options: QueryOptionsOverride<MentionMatch[]> = {}
+) => {
   const trimmed = prefix.trim().slice(0, 32);
   return useQuery({
     queryKey: queryKeys.chat.mentionSearch(trimmed),
@@ -42,8 +48,9 @@ export function useMentionSearchQuery(prefix: string, enabled: boolean) {
       const data = (await response.json()) as MentionSearchResponse;
       return data.matches;
     },
-    enabled: enabled && trimmed.length > 0,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+    ...options,
+    enabled: (options.enabled ?? true) && trimmed.length > 0,
   });
-}
+};

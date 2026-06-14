@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ReleaseDigitalFormatsResponse {
   formats: Array<{
     formatType: DigitalFormatType;
@@ -46,13 +48,14 @@ const fetchReleaseDigitalFormats = async (
  * `AbortSignal`.
  *
  * @param releaseId - The ID of the release whose digital formats are fetched.
- * @param options - Optional settings, including whether the query is `enabled`.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-releaseId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
 export const useReleaseDigitalFormatsQuery = (
   releaseId: string,
-  options?: { enabled?: boolean }
+  options: QueryOptionsOverride<ReleaseDigitalFormatsResponse> = {}
 ) => {
   const {
     isPending,
@@ -62,7 +65,8 @@ export const useReleaseDigitalFormatsQuery = (
   } = useQuery({
     queryKey: queryKeys.releases.digitalFormats(releaseId),
     queryFn: ({ signal }) => fetchReleaseDigitalFormats(releaseId, signal),
-    enabled: (options?.enabled ?? true) && !!releaseId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId,
   });
 
   return { isPending, error, data, refetch };

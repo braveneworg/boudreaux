@@ -87,7 +87,9 @@ export function VenueSelect<
   const queryClient = useQueryClient();
 
   // Venue list fetching via TanStack Query
-  const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, open);
+  const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, {
+    enabled: open,
+  });
   const venues = (venuesData ?? []) as VenueOption[];
 
   // Dialog state for inline venue creation

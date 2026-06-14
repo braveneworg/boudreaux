@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Filters that drive the admin featured-artists infinite query. */
 export interface FeaturedArtistsQueryParams {
   search: string;
@@ -15,7 +17,7 @@ export interface FeaturedArtistsQueryParams {
 }
 
 /** One skip/offset page of featured artists returned by `/api/featured-artists`. */
-export type FeaturedArtistsPage = PaginatedResponse<FeaturedArtist>;
+export type FeaturedArtistsPaginatedResponse = PaginatedResponse<FeaturedArtist>;
 
 /** Page size requested per fetch. */
 export const FEATURED_ARTISTS_PAGE_SIZE = 24;
@@ -37,7 +39,7 @@ const fetchFeaturedArtistsPage = async (
   params: FeaturedArtistsQueryParams,
   skip: number,
   signal?: AbortSignal
-): Promise<FeaturedArtistsPage> => {
+): Promise<FeaturedArtistsPaginatedResponse> => {
   const searchParams = new URLSearchParams({
     skip: String(skip),
     take: String(FEATURED_ARTISTS_PAGE_SIZE),
@@ -50,7 +52,7 @@ const fetchFeaturedArtistsPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch featured artists');
   }
-  return response.json() as Promise<FeaturedArtistsPage>;
+  return response.json() as Promise<FeaturedArtistsPaginatedResponse>;
 };
 
 /**
@@ -62,9 +64,14 @@ const fetchFeaturedArtistsPage = async (
  * pagination. Always refetches on mount so create/edit returns show fresh data.
  *
  * @param params - The server-side search/published/deleted filters.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useFeaturedArtistsQuery = (params: FeaturedArtistsQueryParams) =>
+export const useFeaturedArtistsQuery = (
+  params: FeaturedArtistsQueryParams,
+  options: InfiniteQueryOptionsOverride<FeaturedArtistsPaginatedResponse> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.featuredArtists.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchFeaturedArtistsPage(params, pageParam, signal),
@@ -72,4 +79,5 @@ export const useFeaturedArtistsQuery = (params: FeaturedArtistsQueryParams) =>
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
     refetchOnMount: 'always', // Always refetch when admin page mounts (e.g., after create/edit)
+    ...options,
   });

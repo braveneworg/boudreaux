@@ -5,6 +5,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface CDNStatus {
   status: 'invalidating' | 'ready' | 'unknown' | 'error';
   message: string;
@@ -39,10 +41,12 @@ const fetchCdnStatus = async ({ signal }: QueryFunctionContext): Promise<CDNStat
  * Wraps {@link fetchCdnStatus} with a stable query key and exposes the request
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useCdnStatusQuery = () => {
+export const useCdnStatusQuery = (options: QueryOptionsOverride<CDNStatus> = {}) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -52,6 +56,7 @@ export const useCdnStatusQuery = () => {
     queryKey: queryKeys.cdn.status(),
     queryFn: fetchCdnStatus,
     refetchInterval: (query) => (query.state.data?.status === 'invalidating' ? 30_000 : false),
+    ...options,
   });
 
   return { isPending, error, data, refetch };

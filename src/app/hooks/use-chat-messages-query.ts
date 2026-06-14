@@ -7,6 +7,8 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 interface ChatMessagesPage {
   messages: ChatMessageDto[];
 }
@@ -66,12 +68,15 @@ const fetchPage = async ({
  * Wraps {@link fetchPage}; cancellation is handled automatically via the
  * forwarded `AbortSignal`.
  *
- * @param options - Optional settings; `enabled` defers the request.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`); they take precedence over the defaults below.
  * @returns The flattened `messages` plus paging/request state:
  * `isPending`, `isError`, `error`, `hasNextPage`, `isFetchingNextPage`,
  * `fetchNextPage`, and `refetch`.
  */
-export function useChatMessagesQuery(options?: { enabled?: boolean }) {
+export const useChatMessagesQuery = (
+  options: InfiniteQueryOptionsOverride<ChatMessagesPage, ChatCursor | undefined> = {}
+) => {
   const result = useInfiniteQuery({
     queryKey: queryKeys.chat.messages(),
     queryFn: ({ pageParam, signal }) => fetchPage({ pageParam, signal }),
@@ -82,7 +87,8 @@ export function useChatMessagesQuery(options?: { enabled?: boolean }) {
       if (!oldest) return undefined;
       return { cursorCreatedAt: oldest.createdAt, cursorId: oldest.id };
     },
-    enabled: options?.enabled ?? true,
+    ...options,
+    enabled: options.enabled ?? true,
   });
 
   // Pages arrive newest-page-first; flatten oldest → newest for rendering.
@@ -105,4 +111,4 @@ export function useChatMessagesQuery(options?: { enabled?: boolean }) {
     fetchNextPage: result.fetchNextPage,
     refetch: result.refetch,
   };
-}
+};

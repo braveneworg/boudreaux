@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 /**
  * Fetches a single artist by slug from the `/api/artists/slug/:slug` route
  * handler.
@@ -38,10 +40,15 @@ const fetchArtistBySlug = async (slug: string, signal?: AbortSignal) => {
  * `AbortSignal`.
  *
  * @param slug - The artist slug to look up; the query is disabled when empty.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-slug gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useArtistBySlugQuery = (slug: string) => {
+export const useArtistBySlugQuery = (
+  slug: string,
+  options: QueryOptionsOverride<Awaited<ReturnType<typeof fetchArtistBySlug>>> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -50,7 +57,8 @@ export const useArtistBySlugQuery = (slug: string) => {
   } = useQuery({
     queryKey: queryKeys.artists.bySlug(slug),
     queryFn: ({ signal }) => fetchArtistBySlug(slug, signal),
-    enabled: !!slug,
+    ...options,
+    enabled: (options.enabled ?? true) && !!slug,
   });
 
   return { isPending, error, data, refetch };
