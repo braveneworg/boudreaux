@@ -238,7 +238,7 @@ try {
 
 ### Documentation
 
-See `/docs/copilot/MIDDLEWARE_TEST_ANALYSIS.md` for detailed analysis of all test failures and comprehensive recommendations.
+See `/docs/auto-generated/MIDDLEWARE_TEST_ANALYSIS.md` for detailed analysis of all test failures and comprehensive recommendations.
 
 ## Conclusion
 

@@ -1,0 +1,33 @@
+%% Backend layered architecture — request to data
+flowchart TB
+    subgraph Entry["Entry points"]
+        direction LR
+        SA["Server Actions<br/>src/lib/actions"]
+        API["API Route Handlers<br/>src/app/api"]
+    end
+
+    subgraph Cross["Cross-cutting decorators"]
+        direction LR
+        Auth["withAuth / withAdmin<br/>session + role gate"]
+        Rate["withRateLimit<br/>per-IP throttle"]
+        Log["withLogging<br/>request context"]
+    end
+
+    Valid["Validation (Zod schemas)<br/>src/lib/validation"]
+    Services["Services (business logic)<br/>src/lib/services"]
+    Repos["Repositories (data access)<br/>src/lib/repositories"]
+    Prisma["Prisma Client"]
+    Mongo[("MongoDB")]
+
+    SA --> Cross
+    API --> Cross
+    Cross --> Valid
+    Valid --> Services
+    Services --> Repos
+    Repos --> Prisma
+    Prisma --> Mongo
+
+    Services -. "integrations" .-> Ext["External services<br/>Stripe · S3 · SES · Pusher"]
+
+    classDef plain fill:#ffffff,stroke:#000000,stroke-width:1px,color:#000000;
+    class SA,API,Auth,Rate,Log,Valid,Services,Repos,Prisma,Mongo,Ext plain;

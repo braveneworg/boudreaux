@@ -1,0 +1,59 @@
+%% Data model — Catalog & Commerce domain
+erDiagram
+    User ||--o{ ReleasePurchase : "buys"
+    User ||--o{ ReleaseDownload : "downloads"
+    User ||--o| UserDownloadQuota : "free tier"
+    Release ||--o{ ReleasePurchase : "sold as"
+    Release ||--o{ ReleaseDownload : "delivered as"
+    Release ||--o{ ArtistRelease : "credited"
+    Artist ||--o{ ArtistRelease : "appears on"
+    Release ||--o{ ReleaseDigitalFormat : "has format"
+    ReleaseDigitalFormat ||--o{ ReleaseDigitalFormatFile : "contains track"
+    Release ||--o{ FeaturedArtist : "featured as"
+
+    User {
+        string id PK
+        string email UK
+        string username UK
+        string role
+    }
+    Release {
+        string id PK
+        string title UK
+        datetime publishedAt
+        int suggestedPrice
+        string coverArt
+    }
+    ReleasePurchase {
+        string id PK
+        int amountPaid
+        string stripePaymentIntentId UK
+        datetime confirmationEmailSentAt
+        datetime refundedAt
+    }
+    ReleaseDigitalFormat {
+        string id PK
+        string formatType
+        int trackCount
+    }
+    ReleaseDigitalFormatFile {
+        string id PK
+        int trackNumber
+        string s3Key
+        bigint fileSize
+    }
+    UserDownloadQuota {
+        string id PK
+        string visitorId UK
+        string uniqueReleaseIds
+    }
+    ReleaseDownload {
+        string id PK
+        int downloadCount
+        datetime lastDownloadedAt
+    }
+    Artist {
+        string id PK
+        string slug UK
+        string displayName
+    }

@@ -169,7 +169,7 @@ middleware.spec.ts (test file)
 ├── Enabled: 4 security logging tests (removed .skip)
 └── Cleaned: Removed misleading comments
 
-docs/copilot/
+docs/auto-generated/
 ├── MIDDLEWARE_TESTING_QUICK_REFERENCE.md
 │   ├── Updated test counts
 │   ├── Removed API admin warnings

@@ -133,6 +133,6 @@ Some uncovered branches due to error handling paths that are difficult to trigge
 
 For questions about these tests or the middleware implementation, see:
 
-- Analysis: `/docs/copilot/MIDDLEWARE_TEST_ANALYSIS.md`
-- Summary: `/docs/copilot/MIDDLEWARE_TEST_FIX_SUMMARY.md`
-- Original docs: `/docs/copilot/MIDDLEWARE_TEST_DOCUMENTATION.md`
+- Analysis: `/docs/auto-generated/MIDDLEWARE_TEST_ANALYSIS.md`
+- Summary: `/docs/auto-generated/MIDDLEWARE_TEST_FIX_SUMMARY.md`
+- Original docs: `/docs/auto-generated/MIDDLEWARE_TEST_DOCUMENTATION.md`

@@ -107,7 +107,7 @@ A comprehensive review of the Boudreaux test suite was conducted, identifying an
 
 ### 1. Comprehensive Test Review (93KB)
 
-**File:** `docs/copilot/COMPREHENSIVE_TEST_REVIEW_AND_RECOMMENDATIONS.md`
+**File:** `docs/auto-generated/COMPREHENSIVE_TEST_REVIEW_AND_RECOMMENDATIONS.md`
 
 **Contains:**
 
@@ -125,7 +125,7 @@ A comprehensive review of the Boudreaux test suite was conducted, identifying an
 
 ### 2. Testing Quick Reference (15KB)
 
-**File:** `docs/copilot/TESTING_QUICK_REFERENCE.md`
+**File:** `docs/auto-generated/TESTING_QUICK_REFERENCE.md`
 
 **Contains:**
 

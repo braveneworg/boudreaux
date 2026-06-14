@@ -46,7 +46,7 @@ src/
 prisma/schema.prisma        # MongoDB schema
 e2e/                        # Playwright (fixtures, helpers, tests)
 scripts/                    # tsx scripts (mongo backup, S3 ops, image variants)
-docs/copilot/               # AI-generated markdown goes here
+docs/auto-generated/        # AI-generated markdown goes here
 ```
 
 Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/app/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal.
@@ -147,5 +147,5 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Only use `localStorage` / `sessionStorage` for non-sensitive client state; never store secrets or auth tokens there. Use `httpOnly`, `secure`, `sameSite` cookies for auth sessions.
 - Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Store config and secrets in environment variables — never hardcode them.
 - **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
-- Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
+- Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.

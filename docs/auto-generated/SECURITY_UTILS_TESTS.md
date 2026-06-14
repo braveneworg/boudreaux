@@ -319,7 +319,7 @@ Type Errors  no errors
 - `/src/app/lib/utils/account-lockout.ts` - Account lockout implementation
 - `/src/app/lib/utils/rate-limit.ts` - Rate limiting implementation
 - `/prisma/schema.prisma` - User model with security fields
-- `/docs/copilot/SECURITY_UTILS_TESTS.md` - This document
+- `/docs/auto-generated/SECURITY_UTILS_TESTS.md` - This document
 
 ---
 
