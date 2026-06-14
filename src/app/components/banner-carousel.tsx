@@ -61,6 +61,12 @@ export function BannerCarousel({
 }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
+  // Whether the carousel is scrolled into the viewport. Starts `true` so SSR,
+  // the no-op test IntersectionObserver, and browsers without the API keep the
+  // existing always-rotating behavior; a real observer pauses rotation when the
+  // carousel is offscreen (scrolled past on mobile, or `md:hidden` on desktop)
+  // so the timer stops triggering re-renders no one can see.
+  const [isInViewport, setIsInViewport] = useState(true);
   const [incomingIndex, setIncomingIndex] = useState<number | null>(null);
   const currentIndexRef = useRef(0);
   const isAnimatingRef = useRef(false);
@@ -163,12 +169,25 @@ export function BannerCarousel({
     timerRef.current = setInterval(goToNext, rotationInterval * 1000);
   }, [clearTimer, goToNext, rotationInterval, totalSlides]);
 
-  // Auto-rotation timer
+  // Auto-rotation timer — only runs while the carousel is on screen.
   useEffect(() => {
-    if (totalSlides <= 1) return;
+    if (totalSlides <= 1 || !isInViewport) return;
     resetTimer();
     return () => clearTimer();
-  }, [totalSlides, resetTimer, clearTimer]);
+  }, [totalSlides, isInViewport, resetTimer, clearTimer]);
+
+  // Pause rotation when the carousel scrolls out of the viewport so an
+  // offscreen carousel doesn't keep re-rendering every `rotationInterval`.
+  useEffect(() => {
+    const el = containerRef.current;
+    /* v8 ignore next -- guarded for SSR / browsers without IntersectionObserver */
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setIsInViewport(entry.isIntersecting), {
+      threshold: 0,
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Tab visibility handling
   useEffect(() => {

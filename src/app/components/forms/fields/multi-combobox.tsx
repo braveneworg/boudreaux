@@ -65,7 +65,10 @@ export const MultiCombobox = ({
     }
   }, [allSelected, options, onValueChange]);
 
-  const selectedOptions = options.filter((opt) => value.includes(opt.value));
+  const selectedOptions = React.useMemo(
+    () => options.filter((opt) => value.includes(opt.value)),
+    [options, value]
+  );
 
   const handleRemove = React.useCallback(
     (optionValue: string) => {
