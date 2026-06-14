@@ -9,8 +9,6 @@ import 'server-only';
  * Call sites depend only on this interface; the concrete provider
  * (`SnsSmsService` in production, `NoOpSmsService` in dev/test) is
  * selected at the composition root via {@link getSmsService}.
- *
- * @see specs/010-chat-abuse-reporting/research.md
  */
 export interface SmsService {
   /**

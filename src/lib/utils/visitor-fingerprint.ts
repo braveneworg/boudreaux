@@ -17,8 +17,6 @@ import { createHash } from 'node:crypto';
  * The full client IP is **never** stored. Only the truncated network prefix
  * is fed into the SHA-256, and even that prefix is hashed before it touches
  * any persistent store, satisfying data-minimization for the per-release cap.
- *
- * @see specs/007-free-digital-downloads/research.md §R-1
  */
 
 export interface FingerprintInput {

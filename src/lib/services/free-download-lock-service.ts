@@ -17,8 +17,6 @@ import 'server-only';
  * could obtain one extra successful download in a narrow window.
  *
  * Default TTL: 30 seconds. Locks are GC'd lazily on the next `acquire`.
- *
- * @see specs/007-free-digital-downloads/research.md §R-3
  */
 export class FreeDownloadLockService {
   private readonly ttlMs: number;
