@@ -1,0 +1,28 @@
+%% Sequence — Magic-link sign-in with ban-evasion gate
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as Sign-in form
+    participant NA as Auth.js (NextAuth)
+    participant SES as AWS SES
+    participant CB as signIn callback
+    participant BR as BannedIdentityRepository
+    participant DB as Prisma adapter (MongoDB)
+
+    U->>C: Enter email
+    C->>NA: signIn('nodemailer', email)
+    NA->>DB: create VerificationToken
+    NA->>SES: send magic-link email
+    SES-->>U: Email with one-time link
+    U->>NA: Click magic link (token)
+    NA->>DB: verify + consume token
+    NA->>CB: signIn({ user })
+    CB->>BR: findByEmailOrUserId
+    alt banned
+        CB-->>NA: false (deny)
+        NA-->>U: Access denied
+    else allowed
+        CB-->>NA: true
+        NA->>DB: create Session (JWT)
+        NA-->>U: Authenticated session cookie
+    end

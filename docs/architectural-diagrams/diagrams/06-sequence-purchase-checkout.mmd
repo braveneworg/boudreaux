@@ -1,0 +1,30 @@
+%% Sequence — Pay-What-You-Want checkout & Stripe webhook
+sequenceDiagram
+    autonumber
+    actor U as Buyer
+    participant C as Client (Payment Element)
+    participant A as Server Action<br/>createPurchaseCheckoutSession
+    participant ST as Stripe
+    participant W as Webhook route<br/>/api/stripe/webhook
+    participant DB as PurchaseRepository
+    participant E as SES email
+
+    U->>C: Choose price (PWYW) + email
+    C->>A: createPurchaseCheckoutSessionAction(input)
+    A->>A: Zod validate · rate-limit · resolve userId from session
+    A->>ST: checkout.sessions.create (payment mode)
+    ST-->>A: clientSecret + sessionId
+    A-->>C: clientSecret
+    C->>ST: Confirm payment (Payment Element)
+    ST-->>U: Payment result
+    ST->>W: payment_intent.succeeded (signed)
+    W->>W: Verify signature + IP allowlist
+    W->>DB: findByPaymentIntentId (idempotency)
+    alt not yet recorded
+        W->>DB: create ReleasePurchase
+        W->>DB: markEmailSent (atomic guard)
+        W->>E: send purchase confirmation
+    else already processed
+        W-->>ST: 200 OK (no-op)
+    end
+    W-->>ST: 200 OK

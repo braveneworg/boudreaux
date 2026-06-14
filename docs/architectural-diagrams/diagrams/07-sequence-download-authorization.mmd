@@ -1,0 +1,35 @@
+%% Sequence — Download authorization (purchase gate + freemium quota)
+sequenceDiagram
+    autonumber
+    actor U as User / Guest
+    participant C as Client (Download dialog)
+    participant A as Server Action<br/>download authorization
+    participant PS as PurchaseService
+    participant QS as QuotaEnforcementService
+    participant DB as Repositories
+    participant S3 as AWS S3 / CloudFront
+
+    U->>C: Click "Download" (format)
+    C->>A: requestDownload(releaseId, formatType)
+    A->>PS: getDownloadAccess(subject, releaseId)
+    PS->>DB: findByUserAndRelease (purchase?)
+    alt purchased
+        PS-->>A: allow (paid)
+    else free tier
+        PS->>QS: check freemium quota (max 5 releases)
+        QS->>DB: read UserDownloadQuota / GuestDownloadCount
+        alt within quota
+            QS-->>A: allow + reserve slot
+        else quota exceeded
+            QS-->>A: deny (QUOTA_EXCEEDED)
+        end
+    end
+    alt allowed
+        A->>S3: generate presigned GET (24h)
+        S3-->>A: signed URL
+        A->>DB: increment counter · log DownloadEvent
+        A-->>C: signed URL
+        C->>S3: download file
+    else denied
+        A-->>C: error (upgrade / limit message)
+    end

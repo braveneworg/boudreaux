@@ -418,12 +418,12 @@ Lines: 76/76 (100%)
 
 ### Created Files
 
-1. **docs/copilot/BUTTON_NAVIGATION_TESTING.md**
+1. **docs/auto-generated/BUTTON_NAVIGATION_TESTING.md**
    - Comprehensive testing documentation
    - Testing strategies and best practices
    - CI/CD recommendations
 
-2. **docs/copilot/SESSION_SUMMARY.md** (this file)
+2. **docs/auto-generated/SESSION_SUMMARY.md** (this file)
    - Complete session overview
    - All changes documented
 
@@ -627,7 +627,7 @@ git push origin feature/button-navigation
 
 # Create pull request (via GitHub CLI)
 gh pr create --title "Button Navigation Feature with 100% Test Coverage" \
-  --body "See docs/copilot/SESSION_SUMMARY.md for details"
+  --body "See docs/auto-generated/SESSION_SUMMARY.md for details"
 ```
 
 ---

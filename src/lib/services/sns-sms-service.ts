@@ -27,7 +27,7 @@ interface SnsSmsServiceConfig {
  * higher delivery priority and are exempt from STOP-keyword tracking
  * (system-to-admin alerts, no end-user opt-in flow).
  *
- * See `docs/copilot/010-chat-abuse-reporting-aws-setup.md` for the
+ * See `docs/auto-generated/010-chat-abuse-reporting-aws-setup.md` for the
  * one-time AWS Support cases (sandbox exit + spend limit) and 10DLC
  * registration steps that must complete before this provider works
  * in production.

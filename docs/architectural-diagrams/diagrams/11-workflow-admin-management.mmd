@@ -1,0 +1,25 @@
+%% User workflow — Admin content management
+flowchart TB
+    Admin([Admin signs in]) --> Gate{"withAdmin<br/>role = admin?"}
+    Gate -->|"No"| Deny["403 Insufficient permissions"]
+    Gate -->|"Yes"| Dash["Admin dashboard"]
+
+    Dash --> Release["Create / edit release"]
+    Dash --> Tour["Manage tours · dates · venues"]
+    Dash --> Featured["Curate featured artists · banners"]
+    Dash --> Moderate["Moderate chat<br/>hide · pin · ban"]
+
+    Release --> Upload["Request presigned upload URL<br/>(Server Action)"]
+    Upload --> S3[("Direct upload to S3")]
+    S3 --> Meta["Extract audio metadata<br/>create format + file records"]
+    Meta --> Publish["Publish release<br/>(set publishedAt)"]
+    Publish --> Live([Visible to fans])
+
+    Tour --> Persist["Repositories -> Prisma -> MongoDB"]
+    Featured --> Persist
+    Moderate --> Persist
+
+    classDef plain fill:#ffffff,stroke:#000000,stroke-width:1px,color:#000000;
+    classDef decision fill:#e6e6e6,stroke:#000000,stroke-width:1px,color:#000000;
+    class Admin,Deny,Dash,Release,Tour,Featured,Moderate,Upload,S3,Meta,Publish,Live,Persist plain;
+    class Gate decision;
