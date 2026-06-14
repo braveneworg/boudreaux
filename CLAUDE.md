@@ -1,6 +1,6 @@
 # boudreaux Development Guidelines
 
-Last updated: 2026-06-13
+Last updated: 2026-06-14
 
 ## How to work in this repo
 
@@ -49,7 +49,7 @@ scripts/                    # tsx scripts (mongo backup, S3 ops, image variants)
 docs/auto-generated/        # AI-generated markdown goes here
 ```
 
-Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/app/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal.
+Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/app/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal except for adjacent files.
 
 ## Commands
 
@@ -60,11 +60,15 @@ pnpm run test:run             # Unit tests once (test = watch mode)
 pnpm run test:coverage        # Coverage (target 90–95%)
 pnpm run test:coverage:check  # Coverage + regression check vs COVERAGE_METRICS.md
 pnpm run test:e2e             # Playwright E2E
+pnpm run e2e:docker:up        # Start isolated E2E Mongo (localhost:27018)
+pnpm run e2e:docker:down      # Tear down E2E Mongo + volumes
 pnpm run typecheck            # tsc on tracked types
 pnpm run lint                 # ESLint check + auto-fix (--max-warnings 0)
 pnpm run format               # Prettier write
+pnpm run format:check         # Prettier check (no write)
 pnpm exec prisma db push      # Push schema to MongoDB
 pnpm exec prisma studio       # Browse DB
+pnpm run seed                 # Seed dev DB (tsx prisma/seed.ts)
 pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 ```
 
@@ -75,7 +79,7 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Auth**: gate routes and actions with `withAuth` / `withAdmin` from `src/lib/decorators/with-auth.ts`; rate-limit with `withRateLimit`.
 - **Data layer**: all Prisma access goes through the repository pattern in `src/lib/repositories/` — keep DB logic out of components and routes. Use transactions for multi-step ops; handle connection failures gracefully. Keep business logic in services; keep components presentation-focused.
 - **Validation**: validate all external input (user input, API responses, Server Action args) with Zod before use. Schemas live in `src/lib/validation/`.
-- **Fetching**: TanStack Query on the client, with `fetch` to API routes that forward the `AbortSignal` for automatic cancellation. Use stable query keys from `src/lib/query-keys.ts`. Never call API routes directly from components — always wrap in a custom hook (e.g. `useArtistsQuery`) that forwards the signal and abstracts the query logic. Always use jsdocs to explain the fetch function and hook's behavior and return value. Only use `{ cache: 'no-store' }` for requests that must never be cached (e.g. auth status); otherwise, rely on TanStack Query's caching and invalidation.
+- **Fetching**: TanStack Query on the client, with `fetch` to API routes that forward the `AbortSignal` for automatic cancellation. Use stable query keys from `src/lib/query-keys.ts`. Never call API routes directly from components — always wrap in a custom hook (e.g. `useArtistsQuery`) that forwards the signal and abstracts the query logic. Always use jsdocs to explain the fetch function and hook's behavior and return value. Only use `{ cache: 'no-store' }` for requests that must never be cached (e.g. auth status); otherwise, rely on TanStack Query's caching and invalidation. Each `useEntityQuery` hook takes a trailing, spread-last options override (`QueryOptionsOverride` / `InfiniteQueryOptionsOverride` from `@/hooks/query-options`) so call sites tune `enabled`/`staleTime`/etc. while `queryKey`/`queryFn` (and infinite paging) stay locked.
 - **Error handling**: every API route and Server Action handles errors explicitly with `try`/`catch` and returns appropriate HTTP status codes. Follow REST conventions — plural nouns (`/api/releases`), correct verbs (GET read, POST create, PUT/PATCH update, DELETE remove).
 
 ## TypeScript
@@ -142,6 +146,14 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - Redact to `***` any env var matching `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`, `*CREDENTIAL*`, `*DSN*`, `*CONNECTION*` before it could appear in output. If a task "needs" a secret value to proceed, ask for a placeholder instead.
 - If a secret (even partial) appears in any output or input: stop, tell the user it's compromised and must be rotated, do not repeat it, do not run further commands touching it, and wait.
 
+## Commits & git hooks
+
+Conventional Commits, enforced by commitlint (`commitlint.config.mjs`, `commit-msg` hook): subject ≤50 chars, body/footer lines ≤72. Commit type drives automated version bump + `CHANGELOG.md` on deploy — pick it accurately.
+
+- Format `type(scope): <gitmoji> subject` with a gitmoji signalling the change: `feat: ✨`, `fix: 🐛`, `refactor: ♻️`, `perf: ⚡`, `docs: 📝`, `test: ✅`, `chore: 🔧`, `style: 🎨`.
+- Never add `Co-authored-by` / AI attribution lines. Never commit or push to `main` — always a feature branch. Don't bypass hooks with `--no-verify`.
+- Husky (auto-run): **pre-commit** blocks `main`, scans staged changes with gitleaks, runs `lint-staged` (`tsc-files` + `eslint --fix` + `prettier`) and `vitest --changed`. **pre-push** blocks `main`, requires the branch up to date with `origin/main`, rejects WIP/`fixup!`/`squash!` commits, then runs `tsc --noEmit`, `lint`, `test:coverage:check`. **post-merge** reinstalls deps / regenerates Prisma when the lockfile or schema changed.
+
 ## Application security & conventions
 
 - Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Only use `localStorage` / `sessionStorage` for non-sensitive client state; never store secrets or auth tokens there. Use `httpOnly`, `secure`, `sameSite` cookies for auth sessions.
@@ -149,4 +161,3 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
-- never use the global Node installation; always use the version from `.nvmrc` and `pnpm exec` for CLI tools to ensure the correct environment.
