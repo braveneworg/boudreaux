@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.121.0] - 2026-06-14
+
+### Added
+
+- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n
+
 ## [4.120.0] - 2026-06-14
 
 ### Added
