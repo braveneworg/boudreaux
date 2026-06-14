@@ -12,7 +12,7 @@ export const clientErrorReportSchema = z.object({
   digest: z.string().trim().max(128).optional(),
   message: z.string().trim().min(1).max(500),
   pathname: z.string().trim().min(1).max(300),
-  boundary: z.enum(['route', 'global']),
+  boundary: z.enum(['route', 'global', 'response-validation']),
 });
 
 export type ClientErrorReport = z.infer<typeof clientErrorReportSchema>;

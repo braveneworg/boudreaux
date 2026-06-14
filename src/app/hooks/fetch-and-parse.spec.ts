@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { fetchAndParse, parseResponse } from './fetch-and-parse';
+import { fetchAndParse, parseResponse, ResponseValidationError } from './fetch-and-parse';
 
 const schema = z.object({ id: z.string(), count: z.number() });
 
@@ -83,5 +83,20 @@ describe('parseResponse', () => {
     expect(() => parseResponse('/api/thing', schema, { id: 'a' })).toThrow(
       /Invalid response from \/api\/thing/
     );
+  });
+
+  it('throws a ResponseValidationError on mismatch', () => {
+    expect(() => parseResponse('/api/thing', schema, { id: 'a' })).toThrow(ResponseValidationError);
+  });
+
+  it('exposes the failing endpoint url on the thrown error', () => {
+    let caught: unknown;
+    try {
+      parseResponse('/api/thing', schema, { id: 'a' });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({ name: 'ResponseValidationError', url: '/api/thing' });
   });
 });

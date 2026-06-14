@@ -44,9 +44,30 @@ export async function fetchAndParse<T>(
 }
 
 /**
+ * Error thrown when a response body fails Zod validation. Distinguished from
+ * generic fetch/network/HTTP errors so a global TanStack Query handler can
+ * report only genuine API contract drift, not transient failures.
+ */
+export class ResponseValidationError extends Error {
+  /** The API route whose response failed schema validation. */
+  readonly url: string;
+
+  /**
+   * @param url - The API route whose response failed validation.
+   * @param issues - Prettified Zod issues (field paths + expected types only).
+   */
+  constructor(url: string, issues: string) {
+    super(`Invalid response from ${url}: ${issues}`);
+    this.name = 'ResponseValidationError';
+    this.url = url;
+  }
+}
+
+/**
  * Validates an already-fetched JSON body against a Zod schema, throwing a
- * descriptive `Error` (endpoint URL + prettified Zod issues) on failure so the
- * cause is legible in logs and surfaces via TanStack Query's `error`.
+ * {@link ResponseValidationError} (endpoint URL + prettified Zod issues) on
+ * failure so the cause is legible in logs and surfaces via TanStack Query's
+ * `error`.
  *
  * Use this directly when a hook needs response handling {@link fetchAndParse}
  * does not cover (e.g. mapping a 401 to `null` before validating the body).
@@ -56,12 +77,12 @@ export async function fetchAndParse<T>(
  * @param schema - Zod schema describing the expected response body.
  * @param body - The parsed JSON body to validate.
  * @returns The schema-validated body.
- * @throws If the body fails schema validation.
+ * @throws {ResponseValidationError} If the body fails schema validation.
  */
 export function parseResponse<T>(url: string, schema: ZodType<T>, body: unknown): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new Error(`Invalid response from ${url}: ${z.prettifyError(parsed.error)}`);
+    throw new ResponseValidationError(url, z.prettifyError(parsed.error));
   }
   return parsed.data;
 }
