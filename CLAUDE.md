@@ -149,3 +149,4 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
+- never use the global Node installation; always use the version from `.nvmrc` and `pnpm exec` for CLI tools to ensure the correct environment.
