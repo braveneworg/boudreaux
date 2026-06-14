@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.124.0] - 2026-06-14
+
+### Added
+
+- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n
+
 ## [4.123.0] - 2026-06-14
 
 ### Added
