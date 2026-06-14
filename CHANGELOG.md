@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.117.0] - 2026-06-14
+
+### Added
+
+- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n
+
 ## [4.116.0] - 2026-06-13
 
 ### Added
