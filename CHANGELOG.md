@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.118.0] - 2026-06-14
+
+### Added
+
+- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n
+
 ## [4.117.0] - 2026-06-14
 
 ### Added
