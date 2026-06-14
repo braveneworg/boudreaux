@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.123.0] - 2026-06-14
+
+### Added
+
+- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n
+
 ## [4.122.0] - 2026-06-14
 
 ### Added
