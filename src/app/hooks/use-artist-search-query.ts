@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -17,6 +20,19 @@ interface ArtistSearchResponse {
     lastName: string | null;
   }>;
 }
+
+const artistSearchResponseSchema = z.object({
+  artists: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      slug: z.string(),
+      imageUrl: z.string().nullable(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+    })
+  ),
+}) satisfies z.ZodType<ArtistSearchResponse>;
 
 /**
  * Searches artists (full format) via the `/api/artists/search` route handler.
@@ -33,13 +49,11 @@ const fetchArtistSearch = async (
   query: string,
   signal?: AbortSignal
 ): Promise<ArtistSearchResponse> => {
-  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}&format=full`, {
-    signal,
-  });
-  if (!response.ok) {
-    throw Error('Failed to search artists');
-  }
-  return response.json() as Promise<ArtistSearchResponse>;
+  return fetchAndParse(
+    `/api/artists/search?q=${encodeURIComponent(query)}&format=full`,
+    artistSearchResponseSchema,
+    { signal, errorMessage: 'Failed to search artists' }
+  );
 };
 
 /**

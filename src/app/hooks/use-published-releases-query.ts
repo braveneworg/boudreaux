@@ -6,6 +6,10 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { queryKeys } from '@/lib/query-keys';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import { publishedReleaseListingSchema } from '@/lib/validation/media-models-schema';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from './query-options';
 
@@ -14,6 +18,9 @@ export type PublishedReleasesPaginatedResponse = PaginatedResponse<PublishedRele
 
 /** Page size requested per fetch — kept in sync with the SSR prefetch and service. */
 export const PUBLISHED_RELEASES_PAGE_SIZE = 24;
+
+/** Strict schema for one `/api/releases?listing=published` page. */
+const publishedReleasesPageSchema = paginatedResponseSchema(publishedReleaseListingSchema);
 
 /** Max combobox quick-search results. */
 const SEARCH_RESULT_LIMIT = 20;
@@ -45,11 +52,10 @@ const fetchPublishedReleasesPage = async (
   });
   if (search) params.set('search', search);
 
-  const response = await fetch(`/api/releases?${params.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch releases');
-  }
-  return response.json() as Promise<PublishedReleasesPaginatedResponse>;
+  return fetchAndParse(`/api/releases?${params.toString()}`, publishedReleasesPageSchema, {
+    signal,
+    errorMessage: 'Failed to fetch releases',
+  });
 };
 
 /**

@@ -47,7 +47,9 @@ describe('useToursQuery', () => {
   });
 
   it('fetches a page with skip/take and forwards the signal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('');
     const { signal } = new AbortController();
@@ -60,7 +62,9 @@ describe('useToursQuery', () => {
   });
 
   it('includes the search term in the request when present', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('Rock');
 

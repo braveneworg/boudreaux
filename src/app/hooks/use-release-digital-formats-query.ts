@@ -2,9 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
+import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -14,6 +18,11 @@ interface ReleaseDigitalFormatsResponse {
     fileName: string;
   }>;
 }
+
+/** Strict schema for the `/api/releases/{releaseId}/digital-formats` response. */
+const releaseDigitalFormatsResponseSchema = z.object({
+  formats: z.array(z.object({ formatType: digitalFormatTypeSchema, fileName: z.string() })),
+}) satisfies z.ZodType<ReleaseDigitalFormatsResponse>;
 
 /**
  * Fetches a release's digital formats from the
@@ -31,13 +40,11 @@ const fetchReleaseDigitalFormats = async (
   releaseId: string,
   signal?: AbortSignal
 ): Promise<ReleaseDigitalFormatsResponse> => {
-  const response = await fetch(`/api/releases/${encodeURIComponent(releaseId)}/digital-formats`, {
-    signal,
-  });
-  if (!response.ok) {
-    throw Error('Failed to fetch digital formats');
-  }
-  return response.json() as Promise<ReleaseDigitalFormatsResponse>;
+  return fetchAndParse(
+    `/api/releases/${encodeURIComponent(releaseId)}/digital-formats`,
+    releaseDigitalFormatsResponseSchema,
+    { signal, errorMessage: 'Failed to fetch digital formats' }
+  );
 };
 
 /**

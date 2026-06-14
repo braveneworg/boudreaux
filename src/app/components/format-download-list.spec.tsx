@@ -722,8 +722,8 @@ describe('FormatDownloadList', () => {
     });
   });
 
-  describe('Quota with undefined downloadedReleaseIds', () => {
-    it('should handle missing downloadedReleaseIds in quota response', async () => {
+  describe('Quota response missing required fields', () => {
+    it('rejects an invalid quota payload and fails open (buttons enabled)', async () => {
       vi.mocked(global.fetch).mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         if (urlStr === '/api/user/download-quota') {
@@ -735,7 +735,7 @@ describe('FormatDownloadList', () => {
                 remainingQuota: 0,
                 uniqueDownloads: 5,
                 maxQuota: 5,
-                // downloadedReleaseIds intentionally omitted
+                // downloadedReleaseIds omitted — rejected by the response schema
               }),
           } as Response);
         }
@@ -746,15 +746,16 @@ describe('FormatDownloadList', () => {
         wrapper: createQueryWrapper(),
       });
 
-      // Should set quotaExceeded since downloadedReleaseIds?.includes returns undefined (falsy)
+      // The malformed payload fails schema validation, so quota stays unknown and
+      // the UI fails open rather than falsely showing the quota-exceeded state.
       await waitFor(() => {
-        expect(screen.getByTestId('quota-exceeded-message')).toBeInTheDocument();
+        const buttons = screen.getAllByRole('button');
+        buttons.forEach((button) => {
+          expect(button).not.toBeDisabled();
+        });
       });
 
-      const buttons = screen.getAllByRole('button');
-      buttons.forEach((button) => {
-        expect(button).toBeDisabled();
-      });
+      expect(screen.queryByTestId('quota-exceeded-message')).not.toBeInTheDocument();
     });
   });
 

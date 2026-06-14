@@ -6,6 +6,10 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { Artist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import { artistSchema } from '@/lib/validation/media-models-schema';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
@@ -21,6 +25,9 @@ export type ArtistsPaginatedResponse = PaginatedResponse<Artist>;
 
 /** Page size requested per fetch. */
 export const ARTISTS_PAGE_SIZE = 24;
+
+/** Strict schema for one `/api/artists` page. */
+const artistsPageSchema = paginatedResponseSchema(artistSchema);
 
 /**
  * Fetches one page of artists from the `/api/artists` route handler.
@@ -47,11 +54,10 @@ const fetchArtistsPage = async (
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
 
-  const response = await fetch(`/api/artists?${searchParams.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch artists');
-  }
-  return response.json() as Promise<ArtistsPaginatedResponse>;
+  return fetchAndParse(`/api/artists?${searchParams.toString()}`, artistsPageSchema, {
+    signal,
+    errorMessage: 'Failed to fetch artists',
+  });
 };
 
 /**

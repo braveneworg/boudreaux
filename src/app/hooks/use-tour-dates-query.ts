@@ -2,14 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
 export interface TourDatesResponse {
   tourDates: Array<Record<string, unknown>>;
 }
+
+const tourDatesResponseSchema = z.object({
+  tourDates: z.array(z.record(z.string(), z.unknown())),
+}) satisfies z.ZodType<TourDatesResponse>;
 
 /**
  * Fetches the dates for a tour from the `/api/tours/[tourId]/dates` route handler.
@@ -23,11 +30,11 @@ export interface TourDatesResponse {
  * @throws If the response status is not OK.
  */
 const fetchTourDates = async (tourId: string, signal?: AbortSignal): Promise<TourDatesResponse> => {
-  const response = await fetch(`/api/tours/${tourId}/dates`, { cache: 'no-store', signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch tour dates');
-  }
-  return response.json() as Promise<TourDatesResponse>;
+  return fetchAndParse(`/api/tours/${tourId}/dates`, tourDatesResponseSchema, {
+    signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to fetch tour dates',
+  });
 };
 
 /**

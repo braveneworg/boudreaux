@@ -2,15 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { ReleaseCarouselItem } from '@/lib/types/media-models';
+import { releaseCarouselItemSchema } from '@/lib/validation/media-models-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
 interface ReleaseRelatedResponse {
   releases: ReleaseCarouselItem[];
 }
+
+const releaseRelatedResponseSchema = z.object({
+  releases: z.array(releaseCarouselItemSchema),
+}) satisfies z.ZodType<ReleaseRelatedResponse>;
 
 /**
  * Fetches related releases from the `/api/releases/{releaseId}/related` route handler.
@@ -32,11 +40,10 @@ const fetchReleaseRelated = async (
   const url = artistId
     ? `/api/releases/${encodeURIComponent(releaseId)}/related?artistId=${encodeURIComponent(artistId)}`
     : `/api/releases/${encodeURIComponent(releaseId)}/related`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch related releases');
-  }
-  return response.json() as Promise<ReleaseRelatedResponse>;
+  return fetchAndParse(url, releaseRelatedResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch related releases',
+  });
 };
 
 /**

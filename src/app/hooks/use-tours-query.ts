@@ -5,6 +5,10 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
@@ -29,6 +33,9 @@ export type ToursPaginatedResponse = PaginatedResponse<TourWithRelations>;
 /** Page size requested per fetch — kept in sync with the SSR prefetch. */
 export const TOURS_PAGE_SIZE = 24;
 
+/** Strict schema for one `/api/tours` page. */
+const toursPageSchema = paginatedResponseSchema(tourWithRelationsSchema);
+
 /**
  * Fetches one page of tours from the `/api/tours` route handler.
  *
@@ -49,11 +56,10 @@ const fetchToursPage = async (
   const params = new URLSearchParams({ skip: String(skip), take: String(TOURS_PAGE_SIZE) });
   if (search) params.set('search', search);
 
-  const response = await fetch(`/api/tours?${params.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch tours');
-  }
-  return response.json() as Promise<ToursPaginatedResponse>;
+  return fetchAndParse(`/api/tours?${params.toString()}`, toursPageSchema, {
+    signal,
+    errorMessage: 'Failed to fetch tours',
+  });
 };
 
 /**

@@ -63,7 +63,9 @@ describe('usePublishedReleasesQuery', () => {
   });
 
   it('fetches a published page with skip/take and forwards the signal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions();
     const { signal } = new AbortController();
@@ -106,7 +108,9 @@ describe('usePublishedReleaseSearchQuery', () => {
   });
 
   it('requests a capped first page including the search term', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('rock');
 

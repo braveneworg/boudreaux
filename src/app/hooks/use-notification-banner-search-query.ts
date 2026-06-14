@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -19,6 +22,19 @@ interface NotificationBannerSearchResult {
 interface NotificationBannerSearchResponse {
   notifications: NotificationBannerSearchResult[];
 }
+
+const notificationBannerSearchResponseSchema = z.object({
+  notifications: z.array(
+    z.object({
+      id: z.string(),
+      content: z.string().nullable(),
+      textColor: z.string().nullable(),
+      backgroundColor: z.string().nullable(),
+      slotNumber: z.number(),
+      createdAt: z.string(),
+    })
+  ),
+}) satisfies z.ZodType<NotificationBannerSearchResponse>;
 
 /**
  * Searches notification banners via the `/api/notification-banners/search` route handler.
@@ -39,11 +55,11 @@ const fetchNotificationBannerSearch = async (
   if (query) params.set('q', query);
   params.set('take', '20');
 
-  const response = await fetch(`/api/notification-banners/search?${params.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to search notification banners');
-  }
-  return response.json() as Promise<NotificationBannerSearchResponse>;
+  return fetchAndParse(
+    `/api/notification-banners/search?${params.toString()}`,
+    notificationBannerSearchResponseSchema,
+    { signal, errorMessage: 'Failed to search notification banners' }
+  );
 };
 
 /**
