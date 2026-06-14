@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import { parseResponse } from './fetch-and-parse';
+
 import type { QueryOptionsOverride } from './query-options';
 
 interface CollectionResponse {
@@ -113,7 +115,7 @@ const fetchCollection = async ({ signal }: QueryFunctionContext): Promise<Collec
   if (!response.ok) {
     throw Error('Failed to fetch collection');
   }
-  return collectionResponseSchema.parse(await response.json());
+  return parseResponse('/api/user/collection', collectionResponseSchema, await response.json());
 };
 
 /**

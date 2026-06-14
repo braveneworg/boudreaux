@@ -9,6 +9,8 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
 
+import { parseResponse } from './fetch-and-parse';
+
 import type { QueryOptionsOverride } from './query-options';
 
 interface ReleaseUserStatusResponse {
@@ -58,7 +60,11 @@ const fetchReleaseUserStatus = async (
   if (!response.ok) {
     throw Error('Failed to fetch release user status');
   }
-  return releaseUserStatusResponseSchema.parse(await response.json());
+  return parseResponse(
+    `/api/releases/${encodeURIComponent(releaseId)}/user-status`,
+    releaseUserStatusResponseSchema,
+    await response.json()
+  );
 };
 
 /**

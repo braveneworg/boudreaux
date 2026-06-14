@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ZodType } from 'zod';
+import { z, type ZodType } from 'zod';
 
 /**
  * Options controlling a {@link fetchAndParse} request.
@@ -40,5 +40,28 @@ export async function fetchAndParse<T>(
     throw new Error(errorMessage);
   }
   const body: unknown = await response.json();
-  return schema.parse(body);
+  return parseResponse(url, schema, body);
+}
+
+/**
+ * Validates an already-fetched JSON body against a Zod schema, throwing a
+ * descriptive `Error` (endpoint URL + prettified Zod issues) on failure so the
+ * cause is legible in logs and surfaces via TanStack Query's `error`.
+ *
+ * Use this directly when a hook needs response handling {@link fetchAndParse}
+ * does not cover (e.g. mapping a 401 to `null` before validating the body).
+ *
+ * @typeParam T - The validated response type produced by `schema`.
+ * @param url - The API route the body came from (included in the error message).
+ * @param schema - Zod schema describing the expected response body.
+ * @param body - The parsed JSON body to validate.
+ * @returns The schema-validated body.
+ * @throws If the body fails schema validation.
+ */
+export function parseResponse<T>(url: string, schema: ZodType<T>, body: unknown): T {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new Error(`Invalid response from ${url}: ${z.prettifyError(parsed.error)}`);
+  }
+  return parsed.data;
 }

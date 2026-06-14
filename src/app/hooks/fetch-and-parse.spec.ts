@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse, parseResponse } from './fetch-and-parse';
 
 const schema = z.object({ id: z.string(), count: z.number() });
 
@@ -59,12 +59,29 @@ describe('fetchAndParse', () => {
     await expect(fetchAndParse('/api/thing', schema)).rejects.toThrow('Request failed');
   });
 
-  it('throws when the response body does not match the schema', async () => {
+  it('throws a descriptive error naming the endpoint when the body fails validation', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'a' }) })
     );
 
-    await expect(fetchAndParse('/api/thing', schema)).rejects.toThrow();
+    await expect(fetchAndParse('/api/thing', schema)).rejects.toThrow(
+      'Invalid response from /api/thing'
+    );
+  });
+});
+
+describe('parseResponse', () => {
+  it('returns the schema-parsed body when valid', () => {
+    expect(parseResponse('/api/thing', schema, { id: 'a', count: 2 })).toEqual({
+      id: 'a',
+      count: 2,
+    });
+  });
+
+  it('throws an error naming the endpoint and the failing field on mismatch', () => {
+    expect(() => parseResponse('/api/thing', schema, { id: 'a' })).toThrow(
+      /Invalid response from \/api\/thing/
+    );
   });
 });
