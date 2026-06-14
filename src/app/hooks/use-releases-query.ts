@@ -17,7 +17,7 @@ export interface ReleasesQueryParams {
 }
 
 /** One skip/offset page of releases returned by `/api/releases`. */
-export type ReleasesPage = PaginatedResponse<Release>;
+export type ReleasesPaginatedResponse = PaginatedResponse<Release>;
 
 /** Page size requested per fetch. */
 export const RELEASES_PAGE_SIZE = 24;
@@ -39,7 +39,7 @@ const fetchReleasesPage = async (
   params: ReleasesQueryParams,
   skip: number,
   signal?: AbortSignal
-): Promise<ReleasesPage> => {
+): Promise<ReleasesPaginatedResponse> => {
   const searchParams = new URLSearchParams({
     skip: String(skip),
     take: String(RELEASES_PAGE_SIZE),
@@ -52,7 +52,7 @@ const fetchReleasesPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch releases');
   }
-  return response.json() as Promise<ReleasesPage>;
+  return response.json() as Promise<ReleasesPaginatedResponse>;
 };
 
 /**
@@ -71,7 +71,7 @@ const fetchReleasesPage = async (
  */
 export const useReleasesQuery = (
   params: ReleasesQueryParams,
-  options: InfiniteQueryOptionsOverride<ReleasesPage> = {}
+  options: InfiniteQueryOptionsOverride<ReleasesPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),

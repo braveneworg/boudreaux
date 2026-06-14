@@ -10,7 +10,7 @@ import type { PaginatedResponse } from '@/lib/types/pagination';
 import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from './query-options';
 
 /** One skip/offset page of published releases returned by `/api/releases?listing=published`. */
-export type PublishedReleasesPage = PaginatedResponse<PublishedReleaseListing>;
+export type PublishedReleasesPaginatedResponse = PaginatedResponse<PublishedReleaseListing>;
 
 /** Page size requested per fetch — kept in sync with the SSR prefetch and service. */
 export const PUBLISHED_RELEASES_PAGE_SIZE = 24;
@@ -37,7 +37,7 @@ const fetchPublishedReleasesPage = async (
   skip: number,
   take: number,
   signal?: AbortSignal
-): Promise<PublishedReleasesPage> => {
+): Promise<PublishedReleasesPaginatedResponse> => {
   const params = new URLSearchParams({
     listing: 'published',
     skip: String(skip),
@@ -49,7 +49,7 @@ const fetchPublishedReleasesPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch releases');
   }
-  return response.json() as Promise<PublishedReleasesPage>;
+  return response.json() as Promise<PublishedReleasesPaginatedResponse>;
 };
 
 /**
@@ -67,7 +67,7 @@ const fetchPublishedReleasesPage = async (
  */
 export const usePublishedReleasesQuery = (
   search = '',
-  options: InfiniteQueryOptionsOverride<PublishedReleasesPage> = {}
+  options: InfiniteQueryOptionsOverride<PublishedReleasesPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.publishedInfinite(search),
@@ -93,7 +93,7 @@ export const usePublishedReleasesQuery = (
  */
 export const usePublishedReleaseSearchQuery = (
   search: string,
-  options: QueryOptionsOverride<PublishedReleasesPage, PublishedReleaseListing[]> = {}
+  options: QueryOptionsOverride<PublishedReleasesPaginatedResponse, PublishedReleaseListing[]> = {}
 ) =>
   useQuery({
     queryKey: queryKeys.releases.publishedInfinite(`combobox:${search}`),

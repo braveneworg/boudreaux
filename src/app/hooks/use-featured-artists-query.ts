@@ -17,7 +17,7 @@ export interface FeaturedArtistsQueryParams {
 }
 
 /** One skip/offset page of featured artists returned by `/api/featured-artists`. */
-export type FeaturedArtistsPage = PaginatedResponse<FeaturedArtist>;
+export type FeaturedArtistsPaginatedResponse = PaginatedResponse<FeaturedArtist>;
 
 /** Page size requested per fetch. */
 export const FEATURED_ARTISTS_PAGE_SIZE = 24;
@@ -39,7 +39,7 @@ const fetchFeaturedArtistsPage = async (
   params: FeaturedArtistsQueryParams,
   skip: number,
   signal?: AbortSignal
-): Promise<FeaturedArtistsPage> => {
+): Promise<FeaturedArtistsPaginatedResponse> => {
   const searchParams = new URLSearchParams({
     skip: String(skip),
     take: String(FEATURED_ARTISTS_PAGE_SIZE),
@@ -52,7 +52,7 @@ const fetchFeaturedArtistsPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch featured artists');
   }
-  return response.json() as Promise<FeaturedArtistsPage>;
+  return response.json() as Promise<FeaturedArtistsPaginatedResponse>;
 };
 
 /**
@@ -70,7 +70,7 @@ const fetchFeaturedArtistsPage = async (
  */
 export const useFeaturedArtistsQuery = (
   params: FeaturedArtistsQueryParams,
-  options: InfiniteQueryOptionsOverride<FeaturedArtistsPage> = {}
+  options: InfiniteQueryOptionsOverride<FeaturedArtistsPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.featuredArtists.adminInfinite(params),

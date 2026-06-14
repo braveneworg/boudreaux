@@ -24,7 +24,7 @@ type TourWithRelations = Tour & {
 };
 
 /** One skip/offset page of tours returned by `/api/tours`. */
-export type ToursPage = PaginatedResponse<TourWithRelations>;
+export type ToursPaginatedResponse = PaginatedResponse<TourWithRelations>;
 
 /** Page size requested per fetch — kept in sync with the SSR prefetch. */
 export const TOURS_PAGE_SIZE = 24;
@@ -45,7 +45,7 @@ const fetchToursPage = async (
   search: string,
   skip: number,
   signal?: AbortSignal
-): Promise<ToursPage> => {
+): Promise<ToursPaginatedResponse> => {
   const params = new URLSearchParams({ skip: String(skip), take: String(TOURS_PAGE_SIZE) });
   if (search) params.set('search', search);
 
@@ -53,7 +53,7 @@ const fetchToursPage = async (
   if (!response.ok) {
     throw Error('Failed to fetch tours');
   }
-  return response.json() as Promise<ToursPage>;
+  return response.json() as Promise<ToursPaginatedResponse>;
 };
 
 /**
@@ -72,7 +72,7 @@ const fetchToursPage = async (
  */
 export const useToursQuery = (
   search: string,
-  options: InfiniteQueryOptionsOverride<ToursPage> = {}
+  options: InfiniteQueryOptionsOverride<ToursPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.tours.infinite(search),
