@@ -6,6 +6,10 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { Release } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import { releaseSchema } from '@/lib/validation/media-models-schema';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
@@ -21,6 +25,9 @@ export type ReleasesPaginatedResponse = PaginatedResponse<Release>;
 
 /** Page size requested per fetch. */
 export const RELEASES_PAGE_SIZE = 24;
+
+/** Strict schema for one `/api/releases` page. */
+const releasesPageSchema = paginatedResponseSchema(releaseSchema);
 
 /**
  * Fetches one page of releases from the `/api/releases` route handler (admin
@@ -48,11 +55,10 @@ const fetchReleasesPage = async (
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
 
-  const response = await fetch(`/api/releases?${searchParams.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch releases');
-  }
-  return response.json() as Promise<ReleasesPaginatedResponse>;
+  return fetchAndParse(`/api/releases?${searchParams.toString()}`, releasesPageSchema, {
+    signal,
+    errorMessage: 'Failed to fetch releases',
+  });
 };
 
 /**

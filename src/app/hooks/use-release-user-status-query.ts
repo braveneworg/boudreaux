@@ -3,9 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
+import { z } from 'zod';
 
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
+import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
+
+import { parseResponse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -19,6 +23,17 @@ interface ReleaseUserStatusResponse {
     fileName: string;
   }>;
 }
+
+/** Strict schema for the `/api/releases/{releaseId}/user-status` response. */
+const releaseUserStatusResponseSchema = z.object({
+  hasPurchase: z.boolean(),
+  purchasedAt: z.string().nullable(),
+  downloadCount: z.number(),
+  resetInHours: z.number().nullable(),
+  availableFormats: z.array(
+    z.object({ formatType: digitalFormatTypeSchema, fileName: z.string() })
+  ),
+}) satisfies z.ZodType<ReleaseUserStatusResponse>;
 
 /**
  * Fetches the current user's status for a release from the
@@ -45,7 +60,11 @@ const fetchReleaseUserStatus = async (
   if (!response.ok) {
     throw Error('Failed to fetch release user status');
   }
-  return response.json() as Promise<ReleaseUserStatusResponse>;
+  return parseResponse(
+    `/api/releases/${encodeURIComponent(releaseId)}/user-status`,
+    releaseUserStatusResponseSchema,
+    await response.json()
+  );
 };
 
 /**

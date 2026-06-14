@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -12,6 +15,12 @@ interface DownloadQuotaResponse {
   remainingQuota: number;
   downloadedReleaseIds: string[];
 }
+
+const downloadQuotaResponseSchema = z.object({
+  success: z.boolean(),
+  remainingQuota: z.number(),
+  downloadedReleaseIds: z.array(z.string()),
+}) satisfies z.ZodType<DownloadQuotaResponse>;
 
 /**
  * Fetches the viewer's free download quota from the `/api/user/download-quota`
@@ -27,11 +36,10 @@ interface DownloadQuotaResponse {
 const fetchDownloadQuota = async ({
   signal,
 }: QueryFunctionContext): Promise<DownloadQuotaResponse> => {
-  const response = await fetch('/api/user/download-quota', { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch download quota');
-  }
-  return response.json() as Promise<DownloadQuotaResponse>;
+  return fetchAndParse('/api/user/download-quota', downloadQuotaResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch download quota',
+  });
 };
 
 /**

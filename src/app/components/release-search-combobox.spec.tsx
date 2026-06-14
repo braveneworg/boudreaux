@@ -37,6 +37,7 @@ const mockReleases = [
     id: 'release-1',
     title: 'Midnight Serenade',
     coverArt: 'https://example.com/cover1.jpg',
+    releasedOn: '2024-01-01T00:00:00.000Z',
     images: [],
     artistReleases: [
       {
@@ -52,6 +53,7 @@ const mockReleases = [
     id: 'release-2',
     title: 'Morning Glory',
     coverArt: 'https://example.com/cover2.jpg',
+    releasedOn: '2024-02-01T00:00:00.000Z',
     images: [],
     artistReleases: [
       {
@@ -159,7 +161,8 @@ describe('ReleaseSearchCombobox', () => {
       {
         id: 'release-nc',
         title: 'No Cover Album',
-        coverArt: null,
+        coverArt: '',
+        releasedOn: '2024-03-01T00:00:00.000Z',
         images: [],
         artistReleases: [
           {
@@ -191,6 +194,7 @@ describe('ReleaseSearchCombobox', () => {
         id: 'release-na',
         title: 'Mystery Album',
         coverArt: 'https://example.com/cover.jpg',
+        releasedOn: '2024-04-01T00:00:00.000Z',
         images: [],
         artistReleases: [],
         releaseUrls: [],

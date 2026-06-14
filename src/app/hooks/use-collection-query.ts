@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { parseResponse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -45,6 +48,54 @@ interface CollectionResponse {
   isAdmin: boolean;
 }
 
+const collectionResponseSchema = z.object({
+  purchases: z.array(
+    z.object({
+      id: z.string(),
+      amountPaid: z.number(),
+      currency: z.string(),
+      purchasedAt: z.string(),
+      release: z.object({
+        id: z.string(),
+        title: z.string(),
+        coverArt: z.string(),
+        images: z.array(
+          z.object({
+            id: z.string(),
+            src: z.string().nullable(),
+            altText: z.string().nullable(),
+            sortOrder: z.number(),
+          })
+        ),
+        artistReleases: z.array(
+          z.object({
+            artist: z.object({
+              id: z.string(),
+              firstName: z.string(),
+              surname: z.string(),
+              displayName: z.string().nullable(),
+            }),
+          })
+        ),
+        digitalFormats: z.array(
+          z.object({
+            formatType: z.string(),
+            files: z.array(z.object({ fileName: z.string() })),
+          })
+        ),
+        releaseDownloads: z.array(
+          z.object({
+            downloadCount: z.number(),
+            lastDownloadedAt: z.string().nullable(),
+          })
+        ),
+      }),
+    })
+  ),
+  count: z.number(),
+  isAdmin: z.boolean(),
+}) satisfies z.ZodType<CollectionResponse>;
+
 /**
  * Fetches the viewer's purchased collection from the `/api/user/collection`
  * route handler.
@@ -58,13 +109,13 @@ interface CollectionResponse {
  */
 const fetchCollection = async ({ signal }: QueryFunctionContext): Promise<CollectionResponse> => {
   const response = await fetch('/api/user/collection', { signal });
+  if (response.status === 401) {
+    throw Error('Unauthorized');
+  }
   if (!response.ok) {
-    if (response.status === 401) {
-      throw Error('Unauthorized');
-    }
     throw Error('Failed to fetch collection');
   }
-  return response.json() as Promise<CollectionResponse>;
+  return parseResponse('/api/user/collection', collectionResponseSchema, await response.json());
 };
 
 /**

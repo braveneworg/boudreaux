@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -17,6 +20,17 @@ interface DownloadAnalyticsResponse {
   uniqueUsers: number;
   formatBreakdown: FormatBreakdown[];
 }
+
+const downloadAnalyticsResponseSchema = z.object({
+  totalDownloads: z.number(),
+  uniqueUsers: z.number(),
+  formatBreakdown: z.array(
+    z.object({
+      formatType: z.string(),
+      count: z.number(),
+    })
+  ),
+}) satisfies z.ZodType<DownloadAnalyticsResponse>;
 
 function getDateRange(range: string): { startDate?: string; endDate?: string } {
   if (range === 'all') return {};
@@ -56,11 +70,10 @@ const fetchDownloadAnalytics = async (
   const queryString = params.toString();
   const url = `/api/releases/${releaseId}/download-analytics${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch download analytics');
-  }
-  return response.json() as Promise<DownloadAnalyticsResponse>;
+  return fetchAndParse(url, downloadAnalyticsResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch download analytics',
+  });
 };
 
 /**

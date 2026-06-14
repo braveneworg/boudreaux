@@ -2,16 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/app/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
 
-import type { QueryOptionsOverride } from './query-options';
+import { fetchAndParse } from './fetch-and-parse';
 
 interface ActiveFeaturedArtistsResponse {
   featuredArtists: FeaturedArtist[];
   count: number;
 }
+
+const activeFeaturedArtistsResponseSchema = z.object({
+  featuredArtists: z.array(featuredArtistSchema),
+  count: z.number(),
+}) satisfies z.ZodType<ActiveFeaturedArtistsResponse>;
 
 /**
  * Fetches the active featured artists from the `/api/featured-artists` route handler.
@@ -26,11 +34,14 @@ interface ActiveFeaturedArtistsResponse {
 const fetchActiveFeaturedArtists = async ({
   signal,
 }: QueryFunctionContext): Promise<ActiveFeaturedArtistsResponse> => {
-  const response = await fetch('/api/featured-artists?active=true&limit=7', { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch featured artists');
-  }
-  return response.json() as Promise<ActiveFeaturedArtistsResponse>;
+  return fetchAndParse(
+    '/api/featured-artists?active=true&limit=7',
+    activeFeaturedArtistsResponseSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch featured artists',
+    }
+  );
 };
 
 /**

@@ -6,6 +6,10 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
@@ -21,6 +25,9 @@ export type FeaturedArtistsPaginatedResponse = PaginatedResponse<FeaturedArtist>
 
 /** Page size requested per fetch. */
 export const FEATURED_ARTISTS_PAGE_SIZE = 24;
+
+/** Strict schema for one `/api/featured-artists` page. */
+const featuredArtistsPageSchema = paginatedResponseSchema(featuredArtistSchema);
 
 /**
  * Fetches one page of featured artists from the `/api/featured-artists` route
@@ -48,11 +55,14 @@ const fetchFeaturedArtistsPage = async (
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
 
-  const response = await fetch(`/api/featured-artists?${searchParams.toString()}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch featured artists');
-  }
-  return response.json() as Promise<FeaturedArtistsPaginatedResponse>;
+  return fetchAndParse(
+    `/api/featured-artists?${searchParams.toString()}`,
+    featuredArtistsPageSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch featured artists',
+    }
+  );
 };
 
 /**

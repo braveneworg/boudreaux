@@ -2,13 +2,36 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { BannersApiResponse } from '@/lib/services/banner-notification-service';
 
+import { fetchAndParse } from './fetch-and-parse';
+
 import type { QueryOptionsOverride } from './query-options';
 
 const disableCache = process.env.NEXT_PUBLIC_DISABLE_BANNERS_CACHE === 'true';
+
+const bannersApiResponseSchema = z.object({
+  banners: z.array(
+    z.object({
+      slotNumber: z.number(),
+      imageFilename: z.string(),
+      notification: z
+        .object({
+          id: z.string(),
+          content: z.string(),
+          textColor: z.string().nullable(),
+          backgroundColor: z.string().nullable(),
+          displayFrom: z.string().nullable(),
+          displayUntil: z.string().nullable(),
+        })
+        .nullable(),
+    })
+  ),
+  rotationInterval: z.number(),
+}) satisfies z.ZodType<BannersApiResponse>;
 
 /**
  * Fetches the active notification banners from the `/api/notification-banners`
@@ -22,11 +45,10 @@ const disableCache = process.env.NEXT_PUBLIC_DISABLE_BANNERS_CACHE === 'true';
  * @throws If the response status is not OK.
  */
 const fetchBanners = async ({ signal }: QueryFunctionContext): Promise<BannersApiResponse> => {
-  const response = await fetch('/api/notification-banners', { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch banners');
-  }
-  return response.json() as Promise<BannersApiResponse>;
+  return fetchAndParse('/api/notification-banners', bannersApiResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch banners',
+  });
 };
 
 /**

@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -15,6 +18,15 @@ interface CDNStatus {
   startedAt?: string;
   completedAt?: string;
 }
+
+const cdnStatusSchema = z.object({
+  status: z.enum(['invalidating', 'ready', 'unknown', 'error']),
+  message: z.string(),
+  estimatedMinutesRemaining: z.number().optional(),
+  inProgress: z.number().optional(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+}) satisfies z.ZodType<CDNStatus>;
 
 /**
  * Fetches the current CDN invalidation status from the `/api/cdn-status` route
@@ -28,11 +40,11 @@ interface CDNStatus {
  * @throws If the response status is not OK.
  */
 const fetchCdnStatus = async ({ signal }: QueryFunctionContext): Promise<CDNStatus> => {
-  const response = await fetch('/api/cdn-status', { cache: 'no-store', signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch CDN status');
-  }
-  return response.json() as Promise<CDNStatus>;
+  return fetchAndParse('/api/cdn-status', cdnStatusSchema, {
+    signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to fetch CDN status',
+  });
 };
 
 /**

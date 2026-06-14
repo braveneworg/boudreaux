@@ -47,7 +47,9 @@ describe('useArtistsQuery', () => {
   });
 
   it('fetches a page with skip/take and forwards the signal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions({ search: '', published: null, deleted: false });
     const { signal } = new AbortController();
@@ -60,7 +62,9 @@ describe('useArtistsQuery', () => {
   });
 
   it('includes search, published, and deleted params when set', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions({ search: 'Rock', published: true, deleted: true });
 
@@ -73,7 +77,9 @@ describe('useArtistsQuery', () => {
   });
 
   it('sends published=false but omits deleted when false', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions({ search: '', published: false, deleted: false });
 

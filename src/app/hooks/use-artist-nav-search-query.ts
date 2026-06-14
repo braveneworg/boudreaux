@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -17,6 +20,22 @@ interface ArtistNavSearchResult {
 interface ArtistNavSearchResponse {
   results: ArtistNavSearchResult[];
 }
+
+const artistNavSearchResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      artistSlug: z.string(),
+      artistName: z.string(),
+      thumbnailSrc: z.string().nullable(),
+      releases: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+        })
+      ),
+    })
+  ),
+}) satisfies z.ZodType<ArtistNavSearchResponse>;
 
 /**
  * Searches artists for the nav typeahead via the `/api/artists/search` route
@@ -34,11 +53,11 @@ const fetchArtistNavSearch = async (
   query: string,
   signal?: AbortSignal
 ): Promise<ArtistNavSearchResponse> => {
-  const response = await fetch(`/api/artists/search?q=${encodeURIComponent(query)}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to search artists');
-  }
-  return response.json() as Promise<ArtistNavSearchResponse>;
+  return fetchAndParse(
+    `/api/artists/search?q=${encodeURIComponent(query)}`,
+    artistNavSearchResponseSchema,
+    { signal, errorMessage: 'Failed to search artists' }
+  );
 };
 
 /**
