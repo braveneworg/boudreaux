@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.120.0] - 2026-06-14
+
+### Added
+
+- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n
+
 ## [4.119.0] - 2026-06-14
 
 ### Added
