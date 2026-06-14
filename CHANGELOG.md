@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.122.0] - 2026-06-14
+
+### Added
+
+- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n
+
 ## [4.121.0] - 2026-06-14
 
 ### Added
