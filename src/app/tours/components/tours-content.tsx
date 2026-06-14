@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useState } from 'react';
+
 import { Loader2 } from 'lucide-react';
 
 import { useToursQuery } from '@/app/hooks/use-tours-query';
@@ -11,10 +13,16 @@ import { ToursPageClient } from './tours-page-client';
 
 /**
  * Client content wrapper for the tours listing page.
- * Uses TanStack Query to fetch tours data (hydrated from SSR prefetch).
+ *
+ * Owns the (server-side) search term and drives the infinite tours query
+ * (hydrated from the SSR prefetch of the first, unsearched page), flattening
+ * pages for the presentational {@link ToursPageClient}.
  */
 export const ToursContent = () => {
-  const { isPending, error, data } = useToursQuery();
+  const [search, setSearch] = useState('');
+
+  const { data, isPending, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useToursQuery(search);
 
   if (isPending) {
     return (
@@ -35,5 +43,16 @@ export const ToursContent = () => {
     );
   }
 
-  return <ToursPageClient tours={data?.tours ?? []} />;
+  const tours = data?.pages.flatMap((page) => page.rows) ?? [];
+
+  return (
+    <ToursPageClient
+      tours={tours}
+      search={search}
+      onSearchChange={setSearch}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      fetchNextPage={fetchNextPage}
+    />
+  );
 };

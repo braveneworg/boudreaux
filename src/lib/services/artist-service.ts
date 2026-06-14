@@ -136,26 +136,50 @@ export class ArtistService {
   }
 
   /**
-   * Get all artists with optional filters
+   * Get all artists with optional filters.
+   *
+   * Supports server-side `search` plus `published`/`deleted` filtering for the
+   * admin listing. The search OR and the deletedOn OR are combined under `AND`
+   * so the two `OR` keys never collide (Prisma 6 + MongoDB null-safe pattern).
+   *
+   * - `published === true` → only artists with a `publishedOn` date.
+   * - `published === false` → only artists without a `publishedOn` date.
+   * - `published == null` → no publish filter.
+   * - `deleted` falsy → exclude soft-deleted artists; `deleted === true` → include them.
    */
   static async getArtists(params?: {
     skip?: number;
     take?: number;
     search?: string;
+    published?: boolean;
+    deleted?: boolean;
   }): Promise<ServiceResponse<Artist[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
+      const { skip = 0, take = 50, search, published, deleted } = params || {};
 
-      const where: Prisma.ArtistWhereInput = {
-        ...(search && {
+      const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+      const and: Prisma.ArtistWhereInput[] = [];
+
+      if (!deleted) {
+        and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
+      }
+      if (published === true) {
+        and.push({ publishedOn: { not: null } });
+      } else if (published === false) {
+        and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
+      }
+      if (search) {
+        and.push({
           OR: [
-            { firstName: { contains: search, mode: 'insensitive' } },
-            { surname: { contains: search, mode: 'insensitive' } },
-            { displayName: { contains: search, mode: 'insensitive' } },
-            { slug: { contains: search, mode: 'insensitive' } },
+            { firstName: contains(search) },
+            { surname: contains(search) },
+            { displayName: contains(search) },
+            { slug: contains(search) },
           ],
-        }),
-      };
+        });
+      }
+
+      const where: Prisma.ArtistWhereInput = and.length > 0 ? { AND: and } : {};
 
       const artists = (await prisma.artist.findMany({
         where,

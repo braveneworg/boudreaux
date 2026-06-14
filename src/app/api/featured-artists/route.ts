@@ -9,6 +9,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
@@ -17,6 +18,9 @@ import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-art
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_TAKE = 24;
+const MAX_TAKE = 100;
 
 /**
  * GET /api/featured-artists
@@ -66,20 +70,29 @@ export const GET = withRateLimit(
       );
     }
 
-    const skip = searchParams.get('skip');
-    const take = searchParams.get('take');
     const search = searchParams.get('search');
+    const publishedParam = searchParams.get('published');
+    const published =
+      publishedParam === 'true' ? true : publishedParam === 'false' ? false : undefined;
+    const deleted = searchParams.get('deleted') === 'true';
 
     const session = await auth();
     if (!session?.user?.id || session.user?.role !== 'admin') {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const MAX_TAKE = 100;
+    const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
+    const take = Math.min(
+      Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+      MAX_TAKE
+    );
+
     const params = {
-      ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
-      ...(take && { take: Math.min(Math.max(1, parseInt(take, 10)), MAX_TAKE) }),
+      skip,
+      take,
       ...(search && { search }),
+      ...(published !== undefined && { published }),
+      ...(deleted && { deleted }),
     };
 
     const result = await FeaturedArtistsService.getAllFeaturedArtists(params);
@@ -93,8 +106,8 @@ export const GET = withRateLimit(
 
     return NextResponse.json(
       {
-        featuredArtists: serializeForResponse(result.data),
-        count: result.data.length,
+        rows: serializeForResponse(result.data),
+        nextSkip: computeNextSkip(result.data.length, skip, take),
       },
       {
         headers: {

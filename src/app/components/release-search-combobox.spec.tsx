@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { type ReactNode } from 'react';
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -9,7 +12,6 @@ import type { PublishedReleaseListing } from '@/lib/types/media-models';
 
 import { ReleaseSearchCombobox } from './release-search-combobox';
 
-// Mock next/navigation
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -24,120 +26,136 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock next/image
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     <span data-testid="search-thumbnail" data-src={src} data-alt={alt} />
   ),
 }));
 
+const mockReleases = [
+  {
+    id: 'release-1',
+    title: 'Midnight Serenade',
+    coverArt: 'https://example.com/cover1.jpg',
+    images: [],
+    artistReleases: [
+      {
+        id: 'ar-1',
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+        artist: { id: 'artist-1', firstName: 'John', surname: 'Doe', displayName: null },
+      },
+    ],
+    releaseUrls: [],
+  },
+  {
+    id: 'release-2',
+    title: 'Morning Glory',
+    coverArt: 'https://example.com/cover2.jpg',
+    images: [],
+    artistReleases: [
+      {
+        id: 'ar-2',
+        artistId: 'artist-2',
+        releaseId: 'release-2',
+        artist: { id: 'artist-2', firstName: 'Jane', surname: 'Smith', displayName: 'J. Smith' },
+      },
+    ],
+    releaseUrls: [],
+  },
+] as unknown as PublishedReleaseListing[];
+
+const stubFetchReturning = (rows: PublishedReleaseListing[]) => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows, nextSkip: null }) })
+  );
+};
+
+const renderCombobox = () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  return render(<ReleaseSearchCombobox />, { wrapper: Wrapper });
+};
+
+const setupUser = () => userEvent.setup();
+
 describe('ReleaseSearchCombobox', () => {
-  const mockReleases = [
-    {
-      id: 'release-1',
-      title: 'Midnight Serenade',
-      coverArt: 'https://example.com/cover1.jpg',
-      images: [],
-      artistReleases: [
-        {
-          id: 'ar-1',
-          artistId: 'artist-1',
-          releaseId: 'release-1',
-          artist: {
-            id: 'artist-1',
-            firstName: 'John',
-            surname: 'Doe',
-            displayName: null,
-          },
-        },
-      ],
-      releaseUrls: [],
-    },
-    {
-      id: 'release-2',
-      title: 'Morning Glory',
-      coverArt: 'https://example.com/cover2.jpg',
-      images: [],
-      artistReleases: [
-        {
-          id: 'ar-2',
-          artistId: 'artist-2',
-          releaseId: 'release-2',
-          artist: {
-            id: 'artist-2',
-            firstName: 'Jane',
-            surname: 'Smith',
-            displayName: 'J. Smith',
-          },
-        },
-      ],
-      releaseUrls: [],
-    },
-  ] as unknown as PublishedReleaseListing[];
-  it('should render search trigger button', () => {
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
-
-    expect(screen.getByLabelText('Search releases')).toBeInTheDocument();
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    mockPush.mockReset();
   });
 
-  it('should display "No releases found" when search matches nothing', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
-
-    // Click the trigger to open the popover
-    const trigger = screen.getByLabelText('Search releases');
-    await user.click(trigger);
-
-    // Type into the CommandInput that appears inside the popover
-    const searchInput = screen.getByPlaceholderText(/search by artist/i);
-    await user.type(searchInput, 'zzzznonexistent');
-
-    expect(screen.getByText(/no releases found/i)).toBeInTheDocument();
-  });
-
-  it('should have aria-label on the trigger button', () => {
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
+  it('renders the search trigger button', () => {
+    stubFetchReturning(mockReleases);
+    renderCombobox();
 
     const button = screen.getByLabelText('Search releases');
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('should handle empty releases array', () => {
-    render(<ReleaseSearchCombobox releases={[]} />);
-
-    expect(screen.getByLabelText('Search releases')).toBeInTheDocument();
-  });
-
-  it('should navigate to release page when a result is selected', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
+  it('prompts the user to type before any search', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
 
     await user.click(screen.getByLabelText('Search releases'));
+
+    expect(screen.getByText(/type to search releases/i)).toBeInTheDocument();
+  });
+
+  it('fetches and displays server results when the user types', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'Mid');
 
     await waitFor(() => {
       expect(screen.getByText('Midnight Serenade')).toBeInTheDocument();
     });
+    // The request carries the typed search term.
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('search=Mid'),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
 
+  it('navigates to the release page when a result is selected', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'Mid');
+
+    await waitFor(() => {
+      expect(screen.getByText('Midnight Serenade')).toBeInTheDocument();
+    });
     await user.click(screen.getByText('Midnight Serenade'));
 
     expect(mockPush).toHaveBeenCalledWith('/releases/release-1');
   });
 
-  it('should render cover art thumbnail when coverArt is present', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
+  it('renders a cover art thumbnail when present', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
 
     await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'a');
 
     await waitFor(() => {
       expect(screen.getAllByTestId('search-thumbnail').length).toBeGreaterThan(0);
     });
   });
 
-  it('should render placeholder icon when no cover art is available', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    const releasesNoCoverArt = [
+  it('renders a placeholder icon when no cover art is available', async () => {
+    stubFetchReturning([
       {
         id: 'release-nc',
         title: 'No Cover Album',
@@ -148,33 +166,27 @@ describe('ReleaseSearchCombobox', () => {
             id: 'ar-nc',
             artistId: 'artist-1',
             releaseId: 'release-nc',
-            artist: {
-              id: 'artist-1',
-              firstName: 'John',
-              surname: 'Doe',
-              displayName: null,
-            },
+            artist: { id: 'artist-1', firstName: 'John', surname: 'Doe', displayName: null },
           },
         ],
         releaseUrls: [],
       },
-    ] as unknown as Parameters<typeof ReleaseSearchCombobox>[0]['releases'];
+    ] as unknown as PublishedReleaseListing[]);
+    const user = setupUser();
+    renderCombobox();
 
-    render(<ReleaseSearchCombobox releases={releasesNoCoverArt} />);
     await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'No');
 
     await waitFor(() => {
       expect(screen.getByText('No Cover Album')).toBeInTheDocument();
     });
-
-    // Placeholder ♫ should be shown instead of an image
     expect(screen.getByText('♫')).toBeInTheDocument();
     expect(screen.queryByTestId('search-thumbnail')).not.toBeInTheDocument();
   });
 
-  it('should not display artist name when artistReleases is empty', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    const releasesNoArtist = [
+  it('omits the artist name when a release has no artists', async () => {
+    stubFetchReturning([
       {
         id: 'release-na',
         title: 'Mystery Album',
@@ -183,27 +195,42 @@ describe('ReleaseSearchCombobox', () => {
         artistReleases: [],
         releaseUrls: [],
       },
-    ] as unknown as Parameters<typeof ReleaseSearchCombobox>[0]['releases'];
+    ] as unknown as PublishedReleaseListing[]);
+    const user = setupUser();
+    renderCombobox();
 
-    render(<ReleaseSearchCombobox releases={releasesNoArtist} />);
     await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'Mys');
 
     await waitFor(() => {
       expect(screen.getByText('Mystery Album')).toBeInTheDocument();
-      // No artist name should be rendered
-      expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
+  });
+
+  it('displays the artist displayName when present', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'Glory');
+
+    await waitFor(() => {
+      expect(screen.getByText('J. Smith')).toBeInTheDocument();
     });
   });
 
-  it('should display the artist displayName when present', async () => {
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    render(<ReleaseSearchCombobox releases={mockReleases} />);
+  it('shows "No releases found" when the server returns no matches', async () => {
+    stubFetchReturning([]);
+    const user = setupUser();
+    renderCombobox();
 
     await user.click(screen.getByLabelText('Search releases'));
+    await user.type(screen.getByPlaceholderText(/search by artist/i), 'zzz');
 
     await waitFor(() => {
-      // mockReleases[1] has displayName: 'J. Smith'
-      expect(screen.getByText('J. Smith')).toBeInTheDocument();
+      expect(screen.getByText(/no releases found/i)).toBeInTheDocument();
     });
   });
 });

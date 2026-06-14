@@ -24,6 +24,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
+
+
+## [4.119.0] - 2026-06-14
+
+### Added
+
+- docs: 📝 add architecture diagrams,rename docs dir (#491)\n- docs: 📝 add architecture diagrams,rename docs dir (#491)\n- docs: 📝 add architecture diagrams,rename docs dir (#491)\n
+
+## [4.118.0] - 2026-06-14
+
+### Added
+
+- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n
+
+## [4.117.0] - 2026-06-14
+
+### Added
+
+- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n
+
+## [4.116.0] - 2026-06-13
+
+### Added
+
+- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n
+
+## [4.115.0] - 2026-06-13
+
+### Added
+
+- perf: parallelize independent fetches with Promise.all (#487)\n- perf: parallelize independent fetches with Promise.all (#487)\n- perf: parallelize independent fetches with Promise.all (#487)\n
+
 ## [4.114.0] - 2026-06-12
 
 ### Added
@@ -100,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- feat: reference speckit constitution in claude (#472)\n- feat: reference speckit constitution in claude (#472)\n- fix: update broken pnpm scripts (#470)\n- fix: update broken pnpm scripts (#470)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- fix: update broken pnpm scripts (#470)\n- feat: reference speckit constitution in claude (#472)\n
+- fix: update broken pnpm scripts (#470)\n- fix: update broken pnpm scripts (#470)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- fix: update broken pnpm scripts (#470)\n
 
 ## [4.101.0] - 2026-06-05
 
@@ -108,23 +143,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n
 
-## [4.100.0] - 2026-06-05
-
-### Added
-
-- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n
-
-## [4.99.0] - 2026-06-04
-
-### Added
-
-- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n
-
 ## [4.98.0] - 2026-06-03
 
 ### Added
 
-- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n
+- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n
 
 ## [4.97.0] - 2026-06-02
 

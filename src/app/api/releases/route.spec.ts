@@ -101,7 +101,7 @@ describe('Release API Routes', () => {
       expect(ReleaseService.getReleases).not.toHaveBeenCalled();
     });
 
-    it('should return all releases with default parameters', async () => {
+    it('should return a paginated page of releases with default parameters', async () => {
       const mockReleases = [mockRelease];
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: true,
@@ -114,10 +114,27 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        releases: mockReleases,
-        count: 1,
+        rows: mockReleases,
+        nextSkip: null,
       });
-      expect(ReleaseService.getReleases).toHaveBeenCalledWith({});
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith({ skip: 0, take: 24 });
+    });
+
+    it('should return the next offset when a full page is returned', async () => {
+      const fullPage = Array.from({ length: 2 }, (_, i) => ({
+        ...mockRelease,
+        id: `release-${i}`,
+      }));
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: fullPage as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?skip=0&take=2');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.nextSkip).toBe(2);
     });
 
     it('should include Cache-Control: private, no-store header on admin GET response', async () => {
@@ -160,8 +177,25 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
+        skip: 0,
+        take: 24,
         search: 'test',
       });
+    });
+
+    it('should pass deleted=true when requested', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?deleted=true');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith(
+        expect.objectContaining({ deleted: true })
+      );
     });
 
     it('should handle multiple query parameters', async () => {
@@ -195,8 +229,8 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        releases: [],
-        count: 0,
+        rows: [],
+        nextSkip: null,
       });
     });
 
@@ -250,6 +284,7 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
+        skip: 0,
         take: 100,
       });
     });
@@ -266,27 +301,68 @@ describe('Release API Routes', () => {
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
         skip: 0,
+        take: 24,
       });
     });
 
     describe('listing=published mode', () => {
-      it('should call getPublishedReleases when listing=published', async () => {
+      it('should return a paginated page when listing=published', async () => {
         vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
           success: true,
           data: [mockRelease] as never,
         });
 
-        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases?listing=published&skip=0&take=1'
+        );
         const response = await GET(request);
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data).toEqual({ releases: [mockRelease], count: 1 });
-        expect(ReleaseService.getPublishedReleases).toHaveBeenCalled();
+        // A full page (rows.length === take) yields the next offset.
+        expect(data).toEqual({ rows: [mockRelease], nextSkip: 1 });
+        expect(ReleaseService.getPublishedReleases).toHaveBeenCalledWith({
+          skip: 0,
+          take: 1,
+          search: undefined,
+        });
         expect(ReleaseService.getReleases).not.toHaveBeenCalled();
       });
 
-      it('should include Cache-Control header for published listing', async () => {
+      it('should forward the search term and default skip/take for published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases?listing=published&search=Doe'
+        );
+        await GET(request);
+
+        expect(ReleaseService.getPublishedReleases).toHaveBeenCalledWith({
+          skip: 0,
+          take: 24,
+          search: 'Doe',
+        });
+      });
+
+      it('should return nextSkip null when the published page is short', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [mockRelease] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases?listing=published&take=24'
+        );
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(data.nextSkip).toBeNull();
+      });
+
+      it('should set a no-store Cache-Control header for published listing', async () => {
         vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
           success: true,
           data: [] as never,
@@ -295,9 +371,7 @@ describe('Release API Routes', () => {
         const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
         const response = await GET(request);
 
-        expect(response.headers.get('Cache-Control')).toBe(
-          'public, s-maxage=60, stale-while-revalidate=300'
-        );
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
       });
 
       it('should return 503 for db error in published listing', async () => {
@@ -336,8 +410,8 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
-        skip: NaN,
-        take: NaN,
+        skip: 0,
+        take: 24,
       });
     });
 

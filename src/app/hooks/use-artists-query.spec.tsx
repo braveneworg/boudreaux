@@ -1,162 +1,94 @@
+// @vitest-environment jsdom
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { type ReactNode } from 'react';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 
-import { useArtistsQuery } from './use-artists-query';
+import { ARTISTS_PAGE_SIZE, useArtistsQuery, type ArtistsQueryParams } from './use-artists-query';
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
+const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-  };
+vi.mock('@tanstack/react-query', () => ({
+  keepPreviousData: Symbol('keepPreviousData'),
+  useInfiniteQuery: (options: unknown) => useInfiniteQueryMock(options),
+}));
+
+interface ArtistsQueryOptions {
+  queryKey: unknown[];
+  initialPageParam: number;
+  queryFn: (ctx: { pageParam: number; signal?: AbortSignal }) => Promise<unknown>;
+  getNextPageParam: (lastPage: { nextSkip: number | null }) => number | null;
+}
+
+const getOptions = (params: ArtistsQueryParams): ArtistsQueryOptions => {
+  useInfiniteQueryMock.mockReturnValue({ isPending: true });
+  renderHook(() => useArtistsQuery(params));
+  return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as ArtistsQueryOptions;
 };
 
+beforeEach(() => useInfiniteQueryMock.mockReset());
+
+afterEach(() => vi.unstubAllGlobals());
+
 describe('useArtistsQuery', () => {
-  it('returns isPending true initially', () => {
-    global.fetch = vi.fn().mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                ok: true,
-                json: () => Promise.resolve([]),
-              }),
-            100
-          )
-        )
+  it('keys the query by the admin-infinite params and starts at skip 0', () => {
+    const opts = getOptions({ search: 'John', published: null, deleted: false });
+
+    expect(opts.queryKey).toEqual(['artists', 'adminInfinite', 'john', null, false]);
+    expect(opts.initialPageParam).toBe(0);
+  });
+
+  it('derives the next page param from nextSkip', () => {
+    const opts = getOptions({ search: '', published: null, deleted: false });
+
+    expect(opts.getNextPageParam({ nextSkip: 48 })).toBe(48);
+    expect(opts.getNextPageParam({ nextSkip: null })).toBeNull();
+  });
+
+  it('fetches a page with skip/take and forwards the signal', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: '', published: null, deleted: false });
+    const { signal } = new AbortController();
+
+    await opts.queryFn({ pageParam: 24, signal });
+
+    expect(fetchMock).toHaveBeenCalledWith(`/api/artists?skip=24&take=${ARTISTS_PAGE_SIZE}`, {
+      signal,
+    });
+  });
+
+  it('includes search, published, and deleted params when set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: 'Rock', published: true, deleted: true });
+
+    await opts.queryFn({ pageParam: 0 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/artists?skip=0&take=${ARTISTS_PAGE_SIZE}&search=Rock&published=true&deleted=true`,
+      { signal: undefined }
     );
-
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.isPending).toBe(true);
   });
 
-  it('fetches artists data successfully', async () => {
-    const mockArtists = [
-      { id: '1', firstName: 'John', surname: 'Doe' },
-      { id: '2', firstName: 'Jane', surname: 'Smith' },
-    ];
+  it('sends published=false but omits deleted when false', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: '', published: false, deleted: false });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockArtists),
-    });
+    await opts.queryFn({ pageParam: 0 });
 
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.data).toEqual(mockArtists);
-    expect(result.current.error).toBeNull();
-    expect(global.fetch).toHaveBeenCalledWith('/api/artists');
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/artists?skip=0&take=${ARTISTS_PAGE_SIZE}&published=false`,
+      { signal: undefined }
+    );
   });
 
-  it('handles fetch error when response is not ok', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Server error' }),
-    });
+  it('throws when the response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const opts = getOptions({ search: '', published: null, deleted: false });
 
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.error).toBeTruthy();
-    expect(result.current.error?.message).toBe('Failed to fetch artists');
-    expect(result.current.data).toBeUndefined();
-  });
-
-  it('handles network error', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.error).toBeTruthy();
-    expect(result.current.error?.message).toBe('Network error');
-  });
-
-  it('returns refetch function', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(typeof result.current.refetch).toBe('function');
-  });
-
-  it('refetch triggers new API call', async () => {
-    const mockArtists = [{ id: '1', firstName: 'John', surname: 'Doe' }];
-
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockArtists),
-    });
-
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-
-    await result.current.refetch();
-
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('returns empty array when no artists exist', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    const { result } = renderHook(() => useArtistsQuery(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isPending).toBe(false);
-    });
-
-    expect(result.current.data).toEqual([]);
+    await expect(opts.queryFn({ pageParam: 0 })).rejects.toThrow('Failed to fetch artists');
   });
 });

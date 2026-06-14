@@ -50,36 +50,40 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
   const userId = authSession?.user?.id ?? null;
   const email = authSession?.user?.email ?? customerEmail ?? null;
 
-  try {
-    // Block re-purchase for authenticated users
+  // Resolve whether the buyer already owns this release. For authenticated users
+  // we check directly; for guest checkout we resolve the email to a userId first.
+  const resolveAlreadyPurchased = async (): Promise<boolean> => {
     if (userId) {
-      const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
-      if (alreadyPurchased) {
-        return { success: false, error: 'already_purchased' };
-      }
-    } else if (email) {
-      // For guest checkout, resolve the email to a userId and check for existing
-      // purchase so we don't charge them again for a release they already own.
+      return PurchaseService.checkExistingPurchase(userId, releaseId);
+    }
+    if (email) {
       const existingUser = await prisma.user.findUnique({
         where: { email },
         select: { id: true },
       });
       if (existingUser) {
-        const alreadyPurchased = await PurchaseService.checkExistingPurchase(
-          existingUser.id,
-          releaseId
-        );
-        if (alreadyPurchased) {
-          return { success: false, error: 'already_purchased' };
-        }
+        return PurchaseService.checkExistingPurchase(existingUser.id, releaseId);
       }
     }
+    return false;
+  };
 
-    // Verify release exists and is published; fetch title for Stripe product data
-    const release = await prisma.release.findFirst({
-      where: { id: releaseId, publishedAt: { not: null } },
-      select: { id: true, title: true },
-    });
+  try {
+    // The re-purchase check and the release lookup are independent — run them
+    // concurrently to save a round-trip.
+    const [alreadyPurchased, release] = await Promise.all([
+      resolveAlreadyPurchased(),
+      // Verify release exists and is published; fetch title for Stripe product data
+      prisma.release.findFirst({
+        where: { id: releaseId, publishedAt: { not: null } },
+        select: { id: true, title: true },
+      }),
+    ]);
+
+    if (alreadyPurchased) {
+      return { success: false, error: 'already_purchased' };
+    }
+
     if (!release) {
       return { success: false, error: 'release_unavailable' };
     }

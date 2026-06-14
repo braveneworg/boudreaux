@@ -44,9 +44,6 @@ build
 .vibe
 .windsurf
 .zencoder
-.specify
-.specify/memory
-.specify/scripts
 
 # Tests
 e2e
@@ -84,7 +81,6 @@ COVERAGE_METRICS.md
 # Scripts not needed in container
 scripts
 stripe-webhook
-specs
 
 # TypeScript build caches — these grow to GB-scale and change on every build
 tsconfig.*.json

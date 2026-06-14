@@ -28,9 +28,23 @@ function getDateRange(range: string): { startDate?: string; endDate?: string } {
   };
 }
 
+/**
+ * Fetches download analytics for a release from the
+ * `/api/releases/[id]/download-analytics` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param releaseId - The release whose analytics are requested.
+ * @param dateRange - The date-range selector (e.g. `'7'`, `'30'`, `'all'`).
+ * @param signal - The TanStack Query abort signal forwarded to `fetch`.
+ * @returns The parsed JSON response containing the download analytics.
+ * @throws If the response status is not OK.
+ */
 const fetchDownloadAnalytics = async (
   releaseId: string,
-  dateRange: string
+  dateRange: string,
+  signal?: AbortSignal
 ): Promise<DownloadAnalyticsResponse> => {
   const params = new URLSearchParams();
   const range = getDateRange(dateRange);
@@ -40,13 +54,25 @@ const fetchDownloadAnalytics = async (
   const queryString = params.toString();
   const url = `/api/releases/${releaseId}/download-analytics${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw Error('Failed to fetch download analytics');
   }
   return response.json() as Promise<DownloadAnalyticsResponse>;
 };
 
+/**
+ * React Query hook for fetching download analytics for a release.
+ *
+ * Wraps {@link fetchDownloadAnalytics} with a stable query key and exposes the
+ * request state. Cancellation is handled automatically via the forwarded
+ * `AbortSignal`.
+ *
+ * @param releaseId - The release whose analytics are requested.
+ * @param dateRange - The date-range selector (e.g. `'7'`, `'30'`, `'all'`).
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useDownloadAnalyticsQuery = (releaseId: string, dateRange: string) => {
   const {
     isPending,
@@ -55,7 +81,7 @@ export const useDownloadAnalyticsQuery = (releaseId: string, dateRange: string) 
     refetch,
   } = useQuery({
     queryKey: queryKeys.downloadAnalytics.byRelease(releaseId, dateRange),
-    queryFn: () => fetchDownloadAnalytics(releaseId, dateRange),
+    queryFn: ({ signal }) => fetchDownloadAnalytics(releaseId, dateRange, signal),
     enabled: !!releaseId,
   });
 

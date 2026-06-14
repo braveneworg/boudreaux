@@ -9,14 +9,35 @@ export interface TourDatesResponse {
   tourDates: Array<Record<string, unknown>>;
 }
 
-const fetchTourDates = async (tourId: string): Promise<TourDatesResponse> => {
-  const response = await fetch(`/api/tours/${tourId}/dates`, { cache: 'no-store' });
+/**
+ * Fetches the dates for a tour from the `/api/tours/[tourId]/dates` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param tourId - The tour identifier to fetch dates for.
+ * @param signal - The `AbortSignal` forwarded from TanStack Query.
+ * @returns The parsed JSON response containing the tour dates.
+ * @throws If the response status is not OK.
+ */
+const fetchTourDates = async (tourId: string, signal?: AbortSignal): Promise<TourDatesResponse> => {
+  const response = await fetch(`/api/tours/${tourId}/dates`, { cache: 'no-store', signal });
   if (!response.ok) {
     throw Error('Failed to fetch tour dates');
   }
   return response.json() as Promise<TourDatesResponse>;
 };
 
+/**
+ * React Query hook for fetching the dates for a tour.
+ *
+ * Wraps {@link fetchTourDates} with a stable query key and exposes the request
+ * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
+ *
+ * @param tourId - The tour identifier to fetch dates for.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useTourDatesQuery = (tourId: string) => {
   const {
     isPending,
@@ -25,7 +46,7 @@ export const useTourDatesQuery = (tourId: string) => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.tours.dates(tourId),
-    queryFn: () => fetchTourDates(tourId),
+    queryFn: ({ signal }) => fetchTourDates(tourId, signal),
     enabled: !!tourId,
   });
 

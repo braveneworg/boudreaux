@@ -1,21 +1,41 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { BannersApiResponse } from '@/lib/services/banner-notification-service';
 
 const disableCache = process.env.NEXT_PUBLIC_DISABLE_BANNERS_CACHE === 'true';
 
-const fetchBanners = async (): Promise<BannersApiResponse> => {
-  const response = await fetch('/api/notification-banners');
+/**
+ * Fetches the active notification banners from the `/api/notification-banners`
+ * route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param context - The TanStack Query function context, providing the `signal`.
+ * @returns The parsed JSON response containing the banners.
+ * @throws If the response status is not OK.
+ */
+const fetchBanners = async ({ signal }: QueryFunctionContext): Promise<BannersApiResponse> => {
+  const response = await fetch('/api/notification-banners', { signal });
   if (!response.ok) {
     throw Error('Failed to fetch banners');
   }
   return response.json() as Promise<BannersApiResponse>;
 };
 
+/**
+ * React Query hook for fetching the active notification banners.
+ *
+ * Wraps {@link fetchBanners} with a stable query key and exposes the request
+ * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
+ *
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useBannersQuery = () => {
   const {
     isPending,

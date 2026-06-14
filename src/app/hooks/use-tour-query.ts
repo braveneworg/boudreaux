@@ -21,8 +21,22 @@ export type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
-const fetchTour = async (tourId: string): Promise<TourWithRelations | null> => {
-  const response = await fetch(`/api/tours/${encodeURIComponent(tourId)}`);
+/**
+ * Fetches a single tour from the `/api/tours/[tourId]` route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param tourId - The tour identifier to fetch.
+ * @param signal - The `AbortSignal` forwarded from TanStack Query.
+ * @returns The parsed tour with relations, or `null` when not found (404).
+ * @throws If the response status is not OK (other than 404).
+ */
+const fetchTour = async (
+  tourId: string,
+  signal?: AbortSignal
+): Promise<TourWithRelations | null> => {
+  const response = await fetch(`/api/tours/${encodeURIComponent(tourId)}`, { signal });
   if (!response.ok) {
     if (response.status === 404) {
       return null;
@@ -33,6 +47,16 @@ const fetchTour = async (tourId: string): Promise<TourWithRelations | null> => {
   return (data.tour ?? data) as TourWithRelations;
 };
 
+/**
+ * React Query hook for fetching a single tour.
+ *
+ * Wraps {@link fetchTour} with a stable query key and exposes the request
+ * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
+ *
+ * @param tourId - The tour identifier to fetch.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
 export const useTourQuery = (tourId: string) => {
   const {
     isPending,
@@ -41,7 +65,7 @@ export const useTourQuery = (tourId: string) => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.tours.detail(tourId),
-    queryFn: () => fetchTour(tourId),
+    queryFn: ({ signal }) => fetchTour(tourId, signal),
     enabled: !!tourId,
   });
 

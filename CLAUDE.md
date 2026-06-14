@@ -1,20 +1,21 @@
 # boudreaux Development Guidelines
 
-Last updated: 2026-05-30
+Last updated: 2026-06-13
 
 ## How to work in this repo
 
-- Engineering principles are defined in `.specify/memory/constitution.md` — treat them as binding.
 - Default posture: Server Components, Server Actions for mutations, named exports, reuse before you create. Search for an existing component, type, field, or util before adding one.
-- Gate before committing — all four must pass: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`. Write tests for every feature and bug fix.
+- Quality over speed — deliver correct, reviewed code even when it takes longer. These guidelines are binding; when code can't comply, say so rather than working around them silently.
+- Test-driven development is non-negotiable: write the test first, watch it fail, then implement. Every feature and bug fix ships with tests.
+- Gate before committing — all four must pass: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`.
 - Two sections below are hard constraints, not guidance: [E2E database isolation](#e2e-database-isolation-mandatory) and [Secrets and `.env*`](#secrets-and-env-files). Read them before touching E2E, the DB, builds, dev servers, seed scripts, or anything that reads the environment. When in doubt there, stop and ask.
-- Standard idioms are assumed — Opus already writes them, so they're not spelled out: modern TS (optional chaining, nullish coalescing, `async`/`await` + `try`/`catch`, array methods over loops, template literals), and Prettier/ESLint enforce style (semicolons, single quotes, trailing commas) via `pnpm run format` / `pnpm run lint`.
+- Standard idioms are assumed — Opus already writes them, so they're not spelled out: modern TS (optional chaining, nullish coalescing, `async`/`await` + `try`/`catch`, array methods over loops, template literals, immutable updates, named constants over magic values), and Prettier/ESLint enforce style (semicolons, single quotes, trailing commas) via `pnpm run format` / `pnpm run lint`.
 
 ## Stack
 
 Versions track `package.json` — update this block when they change.
 
-- **Runtime**: TypeScript 6 (strict), Node 24, pnpm 11; Always use Node from `.nvmrc` (never a global install) and `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
+- **Runtime**: TypeScript 6 (strict), Node 24, pnpm 11; always use Node from `.nvmrc` (never a global install) and `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
 - **Framework**: Next.js 16 (App Router, Turbopack dev, webpack build), React 19
 - **Data**: Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min upload)
 - **Auth**: Auth.js (next-auth v5 beta) · **Payments**: Stripe 21 (payment-mode checkout, PWYW) · **Email**: AWS SES
@@ -45,7 +46,7 @@ src/
 prisma/schema.prisma        # MongoDB schema
 e2e/                        # Playwright (fixtures, helpers, tests)
 scripts/                    # tsx scripts (mongo backup, S3 ops, image variants)
-docs/copilot/               # AI-generated markdown goes here
+docs/auto-generated/        # AI-generated markdown goes here
 ```
 
 Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/app/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal.
@@ -72,10 +73,10 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Server vs client**: Server Components by default; add `'use client'` only for interactive components. Client Components must never call services, Prisma, or repositories directly — use Server Actions for mutations, fetch API route handlers for queries. Mark server-only modules with `'server-only'`.
 - **Mutations** go in Server Actions (`src/lib/actions/`, `'use server'` at top). **Queries** go in API routes (`src/app/api/`).
 - **Auth**: gate routes and actions with `withAuth` / `withAdmin` from `src/lib/decorators/with-auth.ts`; rate-limit with `withRateLimit`.
-- **Data layer**: all Prisma access goes through the repository pattern in `src/lib/repositories/` — keep DB logic out of components and routes. Use transactions for multi-step ops; handle connection failures gracefully.
+- **Data layer**: all Prisma access goes through the repository pattern in `src/lib/repositories/` — keep DB logic out of components and routes. Use transactions for multi-step ops; handle connection failures gracefully. Keep business logic in services; keep components presentation-focused.
 - **Validation**: validate all external input (user input, API responses, Server Action args) with Zod before use. Schemas live in `src/lib/validation/`.
-- **Fetching**: TanStack Query on the client; explicit cache options on Server Component fetches (`{ cache: 'no-store' }` for fresh data).
-- **node**: use the node version specified by .nvmrc (24); never a global install. Use `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
+- **Fetching**: TanStack Query on the client, with `fetch` to API routes that forward the `AbortSignal` for automatic cancellation. Use stable query keys from `src/lib/query-keys.ts`. Never call API routes directly from components — always wrap in a custom hook (e.g. `useArtistsQuery`) that forwards the signal and abstracts the query logic. Always use jsdocs to explain the fetch function and hook's behavior and return value. Only use `{ cache: 'no-store' }` for requests that must never be cached (e.g. auth status); otherwise, rely on TanStack Query's caching and invalidation.
+- **Error handling**: every API route and Server Action handles errors explicitly with `try`/`catch` and returns appropriate HTTP status codes. Follow REST conventions — plural nouns (`/api/releases`), correct verbs (GET read, POST create, PUT/PATCH update, DELETE remove).
 
 ## TypeScript
 
@@ -87,9 +88,19 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 
 ## Components, forms, styling
 
-- Function components only — never class components. Keep them small; split large files. Destructure props with explicit types. Memoize (`memo`/`useCallback`/`useMemo`) only where it measurably helps. Use `globalThis`, not `window`, for client globals (SSR safety).
+- Function components only — never class components. Keep them small; split large files. Destructure props with explicit types. Use `globalThis`, not `window`, for client globals (SSR safety).
+- **State**: React built-ins for component state (`useState` / `useReducer` / `useContext`). Reach for an external store (Zustand, Redux) only when architectural complexity justifies it — not by default.
+- **React 19 concurrency** where it improves UX: `useTransition` for non-urgent updates, `useDeferredValue` for expensive derived renders, `useId` for hydration-safe IDs.
 - **Forms**: React Hook Form + Zod via `zodResolver`. Check `src/app/components/forms/fields/` for an existing field before building one.
 - **Styling**: mobile-first; Tailwind v4 utilities only — no `@apply`, no inline styles. Compose conditional classes with `cn()`. Never create a new UI primitive — use shadcn/ui from `@/components/ui`. Icons from `lucide-react`, UI text in Jost. Never use checkboxes in mobile-first UIs — use toggles or radio buttons. Semantic HTML, ARIA, and keyboard navigation are required, not optional.
+- **Errors & debugging**: wrap risky subtrees in error boundaries and handle async failures gracefully. Never ship `console.log` — use the project logger. Never use `alert` / `prompt` — use shadcn/ui dialogs.
+
+## Performance
+
+- Code-split and lazy-load non-critical UI (`React.lazy` + `Suspense`, `next/dynamic`); show skeleton or Suspense fallbacks to improve perceived speed.
+- Use `next/image` for images.
+- Memoize (`memo` / `useCallback` / `useMemo`) only where profiling shows it helps — never by default.
+- Lean on TanStack Query's caching and background updates instead of hand-rolled client caches.
 
 ## Naming
 
@@ -109,7 +120,9 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - Vitest 4 (unit/integration) + Playwright (E2E in `e2e/`). Spec files are `.spec.ts(x)` adjacent to source.
 - `describe`/`it`/`expect`/`vi` are globals — never import them from `vitest`. In server-only specs, `vi.mock('server-only', () => ({}))`.
 - Mock external deps (Stripe, SES, Prisma) at the service-layer boundary. Test behavior and output, never implementation details. One condition per test — never `expect` inside a conditional.
+- Keep tests deterministic and independent of network, time, and ordering. Remove orphaned tests when code is deleted, and orphaned code when tests are removed.
 - Target 90–95% coverage; exclude config, types, interfaces, and the Prisma schema. Don't regress the `COVERAGE_METRICS.md` baseline.
+- E2E (Playwright): cover critical user flows and error paths; use fixtures and page objects to cut duplication; keep tests deterministic and parallel-safe.
 
 ### E2E database isolation (MANDATORY)
 
@@ -131,24 +144,8 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 
 ## Application security & conventions
 
-- Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Never use `localStorage` / `sessionStorage` for anything.
-- Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Keep dependencies patched.
-- Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
+- Never run E2E/builds/dev/seed/migrations in a process that could inherit `DATABASE_URL` from `.env*` (see E2E isolation above). Only use `localStorage` / `sessionStorage` for non-sensitive client state; never store secrets or auth tokens there. Use `httpOnly`, `secure`, `sameSite` cookies for auth sessions.
+- Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Store config and secrets in environment variables — never hardcode them.
+- **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
+- Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
-
-## Spec Kit feature naming
-
-Feature branches and spec directories use a grouped scheme — branch `feature/NNN-name`, spec dir `specs/feature/NNN-name` (the number comes after the slash; exactly one grouping level). When running `/speckit-specify`:
-
-1. Ask the user for a short feature name (2–4 words) if they didn't already give one.
-2. Run `bash scripts/speckit-next-feature.sh <short-name>` — it's read-only and prints the next `GIT_BRANCH_NAME` + `SPECIFY_FEATURE_DIRECTORY`, computing `NNN` by scanning `specs/feature/*` and local/remote `feature/NNN-*` branches.
-3. Export those two values for the whole flow so the `before_specify` git hook creates `feature/NNN-name` and the specify skill creates `specs/feature/NNN-name/` and records it in `.specify/feature.json` (which is what `/speckit-plan`, `/speckit-tasks`, etc. read to find the nested dir).
-
-Pass a second arg to use a different group, e.g. `bash scripts/speckit-next-feature.sh <short-name> fix` → `fix/NNN-name`. This convention drives Spec Kit's existing `GIT_BRANCH_NAME` / `SPECIFY_FEATURE_DIRECTORY` overrides — never hand-edit `.specify/**` to change naming, so it survives Spec Kit upgrades.
-
-<!-- SPECKIT START -->
-
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-
-<!-- SPECKIT END -->

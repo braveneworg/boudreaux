@@ -22,17 +22,6 @@ describe('queryKeys', () => {
       expect(queryKeys.releases.all).toEqual(['releases']);
     });
 
-    it('should return list key extending all', () => {
-      const listKey = queryKeys.releases.list();
-      expect(listKey).toEqual(['releases', 'list']);
-      expect(listKey[0]).toBe(queryKeys.releases.all[0]);
-    });
-
-    it('should return published key extending all', () => {
-      const key = queryKeys.releases.published();
-      expect(key).toEqual(['releases', 'published']);
-    });
-
     it('should return detail key with id', () => {
       const key = queryKeys.releases.detail('r-123');
       expect(key).toEqual(['releases', 'detail', 'r-123']);
@@ -81,12 +70,6 @@ describe('queryKeys', () => {
   describe('artists', () => {
     it('should return all key', () => {
       expect(queryKeys.artists.all).toEqual(['artists']);
-    });
-
-    it('should return list key extending all', () => {
-      const listKey = queryKeys.artists.list();
-      expect(listKey).toEqual(['artists', 'list']);
-      expect(listKey[0]).toBe(queryKeys.artists.all[0]);
     });
 
     it('should return bySlug key with slug', () => {
@@ -142,12 +125,6 @@ describe('queryKeys', () => {
   describe('tours', () => {
     it('should return all key', () => {
       expect(queryKeys.tours.all).toEqual(['tours']);
-    });
-
-    it('should return list key extending all', () => {
-      const key = queryKeys.tours.list();
-      expect(key).toEqual(['tours', 'list']);
-      expect(key[0]).toBe(queryKeys.tours.all[0]);
     });
 
     it('should return detail key with id', () => {
@@ -242,6 +219,53 @@ describe('queryKeys', () => {
     it('should return detail key with id', () => {
       const key = queryKeys.venues.detail('v-123');
       expect(key).toEqual(['venues', 'detail', 'v-123']);
+    });
+  });
+
+  describe('infinite-scroll keys', () => {
+    it('normalizes the published-releases infinite key search term', () => {
+      expect(queryKeys.releases.publishedInfinite('  Rock  ')).toEqual([
+        'releases',
+        'publishedInfinite',
+        'rock',
+      ]);
+    });
+
+    it('includes search and filter flags in the admin releases infinite key', () => {
+      expect(
+        queryKeys.releases.adminInfinite({ search: 'Doe', published: true, deleted: false })
+      ).toEqual(['releases', 'adminInfinite', 'doe', true, false]);
+    });
+
+    it('includes search and filter flags in the admin artists infinite key', () => {
+      expect(
+        queryKeys.artists.adminInfinite({ search: 'X', published: null, deleted: true })
+      ).toEqual(['artists', 'adminInfinite', 'x', null, true]);
+    });
+
+    it('includes search and filter flags in the admin featured-artists infinite key', () => {
+      expect(
+        queryKeys.featuredArtists.adminInfinite({ search: '', published: false, deleted: false })
+      ).toEqual(['featuredArtists', 'adminInfinite', '', false, false]);
+    });
+
+    it('normalizes the tours infinite key search term', () => {
+      expect(queryKeys.tours.infinite('Summer')).toEqual(['tours', 'infinite', 'summer']);
+    });
+
+    it('builds the reported-users infinite key with window and search', () => {
+      expect(queryKeys.chat.reportedUsersInfinite(30, 'Spammer')).toEqual([
+        'chat',
+        'reportedUsersInfinite',
+        30,
+        'spammer',
+      ]);
+      expect(queryKeys.chat.reportedUsersInfinite('all')).toEqual([
+        'chat',
+        'reportedUsersInfinite',
+        'all',
+        '',
+      ]);
     });
   });
 });

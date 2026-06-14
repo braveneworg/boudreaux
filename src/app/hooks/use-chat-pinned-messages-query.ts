@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
@@ -11,8 +11,19 @@ interface PinnedResponse {
   messages: ChatMessageDto[];
 }
 
-const fetchPinned = async (): Promise<ChatMessageDto[]> => {
-  const response = await fetch('/api/chat/pinned', { cache: 'no-store' });
+/**
+ * Fetches the currently pinned chat messages from the `/api/chat/pinned`
+ * route handler.
+ *
+ * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
+ * cancelled automatically on unmount, invalidation, or a superseding refetch.
+ *
+ * @param context - The TanStack Query function context, providing the `signal`.
+ * @returns The list of pinned chat messages.
+ * @throws If the response status is not OK.
+ */
+const fetchPinned = async ({ signal }: QueryFunctionContext): Promise<ChatMessageDto[]> => {
+  const response = await fetch('/api/chat/pinned', { cache: 'no-store', signal });
   if (!response.ok) {
     throw Error('Failed to load pinned messages');
   }
@@ -25,6 +36,9 @@ const fetchPinned = async (): Promise<ChatMessageDto[]> => {
  * survives a page reload even when the pinned rows are older than the
  * loaded chat-history page. Live updates land via the `messagePinChanged`
  * Pusher event and patch this cache directly.
+ *
+ * Wraps {@link fetchPinned}; cancellation is handled automatically via the
+ * forwarded `AbortSignal`.
  */
 export function useChatPinnedMessagesQuery({ enabled }: { enabled: boolean }) {
   return useQuery({

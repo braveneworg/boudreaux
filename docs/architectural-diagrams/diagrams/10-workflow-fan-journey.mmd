@@ -1,0 +1,23 @@
+%% User workflow — Fan journey: discover, listen, buy, download
+flowchart TB
+    Start([Fan visits site]) --> Browse["Browse / search<br/>releases · artists · tours"]
+    Browse --> Detail["Open release page<br/>(Server Component)"]
+    Detail --> Listen["Preview / stream tracks<br/>(media player + CloudFront)"]
+    Listen --> Decide{"Want to keep it?"}
+
+    Decide -->|"Free download"| Quota{"Within free<br/>quota (max 5)?"}
+    Quota -->|"Yes"| Deliver["Presigned download<br/>+ log event"]
+    Quota -->|"No"| Pay
+
+    Decide -->|"Pay-What-You-Want"| Pay["Choose price + checkout<br/>(Stripe Payment Element)"]
+    Pay --> Confirm["Webhook records purchase<br/>+ emails receipt"]
+    Confirm --> Deliver
+
+    Deliver --> Collection["Saved to collection<br/>(if signed in)"]
+    Collection --> Community["Join live chat<br/>(authenticated)"]
+    Community --> End([Engaged fan])
+
+    classDef plain fill:#ffffff,stroke:#000000,stroke-width:1px,color:#000000;
+    classDef decision fill:#e6e6e6,stroke:#000000,stroke-width:1px,color:#000000;
+    class Start,Browse,Detail,Listen,Pay,Confirm,Deliver,Collection,Community,End plain;
+    class Decide,Quota decision;

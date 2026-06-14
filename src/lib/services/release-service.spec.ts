@@ -245,35 +245,38 @@ describe('ReleaseService', () => {
       },
     ];
 
-    it('should retrieve all releases with default parameters', async () => {
+    const deletedOnClause = { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] };
+    const releaseInclude = {
+      images: {
+        orderBy: { sortOrder: 'asc' },
+        take: 3,
+      },
+      artistReleases: {
+        include: {
+          artist: {
+            select: {
+              id: true,
+              firstName: true,
+              surname: true,
+              displayName: true,
+            },
+          },
+        },
+      },
+    };
+
+    it('should retrieve all releases with default parameters (excludes deleted)', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue(mockReleases);
 
       const result = await ReleaseService.getReleases();
 
       expect(result).toMatchObject({ success: true, data: mockReleases });
       expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { AND: [deletedOnClause] },
         skip: 0,
         take: 50,
         orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-        },
+        include: releaseInclude,
       });
     });
 
@@ -284,28 +287,11 @@ describe('ReleaseService', () => {
 
       expect(result.success).toBe(true);
       expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { AND: [deletedOnClause] },
         skip: 10,
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-        },
+        include: releaseInclude,
       });
     });
 
@@ -317,33 +303,21 @@ describe('ReleaseService', () => {
       expect(result.success).toBe(true);
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { title: { contains: 'test', mode: 'insensitive' } },
-            { catalogNumber: { contains: 'test', mode: 'insensitive' } },
-            { description: { contains: 'test', mode: 'insensitive' } },
+          AND: [
+            deletedOnClause,
+            {
+              OR: [
+                { title: { contains: 'test', mode: 'insensitive' } },
+                { catalogNumber: { contains: 'test', mode: 'insensitive' } },
+                { description: { contains: 'test', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
         skip: 0,
         take: 50,
         orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-        },
+        include: releaseInclude,
       });
     });
 
@@ -359,34 +333,53 @@ describe('ReleaseService', () => {
       expect(result.success).toBe(true);
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { title: { contains: 'album', mode: 'insensitive' } },
-            { catalogNumber: { contains: 'album', mode: 'insensitive' } },
-            { description: { contains: 'album', mode: 'insensitive' } },
+          AND: [
+            deletedOnClause,
+            {
+              OR: [
+                { title: { contains: 'album', mode: 'insensitive' } },
+                { catalogNumber: { contains: 'album', mode: 'insensitive' } },
+                { description: { contains: 'album', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
         skip: 5,
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-        },
+        include: releaseInclude,
       });
+    });
+
+    it('should add publishedAt filter when published=true', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+
+      await ReleaseService.getReleases({ published: true });
+
+      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where;
+      expect(passedWhere).toEqual({
+        AND: [deletedOnClause, { publishedAt: { not: null } }],
+      });
+    });
+
+    it('should add unpublished filter when published=false', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+
+      await ReleaseService.getReleases({ published: false });
+
+      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where;
+      expect(passedWhere).toEqual({
+        AND: [deletedOnClause, { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }],
+      });
+    });
+
+    it('should omit the deletedOn constraint when deleted=true', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+
+      await ReleaseService.getReleases({ deleted: true });
+
+      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      expect(passedWhere).not.toHaveProperty('AND');
     });
 
     it('should return empty array when no releases found', async () => {
@@ -911,9 +904,59 @@ describe('ReleaseService', () => {
         expect.objectContaining({
           where: {
             publishedAt: { not: null },
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
           },
           orderBy: { releasedOn: 'desc' },
+          skip: 0,
+          take: 24,
+        })
+      );
+    });
+
+    it('applies skip/take pagination', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      await ReleaseService.getPublishedReleases({ skip: 24, take: 12 });
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 24, take: 12 })
+      );
+    });
+
+    it('adds a server-side search filter across title, catalog, description, and artist', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      await ReleaseService.getPublishedReleases({ search: 'Doe' });
+
+      const contains = { contains: 'Doe', mode: 'insensitive' };
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            publishedAt: { not: null },
+            AND: [
+              { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+              {
+                OR: [
+                  { title: contains },
+                  { catalogNumber: contains },
+                  { description: contains },
+                  {
+                    artistReleases: {
+                      some: {
+                        artist: {
+                          OR: [
+                            { firstName: contains },
+                            { surname: contains },
+                            { displayName: contains },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         })
       );
     });

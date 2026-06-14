@@ -343,11 +343,11 @@ To open last HTML report run:
 
 # Caching Infrastructure Checklist
 
-See [docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md](docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md)
+See [docs/auto-generated/CACHING_INFRASTRUCTURE_CHECKLIST.md](docs/auto-generated/CACHING_INFRASTRUCTURE_CHECKLIST.md)
 
 # Stripe Webhook Lambda Deployment Readiness
 
-See [docs/copilot/stripe-webhook-lambda-deployment-readiness.md](docs/copilot/stripe-webhook-lambda-deployment-readiness.md)
+See [docs/auto-generated/stripe-webhook-lambda-deployment-readiness.md](docs/auto-generated/stripe-webhook-lambda-deployment-readiness.md)
 
 ## Stripe Webhook IP Allowlist Refresh
 

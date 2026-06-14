@@ -13,6 +13,10 @@ export interface TourQueryParams {
   search?: string;
   page?: number;
   limit?: number;
+  /** Offset for skip/take pagination (takes precedence over page/limit). */
+  skip?: number;
+  /** Page size for skip/take pagination (takes precedence over page/limit). */
+  take?: number;
 }
 
 export interface TourCreateData {
@@ -66,11 +70,61 @@ export type TourWithRelations = Prisma.TourGetPayload<{
  */
 export class TourRepository {
   /**
+   * Builds the case-insensitive search filter shared by {@link findAll} and
+   * {@link count}. Mirrors the fields the public tours page previously matched
+   * client-side: tour title/subtitles/description, venue name/city/state, and
+   * headliner artist names. Returns `undefined` when no search term is given.
+   */
+  private static buildSearchWhere(search?: string): Prisma.TourWhereInput | undefined {
+    if (!search) return undefined;
+
+    const contains = { contains: search, mode: 'insensitive' as const };
+
+    return {
+      OR: [
+        { title: contains },
+        { subtitle: contains },
+        { subtitle2: contains },
+        { description: contains },
+        // Venue and headliner matches share a SINGLE `tourDates: { some }` with
+        // an inner OR. Two separate `tourDates: { some }` clauses under the outer
+        // OR make Prisma's MongoDB connector emit a `$size` on a null array
+        // (error 17124) for tours that have no tour dates.
+        {
+          tourDates: {
+            some: {
+              OR: [
+                { venue: { OR: [{ name: contains }, { city: contains }, { state: contains }] } },
+                {
+                  headliners: {
+                    some: {
+                      artist: {
+                        OR: [
+                          { firstName: contains },
+                          { surname: contains },
+                          { displayName: contains },
+                        ],
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  /**
    * Find all tours with optional filtering, search, and pagination
    * Returns tours with tourDates (including venues and headliners) and images
+   *
+   * Pagination accepts either `skip`/`take` (preferred, drives infinite scroll)
+   * or legacy `page`/`limit`.
    */
   static async findAll(params?: TourQueryParams): Promise<TourWithRelations[]> {
-    const { search, page, limit } = params ?? {};
+    const { search, page, limit, skip, take } = params ?? {};
 
     // Build query object
     const query: Prisma.TourFindManyArgs = {
@@ -78,19 +132,16 @@ export class TourRepository {
       include: tourInclude,
     };
 
-    // Apply search filter across title, subtitle, and description
-    if (search) {
-      query.where = {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { subtitle: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-        ],
-      };
+    const where = TourRepository.buildSearchWhere(search);
+    if (where) {
+      query.where = where;
     }
 
-    // Apply pagination if provided
-    if (page !== undefined && limit !== undefined) {
+    // Prefer explicit skip/take; fall back to page/limit for legacy callers.
+    if (skip !== undefined || take !== undefined) {
+      if (skip !== undefined) query.skip = skip;
+      if (take !== undefined) query.take = take;
+    } else if (page !== undefined && limit !== undefined) {
       query.skip = (page - 1) * limit;
       query.take = limit;
     }
@@ -171,16 +222,8 @@ export class TourRepository {
   static async count(params?: TourQueryParams): Promise<number> {
     const { search } = params ?? {};
 
-    const where: Prisma.TourWhereInput = {};
-
-    // Apply same search filter as findAll
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { subtitle: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+    // Apply the same search filter as findAll.
+    const where = TourRepository.buildSearchWhere(search) ?? {};
 
     return prisma.tour.count({ where });
   }

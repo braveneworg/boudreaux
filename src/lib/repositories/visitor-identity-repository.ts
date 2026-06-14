@@ -15,8 +15,6 @@ import type { VisitorIdentity } from '@prisma/client';
  * long-lived first-party `visitorId` cookie to a server-derived
  * fingerprint hash so the per-release rolling-window cap survives cookie
  * clears.
- *
- * @see specs/007-free-digital-downloads/research.md §R-1, §R-6
  */
 export class VisitorIdentityRepository {
   /**
