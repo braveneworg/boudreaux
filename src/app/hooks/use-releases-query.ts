@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Release } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Filters that drive the admin releases infinite query. */
 export interface ReleasesQueryParams {
   search: string;
@@ -63,13 +65,19 @@ const fetchReleasesPage = async (
  * filter transition. Cancellation is automatic via the forwarded `AbortSignal`.
  *
  * @param params - The server-side search/published/deleted filters.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useReleasesQuery = (params: ReleasesQueryParams) =>
+export const useReleasesQuery = (
+  params: ReleasesQueryParams,
+  options: InfiniteQueryOptionsOverride<ReleasesPage> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchReleasesPage(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });

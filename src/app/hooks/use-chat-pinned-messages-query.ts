@@ -7,6 +7,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface PinnedResponse {
   messages: ChatMessageDto[];
 }
@@ -39,13 +41,15 @@ const fetchPinned = async ({ signal }: QueryFunctionContext): Promise<ChatMessag
  *
  * Wraps {@link fetchPinned}; cancellation is handled automatically via the
  * forwarded `AbortSignal`.
+ *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); they take precedence over the defaults below.
  */
-export function useChatPinnedMessagesQuery({ enabled }: { enabled: boolean }) {
-  return useQuery({
+export const useChatPinnedMessagesQuery = (options: QueryOptionsOverride<ChatMessageDto[]> = {}) =>
+  useQuery({
     queryKey: queryKeys.chat.pinned(),
     queryFn: fetchPinned,
-    enabled,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    ...options,
   });
-}

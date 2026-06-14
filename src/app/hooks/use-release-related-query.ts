@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { ReleaseCarouselItem } from '@/lib/types/media-models';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ReleaseRelatedResponse {
   releases: ReleaseCarouselItem[];
 }
@@ -46,10 +48,16 @@ const fetchReleaseRelated = async (
  *
  * @param releaseId - The ID of the release whose related releases are fetched.
  * @param artistId - Optional artist ID to scope the related releases.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-releaseId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useReleaseRelatedQuery = (releaseId: string, artistId: string | null = null) => {
+export const useReleaseRelatedQuery = (
+  releaseId: string,
+  artistId: string | null = null,
+  options: QueryOptionsOverride<ReleaseRelatedResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -58,7 +66,8 @@ export const useReleaseRelatedQuery = (releaseId: string, artistId: string | nul
   } = useQuery({
     queryKey: queryKeys.releases.related(releaseId, artistId),
     queryFn: ({ signal }) => fetchReleaseRelated(releaseId, artistId, signal),
-    enabled: !!releaseId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId,
   });
 
   return { isPending, error, data, refetch };

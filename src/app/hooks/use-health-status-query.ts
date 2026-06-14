@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 
+import type { QueryOptionsOverride } from './query-options';
+
 /**
  * Fetches the application health status from the `/api/health` route handler.
  *
@@ -63,10 +65,12 @@ const fetchHealthStatus = async ({ signal }: QueryFunctionContext): Promise<Heal
  * request state. Cancellation is handled automatically via the forwarded
  * `AbortSignal`.
  *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, `retry`); they take precedence over the defaults below.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useHealthStatusQuery = () => {
+export const useHealthStatusQuery = (options: QueryOptionsOverride<HealthStatus> = {}) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -79,6 +83,7 @@ export const useHealthStatusQuery = () => {
     retryDelay: (attemptIndex) => (attemptIndex < 3 ? 500 : Math.pow(2, attemptIndex - 3) * 1000),
     gcTime: 0,
     staleTime: 0,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

@@ -7,6 +7,8 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import type { AdminUserMessagesResponse } from '@/app/api/admin/chat/users/[userId]/messages/route';
 import { queryKeys } from '@/lib/query-keys';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 const PAGE_SIZE = 25;
 
 /**
@@ -52,13 +54,18 @@ const fetchPage = async ({
  * `AbortSignal`.
  *
  * @param userId - The id of the user whose messages are being paginated.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`).
  * @returns The full TanStack Query infinite-query result.
  */
-export function useAdminUserMessagesQuery(userId: string) {
-  return useInfiniteQuery({
+export const useAdminUserMessagesQuery = (
+  userId: string,
+  options: InfiniteQueryOptionsOverride<AdminUserMessagesResponse> = {}
+) =>
+  useInfiniteQuery({
     queryKey: queryKeys.chat.userMessages(userId),
     queryFn: ({ pageParam, signal }) => fetchPage({ userId, skip: pageParam, signal }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
+    ...options,
   });
-}

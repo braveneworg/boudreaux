@@ -8,7 +8,8 @@ import { ChatMentionAutocomplete } from './chat-mention-autocomplete';
 const mockMentionQuery = vi.hoisted(() => vi.fn());
 
 vi.mock('@/hooks/use-mention-search-query', () => ({
-  useMentionSearchQuery: (query: string, enabled: boolean) => mockMentionQuery(query, enabled),
+  useMentionSearchQuery: (query: string, options?: { enabled?: boolean }) =>
+    mockMentionQuery(query, options),
 }));
 
 const baseProps = {
@@ -125,13 +126,13 @@ describe('ChatMentionAutocomplete', () => {
     rerender(<ChatMentionAutocomplete {...baseProps} query="oc" />);
     rerender(<ChatMentionAutocomplete {...baseProps} query="oct" />);
 
-    expect(mockMentionQuery).toHaveBeenLastCalledWith('o', true);
+    expect(mockMentionQuery).toHaveBeenLastCalledWith('o', { enabled: true });
 
     act(() => {
       vi.advanceTimersByTime(200);
     });
 
-    expect(mockMentionQuery).toHaveBeenLastCalledWith('oct', true);
+    expect(mockMentionQuery).toHaveBeenLastCalledWith('oct', { enabled: true });
   });
 
   it('does not search the intermediate prefixes after the debounce settles', () => {

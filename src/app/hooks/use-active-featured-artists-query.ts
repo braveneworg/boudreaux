@@ -6,6 +6,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ActiveFeaturedArtistsResponse {
   featuredArtists: FeaturedArtist[];
   count: number;
@@ -38,10 +40,14 @@ const fetchActiveFeaturedArtists = async ({
  * the request state. Cancellation is handled automatically via the forwarded
  * `AbortSignal`.
  *
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, `staleTime`).
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useActiveFeaturedArtistsQuery = () => {
+export const useActiveFeaturedArtistsQuery = (
+  options: QueryOptionsOverride<ActiveFeaturedArtistsResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -50,6 +56,7 @@ export const useActiveFeaturedArtistsQuery = () => {
   } = useQuery({
     queryKey: queryKeys.featuredArtists.active(),
     queryFn: fetchActiveFeaturedArtists,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

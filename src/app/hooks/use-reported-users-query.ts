@@ -7,6 +7,8 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import type { ReportedUsersResponse } from '@/app/api/admin/chat/reported-users/route';
 import { queryKeys } from '@/lib/query-keys';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Page size requested per fetch. */
 export const REPORTED_USERS_PAGE_SIZE = 24;
 
@@ -61,14 +63,19 @@ const fetchReportedUsersPage = async (
  * transition. Cancellation is automatic via the forwarded `AbortSignal`.
  *
  * @param params - The window and search filters for the query.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export function useReportedUsersQuery(params: UseReportedUsersQueryParams) {
-  return useInfiniteQuery({
+export const useReportedUsersQuery = (
+  params: UseReportedUsersQueryParams,
+  options: InfiniteQueryOptionsOverride<ReportedUsersResponse> = {}
+) =>
+  useInfiniteQuery({
     queryKey: queryKeys.chat.reportedUsersInfinite(params.windowDays ?? 'all', params.search),
     queryFn: ({ pageParam, signal }) => fetchReportedUsersPage(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });
-}

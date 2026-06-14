@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Filters that drive the admin featured-artists infinite query. */
 export interface FeaturedArtistsQueryParams {
   search: string;
@@ -62,9 +64,14 @@ const fetchFeaturedArtistsPage = async (
  * pagination. Always refetches on mount so create/edit returns show fresh data.
  *
  * @param params - The server-side search/published/deleted filters.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useFeaturedArtistsQuery = (params: FeaturedArtistsQueryParams) =>
+export const useFeaturedArtistsQuery = (
+  params: FeaturedArtistsQueryParams,
+  options: InfiniteQueryOptionsOverride<FeaturedArtistsPage> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.featuredArtists.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchFeaturedArtistsPage(params, pageParam, signal),
@@ -72,4 +79,5 @@ export const useFeaturedArtistsQuery = (params: FeaturedArtistsQueryParams) =>
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
     refetchOnMount: 'always', // Always refetch when admin page mounts (e.g., after create/edit)
+    ...options,
   });

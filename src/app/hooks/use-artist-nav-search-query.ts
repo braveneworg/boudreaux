@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ArtistNavSearchResult {
   artistSlug: string;
   artistName: string;
@@ -48,10 +50,15 @@ const fetchArtistNavSearch = async (
  *
  * @param query - The search term; the query is disabled until at least 3
  * characters are entered.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the 3-character gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useArtistNavSearchQuery = (query: string) => {
+export const useArtistNavSearchQuery = (
+  query: string,
+  options: QueryOptionsOverride<ArtistNavSearchResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -60,8 +67,9 @@ export const useArtistNavSearchQuery = (query: string) => {
   } = useQuery({
     queryKey: queryKeys.artists.search(query),
     queryFn: ({ signal }) => fetchArtistNavSearch(query, signal),
-    enabled: query.length >= 3,
     placeholderData: keepPreviousData,
+    ...options,
+    enabled: (options.enabled ?? true) && query.length >= 3,
   });
 
   return { isPending, error, data, refetch };

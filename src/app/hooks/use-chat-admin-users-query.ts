@@ -7,6 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatUsersSortBy, ListChatUsersResult } from '@/lib/services/chat-admin-service';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface UseChatAdminUsersQueryParams {
   page: number;
   perPage: number;
@@ -53,11 +55,16 @@ const fetchPage = async (
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param params - The page, pagination, and sort parameters for the request.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, `staleTime`).
  * @returns The full TanStack Query result for the chat users page.
  */
-export function useChatAdminUsersQuery(params: UseChatAdminUsersQueryParams) {
-  return useQuery({
+export const useChatAdminUsersQuery = (
+  params: UseChatAdminUsersQueryParams,
+  options: QueryOptionsOverride<ListChatUsersResult> = {}
+) =>
+  useQuery({
     queryKey: queryKeys.chat.adminUsers(params.page, params.sortBy, params.sortDirection),
     queryFn: ({ signal }) => fetchPage(params, signal),
+    ...options,
   });
-}

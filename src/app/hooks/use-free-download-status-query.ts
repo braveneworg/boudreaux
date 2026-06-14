@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { FreeStatusResponse } from '@/lib/validation/bundle-download-schema';
 
+import type { QueryOptionsOverride } from './query-options';
+
 /**
  * Fetches a release's free-download status from the
  * `/api/releases/[id]/download/free-status` route handler.
@@ -44,15 +46,19 @@ const fetchFreeDownloadStatus = async (
  * Feature: 007-free-digital-downloads.
  *
  * @param releaseId - The release whose free-download status is requested.
- * @param options - Optional settings; `enabled` defers the request.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-releaseId gate is always applied on top.
  * @returns The `useQuery` result for the free-download status.
  */
-export const useFreeDownloadStatusQuery = (releaseId: string, options?: { enabled?: boolean }) => {
-  return useQuery({
+export const useFreeDownloadStatusQuery = (
+  releaseId: string,
+  options: QueryOptionsOverride<FreeStatusResponse> = {}
+) =>
+  useQuery({
     queryKey: queryKeys.releases.freeDownloadStatus(releaseId),
     queryFn: ({ signal }) => fetchFreeDownloadStatus(releaseId, signal),
-    enabled: (options?.enabled ?? true) && !!releaseId,
     // Status changes after each successful download; cache only briefly.
     staleTime: 30_000,
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId,
   });
-};

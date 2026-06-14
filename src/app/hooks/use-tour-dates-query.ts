@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 export interface TourDatesResponse {
   tourDates: Array<Record<string, unknown>>;
 }
@@ -35,10 +37,15 @@ const fetchTourDates = async (tourId: string, signal?: AbortSignal): Promise<Tou
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param tourId - The tour identifier to fetch dates for.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-tourId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useTourDatesQuery = (tourId: string) => {
+export const useTourDatesQuery = (
+  tourId: string,
+  options: QueryOptionsOverride<TourDatesResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -47,7 +54,8 @@ export const useTourDatesQuery = (tourId: string) => {
   } = useQuery({
     queryKey: queryKeys.tours.dates(tourId),
     queryFn: ({ signal }) => fetchTourDates(tourId, signal),
-    enabled: !!tourId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!tourId,
   });
 
   return { isPending, error, data, refetch };

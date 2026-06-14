@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from './query-options';
+
 /** One skip/offset page of published releases returned by `/api/releases?listing=published`. */
 export type PublishedReleasesPage = PaginatedResponse<PublishedReleaseListing>;
 
@@ -59,9 +61,14 @@ const fetchPublishedReleasesPage = async (
  * current results visible during a search transition.
  *
  * @param search - Debounced, server-side search term (defaults to all releases).
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const usePublishedReleasesQuery = (search = '') =>
+export const usePublishedReleasesQuery = (
+  search = '',
+  options: InfiniteQueryOptionsOverride<PublishedReleasesPage> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.publishedInfinite(search),
     queryFn: ({ pageParam, signal }) =>
@@ -69,6 +76,7 @@ export const usePublishedReleasesQuery = (search = '') =>
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });
 
 /**
@@ -79,13 +87,19 @@ export const usePublishedReleasesQuery = (search = '') =>
  * user types, so opening the combobox costs nothing.
  *
  * @param search - Debounced search term.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-search gate is always applied on top.
  * @returns The TanStack `useQuery` result whose `data` is the matching releases.
  */
-export const usePublishedReleaseSearchQuery = (search: string) =>
+export const usePublishedReleaseSearchQuery = (
+  search: string,
+  options: QueryOptionsOverride<PublishedReleasesPage, PublishedReleaseListing[]> = {}
+) =>
   useQuery({
     queryKey: queryKeys.releases.publishedInfinite(`combobox:${search}`),
     queryFn: ({ signal }) => fetchPublishedReleasesPage(search, 0, SEARCH_RESULT_LIMIT, signal),
     select: (page) => page.rows,
-    enabled: search.trim().length > 0,
     placeholderData: keepPreviousData,
+    ...options,
+    enabled: (options.enabled ?? true) && search.trim().length > 0,
   });

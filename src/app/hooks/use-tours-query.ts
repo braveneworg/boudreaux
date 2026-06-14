@@ -6,6 +6,7 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
 import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
@@ -65,13 +66,19 @@ const fetchToursPage = async (
  * forwarded `AbortSignal`.
  *
  * @param search - Debounced, server-side search term.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useToursQuery = (search: string) =>
+export const useToursQuery = (
+  search: string,
+  options: InfiniteQueryOptionsOverride<ToursPage> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.tours.infinite(search),
     queryFn: ({ pageParam, signal }) => fetchToursPage(search, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });

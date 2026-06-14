@@ -21,7 +21,8 @@ vi.mock('sonner', () => ({
 
 const mockMentionQuery = vi.fn();
 vi.mock('@/hooks/use-mention-search-query', () => ({
-  useMentionSearchQuery: (query: string, enabled: boolean) => mockMentionQuery(query, enabled),
+  useMentionSearchQuery: (query: string, options?: { enabled?: boolean }) =>
+    mockMentionQuery(query, options),
 }));
 
 const baseProps = {

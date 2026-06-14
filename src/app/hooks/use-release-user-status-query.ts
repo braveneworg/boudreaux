@@ -7,6 +7,8 @@ import { useSession } from 'next-auth/react';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ReleaseUserStatusResponse {
   hasPurchase: boolean;
   purchasedAt: string | null;
@@ -54,10 +56,15 @@ const fetchReleaseUserStatus = async (
  * `AbortSignal`.
  *
  * @param releaseId - The release identifier to look up status for.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the releaseId + authenticated gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useReleaseUserStatusQuery = (releaseId: string) => {
+export const useReleaseUserStatusQuery = (
+  releaseId: string,
+  options: QueryOptionsOverride<ReleaseUserStatusResponse | null> = {}
+) => {
   const { status } = useSession();
 
   const {
@@ -68,7 +75,8 @@ export const useReleaseUserStatusQuery = (releaseId: string) => {
   } = useQuery({
     queryKey: queryKeys.releases.userStatus(releaseId),
     queryFn: ({ signal }) => fetchReleaseUserStatus(releaseId, signal),
-    enabled: !!releaseId && status === 'authenticated',
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId && status === 'authenticated',
   });
 
   return { isPending, error, data, refetch };

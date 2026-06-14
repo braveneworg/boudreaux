@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 /**
  * Fetches a single release from the `/api/releases/{releaseId}` route handler.
  *
@@ -36,10 +38,15 @@ const fetchRelease = async (releaseId: string, signal?: AbortSignal) => {
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param releaseId - The ID of the release to fetch.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-releaseId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useReleaseQuery = (releaseId: string) => {
+export const useReleaseQuery = (
+  releaseId: string,
+  options: QueryOptionsOverride<Awaited<ReturnType<typeof fetchRelease>>> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -48,7 +55,8 @@ export const useReleaseQuery = (releaseId: string) => {
   } = useQuery({
     queryKey: queryKeys.releases.detail(releaseId),
     queryFn: ({ signal }) => fetchRelease(releaseId, signal),
-    enabled: !!releaseId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId,
   });
 
   return { isPending, error, data, refetch };

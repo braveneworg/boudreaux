@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface FormatBreakdown {
   formatType: string;
   count: number;
@@ -70,10 +72,16 @@ const fetchDownloadAnalytics = async (
  *
  * @param releaseId - The release whose analytics are requested.
  * @param dateRange - The date-range selector (e.g. `'7'`, `'30'`, `'all'`).
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-releaseId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useDownloadAnalyticsQuery = (releaseId: string, dateRange: string) => {
+export const useDownloadAnalyticsQuery = (
+  releaseId: string,
+  dateRange: string,
+  options: QueryOptionsOverride<DownloadAnalyticsResponse> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -82,7 +90,8 @@ export const useDownloadAnalyticsQuery = (releaseId: string, dateRange: string) 
   } = useQuery({
     queryKey: queryKeys.downloadAnalytics.byRelease(releaseId, dateRange),
     queryFn: ({ signal }) => fetchDownloadAnalytics(releaseId, dateRange, signal),
-    enabled: !!releaseId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!releaseId,
   });
 
   return { isPending, error, data, refetch };

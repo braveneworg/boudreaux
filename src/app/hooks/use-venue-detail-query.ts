@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface VenueDetail {
   id: string;
   name: string;
@@ -44,10 +46,15 @@ const fetchVenueDetail = async (venueId: string, signal?: AbortSignal): Promise<
  * `AbortSignal`.
  *
  * @param venueId - The venue identifier to fetch.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-venueId gate is always applied on top.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useVenueDetailQuery = (venueId: string) => {
+export const useVenueDetailQuery = (
+  venueId: string,
+  options: QueryOptionsOverride<VenueDetail> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -56,7 +63,8 @@ export const useVenueDetailQuery = (venueId: string) => {
   } = useQuery({
     queryKey: queryKeys.venues.detail(venueId),
     queryFn: ({ signal }) => fetchVenueDetail(venueId, signal),
-    enabled: !!venueId,
+    ...options,
+    enabled: (options.enabled ?? true) && !!venueId,
   });
 
   return { isPending, error, data, refetch };

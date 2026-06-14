@@ -7,6 +7,8 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Artist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 
+import type { InfiniteQueryOptionsOverride } from './query-options';
+
 /** Filters that drive the admin artists infinite query. */
 export interface ArtistsQueryParams {
   search: string;
@@ -62,13 +64,19 @@ const fetchArtistsPage = async (
  * filter transition. Cancellation is automatic via the forwarded `AbortSignal`.
  *
  * @param params - The server-side search/published/deleted filters.
+ * @param options - Caller overrides spread into the `useInfiniteQuery` call
+ * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useArtistsQuery = (params: ArtistsQueryParams) =>
+export const useArtistsQuery = (
+  params: ArtistsQueryParams,
+  options: InfiniteQueryOptionsOverride<ArtistsPage> = {}
+) =>
   useInfiniteQuery({
     queryKey: queryKeys.artists.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchArtistsPage(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    ...options,
   });

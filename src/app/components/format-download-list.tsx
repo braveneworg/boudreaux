@@ -40,7 +40,7 @@ export const FormatDownloadList = ({
   const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: quotaData } = useDownloadQuotaQuery(!hasPurchased);
+  const { data: quotaData } = useDownloadQuotaQuery({ enabled: !hasPurchased });
   const remainingQuota = quotaData?.remainingQuota ?? null;
   const quotaExceeded =
     !hasPurchased &&

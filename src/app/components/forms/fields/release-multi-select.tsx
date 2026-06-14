@@ -73,7 +73,7 @@ export function ReleaseMultiSelect<
     isPending: isLoading,
     error: fetchError,
     data,
-  } = useReleaseListQuery({ search: debouncedSearch || undefined, take: 50 }, open);
+  } = useReleaseListQuery({ search: debouncedSearch || undefined, take: 50 }, { enabled: open });
   const releases = data ?? [];
   const error = fetchError?.message ?? null;
 

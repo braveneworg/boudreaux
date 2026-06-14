@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 
+import type { QueryOptionsOverride } from './query-options';
+
 interface ArtistListItem {
   id: string;
   firstName: string | null;
@@ -55,11 +57,15 @@ const fetchArtistList = async (
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param params - The search and pagination parameters for the list.
- * @param enabled - Whether the query should run; defaults to `true`.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); they take precedence over the defaults below.
  * @returns The query state: `isPending`, `error` (defaulted when unknown),
  * `data`, and `refetch`.
  */
-export const useArtistListQuery = (params: ArtistListParams, enabled = true) => {
+export const useArtistListQuery = (
+  params: ArtistListParams,
+  options: QueryOptionsOverride<ArtistListItem[]> = {}
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -68,8 +74,8 @@ export const useArtistListQuery = (params: ArtistListParams, enabled = true) => 
   } = useQuery({
     queryKey: queryKeys.artists.filteredList(params),
     queryFn: ({ signal }) => fetchArtistList(params, signal),
-    enabled,
     placeholderData: keepPreviousData,
+    ...options,
   });
 
   return { isPending, error, data, refetch };

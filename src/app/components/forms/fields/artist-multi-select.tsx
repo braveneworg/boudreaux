@@ -79,7 +79,7 @@ export function ArtistMultiSelect<
     data,
   } = useArtistListQuery(
     { search: debouncedSearch || undefined, take: debouncedSearch ? undefined : 5 },
-    open
+    { enabled: open }
   );
   const artists: ArtistOption[] = useMemo(
     () =>
