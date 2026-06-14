@@ -4,7 +4,6 @@ Last updated: 2026-05-30
 
 ## How to work in this repo
 
-- Engineering principles are defined in `.specify/memory/constitution.md` — treat them as binding.
 - Default posture: Server Components, Server Actions for mutations, named exports, reuse before you create. Search for an existing component, type, field, or util before adding one.
 - Gate before committing — all four must pass: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`. Write tests for every feature and bug fix.
 - Two sections below are hard constraints, not guidance: [E2E database isolation](#e2e-database-isolation-mandatory) and [Secrets and `.env*`](#secrets-and-env-files). Read them before touching E2E, the DB, builds, dev servers, seed scripts, or anything that reads the environment. When in doubt there, stop and ask.
@@ -135,20 +134,3 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Keep dependencies patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
-
-## Spec Kit feature naming
-
-Feature branches and spec directories use a grouped scheme — branch `feature/NNN-name`, spec dir `specs/feature/NNN-name` (the number comes after the slash; exactly one grouping level). When running `/speckit-specify`:
-
-1. Ask the user for a short feature name (2–4 words) if they didn't already give one.
-2. Run `bash scripts/speckit-next-feature.sh <short-name>` — it's read-only and prints the next `GIT_BRANCH_NAME` + `SPECIFY_FEATURE_DIRECTORY`, computing `NNN` by scanning `specs/feature/*` and local/remote `feature/NNN-*` branches.
-3. Export those two values for the whole flow so the `before_specify` git hook creates `feature/NNN-name` and the specify skill creates `specs/feature/NNN-name/` and records it in `.specify/feature.json` (which is what `/speckit-plan`, `/speckit-tasks`, etc. read to find the nested dir).
-
-Pass a second arg to use a different group, e.g. `bash scripts/speckit-next-feature.sh <short-name> fix` → `fix/NNN-name`. This convention drives Spec Kit's existing `GIT_BRANCH_NAME` / `SPECIFY_FEATURE_DIRECTORY` overrides — never hand-edit `.specify/**` to change naming, so it survives Spec Kit upgrades.
-
-<!-- SPECKIT START -->
-
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-
-<!-- SPECKIT END -->

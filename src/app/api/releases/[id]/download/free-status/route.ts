@@ -28,8 +28,6 @@ import type { FreeStatusResponse } from '@/lib/validation/bundle-download-schema
  * subset of {@link FREE_FORMAT_TYPES} that are actually published for the
  * release. Issues `boudreaux_visitor_id` cookie if absent or invalid so
  * subsequent calls share the same anonymous identity.
- *
- * @see specs/007-free-digital-downloads/contracts/bundle-endpoint.md §1
  */
 export const dynamic = 'force-dynamic';
 

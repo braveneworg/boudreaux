@@ -52,10 +52,7 @@ export const bundleDownloadQuerySchema = z
 export type BundleDownloadQuery = z.infer<typeof bundleDownloadQuerySchema>;
 
 /**
- * Zod schema for the `GET /api/releases/{id}/download/free-status` response
- * (007-free-digital-downloads).
- *
- * @see specs/007-free-digital-downloads/contracts/bundle-endpoint.md §1
+ * Zod schema for the `GET /api/releases/{id}/download/free-status` response.
  */
 export const FreeStatusResponseSchema = z.object({
   allowed: z.boolean(),
