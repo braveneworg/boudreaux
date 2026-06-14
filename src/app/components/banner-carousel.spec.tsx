@@ -298,6 +298,44 @@ describe('BannerCarousel', () => {
 
       expect(screen.getByText('Only one')).toBeInTheDocument();
     });
+
+    it('pauses auto-rotation while the carousel is scrolled offscreen', () => {
+      type IntersectCallback = (entries: Array<{ isIntersecting: boolean }>) => void;
+      let observerCallback: IntersectCallback | null = null;
+      class ControllableIntersectionObserver {
+        readonly root = null;
+        readonly rootMargin = '';
+        readonly thresholds: ReadonlyArray<number> = [];
+        constructor(cb: IntersectCallback) {
+          observerCallback = cb;
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() {
+          return [];
+        }
+      }
+      const original = globalThis.IntersectionObserver;
+      globalThis.IntersectionObserver =
+        ControllableIntersectionObserver as unknown as typeof IntersectionObserver;
+
+      try {
+        render(<BannerCarousel banners={THREE_BANNERS} rotationInterval={3} />);
+
+        // Carousel leaves the viewport — rotation should stop.
+        act(() => {
+          observerCallback?.([{ isIntersecting: false }]);
+        });
+
+        act(() => vi.advanceTimersByTime(6000));
+
+        // The second slide's notification never enters because rotation paused.
+        expect(screen.queryByText('Notification 2')).not.toBeInTheDocument();
+      } finally {
+        globalThis.IntersectionObserver = original;
+      }
+    });
   });
 
   /* ---- keyboard navigation ---- */

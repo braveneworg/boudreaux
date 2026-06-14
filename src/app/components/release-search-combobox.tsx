@@ -52,7 +52,21 @@ export const ReleaseSearchCombobox = () => {
   );
 
   const hasQuery = debouncedSearch.trim().length > 0;
-  const results = releases ?? [];
+
+  // Derive cover art + artist name once per result set rather than on every
+  // keystroke-driven re-render (the search input updates state on each key,
+  // while `releases` only changes when the debounced query resolves).
+  const enrichedResults = React.useMemo(
+    () =>
+      (releases ?? []).map((release) => ({
+        release,
+        coverArt: getReleaseCoverArt(release),
+        artistName: release.artistReleases[0]
+          ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
+          : null,
+      })),
+    [releases]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -79,12 +93,7 @@ export const ReleaseSearchCombobox = () => {
               {hasQuery && !isFetching ? 'No releases found.' : 'Type to search releases.'}
             </CommandEmpty>
             <CommandGroup>
-              {results.map((release) => {
-                const coverArt = getReleaseCoverArt(release);
-                const artistName = release.artistReleases[0]
-                  ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
-                  : null;
-
+              {enrichedResults.map(({ release, coverArt, artistName }) => {
                 return (
                   <CommandItem
                     key={release.id}

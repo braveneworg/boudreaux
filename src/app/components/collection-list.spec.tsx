@@ -193,6 +193,35 @@ describe('CollectionList', () => {
     errorSpy.mockRestore();
   });
 
+  it('does not re-render sibling rows when one row enters the deleting state', async () => {
+    // Keep the action pending so the deleting row stays in its spinner state.
+    vi.mocked(deletePurchaseAction).mockReturnValue(new Promise(() => {}));
+
+    const first = buildPurchase();
+    const second = buildPurchase();
+    second.id = 'purchase-2';
+    second.release.id = 'rel-2';
+    second.release.title = 'Second Album';
+
+    render(<CollectionList purchases={[first, second]} isAdmin />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    // Drop the initial-mount render calls; only count re-renders from here on.
+    vi.mocked(getReleaseCoverArt).mockClear();
+
+    await user.click(screen.getByRole('button', { name: /delete purchase for test album/i }));
+    await user.click(screen.getByRole('button', { name: /delete$/i }));
+
+    // The memoized sibling row must not re-render when the first row's
+    // deleting state flips — so its cover-art derivation is never recomputed.
+    const siblingRowReRendered = vi
+      .mocked(getReleaseCoverArt)
+      .mock.calls.some(([release]) => release.title === 'Second Album');
+
+    expect(siblingRowReRendered).toBe(false);
+  });
+
   it('handles delete action exception gracefully', async () => {
     vi.mocked(deletePurchaseAction).mockRejectedValue(new Error('Network error'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -4,7 +4,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -139,7 +139,7 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
  * </MediaPlayer>
  * ```
  */
-const FeaturedArtistCarousel = ({
+const FeaturedArtistCarousel = memo(function FeaturedArtistCarousel({
   featuredArtists,
   selectedArtistId,
   onSelect,
@@ -147,7 +147,7 @@ const FeaturedArtistCarousel = ({
   featuredArtists: FeaturedArtist[];
   selectedArtistId?: string;
   onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
-}) => {
+}) {
   // Sort by position (lower numbers first)
   const sortedArtists = useMemo(
     () => [...featuredArtists].sort((a, b) => a.position - b.position),
@@ -272,7 +272,7 @@ const FeaturedArtistCarousel = ({
       </div>
     </Carousel>
   );
-};
+});
 
 /**
  * A view that displays the cover art for a given release and artist.

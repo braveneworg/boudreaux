@@ -102,31 +102,37 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     playerControls?.toggle();
   }, [playerControls]);
 
-  const handleSelectArtist = (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => {
-    // If this is a click-initiated reselect of the current artist, toggle play/pause
-    if (selectedArtist?.id === artist.id) {
-      if (options?.autoPlay) {
-        if (isPlaying) {
-          playerControls?.pause();
-        } else {
-          playerControls?.play();
+  // Stable across track-advance/playback re-renders (deps are only the values
+  // it actually reads) so the memoized FeaturedArtistCarousel doesn't re-render
+  // every time a track auto-advances.
+  const handleSelectArtist = useCallback(
+    (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => {
+      // If this is a click-initiated reselect of the current artist, toggle play/pause
+      if (selectedArtist?.id === artist.id) {
+        if (options?.autoPlay) {
+          if (isPlaying) {
+            playerControls?.pause();
+          } else {
+            playerControls?.play();
+          }
         }
+        return;
       }
-      return;
-    }
 
-    setShouldAutoPlay(options?.autoPlay ?? false);
-    setSelectedArtist(artist);
-    // Reset to the featured track if set, otherwise the first file
-    const files = artist.digitalFormat?.files ?? [];
-    const sorted = [...files].sort((a, b) => a.trackNumber - b.trackNumber);
-    let targetFile = sorted[0];
-    if (artist.featuredTrackNumber != null) {
-      const featured = sorted.find((f) => f.trackNumber === artist.featuredTrackNumber);
-      if (featured) targetFile = featured;
-    }
-    setCurrentFileId(targetFile?.id ?? null);
-  };
+      setShouldAutoPlay(options?.autoPlay ?? false);
+      setSelectedArtist(artist);
+      // Reset to the featured track if set, otherwise the first file
+      const files = artist.digitalFormat?.files ?? [];
+      const sorted = [...files].sort((a, b) => a.trackNumber - b.trackNumber);
+      let targetFile = sorted[0];
+      if (artist.featuredTrackNumber != null) {
+        const featured = sorted.find((f) => f.trackNumber === artist.featuredTrackNumber);
+        if (featured) targetFile = featured;
+      }
+      setCurrentFileId(targetFile?.id ?? null);
+    },
+    [selectedArtist?.id, isPlaying, playerControls]
+  );
 
   /**
    * Handle file selection from the format file list drawer

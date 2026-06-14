@@ -149,6 +149,25 @@ export const ChatMessageList = ({
     prevScrollHeightRef.current = newScrollHeight;
   }, [messages, scrollToMentionUsername]);
 
+  // Filter out pinned messages and pre-compute per-row alignment once per
+  // messages/pins change instead of on every render. Consecutive messages by
+  // the same author share a group; alignment flips each time the author
+  // changes so adjacent users' headers sit on opposite sides.
+  const visibleRows = useMemo(() => {
+    const visibleMessages =
+      pinnedById.size > 0 ? messages.filter((m) => !pinnedById.has(m.id)) : messages;
+    let groupIndex = 0;
+    let prevUserId: string | undefined;
+    return visibleMessages.map((message) => {
+      if (prevUserId !== undefined && message.user.id !== prevUserId) {
+        groupIndex += 1;
+      }
+      prevUserId = message.user.id;
+      const align: 'left' | 'right' = groupIndex % 2 === 0 ? 'left' : 'right';
+      return { message, align };
+    });
+  }, [messages, pinnedById]);
+
   return (
     <div
       ref={containerRef}
@@ -176,44 +195,23 @@ export const ChatMessageList = ({
         </div>
       )}
       {hasNextPage && <ChatLoadMoreButton onLoadMore={onLoadMore} isLoading={isFetchingNextPage} />}
-      {(() => {
-        const visibleMessages =
-          pinnedById.size > 0 ? messages.filter((m) => !pinnedById.has(m.id)) : messages;
-        if (visibleMessages.length === 0) {
-          return (
-            <div className="text-muted-foreground flex flex-1 items-center justify-center p-8 text-sm">
-              No messages yet — say hi 👋
-            </div>
-          );
-        }
-        // Group consecutive messages by author so a single user's run
-        // keeps a consistent header alignment; flip alignment each time
-        // the author changes so adjacent users' headers sit on opposite
-        // sides. Body text is always left-aligned (handled in the row).
-        let groupIndex = 0;
-        let prevUserId: string | undefined;
-        const rows = visibleMessages.map((message) => {
-          if (prevUserId !== undefined && message.user.id !== prevUserId) {
-            groupIndex += 1;
-          }
-          prevUserId = message.user.id;
-          const align: 'left' | 'right' = groupIndex % 2 === 0 ? 'left' : 'right';
-          return { message, align };
-        });
-        return (
-          <ul className="divide-y">
-            {rows.map(({ message, align }) => (
-              <li key={message.tempId ?? message.id}>
-                <MemoizedMessageRow
-                  message={message}
-                  align={align}
-                  renderReactionBar={renderReactionBar}
-                />
-              </li>
-            ))}
-          </ul>
-        );
-      })()}
+      {visibleRows.length === 0 ? (
+        <div className="text-muted-foreground flex flex-1 items-center justify-center p-8 text-sm">
+          No messages yet — say hi 👋
+        </div>
+      ) : (
+        <ul className="divide-y">
+          {visibleRows.map(({ message, align }) => (
+            <li key={message.tempId ?? message.id}>
+              <MemoizedMessageRow
+                message={message}
+                align={align}
+                renderReactionBar={renderReactionBar}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

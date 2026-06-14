@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -111,110 +111,133 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
 
   return (
     <div className="grid gap-4">
-      {purchases.map((purchase) => {
-        const artistName = getArtistName(purchase);
-        const coverArt = getReleaseCoverArt(purchase.release);
-        const downloadCount = purchase.release.releaseDownloads[0]?.downloadCount ?? 0;
-        const lastDownloadedAt = purchase.release.releaseDownloads[0]?.lastDownloadedAt ?? null;
-        const resetInHours =
-          downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT
-            ? computeResetInHours(lastDownloadedAt)
-            : null;
-        const availableFormats = purchase.release.digitalFormats
-          .filter((f) => f.files.length > 0)
-          .map((f) => ({
-            formatType: f.formatType,
-            fileName: f.files[0]?.fileName ?? '',
-          }));
-
-        return (
-          <div
-            key={purchase.id}
-            className="flex items-center gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
-          >
-            {/* Cover Art */}
-            <Link href={`/releases/${purchase.release.id}`} className="shrink-0">
-              {coverArt ? (
-                <Image
-                  src={coverArt.src}
-                  alt={coverArt.alt}
-                  width={80}
-                  height={80}
-                  className="size-20 rounded-md object-cover"
-                />
-              ) : (
-                <div className="flex size-20 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-400">
-                  No art
-                </div>
-              )}
-            </Link>
-
-            {/* Info */}
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/releases/${purchase.release.id}`}
-                className="block truncate font-semibold text-zinc-900 hover:underline"
-              >
-                {purchase.release.title}
-              </Link>
-              <p className="truncate text-sm text-zinc-500">{artistName}</p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {formatPrice(purchase.amountPaid, purchase.currency)}
-                {' \u00b7 '}
-                {new Date(purchase.purchasedAt).toLocaleDateString()}
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex shrink-0 items-center gap-2">
-              <CollectionDownloadDialog
-                releaseId={purchase.release.id}
-                releaseTitle={purchase.release.title}
-                availableFormats={availableFormats}
-                downloadCount={downloadCount}
-                resetInHours={resetInHours}
-              />
-
-              {isAdmin && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      disabled={deletingId === purchase.id}
-                      aria-label={`Delete purchase for ${purchase.release.title}`}
-                    >
-                      {deletingId === purchase.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="size-4" />
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete purchase?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently remove the purchase record for{' '}
-                        <strong>{purchase.release.title}</strong>. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(purchase.id)}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {purchases.map((purchase) => (
+        <CollectionListItem
+          key={purchase.id}
+          purchase={purchase}
+          isAdmin={isAdmin}
+          isDeleting={deletingId === purchase.id}
+          onDelete={handleDelete}
+        />
+      ))}
     </div>
   );
 };
+
+interface CollectionListItemProps {
+  purchase: CollectionPurchase;
+  isAdmin: boolean;
+  isDeleting: boolean;
+  onDelete: (purchaseId: string) => void;
+}
+
+/**
+ * A single collection row. Memoized so that toggling another row's delete
+ * spinner (the parent's `deletingId`) doesn't re-render every row \u2014 and, more
+ * importantly, doesn't re-render each row's `CollectionDownloadDialog`, which
+ * holds its own download/SSE state. Per-row derivations only recompute when
+ * this row's own props change.
+ */
+const CollectionListItem = memo(
+  ({ purchase, isAdmin, isDeleting, onDelete }: CollectionListItemProps) => {
+    const artistName = getArtistName(purchase);
+    const coverArt = getReleaseCoverArt(purchase.release);
+    const downloadCount = purchase.release.releaseDownloads[0]?.downloadCount ?? 0;
+    const lastDownloadedAt = purchase.release.releaseDownloads[0]?.lastDownloadedAt ?? null;
+    const resetInHours =
+      downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? computeResetInHours(lastDownloadedAt) : null;
+    const availableFormats = purchase.release.digitalFormats
+      .filter((f) => f.files.length > 0)
+      .map((f) => ({
+        formatType: f.formatType,
+        fileName: f.files[0]?.fileName ?? '',
+      }));
+
+    return (
+      <div className="flex items-center gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+        {/* Cover Art */}
+        <Link href={`/releases/${purchase.release.id}`} className="shrink-0">
+          {coverArt ? (
+            <Image
+              src={coverArt.src}
+              alt={coverArt.alt}
+              width={80}
+              height={80}
+              className="size-20 rounded-md object-cover"
+            />
+          ) : (
+            <div className="flex size-20 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-400">
+              No art
+            </div>
+          )}
+        </Link>
+
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/releases/${purchase.release.id}`}
+            className="block truncate font-semibold text-zinc-900 hover:underline"
+          >
+            {purchase.release.title}
+          </Link>
+          <p className="truncate text-sm text-zinc-500">{artistName}</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {formatPrice(purchase.amountPaid, purchase.currency)}
+            {' \u00b7 '}
+            {new Date(purchase.purchasedAt).toLocaleDateString()}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex shrink-0 items-center gap-2">
+          <CollectionDownloadDialog
+            releaseId={purchase.release.id}
+            releaseTitle={purchase.release.title}
+            availableFormats={availableFormats}
+            downloadCount={downloadCount}
+            resetInHours={resetInHours}
+          />
+
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  disabled={isDeleting}
+                  aria-label={`Delete purchase for ${purchase.release.title}`}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete purchase?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove the purchase record for{' '}
+                    <strong>{purchase.release.title}</strong>. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onDelete(purchase.id)}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </div>
+    );
+  }
+);
+
+CollectionListItem.displayName = 'CollectionListItem';
 
 // ─── Download Dialog ────────────────────────────────────────────────────────
 
