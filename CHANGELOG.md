@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.127.0] - 2026-06-15
+
+### Added
+
+- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n
+
 ## [4.126.0] - 2026-06-15
 
 ### Added
