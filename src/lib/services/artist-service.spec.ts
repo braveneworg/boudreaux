@@ -1312,6 +1312,7 @@ describe('ArtistService', () => {
             images: true,
             labels: true,
             urls: true,
+            members: { include: { member: true } },
             releases: expect.objectContaining({
               include: expect.objectContaining({
                 release: expect.objectContaining({

@@ -10,21 +10,15 @@ import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
-interface VenueSearchItem {
-  id: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  timeZone: string | null;
-}
-
 const venueSearchItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   city: z.string().nullable(),
   state: z.string().nullable(),
   timeZone: z.string().nullable(),
-}) satisfies z.ZodType<VenueSearchItem>;
+});
+
+type VenueSearchItem = z.infer<typeof venueSearchItemSchema>;
 
 const venueSearchResponseSchema = z.object({
   venues: z.array(venueSearchItemSchema),

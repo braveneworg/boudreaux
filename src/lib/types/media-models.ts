@@ -388,26 +388,35 @@ export type ReleaseCarouselItem = Prisma.ReleaseGetPayload<{
 }>;
 
 /**
+ * Prisma include for the public artist detail page at /artists/[slug].
+ * Single source of truth for `ArtistWithPublishedReleases` — the service query
+ * and the derived type are guaranteed to match because both reference this
+ * const, so a relation can't be declared on the type yet dropped from the query
+ * (which would make the response fail client-side schema validation).
+ */
+export const artistWithPublishedReleasesInclude = {
+  images: true,
+  labels: true,
+  urls: true,
+  members: { include: { member: true } },
+  releases: {
+    include: {
+      release: {
+        include: {
+          images: true,
+          artistReleases: { include: { artist: true } },
+          digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+          releaseUrls: { include: { url: true } },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.ArtistInclude;
+
+/**
  * Artist with full published release data including MP3_320KBPS digital format files.
  * Used on the public artist detail page.
  */
 export type ArtistWithPublishedReleases = Prisma.ArtistGetPayload<{
-  include: {
-    images: true;
-    labels: true;
-    urls: true;
-    members: { include: { member: true } };
-    releases: {
-      include: {
-        release: {
-          include: {
-            images: true;
-            artistReleases: { include: { artist: true } };
-            digitalFormats: { include: { files: true } };
-            releaseUrls: { include: { url: true } };
-          };
-        };
-      };
-    };
-  };
+  include: typeof artistWithPublishedReleasesInclude;
 }>;

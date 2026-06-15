@@ -5,8 +5,12 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import type { AdminUserMessagesResponse } from '@/app/api/admin/chat/users/[userId]/messages/route';
+import type {
+  AdminUserMessageDto,
+  AdminUserMessagesResponse,
+} from '@/app/api/admin/chat/users/[userId]/messages/route';
 import { queryKeys } from '@/lib/query-keys';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 
 import { fetchAndParse } from './fetch-and-parse';
 
@@ -20,12 +24,9 @@ const adminUserMessageDtoSchema = z.object({
   createdAt: z.string(),
   hiddenAt: z.string().nullable(),
   hiddenReason: z.string().nullable(),
-});
+}) satisfies z.ZodType<AdminUserMessageDto>;
 
-const adminUserMessagesResponseSchema = z.object({
-  rows: z.array(adminUserMessageDtoSchema),
-  nextSkip: z.number().nullable(),
-}) satisfies z.ZodType<AdminUserMessagesResponse>;
+const adminUserMessagesResponseSchema = paginatedResponseSchema(adminUserMessageDtoSchema);
 
 /**
  * Fetches a page of admin user chat messages from the

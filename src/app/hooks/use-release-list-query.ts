@@ -10,20 +10,6 @@ import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
-interface ReleaseListItem {
-  id: string;
-  title: string;
-  releasedOn: string;
-  artistReleases?: {
-    artist: {
-      id: string;
-      firstName: string | null;
-      surname: string;
-      displayName: string | null;
-    };
-  }[];
-}
-
 const releaseListItemSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -40,7 +26,9 @@ const releaseListItemSchema = z.object({
       })
     )
     .optional(),
-}) satisfies z.ZodType<ReleaseListItem>;
+});
+
+type ReleaseListItem = z.infer<typeof releaseListItemSchema>;
 
 // The hook consumes only `rows`; the route's pagination cursor is ignored here.
 const releaseListResponseSchema = z.object({

@@ -10,17 +10,6 @@ import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
-interface VenueDetail {
-  id: string;
-  name: string;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  postalCode: string | null;
-  country: string | null;
-  timeZone: string | null;
-}
-
 const venueDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -30,7 +19,9 @@ const venueDetailSchema = z.object({
   postalCode: z.string().nullable(),
   country: z.string().nullable(),
   timeZone: z.string().nullable(),
-}) satisfies z.ZodType<VenueDetail>;
+});
+
+type VenueDetail = z.infer<typeof venueDetailSchema>;
 
 const venueDetailResponseSchema = z.object({
   venue: venueDetailSchema,
