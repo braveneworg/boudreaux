@@ -1,0 +1,38 @@
+%% useReleasesQuery — admin releases listing (infinite)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(release-data-view)
+    participant H as useReleasesQuery<br/>(useInfiniteQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/releases
+    participant A as auth()
+    participant SV as ReleaseService<br/>.getReleases
+    participant DB as Prisma · MongoDB<br/>(release.findMany)
+    participant V as paginatedResponseSchema<br/>(releaseSchema)
+    participant RC as QueryCache.onError
+    C->>H: useReleasesQuery({search,published,deleted})
+    H->>F: queryFn({pageParam=skip, signal})
+    F->>R: fetch(/api/releases?skip&take=24&filters, {signal})
+    R->>A: auth() — require role 'admin'
+    alt not admin
+        A-->>R: no admin session
+        R-->>F: 401 Authentication required
+        F-->>H: throw Error('Failed to fetch releases')
+    else admin
+        R->>SV: getReleases({skip,take,search,published,deleted})
+        SV->>DB: prisma.release.findMany(where, skip, take, orderBy createdAt desc)
+        DB-->>SV: rows
+        SV-->>R: { success, data }
+        R-->>F: 200 { rows, nextSkip } (private,no-store)
+        F->>V: safeParse(body)
+        alt valid
+            V-->>F: parsed
+            F-->>H: page
+            H-->>C: data.pages (getNextPageParam=nextSkip, keepPreviousData)
+        else contract drift
+            V-->>F: error
+            F-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

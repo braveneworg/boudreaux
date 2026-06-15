@@ -1,0 +1,33 @@
+%% useToursQuery — paginated public tours listing (infinite scroll)
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant C as Component<br/>(tours-content / home-content)
+    participant H as useToursQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant F as fetchAndParse
+    participant R as GET /api/tours<br/>(withRateLimit: publicLimiter)
+    participant RP as TourRepository.findAll
+    participant DB as Prisma (tour.findMany)
+    participant V as paginatedResponseSchema<br/>(tourWithRelationsSchema)
+    participant RC as QueryCache.onError
+    C->>H: useToursQuery(search)
+    H->>F: queryFn({pageParam=skip, signal})
+    F->>R: fetch(/api/tours?skip&take=24&search, {signal})
+    R->>RP: findAll({skip, take, search})
+    RP->>DB: findMany(buildSearchWhere, include tourDates/venue/headliners/images)
+    DB-->>RP: rows
+    RP-->>R: TourWithRelations[]
+    R-->>F: 200 { rows, nextSkip } (no-store)
+    F->>V: safeParse(body)
+    alt valid
+        V-->>F: parsed page
+        F-->>H: { rows, nextSkip } (getNextPageParam → nextSkip)
+        H-->>C: { data.pages, fetchNextPage }
+    else contract drift
+        V-->>F: error
+        F-->>H: throw ResponseValidationError
+        H->>RC: reportResponseValidationError → POST /api/client-errors
+    else response not ok
+        R-->>F: 4xx/5xx (500 / 429 rate limit)
+        F-->>H: throw Error('Failed to fetch tours')
+    end

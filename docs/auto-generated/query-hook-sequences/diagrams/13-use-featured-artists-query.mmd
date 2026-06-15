@@ -1,0 +1,38 @@
+%% useFeaturedArtistsQuery — admin featured-artists listing (infinite)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(featured-artist-data-view)
+    participant H as useFeaturedArtistsQuery<br/>(useInfiniteQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/featured-artists<br/>(withRateLimit publicLimiter)
+    participant SV as FeaturedArtistsService<br/>.getAllFeaturedArtists
+    participant DB as Prisma · MongoDB
+    participant V as paginatedResponseSchema<br/>(featuredArtistSchema)
+    participant RC as QueryCache.onError
+    C->>H: useFeaturedArtistsQuery({search,published,deleted})
+    H->>F: queryFn({pageParam=skip, signal})
+    F->>R: fetch(/api/featured-artists?skip&take=24 (NO active), {signal})
+    R->>SV: auth admin · getAllFeaturedArtists({skip,take,filters})
+    alt rate limited
+        R-->>F: 429
+        F-->>H: throw Error('Failed to fetch featured artists')
+    else not admin
+        R-->>F: 401 Authentication required
+        F-->>H: throw Error('Failed to fetch featured artists')
+    else admin
+        SV->>DB: findMany(where, orderBy position asc, featuredOn desc)
+        DB-->>SV: rows
+        SV-->>R: { success, data }
+        R-->>F: 200 { rows: serializeForResponse(data), nextSkip } (private,no-store)
+        F->>V: safeParse(body)
+        alt valid
+            V-->>F: parsed
+            F-->>H: page (keepPreviousData, refetchOnMount:'always')
+            H-->>C: data.pages
+        else contract drift
+            V-->>F: error
+            F-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

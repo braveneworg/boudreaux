@@ -1,0 +1,47 @@
+%% useFreeDownloadStatusQuery — visitor free-download cap status (validated)
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant C as Component<br/>(download-dialog)
+    participant H as useFreeDownloadStatusQuery<br/>(useQuery, enabled when releaseId, staleTime 30s)
+    participant Q as fetchFreeDownloadStatus
+    participant P as parseResponse
+    participant R as GET /api/releases/{id}/download/free-status<br/>(withRateLimit · downloadLimiter, no-store)
+    participant FS as freeDownloadQuotaService +<br/>format repo
+    participant DB as Prisma · MongoDB
+    participant V as FreeStatusResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useFreeDownloadStatusQuery(releaseId)
+    H->>Q: queryFn({signal})
+    Q->>R: fetch(url, {signal})
+    alt 200 ok
+        R->>R: resolve visitor identity (cookie + fingerprint)
+        R->>FS: findAllByRelease ∩ FREE_FORMAT_TYPES
+        FS->>DB: published free formats
+        alt no free formats
+            R-->>Q: 200 { allowed:false, blockedReason:'no-free-formats' }
+        else cap query
+            R->>FS: assertFreeDownloadAllowed(guest, visitorIds, releaseId)
+            alt allowed
+                FS-->>R: { remaining, resetsAt }
+                R-->>Q: 200 { allowed:true, remaining }
+            else CapReachedError
+                FS-->>R: throw CapReachedError
+                R-->>Q: 200 { allowed:false, blockedReason:'cap-reached' }
+            end
+        end
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else 400/404/500 error
+        R-->>Q: invalid id / not_found / 500
+        Q-->>H: throw Error('Failed to fetch free download status')
+    end

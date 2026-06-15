@@ -1,0 +1,41 @@
+%% useAdminUserMessagesQuery — per-user message history (infinite, validated, no-store)
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant C as UserDetailView<br/>(admin/chat/users/{userId})
+    participant H as useAdminUserMessagesQuery<br/>(useInfiniteQuery)
+    participant Q as fetchPage queryFn
+    participant P as parseResponse
+    participant R as GET /api/admin/chat/users/{userId}/messages<br/>(withAdmin, force-dynamic)
+    participant SV as ChatAdminService.listUserMessages
+    participant SR as ChatMessageRepository.findByUserIdForAdmin
+    participant DB as Prisma · MongoDB
+    participant V as adminUserMessagesResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useAdminUserMessagesQuery(userId)
+    H->>Q: fetchPage({ userId, skip=pageParam, signal })
+    Q->>R: fetch('.../messages?skip&take=25', {cache:'no-store', signal})
+    alt not authenticated / not admin
+        R-->>Q: 401 / 403
+        Q-->>H: throw Error('Failed to load user messages')
+    else admin ok
+        R->>SV: listUserMessages({userId,skip,take})
+        SV->>SR: findByUserIdForAdmin({userId,skip,take})
+        SR->>DB: findMany(where userId, createdAt desc, includes hidden)
+        DB-->>SR: rows
+        SR-->>SV: rows
+        SV-->>R: rows
+        R->>R: map AdminUserMessageDto[] · nextSkip = full-page ? skip+take : null
+        R-->>Q: 200 { rows, nextSkip }
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: page (getNextPageParam → nextSkip)
+            H-->>C: { data.pages, fetchNextPage }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

@@ -1,0 +1,42 @@
+%% useNotificationBannerSearchQuery — admin banner search
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(admin notification-search)
+    participant H as useNotificationBannerSearchQuery<br/>(useQuery, keepPreviousData)
+    participant F as fetchAndParse
+    participant R as GET /api/notification-banners/search<br/>(server-only, withAdmin)
+    participant SV as BannerNotificationService<br/>.searchNotifications
+    participant DB as Prisma (bannerNotification.findMany)
+    participant V as notificationBannerSearchResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useNotificationBannerSearchQuery(query)
+    H->>F: queryFn({signal})
+    F->>R: fetch(/api/notification-banners/search?q&take=20, {signal})
+    R->>R: withAdmin (session + admin role)
+    alt not admin
+        R-->>F: 401/403
+        F-->>H: throw Error('Failed to search notification banners')
+    else admin
+        R->>SV: searchNotifications(q, take)
+        SV->>DB: findMany(content contains q, select, createdAt desc, take)
+        DB-->>SV: notifications
+        alt success
+            SV-->>R: { success:true, data }
+            R-->>F: 200 { notifications }
+            F->>V: safeParse(body)
+            alt valid
+                V-->>F: parsed
+                F-->>H: { notifications }
+                H-->>C: { data }
+            else contract drift
+                V-->>F: error
+                F-->>H: throw ResponseValidationError
+                H->>RC: report → POST /api/client-errors
+            end
+        else service failure
+            SV-->>R: { success:false }
+            R-->>F: 500
+            F-->>H: throw Error('Failed to search notification banners')
+        end
+    end

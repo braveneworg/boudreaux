@@ -1,0 +1,39 @@
+%% useChatMeQuery — viewer chat-permission gate (validated, no-store, focus-refetch)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as ChatBody<br/>(chat drawer)
+    participant H as useChatMeQuery<br/>(useQuery, staleTime 60s)
+    participant Q as fetchMe queryFn
+    participant P as parseResponse
+    participant R as GET /api/chat/me<br/>(withAuth, force-dynamic)
+    participant CUR as ChatUserRepository
+    participant BES as BanEvasionService
+    participant DB as Prisma · MongoDB
+    participant V as chatMeResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useChatMeQuery({ enabled })
+    H->>Q: fetchMe({ signal })
+    Q->>R: fetch('/api/chat/me', {cache:'no-store', signal})
+    alt not authenticated
+        R-->>Q: 401 Authentication required
+        Q-->>H: throw Error('Failed to load chat status')
+    else authenticated
+        R->>CUR: findByUserId(userId)
+        R->>BES: check({userId,email,ua,lang,ip})
+        CUR->>DB: prisma.chatUser.findUnique
+        BES->>DB: bannedIdentity lookup
+        DB-->>R: chatUser?, ban
+        R-->>Q: 200 { blocked: chatUser.disabled OR ban.banned }
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: { blocked }
+            H-->>C: { data: meStatus }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

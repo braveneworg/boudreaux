@@ -1,0 +1,40 @@
+%% useChatPinnedMessagesQuery — pinned announcements strip (validated, no-store)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as ChatBody<br/>(chat drawer)
+    participant H as useChatPinnedMessagesQuery<br/>(useQuery, staleTime 30s)
+    participant Q as fetchPinned queryFn
+    participant P as parseResponse
+    participant R as GET /api/chat/pinned<br/>(withAuth, force-dynamic)
+    participant SV as ChatService.listPinned
+    participant SR as ChatMessageRepository.findPinned
+    participant DB as Prisma · MongoDB
+    participant V as pinnedResponseSchema<br/>(chatMessageDtoSchema[])
+    participant RC as QueryCache.onError
+    C->>H: useChatPinnedMessagesQuery({ enabled })
+    H->>Q: fetchPinned({ signal })
+    Q->>R: fetch('/api/chat/pinned', {cache:'no-store', signal})
+    alt not authenticated
+        R-->>Q: 401 Authentication required
+        Q-->>H: throw Error('Failed to load pinned messages')
+    else ok
+        R->>SV: listPinned()
+        SV->>SR: findPinned()
+        SR->>DB: findMany(pinnedAt not null, not hidden, pinnedAt desc)
+        DB-->>SR: rows
+        SR-->>SV: rows → toDto
+        SV-->>R: ChatMessageDto[]
+        R-->>Q: 200 { messages }
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: messages
+            H-->>C: { data: pinnedMessages }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

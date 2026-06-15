@@ -1,0 +1,42 @@
+%% useHealthStatusQuery — DB health (validated, 5s timeout, retry:10)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as Component<br/>(data-store-health-status)
+    participant H as useHealthStatusQuery<br/>(useQuery, retry:10, gcTime/staleTime:0)
+    participant FH as fetchHealthStatus<br/>(fetch + 5s AbortController)
+    participant P as parseResponse
+    participant R as GET /api/health<br/>(withRateLimit: healthLimiter)
+    participant DBU as checkDatabaseHealth
+    participant DB as Prisma ($runCommandRaw ping)
+    participant V as healthStatusSchema
+    participant RC as QueryCache.onError
+    C->>H: useHealthStatusQuery()
+    H->>FH: queryFn({signal})
+    FH->>FH: AbortSignal.any([signal, 5s timeout])
+    FH->>R: fetch(getApiBaseUrl()+/api/health, {cache:'no-store', no-cache, signal})
+    R->>DBU: checkDatabaseHealth()
+    DBU->>DB: $runCommandRaw({ping:1})
+    alt db healthy
+        DB-->>DBU: ok (+latency)
+        DBU-->>R: { healthy:true, latency }
+        R-->>FH: 200 { status:'healthy', database:'connected', latency } (no-store)
+        FH->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else db unhealthy
+        DB-->>DBU: error
+        DBU-->>R: { healthy:false, error }
+        R-->>FH: 500 { status:'unhealthy', database:'connection failed' }
+        FH->>FH: parse body → errorData.database
+        FH-->>H: throw Error(errorData.database ?? 'Failed to fetch health status')
+        H->>H: retry up to 10x (500ms x3, then exponential backoff)
+    end

@@ -1,0 +1,42 @@
+%% useArtistBySlugQuery — single artist by slug (validated, 404→null)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as ArtistDetailContent
+    participant H as useArtistBySlugQuery<br/>(useQuery, enabled !!slug)
+    participant Q as fetchArtistBySlug
+    participant P as parseResponse
+    participant R as GET /api/artists/slug/{slug}?withReleases=true<br/>(withRateLimit · publicLimiter)
+    participant SV as ArtistService<br/>.getArtistBySlugWithReleases
+    participant DB as Prisma · MongoDB<br/>(artist.findFirst)
+    participant V as artistWithPublishedReleasesSchema
+    participant RC as QueryCache.onError
+    C->>H: useArtistBySlugQuery(slug)
+    H->>Q: queryFn({signal})
+    Q->>R: fetch(url, {signal})
+    R->>R: validate slug regex (else 400)
+    R->>SV: getArtistBySlugWithReleases(slug)
+    SV->>DB: findFirst(slug, isActive, deletedOn null/isSet:false) + includes
+    DB-->>SV: artist | null
+    SV-->>R: { success, data } | not found
+    alt 200 OK
+        R->>R: attachStreamUrls(serializeForResponse(data))
+        R-->>Q: 200 JSON
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else 404 not found
+        R-->>Q: 404
+        Q-->>H: return null
+    else other non-ok (400/503/500)
+        R-->>Q: 4xx/5xx
+        Q-->>H: throw Error('Failed to fetch artist')
+    end
