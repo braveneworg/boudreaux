@@ -5,9 +5,11 @@
 
 import { useState } from 'react';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
+
+import { reportResponseValidationError } from '@/hooks/query-error-reporter';
 
 import type { ThemeProviderProps } from 'next-themes';
 
@@ -21,6 +23,9 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
   const [client] = useState(
     () =>
       new QueryClient({
+        // Report only API contract drift (response-validation failures); transient
+        // network/abort/HTTP errors are filtered out inside the handler.
+        queryCache: new QueryCache({ onError: reportResponseValidationError }),
         defaultOptions: {
           queries: {
             staleTime: disableCache ? 0 : 5 * 60 * 1000,

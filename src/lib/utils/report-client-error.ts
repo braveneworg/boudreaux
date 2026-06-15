@@ -3,15 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Fire-and-forget reporting of client-render errors to the server so they
- * land in the structured server logs. Sends only the error digest, a
- * truncated message, and the pathname — never stacks or user data.
+ * Fire-and-forget reporting of client-side errors to the server so they land
+ * in the structured server logs. Sends only the error digest, a truncated
+ * message, and the pathname — never stacks or user data.
  *
- * Must never throw: it runs inside error boundaries.
+ * Must never throw: it runs inside error boundaries and query handlers.
  */
 export const reportClientError = (
   error: Error & { digest?: string },
-  boundary: 'route' | 'global'
+  boundary: 'route' | 'global' | 'response-validation'
 ): void => {
   const payload = {
     ...(error.digest ? { digest: error.digest } : {}),
