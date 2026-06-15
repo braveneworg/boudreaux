@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.126.0] - 2026-06-15
+
+### Added
+
+- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n
+
 ## [4.125.0] - 2026-06-15
 
 ### Added
