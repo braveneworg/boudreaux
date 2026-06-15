@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.125.0] - 2026-06-15
+
+### Added
+
+- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n
+
 ## [4.124.0] - 2026-06-14
 
 ### Added
