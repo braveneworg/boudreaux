@@ -1,0 +1,40 @@
+%% useReleaseUserStatusQuery — per-user purchase/quota status (401→null)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as Component<br/>(download-dialog)
+    participant H as useReleaseUserStatusQuery<br/>(useQuery, enabled when releaseId & authed)
+    participant Q as fetchReleaseUserStatus
+    participant P as parseResponse
+    participant R as GET /api/releases/{id}/user-status<br/>(withAuth)
+    participant PS as PurchaseRepository +<br/>PurchaseService + formats repo
+    participant DB as Prisma · MongoDB
+    participant V as releaseUserStatusResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useReleaseUserStatusQuery(releaseId)
+    H->>Q: queryFn({signal})
+    Q->>R: fetch(url, {signal})
+    alt 401 unauthenticated
+        R-->>Q: 401 (withAuth)
+        Q-->>H: return null
+    else 200 ok
+        R->>PS: findByUserAndRelease · getDownloadAccess · findAllByRelease
+        PS->>DB: purchase + formats + quota
+        DB-->>PS: data
+        PS-->>R: status payload
+        R-->>Q: 200 { hasPurchase, purchasedAt, downloadCount, resetInHours, availableFormats }
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else other error
+        R-->>Q: 500
+        Q-->>H: throw Error('Failed to fetch release user status')
+    end

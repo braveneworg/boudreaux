@@ -4,6 +4,9 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
+import { artistWithPublishedReleasesSchema } from '@/lib/validation/media-models-schema';
+
+import { parseResponse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -20,7 +23,8 @@ import type { QueryOptionsOverride } from './query-options';
  * @throws If the response status is not OK and not a 404.
  */
 const fetchArtistBySlug = async (slug: string, signal?: AbortSignal) => {
-  const response = await fetch(`/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`, {
+  const url = `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`;
+  const response = await fetch(url, {
     signal,
   });
   if (!response.ok) {
@@ -29,7 +33,7 @@ const fetchArtistBySlug = async (slug: string, signal?: AbortSignal) => {
     }
     throw Error('Failed to fetch artist');
   }
-  return response.json();
+  return parseResponse(url, artistWithPublishedReleasesSchema, await response.json());
 };
 
 /**

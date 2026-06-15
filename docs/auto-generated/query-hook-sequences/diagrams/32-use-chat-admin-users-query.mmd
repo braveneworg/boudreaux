@@ -1,0 +1,40 @@
+%% useChatAdminUsersQuery — admin chat-users table (paginated, validated, no-store)
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant C as ChatUsersTable<br/>(admin/chat)
+    participant H as useChatAdminUsersQuery<br/>(useQuery)
+    participant Q as fetchPage queryFn
+    participant P as parseResponse
+    participant R as GET /api/admin/chat/users<br/>(withAdmin, force-dynamic)
+    participant SV as ChatAdminService.listChatUsers
+    participant SR as ChatUserRepository
+    participant DB as Prisma · MongoDB
+    participant V as listChatUsersResultSchema
+    participant RC as QueryCache.onError
+    C->>H: useChatAdminUsersQuery({page,perPage,sortBy,sortDirection})
+    H->>Q: fetchPage(params, signal)
+    Q->>R: fetch('/api/admin/chat/users?page&perPage&sortBy&sortDirection', {cache:'no-store', signal})
+    alt not authenticated / not admin
+        R-->>Q: 401 / 403
+        Q-->>H: throw Error('Failed to load chat users')
+    else admin ok
+        R->>SV: listChatUsers({page,perPage,sortBy,sortDirection})
+        SV->>SR: findManyPaginated(skip,take,sortBy,dir) + count()
+        SR->>DB: findMany(include user) + count()
+        DB-->>SR: rows, total
+        SR-->>SV: rows, total → map ChatUserAdminDto[]
+        SV-->>R: { rows, total, page, perPage }
+        R-->>Q: 200 ListChatUsersResult
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: result
+            H-->>C: { data }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

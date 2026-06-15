@@ -1,0 +1,35 @@
+%% useDownloadQuotaQuery — viewer's free download quota
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as Component<br/>(format-download-list)
+    participant H as useDownloadQuotaQuery<br/>(useQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/user/download-quota<br/>(withAuth)
+    participant SV as QuotaEnforcementService<br/>.getQuotaStatus
+    participant DB as Prisma · MongoDB
+    participant V as downloadQuotaResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useDownloadQuotaQuery()
+    H->>F: fetchAndParse(url, schema, {signal, errorMessage})
+    F->>R: fetch(url, {signal})
+    alt 200 ok
+        R->>SV: getQuotaStatus({kind:'user', userId})
+        SV->>DB: query downloads/quota
+        DB-->>SV: status
+        SV-->>R: { remainingQuota, downloadedReleaseIds }
+        R-->>F: 200 { success, ...status }
+        F->>V: parseResponse → safeParse(body)
+        alt valid
+            V-->>F: parsed
+            F-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>F: error
+            F-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else 401 / 500 error
+        R-->>F: 401 (withAuth) or 500
+        F-->>H: throw Error('Failed to fetch download quota')
+    end

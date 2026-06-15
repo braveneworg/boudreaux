@@ -1,0 +1,41 @@
+%% useReleaseListQuery — admin form release picker (validated)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(release-select /<br/>release-multi-select)
+    participant H as useReleaseListQuery<br/>(useQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/releases
+    participant A as auth()
+    participant SV as ReleaseService.getReleases
+    participant DB as Prisma · MongoDB
+    participant V as z.object rows:<br/>releaseListItemSchema[]
+    participant RC as QueryCache.onError
+    C->>H: useReleaseListQuery({search,artistIds,take})
+    H->>F: queryFn({signal})
+    F->>R: fetch(/api/releases?search&take&artistIds, {signal})
+    R->>A: auth() — require role 'admin'
+    alt not admin
+        A-->>R: no admin session
+        R-->>F: 401 Authentication required
+        F-->>H: throw Error('Failed to fetch releases')
+    else not ok
+        R-->>F: 4xx/5xx
+        F-->>H: throw Error('Failed to fetch releases')
+    else ok
+        R->>SV: getReleases({skip:0,take,search,artistIds})
+        SV->>DB: prisma.release.findMany(where, orderBy createdAt desc)
+        DB-->>SV: rows
+        SV-->>R: { success, data }
+        R-->>F: 200 { rows, nextSkip } (private,no-store)
+        F->>V: safeParse(body)
+        alt valid
+            V-->>F: parsed
+            F-->>H: data
+            H-->>C: { data } (keepPreviousData)
+        else contract drift
+            V-->>F: error
+            F-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

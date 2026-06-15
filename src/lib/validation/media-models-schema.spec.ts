@@ -4,9 +4,11 @@
 import {
   artistScalarSchema,
   artistSchema,
+  artistWithPublishedReleasesSchema,
   featuredArtistSchema,
   formatSchema,
   platformSchema,
+  publishedReleaseDetailSchema,
   publishedReleaseListingSchema,
   releaseCarouselItemSchema,
   releaseSchema,
@@ -198,6 +200,36 @@ const publishedReleaseListing = {
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://bc' } }],
 };
 
+/** Narrowed artist projection on the media-player release-detail page. */
+const releaseDetailArtist = {
+  id: 'a1',
+  firstName: 'John',
+  middleName: 'Q',
+  surname: 'Doe',
+  displayName: null,
+  title: null,
+  suffix: null,
+};
+
+/** `PublishedReleaseDetail` wire shape — the `withTracks` release payload. */
+const publishedReleaseDetail = {
+  ...releaseScalar,
+  images: [image],
+  artistReleases: [{ artist: releaseDetailArtist }],
+  digitalFormats: [digitalFormat],
+  releaseUrls: [{ id: 'ru1', releaseId: 'r1', urlId: 'u1', url }],
+};
+
+/** `ArtistWithPublishedReleases` wire shape — the artist detail page payload. */
+const artistWithPublishedReleases = {
+  ...artistScalar,
+  images: [image],
+  labels: [{ id: 'al1', artistId: 'a1', labelId: 'l1' }],
+  urls: [url],
+  members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...artistScalar, id: 'a2' } }],
+  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release }],
+};
+
 describe('platformSchema', () => {
   it('accepts a known platform', () => {
     expect(platformSchema.parse('SPOTIFY')).toBe('SPOTIFY');
@@ -302,5 +334,38 @@ describe('publishedReleaseListingSchema', () => {
   it('rejects a listing missing required coverArt', () => {
     const { coverArt: _omit, ...invalid } = publishedReleaseListing;
     expect(() => publishedReleaseListingSchema.parse(invalid)).toThrow();
+  });
+});
+
+describe('publishedReleaseDetailSchema', () => {
+  it('parses a withTracks release detail payload', () => {
+    expect(() => publishedReleaseDetailSchema.parse(publishedReleaseDetail)).not.toThrow();
+  });
+
+  it('preserves a runtime streamUrl signed onto a digital format file', () => {
+    const withStream = {
+      ...publishedReleaseDetail,
+      digitalFormats: [
+        { ...digitalFormat, files: [{ ...digitalFormatFile, streamUrl: 'https://cf/signed' }] },
+      ],
+    };
+    expect(
+      publishedReleaseDetailSchema.parse(withStream).digitalFormats[0].files[0].streamUrl
+    ).toBe('https://cf/signed');
+  });
+});
+
+describe('artistWithPublishedReleasesSchema', () => {
+  it('parses an artist-with-releases payload including the members relation', () => {
+    expect(() =>
+      artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases)
+    ).not.toThrow();
+  });
+
+  // Guards the regression where the route's Prisma include omitted `members`
+  // while the schema required it, failing client-side validation on every visit.
+  it('rejects a payload missing the members relation', () => {
+    const { members: _omit, ...invalid } = artistWithPublishedReleases;
+    expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
   });
 });

@@ -1,0 +1,42 @@
+%% useReportedUsersQuery — admin reported-users list (infinite, validated, no-store)
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant C as ReportedUsersTable<br/>(admin/chat)
+    participant H as useReportedUsersQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant Q as fetchReportedUsersPage queryFn
+    participant P as parseResponse
+    participant R as GET /api/admin/chat/reported-users<br/>(withAdmin, force-dynamic)
+    participant SV as ChatAdminService.listReportedUsers
+    participant AR as AbuseReportRepository.listReportedUsers
+    participant DB as Prisma · MongoDB
+    participant V as paginatedResponseSchema<br/>(reportedUserDtoSchema)
+    participant RC as QueryCache.onError
+    C->>H: useReportedUsersQuery({ windowDays, search })
+    H->>Q: fetchReportedUsersPage(params, skip=pageParam, signal)
+    Q->>R: fetch('.../reported-users?skip&take=24&windowDays&search', {cache:'no-store', signal})
+    alt not authenticated / not admin
+        R-->>Q: 401 / 403
+        Q-->>H: throw Error('Failed to load reported users')
+    else admin ok
+        R->>SV: listReportedUsers({windowDays,search,skip,take})
+        SV->>AR: listReportedUsers({ windowDays })
+        AR->>DB: abuseReport.groupBy(reportedUserId, _count, _max createdAt) + user.findMany
+        DB-->>AR: grouped + users
+        AR-->>SV: ReportedUserSummary[] (global, sorted)
+        SV->>SV: in-memory search filter + skip/take slice → nextSkip
+        SV-->>R: { rows, nextSkip }
+        R->>R: map ReportedUserDto[] (no reporter identity)
+        R-->>Q: 200 { rows, nextSkip }
+        Q->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: page (getNextPageParam → nextSkip, keepPreviousData)
+            H-->>C: { data.pages, fetchNextPage }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    end

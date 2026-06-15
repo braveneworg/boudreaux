@@ -1,0 +1,33 @@
+%% usePublishedReleasesQuery (+ usePublishedReleaseSearchQuery)
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant C as Component<br/>(releases-content /<br/>release-search-combobox)
+    participant H as usePublishedReleasesQuery<br/>(useInfiniteQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/releases?listing=published
+    participant SV as ReleaseService<br/>.getPublishedReleases
+    participant DB as Prisma · MongoDB<br/>(release.findMany select)
+    participant V as paginatedResponseSchema<br/>(publishedReleaseListingSchema)
+    participant RC as QueryCache.onError
+    C->>H: usePublishedReleasesQuery(search)
+    H->>F: queryFn({pageParam=skip, signal})
+    F->>R: fetch(/api/releases?listing=published&skip&take=24&search, {signal})
+    R->>SV: getPublishedReleases({skip,take,search})
+    SV->>DB: findMany(publishedAt not null, not deleted, listing select, releasedOn desc)
+    DB-->>SV: rows
+    SV-->>R: { success, data }
+    R-->>F: 200 { rows, nextSkip } (no-store)
+    F->>V: safeParse(body)
+    alt valid
+        V-->>F: parsed
+        F-->>H: page
+        H-->>C: data.pages (getNextPageParam=nextSkip, keepPreviousData)
+    else contract drift
+        V-->>F: error
+        F-->>H: throw ResponseValidationError
+        H->>RC: onError reports to /api/client-errors
+    else not ok / 503 DB unavailable
+        R-->>F: 4xx/5xx/503
+        F-->>H: throw Error('Failed to fetch releases')
+    end

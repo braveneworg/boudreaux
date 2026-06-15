@@ -1,0 +1,36 @@
+%% useCdnStatusQuery — CloudFront invalidation status (polled, no-store)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(cdn-status-banner)
+    participant H as useCdnStatusQuery<br/>(useQuery, refetchInterval while invalidating)
+    participant F as fetchAndParse (cache:'no-store')
+    participant R as GET /api/cdn-status<br/>(withAdmin)
+    participant CF as CloudFrontClient.ListInvalidations
+    participant V as cdnStatusSchema
+    participant RC as QueryCache.onError
+    C->>H: useCdnStatusQuery()
+    H->>F: queryFn({signal})
+    F->>R: fetch(/api/cdn-status, {cache:'no-store', signal})
+    R->>R: withAdmin (session + admin role)
+    alt not configured
+        R-->>F: 200 { status:'unknown', message:'CDN not configured' }
+    else configured
+        R->>CF: send(ListInvalidationsCommand, MaxItems:5)
+        CF-->>R: InvalidationList
+        R->>R: derive invalidating / ready (+est. minutes)
+        R-->>F: 200 { status, message }
+    end
+    F->>V: safeParse(body)
+    alt valid
+        V-->>F: parsed
+        F-->>H: data (poll every 30s while invalidating, else stop)
+        H-->>C: { data }
+    else contract drift
+        V-->>F: error
+        F-->>H: throw ResponseValidationError
+        H->>RC: report → POST /api/client-errors
+    else response not ok
+        R-->>F: 401/403 (non-admin) or 500
+        F-->>H: throw Error('Failed to fetch CDN status')
+    end

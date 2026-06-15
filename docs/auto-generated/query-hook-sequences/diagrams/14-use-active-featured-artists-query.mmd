@@ -1,0 +1,33 @@
+%% useActiveFeaturedArtistsQuery — public homepage spotlight
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant C as Component<br/>(home-content)
+    participant H as useActiveFeaturedArtistsQuery<br/>(useQuery)
+    participant F as fetchAndParse
+    participant R as GET /api/featured-artists?active=true&limit=7<br/>(withRateLimit publicLimiter)
+    participant SV as FeaturedArtistsService<br/>.getFeaturedArtists (withCache)
+    participant DB as Prisma · MongoDB
+    participant V as z.object featuredArtists[], count
+    participant RC as QueryCache.onError
+    C->>H: useActiveFeaturedArtistsQuery()
+    H->>F: queryFn({signal})
+    F->>R: fetch(/api/featured-artists?active=true&limit=7, {signal})
+    R->>SV: getFeaturedArtists(now, 7)
+    SV->>DB: findMany(publishedOn not null, featured date window)
+    DB-->>SV: rows
+    SV-->>R: { success, data }
+    R-->>F: 200 { featuredArtists: attachStreamUrls(serialize(data)), count } (s-maxage=60,swr=300)
+    F->>V: safeParse(body)
+    alt valid
+        V-->>F: parsed
+        F-->>H: { featuredArtists, count }
+        H-->>C: { data }
+    else contract drift
+        V-->>F: error
+        F-->>H: throw ResponseValidationError
+        H->>RC: onError reports to /api/client-errors
+    else rate limit / not ok
+        R-->>F: 429/5xx
+        F-->>H: throw Error('Failed to fetch featured artists')
+    end

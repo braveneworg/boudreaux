@@ -1,0 +1,38 @@
+%% useTourDatesQuery — dates for a tour (loose schema, no-store)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(admin tour-date-list)
+    participant H as useTourDatesQuery<br/>(useQuery, enabled=!!tourId)
+    participant F as fetchAndParse (cache:'no-store')
+    participant R as GET /api/tours/{tourId}/dates<br/>(withRateLimit: publicLimiter)
+    participant RP as TourDateRepository.findByTourId
+    participant DB as Prisma (tourDate.findMany)
+    participant V as tourDatesResponseSchema<br/>z.object tourDates: array(record)
+    participant RC as QueryCache.onError
+    C->>H: useTourDatesQuery(tourId)
+    H->>F: queryFn({signal}) [gated on tourId]
+    F->>R: fetch(/api/tours/{tourId}/dates, {cache:'no-store', signal})
+    R->>R: OBJECT_ID_REGEX.test(tourId)
+    alt invalid id
+        R-->>F: 200 { tourDates: [] }
+    else valid id
+        R->>RP: findByTourId(tourId)
+        RP->>DB: findMany({tourId}, orderBy startDate, include)
+        DB-->>RP: TourDate[]
+        RP-->>R: tourDates
+        R-->>F: 200 { tourDates } (s-maxage=60, swr=300)
+    end
+    F->>V: safeParse(body)
+    alt valid
+        V-->>F: parsed
+        F-->>H: { tourDates }
+        H-->>C: { data }
+    else contract drift
+        V-->>F: error
+        F-->>H: throw ResponseValidationError
+        H->>RC: report → POST /api/client-errors
+    else response not ok
+        R-->>F: 500
+        F-->>H: throw Error('Failed to fetch tour dates')
+    end

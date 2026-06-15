@@ -46,7 +46,9 @@ describe('useReportedUsersQuery', () => {
   });
 
   it('fetches a page with skip/take (no-store) and forwards the signal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions({ windowDays: null });
     const { signal } = new AbortController();
@@ -60,7 +62,9 @@ describe('useReportedUsersQuery', () => {
   });
 
   it('includes windowDays and search in the request', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions({ windowDays: 30, search: 'abc' });
 

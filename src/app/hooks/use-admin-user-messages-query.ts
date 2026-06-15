@@ -3,13 +3,30 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
-import type { AdminUserMessagesResponse } from '@/app/api/admin/chat/users/[userId]/messages/route';
+import type {
+  AdminUserMessageDto,
+  AdminUserMessagesResponse,
+} from '@/app/api/admin/chat/users/[userId]/messages/route';
 import { queryKeys } from '@/lib/query-keys';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
 const PAGE_SIZE = 25;
+
+const adminUserMessageDtoSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  hiddenAt: z.string().nullable(),
+  hiddenReason: z.string().nullable(),
+}) satisfies z.ZodType<AdminUserMessageDto>;
+
+const adminUserMessagesResponseSchema = paginatedResponseSchema(adminUserMessageDtoSchema);
 
 /**
  * Fetches a page of admin user chat messages from the
@@ -36,14 +53,12 @@ const fetchPage = async ({
     skip: String(skip),
     take: String(PAGE_SIZE),
   });
-  const response = await fetch(`/api/admin/chat/users/${userId}/messages?${params.toString()}`, {
-    cache: 'no-store',
+  const url = `/api/admin/chat/users/${userId}/messages?${params.toString()}`;
+  return fetchAndParse(url, adminUserMessagesResponseSchema, {
     signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load user messages',
   });
-  if (!response.ok) {
-    throw Error('Failed to load user messages');
-  }
-  return (await response.json()) as AdminUserMessagesResponse;
 };
 
 /**

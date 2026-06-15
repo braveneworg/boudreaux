@@ -7,6 +7,7 @@ import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { artistWithPublishedReleasesInclude } from '@/lib/types/media-models';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getS3Client } from '@/lib/utils/s3-client';
@@ -722,7 +723,7 @@ export class ArtistService {
     slug: string
   ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
     try {
-      const artist = (await prisma.artist.findFirst({
+      const artist = await prisma.artist.findFirst({
         where: {
           slug,
           isActive: true,
@@ -730,28 +731,8 @@ export class ArtistService {
           // set to null, not missing fields. Use OR to handle both cases.
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
-        include: {
-          images: true,
-          labels: true,
-          urls: true,
-          releases: {
-            include: {
-              release: {
-                include: {
-                  images: true,
-                  artistReleases: { include: { artist: true } },
-                  digitalFormats: {
-                    include: {
-                      files: { orderBy: { trackNumber: 'asc' } },
-                    },
-                  },
-                  releaseUrls: { include: { url: true } },
-                },
-              },
-            },
-          },
-        },
-      })) as unknown as ArtistWithPublishedReleases | null;
+        include: artistWithPublishedReleasesInclude,
+      });
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };

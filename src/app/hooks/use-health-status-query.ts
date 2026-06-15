@@ -2,12 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 
+import { parseResponse } from './fetch-and-parse';
+
 import type { QueryOptionsOverride } from './query-options';
+
+const healthStatusSchema = z.object({
+  status: z.enum(['healthy', 'unhealthy', 'error']),
+  database: z.string(),
+  latency: z.number().optional(),
+  error: z.string().optional(),
+}) satisfies z.ZodType<HealthStatus>;
 
 /**
  * Fetches the application health status from the `/api/health` route handler.
@@ -51,7 +61,7 @@ const fetchHealthStatus = async ({ signal }: QueryFunctionContext): Promise<Heal
       throw Error(errorData.database ?? 'Failed to fetch health status');
     }
 
-    return (await response.json()) as HealthStatus;
+    return parseResponse(apiUrl, healthStatusSchema, await response.json());
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;

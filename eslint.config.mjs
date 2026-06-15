@@ -43,6 +43,8 @@ const eslintConfig = [
       '**/*.json',
       '**/*.d.ts',
       'scripts/**/*.js',
+      // Auto-generated docs build scripts mix Node and browser (page.evaluate) globals.
+      'docs/**/*.mjs',
       '*.pem',
       '*.crt',
       '*.key',

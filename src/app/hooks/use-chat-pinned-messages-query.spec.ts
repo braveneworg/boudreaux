@@ -36,11 +36,18 @@ describe('useChatPinnedMessagesQuery', () => {
   });
 
   it('fetches /api/chat/pinned with no-store cache and returns the messages array', async () => {
+    const message = {
+      id: 'msg-1',
+      body: 'pinned',
+      reactions: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      user: { id: 'user-1', username: 'admin', gravatarHash: 'hash' },
+    };
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ messages: [{ id: 'msg-1' }] }),
+        json: async () => ({ messages: [message] }),
       })
     );
 
@@ -52,7 +59,7 @@ describe('useChatPinnedMessagesQuery', () => {
 
     const { signal } = new AbortController();
 
-    await expect(options.queryFn({ signal })).resolves.toEqual([{ id: 'msg-1' }]);
+    await expect(options.queryFn({ signal })).resolves.toEqual([message]);
     expect(global.fetch).toHaveBeenCalledWith('/api/chat/pinned', { cache: 'no-store', signal });
   });
 

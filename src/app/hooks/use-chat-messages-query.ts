@@ -3,15 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
+import { chatMessageDtoSchema } from '@/lib/validation/chat-message-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
 interface ChatMessagesPage {
   messages: ChatMessageDto[];
 }
+
+const chatMessagesPageSchema = z.object({
+  messages: z.array(chatMessageDtoSchema),
+}) satisfies z.ZodType<ChatMessagesPage>;
 
 interface ChatCursor {
   cursorCreatedAt: string;
@@ -47,14 +55,12 @@ const fetchPage = async ({
     params.set('cursorCreatedAt', pageParam.cursorCreatedAt);
     params.set('cursorId', pageParam.cursorId);
   }
-  const response = await fetch(`/api/chat/messages?${params.toString()}`, {
-    cache: 'no-store',
+  const url = `/api/chat/messages?${params.toString()}`;
+  return fetchAndParse(url, chatMessagesPageSchema, {
     signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load chat messages',
   });
-  if (!response.ok) {
-    throw Error('Failed to load chat messages');
-  }
-  return (await response.json()) as ChatMessagesPage;
 };
 
 /**

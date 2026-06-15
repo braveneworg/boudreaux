@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import type { ChatMessageDto } from '@/lib/services/chat-service';
+
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
 const CHAT_BODY_MIN = 1;
@@ -65,3 +67,23 @@ export const chatReactionsArraySchema = z.array(
 );
 
 export type ChatReactions = z.infer<typeof chatReactionsArraySchema>;
+
+/**
+ * Response shape for a single chat message as returned by the read API routes
+ * (`ChatMessageDto`). Dates are ISO strings over the wire. Kept in sync with
+ * `ChatMessageDto` via the `satisfies` guard below.
+ */
+export const chatMessageDtoSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  reactions: chatReactionsArraySchema,
+  createdAt: z.string(),
+  user: z.object({
+    id: z.string(),
+    username: z.string().nullable(),
+    gravatarHash: z.string(),
+    role: z.string().nullish(),
+  }),
+  tempId: z.string().optional(),
+  pinnedAt: z.string().nullish(),
+}) satisfies z.ZodType<ChatMessageDto>;

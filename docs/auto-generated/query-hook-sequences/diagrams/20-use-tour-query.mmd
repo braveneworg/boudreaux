@@ -1,0 +1,46 @@
+%% useTourQuery — single tour detail (validated)
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant C as Component<br/>(tour-detail-content)
+    participant H as useTourQuery<br/>(useQuery, enabled=!!tourId)
+    participant FT as fetchTour
+    participant P as parseResponse
+    participant R as GET /api/tours/{tourId}<br/>(withRateLimit: publicLimiter)
+    participant RP as TourRepository.findById
+    participant DB as Prisma (tour.findUnique)
+    participant V as tourWithRelationsSchema
+    participant RC as QueryCache.onError
+    C->>H: useTourQuery(tourId)
+    H->>FT: queryFn({signal}) [gated on tourId]
+    FT->>R: fetch(/api/tours/{tourId}, {signal})
+    R->>R: OBJECT_ID_REGEX.test(tourId)
+    alt invalid id
+        R-->>FT: 400 Invalid tour ID
+        FT-->>H: throw Error('Failed to fetch tour')
+    else valid id
+        R->>RP: findById(tourId)
+        RP->>DB: findUnique({id}, include relations)
+        DB-->>RP: tour | null
+        RP-->>R: tour | null
+        alt found
+            R-->>FT: 200 { tour } (s-maxage=60, swr=300)
+            FT->>P: parseResponse(url, schema, data.tour ?? data)
+            P->>V: safeParse(body)
+            alt valid
+                V-->>P: parsed
+                P-->>H: data
+                H-->>C: { data }
+            else contract drift
+                V-->>P: error
+                P-->>H: throw ResponseValidationError
+                H->>RC: onError reports to /api/client-errors
+            end
+        else not found
+            R-->>FT: 404 Tour not found
+            FT-->>H: return null (no throw)
+        else server error
+            R-->>FT: 500
+            FT-->>H: throw Error('Failed to fetch tour')
+        end
+    end

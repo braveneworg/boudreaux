@@ -1,0 +1,37 @@
+%% useMentionSearchQuery — chat @-mention autocomplete (inline queryFn, validated)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant C as ChatMentionAutocomplete<br/>(useDebounce 200ms)
+    participant H as useMentionSearchQuery<br/>(useQuery, enabled trimmed.length>0)
+    participant P as parseResponse
+    participant R as GET /api/chat/mention-search?q<br/>(withAuth, server-only, no-store)
+    participant SV as ChatMentionService.searchByPrefix
+    participant DB as Prisma (user.findMany)
+    participant V as mentionSearchResponseSchema
+    participant RC as QueryCache.onError
+    C->>H: useMentionSearchQuery(debouncedQuery)
+    H->>H: trimmed = prefix.trim().slice(0,32)
+    H->>R: fetch(url, {signal, cache:'no-store'})
+    R->>R: withAuth → require session
+    alt authenticated
+        R->>SV: searchByPrefix(q, session.user.id)
+        SV->>DB: findMany(username startsWith q, NOT self, take SEARCH_LIMIT, orderBy username)
+        DB-->>SV: rows (filter null usernames)
+        SV-->>R: matches
+        R-->>H: 200 { matches }
+        H->>P: parseResponse(url, schema, body)
+        P->>V: safeParse(body)
+        alt valid
+            V-->>P: parsed
+            P-->>H: data.matches
+            H-->>C: { data: MentionMatch[] }
+        else contract drift
+            V-->>P: error
+            P-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else unauthenticated / non-ok
+        R-->>H: 401/4xx/5xx
+        H-->>C: throw Error('Mention search failed')
+    end

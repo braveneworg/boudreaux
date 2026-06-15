@@ -3,9 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatUsersSortBy, ListChatUsersResult } from '@/lib/services/chat-admin-service';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -15,6 +18,27 @@ interface UseChatAdminUsersQueryParams {
   sortBy: ChatUsersSortBy;
   sortDirection: 'asc' | 'desc';
 }
+
+const chatUserAdminDtoSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  username: z.string().nullable(),
+  email: z.string(),
+  fingerprint: z.string(),
+  ipAddress: z.string(),
+  messageCount: z.number(),
+  flagged: z.boolean(),
+  disabled: z.boolean(),
+  lastSeenAt: z.string(),
+  createdAt: z.string(),
+});
+
+const listChatUsersResultSchema = z.object({
+  rows: z.array(chatUserAdminDtoSchema),
+  total: z.number(),
+  page: z.number(),
+  perPage: z.number(),
+}) satisfies z.ZodType<ListChatUsersResult>;
 
 /**
  * Fetches a page of admin chat users from the `/api/admin/chat/users` route
@@ -38,14 +62,12 @@ const fetchPage = async (
     sortBy,
     sortDirection,
   });
-  const response = await fetch(`/api/admin/chat/users?${params.toString()}`, {
-    cache: 'no-store',
+  const url = `/api/admin/chat/users?${params.toString()}`;
+  return fetchAndParse(url, listChatUsersResultSchema, {
     signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load chat users',
   });
-  if (!response.ok) {
-    throw Error('Failed to load chat users');
-  }
-  return (await response.json()) as ListChatUsersResult;
 };
 
 /**

@@ -1,0 +1,36 @@
+%% useVenueDetailQuery — single venue (edit dialog, validated)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as VenueSelect<br/>(edit dialog)
+    participant H as useVenueDetailQuery<br/>(useQuery, enabled !!venueId)
+    participant F as fetchAndParse
+    participant R as GET /api/venues/{venueId}<br/>(withRateLimit · publicLimiter)
+    participant RP as VenueRepository.findById
+    participant DB as Prisma (venue.findUnique)
+    participant V as z.object venue:<br/>venueDetailSchema
+    participant RC as QueryCache.onError
+    C->>H: useVenueDetailQuery(editVenueId ?? '')
+    H->>F: queryFn({signal})
+    F->>R: fetch(/api/venues/{venueId}, {signal})
+    R->>R: isValidObjectId(venueId) else 400
+    R->>RP: findById(venueId)
+    RP->>DB: findUnique({ where: { id } })
+    DB-->>RP: venue | null
+    alt found (200)
+        RP-->>R: venue
+        R-->>F: 200 { venue }
+        F->>V: safeParse(body)
+        alt valid
+            V-->>F: parsed
+            F-->>H: data
+            H-->>C: { data }
+        else contract drift
+            V-->>F: error
+            F-->>H: throw ResponseValidationError
+            H->>RC: onError reports to /api/client-errors
+        end
+    else not found / invalid / error
+        R-->>F: 404 / 400 / 500
+        F-->>H: throw Error('Failed to fetch venue details')
+    end
