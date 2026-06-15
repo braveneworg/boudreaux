@@ -3,11 +3,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import type { ChatMeResponse } from '@/app/api/chat/me/route';
 import { queryKeys } from '@/lib/query-keys';
 
+import { fetchAndParse } from './fetch-and-parse';
+
 import type { QueryOptionsOverride } from './query-options';
+
+const chatMeResponseSchema = z.object({ blocked: z.boolean() }) satisfies z.ZodType<ChatMeResponse>;
 
 /**
  * Fetches the viewer's chat status from the `/api/chat/me` route handler.
@@ -19,13 +24,12 @@ import type { QueryOptionsOverride } from './query-options';
  * @returns The parsed JSON response containing the viewer's chat status.
  * @throws If the response status is not OK.
  */
-const fetchMe = async ({ signal }: QueryFunctionContext): Promise<ChatMeResponse> => {
-  const response = await fetch('/api/chat/me', { cache: 'no-store', signal });
-  if (!response.ok) {
-    throw Error('Failed to load chat status');
-  }
-  return (await response.json()) as ChatMeResponse;
-};
+const fetchMe = async ({ signal }: QueryFunctionContext): Promise<ChatMeResponse> =>
+  fetchAndParse('/api/chat/me', chatMeResponseSchema, {
+    signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load chat status',
+  });
 
 /**
  * Polls `/api/chat/me` to determine whether the viewer is permitted

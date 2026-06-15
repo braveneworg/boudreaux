@@ -3,8 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -13,9 +16,12 @@ export interface MentionMatch {
   username: string;
 }
 
-interface MentionSearchResponse {
-  matches: MentionMatch[];
-}
+const mentionMatchSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+}) satisfies z.ZodType<MentionMatch>;
+
+const mentionSearchResponseSchema = z.object({ matches: z.array(mentionMatchSchema) });
 
 /**
  * Prefix-search usernames for the chat composer autocomplete. The query
@@ -40,13 +46,13 @@ export const useMentionSearchQuery = (
     queryKey: queryKeys.chat.mentionSearch(trimmed),
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({ q: trimmed });
-      const response = await fetch(`/api/chat/mention-search?${params.toString()}`, {
+      const url = `/api/chat/mention-search?${params.toString()}`;
+      const { matches } = await fetchAndParse(url, mentionSearchResponseSchema, {
         signal,
         cache: 'no-store',
+        errorMessage: 'Mention search failed',
       });
-      if (!response.ok) throw Error('Mention search failed');
-      const data = (await response.json()) as MentionSearchResponse;
-      return data.matches;
+      return matches;
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,

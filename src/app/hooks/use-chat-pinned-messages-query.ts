@@ -3,15 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
+import { chatMessageDtoSchema } from '@/lib/validation/chat-message-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
 interface PinnedResponse {
   messages: ChatMessageDto[];
 }
+
+const pinnedResponseSchema = z.object({
+  messages: z.array(chatMessageDtoSchema),
+}) satisfies z.ZodType<PinnedResponse>;
 
 /**
  * Fetches the currently pinned chat messages from the `/api/chat/pinned`
@@ -25,12 +33,12 @@ interface PinnedResponse {
  * @throws If the response status is not OK.
  */
 const fetchPinned = async ({ signal }: QueryFunctionContext): Promise<ChatMessageDto[]> => {
-  const response = await fetch('/api/chat/pinned', { cache: 'no-store', signal });
-  if (!response.ok) {
-    throw Error('Failed to load pinned messages');
-  }
-  const json = (await response.json()) as PinnedResponse;
-  return json.messages;
+  const { messages } = await fetchAndParse('/api/chat/pinned', pinnedResponseSchema, {
+    signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load pinned messages',
+  });
+  return messages;
 };
 
 /**

@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -14,6 +17,19 @@ interface ArtistListItem {
   displayName: string | null;
   slug: string;
 }
+
+const artistListItemSchema = z.object({
+  id: z.string(),
+  firstName: z.string().nullable(),
+  surname: z.string(),
+  displayName: z.string().nullable(),
+  slug: z.string(),
+}) satisfies z.ZodType<ArtistListItem>;
+
+// The hook consumes only `rows`; the route's pagination cursor is ignored here.
+const artistListResponseSchema = z.object({
+  rows: z.array(artistListItemSchema),
+});
 
 interface ArtistListParams {
   search?: string;
@@ -42,12 +58,11 @@ const fetchArtistList = async (
   const queryString = searchParams.toString();
   const url = `/api/artists${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch artists');
-  }
-  const json = (await response.json()) as { rows: ArtistListItem[] };
-  return json.rows;
+  const { rows } = await fetchAndParse(url, artistListResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch artists',
+  });
+  return rows;
 };
 
 /**

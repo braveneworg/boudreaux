@@ -4,7 +4,12 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import type { FreeStatusResponse } from '@/lib/validation/bundle-download-schema';
+import {
+  FreeStatusResponseSchema,
+  type FreeStatusResponse,
+} from '@/lib/validation/bundle-download-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -24,14 +29,11 @@ const fetchFreeDownloadStatus = async (
   releaseId: string,
   signal?: AbortSignal
 ): Promise<FreeStatusResponse> => {
-  const response = await fetch(
-    `/api/releases/${encodeURIComponent(releaseId)}/download/free-status`,
-    { signal }
-  );
-  if (!response.ok) {
-    throw Error('Failed to fetch free download status');
-  }
-  return (await response.json()) as FreeStatusResponse;
+  const url = `/api/releases/${encodeURIComponent(releaseId)}/download/free-status`;
+  return fetchAndParse(url, FreeStatusResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch free download status',
+  });
 };
 
 /**

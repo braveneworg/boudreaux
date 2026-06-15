@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -14,6 +17,18 @@ interface VenueSearchItem {
   state: string | null;
   timeZone: string | null;
 }
+
+const venueSearchItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  timeZone: z.string().nullable(),
+}) satisfies z.ZodType<VenueSearchItem>;
+
+const venueSearchResponseSchema = z.object({
+  venues: z.array(venueSearchItemSchema),
+});
 
 /**
  * Fetches matching venues from the `/api/venues` route handler.
@@ -36,12 +51,11 @@ const fetchVenueSearch = async (
   const queryString = params.toString();
   const url = `/api/venues${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch venues');
-  }
-  const json = (await response.json()) as { venues: VenueSearchItem[] };
-  return json.venues;
+  const { venues } = await fetchAndParse(url, venueSearchResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch venues',
+  });
+  return venues;
 };
 
 /**

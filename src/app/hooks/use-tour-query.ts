@@ -4,6 +4,9 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
+import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
+
+import { parseResponse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
@@ -37,7 +40,8 @@ const fetchTour = async (
   tourId: string,
   signal?: AbortSignal
 ): Promise<TourWithRelations | null> => {
-  const response = await fetch(`/api/tours/${encodeURIComponent(tourId)}`, { signal });
+  const url = `/api/tours/${encodeURIComponent(tourId)}`;
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     if (response.status === 404) {
       return null;
@@ -45,7 +49,7 @@ const fetchTour = async (
     throw Error('Failed to fetch tour');
   }
   const data = await response.json();
-  return (data.tour ?? data) as TourWithRelations;
+  return parseResponse(url, tourWithRelationsSchema, data.tour ?? data);
 };
 
 /**

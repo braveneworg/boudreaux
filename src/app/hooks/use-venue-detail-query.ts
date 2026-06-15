@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -18,6 +21,21 @@ interface VenueDetail {
   timeZone: string | null;
 }
 
+const venueDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string().nullable(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  country: z.string().nullable(),
+  timeZone: z.string().nullable(),
+}) satisfies z.ZodType<VenueDetail>;
+
+const venueDetailResponseSchema = z.object({
+  venue: venueDetailSchema,
+});
+
 /**
  * Fetches a single venue from the `/api/venues/[venueId]` route handler.
  *
@@ -30,12 +48,12 @@ interface VenueDetail {
  * @throws If the response status is not OK.
  */
 const fetchVenueDetail = async (venueId: string, signal?: AbortSignal): Promise<VenueDetail> => {
-  const response = await fetch(`/api/venues/${venueId}`, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch venue details');
-  }
-  const json = (await response.json()) as { venue: VenueDetail };
-  return json.venue;
+  const url = `/api/venues/${venueId}`;
+  const { venue } = await fetchAndParse(url, venueDetailResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch venue details',
+  });
+  return venue;
 };
 
 /**

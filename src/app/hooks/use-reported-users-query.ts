@@ -3,14 +3,29 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import type { ReportedUsersResponse } from '@/app/api/admin/chat/reported-users/route';
 import { queryKeys } from '@/lib/query-keys';
+import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
 /** Page size requested per fetch. */
 export const REPORTED_USERS_PAGE_SIZE = 24;
+
+const reportedUserDtoSchema = z.object({
+  userId: z.string(),
+  username: z.string().nullable(),
+  email: z.string(),
+  reportCount: z.number(),
+  latestReportedAt: z.string(),
+  chatDisabled: z.boolean(),
+});
+
+const reportedUsersResponseSchema = paginatedResponseSchema(reportedUserDtoSchema);
 
 interface UseReportedUsersQueryParams {
   /** `null` = all-time. */
@@ -44,14 +59,12 @@ const fetchReportedUsersPage = async (
   if (windowDays !== null) params.set('windowDays', String(windowDays));
   if (search) params.set('search', search);
 
-  const response = await fetch(`/api/admin/chat/reported-users?${params.toString()}`, {
-    cache: 'no-store',
+  const url = `/api/admin/chat/reported-users?${params.toString()}`;
+  return fetchAndParse(url, reportedUsersResponseSchema, {
     signal,
+    cache: 'no-store',
+    errorMessage: 'Failed to load reported users',
   });
-  if (!response.ok) {
-    throw Error('Failed to load reported users');
-  }
-  return (await response.json()) as ReportedUsersResponse;
 };
 
 /**

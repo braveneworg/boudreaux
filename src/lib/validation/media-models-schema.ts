@@ -5,9 +5,11 @@ import { z } from 'zod';
 
 import type {
   Artist,
+  ArtistWithPublishedReleases,
   FeaturedArtist,
   Format,
   Platform,
+  PublishedReleaseDetail,
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
@@ -95,6 +97,10 @@ const digitalFormatFileSchema = z.object({
   uploadedAt: date,
   createdAt: date,
   updatedAt: date,
+  // Runtime-only: `attachStreamUrls` signs a CloudFront URL for non-public
+  // formats. Absent for public (MP3 320) files. Preserved (not stripped) so
+  // the media player can read it; not part of the Prisma scalar type.
+  streamUrl: z.string().nullish(),
 });
 
 /** `ReleaseDigitalFormat` with its child files (`digitalFormats: { include: { files } }`). */
@@ -290,3 +296,54 @@ export const publishedReleaseListingSchema = z.object({
   ),
   releaseUrls: z.array(z.object({ url: z.object({ platform: platformSchema, url: z.string() }) })),
 }) satisfies z.ZodType<PublishedReleaseListing>;
+
+/** `ArtistMember` join row with its included member artist (`members: { include: { member } }`). */
+const artistMemberSchema = z.object({
+  id: z.string(),
+  artistId: z.string(),
+  memberId: z.string(),
+  member: artistScalarSchema,
+});
+
+/** Published release detail (media player page) — the `withTracks` release payload. */
+export const publishedReleaseDetailSchema = releaseScalarSchema.extend({
+  images: z.array(imageSchema),
+  artistReleases: z.array(
+    z.object({
+      artist: z.object({
+        id: z.string(),
+        firstName: z.string(),
+        middleName: nullableString,
+        surname: z.string(),
+        displayName: nullableString,
+        title: nullableString,
+        suffix: nullableString,
+      }),
+    })
+  ),
+  digitalFormats: z.array(digitalFormatWithFilesSchema),
+  releaseUrls: z.array(
+    z.object({
+      id: z.string(),
+      releaseId: z.string(),
+      urlId: z.string(),
+      url: urlSchema,
+    })
+  ),
+}) satisfies z.ZodType<PublishedReleaseDetail>;
+
+/** Artist with full published release data, for the public artist detail page. */
+export const artistWithPublishedReleasesSchema = artistScalarSchema.extend({
+  images: z.array(imageSchema),
+  labels: z.array(artistLabelSchema),
+  urls: z.array(urlSchema),
+  members: z.array(artistMemberSchema),
+  releases: z.array(
+    z.object({
+      id: z.string(),
+      artistId: z.string(),
+      releaseId: z.string(),
+      release: releaseSchema,
+    })
+  ),
+}) satisfies z.ZodType<ArtistWithPublishedReleases>;

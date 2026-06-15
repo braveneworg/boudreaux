@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
+
+import { fetchAndParse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -20,6 +23,29 @@ interface ReleaseListItem {
     };
   }[];
 }
+
+const releaseListItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  releasedOn: z.string(),
+  artistReleases: z
+    .array(
+      z.object({
+        artist: z.object({
+          id: z.string(),
+          firstName: z.string().nullable(),
+          surname: z.string(),
+          displayName: z.string().nullable(),
+        }),
+      })
+    )
+    .optional(),
+}) satisfies z.ZodType<ReleaseListItem>;
+
+// The hook consumes only `rows`; the route's pagination cursor is ignored here.
+const releaseListResponseSchema = z.object({
+  rows: z.array(releaseListItemSchema),
+});
 
 interface ReleaseListParams {
   search?: string;
@@ -54,12 +80,11 @@ const fetchReleaseList = async (
   const queryString = searchParams.toString();
   const url = `/api/releases${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch releases');
-  }
-  const json = (await response.json()) as { rows: ReleaseListItem[] };
-  return json.rows;
+  const { rows } = await fetchAndParse(url, releaseListResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch releases',
+  });
+  return rows;
 };
 
 /**
