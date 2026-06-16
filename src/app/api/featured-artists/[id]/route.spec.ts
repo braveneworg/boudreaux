@@ -56,7 +56,7 @@ describe('Featured Artist by ID API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(JSON.parse(JSON.stringify(mockFeaturedArtist)));
+      expect(data).toEqual(mockFeaturedArtist);
       expect(FeaturedArtistsService.getFeaturedArtistById).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011'
       );
@@ -170,7 +170,7 @@ describe('Featured Artist by ID API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(JSON.parse(JSON.stringify(updatedFeaturedArtist)));
+      expect(data).toEqual(updatedFeaturedArtist);
       expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         {

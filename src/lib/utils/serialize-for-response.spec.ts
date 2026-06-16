@@ -24,4 +24,33 @@ describe('serializeForResponse', () => {
 
     expect(serializeForResponse(input)).toEqual(input);
   });
+
+  it('converts negative in-range BigInt values to Number', () => {
+    expect(serializeForResponse({ delta: BigInt(-2048) })).toEqual({ delta: -2048 });
+  });
+
+  it('emits BigInt values beyond MAX_SAFE_INTEGER as a decimal string to avoid precision loss', () => {
+    const huge = BigInt(Number.MAX_SAFE_INTEGER) + 10n;
+
+    expect(serializeForResponse({ size: huge })).toEqual({ size: huge.toString() });
+  });
+
+  it('emits BigInt values below MIN_SAFE_INTEGER as a decimal string', () => {
+    const tiny = BigInt(Number.MIN_SAFE_INTEGER) - 10n;
+
+    expect(serializeForResponse({ size: tiny })).toEqual({ size: tiny.toString() });
+  });
+
+  it('preserves Date instances instead of stringifying them', () => {
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+
+    const result = serializeForResponse({ createdAt });
+
+    expect(result.createdAt).toBe(createdAt);
+  });
+
+  it('preserves null and primitive top-level values', () => {
+    expect(serializeForResponse(null)).toBeNull();
+    expect(serializeForResponse(BigInt(7))).toBe(7);
+  });
 });

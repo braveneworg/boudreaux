@@ -55,11 +55,9 @@ describe('Artist by Slug API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({
-        ...mockArtist,
-        createdAt: mockArtist.createdAt.toISOString(),
-        updatedAt: mockArtist.updatedAt.toISOString(),
-      });
+      // serializeForResponse preserves Date instances (only BigInt is
+      // converted), and the mock NextResponse returns the object unserialized.
+      expect(data).toEqual(mockArtist);
       expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-doe');
     });
 
