@@ -145,7 +145,13 @@ vi.mock('@/app/components/format-bundle-download', () => ({
   },
 }));
 
-let currentFreeStatusData: { availableFreeFormats: string[] } | undefined = {
+let currentFreeStatusData:
+  | {
+      availableFreeFormats: string[];
+      blockedReason?: string | null;
+      resetsAtIso?: string | null;
+    }
+  | undefined = {
   availableFreeFormats: ['MP3_320KBPS', 'AAC'],
 };
 const mockUseFreeDownloadStatusQuery = vi.fn(() => ({ data: currentFreeStatusData }));
@@ -1917,5 +1923,140 @@ describe('DownloadDialog — free download flow (007 US1)', () => {
     const freeRadio = screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i });
     expect(freeRadio).toBeDisabled();
     expect(screen.getByText(/Not available for this release/i)).toBeInTheDocument();
+  });
+
+  it('falls back to an empty free-format list when the free-status query has no data', async () => {
+    // freeStatus is undefined → `availableFreeFormats = undefined ?? []`. The free
+    // radio is still enabled (freeRadioDisabled only trips when freeStatus is defined).
+    currentFreeStatusData = undefined;
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }));
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+
+    const step = await screen.findByTestId('free-format-select-step');
+    expect(step.getAttribute('data-available')).toBe('');
+  });
+
+  it('passes cap-reached resets-at into FreeFormatSelectStep when the cap is hit', async () => {
+    // blockedReason === 'cap-reached' selects the resetsAtIso branch for
+    // capReachedResetsAtIso (otherwise null).
+    currentFreeStatusData = {
+      availableFreeFormats: ['MP3_320KBPS', 'AAC'],
+      blockedReason: 'cap-reached',
+      resetsAtIso: '2026-06-16T00:00:00.000Z',
+    };
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }));
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+
+    expect(await screen.findByTestId('free-format-select-step')).toBeInTheDocument();
+  });
+});
+
+describe('DownloadDialog — purchase-confirmed step variants', () => {
+  const defaultProps = {
+    artistName: 'Test Artist',
+    premiumPrice: 8,
+    releaseId: 'release-123',
+    releaseTitle: 'Test Release',
+  };
+
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+    mockCheckGuestPurchaseAction.mockReset();
+  });
+
+  const advanceToConfirmed = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
+    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
+    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Trigger Already Purchased' }));
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument()
+    );
+  };
+
+  it('shows "a previous date" when purchasedAt is null on the confirmed step', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <DownloadDialog {...defaultProps} purchasedAt={null} downloadCount={2}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await advanceToConfirmed(user);
+
+    expect(screen.getByText(/a previous date/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+  });
+
+  it('shows a disabled limit-reached button on the confirmed step when at the download cap', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        downloadCount={5}
+        resetInHours={4}
+        purchasedAt={new Date('2025-06-15T12:00:00')}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await advanceToConfirmed(user);
+
+    // purchasedAt is set → the date is formatted (covers the truthy ternary branch).
+    expect(screen.getByText(/June 15, 2025/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    expect(screen.getByText(/resets in 4 hours/i)).toBeInTheDocument();
+  });
+
+  it('shows singular hour text on the confirmed step when resetInHours is 1', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <DownloadDialog {...defaultProps} downloadCount={5} resetInHours={1}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await advanceToConfirmed(user);
+
+    expect(screen.getByText(/resets in 1 hour\./i)).toBeInTheDocument();
+  });
+
+  it('omits reset text on the confirmed step when resetInHours is null and at cap', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <DownloadDialog {...defaultProps} downloadCount={5} resetInHours={null}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await advanceToConfirmed(user);
+
+    expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    expect(screen.queryByText(/resets in/i)).not.toBeInTheDocument();
   });
 });

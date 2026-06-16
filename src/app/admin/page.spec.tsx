@@ -144,6 +144,26 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
   });
 
+  it('navigates to chat moderation page when chat is selected', async () => {
+    render(<AdminPage />);
+
+    await user.click(screen.getByTestId('option-chat'));
+
+    expect(mockPush).toHaveBeenCalledWith('/admin/chat');
+    // Should still show artist view since we navigated away
+    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
+  });
+
+  it('navigates to logging page when logging is selected', async () => {
+    render(<AdminPage />);
+
+    await user.click(screen.getByTestId('option-logging'));
+
+    expect(mockPush).toHaveBeenCalledWith('/admin/logging');
+    // Should still show artist view since we navigated away
+    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
+  });
+
   it('can switch back to artist view after selecting another view', async () => {
     render(<AdminPage />);
 

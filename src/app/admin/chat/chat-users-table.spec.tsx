@@ -179,4 +179,111 @@ describe('ChatUsersTable', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
   });
+
+  it('surfaces an error toast when clearing a flag fails', async () => {
+    useChatAdminUsersQueryMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        rows: [{ ...sampleRow, flagged: true }],
+        total: 1,
+        page: 1,
+        perPage: 50,
+      },
+    });
+    vi.mocked(updateChatUserAction).mockResolvedValue({ success: false, error: 'unauthorized' });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(<ChatUsersTable />);
+    await user.click(screen.getByRole('button', { name: /clear flag/i }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/could not clear flag/i))
+    );
+  });
+
+  it('renders a dash for a missing username and an unparseable last-seen date', () => {
+    useChatAdminUsersQueryMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        rows: [{ ...sampleRow, username: null, lastSeenAt: 'not-a-date' }],
+        total: 1,
+        page: 1,
+        perPage: 50,
+      },
+    });
+
+    render(<ChatUsersTable />);
+
+    // username fallback (—) and timestamp fallback (—) both render.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('restores chat access (disabled=false) for an already-disabled user', async () => {
+    useChatAdminUsersQueryMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        rows: [{ ...sampleRow, username: null, disabled: true }],
+        total: 1,
+        page: 1,
+        perPage: 50,
+      },
+    });
+    vi.mocked(updateChatUserAction).mockResolvedValue({ success: true });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(<ChatUsersTable />);
+    // aria-label uses 'Enable' + falls back to email when username is null.
+    await user.click(screen.getByRole('switch', { name: /enable chat for octo@example.com/i }));
+
+    await waitFor(() =>
+      expect(updateChatUserAction).toHaveBeenCalledWith({ userId: 'user-1', disabled: false })
+    );
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/restored/i))
+    );
+  });
+
+  describe('pagination', () => {
+    it('renders pagination controls and advances to the next page', async () => {
+      useChatAdminUsersQueryMock.mockReturnValue({
+        isPending: false,
+        isError: false,
+        data: { rows: [sampleRow], total: 120, page: 1, perPage: 50 },
+      });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+      render(<ChatUsersTable />);
+
+      const previous = screen.getByRole('button', { name: /previous/i });
+      const next = screen.getByRole('button', { name: /next/i });
+      expect(previous).toBeDisabled();
+      await user.click(next);
+
+      await waitFor(() =>
+        expect(useChatAdminUsersQueryMock).toHaveBeenCalledWith(
+          expect.objectContaining({ page: 2 })
+        )
+      );
+    });
+
+    it('returns to the previous page from a later page', async () => {
+      useChatAdminUsersQueryMock.mockReturnValue({
+        isPending: false,
+        isError: false,
+        data: { rows: [sampleRow], total: 120, page: 1, perPage: 50 },
+      });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+      render(<ChatUsersTable />);
+
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled());
+      await user.click(screen.getByRole('button', { name: /previous/i }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled());
+    });
+  });
 });

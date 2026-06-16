@@ -230,6 +230,9 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     }
   }
 
+  /* v8 ignore start -- defensive: by this point `purchase` is always set — the
+     create block above either assigns it or throws (re-thrown on a failed P2002
+     re-fetch), so this guard is unreachable. */
   if (!purchase) {
     logger.error('release_purchase webhook: failed to create or find purchase', undefined, {
       checkoutId: retrievedSession.id,
@@ -237,6 +240,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     });
     return;
   }
+  /* v8 ignore stop */
 
   // Fetch release title for the confirmation email
   const release = await ReleaseService.findTitleById(releaseId);
@@ -304,13 +308,17 @@ function isIpInCidr(ip: string, cidr: string): boolean {
     const bits = parseInt(normalizedBitsStr, 10);
     if (bits < 0 || bits > 32) return false;
     const ipNum = ipToNum(ip);
+    /* v8 ignore start -- `cidr.split('/')` always yields a defined first element, so the `?? ''` fallback is unreachable */
     const rangeNum = ipToNum(range ?? '');
+    /* v8 ignore stop */
     if (ipNum === null || rangeNum === null) return false;
     const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
     return (ipNum & mask) === (rangeNum & mask);
+    /* v8 ignore start -- defensive: the operations above (split, regex, parseInt, bitwise) cannot throw, so this catch is unreachable */
   } catch {
     return false;
   }
+  /* v8 ignore stop */
 }
 
 /**

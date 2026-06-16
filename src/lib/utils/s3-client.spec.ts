@@ -4,6 +4,8 @@
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
+
 import {
   getS3Client,
   getS3BucketName,
@@ -201,6 +203,23 @@ describe('s3-client', () => {
         expect.anything(),
         expect.objectContaining({ expiresIn: 86400 })
       );
+    });
+
+    it('returns the CloudFront signed URL without touching S3 when configured', async () => {
+      vi.mocked(generateCloudFrontSignedUrl).mockReturnValueOnce(
+        'https://cdn.example.com/file.mp3?Signature=abc'
+      );
+
+      const result = await generatePresignedDownloadUrl(
+        'releases/123/digital-formats/MP3_320KBPS/file.mp3',
+        'Artist - Album.mp3'
+      );
+
+      expect(result).toBe('https://cdn.example.com/file.mp3?Signature=abc');
+      // CDN short-circuit means no S3 GET command is built and no S3
+      // presigning happens.
+      expect(getCommandCalls).toHaveLength(0);
+      expect(getSignedUrl).not.toHaveBeenCalled();
     });
   });
 

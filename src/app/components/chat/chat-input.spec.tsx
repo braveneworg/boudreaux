@@ -205,6 +205,54 @@ describe('ChatInput', () => {
     expect(onTyping).toHaveBeenCalled();
   });
 
+  it('uses a vague delay in the rate-limit toast when retryAfterSeconds is omitted', async () => {
+    const handlers = noopHandlers();
+    vi.mocked(sendChatMessageAction).mockResolvedValue({
+      success: false,
+      error: 'rate_limited',
+    });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(<ChatInput {...baseProps} {...handlers} />);
+    await user.type(screen.getByLabelText('Chat message'), 'hi{Enter}');
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/try again in a few seconds/i))
+    );
+  });
+
+  it('shows a timeout-specific toast when the send never resolves', async () => {
+    const handlers = noopHandlers();
+    // Never resolves → the SEND_TIMEOUT_MS race rejects with 'send_timeout'.
+    vi.mocked(sendChatMessageAction).mockReturnValue(new Promise(() => undefined));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(<ChatInput {...baseProps} {...handlers} />);
+    const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
+    await user.type(textarea, 'hi');
+
+    // Switch to fake timers only for the send so we can fast-forward the
+    // 10s SEND_TIMEOUT_MS race without a real delay.
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        textarea.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+        );
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(handlers.onSendFailed).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/taking too long/i));
+    consoleSpy.mockRestore();
+  });
+
   it('truncates input beyond MAX_BODY (2000 chars)', async () => {
     const handlers = noopHandlers();
     render(<ChatInput {...baseProps} {...handlers} />);
@@ -277,6 +325,62 @@ describe('ChatInput', () => {
       expect(
         screen.queryByRole('listbox', { name: /mention suggestions/i })
       ).not.toBeInTheDocument();
+    });
+
+    it('restores focus and caret after inserting a mention', async () => {
+      const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+        cb(0);
+        return 0;
+      });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      render(<ChatInput {...baseProps} {...noopHandlers()} />);
+      const textarea = screen.getByLabelText('Chat message') as HTMLTextAreaElement;
+
+      await user.type(textarea, '@a');
+      await user.keyboard('{Enter}');
+
+      // The (synchronously flushed) RAF callback restores focus + caret.
+      expect(textarea).toHaveFocus();
+      expect(textarea.selectionStart).toBe('@alice '.length);
+      rafSpy.mockRestore();
+    });
+
+    it('does not open the autocomplete inside an email address', async () => {
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      render(<ChatInput {...baseProps} {...noopHandlers()} />);
+
+      // The char before '@' is a word char, so findActiveMentionToken bails.
+      await user.type(screen.getByLabelText('Chat message'), 'octo@al');
+
+      expect(
+        screen.queryByRole('listbox', { name: /mention suggestions/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not open the autocomplete for a non-username charset', async () => {
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      render(<ChatInput {...baseProps} {...noopHandlers()} />);
+
+      // '!' is outside the conservative username charset → no autocomplete.
+      await user.type(screen.getByLabelText('Chat message'), '@a!');
+
+      expect(
+        screen.queryByRole('listbox', { name: /mention suggestions/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('resets the active index to 0 when the match list becomes empty', async () => {
+      // First render with matches so the autocomplete opens, then flip the
+      // hook to return no matches — handleMentionMatches takes the
+      // length === 0 branch.
+      mockMentionQuery.mockReturnValue({ data: [], isFetching: false });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      render(<ChatInput {...baseProps} {...noopHandlers()} />);
+
+      await user.type(screen.getByLabelText('Chat message'), '@zzz');
+
+      // No options render, but typing did not throw and the input is intact.
+      expect((screen.getByLabelText('Chat message') as HTMLTextAreaElement).value).toBe('@zzz');
     });
 
     it('closes the autocomplete on blur', async () => {

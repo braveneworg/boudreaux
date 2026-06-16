@@ -16,10 +16,11 @@ export function splitFullName(fullName: string | null | undefined): {
 
   const names = fullName.trim().split(/\s+/); // Split on one or more whitespace characters
 
-  /* v8 ignore next 3 -- String.split() never returns an empty array */
+  /* v8 ignore start -- String.split() never returns an empty array */
   if (names.length === 0) {
     return { firstName: '', lastName: '' };
   }
+  /* v8 ignore stop */
 
   if (names.length === 1) {
     return { firstName: names[0], lastName: '' };

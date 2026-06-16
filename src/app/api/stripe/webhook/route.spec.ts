@@ -909,6 +909,125 @@ describe('POST /api/stripe/webhook', () => {
       vi.mocked(console.error).mockRestore();
     });
 
+    it('returns early when paymentIntentId is missing but releaseId is present', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Raw session and retrieved session both lack payment_intent — releaseId is
+      // valid, so the `!paymentIntentId` side of the guard short-circuits.
+      const session = makePaymentSession({ payment_intent: null });
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue({ ...session, payment_intent: null });
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(stripeLoggerMock.error).toHaveBeenCalledWith(
+        'release_purchase webhook missing required metadata',
+        undefined,
+        expect.objectContaining({ releaseId: validReleaseId })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('updates the session id and reuses an existing purchase for the same user+release', async () => {
+      // No purchase by paymentIntentId, but the user already owns the release —
+      // the route updates the stored session id and reuses that purchase.
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-reused' });
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(mockUpdateSessionId).toHaveBeenCalledWith('purchase-reused', 'cs_pay_123');
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ purchaseId: 'purchase-reused' })
+      );
+    });
+
+    it('logs metadata as undefined when the retrieved session has no metadata', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const eventSession = makePaymentSession();
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: eventSession },
+      });
+      // Retrieved session metadata is null → Zod parse fails and the error log
+      // uses `metadata ?? undefined`.
+      mockCheckoutSessionsRetrieve.mockResolvedValue({ ...eventSession, metadata: null });
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(stripeLoggerMock.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        undefined,
+        expect.objectContaining({ metadata: undefined })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('recovers from a duck-typed (non-Prisma) P2002 error using findByUserAndRelease', async () => {
+      // createError is a plain Error carrying a P2002 code (not a
+      // PrismaClientKnownRequestError instance) → the `instanceof Error && 'code'`
+      // duck-type branch detects it. findByPaymentIntentId re-fetch returns null so
+      // the recovery falls through to findByUserAndRelease.
+      const duckError = Object.assign(new Error('dup'), { code: 'P2002' });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockFindByUserAndRelease
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'purchase-duck' });
+      mockPurchaseCreate.mockRejectedValue(duckError);
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateSessionId).toHaveBeenCalledWith('purchase-duck', 'cs_pay_123');
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ purchaseId: 'purchase-duck' })
+      );
+    });
+
+    it('rethrows 500 when a P2002 race occurs and neither re-fetch finds a purchase', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      // P2002 is detected, but both recovery look-ups return null, so the
+      // `if (purchase)` guard is skipped and createError is re-thrown → 500.
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockFindByUserAndRelease.mockResolvedValue(null);
+      mockPurchaseCreate.mockRejectedValue(
+        new MockPrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+          meta: { target: ['stripePaymentIntentId'] },
+        })
+      );
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(500);
+      expect(mockUpdateSessionId).not.toHaveBeenCalled();
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('rethrows and returns 500 when the create error is not a P2002 conflict', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      // A non-P2002 Prisma error skips the recovery branch entirely and is
+      // rethrown, so the outer handler returns 500.
+      const otherError = Object.assign(new Error('boom'), { code: 'P2010' });
+      mockPurchaseCreate.mockRejectedValue(otherError);
+
+      const response = await POST(createRequest('{}'));
+
+      expect(response.status).toBe(500);
+      const json = await response.json();
+      expect(json.error).toBe('Handler failed');
+      vi.mocked(console.error).mockRestore();
+    });
+
     it('logs warning when sendPurchaseConfirmationEmail returns false', async () => {
       mockSendPurchaseConfirmationEmail.mockResolvedValue(false);
 

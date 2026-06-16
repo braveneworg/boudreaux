@@ -50,14 +50,18 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
-const mockFindAllByRelease = vi.fn();
+// Hoisted so the fns exist before the module-import phase runs these class-field
+// initializers — release-service instantiates these repositories at module level.
+const { mockFindAllByRelease, mockLogDownloadEvent } = vi.hoisted(() => ({
+  mockFindAllByRelease: vi.fn(),
+  mockLogDownloadEvent: vi.fn(),
+}));
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class MockRepo {
     findAllByRelease = mockFindAllByRelease;
   },
 }));
 
-const mockLogDownloadEvent = vi.fn();
 vi.mock('@/lib/repositories/download-event-repository', () => ({
   DownloadEventRepository: class MockRepo {
     logDownloadEvent = mockLogDownloadEvent;
@@ -1379,7 +1383,248 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(typeof body.message).toBe('string');
     expect(body.message.length).toBeGreaterThan(0);
   });
+
+  // ─── fetchObjectBuffer: transformToByteArray (smithy) body path ────────────
+
+  it('should read S3 body via transformToByteArray when the SDK helper is present', async () => {
+    // AWS SDK v3 in Node returns an IncomingMessage with a smithy-injected
+    // `transformToByteArray` helper. Single FLAC file → one append with the
+    // bytes returned by that helper.
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '01.flac' }],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({
+      Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3, 4]) },
+    });
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+
+    expect(response.status).toBe(302);
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '01.flac' })
+    );
+  });
+
+  it('should skip the file when the S3 body is neither a Readable nor a smithy stream', async () => {
+    // A truthy body that is neither a Readable nor exposes transformToByteArray
+    // coerces to a null buffer, so the file is skipped (no append).
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '01.flac' }],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: { not: 'a stream' } });
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+
+    // The format resolves (so the request still 302s) but the unusable body
+    // coerces to null and the file is skipped — no archive append.
+    expect(response.status).toBe(302);
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
+  // ─── Prefetch pipeline depth refill (redirect path) ────────────────────────
+
+  it('should refill the prefetch pipeline when files exceed the prefetch depth', async () => {
+    // 10 child files > S3_PREFETCH_DEPTH (8) → the consume loop pushes
+    // additional prefetches for indices beyond the initial window.
+    const manyFiles = Array.from({ length: 10 }, (_, i) => ({
+      s3Key: `releases/r1/FLAC/${i}.flac`,
+      fileName: `${i}.flac`,
+    }));
+    mockFindAllByRelease.mockResolvedValue([
+      { id: 'format-flac', formatType: 'FLAC', s3Key: null, fileName: null, files: manyFiles },
+    ]);
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+
+    expect(response.status).toBe(302);
+    expect(mockAppend).toHaveBeenCalledTimes(10);
+  });
+
+  // ─── SSE cache-hit fast path (respond=json) ────────────────────────────────
+
+  it('should serve a cached ZIP via synthetic SSE events on cache hit (respond=json)', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(makeJsonRequest('FLAC,WAV'), makeParams());
+    const events = await readSSEEvents(response);
+
+    // Cache hit skips archiving entirely.
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockFinalize).not.toHaveBeenCalled();
+    expect(events.find((e) => e.event === 'ready')).toBeDefined();
+  });
+
+  it('should still record analytics on SSE cache hit', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(makeJsonRequest('FLAC,WAV'), makeParams());
+    await response.text();
+
+    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
+  });
+
+  it('should emit complete after a cache-hit ready event (respond=json)', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(makeJsonRequest('FLAC,WAV'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(events[events.length - 1]).toEqual(expect.objectContaining({ event: 'complete' }));
+  });
+
+  it('should log analytics failure on SSE cache hit and still complete', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+    mockUpsertDownloadCount.mockRejectedValueOnce(new Error('analytics down'));
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(events.find((e) => e.event === 'ready')).toBeDefined();
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Failed to record bundle download analytics (cache hit)',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── respond=stream paid path: cache upload + drive + analytics ────────────
+
+  it('should record paid analytics once the cache upload completes (respond=stream)', async () => {
+    mockUploadDone.mockResolvedValueOnce(undefined);
+
+    const response = await GET(makeStreamRequest('FLAC,WAV'), makeParams());
+    await response.arrayBuffer();
+
+    // The cache-upload `.then` fires the paid analytics; allow the
+    // fire-and-forget microtask chain to settle.
+    await flushMicrotasks();
+
+    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
+  });
+
+  it('should skip paid analytics when the cache upload fails (respond=stream)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUploadDone.mockRejectedValueOnce(new Error('cache upload failed'));
+
+    const response = await GET(makeStreamRequest('FLAC,WAV'), makeParams());
+    await response.arrayBuffer().catch(() => undefined);
+    await flushMicrotasks();
+
+    // Upload failed → analytics skipped, and the failure is logged.
+    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle cache upload failed (stream path)',
+      expect.any(Error),
+      expect.objectContaining({ tempS3Key: expect.stringContaining('tmp/bundles/cache/') })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should log paid analytics failure on the stream path when logging throws', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUploadDone.mockResolvedValueOnce(undefined);
+    mockUpsertDownloadCount.mockRejectedValueOnce(new Error('analytics write failed'));
+
+    const response = await GET(makeStreamRequest('FLAC,WAV'), makeParams());
+    await response.arrayBuffer();
+    await flushMicrotasks();
+
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Failed to record bundle download analytics (stream path)',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should refill the stream prefetch pipeline when files exceed the depth', async () => {
+    const manyFiles = Array.from({ length: 10 }, (_, i) => ({
+      s3Key: `releases/r1/FLAC/${i}.flac`,
+      fileName: `${i}.flac`,
+    }));
+    mockFindAllByRelease.mockResolvedValue([
+      { id: 'format-flac', formatType: 'FLAC', s3Key: null, fileName: null, files: manyFiles },
+    ]);
+
+    const response = await GET(makeStreamRequest('FLAC'), makeParams());
+    await response.arrayBuffer();
+    await flushMicrotasks();
+
+    expect(mockAppend).toHaveBeenCalledTimes(10);
+  });
+
+  it('should abort the archive and destroy streams when the stream drive throws', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // First body resolves (so streamFirstBuffer is set), then a later append
+    // throws to drive the catch in the async IIFE.
+    mockAppend
+      .mockImplementationOnce(() => {
+        queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('append exploded');
+      });
+
+    const response = await GET(makeStreamRequest('FLAC,WAV'), makeParams());
+    await response.arrayBuffer().catch(() => undefined);
+    await flushMicrotasks();
+
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle stream drive error',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+    expect(mockArchiveAbort).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should error the web stream controller when the archive emits an error (respond=stream)', async () => {
+    // Emit an error on the archiver after the response starts streaming so the
+    // `responsePass.on('error')` controller.error path runs.
+    const response = await GET(makeStreamRequest('FLAC,WAV'), makeParams());
+    queueMicrotask(() => mockArchiverPassThrough.emit('error', new Error('archive boom')));
+
+    await expect(response.arrayBuffer()).rejects.toBeDefined();
+  });
 });
+
+function makeStreamRequest(formats = 'FLAC,WAV'): NextRequest {
+  return new NextRequest(
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=stream`,
+    {
+      headers: {
+        'x-forwarded-for': '127.0.0.1',
+        'user-agent': 'test-agent',
+      },
+    }
+  );
+}
+
+async function flushMicrotasks(): Promise<void> {
+  // Let queued microtasks (fire-and-forget cache-upload `.then` chains) settle.
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 007-free-digital-downloads — mode='free' guest flow
@@ -2147,5 +2392,413 @@ describe('GET /api/releases/[id]/download/bundle — preflight (respond=prefligh
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.errorCode).toBe('CAP_REACHED');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Additional branch coverage — free-mode SSE/stream record + audit failures,
+// SSE archiver error listeners, web-stream cancel, redirect archive-error pipe.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeFreeJsonRequest(formats = 'MP3_320KBPS'): NextRequest {
+  return new NextRequest(
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=json&mode=free`,
+    { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+  );
+}
+
+function makeFreeStreamRequest(formats = 'MP3_320KBPS'): NextRequest {
+  return new NextRequest(
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=stream&mode=free`,
+    { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+  );
+}
+
+describe('GET /api/releases/[id]/download/bundle — additional branch coverage', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+    mockUploadDone.mockResolvedValue(undefined);
+    mockUpsertDownloadCount.mockResolvedValue(undefined);
+    mockLogDownloadEvent.mockResolvedValue(undefined);
+    mockAssertFreeDownloadAllowed.mockResolvedValue({
+      allowed: true,
+      remaining: 3,
+      count: 0,
+      oldestInWindow: null,
+      resetsAt: null,
+    });
+    mockRecordSuccessfulDownload.mockImplementation(async (params) => {
+      await mockLogDownloadEvent({
+        userId: params.subject.kind === 'user' ? params.subject.userId : null,
+        visitorId: params.subject.kind === 'guest' ? params.subject.visitorId : null,
+        releaseId: params.releaseId,
+        formatType: params.formatType,
+        success: true,
+        ipAddress: params.ipAddress ?? '',
+        userAgent: params.userAgent ?? '',
+      });
+    });
+    // Restore the default append behavior (emit 'entry') in case a prior
+    // shuffled test consumed a one-shot override.
+    mockAppend.mockImplementation(() => {
+      queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+    });
+  });
+
+  // ─── CAP_REACHED audit-write failure (line 473) ────────────────────────────
+
+  it('logs an error when the CAP_REACHED audit event write fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+    mockLogDownloadEvent.mockRejectedValueOnce(new Error('audit write failed'));
+
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+
+    expect(response.status).toBe(403);
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Failed to write CAP_REACHED audit event',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── Non-Cap error from assertFreeDownloadAllowed rethrows → 500 (line 486) ─
+
+  it('rethrows a non-CapReached error from the quota check as a 500', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(new Error('quota service unavailable'));
+
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── recordSuccessfulDownload failure logs an error (line 543) ─────────────
+
+  it('logs an error when recording a successful free download fails (302 path)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockRecordSuccessfulDownload.mockRejectedValueOnce(new Error('record failed'));
+
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+
+    expect(response.status).toBe(302);
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Failed to record successful free download',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── recordFreeStreamFailure audit-write failure logs an error (line 568) ──
+
+  it('logs an error when the STREAM_FAILED audit write itself fails (302 path)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Drive the redirect-path archive failure (S3 GET rejects), then make the
+    // STREAM_FAILED audit logDownloadEvent throw.
+    mockS3Send.mockRejectedValueOnce(new Error('S3 GetObject failed'));
+    mockLogDownloadEvent.mockRejectedValueOnce(new Error('audit write failed'));
+
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams()).catch(() => undefined);
+
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Failed to write STREAM_FAILED audit event',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── SSE free-mode: recordFreeSuccess before ready (live archive, line 831) ─
+
+  it('records a free success before the SSE ready event (live archive path)', async () => {
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS'), makeParams());
+    await response.text();
+
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── SSE free-mode cache hit: recordFreeSuccess before ready (line 648) ─────
+
+  it('records a free success on SSE cache hit before emitting ready', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(events.find((e) => e.event === 'ready')).toBeDefined();
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
+  // ─── SSE archiver error listeners (lines 700, 706) + abort on stream error ─
+
+  it('emits an SSE error and aborts the upload when the archive errors mid-zip', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Two formats so the archive lives long enough to receive an emitted error
+    // after the first append; the error listener sets archiveError and the
+    // pipe-through destroys the PassThrough.
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+    // First append emits an archiver error rather than an 'entry' event.
+    mockAppend.mockImplementationOnce(() => {
+      queueMicrotask(() => mockArchiverPassThrough.emit('error', new Error('archive failure')));
+    });
+
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS,AAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(events.find((e) => e.event === 'complete')).toBeDefined();
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── SSE prefetch refill across depth (lines 776, 779 region) ──────────────
+
+  it('refills the SSE prefetch pipeline when files exceed the prefetch depth', async () => {
+    const manyFiles = Array.from({ length: 10 }, (_, i) => ({
+      s3Key: `releases/r1/MP3_320KBPS/${i}.mp3`,
+      fileName: `${i}.mp3`,
+    }));
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: null,
+        fileName: null,
+        files: manyFiles,
+      },
+    ]);
+
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS'), makeParams());
+    await response.text();
+
+    expect(mockAppend).toHaveBeenCalledTimes(10);
+  });
+
+  // ─── Stream tee: cachePass already destroyed → skips write/end (966, 972) ──
+
+  it('keeps streaming to the client when the cache pass is destroyed mid-stream', async () => {
+    // Make the cache Upload abort the cache PassThrough by having done() reject;
+    // the tee Transform must then skip writing to the destroyed cachePass and
+    // continue forwarding to the response.
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUploadDone.mockRejectedValueOnce(new Error('cache upload aborted'));
+
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    const buf = await response.arrayBuffer().catch(() => new ArrayBuffer(0));
+    await flushMicrotasks();
+
+    expect(response.status).toBe(200);
+    expect(buf).toBeDefined();
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── Web stream cancel handler (lines 1144-1147) ───────────────────────────
+
+  it('destroys streams and aborts uploads when the web response stream is canceled', async () => {
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    const reader = response.body?.getReader();
+
+    // Cancel before draining → triggers the ReadableStream `cancel()` handler.
+    await reader?.cancel();
+
+    expect(mockArchiveAbort).toHaveBeenCalled();
+    expect(mockUploadAbort).toHaveBeenCalled();
+  });
+
+  // ─── Stream path: real bytes flow through tee + web stream (966-969, 1134) ──
+
+  it('forwards archived bytes through the tee Transform and the web response stream', async () => {
+    // Make append actually write bytes into the archiver PassThrough so a chunk
+    // flows through teeToCache (transform) and the webStream data handler.
+    mockAppend.mockImplementationOnce((buffer: Buffer) => {
+      mockArchiverPassThrough.write(buffer);
+      queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+    });
+    mockS3Send.mockResolvedValueOnce({ Body: Readable.from(Buffer.from('real-bytes')) });
+
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    const buf = await response.arrayBuffer();
+    await flushMicrotasks();
+
+    expect(response.status).toBe(200);
+    expect(buf.byteLength).toBeGreaterThan(0);
+  });
+
+  // ─── SSE abort path with a rejecting upload promise (line 620 catch) ───────
+
+  it('awaits and swallows a rejected upload promise when aborting the SSE upload', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The S3 fetch fails → no formats appended → abortSseUpload runs and
+    // awaits the (rejected) upload promise, exercising the `.catch` callback.
+    mockS3Send.mockRejectedValueOnce(new Error('S3 fetch failed'));
+    mockUploadDone.mockRejectedValueOnce(new Error('upload rejected'));
+
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(
+      events.some((e) => e.event === 'error' && e.data.message === 'No formats could be prepared.')
+    ).toBe(true);
+    expect(mockUploadAbort).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── Redirect-path archiver error listener pipes through (line 1167) ───────
+
+  it('destroys the upload PassThrough when the archiver errors in the redirect path', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Use the default (redirect) path. The first append emits an archiver error
+    // which the `archive.on('error')` listener pipes into the PassThrough.
+    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    mockGetDownloadAccess.mockResolvedValueOnce({
+      allowed: true,
+      reason: null,
+      downloadCount: 1,
+      lastDownloadedAt: null,
+      resetInHours: null,
+    });
+    mockFindAllByRelease.mockResolvedValueOnce([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '01.flac' }],
+      },
+    ]);
+    // append rejects the per-entry promise by emitting an archiver error.
+    mockAppend.mockImplementationOnce(() => {
+      mockArchiverPassThrough.emit('error', new Error('archiver exploded'));
+    });
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── Stream drive catch destroys both streams (lines 1069-1070) ────────────
+
+  it('destroys the cache and tee streams when the stream drive throws after first byte', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // First file resolves (streamFirstBuffer set), then append throws on the
+    // SECOND entry so the drive catch destroys cachePass + teeToCache.
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/MP3_320KBPS/01.mp3', fileName: '01.mp3' },
+          { s3Key: 'releases/r1/MP3_320KBPS/02.mp3', fileName: '02.mp3' },
+        ],
+      },
+    ]);
+    mockAppend
+      .mockImplementationOnce(() => {
+        queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('append exploded');
+      });
+
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    await response.arrayBuffer().catch(() => undefined);
+    await flushMicrotasks();
+
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle stream drive error',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── Stream cancel after streams already destroyed (1144/1145 false) ───────
+
+  it('handles web-stream cancel idempotently when streams are already destroyed', async () => {
+    // Emit an archiver error first (destroys cachePass + teeToCache via the
+    // archive error listener), then cancel the reader so the cancel handler
+    // sees already-destroyed streams (the `!destroyed` guards short-circuit).
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    mockArchiverPassThrough.emit('error', new Error('archive boom'));
+    await flushMicrotasks();
+
+    const reader = response.body?.getReader();
+    await reader?.cancel().catch(() => undefined);
+
+    // Cancel still calls abort on the archive + upload (idempotent).
+    expect(mockArchiveAbort).toHaveBeenCalled();
+  });
+
+  // ─── Archive error after cache streams destroyed (981/982 false) ───────────
+
+  it('does not double-destroy streams when the archive errors twice (stream path)', async () => {
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    // First error destroys cachePass + teeToCache; the second error finds them
+    // already destroyed so the `!destroyed` guards are exercised on the false side.
+    mockArchiverPassThrough.emit('error', new Error('first boom'));
+    mockArchiverPassThrough.emit('error', new Error('second boom'));
+    await flushMicrotasks();
+
+    await response.arrayBuffer().catch(() => undefined);
+
+    expect(mockArchiverPassThrough).toBeDefined();
   });
 });

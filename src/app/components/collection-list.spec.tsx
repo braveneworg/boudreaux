@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
@@ -279,6 +279,23 @@ describe('CollectionList', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
     expect(screen.getByText(/no digital formats/i)).toBeInTheDocument();
+  });
+
+  it('falls back to an empty fileName when a format file has no fileName', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    const purchase = buildPurchase();
+    // First file has no fileName — exercises the `files[0]?.fileName ?? ''`
+    // fallback when building availableFormats.
+    purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{} as { fileName: string }] }];
+
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+
+    // The format is still offered (its fileName defaulted to '').
+    expect(screen.getByRole('button', { name: /select flac/i })).toBeInTheDocument();
   });
 
   it('uses firstName only when surname is empty', () => {
@@ -692,6 +709,78 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('keeps the download dialog open when an outside interaction occurs during an active download', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeDisabled();
+
+    // Pointer-down outside the dialog content fires Radix onInteractOutside;
+    // while downloading the handler preventDefaults so the dialog stays open.
+    // (Radix sets pointer-events:none on body, so dispatch the event directly
+    // rather than via userEvent's pointer pipeline.)
+    fireEvent.pointerDown(document.body, { button: 0 });
+    fireEvent.pointerUp(document.body, { button: 0 });
+
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeInTheDocument();
+  });
+
+  it('closes on an outside interaction when no download is in progress', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    expect(screen.getByText('Select formats for')).toBeInTheDocument();
+
+    // Idle (not downloading) outside interaction — onInteractOutside runs with
+    // isDownloading false, so it does NOT preventDefault and the dialog closes.
+    fireEvent.pointerDown(document.body, { button: 0 });
+    fireEvent.pointerUp(document.body, { button: 0 });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Select formats for')).not.toBeInTheDocument();
+    });
+  });
+
+  it('clears the pending reset timer when a second download starts before reset fires', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeSSEResponse());
+    vi.stubGlobal('fetch', mockFetch);
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
+
+    // Reopen and download again before advancing past the 3s reset window so
+    // the second scheduleReset clears the still-pending first timer.
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    clearTimeoutSpy.mockClear();
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+  });
+
   it('keeps the download dialog open when escape is pressed during an active download', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
@@ -786,5 +875,55 @@ describe('CollectionDownloadDialog', () => {
 
     const progressRegion = screen.getByRole('status');
     expect(within(progressRegion).getByText('CUSTOM_XYZ')).toBeInTheDocument();
+  });
+
+  it('ignores a global progress event that is neither per-format nor uploading', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    // A progress event with no formatType and a non-uploading status hits the
+    // else-if false branch, leaving per-format progress untouched.
+    const events: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'progress', data: { status: 'zipping' } },
+      {
+        event: 'ready',
+        data: { downloadUrl: 'https://s3.example.com/bundle.zip', fileName: 'Test Album.zip' },
+      },
+      { event: 'complete', data: {} },
+    ];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(events)));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
+  });
+
+  it('ignores an error event that omits a formatType', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    // An error event without a formatType hits the inner `if (data.formatType)`
+    // false branch — no per-format status is flipped to error, and the overall
+    // download still succeeds because ready was emitted.
+    const events: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'error', data: {} },
+      {
+        event: 'ready',
+        data: { downloadUrl: 'https://s3.example.com/bundle.zip', fileName: 'Test Album.zip' },
+      },
+      { event: 'complete', data: {} },
+    ];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(events)));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

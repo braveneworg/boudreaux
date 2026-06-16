@@ -28,7 +28,9 @@ function isDisallowedAddress(address: string): boolean {
   const version = isIP(address);
   if (version === 4) {
     const parts = address.split('.').map((octet) => Number.parseInt(octet, 10));
+    /* v8 ignore start -- defensive: isIP() already guarantees version 4 means exactly four numeric octets, so this guard is unreachable */
     if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
+    /* v8 ignore stop */
     const [a, b] = parts;
     // 0.0.0.0/8, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, 100.64/10 (CGNAT), 224/4+
     if (a === 0 || a === 10 || a === 127) return true;

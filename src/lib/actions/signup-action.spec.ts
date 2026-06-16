@@ -21,6 +21,7 @@ const mockHeaders = vi.hoisted(() =>
   }))
 );
 const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
+const mockLimiterCheck = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -30,10 +31,12 @@ vi.mock('next/headers', () => ({
   headers: mockHeaders,
 }));
 
-// Mock rate limiter
+// Mock rate limiter — `check` is a controllable hoisted mock so individual
+// tests can force the rate-limit-exceeded path. The singleton limiter is built
+// once at module load, so the same `check` instance is reused on every call.
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: vi.fn(() => ({
-    check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
+    check: mockLimiterCheck,
   })),
 }));
 
@@ -109,6 +112,8 @@ describe('signupAction', () => {
     vi.mocked(mockGenerateUsername).mockReturnValue('test-user-1234');
     // Default to passing Turnstile verification
     mockVerifyTurnstile.mockResolvedValue({ success: true });
+    // Default to passing the rate limit (clearMocks resets the impl each test).
+    mockLimiterCheck.mockResolvedValue(undefined);
   });
 
   describe('successful signup flow', () => {
@@ -284,9 +289,18 @@ describe('signupAction', () => {
     });
   });
 
-  // Note: Rate limiting is tested separately in src/app/lib/utils/rate-limit.spec.ts
-  // The rate limit error path in signup action (lines 40-45) requires integration testing
-  // due to architectural limitations with the singleton rate limiter created at module load time.
+  describe('rate limiting', () => {
+    it('returns a too-many-attempts error when the rate limiter rejects', async () => {
+      mockLimiterCheck.mockRejectedValue(new Error('rate limit exceeded'));
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('Too many signup attempts. Please try again later.');
+      expect(mockVerifyTurnstile).not.toHaveBeenCalled();
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+  });
 
   describe('validation failures', () => {
     it('should return form state with errors when validation fails', async () => {
@@ -422,6 +436,34 @@ describe('signupAction', () => {
       });
       // Should redirect to the same success page as a new signup
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
+    });
+
+    it('still redirects on duplicate email when the silent sign-in magic link fails to send', async () => {
+      // Account-enumeration defense: even if the magic-link signIn throws, the
+      // error is logged (console.error) and swallowed, and the flow still
+      // redirects to the same success page as a brand-new signup.
+      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_email_key' },
+      });
+
+      mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
+      vi.mocked(mockSignIn).mockRejectedValue(new Error('SES send failed'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to send sign-in magic link on duplicate email',
+        expect.any(Error)
+      );
+      expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
+
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle P2002 error with different target (not email)', async () => {

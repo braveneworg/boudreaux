@@ -11,11 +11,12 @@ import { withAdmin } from '@/lib/decorators/with-auth';
  * Only returns boolean presence indicators, never actual values.
  */
 export const GET = withAdmin(async () => {
-  // Debug endpoints are disabled in production
-  /* v8 ignore next 3 -- vitest config replaces `process.env.NODE_ENV` with `'test'` at compile time, so the production branch is dead-code-eliminated and not reachable from tests */
+  // Debug endpoints are disabled in production.
+  /* v8 ignore start -- vitest config replaces `process.env.NODE_ENV` with `'test'` at compile time, so the production branch is dead-code-eliminated and not reachable from tests */
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+  /* v8 ignore stop */
 
   // Only return presence indicators, never actual values
   return NextResponse.json({

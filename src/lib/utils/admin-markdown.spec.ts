@@ -57,6 +57,10 @@ describe('parseAdminMarkdown', () => {
     it('prefers bold over emphasis when both delimiters could match', () => {
       expect(parseAdminMarkdown('**strong**')).toEqual([{ kind: 'bold', value: 'strong' }]);
     });
+
+    it('does not let an emphasis span cross a newline', () => {
+      expect(parseAdminMarkdown('*a\nb*')).toEqual([{ kind: 'text', value: '*a\nb*' }]);
+    });
   });
 
   describe('links', () => {
@@ -130,6 +134,34 @@ describe('parseAdminMarkdown', () => {
     it('treats absolute URL without siteHost as external (safe default)', () => {
       const nodes = parseAdminMarkdown('[x](https://example.com/y)');
       expect(nodes[0]).toMatchObject({ external: true });
+    });
+
+    it('drops a malformed non-path href to plain text', () => {
+      // `http://[` is an unparseable URL — sanitiseHref's URL parse throws
+      // and the link must degrade to its literal source text.
+      expect(parseAdminMarkdown('[x](http://[)')).toEqual([
+        { kind: 'text', value: '[x](http://[)' },
+      ]);
+    });
+
+    it('drops a link whose href is only whitespace', () => {
+      expect(parseAdminMarkdown('[x]( )')).toEqual([{ kind: 'text', value: '[x]( )' }]);
+    });
+
+    it('matches balanced nested brackets inside the link label', () => {
+      expect(parseAdminMarkdown('[a[b]c](/x)')).toEqual([
+        { kind: 'link', text: 'a[b]c', href: '/x', external: false },
+      ]);
+    });
+
+    it('does not span newlines when scanning the href', () => {
+      expect(parseAdminMarkdown('[x](/foo\nbar)')).toEqual([
+        { kind: 'text', value: '[x](/foo\nbar)' },
+      ]);
+    });
+
+    it('leaves an unclosed href as plain text', () => {
+      expect(parseAdminMarkdown('[x](/foo')).toEqual([{ kind: 'text', value: '[x](/foo' }]);
     });
   });
 

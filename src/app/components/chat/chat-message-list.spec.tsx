@@ -184,6 +184,24 @@ describe('ChatMessageList', () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
 
+  it('alternates row alignment each time the message author changes', () => {
+    const fromUser = (id: string, userId: string): OptimisticChatMessage => ({
+      ...makeMsg(id),
+      user: { id: userId, username: userId, gravatarHash: 'h' },
+    });
+    const { container } = render(
+      <ChatMessageList
+        {...baseProps}
+        messages={[fromUser('a', 'user-1'), fromUser('b', 'user-2'), fromUser('c', 'user-1')]}
+      />
+    );
+
+    const aligns = Array.from(container.querySelectorAll('[data-testid="chat-message-row"]')).map(
+      (el) => el.getAttribute('data-align')
+    );
+    expect(aligns).toEqual(['left', 'right', 'left']);
+  });
+
   it('falls back to bottom-anchor when the mention is not found', () => {
     render(
       <ChatMessageList

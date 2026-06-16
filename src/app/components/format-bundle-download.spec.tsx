@@ -637,6 +637,33 @@ describe('FormatBundleDownload', () => {
     expect(triggerDownload).not.toHaveBeenCalled();
   });
 
+  it('shows the default error message when preflight is not ok but the body has no message', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    // not-ok preflight whose JSON body omits `message` — exercises the L192
+    // false branch so the default "Download failed" copy is used.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ errorCode: 'NOPE' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+
+    render(<FormatBundleDownload {...freeOnlyProps} mode="free" />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 2 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Download failed. Please try again.'
+    );
+    expect(triggerDownload).not.toHaveBeenCalled();
+  });
+
   it('uses raw formatType as progress label when label mapping is missing', async () => {
     // Custom (non-FREE) formats only render with a progress list when the
     // SSE flow is active. Drive this through `mode="free"` so the

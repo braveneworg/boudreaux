@@ -201,6 +201,15 @@ describe('GET /api/releases/[id]/download/free-status', () => {
     });
   });
 
+  it('rethrows non-CapReachedError failures from assertFreeDownloadAllowed', async () => {
+    // A non-cap error is not a CapReachedError, so the catch re-throws it
+    // (the route does not swallow unexpected failures).
+    const unexpected = new Error('quota service exploded');
+    vi.mocked(freeDownloadQuotaService.assertFreeDownloadAllowed).mockRejectedValue(unexpected);
+
+    await expect(GET(buildRequest(), dummyContext)).rejects.toThrow('quota service exploded');
+  });
+
   it('passes union of all visitorIds to assertFreeDownloadAllowed (identity-conflict union)', async () => {
     // Cookie + fingerprint resolve to two different existing rows. Cap query
     // must union the events so cookie-cleared sessions cannot reset the cap.

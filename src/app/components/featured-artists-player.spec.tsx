@@ -1282,6 +1282,24 @@ describe('FeaturedArtistsPlayer', () => {
   });
 
   describe('additional branch coverage', () => {
+    it('should no-op without toggling play when reselecting the current artist without autoPlay', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist-2 (has a digital format) and start playing.
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+      fireEvent.click(screen.getByTestId('play-button'));
+      expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'true');
+
+      // Reselect the SAME artist without autoPlay — handleSelectArtist takes the
+      // early `selectedArtist?.id === artist.id` return without toggling play.
+      fireEvent.click(screen.getByTestId('artist-no-autoplay-featured-2'));
+
+      // Playback state is untouched (no pause/play fired).
+      expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'true');
+    });
+
     it('should default autoPlay to false when selecting artist without autoPlay options', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
