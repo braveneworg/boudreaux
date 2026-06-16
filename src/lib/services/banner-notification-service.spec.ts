@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
+import { BannerNotificationRepository } from '@/lib/repositories/banner-notification-repository';
+import { SiteSettingsRepository } from '@/lib/repositories/site-settings-repository';
 import { cache, withCache } from '@/lib/utils/simple-cache';
 
 import { BannerNotificationService } from './banner-notification-service';
@@ -11,20 +12,18 @@ import { BannerNotificationService } from './banner-notification-service';
 import type * as PrismaClientModule from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    bannerNotification: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      upsert: vi.fn(),
-      delete: vi.fn(),
-    },
-    siteSettings: {
-      findUnique: vi.fn(),
-      upsert: vi.fn(),
-    },
+vi.mock('@/lib/repositories/banner-notification-repository', () => ({
+  BannerNotificationRepository: {
+    findAllOrderedBySlot: vi.fn(),
+    searchByContent: vi.fn(),
+    upsertBySlot: vi.fn(),
+    deleteBySlot: vi.fn(),
+  },
+}));
+vi.mock('@/lib/repositories/site-settings-repository', () => ({
+  SiteSettingsRepository: {
+    findByKey: vi.fn(),
+    upsertByKey: vi.fn(),
   },
 }));
 vi.mock('@prisma/client', async () => {
@@ -57,11 +56,12 @@ vi.mock('@/lib/utils/simple-cache', () => ({
   withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
 }));
 
-const mockFindMany = vi.mocked(prisma.bannerNotification.findMany);
-const mockBannerUpsert = vi.mocked(prisma.bannerNotification.upsert);
-const mockDelete = vi.mocked(prisma.bannerNotification.delete);
-const mockSettingsFindUnique = vi.mocked(prisma.siteSettings.findUnique);
-const mockSettingsUpsert = vi.mocked(prisma.siteSettings.upsert);
+const mockFindMany = vi.mocked(BannerNotificationRepository.findAllOrderedBySlot);
+const mockSearch = vi.mocked(BannerNotificationRepository.searchByContent);
+const mockBannerUpsert = vi.mocked(BannerNotificationRepository.upsertBySlot);
+const mockDelete = vi.mocked(BannerNotificationRepository.deleteBySlot);
+const mockSettingsFindUnique = vi.mocked(SiteSettingsRepository.findByKey);
+const mockSettingsUpsert = vi.mocked(SiteSettingsRepository.upsertByKey);
 const mockCacheDelete = vi.mocked(cache.delete);
 const mockWithCache = vi.mocked(withCache);
 
@@ -323,7 +323,7 @@ describe('BannerNotificationService', () => {
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<unknown[]>).data).toEqual([mockNotification]);
-      expect(mockFindMany).toHaveBeenCalledWith({ orderBy: { slotNumber: 'asc' } });
+      expect(mockFindMany).toHaveBeenCalledWith();
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
@@ -366,28 +366,7 @@ describe('BannerNotificationService', () => {
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<{ content: string }>).data.content).toBe('Updated content');
-      expect(mockBannerUpsert).toHaveBeenCalledWith({
-        where: { slotNumber: 1 },
-        update: {
-          content: upsertData.content,
-          textColor: upsertData.textColor,
-          backgroundColor: upsertData.backgroundColor,
-          displayFrom: upsertData.displayFrom,
-          displayUntil: upsertData.displayUntil,
-          repostedFromId: upsertData.repostedFromId,
-          addedById: upsertData.addedById,
-        },
-        create: {
-          slotNumber: 1,
-          content: upsertData.content,
-          textColor: upsertData.textColor,
-          backgroundColor: upsertData.backgroundColor,
-          displayFrom: upsertData.displayFrom,
-          displayUntil: upsertData.displayUntil,
-          repostedFromId: upsertData.repostedFromId,
-          addedById: upsertData.addedById,
-        },
-      });
+      expect(mockBannerUpsert).toHaveBeenCalledWith(1, upsertData);
       expect(mockCacheDelete).toHaveBeenCalled();
     });
 
@@ -398,28 +377,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.upsertNotification(2, upsertData);
 
       expect(result.success).toBe(true);
-      expect(mockBannerUpsert).toHaveBeenCalledWith({
-        where: { slotNumber: 2 },
-        update: {
-          content: upsertData.content,
-          textColor: upsertData.textColor,
-          backgroundColor: upsertData.backgroundColor,
-          displayFrom: upsertData.displayFrom,
-          displayUntil: upsertData.displayUntil,
-          repostedFromId: upsertData.repostedFromId,
-          addedById: upsertData.addedById,
-        },
-        create: {
-          slotNumber: 2,
-          content: upsertData.content,
-          textColor: upsertData.textColor,
-          backgroundColor: upsertData.backgroundColor,
-          displayFrom: upsertData.displayFrom,
-          displayUntil: upsertData.displayUntil,
-          repostedFromId: upsertData.repostedFromId,
-          addedById: upsertData.addedById,
-        },
-      });
+      expect(mockBannerUpsert).toHaveBeenCalledWith(2, upsertData);
       expect(mockCacheDelete).toHaveBeenCalled();
     });
 
@@ -441,7 +399,7 @@ describe('BannerNotificationService', () => {
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<{ deleted: boolean }>).data).toEqual({ deleted: true });
-      expect(mockDelete).toHaveBeenCalledWith({ where: { slotNumber: 1 } });
+      expect(mockDelete).toHaveBeenCalledWith(1);
       expect(mockCacheDelete).toHaveBeenCalled();
     });
 
@@ -485,58 +443,34 @@ describe('BannerNotificationService', () => {
     };
 
     it('should search with query string', async () => {
-      mockFindMany.mockResolvedValue([searchResult]);
+      mockSearch.mockResolvedValue([searchResult]);
 
       const result = await BannerNotificationService.searchNotifications('test');
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<unknown[]>).data).toEqual([searchResult]);
-      expect(mockFindMany).toHaveBeenCalledWith({
-        where: { content: { contains: 'test', mode: 'insensitive' } },
-        select: {
-          id: true,
-          content: true,
-          textColor: true,
-          backgroundColor: true,
-          slotNumber: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
+      expect(mockSearch).toHaveBeenCalledWith('test', 20);
     });
 
     it('should return all non-null content when query is empty', async () => {
-      mockFindMany.mockResolvedValue([searchResult]);
+      mockSearch.mockResolvedValue([searchResult]);
 
       const result = await BannerNotificationService.searchNotifications('');
 
       expect(result.success).toBe(true);
-      expect(mockFindMany).toHaveBeenCalledWith({
-        where: { content: { not: null } },
-        select: {
-          id: true,
-          content: true,
-          textColor: true,
-          backgroundColor: true,
-          slotNumber: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
+      expect(mockSearch).toHaveBeenCalledWith('', 20);
     });
 
     it('should respect custom take parameter', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockSearch.mockResolvedValue([]);
 
       await BannerNotificationService.searchNotifications('test', 5);
 
-      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }));
+      expect(mockSearch).toHaveBeenCalledWith('test', 5);
     });
 
     it('should return error on failure', async () => {
-      mockFindMany.mockRejectedValue(new Error('Search failed'));
+      mockSearch.mockRejectedValue(new Error('Search failed'));
 
       const result = await BannerNotificationService.searchNotifications('test');
 
@@ -557,9 +491,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getRotationInterval();
 
       expect(result).toBe(8);
-      expect(mockSettingsFindUnique).toHaveBeenCalledWith({
-        where: { key: 'carousel-rotation-interval' },
-      });
+      expect(mockSettingsFindUnique).toHaveBeenCalledWith('carousel-rotation-interval');
     });
 
     it('should return default interval when no setting exists', async () => {
@@ -657,11 +589,7 @@ describe('BannerNotificationService', () => {
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<{ interval: number }>).data).toEqual({ interval: 10 });
-      expect(mockSettingsUpsert).toHaveBeenCalledWith({
-        where: { key: 'carousel-rotation-interval' },
-        update: { value: '10' },
-        create: { key: 'carousel-rotation-interval', value: '10' },
-      });
+      expect(mockSettingsUpsert).toHaveBeenCalledWith('carousel-rotation-interval', '10');
       expect(mockCacheDelete).toHaveBeenCalled();
     });
 

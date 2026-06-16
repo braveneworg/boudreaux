@@ -222,6 +222,42 @@ describe('queryKeys', () => {
     });
   });
 
+  describe('chat', () => {
+    it('should return all key', () => {
+      expect(queryKeys.chat.all).toEqual(['chat']);
+    });
+
+    it('should return messages key extending all', () => {
+      const key = queryKeys.chat.messages();
+      expect(key).toEqual(['chat', 'messages']);
+    });
+
+    it('should return pinned key extending all', () => {
+      const key = queryKeys.chat.pinned();
+      expect(key).toEqual(['chat', 'pinned']);
+    });
+
+    it('should return adminUsers key with page and sort params', () => {
+      const key = queryKeys.chat.adminUsers(2, 'createdAt', 'desc');
+      expect(key).toEqual(['chat', 'adminUsers', 2, 'createdAt', 'desc']);
+    });
+
+    it('should return mentionSearch key with query', () => {
+      const key = queryKeys.chat.mentionSearch('ali');
+      expect(key).toEqual(['chat', 'mentionSearch', 'ali']);
+    });
+
+    it('should return me key extending all', () => {
+      const key = queryKeys.chat.me();
+      expect(key).toEqual(['chat', 'me']);
+    });
+
+    it('should return userMessages key with userId', () => {
+      const key = queryKeys.chat.userMessages('u-123');
+      expect(key).toEqual(['chat', 'userMessages', 'u-123']);
+    });
+  });
+
   describe('infinite-scroll keys', () => {
     it('normalizes the published-releases infinite key search term', () => {
       expect(queryKeys.releases.publishedInfinite('  Rock  ')).toEqual([

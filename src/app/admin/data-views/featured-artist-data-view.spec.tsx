@@ -65,6 +65,7 @@ const createWrapper = () => {
 /** Wraps an array of featured-artist rows in the infinite-query page shape. */
 const toInfiniteResult = (rows: unknown[]) => ({
   isPending: false,
+  isFetching: false,
   error: null,
   data: { pages: [{ rows, nextSkip: null }] },
   refetch: vi.fn(),
@@ -315,5 +316,17 @@ describe('FeaturedArtistDataView', () => {
     await waitFor(() => {
       expect(screen.getByText('Unnamed')).toBeInTheDocument();
     });
+  });
+
+  it('passes a published filter to the query when the publish toggles differ', async () => {
+    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
+
+    expect(useFeaturedArtistsQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ published: true })
+    );
   });
 });

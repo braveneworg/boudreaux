@@ -196,4 +196,81 @@ describe('ChatMessageRow', () => {
       expect(strong.querySelector('[data-mention-username="alice"]')).not.toBeNull();
     });
   });
+
+  it('highlights @mentions in a non-admin body and lists them as targets', () => {
+    const { container } = render(<ChatMessageRow message={makeMsg({ body: 'hey @alice!' })} />);
+
+    const mention = container.querySelector('[data-mention-username="alice"]');
+    if (!mention) throw new Error('Expected a mention span');
+    expect(mention.textContent).toBe('@alice');
+    const body = container.querySelector('p');
+    expect(body?.getAttribute('data-mention-targets')).toBe('alice');
+  });
+
+  it('renders the pinIndicator inside a right-aligned header', () => {
+    render(
+      <ChatMessageRow
+        align="right"
+        message={makeMsg()}
+        pinIndicator={<button data-testid="pin-right">pin</button>}
+      />
+    );
+    expect(screen.getByTestId('pin-right')).toBeInTheDocument();
+  });
+
+  it('right-aligns the reaction-bar slot with pr-8 spacing', () => {
+    const { container } = render(
+      <ChatMessageRow
+        align="right"
+        message={makeMsg()}
+        reactionBar={<div data-testid="rb">bar</div>}
+      />
+    );
+    const reactionWrap = screen.getByTestId('rb').parentElement;
+    expect(reactionWrap).toHaveClass('pr-8');
+    expect(container.querySelector('p')).toHaveClass('pr-8');
+  });
+
+  describe('SITE_HOST resolution (NEXT_PUBLIC_BASE_URL)', () => {
+    const adminUser = { id: 'admin-1', username: 'mod', gravatarHash: 'h', role: 'admin' as const };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    it('treats a link on the configured host as internal (no new tab)', async () => {
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://chat.example.com');
+      vi.resetModules();
+      const mod = await import('./chat-message-row');
+      const { container } = render(
+        <mod.ChatMessageRow
+          message={makeMsg({
+            user: adminUser,
+            body: 'see [home](https://chat.example.com/welcome)',
+          })}
+        />
+      );
+      const anchor = container.querySelector('a');
+      if (!anchor) throw new Error('Expected an anchor');
+      expect(anchor.getAttribute('target')).toBeNull();
+    });
+
+    it('falls back to external classification when NEXT_PUBLIC_BASE_URL is unparseable', async () => {
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'not a valid url');
+      vi.resetModules();
+      const mod = await import('./chat-message-row');
+      const { container } = render(
+        <mod.ChatMessageRow
+          message={makeMsg({
+            user: adminUser,
+            body: 'see [wiki](https://en.wikipedia.org/wiki/x)',
+          })}
+        />
+      );
+      const anchor = container.querySelector('a');
+      if (!anchor) throw new Error('Expected an anchor');
+      expect(anchor.getAttribute('target')).toBe('_blank');
+    });
+  });
 });

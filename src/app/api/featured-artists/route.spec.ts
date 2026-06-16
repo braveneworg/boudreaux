@@ -107,7 +107,9 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        rows: JSON.parse(JSON.stringify(mockFeaturedArtists)),
+        // serializeForResponse only converts BigInt; Date instances are
+        // preserved (the mock NextResponse returns the object unserialized).
+        rows: mockFeaturedArtists,
         nextSkip: null,
       });
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
@@ -424,7 +426,7 @@ describe('Featured Artists API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(201);
-      expect(data).toEqual(JSON.parse(JSON.stringify(mockFeaturedArtist)));
+      expect(data).toEqual(mockFeaturedArtist);
     });
 
     it('should return 400 when required fields are missing', async () => {

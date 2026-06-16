@@ -4,7 +4,7 @@
 import 'server-only';
 
 import { sendAbuseReportNotificationEmail } from '@/lib/email/send-abuse-report-notification';
-import { prisma } from '@/lib/prisma';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { getSmsService } from '@/lib/services/get-sms-service';
 
 interface DispatchInput {
@@ -23,16 +23,7 @@ interface DispatchInput {
  * bodies. The function does not even accept a reporter parameter.
  */
 export async function dispatchAbuseReportNotifications(input: DispatchInput): Promise<void> {
-  const admins = await prisma.user.findMany({
-    where: { role: 'admin' },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      phone: true,
-      allowSmsNotifications: true,
-    },
-  });
+  const admins = await UserRepository.findAdmins();
 
   if (admins.length === 0) {
     console.warn(
@@ -51,7 +42,7 @@ export async function dispatchAbuseReportNotifications(input: DispatchInput): Pr
   // process mid-dispatch.
   await Promise.allSettled(
     admins.map(async (admin) => {
-      const recipientUsername = admin.username ?? admin.email.split('@')[0] ?? 'admin';
+      const recipientUsername = admin.username ?? admin.email.split('@')[0];
 
       const emailPromise = sendAbuseReportNotificationEmail({
         toEmail: admin.email,
@@ -61,24 +52,25 @@ export async function dispatchAbuseReportNotifications(input: DispatchInput): Pr
         console.error(`[dispatchAbuseReportNotifications] email failed for ${admin.email}:`, error);
       });
 
-      const shouldSms = Boolean(admin.allowSmsNotifications) && Boolean(admin.phone);
-      const smsPromise = shouldSms
-        ? sms
-            .send(admin.phone ?? '', smsBody, { transactional: true })
-            .then((result) => {
-              if (!result.ok) {
+      // Truthy-guard narrows `admin.phone` to a non-null string for `send`.
+      const smsPromise =
+        admin.allowSmsNotifications && admin.phone
+          ? sms
+              .send(admin.phone, smsBody, { transactional: true })
+              .then((result) => {
+                if (!result.ok) {
+                  console.error(
+                    `[dispatchAbuseReportNotifications] SMS failed for admin ${admin.id}: ${result.error}`
+                  );
+                }
+              })
+              .catch((error) => {
                 console.error(
-                  `[dispatchAbuseReportNotifications] SMS failed for admin ${admin.id}: ${result.error}`
+                  `[dispatchAbuseReportNotifications] SMS threw for admin ${admin.id}:`,
+                  error
                 );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `[dispatchAbuseReportNotifications] SMS threw for admin ${admin.id}:`,
-                error
-              );
-            })
-        : Promise.resolve();
+              })
+          : Promise.resolve();
 
       await Promise.all([emailPromise, smsPromise]);
     })

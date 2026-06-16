@@ -67,9 +67,13 @@ export default async function middleware(request: NextRequest) {
 
   // Role-based authorization for admin routes
   if (pathname.startsWith('/admin')) {
+    /* v8 ignore start -- defensive: an unauthenticated /admin request is already
+       redirected to /signin by the `!token && !isPublicRoute` guard above, so this
+       branch is unreachable. Kept as defense-in-depth for the admin role check. */
     if (!token) {
       return NextResponse.redirect(new URL('/signin', request.url));
     }
+    /* v8 ignore stop */
 
     const userRole = (token.user as TokenUser | null | undefined)?.role;
     if (userRole !== 'admin') {

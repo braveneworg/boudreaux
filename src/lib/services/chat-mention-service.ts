@@ -4,8 +4,8 @@
 import 'server-only';
 
 import { sendChatMentionEmail } from '@/lib/email/send-chat-mention';
-import { prisma } from '@/lib/prisma';
 import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { loggers } from '@/lib/utils/logger';
 import { extractMentionUsernames } from '@/lib/utils/mention-parsing';
 import { getRedisClient } from '@/lib/utils/upstash-redis';
@@ -70,18 +70,7 @@ export class ChatMentionService {
     const trimmed = prefix.trim();
     if (trimmed.length === 0) return [];
 
-    const rows = await prisma.user.findMany({
-      where: {
-        username: {
-          startsWith: trimmed,
-          mode: 'insensitive',
-        },
-        NOT: { id: excludeUserId },
-      },
-      select: { id: true, username: true },
-      take: SEARCH_LIMIT,
-      orderBy: { username: 'asc' },
-    });
+    const rows = await UserRepository.searchByUsernamePrefix(trimmed, excludeUserId, SEARCH_LIMIT);
 
     return rows
       .filter((row): row is { id: string; username: string } => row.username !== null)
@@ -100,13 +89,7 @@ export class ChatMentionService {
     const usernames = extractMentionUsernames(body);
     if (usernames.length === 0) return [];
 
-    const rows = await prisma.user.findMany({
-      where: {
-        username: { in: usernames, mode: 'insensitive' },
-        NOT: { id: authorId },
-      },
-      select: { id: true, username: true, email: true },
-    });
+    const rows = await UserRepository.findByUsernames(usernames, authorId);
 
     return rows
       .filter(
@@ -205,12 +188,11 @@ export class ChatMentionService {
           }
         } catch (error) {
           // Re-buffer so the next mention can retry, and release the
-          // throttle so the next mention is the one that flushes.
+          // throttle so the next mention is the one that flushes. `mentions`
+          // always contains the current mention, so the push is unconditional.
           await redis.del(tKey);
-          if (mentions.length > 0) {
-            await redis.rpush(bKey, ...mentions.map((m) => JSON.stringify(m)));
-            await redis.expire(bKey, MENTION_BUFFER_TTL_SECONDS);
-          }
+          await redis.rpush(bKey, ...mentions.map((m) => JSON.stringify(m)));
+          await redis.expire(bKey, MENTION_BUFFER_TTL_SECONDS);
           logger.error('Chat mention email failed', {
             module: 'CHAT',
             operation: 'notifyMentions',

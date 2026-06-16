@@ -335,6 +335,9 @@ export function useDigitalFormatUploads({
       }
 
       // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+      /* v8 ignore start -- defensive guard: a successful uploadSingleFile result
+         (asserted above) is impossible without a releaseId, since uploadSingleFile
+         returns { success: false } when releaseId is falsy. */
       if (!releaseId) {
         const errMsg = 'Cannot confirm upload: missing release ID';
         setUploadStates((prev) => ({
@@ -345,6 +348,7 @@ export function useDigitalFormatUploads({
         toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
         return;
       }
+      /* v8 ignore stop */
       setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
       try {
         const confirmResult = await confirmDigitalFormatUploadAction({
@@ -591,6 +595,9 @@ export function useDigitalFormatUploads({
         }
 
         // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+        /* v8 ignore start -- defensive guard: successFiles is non-empty here, which
+           is impossible without a releaseId, since uploadSingleFile returns
+           { success: false } when releaseId is falsy. */
         if (!releaseId) {
           const errMsg = 'Cannot confirm upload: missing release ID';
           setUploadStates((prev) => ({
@@ -601,6 +608,7 @@ export function useDigitalFormatUploads({
           toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
           return;
         }
+        /* v8 ignore stop */
         let confirmOk = false;
         if (successFiles.length === 1) {
           const cr = await confirmDigitalFormatUploadAction({

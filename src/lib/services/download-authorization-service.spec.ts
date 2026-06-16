@@ -4,22 +4,24 @@
 
 import { SOFT_DELETE_GRACE_PERIOD_DAYS } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { prisma } from '@/lib/prisma';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { generatePresignedDownloadUrl } from '@/lib/utils/s3-client';
 
 import { DownloadAuthorizationService } from './download-authorization-service';
 
 import type { ReleaseDigitalFormat, ReleasePurchase } from '@prisma/client';
 
-// Mock Prisma client
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    releasePurchase: {
-      findUnique: vi.fn(),
-    },
-    releaseDigitalFormat: {
-      findFirst: vi.fn(),
-    },
+// Mock repositories — the service no longer touches Prisma directly.
+vi.mock('@/lib/repositories/purchase-repository', () => ({
+  PurchaseRepository: {
+    findByUserReleaseKey: vi.fn(),
+  },
+}));
+
+const findActiveByReleaseAndFormat = vi.fn();
+vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
+  ReleaseDigitalFormatRepository: class {
+    findActiveByReleaseAndFormat = findActiveByReleaseAndFormat;
   },
 }));
 
@@ -62,7 +64,7 @@ describe('DownloadAuthorizationService', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('checkPurchaseStatus', () => {
@@ -75,25 +77,21 @@ describe('DownloadAuthorizationService', () => {
         currency: 'usd',
       };
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
 
       const result = await service.checkPurchaseStatus(mockUserId, mockReleaseId);
 
-      expect(prisma.releasePurchase.findUnique).toHaveBeenCalledWith({
-        where: {
-          userId_releaseId: {
-            userId: mockUserId,
-            releaseId: mockReleaseId,
-          },
-        },
-      });
+      expect(PurchaseRepository.findByUserReleaseKey).toHaveBeenCalledWith(
+        mockUserId,
+        mockReleaseId
+      );
       expect(result).toBe(true);
     });
 
     it('should return false when user has no purchase', async () => {
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(null);
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(null);
 
       const result = await service.checkPurchaseStatus(mockUserId, mockReleaseId);
 
@@ -105,22 +103,16 @@ describe('DownloadAuthorizationService', () => {
     it('should return format record when format exists and is not deleted', async () => {
       const mockFormat = createMockFormat();
 
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(mockFormat);
+      findActiveByReleaseAndFormat.mockResolvedValue(mockFormat);
 
       const result = await service.checkFormatExists(mockReleaseId, mockFormatType);
 
-      expect(prisma.releaseDigitalFormat.findFirst).toHaveBeenCalledWith({
-        where: {
-          releaseId: mockReleaseId,
-          formatType: mockFormatType,
-          deletedAt: null,
-        },
-      });
+      expect(findActiveByReleaseAndFormat).toHaveBeenCalledWith(mockReleaseId, mockFormatType);
       expect(result).toEqual(mockFormat);
     });
 
     it('should return null when format does not exist', async () => {
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(null);
+      findActiveByReleaseAndFormat.mockResolvedValue(null);
 
       const result = await service.checkFormatExists(mockReleaseId, mockFormatType);
 
@@ -128,7 +120,7 @@ describe('DownloadAuthorizationService', () => {
     });
 
     it('should return null when format is soft-deleted', async () => {
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(null);
+      findActiveByReleaseAndFormat.mockResolvedValue(null);
 
       const result = await service.checkFormatExists(mockReleaseId, mockFormatType);
 
@@ -211,10 +203,10 @@ describe('DownloadAuthorizationService', () => {
       };
       const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(mockFormat);
+      findActiveByReleaseAndFormat.mockResolvedValue(mockFormat);
       vi.mocked(generatePresignedDownloadUrl).mockResolvedValue(mockPresignedUrl);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
@@ -227,7 +219,7 @@ describe('DownloadAuthorizationService', () => {
     });
 
     it('should deny download when user has not purchased', async () => {
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(null);
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(null);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
 
@@ -238,7 +230,7 @@ describe('DownloadAuthorizationService', () => {
       });
 
       // Should not check format or generate URL
-      expect(prisma.releaseDigitalFormat.findFirst).not.toHaveBeenCalled();
+      expect(findActiveByReleaseAndFormat).not.toHaveBeenCalled();
       expect(generatePresignedDownloadUrl).not.toHaveBeenCalled();
     });
 
@@ -250,10 +242,10 @@ describe('DownloadAuthorizationService', () => {
         amountPaid: 500,
       };
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(null);
+      findActiveByReleaseAndFormat.mockResolvedValue(null);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
 
@@ -281,10 +273,10 @@ describe('DownloadAuthorizationService', () => {
         amountPaid: 500,
       };
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(deletedFormat);
+      findActiveByReleaseAndFormat.mockResolvedValue(deletedFormat);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
 
@@ -308,10 +300,10 @@ describe('DownloadAuthorizationService', () => {
         amountPaid: 500,
       };
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(incompleteFormat);
+      findActiveByReleaseAndFormat.mockResolvedValue(incompleteFormat);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
 
@@ -338,10 +330,10 @@ describe('DownloadAuthorizationService', () => {
       };
       const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
 
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+      vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
         mockPurchase as ReleasePurchase
       );
-      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(deletedFormat);
+      findActiveByReleaseAndFormat.mockResolvedValue(deletedFormat);
       vi.mocked(generatePresignedDownloadUrl).mockResolvedValue(mockPresignedUrl);
 
       const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);

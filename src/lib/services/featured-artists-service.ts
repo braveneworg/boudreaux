@@ -5,7 +5,7 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
+import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { withCache } from '@/lib/utils/simple-cache';
 
@@ -16,33 +16,7 @@ export class FeaturedArtistsService {
     data: Prisma.FeaturedArtistCreateInput
   ): Promise<ServiceResponse<FeaturedArtist>> {
     try {
-      const artist = await prisma.featuredArtist.create({
-        data,
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const artist = await FeaturedArtistRepository.create(data);
       return { success: true, data: artist };
     } catch (error) {
       // Connection/network issues
@@ -68,47 +42,7 @@ export class FeaturedArtistsService {
       cacheKey,
       async () => {
         try {
-          const artists = await prisma.featuredArtist.findMany({
-            where: {
-              publishedOn: { not: null },
-              featuredOn: {
-                lte: currentDate,
-              },
-              OR: [
-                { featuredUntil: null },
-                { featuredUntil: { isSet: false } },
-                { featuredUntil: { gte: currentDate } },
-              ],
-            },
-            include: {
-              artists: {
-                include: {
-                  images: true,
-                },
-              },
-              digitalFormat: {
-                include: {
-                  files: {
-                    orderBy: { trackNumber: 'asc' as const },
-                  },
-                },
-              },
-              release: {
-                include: {
-                  images: true,
-                  artistReleases: {
-                    include: {
-                      artist: true,
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: {
-              featuredOn: 'desc',
-            },
-            take: limit,
-          });
+          const artists = await FeaturedArtistRepository.findFeatured(currentDate, limit);
 
           return { success: true as const, data: artists };
         } catch (error) {
@@ -166,36 +100,7 @@ export class FeaturedArtistsService {
 
       const where: Prisma.FeaturedArtistWhereInput = and.length > 0 ? { AND: and } : {};
 
-      const featuredArtists = await prisma.featuredArtist.findMany({
-        where,
-        skip,
-        take,
-        orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const featuredArtists = await FeaturedArtistRepository.findAll({ where, skip, take });
 
       return { success: true, data: featuredArtists };
     } catch (error) {
@@ -214,33 +119,7 @@ export class FeaturedArtistsService {
    */
   static async getFeaturedArtistById(id: string): Promise<ServiceResponse<FeaturedArtist>> {
     try {
-      const featuredArtist = await prisma.featuredArtist.findUnique({
-        where: { id },
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const featuredArtist = await FeaturedArtistRepository.findById(id);
 
       if (!featuredArtist) {
         return { success: false, error: 'Featured artist not found' };
@@ -266,34 +145,7 @@ export class FeaturedArtistsService {
     data: Prisma.FeaturedArtistUpdateInput
   ): Promise<ServiceResponse<FeaturedArtist>> {
     try {
-      const featuredArtist = await prisma.featuredArtist.update({
-        where: { id },
-        data,
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const featuredArtist = await FeaturedArtistRepository.update(id, data);
 
       return { success: true, data: featuredArtist };
     } catch (error) {
@@ -312,89 +164,11 @@ export class FeaturedArtistsService {
   }
 
   /**
-   * Delete a featured artist by ID (soft delete by setting deletedOn)
-   */
-  static async deleteFeaturedArtist(id: string): Promise<ServiceResponse<FeaturedArtist>> {
-    try {
-      const featuredArtist = await prisma.featuredArtist.update({
-        where: { id },
-        data: {
-          // Note: FeaturedArtist model doesn't have deletedOn, so we do a hard delete
-        },
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      return { success: true, data: featuredArtist };
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Featured artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      console.error('Unexpected error:', error);
-      return { success: false, error: 'Failed to delete featured artist' };
-    }
-  }
-
-  /**
    * Hard delete a featured artist by ID
    */
   static async hardDeleteFeaturedArtist(id: string): Promise<ServiceResponse<FeaturedArtist>> {
     try {
-      const featuredArtist = await prisma.featuredArtist.delete({
-        where: { id },
-        include: {
-          artists: {
-            include: {
-              images: true,
-            },
-          },
-          digitalFormat: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' as const },
-              },
-            },
-          },
-          release: {
-            include: {
-              images: true,
-              artistReleases: {
-                include: {
-                  artist: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const featuredArtist = await FeaturedArtistRepository.delete(id);
 
       return { success: true, data: featuredArtist };
     } catch (error) {

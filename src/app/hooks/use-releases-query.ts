@@ -4,9 +4,9 @@
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import type { Release } from '@/lib/types/media-models';
+import type { ReleaseListItem } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { releaseSchema } from '@/lib/validation/media-models-schema';
+import { releaseListItemSchema } from '@/lib/validation/media-models-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 
 import { fetchAndParse } from './fetch-and-parse';
@@ -21,13 +21,13 @@ export interface ReleasesQueryParams {
 }
 
 /** One skip/offset page of releases returned by `/api/releases`. */
-export type ReleasesPaginatedResponse = PaginatedResponse<Release>;
+export type ReleasesPaginatedResponse = PaginatedResponse<ReleaseListItem>;
 
 /** Page size requested per fetch. */
 export const RELEASES_PAGE_SIZE = 24;
 
 /** Strict schema for one `/api/releases` page. */
-const releasesPageSchema = paginatedResponseSchema(releaseSchema);
+const releasesPageSchema = paginatedResponseSchema(releaseListItemSchema);
 
 /**
  * Fetches one page of releases from the `/api/releases` route handler (admin

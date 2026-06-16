@@ -33,16 +33,11 @@ const activeFeaturedArtistsResponseSchema = z.object({
  */
 const fetchActiveFeaturedArtists = async ({
   signal,
-}: QueryFunctionContext): Promise<ActiveFeaturedArtistsResponse> => {
-  return fetchAndParse(
-    '/api/featured-artists?active=true&limit=7',
-    activeFeaturedArtistsResponseSchema,
-    {
-      signal,
-      errorMessage: 'Failed to fetch featured artists',
-    }
-  );
-};
+}: QueryFunctionContext): Promise<ActiveFeaturedArtistsResponse> =>
+  fetchAndParse('/api/featured-artists?active=true&limit=7', activeFeaturedArtistsResponseSchema, {
+    signal,
+    errorMessage: 'Failed to fetch featured artists',
+  });
 
 /**
  * React Query hook for fetching the active featured artists.

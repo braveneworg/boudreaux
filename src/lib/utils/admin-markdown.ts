@@ -52,9 +52,13 @@ function isExternalHref(href: string, siteHost: string | undefined): boolean {
     if (url.protocol === 'mailto:') return true;
     if (!siteHost) return true;
     return normaliseHost(url.host) !== normaliseHost(siteHost);
+    /* v8 ignore start -- the only caller passes a sanitised href that is
+       either a bare `/` path (returned above) or an already-normalised URL,
+       so `new URL` here can never throw; the catch is defensive only. */
   } catch {
     return false;
   }
+  /* v8 ignore stop */
 }
 
 /**

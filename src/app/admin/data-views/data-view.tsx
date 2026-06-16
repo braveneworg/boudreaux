@@ -79,6 +79,7 @@ export function DataView<T extends Record<string, unknown>>({
   forceHardDelete = false,
   refetch,
   isPending,
+  isFetching = false,
   error,
   hasNextPage,
   fetchNextPage,
@@ -104,6 +105,8 @@ export function DataView<T extends Record<string, unknown>>({
   forceHardDelete?: boolean;
   refetch: () => void;
   isPending: boolean;
+  /** Whether the query is fetching (e.g. after `refetch()`); drives the refresh skeleton. */
+  isFetching?: boolean;
   error?: string | null;
   /** For infinite scroll - whether there are more pages to load */
   hasNextPage?: boolean;
@@ -291,6 +294,10 @@ export function DataView<T extends Record<string, unknown>>({
     [entityDisplayLabel, updateEntity, refetch, resolveDisplayName]
   );
 
+  // Show the full-area skeleton on a refetch (e.g. after publish/delete/restore),
+  // but not while paging in more items — that keeps its own "Loading more..." spinner.
+  const showRefreshSkeleton = isFetching && !isFetchingNextPage;
+
   return (
     <div className="mx-1">
       <Button
@@ -333,131 +340,147 @@ export function DataView<T extends Record<string, unknown>>({
           Show unpublished
         </Label>
       </div>
-      {data && (data[`${entity}s`] as T[]).length > 0 ? (
-        <>
-          <ul>
-            {(data[`${String(entity)}s`] as T[]).map((item) => {
-              const id = item.id as string;
+      <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
+        {data && (data[`${entity}s`] as T[]).length > 0 ? (
+          <>
+            <ul>
+              {(data[`${String(entity)}s`] as T[]).map((item) => {
+                const id = item.id as string;
 
-              return (
-                <li key={id}>
-                  <Card>
-                    {/* Image thumbnails */}
-                    {(() => {
-                      // First check for direct coverArt URL field
-                      let coverArtUrl = coverArtField
-                        ? (item[coverArtField] as string | undefined)
-                        : undefined;
+                return (
+                  <li key={id}>
+                    <Card>
+                      {/* Image thumbnails */}
+                      {(() => {
+                        // First check for direct coverArt URL field
+                        let coverArtUrl = coverArtField
+                          ? (item[coverArtField] as string | undefined)
+                          : undefined;
 
-                      // Fallback: check releaseTracks for coverArt (for tracks)
-                      if (!coverArtUrl && item.releaseTracks) {
-                        const releaseTracks = item.releaseTracks as Array<{
-                          coverArt?: string;
-                        }>;
-                        coverArtUrl = releaseTracks[0]?.coverArt;
-                      }
+                        // Fallback: check releaseTracks for coverArt (for tracks)
+                        if (!coverArtUrl && item.releaseTracks) {
+                          const releaseTracks = item.releaseTracks as Array<{
+                            coverArt?: string;
+                          }>;
+                          coverArtUrl = releaseTracks[0]?.coverArt;
+                        }
 
-                      // Then check for images array
-                      const images = imageField
-                        ? (item[imageField] as
-                            | Array<{ src?: string; altText?: string }>
-                            | undefined)
-                        : undefined;
+                        // Then check for images array
+                        const images = imageField
+                          ? (item[imageField] as
+                              | Array<{ src?: string; altText?: string }>
+                              | undefined)
+                          : undefined;
 
-                      // If we have a direct cover art URL, show it
-                      if (coverArtUrl) {
-                        const resolvedCoverArtUrl: string = coverArtUrl;
-                        const isBase64 = resolvedCoverArtUrl.startsWith('data:');
-                        return (
-                          <div className="mb-3 flex justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPreviewImage({ src: resolvedCoverArtUrl, altText: 'Cover art' })
-                              }
-                              className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                            >
-                              {isBase64 ? (
-                                // Use native img for base64 data URLs
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={resolvedCoverArtUrl}
-                                  alt="Cover art"
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <Image
-                                  src={cleanImageUrl(resolvedCoverArtUrl)}
-                                  alt="Cover art"
-                                  fill
-                                  className="object-cover"
-                                  sizes="64px"
-                                />
-                              )}
-                              <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
-                                <Eye className="h-3 w-3" />
-                              </span>
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      // If we have images array, show those
-                      if (images && images.length > 0) {
-                        return (
-                          <div className="mb-3 flex justify-center gap-2">
-                            {images.slice(0, 3).map((image) =>
-                              image.src ? (
-                                <button
-                                  key={image.src}
-                                  type="button"
-                                  onClick={() =>
-                                    setPreviewImage(image as { src: string; altText?: string })
-                                  }
-                                  className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                                >
+                        // If we have a direct cover art URL, show it
+                        if (coverArtUrl) {
+                          const resolvedCoverArtUrl: string = coverArtUrl;
+                          const isBase64 = resolvedCoverArtUrl.startsWith('data:');
+                          return (
+                            <div className="mb-3 flex justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    src: resolvedCoverArtUrl,
+                                    altText: 'Cover art',
+                                  })
+                                }
+                                className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                              >
+                                {isBase64 ? (
+                                  // Use native img for base64 data URLs
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={resolvedCoverArtUrl}
+                                    alt="Cover art"
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
                                   <Image
-                                    src={cleanImageUrl(image.src)}
-                                    alt={image.altText || `${entity} image`}
+                                    src={cleanImageUrl(resolvedCoverArtUrl)}
+                                    alt="Cover art"
                                     fill
                                     className="object-cover"
                                     sizes="64px"
                                   />
-                                  <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
-                                    <Eye className="h-3 w-3" />
-                                  </span>
-                                </button>
-                              ) : null
-                            )}
-                          </div>
-                        );
-                      }
+                                )}
+                                <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+                                  <Eye className="h-3 w-3" />
+                                </span>
+                              </button>
+                            </div>
+                          );
+                        }
 
-                      return null;
-                    })()}
-                    <div className="mb-2 flex flex-row items-center justify-center gap-2">
-                      <InfoIcon className="h-4 w-4" />
-                      <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
-                    </div>
-                    <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
-                    {fieldsToShow.map((field: string, index: number) => {
-                      if (field.endsWith('At') || field.endsWith('On')) {
-                        const dateValue = item[field] ? new Date(item[field] as string) : null;
-                        /**
-                         * The formatted date string in locale-specific format (M/D/YYYY).
-                         * Uses the default locale with numeric representation for year, month, and day.
-                         * Returns '-' if dateValue is null/undefined.
-                         *
-                         * Note: 'default' is a valid locale argument that uses the runtime's default locale,
-                         * though it's often clearer to use `undefined` or explicitly specify a locale like 'en-US'.
-                         */
-                        const formattedDate = dateValue
-                          ? dateValue.toLocaleDateString('default', {
-                              year: 'numeric',
-                              month: 'numeric',
-                              day: 'numeric',
-                            })
-                          : '-';
+                        // If we have images array, show those
+                        if (images && images.length > 0) {
+                          return (
+                            <div className="mb-3 flex justify-center gap-2">
+                              {images.slice(0, 3).map((image) =>
+                                image.src ? (
+                                  <button
+                                    key={image.src}
+                                    type="button"
+                                    onClick={() =>
+                                      setPreviewImage(image as { src: string; altText?: string })
+                                    }
+                                    className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                                  >
+                                    <Image
+                                      src={cleanImageUrl(image.src)}
+                                      alt={image.altText || `${entity} image`}
+                                      fill
+                                      className="object-cover"
+                                      sizes="64px"
+                                    />
+                                    <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+                                      <Eye className="h-3 w-3" />
+                                    </span>
+                                  </button>
+                                ) : null
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
+                      <div className="mb-2 flex flex-row items-center justify-center gap-2">
+                        <InfoIcon className="h-4 w-4" />
+                        <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
+                      </div>
+                      <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
+                      {fieldsToShow.map((field: string, index: number) => {
+                        if (field.endsWith('At') || field.endsWith('On')) {
+                          const dateValue = item[field] ? new Date(item[field] as string) : null;
+                          /**
+                           * The formatted date string in locale-specific format (M/D/YYYY).
+                           * Uses the default locale with numeric representation for year, month, and day.
+                           * Returns '-' if dateValue is null/undefined.
+                           *
+                           * Note: 'default' is a valid locale argument that uses the runtime's default locale,
+                           * though it's often clearer to use `undefined` or explicitly specify a locale like 'en-US'.
+                           */
+                          const formattedDate = dateValue
+                            ? dateValue.toLocaleDateString('default', {
+                                year: 'numeric',
+                                month: 'numeric',
+                                day: 'numeric',
+                              })
+                            : '-';
+                          return (
+                            <span className="ml-2 leading-7" key={`${field}-${index + 1}`}>
+                              <b>
+                                {toPascalCase(field)
+                                  .split(/(?=[A-Z])/)
+                                  .join(' ')}
+                              </b>
+                              : <span>{formattedDate}</span>
+                            </span>
+                          );
+                        }
+
                         return (
                           <span className="ml-2 leading-7" key={`${field}-${index + 1}`}>
                             <b>
@@ -465,165 +488,169 @@ export function DataView<T extends Record<string, unknown>>({
                                 .split(/(?=[A-Z])/)
                                 .join(' ')}
                             </b>
-                            : <span>{formattedDate}</span>
+                            :{' '}
+                            <span>
+                              {field === 'displayName' && !item[field]
+                                ? resolveDisplayName(item)
+                                : String(item[field] ?? '-')}
+                            </span>
                           </span>
                         );
-                      }
-
-                      return (
-                        <span className="ml-2 leading-7" key={`${field}-${index + 1}`}>
-                          <b>
-                            {toPascalCase(field)
-                              .split(/(?=[A-Z])/)
-                              .join(' ')}
-                          </b>
-                          :{' '}
-                          <span>
-                            {field === 'displayName' && !item[field]
-                              ? resolveDisplayName(item)
-                              : String(item[field] ?? '-')}
-                          </span>
-                        </span>
-                      );
-                    })}
-                    <Separator className="mt-2 mb-4 border-[0.5px] border-zinc-400" />
-                    <div className="flex items-center justify-center gap-2">
-                      <Button asChild variant="outline">
-                        <Link href={`/admin/${entityUrlPath}/${id}`}>
-                          <Pencil className="mr-2 size-4" />
-                          Edit
-                        </Link>
-                      </Button>
-                      {((): ReactElement => {
-                        // Check if item is published (releases use publishedAt, others use publishedOn)
-                        const isPublished = !!(item.publishedAt || item.publishedOn);
-                        return (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button disabled={isPublished}>
-                                {isPublished ? (
-                                  <BookCheck className="mr-0 size-4" />
-                                ) : (
-                                  <Send className="mr-0 size-4" />
-                                )}
-                                {isPublished ? 'Published' : 'Publish'}
-                                {isPending && <Spinner className="mr-2 size-4" />}
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <section>
-                                <DialogHeader>
-                                  <DialogTitle asChild>
-                                    <h1 className="text-3xl!">Confirm Publish</h1>
-                                  </DialogTitle>
-                                </DialogHeader>
-                                <p className="mt-1 mb-4">
-                                  Are you sure you want to publish <b>{resolveDisplayName(item)}</b>
-                                  ?
-                                </p>
-                                <DialogFooter>
-                                  <DialogClose asChild>
-                                    <Button variant="secondary">Cancel</Button>
-                                  </DialogClose>
-                                  <DialogClose asChild>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={handleClickPublishButton}
-                                      datasetId={id}
-                                    >
-                                      Confirm
-                                    </Button>
-                                  </DialogClose>
-                                </DialogFooter>
-                              </section>
-                            </DialogContent>
-                          </Dialog>
-                        );
-                      })()}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant={
-                              supportsSoftDelete && item.deletedOn ? 'secondary' : 'destructive'
-                            }
-                          >
-                            {supportsSoftDelete && item.deletedOn ? (
-                              <ArchiveRestoreIcon className="mr-0 size-4" />
-                            ) : (
-                              <Trash2Icon className="mr-0 size-4" />
-                            )}
-                            {supportsSoftDelete && item.deletedOn ? 'Restore' : 'Delete'}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <section>
-                            <DialogHeader>
-                              <DialogTitle asChild>
-                                {supportsSoftDelete && item.deletedOn ? (
-                                  <h1 className="text-3xl!">Confirm Restore</h1>
-                                ) : (
-                                  <h1 className="text-3xl!">Confirm Delete</h1>
-                                )}
-                              </DialogTitle>
-                            </DialogHeader>
-                            <p className="mt-1 mb-4">
-                              Are you sure you want to{' '}
-                              {supportsSoftDelete && item.deletedOn ? 'restore' : 'delete'}{' '}
-                              <b>{resolveDisplayName(item)}</b>?
-                            </p>
-                            <DialogFooter>
-                              <DialogClose asChild>
-                                <Button variant="secondary">Cancel</Button>
-                              </DialogClose>
-                              <DialogClose asChild>
-                                <Button
-                                  variant={
-                                    supportsSoftDelete && item.deletedOn ? 'default' : 'destructive'
-                                  }
-                                  onClick={
-                                    supportsSoftDelete && item.deletedOn
-                                      ? handleClickRestoreButton
-                                      : handleClickDeleteButton
-                                  }
-                                  datasetId={id}
-                                >
-                                  Confirm
+                      })}
+                      <Separator className="mt-2 mb-4 border-[0.5px] border-zinc-400" />
+                      <div className="flex items-center justify-center gap-2">
+                        <Button asChild variant="outline">
+                          <Link href={`/admin/${entityUrlPath}/${id}`}>
+                            <Pencil className="mr-2 size-4" />
+                            Edit
+                          </Link>
+                        </Button>
+                        {((): ReactElement => {
+                          // Check if item is published (releases use publishedAt, others use publishedOn)
+                          const isPublished = !!(item.publishedAt || item.publishedOn);
+                          return (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button disabled={isPublished}>
+                                  {isPublished ? (
+                                    <BookCheck className="mr-0 size-4" />
+                                  ) : (
+                                    <Send className="mr-0 size-4" />
+                                  )}
+                                  {isPublished ? 'Published' : 'Publish'}
+                                  {isPending && <Spinner className="mr-2 size-4" />}
                                 </Button>
-                              </DialogClose>
-                            </DialogFooter>
-                          </section>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </Card>
-                </li>
-              );
-            })}
-          </ul>
-          {/* Infinite scroll load more trigger */}
-          {fetchNextPage && (
-            <div
-              ref={loadMoreRef}
-              className="flex min-h-15 flex-col items-center justify-center gap-2 py-6"
-            >
-              {isFetchingNextPage ? (
-                <div className="flex items-center gap-2">
-                  <Spinner className="size-4" />
-                  <span className="text-zinc-950-foreground text-sm">Loading more...</span>
-                </div>
-              ) : hasNextPage ? (
-                <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
-                  Load More
-                </Button>
-              ) : (
-                <span className="text-zinc-950-foreground text-sm">All items loaded</span>
-              )}
+                              </DialogTrigger>
+                              <DialogContent>
+                                <section>
+                                  <DialogHeader>
+                                    <DialogTitle asChild>
+                                      <h1 className="text-3xl!">Confirm Publish</h1>
+                                    </DialogTitle>
+                                  </DialogHeader>
+                                  <p className="mt-1 mb-4">
+                                    Are you sure you want to publish{' '}
+                                    <b>{resolveDisplayName(item)}</b>?
+                                  </p>
+                                  <DialogFooter>
+                                    <DialogClose asChild>
+                                      <Button variant="secondary">Cancel</Button>
+                                    </DialogClose>
+                                    <DialogClose asChild>
+                                      <Button
+                                        variant="destructive"
+                                        onClick={handleClickPublishButton}
+                                        datasetId={id}
+                                      >
+                                        Confirm
+                                      </Button>
+                                    </DialogClose>
+                                  </DialogFooter>
+                                </section>
+                              </DialogContent>
+                            </Dialog>
+                          );
+                        })()}
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant={
+                                supportsSoftDelete && item.deletedOn ? 'secondary' : 'destructive'
+                              }
+                            >
+                              {supportsSoftDelete && item.deletedOn ? (
+                                <ArchiveRestoreIcon className="mr-0 size-4" />
+                              ) : (
+                                <Trash2Icon className="mr-0 size-4" />
+                              )}
+                              {supportsSoftDelete && item.deletedOn ? 'Restore' : 'Delete'}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <section>
+                              <DialogHeader>
+                                <DialogTitle asChild>
+                                  {supportsSoftDelete && item.deletedOn ? (
+                                    <h1 className="text-3xl!">Confirm Restore</h1>
+                                  ) : (
+                                    <h1 className="text-3xl!">Confirm Delete</h1>
+                                  )}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <p className="mt-1 mb-4">
+                                Are you sure you want to{' '}
+                                {supportsSoftDelete && item.deletedOn ? 'restore' : 'delete'}{' '}
+                                <b>{resolveDisplayName(item)}</b>?
+                              </p>
+                              <DialogFooter>
+                                <DialogClose asChild>
+                                  <Button variant="secondary">Cancel</Button>
+                                </DialogClose>
+                                <DialogClose asChild>
+                                  <Button
+                                    variant={
+                                      supportsSoftDelete && item.deletedOn
+                                        ? 'default'
+                                        : 'destructive'
+                                    }
+                                    onClick={
+                                      supportsSoftDelete && item.deletedOn
+                                        ? handleClickRestoreButton
+                                        : handleClickDeleteButton
+                                    }
+                                    datasetId={id}
+                                  >
+                                    Confirm
+                                  </Button>
+                                </DialogClose>
+                              </DialogFooter>
+                            </section>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
+            {/* Infinite scroll load more trigger */}
+            {fetchNextPage && (
+              <div
+                ref={loadMoreRef}
+                className="flex min-h-15 flex-col items-center justify-center gap-2 py-6"
+              >
+                {isFetchingNextPage ? (
+                  <div className="flex items-center gap-2">
+                    <Spinner className="size-4" />
+                    <span className="text-zinc-950-foreground text-sm">Loading more...</span>
+                  </div>
+                ) : hasNextPage ? (
+                  <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
+                    Load More
+                  </Button>
+                ) : (
+                  <span className="text-zinc-950-foreground text-sm">All items loaded</span>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <p>No data available</p>
+        )}
+        {showRefreshSkeleton && (
+          <div
+            data-testid="data-view-overlay"
+            role="status"
+            aria-label={`Loading ${entityDisplayLabel}s`}
+            className="bg-background/60 absolute inset-0 z-10 flex cursor-wait items-start justify-center pt-24 backdrop-blur-sm"
+          >
+            <div className="text-muted-foreground flex items-center gap-2">
+              <Spinner className="size-5" />
+              <span className="text-sm">{`Loading ${entityDisplayLabel}s...`}</span>
             </div>
-          )}
-        </>
-      ) : (
-        <p>No data available</p>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>

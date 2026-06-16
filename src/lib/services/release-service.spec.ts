@@ -3,11 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-import {
-  publishedReleaseDetailInclude,
-  publishedReleaseListingSelect,
-} from '@/lib/types/media-models';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type { Format } from '@/lib/types/media-models';
 
 import { ReleaseService } from './release-service';
@@ -19,43 +16,53 @@ vi.mock('../utils/s3-client', () => ({
   deleteS3Object: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../prisma', () => ({
-  prisma: {
-    release: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    releaseDigitalFormatFile: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    releaseDigitalFormat: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    releasePurchase: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    releaseDownload: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    downloadEvent: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    releaseUrl: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    image: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    artistRelease: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    featuredArtist: {
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
+vi.mock('@/lib/repositories/release-repository', () => ({
+  ReleaseRepository: {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    updateData: vi.fn(),
+    softDelete: vi.fn(),
+    restore: vi.fn(),
+    findForDeletion: vi.fn(),
+    delete: vi.fn(),
+    deleteReleaseUrls: vi.fn().mockResolvedValue(undefined),
+    deleteImages: vi.fn().mockResolvedValue(undefined),
+    deleteArtistReleases: vi.fn().mockResolvedValue(undefined),
+    clearFeaturedArtistReferences: vi.fn().mockResolvedValue(undefined),
+    findPublished: vi.fn(),
+    findPublishedWithTracks: vi.fn(),
+    findPublishedByArtistExcluding: vi.fn(),
+    findByTitleInsensitive: vi.fn(),
+    findPublishedTitleById: vi.fn(),
+    findTitleById: vi.fn(),
+    existsById: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
+  ReleaseDigitalFormatRepository: class {
+    deleteAllByReleaseId = vi.fn().mockResolvedValue(0);
+  },
+}));
+
+vi.mock('@/lib/repositories/release-digital-format-file-repository', () => ({
+  ReleaseDigitalFormatFileRepository: class {
+    deleteAllByFormatId = vi.fn().mockResolvedValue(0);
+  },
+}));
+
+vi.mock('@/lib/repositories/purchase-repository', () => ({
+  PurchaseRepository: {
+    deleteAllByReleaseId: vi.fn().mockResolvedValue(0),
+    deleteAllDownloadsByReleaseId: vi.fn().mockResolvedValue(0),
+  },
+}));
+
+vi.mock('@/lib/repositories/download-event-repository', () => ({
+  DownloadEventRepository: class {
+    deleteAllByReleaseId = vi.fn().mockResolvedValue(0);
   },
 }));
 
@@ -103,6 +110,7 @@ describe('ReleaseService', () => {
     tagId: null,
     suggestedPrice: null,
   };
+
   describe('createRelease', () => {
     const createInput: Prisma.ReleaseCreateInput = {
       title: 'Test Album',
@@ -113,32 +121,12 @@ describe('ReleaseService', () => {
     };
 
     it('should create a release successfully', async () => {
-      vi.mocked(prisma.release.create).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.create).mockResolvedValue(mockRelease as never);
 
       const result = await ReleaseService.createRelease(createInput);
 
       expect(result).toMatchObject({ success: true, data: mockRelease });
-      expect(prisma.release.create).toHaveBeenCalledWith({
-        data: createInput,
-        include: {
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-          images: true,
-        },
-      });
+      expect(ReleaseRepository.create).toHaveBeenCalledWith(createInput);
     });
 
     it('should return error when title already exists', async () => {
@@ -146,7 +134,7 @@ describe('ReleaseService', () => {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.create).mockRejectedValue(prismaError);
+      vi.mocked(ReleaseRepository.create).mockRejectedValue(prismaError);
 
       const result = await ReleaseService.createRelease(createInput);
 
@@ -158,7 +146,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.create).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.create).mockRejectedValue(initError);
 
       const result = await ReleaseService.createRelease(createInput);
 
@@ -166,7 +154,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.create).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.create).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.createRelease(createInput);
 
@@ -176,40 +164,16 @@ describe('ReleaseService', () => {
 
   describe('getReleaseById', () => {
     it('should retrieve a release by ID', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findById).mockResolvedValue(mockRelease as never);
 
       const result = await ReleaseService.getReleaseById('release-123');
 
       expect(result).toMatchObject({ success: true, data: mockRelease });
-      expect(prisma.release.findUnique).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' },
-              },
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      expect(ReleaseRepository.findById).toHaveBeenCalledWith('release-123');
     });
 
     it('should return error when release not found', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.findById).mockResolvedValue(null);
 
       const result = await ReleaseService.getReleaseById('non-existent');
 
@@ -218,7 +182,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findUnique).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findById).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleaseById('release-123');
 
@@ -226,7 +190,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findUnique).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.findById).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.getReleaseById('release-123');
 
@@ -246,62 +210,40 @@ describe('ReleaseService', () => {
     ];
 
     const deletedOnClause = { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] };
-    const releaseInclude = {
-      images: {
-        orderBy: { sortOrder: 'asc' },
-        take: 3,
-      },
-      artistReleases: {
-        include: {
-          artist: {
-            select: {
-              id: true,
-              firstName: true,
-              surname: true,
-              displayName: true,
-            },
-          },
-        },
-      },
-    };
 
     it('should retrieve all releases with default parameters (excludes deleted)', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue(mockReleases);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue(mockReleases as never);
 
       const result = await ReleaseService.getReleases();
 
       expect(result).toMatchObject({ success: true, data: mockReleases });
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
         where: { AND: [deletedOnClause] },
         skip: 0,
         take: 50,
-        orderBy: { createdAt: 'desc' },
-        include: releaseInclude,
       });
     });
 
     it('should retrieve releases with custom pagination', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({ skip: 10, take: 5 });
 
       expect(result.success).toBe(true);
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
         where: { AND: [deletedOnClause] },
         skip: 10,
         take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: releaseInclude,
       });
     });
 
     it('should search across multiple fields', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({ search: 'test' });
 
       expect(result.success).toBe(true);
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
         where: {
           AND: [
             deletedOnClause,
@@ -316,13 +258,11 @@ describe('ReleaseService', () => {
         },
         skip: 0,
         take: 50,
-        orderBy: { createdAt: 'desc' },
-        include: releaseInclude,
       });
     });
 
     it('should combine pagination and search', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({
         skip: 5,
@@ -331,7 +271,7 @@ describe('ReleaseService', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
         where: {
           AND: [
             deletedOnClause,
@@ -346,44 +286,42 @@ describe('ReleaseService', () => {
         },
         skip: 5,
         take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: releaseInclude,
       });
     });
 
     it('should add publishedAt filter when published=true', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ published: true });
 
-      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where;
+      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where;
       expect(passedWhere).toEqual({
         AND: [deletedOnClause, { publishedAt: { not: null } }],
       });
     });
 
     it('should add unpublished filter when published=false', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ published: false });
 
-      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where;
+      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where;
       expect(passedWhere).toEqual({
         AND: [deletedOnClause, { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }],
       });
     });
 
     it('should omit the deletedOn constraint when deleted=true', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ deleted: true });
 
-      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
       expect(passedWhere).not.toHaveProperty('AND');
     });
 
     it('should return empty array when no releases found', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([] as never);
 
       const result = await ReleaseService.getReleases();
 
@@ -392,7 +330,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findMany).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findMany).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleases();
 
@@ -400,7 +338,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findMany).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.findMany).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.getReleases();
 
@@ -408,12 +346,12 @@ describe('ReleaseService', () => {
     });
 
     it('should filter by artistIds when provided', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({ artistIds: ['artist-1', 'artist-2'] });
 
       expect(result.success).toBe(true);
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             artistReleases: {
@@ -425,11 +363,11 @@ describe('ReleaseService', () => {
     });
 
     it('should NOT filter by artistIds when an empty array is provided', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ artistIds: [] });
 
-      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
       expect(passedWhere).not.toHaveProperty('artistReleases');
     });
   });
@@ -441,11 +379,12 @@ describe('ReleaseService', () => {
 
     it('should update a release successfully', async () => {
       const updatedRelease = { ...mockRelease, title: 'Updated Album Title' };
-      vi.mocked(prisma.release.update).mockResolvedValue(updatedRelease);
+      vi.mocked(ReleaseRepository.update).mockResolvedValue(updatedRelease as never);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
       expect(result).toMatchObject({ success: true, data: updatedRelease });
+      expect(ReleaseRepository.update).toHaveBeenCalledWith('release-123', updateData);
     });
 
     it('should return error when release not found', async () => {
@@ -453,7 +392,7 @@ describe('ReleaseService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.updateRelease('non-existent', updateData);
 
@@ -465,7 +404,7 @@ describe('ReleaseService', () => {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.update).mockRejectedValue(uniqueError);
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(uniqueError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -477,7 +416,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.update).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(initError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -485,7 +424,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -510,55 +449,25 @@ describe('ReleaseService', () => {
     };
 
     it('should delete a release successfully with cascade', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
       expect(result).toMatchObject({ success: true, data: mockRelease });
       // Verify cascade delete order
-      expect(prisma.release.findUnique).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        include: {
-          digitalFormats: { include: { files: true } },
-          images: true,
-        },
-      });
-      expect(prisma.releaseDigitalFormatFile.deleteMany).toHaveBeenCalledWith({
-        where: { formatId: 'format-1' },
-      });
-      expect(prisma.releaseDigitalFormat.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.releasePurchase.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.releaseDownload.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.downloadEvent.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.releaseUrl.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.image.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.artistRelease.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-      expect(prisma.featuredArtist.updateMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-        data: { releaseId: null },
-      });
-      expect(prisma.release.delete).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-      });
+      expect(ReleaseRepository.findForDeletion).toHaveBeenCalledWith('release-123');
+      expect(PurchaseRepository.deleteAllByReleaseId).toHaveBeenCalledWith('release-123');
+      expect(PurchaseRepository.deleteAllDownloadsByReleaseId).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.deleteReleaseUrls).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.deleteImages).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.deleteArtistReleases).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.clearFeaturedArtistReferences).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.delete).toHaveBeenCalledWith('release-123');
     });
 
     it('should return error when release not found', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(null);
 
       const result = await ReleaseService.deleteRelease('non-existent');
 
@@ -566,12 +475,12 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when release not found during delete step', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
       const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.delete).mockRejectedValue(notFoundError);
+      vi.mocked(ReleaseRepository.delete).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
@@ -580,7 +489,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findUnique).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findForDeletion).mockRejectedValue(initError);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
@@ -588,8 +497,8 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
-      vi.mocked(prisma.release.delete).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
+      vi.mocked(ReleaseRepository.delete).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.deleteRelease('release-123');
 
@@ -605,8 +514,8 @@ describe('ReleaseService', () => {
         coverArt: null,
         images: [{ id: 'img-1', src: 'https://cdn.example.com/releases/cover.jpg' }],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithCdnImages as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithCdnImages as never);
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -628,8 +537,8 @@ describe('ReleaseService', () => {
           },
         ],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithS3Images as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithS3Images as never);
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -645,8 +554,8 @@ describe('ReleaseService', () => {
         coverArt: 'https://cdn.example.com/covers/album.jpg',
         images: [],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithCoverArt as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithCoverArt as never);
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -665,8 +574,10 @@ describe('ReleaseService', () => {
         images: [{ id: 'img-1', src: 'https://external.example.com/image.jpg' }],
         digitalFormats: [],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithExternalImages as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(
+        releaseWithExternalImages as never
+      );
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -692,8 +603,8 @@ describe('ReleaseService', () => {
           },
         ],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithEmptyKey as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithEmptyKey as never);
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -712,8 +623,10 @@ describe('ReleaseService', () => {
         images: [{ id: 'img-1', src: 'https://bucket.s3.' }],
         digitalFormats: [],
       };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithMalformedS3Url as never);
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(
+        releaseWithMalformedS3Url as never
+      );
+      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -724,7 +637,7 @@ describe('ReleaseService', () => {
   describe('softDeleteRelease', () => {
     it('should soft delete a release successfully', async () => {
       const softDeletedRelease = { ...mockRelease, deletedOn: new Date() };
-      vi.mocked(prisma.release.update).mockResolvedValue(softDeletedRelease);
+      vi.mocked(ReleaseRepository.softDelete).mockResolvedValue(softDeletedRelease as never);
 
       const result = await ReleaseService.softDeleteRelease('release-123');
 
@@ -732,28 +645,7 @@ describe('ReleaseService', () => {
       expect(
         (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
       ).not.toBeNull();
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { deletedOn: expect.any(Date) },
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      expect(ReleaseRepository.softDelete).toHaveBeenCalledWith('release-123');
     });
 
     it('should return error when release not found', async () => {
@@ -761,7 +653,7 @@ describe('ReleaseService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
+      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.softDeleteRelease('non-existent');
 
@@ -770,7 +662,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.update).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(initError);
 
       const result = await ReleaseService.softDeleteRelease('release-123');
 
@@ -778,7 +670,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.softDeleteRelease('release-123');
 
@@ -789,7 +681,7 @@ describe('ReleaseService', () => {
   describe('restoreRelease', () => {
     it('should restore a soft-deleted release successfully', async () => {
       const restoredRelease = { ...mockRelease, deletedOn: null };
-      vi.mocked(prisma.release.update).mockResolvedValue(restoredRelease);
+      vi.mocked(ReleaseRepository.restore).mockResolvedValue(restoredRelease as never);
 
       const result = await ReleaseService.restoreRelease('release-123');
 
@@ -797,28 +689,7 @@ describe('ReleaseService', () => {
       expect(
         (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
       ).toBeNull();
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { deletedOn: null },
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      expect(ReleaseRepository.restore).toHaveBeenCalledWith('release-123');
     });
 
     it('should return error when release not found', async () => {
@@ -826,7 +697,7 @@ describe('ReleaseService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
+      vi.mocked(ReleaseRepository.restore).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.restoreRelease('non-existent');
 
@@ -835,7 +706,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.update).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.restore).mockRejectedValue(initError);
 
       const result = await ReleaseService.restoreRelease('release-123');
 
@@ -843,7 +714,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.restore).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.restoreRelease('release-123');
 
@@ -884,7 +755,7 @@ describe('ReleaseService', () => {
     };
 
     it('should return published releases ordered by releasedOn desc', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([mockPublishedRelease] as never);
 
       const result = await ReleaseService.getPublishedReleases();
 
@@ -896,17 +767,16 @@ describe('ReleaseService', () => {
     });
 
     it('should filter by publishedAt not null and deletedOn null or unset', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       await ReleaseService.getPublishedReleases();
 
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
+      expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             publishedAt: { not: null },
             AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
           },
-          orderBy: { releasedOn: 'desc' },
           skip: 0,
           take: 24,
         })
@@ -914,22 +784,22 @@ describe('ReleaseService', () => {
     });
 
     it('applies skip/take pagination', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       await ReleaseService.getPublishedReleases({ skip: 24, take: 12 });
 
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
+      expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 24, take: 12 })
       );
     });
 
     it('adds a server-side search filter across title, catalog, description, and artist', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       await ReleaseService.getPublishedReleases({ search: 'Doe' });
 
       const contains = { contains: 'Doe', mode: 'insensitive' };
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
+      expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             publishedAt: { not: null },
@@ -961,20 +831,8 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('should select only the listing projection fields', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
-
-      await ReleaseService.getPublishedReleases();
-
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          select: publishedReleaseListingSelect,
-        })
-      );
-    });
-
     it('should return empty array when no published releases exist', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       const result = await ReleaseService.getPublishedReleases();
 
@@ -983,7 +841,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findMany).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findPublished).mockRejectedValue(initError);
 
       const result = await ReleaseService.getPublishedReleases();
 
@@ -991,7 +849,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findMany).mockRejectedValue(Error('Unknown'));
+      vi.mocked(ReleaseRepository.findPublished).mockRejectedValue(Error('Unknown'));
 
       const result = await ReleaseService.getPublishedReleases();
 
@@ -1001,7 +859,7 @@ describe('ReleaseService', () => {
     it('should bypass withCache in development mode', async () => {
       const { withCache } = await import('../utils/simple-cache');
       vi.stubEnv('NODE_ENV', 'development');
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([mockPublishedRelease] as never);
 
       const result = await ReleaseService.getPublishedReleases();
 
@@ -1015,97 +873,44 @@ describe('ReleaseService', () => {
     const mockReleaseWithTracks = {
       ...mockRelease,
       publishedAt: new Date('2024-01-10'),
-      images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
-      artistReleases: [
-        {
-          id: 'ar-1',
-          artistId: 'artist-1',
-          releaseId: 'release-123',
-          artist: {
-            id: 'artist-1',
-            firstName: 'John',
-            surname: 'Doe',
-            displayName: null,
-          },
-        },
-      ],
       digitalFormats: [
         {
           id: 'df-1',
           releaseId: 'release-123',
           format: 'MP3_320KBPS',
           files: [
-            {
-              id: 'f-1',
-              trackNumber: 1,
-              fileName: 'track-one.mp3',
-              fileSize: 10485760,
-            },
-            {
-              id: 'f-2',
-              trackNumber: 2,
-              fileName: 'track-two.mp3',
-              fileSize: 9437184,
-            },
+            { id: 'f-1', trackNumber: 1, fileName: 'track-one.mp3', fileSize: 10485760 },
+            { id: 'f-2', trackNumber: 2, fileName: 'track-two.mp3', fileSize: 9437184 },
           ],
-        },
-      ],
-      releaseUrls: [
-        {
-          id: 'ru-1',
-          releaseId: 'release-123',
-          urlId: 'url-1',
-          url: { id: 'url-1', platform: 'BANDCAMP', url: 'https://label.bandcamp.com/album/test' },
         },
       ],
     };
 
     it('should return a published release with tracks', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockResolvedValue(
+        mockReleaseWithTracks as never
+      );
 
       const result = await ReleaseService.getReleaseWithTracks('release-123');
 
       expect(result.success).toBe(true);
-      expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('data.id', 'release-123');
-      expect(result).toHaveProperty('data.digitalFormats');
       const { data } = result as unknown as { data: { digitalFormats: unknown[] } };
       expect(data.digitalFormats).toHaveLength(1);
     });
 
-    it('should filter by id, publishedAt not null, and deletedOn null or unset', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
+    it('should delegate to the repository with the release id', async () => {
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockResolvedValue(
+        mockReleaseWithTracks as never
+      );
 
       await ReleaseService.getReleaseWithTracks('release-123');
 
-      expect(prisma.release.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            id: 'release-123',
-            publishedAt: { not: null },
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-          },
-        })
-      );
-    });
-
-    it('should query with the detail projection, files ordered by trackNumber', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
-
-      await ReleaseService.getReleaseWithTracks('release-123');
-
-      expect(prisma.release.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: publishedReleaseDetailInclude,
-        })
-      );
-      expect(publishedReleaseDetailInclude.digitalFormats.include.files.orderBy).toEqual({
-        trackNumber: 'asc',
-      });
+      expect(ReleaseRepository.findPublishedWithTracks).toHaveBeenCalledWith('release-123');
     });
 
     it('should return error when release not found', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockResolvedValue(null);
 
       const result = await ReleaseService.getReleaseWithTracks('non-existent');
 
@@ -1114,7 +919,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findFirst).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleaseWithTracks('release-123');
 
@@ -1122,7 +927,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findFirst).mockRejectedValue(Error('Unknown'));
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockRejectedValue(Error('Unknown'));
 
       const result = await ReleaseService.getReleaseWithTracks('release-123');
 
@@ -1135,66 +940,34 @@ describe('ReleaseService', () => {
       ...mockRelease,
       id: 'release-456',
       title: 'Other Album',
-      coverArt: 'https://example.com/other-cover.jpg',
-      releasedOn: new Date('2024-02-01'),
-      publishedAt: new Date('2024-01-20'),
-      deletedOn: null,
-      images: [
-        {
-          id: 'img-2',
-          src: 'https://example.com/other-img.jpg',
-          altText: 'Other cover',
-          sortOrder: 0,
-        },
-      ],
     };
 
     it('should return other published releases by the artist', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([mockOtherRelease]);
+      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([
+        mockOtherRelease,
+      ] as never);
 
       const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
 
       expect(result.success).toBe(true);
-      expect(result).toHaveProperty('data');
       const { data } = result as unknown as { data: { id: string }[] };
       expect(data).toHaveLength(1);
       expect(data[0].id).toBe('release-456');
     });
 
-    it('should filter by artistId, exclude current release, and only include published', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+    it('should delegate to the repository with artistId and exclude id', async () => {
+      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([] as never);
 
       await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
 
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            artistReleases: { some: { artistId: 'artist-1' } },
-            id: { not: 'release-123' },
-            publishedAt: { not: null },
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-          },
-          orderBy: { releasedOn: 'desc' },
-        })
-      );
-    });
-
-    it('should include images for cover art display', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
-
-      await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(prisma.release.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: expect.objectContaining({
-            images: expect.anything(),
-          }),
-        })
+      expect(ReleaseRepository.findPublishedByArtistExcluding).toHaveBeenCalledWith(
+        'artist-1',
+        'release-123'
       );
     });
 
     it('should return empty array when no other releases exist', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([] as never);
 
       const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
 
@@ -1203,7 +976,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findMany).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockRejectedValue(initError);
 
       const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
 
@@ -1211,7 +984,9 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findMany).mockRejectedValue(Error('Unknown'));
+      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockRejectedValue(
+        Error('Unknown')
+      );
 
       const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
 
@@ -1224,44 +999,43 @@ describe('ReleaseService', () => {
 
   describe('applyFoundReleaseUpdate', () => {
     it('clears deletedOn when undelete is true', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.applyFoundReleaseUpdate('release-123', { undelete: true });
 
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { deletedOn: null },
+      expect(ReleaseRepository.updateData).toHaveBeenCalledWith('release-123', {
+        deletedOn: null,
       });
     });
 
     it('sets publishedAt when publish is true', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.applyFoundReleaseUpdate('release-123', { publish: true });
 
-      const call = vi.mocked(prisma.release.update).mock.calls.at(-1)?.[0];
-      expect(call?.where).toEqual({ id: 'release-123' });
-      expect(call?.data).toEqual({ publishedAt: expect.any(Date) });
+      const call = vi.mocked(ReleaseRepository.updateData).mock.calls.at(-1);
+      expect(call?.[0]).toBe('release-123');
+      expect(call?.[1]).toEqual({ publishedAt: expect.any(Date) });
     });
 
     it('combines both updates when both flags are set', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
 
       await ReleaseService.applyFoundReleaseUpdate('release-123', {
         undelete: true,
         publish: true,
       });
 
-      const data = vi.mocked(prisma.release.update).mock.calls.at(-1)?.[0]?.data;
+      const data = vi.mocked(ReleaseRepository.updateData).mock.calls.at(-1)?.[1];
       expect(data).toMatchObject({ deletedOn: null, publishedAt: expect.any(Date) });
     });
 
     it('is a no-op when neither flag is set', async () => {
-      vi.mocked(prisma.release.update).mockClear();
+      vi.mocked(ReleaseRepository.updateData).mockClear();
 
       await ReleaseService.applyFoundReleaseUpdate('release-123', {});
 
-      expect(prisma.release.update).not.toHaveBeenCalled();
+      expect(ReleaseRepository.updateData).not.toHaveBeenCalled();
     });
   });
 
@@ -1273,20 +1047,16 @@ describe('ReleaseService', () => {
         publishedAt: null,
         deletedOn: null,
       };
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockResult as never);
+      vi.mocked(ReleaseRepository.findByTitleInsensitive).mockResolvedValue(mockResult);
 
       const result = await ReleaseService.findByTitleInsensitive('test album');
 
       expect(result).toEqual(mockResult);
-      expect(prisma.release.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { title: { equals: 'test album', mode: 'insensitive' } },
-        })
-      );
+      expect(ReleaseRepository.findByTitleInsensitive).toHaveBeenCalledWith('test album');
     });
 
     it('should return null when no release matches the title', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.findByTitleInsensitive).mockResolvedValue(null);
 
       const result = await ReleaseService.findByTitleInsensitive('missing title');
 
@@ -1296,10 +1066,10 @@ describe('ReleaseService', () => {
 
   describe('findTitleById', () => {
     it('should return id and title when release is found', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({
+      vi.mocked(ReleaseRepository.findTitleById).mockResolvedValue({
         id: 'r-1',
         title: 'Test Album',
-      } as never);
+      });
 
       const result = await ReleaseService.findTitleById('r-1');
 
@@ -1307,7 +1077,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return null when release is not found', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.findTitleById).mockResolvedValue(null);
 
       const result = await ReleaseService.findTitleById('missing-id');
 
@@ -1317,7 +1087,7 @@ describe('ReleaseService', () => {
 
   describe('existsById', () => {
     it('should return true when the release exists', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ id: 'r-1' } as never);
+      vi.mocked(ReleaseRepository.existsById).mockResolvedValue(true);
 
       const result = await ReleaseService.existsById('r-1');
 
@@ -1325,7 +1095,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return false when the release does not exist', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+      vi.mocked(ReleaseRepository.existsById).mockResolvedValue(false);
 
       const result = await ReleaseService.existsById('missing-id');
 

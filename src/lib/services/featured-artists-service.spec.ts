@@ -3,22 +3,21 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
+import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 
 import { FeaturedArtistsService } from './featured-artists-service';
 
 import type * as PrismaClientModule from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    featuredArtist: {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
+vi.mock('@/lib/repositories/featured-artist-repository', () => ({
+  FeaturedArtistRepository: {
+    create: vi.fn(),
+    findFeatured: vi.fn(),
+    findAll: vi.fn(),
+    findById: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 vi.mock('@prisma/client', async () => {
@@ -50,11 +49,12 @@ vi.mock('@/lib/utils/simple-cache', () => ({
   withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
 }));
 
-const mockCreate = vi.mocked(prisma.featuredArtist.create);
-const mockFindMany = vi.mocked(prisma.featuredArtist.findMany);
-const mockFindUnique = vi.mocked(prisma.featuredArtist.findUnique);
-const mockUpdate = vi.mocked(prisma.featuredArtist.update);
-const mockDelete = vi.mocked(prisma.featuredArtist.delete);
+const mockCreate = vi.mocked(FeaturedArtistRepository.create);
+const mockFindFeatured = vi.mocked(FeaturedArtistRepository.findFeatured);
+const mockFindAll = vi.mocked(FeaturedArtistRepository.findAll);
+const mockFindById = vi.mocked(FeaturedArtistRepository.findById);
+const mockUpdate = vi.mocked(FeaturedArtistRepository.update);
+const mockDelete = vi.mocked(FeaturedArtistRepository.delete);
 
 const mockFeaturedArtist = {
   id: 'fa-1',
@@ -82,11 +82,7 @@ describe('FeaturedArtistsService', () => {
       });
 
       expect(result).toMatchObject({ success: true, data: mockFeaturedArtist });
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: { displayName: 'Test Featured Artist' },
-        })
-      );
+      expect(mockCreate).toHaveBeenCalledWith({ displayName: 'Test Featured Artist' });
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
@@ -113,39 +109,25 @@ describe('FeaturedArtistsService', () => {
   describe('getFeaturedArtists', () => {
     it('should return featured artists filtered by date', async () => {
       const artists = [mockFeaturedArtist];
-      mockFindMany.mockResolvedValue(artists as never);
+      mockFindFeatured.mockResolvedValue(artists as never);
 
       const currentDate = new Date('2024-07-01');
       const result = await FeaturedArtistsService.getFeaturedArtists(currentDate, 5);
 
       expect(result).toMatchObject({ success: true, data: artists });
-      expect(mockFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            publishedOn: { not: null },
-            featuredOn: { lte: currentDate },
-            OR: [
-              { featuredUntil: null },
-              { featuredUntil: { isSet: false } },
-              { featuredUntil: { gte: currentDate } },
-            ],
-          },
-          orderBy: { featuredOn: 'desc' },
-          take: 5,
-        })
-      );
+      expect(mockFindFeatured).toHaveBeenCalledWith(currentDate, 5);
     });
 
     it('should use default limit of 10', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindFeatured.mockResolvedValue([]);
 
       await FeaturedArtistsService.getFeaturedArtists(new Date());
 
-      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 10 }));
+      expect(mockFindFeatured).toHaveBeenCalledWith(expect.any(Date), 10);
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
-      mockFindMany.mockRejectedValue(
+      mockFindFeatured.mockRejectedValue(
         new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
       );
 
@@ -155,7 +137,7 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should return error on generic exception', async () => {
-      mockFindMany.mockRejectedValue(new Error('Query failed'));
+      mockFindFeatured.mockRejectedValue(new Error('Query failed'));
 
       const result = await FeaturedArtistsService.getFeaturedArtists(new Date());
 
@@ -166,26 +148,22 @@ describe('FeaturedArtistsService', () => {
   describe('getAllFeaturedArtists', () => {
     it('should return all featured artists with defaults', async () => {
       const artists = [mockFeaturedArtist];
-      mockFindMany.mockResolvedValue(artists as never);
+      mockFindAll.mockResolvedValue(artists as never);
 
       const result = await FeaturedArtistsService.getAllFeaturedArtists();
 
       expect(result).toMatchObject({ success: true, data: artists });
-      expect(mockFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skip: 0,
-          take: 50,
-          orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
-        })
+      expect(mockFindAll).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 50, where: {} })
       );
     });
 
     it('should apply search filter when provided', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ search: 'jazz' });
 
-      expect(mockFindMany).toHaveBeenCalledWith(
+      expect(mockFindAll).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             AND: [
@@ -202,11 +180,11 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should apply publishedOn filter when published=true', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ published: true });
 
-      expect(mockFindMany).toHaveBeenCalledWith(
+      expect(mockFindAll).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { AND: [{ publishedOn: { not: null } }] },
         })
@@ -214,11 +192,11 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should apply unpublished filter when published=false', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ published: false });
 
-      expect(mockFindMany).toHaveBeenCalledWith(
+      expect(mockFindAll).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
@@ -228,25 +206,23 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should not add any soft-delete constraint (model has no deletedOn)', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ deleted: false });
 
-      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+      expect(mockFindAll).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
     });
 
     it('should apply pagination when provided', async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ skip: 10, take: 20 });
 
-      expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 20 }));
+      expect(mockFindAll).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 20 }));
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
-      mockFindMany.mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
-      );
+      mockFindAll.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
 
       const result = await FeaturedArtistsService.getAllFeaturedArtists();
 
@@ -254,7 +230,7 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should return error on generic exception', async () => {
-      mockFindMany.mockRejectedValue(new Error('Read failed'));
+      mockFindAll.mockRejectedValue(new Error('Read failed'));
 
       const result = await FeaturedArtistsService.getAllFeaturedArtists();
 
@@ -267,18 +243,16 @@ describe('FeaturedArtistsService', () => {
 
   describe('getFeaturedArtistById', () => {
     it('should return a featured artist when found', async () => {
-      mockFindUnique.mockResolvedValue(mockFeaturedArtist as never);
+      mockFindById.mockResolvedValue(mockFeaturedArtist as never);
 
       const result = await FeaturedArtistsService.getFeaturedArtistById('fa-1');
 
       expect(result).toMatchObject({ success: true, data: mockFeaturedArtist });
-      expect(mockFindUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'fa-1' } })
-      );
+      expect(mockFindById).toHaveBeenCalledWith('fa-1');
     });
 
     it('should return not found error when artist does not exist', async () => {
-      mockFindUnique.mockResolvedValue(null);
+      mockFindById.mockResolvedValue(null);
 
       const result = await FeaturedArtistsService.getFeaturedArtistById('nonexistent');
 
@@ -286,7 +260,7 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
-      mockFindUnique.mockRejectedValue(
+      mockFindById.mockRejectedValue(
         new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
       );
 
@@ -296,7 +270,7 @@ describe('FeaturedArtistsService', () => {
     });
 
     it('should return error on generic exception', async () => {
-      mockFindUnique.mockRejectedValue(new Error('Unexpected'));
+      mockFindById.mockRejectedValue(new Error('Unexpected'));
 
       const result = await FeaturedArtistsService.getFeaturedArtistById('fa-1');
 
@@ -317,12 +291,7 @@ describe('FeaturedArtistsService', () => {
       });
 
       expect(result).toMatchObject({ success: true, data: updated });
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'fa-1' },
-          data: { displayName: 'Updated Name' },
-        })
-      );
+      expect(mockUpdate).toHaveBeenCalledWith('fa-1', { displayName: 'Updated Name' });
     });
 
     it('should return not found error on P2025', async () => {
@@ -364,49 +333,6 @@ describe('FeaturedArtistsService', () => {
     });
   });
 
-  describe('deleteFeaturedArtist', () => {
-    it('should soft-delete and return the featured artist', async () => {
-      mockUpdate.mockResolvedValue(mockFeaturedArtist as never);
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({ success: true, data: mockFeaturedArtist });
-      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'fa-1' } }));
-    });
-
-    it('should return not found error on P2025', async () => {
-      mockUpdate.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('missing');
-
-      expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
-    });
-
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockUpdate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should return error on generic exception', async () => {
-      mockUpdate.mockRejectedValue(new Error('Delete failed'));
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({
-        success: false,
-        error: 'Failed to delete featured artist',
-      });
-    });
-  });
-
   describe('hardDeleteFeaturedArtist', () => {
     it('should hard-delete and return the featured artist', async () => {
       mockDelete.mockResolvedValue(mockFeaturedArtist as never);
@@ -414,7 +340,7 @@ describe('FeaturedArtistsService', () => {
       const result = await FeaturedArtistsService.hardDeleteFeaturedArtist('fa-1');
 
       expect(result).toMatchObject({ success: true, data: mockFeaturedArtist });
-      expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'fa-1' } }));
+      expect(mockDelete).toHaveBeenCalledWith('fa-1');
     });
 
     it('should return not found error on P2025', async () => {
@@ -453,7 +379,7 @@ describe('FeaturedArtistsService', () => {
   describe('cache TTL', () => {
     it('should use zero TTL when E2E_MODE is true', async () => {
       vi.stubEnv('E2E_MODE', 'true');
-      mockFindMany.mockResolvedValue([mockFeaturedArtist] as never);
+      mockFindFeatured.mockResolvedValue([mockFeaturedArtist] as never);
 
       const result = await FeaturedArtistsService.getFeaturedArtists(new Date('2024-06-01'));
 

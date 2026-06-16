@@ -16,9 +16,11 @@ vi.mock('@/lib/prisma', () => ({
     releaseDigitalFormat: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       upsert: vi.fn(),
     },
     releaseDigitalFormatFile: {
@@ -396,6 +398,45 @@ describe('ReleaseDigitalFormatRepository', () => {
           trackCount: 0,
           totalFileSize: BigInt(0),
         },
+      });
+    });
+  });
+
+  describe('findActiveByReleaseAndFormat', () => {
+    it('queries with a strict deletedAt null filter and returns the bare format', async () => {
+      const mockFormat = createMockFormat();
+      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(mockFormat);
+
+      const result = await repository.findActiveByReleaseAndFormat(mockReleaseId, 'MP3_320KBPS');
+
+      expect(result).toEqual(mockFormat);
+      expect(prisma.releaseDigitalFormat.findFirst).toHaveBeenCalledWith({
+        where: {
+          releaseId: mockReleaseId,
+          formatType: 'MP3_320KBPS',
+          deletedAt: null,
+        },
+      });
+    });
+
+    it('returns null when no active format matches', async () => {
+      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(null);
+
+      const result = await repository.findActiveByReleaseAndFormat(mockReleaseId, 'MP3_320KBPS');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('deleteAllByReleaseId', () => {
+    it('deletes all formats for a release and returns the count', async () => {
+      vi.mocked(prisma.releaseDigitalFormat.deleteMany).mockResolvedValue({ count: 3 } as never);
+
+      const result = await repository.deleteAllByReleaseId(mockReleaseId);
+
+      expect(result).toBe(3);
+      expect(prisma.releaseDigitalFormat.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: mockReleaseId },
       });
     });
   });

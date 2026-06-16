@@ -33,8 +33,16 @@ export const ArtistDataView = () => {
   // Both same → no publish filter; otherwise the enabled one.
   const published = showPublished === showUnpublished ? null : showPublished;
 
-  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  const {
+    data,
+    isPending,
+    isFetching,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
 
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
@@ -54,6 +62,7 @@ export const ArtistDataView = () => {
       imageField="images"
       refetch={refetch}
       isPending={isPending}
+      isFetching={isFetching}
       error={null}
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}

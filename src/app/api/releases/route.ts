@@ -97,6 +97,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
+        // The admin listing projection carries no BigInt fields (digital-format
+        // files/URLs are not loaded), so the payload is JSON-safe as-is.
         rows: result.data,
         nextSkip: computeNextSkip(result.data.length, skip, take),
       },

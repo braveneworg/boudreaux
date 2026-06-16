@@ -114,6 +114,8 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
+        // The admin listing projection is JSON-safe as-is (no digital-format
+        // files/URLs, so no BigInt fields to convert).
         rows: mockReleases,
         nextSkip: null,
       });

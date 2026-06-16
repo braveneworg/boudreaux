@@ -271,6 +271,35 @@ export type Release = Prisma.ReleaseGetPayload<{
   };
 }>;
 
+/**
+ * Prisma include for the admin releases listing. The admin grid only renders
+ * release scalars, cover-art images, and the album-artist display name, so the
+ * heavy `digitalFormats.files` and `releaseUrls` relations (loaded by the full
+ * detail include) are deliberately omitted. Single source of truth for
+ * `ReleaseListItem` — the repository query and the derived type reference this
+ * same const so they can't drift.
+ */
+export const releaseListItemInclude = {
+  images: {
+    orderBy: { sortOrder: 'asc' },
+    take: 3,
+  },
+  artistReleases: {
+    include: {
+      artist: true,
+    },
+  },
+} as const satisfies Prisma.ReleaseInclude;
+
+/**
+ * Lightweight release row for the admin releases listing — release scalars
+ * plus capped cover-art images and the artist join rows used to derive the
+ * album-artist display name.
+ */
+export type ReleaseListItem = Prisma.ReleaseGetPayload<{
+  include: typeof releaseListItemInclude;
+}>;
+
 export type Url = Prisma.UrlGetPayload<{
   include: {
     artist: true;

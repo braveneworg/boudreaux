@@ -19,9 +19,21 @@ vi.mock('@/app/hooks/use-release-user-status-query', () => ({
 // defers rendering via React.lazy. This mock bypasses the async loader entirely
 // and returns a synchronous component that mirrors the DownloadDialog interface
 // so that getByTestId assertions work without awaiting.
+// Mock the lazily-imported DownloadDialog so the real next/dynamic loader
+// (`() => import('./download-dialog').then(...)`) resolves to a stub instead of
+// pulling in the heavy real component during the loader invocation below.
+vi.mock('./download-dialog', () => ({
+  DownloadDialog: () => null,
+}));
+
 vi.mock('next/dynamic', () => ({
   __esModule: true,
-  default: (_loader: unknown) => {
+  default: (loader: () => Promise<{ default: unknown }>, options?: { loading?: () => unknown }) => {
+    // Invoke the real loader + loading callback so the import()/then mapping and
+    // the `loading: () => null` placeholder in the source are executed (they are
+    // otherwise dead under a synchronous dynamic mock).
+    void loader();
+    options?.loading?.();
     const DynamicComponent = ({
       artistName,
       releaseId,

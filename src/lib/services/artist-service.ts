@@ -6,8 +6,8 @@ import 'server-only';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-import { artistWithPublishedReleasesInclude } from '@/lib/types/media-models';
+import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getS3Client } from '@/lib/utils/s3-client';
@@ -59,9 +59,7 @@ export class ArtistService {
    */
   static async createArtist(data: Prisma.ArtistCreateInput): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.create({
-        data,
-      })) as unknown as Artist;
+      const artist = (await ArtistRepository.create(data)) as unknown as Artist;
       return { success: true, data: artist };
     } catch (error) {
       // Unique constraint violations
@@ -86,14 +84,7 @@ export class ArtistService {
    */
   static async getArtistById(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.findUnique({
-        where: { id },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-      })) as unknown as Artist | null;
+      const artist = await ArtistRepository.findById(id);
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };
@@ -116,9 +107,7 @@ export class ArtistService {
    */
   static async getArtistBySlug(slug: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.findUnique({
-        where: { slug },
-      })) as unknown as Artist | null;
+      const artist = (await ArtistRepository.findBySlug(slug)) as unknown as Artist | null;
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };
@@ -182,18 +171,10 @@ export class ArtistService {
 
       const where: Prisma.ArtistWhereInput = and.length > 0 ? { AND: and } : {};
 
-      const artists = (await prisma.artist.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-        },
-      })) as unknown as Artist[];
+      // The repository owns the include shape (images take 3, labels, urls,
+      // releases → release) required by `artistSchema`, which the admin artists
+      // query validates against.
+      const artists = await ArtistRepository.findMany({ where, skip, take });
 
       return { success: true, data: artists };
     } catch (error) {
@@ -215,10 +196,7 @@ export class ArtistService {
     data: Prisma.ArtistUpdateInput
   ): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.update({
-        where: { id },
-        data,
-      })) as unknown as Artist;
+      const artist = (await ArtistRepository.update(id, data)) as unknown as Artist;
 
       return { success: true, data: artist };
     } catch (error) {
@@ -247,9 +225,7 @@ export class ArtistService {
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.delete({
-        where: { id },
-      })) as unknown as Artist;
+      const artist = (await ArtistRepository.delete(id)) as unknown as Artist;
 
       return { success: true, data: artist };
     } catch (error) {
@@ -273,10 +249,7 @@ export class ArtistService {
    */
   static async archiveArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await prisma.artist.update({
-        where: { id },
-        data: { deletedOn: new Date() },
-      })) as unknown as Artist;
+      const artist = (await ArtistRepository.archive(id)) as unknown as Artist;
 
       return { success: true, data: artist };
     } catch (error) {
@@ -303,10 +276,7 @@ export class ArtistService {
   ): Promise<ServiceResponse<ImageUploadResult>> {
     try {
       // Verify artist exists
-      const artistExists = await prisma.artist.findUnique({
-        where: { id: artistId },
-        select: { id: true },
-      });
+      const artistExists = await ArtistRepository.existsById(artistId);
 
       if (!artistExists) {
         return { success: false, error: 'Artist not found' };
@@ -351,21 +321,16 @@ export class ArtistService {
       const imageUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
 
       // Get the next sort order for this artist
-      const existingImages = await prisma.image.findMany({
-        where: { artistId },
-        select: { id: true },
-      });
+      const existingImages = await ImageRepository.findManyByOwner({ artistId }, { id: true });
       const nextSortOrder = existingImages.length;
 
       // Create Image record in database with sortOrder
-      const image = await prisma.image.create({
-        data: {
-          src: imageUrl,
-          caption: imageData.caption,
-          altText: imageData.altText,
-          artistId,
-          sortOrder: nextSortOrder,
-        } as Prisma.ImageCreateInput,
+      const image = await ImageRepository.create({
+        src: imageUrl,
+        caption: imageData.caption,
+        altText: imageData.altText,
+        artistId,
+        sortOrder: nextSortOrder,
       });
 
       return {
@@ -398,10 +363,7 @@ export class ArtistService {
   ): Promise<ServiceResponse<ImageUploadResult[]>> {
     try {
       // Verify artist exists
-      const artistExists = await prisma.artist.findUnique({
-        where: { id: artistId },
-        select: { id: true },
-      });
+      const artistExists = await ArtistRepository.existsById(artistId);
 
       if (!artistExists) {
         return { success: false, error: 'Artist not found' };
@@ -437,9 +399,10 @@ export class ArtistService {
   static async deleteArtistImage(imageId: string): Promise<ServiceResponse<{ id: string }>> {
     try {
       // Get the image record to get the S3 key
-      const image = await prisma.image.findUnique({
-        where: { id: imageId },
-        select: { id: true, src: true, artistId: true },
+      const image = await ImageRepository.findUniqueById(imageId, {
+        id: true,
+        src: true,
+        artistId: true,
       });
 
       if (!image) {
@@ -484,9 +447,7 @@ export class ArtistService {
       }
 
       // Delete from database
-      await prisma.image.delete({
-        where: { id: imageId },
-      });
+      await ImageRepository.delete(imageId);
 
       return { success: true, data: { id: imageId } };
     } catch (error) {
@@ -509,10 +470,7 @@ export class ArtistService {
    */
   static async getArtistImages(artistId: string): Promise<ServiceResponse<ImageUploadResult[]>> {
     try {
-      const images = await prisma.image.findMany({
-        where: { artistId },
-        orderBy: { sortOrder: 'asc' } as Prisma.ImageOrderByWithRelationInput,
-      });
+      const images = await ImageRepository.findManyByArtist(artistId);
 
       return {
         success: true,
@@ -543,12 +501,9 @@ export class ArtistService {
     data: { caption?: string; altText?: string }
   ): Promise<ServiceResponse<ImageUploadResult>> {
     try {
-      const image = await prisma.image.update({
-        where: { id: imageId },
-        data: {
-          caption: data.caption,
-          altText: data.altText,
-        },
+      const image = await ImageRepository.update(imageId, {
+        caption: data.caption,
+        altText: data.altText,
       });
 
       return {
@@ -586,10 +541,7 @@ export class ArtistService {
   ): Promise<ServiceResponse<ImageUploadResult[]>> {
     try {
       // Verify all images belong to the artist
-      const existingImages = await prisma.image.findMany({
-        where: { artistId, id: { in: imageIds } },
-        select: { id: true },
-      });
+      const existingImages = await ImageRepository.findManyByArtistAndIds(artistId, imageIds);
 
       if (existingImages.length !== imageIds.length) {
         return { success: false, error: 'Some images not found or do not belong to this artist' };
@@ -597,19 +549,13 @@ export class ArtistService {
 
       // Update sort order for each image
       const updatePromises = imageIds.map((id, index) =>
-        prisma.image.update({
-          where: { id },
-          data: { sortOrder: index } as Prisma.ImageUpdateInput,
-        })
+        ImageRepository.updateSortOrder(id, index)
       );
 
       await Promise.all(updatePromises);
 
       // Fetch updated images in new order
-      const updatedImages = await prisma.image.findMany({
-        where: { artistId },
-        orderBy: { sortOrder: 'asc' } as Prisma.ImageOrderByWithRelationInput,
-      });
+      const updatedImages = await ImageRepository.findManyByArtist(artistId);
 
       return {
         success: true,
@@ -683,25 +629,9 @@ export class ArtistService {
         }),
       };
 
-      const artists = (await prisma.artist.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { displayName: 'asc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 1,
-          },
-          releases: {
-            include: {
-              release: {
-                select: { id: true, title: true, publishedAt: true, deletedOn: true },
-              },
-            },
-          },
-        },
-      })) as unknown as Artist[];
+      // The repository owns the orderBy + lightweight images/releases include
+      // the public search UI consumes.
+      const artists = await ArtistRepository.searchPublished({ where, skip, take });
 
       return { success: true, data: artists };
     } catch (error) {
@@ -723,15 +653,12 @@ export class ArtistService {
     slug: string
   ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
     try {
-      const artist = await prisma.artist.findFirst({
-        where: {
-          slug,
-          isActive: true,
-          // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-          // set to null, not missing fields. Use OR to handle both cases.
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        include: artistWithPublishedReleasesInclude,
+      const artist = await ArtistRepository.findBySlugWithReleases({
+        slug,
+        isActive: true,
+        // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+        // set to null, not missing fields. Use OR to handle both cases.
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       });
 
       if (!artist) {
@@ -784,63 +711,56 @@ export class ArtistService {
     try {
       const slug = generateSlug(trimmed);
       const { firstName, lastName } = splitFullName(trimmed);
-      const selectFields = { id: true, displayName: true, firstName: true, surname: true };
+      const selectFields = {
+        id: true,
+        displayName: true,
+        firstName: true,
+        surname: true,
+      } as const;
 
       // 1. Try slug match (unique index, most reliable)
       if (slug) {
-        const bySlug = await prisma.artist.findUnique({
-          where: { slug },
-          select: selectFields,
-        });
+        const bySlug = await ArtistRepository.findUniqueBySlug(slug, selectFields);
         if (bySlug) {
           return { success: true, data: bySlug };
         }
       }
 
       // 2. Try case-insensitive displayName match
-      const byDisplayName = await prisma.artist.findFirst({
-        where: { displayName: { equals: trimmed, mode: 'insensitive' } },
-        select: selectFields,
-      });
+      const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed, selectFields);
       if (byDisplayName) {
         return { success: true, data: byDisplayName };
       }
 
       // 3. Try case-insensitive firstName + surname match
       if (firstName) {
-        const byName = await prisma.artist.findFirst({
-          where: {
-            AND: [
-              { firstName: { equals: firstName, mode: 'insensitive' } },
-              { surname: { equals: lastName, mode: 'insensitive' } },
-            ],
-          },
-          select: selectFields,
-        });
+        const byName = await ArtistRepository.findFirstByName(firstName, lastName, selectFields);
         if (byName) {
           return { success: true, data: byName };
         }
       }
 
       // 4. Create new artist
-      const newArtist = await prisma.artist.create({
-        data: {
+      const newArtist = await ArtistRepository.createWithSelect(
+        {
           firstName,
           surname: lastName,
           displayName: trimmed,
           slug: slug || generateSlug(firstName || 'artist'),
           isActive: true,
         },
-        select: selectFields,
-      });
+        selectFields
+      );
       return { success: true, data: newArtist };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         // Slug collision — try to find the existing artist instead
         const slug = generateSlug(trimmed);
-        const existing = await prisma.artist.findUnique({
-          where: { slug },
-          select: { id: true, displayName: true, firstName: true, surname: true },
+        const existing = await ArtistRepository.findUniqueBySlug(slug, {
+          id: true,
+          displayName: true,
+          firstName: true,
+          surname: true,
         });
         if (existing) {
           return { success: true, data: existing };
@@ -866,13 +786,7 @@ export class ArtistService {
    * @param releaseId - The Release ID
    */
   static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
-    await prisma.artistRelease.upsert({
-      where: {
-        artistId_releaseId: { artistId, releaseId },
-      },
-      update: {},
-      create: { artistId, releaseId },
-    });
+    await ArtistRepository.connectToRelease(artistId, releaseId);
   }
 
   /**
@@ -880,10 +794,7 @@ export class ArtistService {
    * artistId before performing a follow-up write.
    */
   static async existsById(artistId: string): Promise<boolean> {
-    const found = await prisma.artist.findUnique({
-      where: { id: artistId },
-      select: { id: true },
-    });
+    const found = await ArtistRepository.existsById(artistId);
     return Boolean(found);
   }
 }

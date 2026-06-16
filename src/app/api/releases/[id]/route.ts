@@ -11,6 +11,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
@@ -18,11 +19,6 @@ import { updateReleaseSchema } from '@/lib/validation/update-schemas';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
-
-/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
-function serializeRelease<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
-}
 
 /**
  * GET /api/releases/[id]
@@ -59,8 +55,8 @@ export const GET = withRateLimit<{ id: string }>(
     }
 
     const responseData = withTracks
-      ? attachStreamUrls(serializeRelease(result.data))
-      : serializeRelease(result.data);
+      ? attachStreamUrls(serializeForResponse(result.data))
+      : serializeForResponse(result.data);
 
     return NextResponse.json(responseData, {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
@@ -103,7 +99,7 @@ export const PATCH = withAdmin(
         return NextResponse.json({ error: result.error }, { status });
       }
 
-      return NextResponse.json(serializeRelease(result.data));
+      return NextResponse.json(serializeForResponse(result.data));
     } catch (error) {
       console.error('Release PATCH error:', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

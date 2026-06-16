@@ -6,7 +6,8 @@ import 'server-only';
 
 import { SOFT_DELETE_GRACE_PERIOD_DAYS } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { prisma } from '@/lib/prisma';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { generatePresignedDownloadUrl } from '@/lib/utils/s3-client';
 
 import type { ReleaseDigitalFormat } from '@prisma/client';
@@ -16,6 +17,7 @@ import type { ReleaseDigitalFormat } from '@prisma/client';
  * and soft delete grace period checks
  */
 export class DownloadAuthorizationService {
+  private readonly digitalFormatRepository = new ReleaseDigitalFormatRepository();
   /**
    * Check if user has purchased a release
    *
@@ -24,14 +26,7 @@ export class DownloadAuthorizationService {
    * @returns True if user has a successful purchase, false otherwise
    */
   async checkPurchaseStatus(userId: string, releaseId: string): Promise<boolean> {
-    const purchase = await prisma.releasePurchase.findUnique({
-      where: {
-        userId_releaseId: {
-          userId,
-          releaseId,
-        },
-      },
-    });
+    const purchase = await PurchaseRepository.findByUserReleaseKey(userId, releaseId);
 
     return purchase !== null;
   }
@@ -47,13 +42,7 @@ export class DownloadAuthorizationService {
     releaseId: string,
     formatType: DigitalFormatType
   ): Promise<ReleaseDigitalFormat | null> {
-    return prisma.releaseDigitalFormat.findFirst({
-      where: {
-        releaseId,
-        formatType,
-        deletedAt: null,
-      },
-    });
+    return this.digitalFormatRepository.findActiveByReleaseAndFormat(releaseId, formatType);
   }
 
   /**

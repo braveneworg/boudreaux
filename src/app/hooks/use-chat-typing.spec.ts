@@ -54,6 +54,30 @@ describe('useChatTyping', () => {
     expect(result.current.activeTypers).toEqual([]);
   });
 
+  it('prunes only the expired typer and keeps the still-active one', () => {
+    const { result } = renderHook(() => useChatTyping('me'));
+
+    // First typer starts the clock.
+    act(() => result.current.noteTyping({ userId: 'user-2', username: 'cat' }));
+    // A second typer arrives 2s later, so its TTL outlives the first.
+    act(() => vi.advanceTimersByTime(2000));
+    act(() => result.current.noteTyping({ userId: 'user-3', username: 'dog' }));
+
+    // At 3.5s total the first typer (TTL expired at 3s) is pruned, but the
+    // second (TTL expires at ~5s) survives — exercising the recompute map.
+    act(() => vi.advanceTimersByTime(1500));
+
+    expect(result.current.activeTypers).toEqual([{ userId: 'user-3', username: 'dog' }]);
+  });
+
+  it('ignores typing events with an empty userId', () => {
+    const { result } = renderHook(() => useChatTyping('user-1'));
+
+    act(() => result.current.noteTyping({ userId: '', username: 'ghost' }));
+
+    expect(result.current.activeTypers).toEqual([]);
+  });
+
   it('keeps a typer alive while events keep arriving inside the TTL', () => {
     const { result } = renderHook(() => useChatTyping('user-1'));
 

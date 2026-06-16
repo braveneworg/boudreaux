@@ -98,6 +98,7 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Forms**: React Hook Form + Zod via `zodResolver`. Check `src/app/components/forms/fields/` for an existing field before building one.
 - **Styling**: mobile-first; Tailwind v4 utilities only — no `@apply`, no inline styles. Compose conditional classes with `cn()`. Never create a new UI primitive — use shadcn/ui from `@/components/ui`. Icons from `lucide-react`, UI text in Jost. Never use checkboxes in mobile-first UIs — use toggles or radio buttons. Semantic HTML, ARIA, and keyboard navigation are required, not optional.
 - **Errors & debugging**: wrap risky subtrees in error boundaries and handle async failures gracefully. Never ship `console.log` — use the project logger. Never use `alert` / `prompt` — use shadcn/ui dialogs.
+- Don't use curly braces for function bodies that are a single expression — use implicit return. Don't use parentheses around single params. Always include the `return` type on exported functions, especially components and hooks.
 
 ## Performance
 
@@ -161,3 +162,9 @@ Conventional Commits, enforced by commitlint (`commitlint.config.mjs`, `commit-m
 - **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
+
+# Refactoring
+
+- Refactor with confidence: tests, type safety, and code review catch mistakes. Don't be afraid to make big changes when they improve the codebase.
+- When refactoring, update or remove tests as needed to reflect the new structure. Don't leave orphaned tests or code.
+- Make sure the e2e tests still pass, and add more as deemed necessary to cover new flows or edge cases uncovered during refactoring.

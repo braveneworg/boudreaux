@@ -653,6 +653,37 @@ describe('GET /api/proxy-image', () => {
     expect(response.status).toBe(200);
   });
 
+  it('returns 403 when the hostname is a literal IP that is on the allowlist via CDN_DOMAIN', async () => {
+    // Allowlisting an IP-literal CDN_DOMAIN lets the request pass the domain
+    // check, so it reaches the `isIP(hostname) !== 0` guard which rejects all
+    // literal-IP hostnames (allowlist is strictly DNS-name based).
+    vi.stubEnv('CDN_DOMAIN', 'https://1.2.3.4');
+
+    const request = createRequest('https://1.2.3.4/image.png');
+    const response = await GET(request, dummyContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Domain not allowed');
+    expect(mockFetch).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
+  it('returns 403 when DNS resolves to an IPv4-mapped IPv6 with a non-IP tail', async () => {
+    // The recursive `::ffff:` branch passes a non-IPv4 tail back through
+    // isDisallowedAddress, where isIP returns 0 → the trailing `return true`.
+    const { lookup } = await import('node:dns/promises');
+    vi.mocked(lookup).mockResolvedValueOnce({
+      address: '::ffff:not-an-ip',
+      family: 6,
+    } as never);
+
+    const request = createRequest('https://cdn.fakefourrecords.com/image.png');
+    const response = await GET(request, dummyContext);
+
+    expect(response.status).toBe(403);
+  });
+
   it('should handle stream with empty value chunks', async () => {
     let callCount = 0;
     const reader = {

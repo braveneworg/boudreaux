@@ -112,6 +112,18 @@ describe('checkAbuseReportRateLimit', () => {
     expect(result.blockedBy).toBe('global');
   });
 
+  it('reuses cached limiter singletons across calls', async () => {
+    pairLimit.mockResolvedValue({ success: true, reset: Date.now() + 1000 });
+    globalLimit.mockResolvedValue({ success: true, reset: Date.now() + 1000 });
+
+    await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+    await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+
+    // Each limiter constructed exactly once despite two checks — the
+    // cached-singleton early return is exercised on the second call.
+    expect(buildOrder).toEqual(['abuse-report:pair', 'abuse-report:global']);
+  });
+
   it('short-circuits in E2E mode without calling Redis', async () => {
     vi.stubEnv('E2E_MODE', 'true');
 

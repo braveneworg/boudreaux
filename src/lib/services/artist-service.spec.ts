@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
+import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { ImageRepository } from '@/lib/repositories/image-repository';
 
 import { ArtistService } from './artist-service';
 
@@ -33,27 +34,36 @@ vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => new MockS3Client(),
 }));
 
-vi.mock('../prisma', () => ({
-  prisma: {
-    artist: {
-      create: vi.fn(),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    image: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    artistRelease: {
-      upsert: vi.fn(),
-    },
-    $transaction: vi.fn(),
+vi.mock('@/lib/repositories/artist-repository', () => ({
+  ArtistRepository: {
+    create: vi.fn(),
+    createWithSelect: vi.fn(),
+    findById: vi.fn(),
+    findBySlug: vi.fn(),
+    findUniqueBySlug: vi.fn(),
+    findFirstByDisplayName: vi.fn(),
+    findFirstByName: vi.fn(),
+    findMany: vi.fn(),
+    searchPublished: vi.fn(),
+    findBySlugWithReleases: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    archive: vi.fn(),
+    existsById: vi.fn(),
+    connectToRelease: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/image-repository', () => ({
+  ImageRepository: {
+    findManyByOwner: vi.fn(),
+    findManyByArtist: vi.fn(),
+    findManyByArtistAndIds: vi.fn(),
+    findUniqueById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateSortOrder: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -116,12 +126,12 @@ describe('ArtistService', () => {
     };
 
     it('should create an artist successfully', async () => {
-      vi.mocked(prisma.artist.create).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
       const result = await ArtistService.createArtist(createInput);
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
-      expect(prisma.artist.create).toHaveBeenCalledWith({ data: createInput });
+      expect(ArtistRepository.create).toHaveBeenCalledWith(createInput);
     });
 
     it('should return error when slug already exists', async () => {
@@ -129,7 +139,7 @@ describe('ArtistService', () => {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.artist.create).mockRejectedValue(prismaError);
+      vi.mocked(ArtistRepository.create).mockRejectedValue(prismaError);
 
       const result = await ArtistService.createArtist(createInput);
 
@@ -141,7 +151,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.create).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.create).mockRejectedValue(initError);
 
       const result = await ArtistService.createArtist(createInput);
 
@@ -149,7 +159,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.create).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.create).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.createArtist(createInput);
 
@@ -159,23 +169,16 @@ describe('ArtistService', () => {
 
   describe('getArtistById', () => {
     it('should retrieve an artist by ID', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.findById).mockResolvedValue(mockArtist);
 
       const result = await ArtistService.getArtistById('artist-123');
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
-        where: { id: 'artist-123' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-      });
+      expect(ArtistRepository.findById).toHaveBeenCalledWith('artist-123');
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findById).mockResolvedValue(null);
 
       const result = await ArtistService.getArtistById('non-existent');
 
@@ -184,7 +187,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findById).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtistById('artist-123');
 
@@ -192,7 +195,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.findById).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtistById('artist-123');
 
@@ -202,16 +205,16 @@ describe('ArtistService', () => {
 
   describe('getArtistBySlug', () => {
     it('should retrieve an artist by slug', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.findBySlug).mockResolvedValue(mockArtist);
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({ where: { slug: 'john-doe' } });
+      expect(ArtistRepository.findBySlug).toHaveBeenCalledWith('john-doe');
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findBySlug).mockResolvedValue(null);
 
       const result = await ArtistService.getArtistBySlug('non-existent');
 
@@ -220,7 +223,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findBySlug).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
@@ -228,7 +231,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.findBySlug).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
@@ -252,52 +255,38 @@ describe('ArtistService', () => {
     const deletedOnClause = { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] };
 
     it('should retrieve all artists with default parameters (excludes deleted)', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue(mockArtists);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue(mockArtists);
 
       const result = await ArtistService.getArtists();
 
       expect(result).toMatchObject({ success: true, data: mockArtists });
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
+      expect(ArtistRepository.findMany).toHaveBeenCalledWith({
         where: { AND: [deletedOnClause] },
         skip: 0,
         take: 50,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-        },
       });
     });
 
     it('should retrieve artists with custom pagination', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       const result = await ArtistService.getArtists({ skip: 10, take: 5 });
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
+      expect(ArtistRepository.findMany).toHaveBeenCalledWith({
         where: { AND: [deletedOnClause] },
         skip: 10,
         take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-        },
       });
     });
 
     it('should search across multiple fields', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       const result = await ArtistService.getArtists({ search: 'john' });
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
+      expect(ArtistRepository.findMany).toHaveBeenCalledWith({
         where: {
           AND: [
             deletedOnClause,
@@ -313,18 +302,11 @@ describe('ArtistService', () => {
         },
         skip: 0,
         take: 50,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-        },
       });
     });
 
     it('should combine pagination and search', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       const result = await ArtistService.getArtists({
         skip: 5,
@@ -333,7 +315,7 @@ describe('ArtistService', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
+      expect(ArtistRepository.findMany).toHaveBeenCalledWith({
         where: {
           AND: [
             deletedOnClause,
@@ -349,49 +331,42 @@ describe('ArtistService', () => {
         },
         skip: 5,
         take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-        },
       });
     });
 
     it('should add publishedOn filter when published=true', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       await ArtistService.getArtists({ published: true });
 
-      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where;
+      const passedWhere = vi.mocked(ArtistRepository.findMany).mock.calls.at(-1)?.[0]?.where;
       expect(passedWhere).toEqual({
         AND: [deletedOnClause, { publishedOn: { not: null } }],
       });
     });
 
     it('should add unpublished filter when published=false', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       await ArtistService.getArtists({ published: false });
 
-      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where;
+      const passedWhere = vi.mocked(ArtistRepository.findMany).mock.calls.at(-1)?.[0]?.where;
       expect(passedWhere).toEqual({
         AND: [deletedOnClause, { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
       });
     });
 
     it('should omit the deletedOn constraint when deleted=true', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
 
       await ArtistService.getArtists({ deleted: true });
 
-      const passedWhere = vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      const passedWhere = vi.mocked(ArtistRepository.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
       expect(passedWhere).toEqual({});
     });
 
     it('should return empty array when no artists found', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([]);
 
       const result = await ArtistService.getArtists();
 
@@ -400,7 +375,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findMany).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtists();
 
@@ -408,7 +383,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.findMany).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtists();
 
@@ -423,15 +398,12 @@ describe('ArtistService', () => {
 
     it('should update an artist successfully', async () => {
       const updatedArtist = { ...mockArtist, displayName: 'John Updated Doe' };
-      vi.mocked(prisma.artist.update).mockResolvedValue(updatedArtist);
+      vi.mocked(ArtistRepository.update).mockResolvedValue(updatedArtist);
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
       expect(result).toMatchObject({ success: true, data: updatedArtist });
-      expect(prisma.artist.update).toHaveBeenCalledWith({
-        where: { id: 'artist-123' },
-        data: updateData,
-      });
+      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', updateData);
     });
 
     it('should return error when artist not found', async () => {
@@ -439,7 +411,7 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.artist.update).mockRejectedValue(notFoundError);
+      vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);
 
       const result = await ArtistService.updateArtist('non-existent', updateData);
 
@@ -451,7 +423,7 @@ describe('ArtistService', () => {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.artist.update).mockRejectedValue(uniqueError);
+      vi.mocked(ArtistRepository.update).mockRejectedValue(uniqueError);
 
       const result = await ArtistService.updateArtist('artist-123', { slug: 'existing-slug' });
 
@@ -463,7 +435,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.update).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
@@ -471,7 +443,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.update).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
@@ -481,12 +453,12 @@ describe('ArtistService', () => {
 
   describe('deleteArtist', () => {
     it('should delete an artist successfully', async () => {
-      vi.mocked(prisma.artist.delete).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
 
       const result = await ArtistService.deleteArtist('artist-123');
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
-      expect(prisma.artist.delete).toHaveBeenCalledWith({ where: { id: 'artist-123' } });
+      expect(ArtistRepository.delete).toHaveBeenCalledWith('artist-123');
     });
 
     it('should return error when artist not found', async () => {
@@ -494,7 +466,7 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.artist.delete).mockRejectedValue(notFoundError);
+      vi.mocked(ArtistRepository.delete).mockRejectedValue(notFoundError);
 
       const result = await ArtistService.deleteArtist('non-existent');
 
@@ -503,7 +475,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.delete).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.delete).mockRejectedValue(initError);
 
       const result = await ArtistService.deleteArtist('artist-123');
 
@@ -511,7 +483,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.delete).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.delete).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.deleteArtist('artist-123');
 
@@ -522,15 +494,12 @@ describe('ArtistService', () => {
   describe('archiveArtist', () => {
     it('should archive an artist successfully', async () => {
       const archivedArtist = { ...mockArtist, deletedOn: new Date('2024-12-13') };
-      vi.mocked(prisma.artist.update).mockResolvedValue(archivedArtist);
+      vi.mocked(ArtistRepository.archive).mockResolvedValue(archivedArtist);
 
       const result = await ArtistService.archiveArtist('artist-123');
 
       expect(result).toMatchObject({ success: true, data: archivedArtist });
-      expect(prisma.artist.update).toHaveBeenCalledWith({
-        where: { id: 'artist-123' },
-        data: { deletedOn: expect.any(Date) },
-      });
+      expect(ArtistRepository.archive).toHaveBeenCalledWith('artist-123');
     });
 
     it('should return error when artist not found', async () => {
@@ -538,8 +507,8 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.artist.update).mockReset();
-      vi.mocked(prisma.artist.update).mockRejectedValue(notFoundError);
+      vi.mocked(ArtistRepository.archive).mockReset();
+      vi.mocked(ArtistRepository.archive).mockRejectedValue(notFoundError);
 
       const result = await ArtistService.archiveArtist('non-existent');
 
@@ -548,8 +517,8 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.update).mockReset();
-      vi.mocked(prisma.artist.update).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.archive).mockReset();
+      vi.mocked(ArtistRepository.archive).mockRejectedValue(initError);
 
       const result = await ArtistService.archiveArtist('artist-123');
 
@@ -557,8 +526,8 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.update).mockReset();
-      vi.mocked(prisma.artist.update).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.archive).mockReset();
+      vi.mocked(ArtistRepository.archive).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.archiveArtist('artist-123');
 
@@ -582,9 +551,9 @@ describe('ArtistService', () => {
     });
 
     it('should upload image successfully', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/test-image.jpg',
         caption: 'Test caption',
@@ -600,7 +569,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue(null);
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
@@ -609,7 +578,7 @@ describe('ArtistService', () => {
 
     it('should return error when S3 bucket not configured', async () => {
       vi.stubEnv('S3_BUCKET', undefined);
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
@@ -618,7 +587,7 @@ describe('ArtistService', () => {
 
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.existsById).mockRejectedValue(initError);
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
@@ -626,8 +595,8 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
@@ -636,9 +605,9 @@ describe('ArtistService', () => {
 
     it('should use direct S3 URL when CDN not configured', async () => {
       vi.stubEnv('CDN_DOMAIN', undefined);
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://test-bucket.s3.us-east-1.amazonaws.com/media/artists/artist-123/test-image.jpg',
         caption: 'Test caption',
@@ -673,9 +642,9 @@ describe('ArtistService', () => {
     });
 
     it('should upload multiple images successfully', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create)
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create)
         .mockResolvedValueOnce({
           id: 'image-1',
           src: 'https://cdn.example.com/image1.jpg',
@@ -694,7 +663,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue(null);
 
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
@@ -702,7 +671,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ArtistRepository.existsById).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
@@ -710,8 +679,8 @@ describe('ArtistService', () => {
     });
 
     it('should aggregate errors when all uploads fail', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
       // Mock S3 upload to fail for all images
       mockS3Send.mockRejectedValue(new Error('S3 upload failed'));
 
@@ -725,11 +694,11 @@ describe('ArtistService', () => {
     });
 
     it('should return partial success when some uploads fail', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
       // First upload succeeds, second fails
       mockS3Send.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('S3 upload failed'));
-      vi.mocked(prisma.image.create).mockResolvedValueOnce({
+      vi.mocked(ImageRepository.create).mockResolvedValueOnce({
         id: 'image-1',
         src: 'https://cdn.example.com/image1.jpg',
         sortOrder: 0,
@@ -752,12 +721,12 @@ describe('ArtistService', () => {
     });
 
     it('should delete image successfully', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -766,7 +735,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when image not found', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(null);
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue(null);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -774,12 +743,12 @@ describe('ArtistService', () => {
     });
 
     it('should delete from S3 with S3 URL format', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://test-bucket.s3.us-east-1.amazonaws.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -788,12 +757,12 @@ describe('ArtistService', () => {
     });
 
     it('should continue with DB delete even if S3 delete fails', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
       mockS3Send.mockRejectedValueOnce(new Error('S3 error'));
 
       const result = await ArtistService.deleteArtistImage('image-123');
@@ -802,12 +771,12 @@ describe('ArtistService', () => {
     });
 
     it('should skip S3 deletion when image URL does not match CDN or S3 patterns', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://some-other-host.example.com/media/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -817,7 +786,7 @@ describe('ArtistService', () => {
 
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.image.findUnique).mockRejectedValue(initError);
+      vi.mocked(ImageRepository.findUniqueById).mockRejectedValue(initError);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -826,7 +795,7 @@ describe('ArtistService', () => {
 
     it('should handle P2025 error when image is deleted during operation', async () => {
       // Simulate findUnique succeeding but delete failing due to record being deleted
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
@@ -835,7 +804,7 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.image.delete).mockRejectedValue(p2025Error);
+      vi.mocked(ImageRepository.delete).mockRejectedValue(p2025Error);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -843,13 +812,13 @@ describe('ArtistService', () => {
     });
 
     it('should handle database init error during delete', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.image.delete).mockRejectedValue(initError);
+      vi.mocked(ImageRepository.delete).mockRejectedValue(initError);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -857,12 +826,12 @@ describe('ArtistService', () => {
     });
 
     it('should handle generic error during delete operation', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockRejectedValue(new Error('Unexpected failure'));
+      vi.mocked(ImageRepository.delete).mockRejectedValue(new Error('Unexpected failure'));
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -876,7 +845,7 @@ describe('ArtistService', () => {
         { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 0 },
         { id: 'image-2', src: 'https://cdn.example.com/image2.jpg', sortOrder: 1 },
       ];
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue(mockImages as never);
 
       const result = await ArtistService.getArtistImages('artist-123');
 
@@ -886,7 +855,7 @@ describe('ArtistService', () => {
 
     it('should use fallback values when image fields are null or missing', async () => {
       const mockImages = [{ id: 'image-1', src: null, caption: null, altText: null }];
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue(mockImages as never);
 
       const result = await ArtistService.getArtistImages('artist-123');
 
@@ -910,7 +879,7 @@ describe('ArtistService', () => {
     });
 
     it('should return empty array when no images found', async () => {
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([]);
 
       const result = await ArtistService.getArtistImages('artist-123');
 
@@ -920,7 +889,7 @@ describe('ArtistService', () => {
 
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.image.findMany).mockRejectedValue(initError);
+      vi.mocked(ImageRepository.findManyByArtist).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtistImages('artist-123');
 
@@ -928,7 +897,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ImageRepository.findManyByArtist).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.getArtistImages('artist-123');
 
@@ -938,7 +907,7 @@ describe('ArtistService', () => {
 
   describe('updateArtistImage', () => {
     it('should update image successfully', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({
+      vi.mocked(ImageRepository.update).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/image.jpg',
         caption: 'Updated caption',
@@ -958,7 +927,7 @@ describe('ArtistService', () => {
     });
 
     it('should use fallback values when updated image has null fields', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({
+      vi.mocked(ImageRepository.update).mockResolvedValue({
         id: 'image-123',
         src: null,
         caption: null,
@@ -988,7 +957,7 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.image.update).mockRejectedValue(notFoundError);
+      vi.mocked(ImageRepository.update).mockRejectedValue(notFoundError);
 
       const result = await ArtistService.updateArtistImage('image-123', {
         caption: 'Updated caption',
@@ -999,7 +968,7 @@ describe('ArtistService', () => {
 
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.image.update).mockRejectedValue(initError);
+      vi.mocked(ImageRepository.update).mockRejectedValue(initError);
 
       const result = await ArtistService.updateArtistImage('image-123', {
         caption: 'Updated caption',
@@ -1009,7 +978,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.image.update).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ImageRepository.update).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.updateArtistImage('image-123', {
         caption: 'Updated caption',
@@ -1021,28 +990,32 @@ describe('ArtistService', () => {
 
   describe('reorderArtistImages', () => {
     it('should reorder images successfully', async () => {
-      vi.mocked(prisma.image.findMany)
-        .mockResolvedValueOnce([{ id: 'image-1' }, { id: 'image-2' }] as never)
-        .mockResolvedValueOnce([
-          { id: 'image-2', src: 'https://cdn.example.com/image2.jpg', sortOrder: 0 },
-          { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 1 },
-        ] as never);
-      vi.mocked(prisma.image.update).mockResolvedValue({} as never);
+      vi.mocked(ImageRepository.findManyByArtistAndIds).mockResolvedValue([
+        { id: 'image-1' },
+        { id: 'image-2' },
+      ] as never);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([
+        { id: 'image-2', src: 'https://cdn.example.com/image2.jpg', sortOrder: 0 },
+        { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 1 },
+      ] as never);
+      vi.mocked(ImageRepository.updateSortOrder).mockResolvedValue({} as never);
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
       expect(result.success).toBe(true);
-      expect(prisma.image.update).toHaveBeenCalled();
+      expect(ImageRepository.updateSortOrder).toHaveBeenCalled();
     });
 
     it('should use fallback values when reordered images have null fields', async () => {
-      vi.mocked(prisma.image.findMany)
-        .mockResolvedValueOnce([{ id: 'image-1' }, { id: 'image-2' }] as never)
-        .mockResolvedValueOnce([
-          { id: 'image-2', src: null, caption: null, altText: null },
-          { id: 'image-1', src: null, caption: null, altText: null },
-        ] as never);
-      vi.mocked(prisma.image.update).mockResolvedValue({} as never);
+      vi.mocked(ImageRepository.findManyByArtistAndIds).mockResolvedValue([
+        { id: 'image-1' },
+        { id: 'image-2' },
+      ] as never);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([
+        { id: 'image-2', src: null, caption: null, altText: null },
+        { id: 'image-1', src: null, caption: null, altText: null },
+      ] as never);
+      vi.mocked(ImageRepository.updateSortOrder).mockResolvedValue({} as never);
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
@@ -1068,7 +1041,9 @@ describe('ArtistService', () => {
     });
 
     it('should return error when images not found', async () => {
-      vi.mocked(prisma.image.findMany).mockResolvedValue([{ id: 'image-1' }] as never);
+      vi.mocked(ImageRepository.findManyByArtistAndIds).mockResolvedValue([
+        { id: 'image-1' },
+      ] as never);
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
@@ -1080,7 +1055,7 @@ describe('ArtistService', () => {
 
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.image.findMany).mockRejectedValue(initError);
+      vi.mocked(ImageRepository.findManyByArtistAndIds).mockRejectedValue(initError);
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
@@ -1088,7 +1063,9 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ImageRepository.findManyByArtistAndIds).mockRejectedValue(
+        new Error('Unknown error')
+      );
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
@@ -1098,12 +1075,12 @@ describe('ArtistService', () => {
 
   describe('searchPublishedArtists', () => {
     it('should search published artists with default parameters', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([mockArtist] as never);
 
       const result = await ArtistService.searchPublishedArtists();
 
       expect(result).toMatchObject({ success: true, data: [mockArtist] });
-      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+      expect(ArtistRepository.searchPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             isActive: true,
@@ -1119,18 +1096,17 @@ describe('ArtistService', () => {
           }),
           skip: 0,
           take: 50,
-          orderBy: { displayName: 'asc' },
         })
       );
     });
 
     it('should search with custom pagination', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([mockArtist] as never);
 
       const result = await ArtistService.searchPublishedArtists({ skip: 10, take: 5 });
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+      expect(ArtistRepository.searchPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 10,
           take: 5,
@@ -1139,12 +1115,12 @@ describe('ArtistService', () => {
     });
 
     it('should search across name, group, and release title fields', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([mockArtist] as never);
 
       const result = await ArtistService.searchPublishedArtists({ search: 'john' });
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+      expect(ArtistRepository.searchPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             isActive: true,
@@ -1173,32 +1149,25 @@ describe('ArtistService', () => {
       );
     });
 
-    it('should include images and releases in the query', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+    it('should forward the search where-clause to the repository', async () => {
+      // The images/releases include shape now lives in (and is covered by)
+      // ArtistRepository.searchPublished; the service only builds the filter.
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([mockArtist] as never);
 
       await ArtistService.searchPublishedArtists({ search: 'test' });
 
-      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+      expect(ArtistRepository.searchPublished).toHaveBeenCalledWith(
         expect.objectContaining({
-          include: expect.objectContaining({
-            images: expect.objectContaining({
-              orderBy: { sortOrder: 'asc' },
-              take: 1,
-            }),
-            releases: expect.objectContaining({
-              include: expect.objectContaining({
-                release: expect.objectContaining({
-                  select: { id: true, title: true, publishedAt: true, deletedOn: true },
-                }),
-              }),
-            }),
+          where: expect.objectContaining({
+            isActive: true,
+            AND: expect.any(Array),
           }),
         })
       );
     });
 
     it('should return empty array when no artists found', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([]);
 
       const result = await ArtistService.searchPublishedArtists({ search: 'nonexistent' });
 
@@ -1207,7 +1176,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.searchPublished).mockRejectedValue(initError);
 
       const result = await ArtistService.searchPublishedArtists({ search: 'test' });
 
@@ -1215,7 +1184,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ArtistRepository.searchPublished).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.searchPublishedArtists({ search: 'test' });
 
@@ -1223,11 +1192,11 @@ describe('ArtistService', () => {
     });
 
     it('should not include search OR conditions when no search term', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.searchPublished).mockResolvedValue([]);
 
       await ArtistService.searchPublishedArtists();
 
-      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+      expect(ArtistRepository.searchPublished).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             isActive: true,
@@ -1296,44 +1265,27 @@ describe('ArtistService', () => {
     };
 
     it('should retrieve an artist with releases by slug', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue(
+        mockArtistWithReleases as never
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            slug: 'john-doe',
-            isActive: true,
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-          },
-          include: expect.objectContaining({
-            images: true,
-            labels: true,
-            urls: true,
-            members: { include: { member: true } },
-            releases: expect.objectContaining({
-              include: expect.objectContaining({
-                release: expect.objectContaining({
-                  include: expect.objectContaining({
-                    images: true,
-                    digitalFormats: expect.objectContaining({
-                      include: {
-                        files: { orderBy: { trackNumber: 'asc' } },
-                      },
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        })
-      );
+      // The full nested release/digital-format include now lives in (and is
+      // covered by) ArtistRepository.findBySlugWithReleases; the service only
+      // builds the active/published where-clause.
+      expect(ArtistRepository.findBySlugWithReleases).toHaveBeenCalledWith({
+        slug: 'john-doe',
+        isActive: true,
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      });
     });
 
     it('should filter to only published, non-deleted releases', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue(
+        mockArtistWithReleases as never
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1345,7 +1297,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue(null);
 
       const result = await ArtistService.getArtistBySlugWithReleases('non-existent');
 
@@ -1354,7 +1306,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findFirst).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1362,7 +1314,9 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findFirst).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockRejectedValue(
+        new Error('Unknown error')
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1384,7 +1338,9 @@ describe('ArtistService', () => {
           },
         ],
       };
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithOnlyUnpublished as never);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue(
+        artistWithOnlyUnpublished as never
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1409,7 +1365,9 @@ describe('ArtistService', () => {
           },
         ],
       };
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithMissingPublishedAt as never);
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue(
+        artistWithMissingPublishedAt as never
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1431,48 +1389,37 @@ describe('ArtistService', () => {
     };
 
     it('should return artist found by slug', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(existingArtist as never);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(existingArtist as never);
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
       expect(result).toEqual({ success: true, data: existingArtist });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
-        where: { slug: 'ceschi' },
-        select: selectFields,
-      });
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi', selectFields);
     });
 
     it('should fall back to displayName match when slug not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(existingArtist as never);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(existingArtist as never);
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
       expect(result).toEqual({ success: true, data: existingArtist });
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: { displayName: { equals: 'Ceschi', mode: 'insensitive' } },
-        select: selectFields,
-      });
+      expect(ArtistRepository.findFirstByDisplayName).toHaveBeenCalledWith('Ceschi', selectFields);
     });
 
     it('should fall back to firstName + surname match', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst)
-        .mockResolvedValueOnce(null as never) // displayName miss
-        .mockResolvedValueOnce(existingArtist as never); // firstName+surname hit
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(existingArtist as never);
 
       const result = await ArtistService.findOrCreateByName('Ceschi Ramos');
 
       expect(result).toEqual({ success: true, data: existingArtist });
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
-            { surname: { equals: 'Ramos', mode: 'insensitive' } },
-          ],
-        },
-        select: selectFields,
-      });
+      expect(ArtistRepository.findFirstByName).toHaveBeenCalledWith(
+        'Ceschi',
+        'Ramos',
+        selectFields
+      );
     });
 
     it('should create a new artist when no match found', async () => {
@@ -1482,29 +1429,31 @@ describe('ArtistService', () => {
         firstName: 'Jane',
         surname: 'Smith',
       };
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockResolvedValue(newArtist as never);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue(newArtist as never);
 
       const result = await ArtistService.findOrCreateByName('Jane Smith');
 
       expect(result).toEqual({ success: true, data: newArtist });
-      expect(prisma.artist.create).toHaveBeenCalledWith({
-        data: {
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
+        {
           firstName: 'Jane',
           surname: 'Smith',
           displayName: 'Jane Smith',
           slug: 'jane-smith',
           isActive: true,
         },
-        select: selectFields,
-      });
+        selectFields
+      );
     });
 
     it('should handle single-word artist name', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
         id: 'artist-new',
         displayName: 'Ceschi',
         firstName: 'Ceschi',
@@ -1514,15 +1463,14 @@ describe('ArtistService', () => {
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.create).toHaveBeenCalledWith(
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            firstName: 'Ceschi',
-            surname: '',
-            displayName: 'Ceschi',
-            slug: 'ceschi',
-          }),
-        })
+          firstName: 'Ceschi',
+          surname: '',
+          displayName: 'Ceschi',
+          slug: 'ceschi',
+        }),
+        selectFields
       );
     });
 
@@ -1545,10 +1493,11 @@ describe('ArtistService', () => {
         clientVersion: '5.0.0',
       });
 
-      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(null as never); // slug lookup
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockRejectedValue(p2002Error);
-      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(existingArtist as never); // retry
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // slug lookup
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(p2002Error);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(existingArtist as never); // retry
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1558,7 +1507,7 @@ describe('ArtistService', () => {
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection refused', '5.0.0');
 
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockRejectedValue(initError);
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1569,9 +1518,10 @@ describe('ArtistService', () => {
       // Names composed of only special characters slugify to '' — exercising the
       // `if (slug)` false branch and the `slug || generateSlug(firstName ?? 'artist')`
       // right-hand branch when persisting the new artist.
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
         id: 'artist-special',
         displayName: '...',
         firstName: '...',
@@ -1582,11 +1532,10 @@ describe('ArtistService', () => {
 
       expect(result.success).toBe(true);
       // Slug lookup must be skipped entirely — only the displayName fallback path is consulted.
-      expect(prisma.artist.findUnique).not.toHaveBeenCalled();
-      expect(prisma.artist.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ displayName: '...' }),
-        })
+      expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ displayName: '...' }),
+        expect.anything()
       );
     });
   });
@@ -1599,9 +1548,9 @@ describe('ArtistService', () => {
     });
 
     it('should use fallback content type when contentType is empty', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/test-image.jpg',
         caption: null,
@@ -1619,9 +1568,9 @@ describe('ArtistService', () => {
     });
 
     it('should use fallback values when image result has null src, caption, altText, and no sortOrder', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([{ id: 'existing' }] as never);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([{ id: 'existing' }] as never);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: null, // triggers || imageUrl
         caption: null, // triggers || undefined
@@ -1652,9 +1601,9 @@ describe('ArtistService', () => {
 
     it('should use default AWS region when AWS_REGION is not set', async () => {
       vi.stubEnv('AWS_REGION', undefined);
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://test-bucket.s3.us-east-1.amazonaws.com/test.jpg',
         caption: null,
@@ -1673,9 +1622,9 @@ describe('ArtistService', () => {
     });
 
     it('should handle fileName with no extension', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/test.jpg',
         caption: null,
@@ -1695,9 +1644,9 @@ describe('ArtistService', () => {
     it("should fall back to 'jpg' when the fileName extension slot is empty", async () => {
       // `'cover.'.split('.').pop()` === '' which is falsy and falls through
       // to the `|| 'jpg'` default, covering the right-hand branch.
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.image.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([]);
+      vi.mocked(ImageRepository.create).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/cover.jpg',
         caption: null,
@@ -1722,12 +1671,12 @@ describe('ArtistService', () => {
     });
 
     it('should skip S3 deletion when image src is null', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: null,
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -1737,12 +1686,12 @@ describe('ArtistService', () => {
 
     it('should skip S3 deletion when S3_BUCKET is not configured', async () => {
       vi.stubEnv('S3_BUCKET', undefined);
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -1751,12 +1700,12 @@ describe('ArtistService', () => {
     });
 
     it('should handle S3 URL where urlParts[1] is undefined', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://bucket.s3.', // urlParts[1] will be empty string
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -1765,12 +1714,12 @@ describe('ArtistService', () => {
 
     it('should strip protocol from CDN_DOMAIN when extracting S3 key', async () => {
       vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
-      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+      vi.mocked(ImageRepository.findUniqueById).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
         artistId: 'artist-123',
       } as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
@@ -1789,10 +1738,11 @@ describe('ArtistService', () => {
         clientVersion: '5.0.0',
       });
 
-      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(null as never); // slug lookup
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockRejectedValue(p2002Error);
-      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(null as never); // retry also fails
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // slug lookup
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(p2002Error);
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // retry also fails
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1800,9 +1750,10 @@ describe('ArtistService', () => {
     });
 
     it('should handle unexpected error in findOrCreateByName', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
-      vi.mocked(prisma.artist.create).mockRejectedValue(new Error('Unexpected'));
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(new Error('Unexpected'));
 
       const result = await ArtistService.findOrCreateByName('New Artist');
 
@@ -1817,11 +1768,10 @@ describe('ArtistService', () => {
       // The important branch is when slug lookup returns null, displayName returns null,
       // but firstName is truthy (which is always the case for non-empty names).
       // The actual uncovered branch is: byName not found -> falls through to create.
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never); // slug miss
-      vi.mocked(prisma.artist.findFirst)
-        .mockResolvedValueOnce(null as never) // displayName miss
-        .mockResolvedValueOnce(null as never); // firstName+surname miss
-      vi.mocked(prisma.artist.create).mockResolvedValue({
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never); // slug miss
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never); // displayName miss
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never); // firstName+surname miss
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
         id: 'new-id',
         displayName: 'Test Name',
         firstName: 'Test',
@@ -1831,18 +1781,15 @@ describe('ArtistService', () => {
       const result = await ArtistService.findOrCreateByName('Test Name');
 
       expect(result.success).toBe(true);
-      // Verify all three search paths were attempted
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
-        where: { slug: 'test-name' },
-        select: selectFields,
-      });
-      expect(prisma.artist.findFirst).toHaveBeenCalledTimes(2);
+      // Verify the displayName and firstName+surname search paths were attempted.
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('test-name', selectFields);
+      expect(ArtistRepository.findFirstByName).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('connectToRelease', () => {
     it('should upsert an ArtistRelease join record', async () => {
-      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({
+      vi.mocked(ArtistRepository.connectToRelease).mockResolvedValue({
         id: 'join-1',
         artistId: 'artist-1',
         releaseId: 'release-1',
@@ -1850,17 +1797,11 @@ describe('ArtistService', () => {
 
       await ArtistService.connectToRelease('artist-1', 'release-1');
 
-      expect(prisma.artistRelease.upsert).toHaveBeenCalledWith({
-        where: {
-          artistId_releaseId: { artistId: 'artist-1', releaseId: 'release-1' },
-        },
-        update: {},
-        create: { artistId: 'artist-1', releaseId: 'release-1' },
-      });
+      expect(ArtistRepository.connectToRelease).toHaveBeenCalledWith('artist-1', 'release-1');
     });
 
     it('should be idempotent on duplicate calls', async () => {
-      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({
+      vi.mocked(ArtistRepository.connectToRelease).mockResolvedValue({
         id: 'join-1',
         artistId: 'artist-1',
         releaseId: 'release-1',
@@ -1869,24 +1810,22 @@ describe('ArtistService', () => {
       await ArtistService.connectToRelease('artist-1', 'release-1');
       await ArtistService.connectToRelease('artist-1', 'release-1');
 
-      expect(prisma.artistRelease.upsert).toHaveBeenCalledTimes(2);
+      expect(ArtistRepository.connectToRelease).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('existsById', () => {
     it('should return true when the artist exists', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-1' } as never);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-1' } as never);
 
       const result = await ArtistService.existsById('artist-1');
 
       expect(result).toBe(true);
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'artist-1' } })
-      );
+      expect(ArtistRepository.existsById).toHaveBeenCalledWith('artist-1');
     });
 
     it('should return false when the artist does not exist', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue(null);
 
       const result = await ArtistService.existsById('missing-id');
 
