@@ -226,35 +226,29 @@ export class ReleaseService {
         if (s3Key) s3KeysToDelete.push(s3Key);
       }
 
-      // Delete related records in dependency order (children first)
-      // 1. Digital format files (child of ReleaseDigitalFormat)
-      for (const format of existing.digitalFormats) {
-        await digitalFormatFileRepository.deleteAllByFormatId(format.id);
-      }
+      // Delete related records in dependency order (children first).
+      // 1. Digital format files (children of ReleaseDigitalFormat) — one delete
+      //    per format, run together since they target disjoint format ids.
+      await Promise.all(
+        existing.digitalFormats.map((format) =>
+          digitalFormatFileRepository.deleteAllByFormatId(format.id)
+        )
+      );
 
-      // 2. Digital formats
-      await digitalFormatRepository.deleteAllByReleaseId(id);
+      // 2. Everything else keyed off the release id touches a different
+      //    collection, so the remaining cascade deletes run concurrently.
+      await Promise.all([
+        digitalFormatRepository.deleteAllByReleaseId(id),
+        PurchaseRepository.deleteAllByReleaseId(id),
+        PurchaseRepository.deleteAllDownloadsByReleaseId(id),
+        downloadEventRepository.deleteAllByReleaseId(id),
+        ReleaseRepository.deleteReleaseUrls(id),
+        ReleaseRepository.deleteImages(id),
+        ReleaseRepository.deleteArtistReleases(id),
+        ReleaseRepository.clearFeaturedArtistReferences(id),
+      ]);
 
-      // 3. Purchase and download records
-      await PurchaseRepository.deleteAllByReleaseId(id);
-      await PurchaseRepository.deleteAllDownloadsByReleaseId(id);
-
-      // 4. Download events (no FK relation, just matching field)
-      await downloadEventRepository.deleteAllByReleaseId(id);
-
-      // 5. Release URLs (junction table)
-      await ReleaseRepository.deleteReleaseUrls(id);
-
-      // 6. Images (shared model — only delete images linked to this release)
-      await ReleaseRepository.deleteImages(id);
-
-      // 7. ArtistRelease junction records (does NOT delete the Artist)
-      await ReleaseRepository.deleteArtistReleases(id);
-
-      // 8. FeaturedArtist references (disconnect, don't delete the featured artist record)
-      await ReleaseRepository.clearFeaturedArtistReferences(id);
-
-      // 9. Delete the release itself
+      // 3. Delete the release itself, after all of its references are gone.
       const release = await ReleaseRepository.delete(id);
 
       // 10. Best-effort S3 cleanup (async, fire-and-forget)
