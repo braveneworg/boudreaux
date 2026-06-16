@@ -80,7 +80,7 @@ const fetchReportedUsers = async (
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useReportedUsersQuery = (
+export const useInfiniteReportedUsersQuery = (
   params: UseReportedUsersQueryParams,
   options: InfiniteQueryOptionsOverride<ReportedUsersResponse> = {}
 ) =>

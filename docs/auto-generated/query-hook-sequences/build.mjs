@@ -24,13 +24,13 @@ mkdirSync(diagramsDir, { recursive: true });
 const DIAGRAMS = [
   {
     file: '01-use-releases-query.mmd',
-    title: '1. useReleasesQuery — admin releases listing (infinite)',
-    src: `%% useReleasesQuery — admin releases listing (infinite)
+    title: '1. useInfiniteReleasesQuery — admin releases listing (infinite)',
+    src: `%% useInfiniteReleasesQuery — admin releases listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(release-data-view)
-    participant H as useReleasesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteReleasesQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/releases
     participant A as auth()
@@ -38,7 +38,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB<br/>(release.findMany)
     participant V as paginatedResponseSchema<br/>(releaseSchema)
     participant RC as QueryCache.onError
-    C->>H: useReleasesQuery({search,published,deleted})
+    C->>H: useInfiniteReleasesQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/releases?skip&take=24&filters, {signal})
     R->>A: auth() — require role 'admin'
@@ -66,20 +66,20 @@ sequenceDiagram
   },
   {
     file: '02-use-published-releases-query.mmd',
-    title: '2. usePublishedReleasesQuery — public releases (infinite + combobox)',
-    src: `%% usePublishedReleasesQuery (+ usePublishedReleaseSearchQuery)
+    title: '2. useInfinitePublishedReleasesQuery — public releases (infinite + combobox)',
+    src: `%% useInfinitePublishedReleasesQuery (+ usePublishedReleaseSearchQuery)
 sequenceDiagram
     autonumber
     actor U as Visitor
     participant C as Component<br/>(releases-content /<br/>release-search-combobox)
-    participant H as usePublishedReleasesQuery<br/>(useInfiniteQuery)
+    participant H as useInfinitePublishedReleasesQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/releases?listing=published
     participant SV as ReleaseService<br/>.getPublishedReleases
     participant DB as Prisma · MongoDB<br/>(release.findMany select)
     participant V as paginatedResponseSchema<br/>(publishedReleaseListingSchema)
     participant RC as QueryCache.onError
-    C->>H: usePublishedReleasesQuery(search)
+    C->>H: useInfinitePublishedReleasesQuery(search)
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/releases?listing=published&skip&take=24&search, {signal})
     R->>SV: getPublishedReleases({skip,take,search})
@@ -317,13 +317,13 @@ sequenceDiagram
   },
   {
     file: '08-use-artists-query.mmd',
-    title: '8. useArtistsQuery — admin artists listing (infinite)',
-    src: `%% useArtistsQuery — admin artists listing (infinite)
+    title: '8. useInfiniteArtistsQuery — admin artists listing (infinite)',
+    src: `%% useInfiniteArtistsQuery — admin artists listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(artist-data-view)
-    participant H as useArtistsQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteArtistsQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/artists
     participant A as auth()
@@ -331,7 +331,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB<br/>(artist.findMany)
     participant V as paginatedResponseSchema<br/>(artistSchema)
     participant RC as QueryCache.onError
-    C->>H: useArtistsQuery({search,published,deleted})
+    C->>H: useInfiniteArtistsQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/artists?skip&take=24&filters, {signal})
     R->>A: auth() — require role 'admin'
@@ -526,20 +526,20 @@ sequenceDiagram
   },
   {
     file: '13-use-featured-artists-query.mmd',
-    title: '13. useFeaturedArtistsQuery — admin featured-artists listing (infinite)',
-    src: `%% useFeaturedArtistsQuery — admin featured-artists listing (infinite)
+    title: '13. useInfiniteFeaturedArtistsQuery — admin featured-artists listing (infinite)',
+    src: `%% useInfiniteFeaturedArtistsQuery — admin featured-artists listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(featured-artist-data-view)
-    participant H as useFeaturedArtistsQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteFeaturedArtistsQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/featured-artists<br/>(withRateLimit publicLimiter)
     participant SV as FeaturedArtistsService<br/>.getAllFeaturedArtists
     participant DB as Prisma · MongoDB
     participant V as paginatedResponseSchema<br/>(featuredArtistSchema)
     participant RC as QueryCache.onError
-    C->>H: useFeaturedArtistsQuery({search,published,deleted})
+    C->>H: useInfiniteFeaturedArtistsQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/featured-artists?skip&take=24 (NO active), {signal})
     R->>SV: auth admin · getAllFeaturedArtists({skip,take,filters})
@@ -779,20 +779,20 @@ sequenceDiagram
   },
   {
     file: '19-use-tours-query.mmd',
-    title: '19. useToursQuery — paginated public tours (infinite)',
-    src: `%% useToursQuery — paginated public tours listing (infinite scroll)
+    title: '19. useInfiniteToursQuery — paginated public tours (infinite)',
+    src: `%% useInfiniteToursQuery — paginated public tours listing (infinite scroll)
 sequenceDiagram
     autonumber
     actor U as Visitor
     participant C as Component<br/>(tours-content / home-content)
-    participant H as useToursQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant H as useInfiniteToursQuery<br/>(useInfiniteQuery, keepPreviousData)
     participant F as fetchAndParse
     participant R as GET /api/tours<br/>(withRateLimit: publicLimiter)
     participant RP as TourRepository.findAll
     participant DB as Prisma (tour.findMany)
     participant V as paginatedResponseSchema<br/>(tourWithRelationsSchema)
     participant RC as QueryCache.onError
-    C->>H: useToursQuery(search)
+    C->>H: useInfiniteToursQuery(search)
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/tours?skip&take=24&search, {signal})
     R->>RP: findAll({skip, take, search})
@@ -1208,13 +1208,13 @@ sequenceDiagram
   },
   {
     file: '29-use-chat-messages-query.mmd',
-    title: '29. useChatMessagesQuery — paged chat history',
-    src: `%% useChatMessagesQuery — paged chat history (infinite, validated, no-store)
+    title: '29. useInfiniteChatMessagesQuery — paged chat history',
+    src: `%% useInfiniteChatMessagesQuery — paged chat history (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor U as User
     participant C as ChatBody<br/>(chat drawer)
-    participant H as useChatMessagesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteChatMessagesQuery<br/>(useInfiniteQuery)
     participant Q as fetchPage queryFn
     participant P as parseResponse
     participant R as GET /api/chat/messages<br/>(withAuth, force-dynamic)
@@ -1223,7 +1223,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as chatMessagesPageSchema<br/>(chatMessageDtoSchema[])
     participant RC as QueryCache.onError
-    C->>H: useChatMessagesQuery({ enabled })
+    C->>H: useInfiniteChatMessagesQuery({ enabled })
     H->>Q: fetchPage({ pageParam cursor, signal })
     Q->>R: fetch('/api/chat/messages?limit=20&cursor', {cache:'no-store', signal})
     alt bad cursorCreatedAt
@@ -1383,13 +1383,13 @@ sequenceDiagram
   },
   {
     file: '33-use-admin-user-messages-query.mmd',
-    title: '33. useAdminUserMessagesQuery — per-user message history',
-    src: `%% useAdminUserMessagesQuery — per-user message history (infinite, validated, no-store)
+    title: '33. useInfiniteAdminUserMessagesQuery — per-user message history',
+    src: `%% useInfiniteAdminUserMessagesQuery — per-user message history (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor A as Admin
     participant C as UserDetailView<br/>(admin/chat/users/{userId})
-    participant H as useAdminUserMessagesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteAdminUserMessagesQuery<br/>(useInfiniteQuery)
     participant Q as fetchPage queryFn
     participant P as parseResponse
     participant R as GET /api/admin/chat/users/{userId}/messages<br/>(withAdmin, force-dynamic)
@@ -1398,7 +1398,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as adminUserMessagesResponseSchema
     participant RC as QueryCache.onError
-    C->>H: useAdminUserMessagesQuery(userId)
+    C->>H: useInfiniteAdminUserMessagesQuery(userId)
     H->>Q: fetchPage({ userId, skip=pageParam, signal })
     Q->>R: fetch('.../messages?skip&take=25', {cache:'no-store', signal})
     alt not authenticated / not admin
@@ -1428,13 +1428,13 @@ sequenceDiagram
   },
   {
     file: '34-use-reported-users-query.mmd',
-    title: '34. useReportedUsersQuery — admin reported-users list',
-    src: `%% useReportedUsersQuery — admin reported-users list (infinite, validated, no-store)
+    title: '34. useInfiniteReportedUsersQuery — admin reported-users list',
+    src: `%% useInfiniteReportedUsersQuery — admin reported-users list (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor A as Admin
     participant C as ReportedUsersTable<br/>(admin/chat)
-    participant H as useReportedUsersQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant H as useInfiniteReportedUsersQuery<br/>(useInfiniteQuery, keepPreviousData)
     participant Q as fetchReportedUsersPage queryFn
     participant P as parseResponse
     participant R as GET /api/admin/chat/reported-users<br/>(withAdmin, force-dynamic)
@@ -1443,7 +1443,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as paginatedResponseSchema<br/>(reportedUserDtoSchema)
     participant RC as QueryCache.onError
-    C->>H: useReportedUsersQuery({ windowDays, search })
+    C->>H: useInfiniteReportedUsersQuery({ windowDays, search })
     H->>Q: fetchReportedUsersPage(params, skip=pageParam, signal)
     Q->>R: fetch('.../reported-users?skip&take=24&windowDays&search', {cache:'no-store', signal})
     alt not authenticated / not admin

@@ -39,7 +39,7 @@ export default async function ReleasesPage() {
   const queryClient = getQueryClient();
 
   // Prefetch the first (unsearched) page as an infinite query. The query key and
-  // initialPageParam must exactly match the client `usePublishedReleasesQuery('')`
+  // initialPageParam must exactly match the client `useInfinitePublishedReleasesQuery('')`
   // hook or hydration misses and the client refetches. Read the service directly
   // instead of self-fetching /api/releases — the internal HTTP roundtrip fails
   // silently under load on the standalone server.

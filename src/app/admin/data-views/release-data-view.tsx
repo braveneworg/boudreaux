@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
+import { useInfiniteReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 import { ENTITIES } from '@/lib/constants';
 import type { ReleaseListItem } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';
@@ -57,7 +57,7 @@ export const ReleaseDataView = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  } = useInfiniteReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
 
   // Flatten the infinite pages and add the computed albumArtist field.
   const rows = useMemo(

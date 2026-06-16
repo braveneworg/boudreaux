@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { Loader2 } from 'lucide-react';
 
-import { useToursQuery } from '@/app/hooks/use-infinite-tours-query';
+import { useInfiniteToursQuery } from '@/app/hooks/use-infinite-tours-query';
 
 import { ToursPageClient } from './tours-page-client';
 
@@ -22,7 +22,7 @@ export const ToursContent = () => {
   const [search, setSearch] = useState('');
 
   const { data, isPending, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useToursQuery(search);
+    useInfiniteToursQuery(search);
 
   if (isPending) {
     return (

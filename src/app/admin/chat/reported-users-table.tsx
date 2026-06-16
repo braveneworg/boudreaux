@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useReportedUsersQuery } from '@/hooks/use-infinite-reported-users-query';
+import { useInfiniteReportedUsersQuery } from '@/hooks/use-infinite-reported-users-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   disableChatUserAction,
@@ -58,7 +58,7 @@ export const ReportedUsersTable = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useReportedUsersQuery({
+  } = useInfiniteReportedUsersQuery({
     windowDays: null,
     search: debouncedSearch,
   });

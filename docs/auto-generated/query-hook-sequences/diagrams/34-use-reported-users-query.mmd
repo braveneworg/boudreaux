@@ -1,9 +1,9 @@
-%% useReportedUsersQuery — admin reported-users list (infinite, validated, no-store)
+%% useInfiniteReportedUsersQuery — admin reported-users list (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor A as Admin
     participant C as ReportedUsersTable<br/>(admin/chat)
-    participant H as useReportedUsersQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant H as useInfiniteReportedUsersQuery<br/>(useInfiniteQuery, keepPreviousData)
     participant Q as fetchReportedUsersPage queryFn
     participant P as parseResponse
     participant R as GET /api/admin/chat/reported-users<br/>(withAdmin, force-dynamic)
@@ -12,7 +12,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as paginatedResponseSchema<br/>(reportedUserDtoSchema)
     participant RC as QueryCache.onError
-    C->>H: useReportedUsersQuery({ windowDays, search })
+    C->>H: useInfiniteReportedUsersQuery({ windowDays, search })
     H->>Q: fetchReportedUsersPage(params, skip=pageParam, signal)
     Q->>R: fetch('.../reported-users?skip&take=24&windowDays&search', {cache:'no-store', signal})
     alt not authenticated / not admin

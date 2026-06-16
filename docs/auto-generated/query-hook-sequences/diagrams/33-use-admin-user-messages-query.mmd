@@ -1,9 +1,9 @@
-%% useAdminUserMessagesQuery — per-user message history (infinite, validated, no-store)
+%% useInfiniteAdminUserMessagesQuery — per-user message history (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor A as Admin
     participant C as UserDetailView<br/>(admin/chat/users/{userId})
-    participant H as useAdminUserMessagesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteAdminUserMessagesQuery<br/>(useInfiniteQuery)
     participant Q as fetchPage queryFn
     participant P as parseResponse
     participant R as GET /api/admin/chat/users/{userId}/messages<br/>(withAdmin, force-dynamic)
@@ -12,7 +12,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as adminUserMessagesResponseSchema
     participant RC as QueryCache.onError
-    C->>H: useAdminUserMessagesQuery(userId)
+    C->>H: useInfiniteAdminUserMessagesQuery(userId)
     H->>Q: fetchPage({ userId, skip=pageParam, signal })
     Q->>R: fetch('.../messages?skip&take=25', {cache:'no-store', signal})
     alt not authenticated / not admin

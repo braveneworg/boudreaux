@@ -5,7 +5,7 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { TOURS_PAGE_SIZE, useToursQuery } from './use-infinite-tours-query';
+import { TOURS_PAGE_SIZE, useInfiniteToursQuery } from './use-infinite-tours-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 
@@ -23,7 +23,7 @@ interface ToursQueryOptions {
 
 const getOptions = (search: string): ToursQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useToursQuery(search));
+  renderHook(() => useInfiniteToursQuery(search));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as ToursQueryOptions;
 };
 
@@ -31,7 +31,7 @@ beforeEach(() => useInfiniteQueryMock.mockReset());
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useToursQuery', () => {
+describe('useInfiniteToursQuery', () => {
   it('keys the query by the (normalized) search term and starts at skip 0', () => {
     const opts = getOptions('Summer');
 

@@ -1,9 +1,9 @@
-%% useChatMessagesQuery — paged chat history (infinite, validated, no-store)
+%% useInfiniteChatMessagesQuery — paged chat history (infinite, validated, no-store)
 sequenceDiagram
     autonumber
     actor U as User
     participant C as ChatBody<br/>(chat drawer)
-    participant H as useChatMessagesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteChatMessagesQuery<br/>(useInfiniteQuery)
     participant Q as fetchPage queryFn
     participant P as parseResponse
     participant R as GET /api/chat/messages<br/>(withAuth, force-dynamic)
@@ -12,7 +12,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB
     participant V as chatMessagesPageSchema<br/>(chatMessageDtoSchema[])
     participant RC as QueryCache.onError
-    C->>H: useChatMessagesQuery({ enabled })
+    C->>H: useInfiniteChatMessagesQuery({ enabled })
     H->>Q: fetchPage({ pageParam cursor, signal })
     Q->>R: fetch('/api/chat/messages?limit=20&cursor', {cache:'no-store', signal})
     alt bad cursorCreatedAt

@@ -8,7 +8,7 @@ import { renderHook } from '@testing-library/react';
 import {
   PUBLISHED_RELEASES_PAGE_SIZE,
   usePublishedReleaseSearchQuery,
-  usePublishedReleasesQuery,
+  useInfinitePublishedReleasesQuery,
 } from './use-infinite-published-releases-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
@@ -41,10 +41,10 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('usePublishedReleasesQuery', () => {
+describe('useInfinitePublishedReleasesQuery', () => {
   const getOptions = (search?: string): InfiniteOptions => {
     useInfiniteQueryMock.mockReturnValue({ isPending: true });
-    renderHook(() => usePublishedReleasesQuery(search));
+    renderHook(() => useInfinitePublishedReleasesQuery(search));
     return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as InfiniteOptions;
   };
 

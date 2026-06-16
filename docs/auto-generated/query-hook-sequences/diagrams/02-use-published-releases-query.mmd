@@ -1,16 +1,16 @@
-%% usePublishedReleasesQuery (+ usePublishedReleaseSearchQuery)
+%% useInfinitePublishedReleasesQuery (+ usePublishedReleaseSearchQuery)
 sequenceDiagram
     autonumber
     actor U as Visitor
     participant C as Component<br/>(releases-content /<br/>release-search-combobox)
-    participant H as usePublishedReleasesQuery<br/>(useInfiniteQuery)
+    participant H as useInfinitePublishedReleasesQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/releases?listing=published
     participant SV as ReleaseService<br/>.getPublishedReleases
     participant DB as Prisma · MongoDB<br/>(release.findMany select)
     participant V as paginatedResponseSchema<br/>(publishedReleaseListingSchema)
     participant RC as QueryCache.onError
-    C->>H: usePublishedReleasesQuery(search)
+    C->>H: useInfinitePublishedReleasesQuery(search)
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/releases?listing=published&skip&take=24&search, {signal})
     R->>SV: getPublishedReleases({skip,take,search})

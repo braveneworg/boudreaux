@@ -59,17 +59,17 @@ depicts it. See the [coverage section](#validation-coverage) below.
 
 **Releases & catalog**
 
-1. [useReleasesQuery](#1-usereleasesquery) · 2. [usePublishedReleasesQuery](#2-usepublishedreleasesquery) · 3. [useReleaseListQuery](#3-usereleaselistquery) · 4. [useReleaseQuery](#4-usereleasequery) · 5. [useReleaseRelatedQuery](#5-usereleaserelatedquery) · 6. [useReleaseDigitalFormatsQuery](#6-usereleasedigitalformatsquery) · 7. [useReleaseUserStatusQuery](#7-usereleaseuserstatusquery)
+1. [useInfiniteReleasesQuery](#1-useinfinitereleasesquery) · 2. [useInfinitePublishedReleasesQuery](#2-useinfinitepublishedreleasesquery) · 3. [useReleaseListQuery](#3-usereleaselistquery) · 4. [useReleaseQuery](#4-usereleasequery) · 5. [useReleaseRelatedQuery](#5-usereleaserelatedquery) · 6. [useReleaseDigitalFormatsQuery](#6-usereleasedigitalformatsquery) · 7. [useReleaseUserStatusQuery](#7-usereleaseuserstatusquery)
 
-**Artists & featured** 8. [useArtistsQuery](#8-useartistsquery) · 9. [useArtistListQuery](#9-useartistlistquery) · 10. [useArtistBySlugQuery](#10-useartistbyslugquery) · 11. [useArtistSearchQuery](#11-useartistsearchquery) · 12. [useArtistNavSearchQuery](#12-useartistnavsearchquery) · 13. [useFeaturedArtistsQuery](#13-usefeaturedartistsquery) · 14. [useActiveFeaturedArtistsQuery](#14-useactivefeaturedartistsquery)
+**Artists & featured** 8. [useInfiniteArtistsQuery](#8-useinfiniteartistsquery) · 9. [useArtistListQuery](#9-useartistlistquery) · 10. [useArtistBySlugQuery](#10-useartistbyslugquery) · 11. [useArtistSearchQuery](#11-useartistsearchquery) · 12. [useArtistNavSearchQuery](#12-useartistnavsearchquery) · 13. [useInfiniteFeaturedArtistsQuery](#13-useinfinitefeaturedartistsquery) · 14. [useActiveFeaturedArtistsQuery](#14-useactivefeaturedartistsquery)
 
 **Downloads & commerce** 15. [useDownloadQuotaQuery](#15-usedownloadquotaquery) · 16. [useFreeDownloadStatusQuery](#16-usefreedownloadstatusquery) · 17. [useDownloadAnalyticsQuery](#17-usedownloadanalyticsquery) · 18. [useCollectionQuery](#18-usecollectionquery)
 
-**Tours & venues** 19. [useToursQuery](#19-usetoursquery) · 20. [useTourQuery](#20-usetourquery) · 21. [useTourDatesQuery](#21-usetourdatesquery) · 22. [useVenueSearchQuery](#22-usevenuesearchquery) · 23. [useVenueDetailQuery](#23-usevenuedetailquery)
+**Tours & venues** 19. [useInfiniteToursQuery](#19-useinfinitetoursquery) · 20. [useTourQuery](#20-usetourquery) · 21. [useTourDatesQuery](#21-usetourdatesquery) · 22. [useVenueSearchQuery](#22-usevenuesearchquery) · 23. [useVenueDetailQuery](#23-usevenuedetailquery)
 
 **Banners & system** 24. [useBannersQuery](#24-usebannersquery) · 25. [useNotificationBannerSearchQuery](#25-usenotificationbannersearchquery) · 26. [useCdnStatusQuery](#26-usecdnstatusquery) · 27. [useHealthStatusQuery](#27-usehealthstatusquery)
 
-**Chat & moderation** 28. [useChatMeQuery](#28-usechatmequery) · 29. [useChatMessagesQuery](#29-usechatmessagesquery) · 30. [useChatPinnedMessagesQuery](#30-usechatpinnedmessagesquery) · 31. [useMentionSearchQuery](#31-usementionsearchquery) · 32. [useChatAdminUsersQuery](#32-usechatadminusersquery) · 33. [useAdminUserMessagesQuery](#33-useadminusermessagesquery) · 34. [useReportedUsersQuery](#34-usereportedusersquery)
+**Chat & moderation** 28. [useChatMeQuery](#28-usechatmequery) · 29. [useInfiniteChatMessagesQuery](#29-useinfinitechatmessagesquery) · 30. [useChatPinnedMessagesQuery](#30-usechatpinnedmessagesquery) · 31. [useMentionSearchQuery](#31-usementionsearchquery) · 32. [useChatAdminUsersQuery](#32-usechatadminusersquery) · 33. [useInfiniteAdminUserMessagesQuery](#33-useinfiniteadminusermessagesquery) · 34. [useInfiniteReportedUsersQuery](#34-useinfinitereportedusersquery)
 
 Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](#regenerating-the-pdf)
 
@@ -77,13 +77,13 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 ## Releases & catalog
 
-### 1. useReleasesQuery
+### 1. useInfiniteReleasesQuery
 
 **Validated.** Infinite (`useInfiniteQuery`) admin listing that pages `/api/releases` by skip/offset (`take=24`), forwarding `search`/`published`/`deleted` filters baked into the query key, so changing any resets pagination; `keepPreviousData` holds results during filter transitions. The GET handler gates on `auth()` requiring `role === 'admin'` (401 otherwise) and calls `ReleaseService.getReleases` → `prisma.release.findMany`. Validates against `paginatedResponseSchema(releaseSchema)`; HTTP failures throw `Error('Failed to fetch releases')`, schema drift throws `ResponseValidationError`. PDF page 1.
 
-### 2. usePublishedReleasesQuery
+### 2. useInfinitePublishedReleasesQuery
 
-**Validated.** Public releases listing exported as two hooks: the infinite `usePublishedReleasesQuery` pages `/api/releases?listing=published` (`take=24`, debounced `search` in the key, `keepPreviousData`), and the sibling `usePublishedReleaseSearchQuery` reuses the same fetcher as a single-page `useQuery` (`limit=20`, `select: page => page.rows`) disabled until the user types, for the search combobox. The unauthenticated `listing=published` branch calls `ReleaseService.getPublishedReleases` → `prisma.release.findMany` (published, non-deleted, `publishedReleaseListingSelect`); `'Database unavailable'` maps to 503. Validates against `paginatedResponseSchema(publishedReleaseListingSchema)`. PDF page 2.
+**Validated.** Public releases listing exported as two hooks: the infinite `useInfinitePublishedReleasesQuery` pages `/api/releases?listing=published` (`take=24`, debounced `search` in the key, `keepPreviousData`), and the sibling `usePublishedReleaseSearchQuery` reuses the same fetcher as a single-page `useQuery` (`limit=20`, `select: page => page.rows`) disabled until the user types, for the search combobox. The unauthenticated `listing=published` branch calls `ReleaseService.getPublishedReleases` → `prisma.release.findMany` (published, non-deleted, `publishedReleaseListingSelect`); `'Database unavailable'` maps to 503. Validates against `paginatedResponseSchema(publishedReleaseListingSchema)`. PDF page 2.
 
 ### 3. useReleaseListQuery
 
@@ -109,7 +109,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 ## Artists & featured
 
-### 8. useArtistsQuery
+### 8. useInfiniteArtistsQuery
 
 **Validated.** Infinite admin artists listing (`artist-data-view`), paging `/api/artists` (`take=24`) with filters in the key and `keepPreviousData`. The GET handler requires an admin `auth()` session (401 otherwise) and delegates to `ArtistService.getArtists` → `prisma.artist.findMany`. Validates against `paginatedResponseSchema(artistSchema)`. PDF page 8.
 
@@ -129,7 +129,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 **Validated.** Drives the nav/header artist typeahead by hitting the **same** `/api/artists/search` endpoint with **no `format` param**, returning the lightweight combobox shape (`{ results: [{ artistSlug, artistName, thumbnailSrc, releases }] }`) from `ArtistService.searchPublishedArtists({ take: 20 })`. Validates via inline `artistNavSearchResponseSchema`; gates on `query.length >= 3` (mirroring the server's `< 3 → []` short-circuit); consumers debounce ~250ms. PDF page 12.
 
-### 13. useFeaturedArtistsQuery
+### 13. useInfiniteFeaturedArtistsQuery
 
 **Validated.** Infinite admin featured-artists listing paging `/api/featured-artists` without the `active` param (`take=24`), with `keepPreviousData` and `refetchOnMount: 'always'` so create/edit returns show fresh data. The route is `withRateLimit(publicLimiter)` and, in admin mode, requires admin `auth()`, calling `FeaturedArtistsService.getAllFeaturedArtists` (`serializeForResponse` applied). Validates against `paginatedResponseSchema(featuredArtistSchema)`. PDF page 13.
 
@@ -161,7 +161,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 ## Tours & venues
 
-### 19. useToursQuery
+### 19. useInfiniteToursQuery
 
 **Validated.** Infinite-scroll public tours listing paging `/api/tours` (rate-limited), where the route delegates to `TourRepository.findAll` (`tour.findMany` with `buildSearchWhere` and full relation includes — tourDates→venue/headliners→artist, images). Validates each page against `paginatedResponseSchema(tourWithRelationsSchema)`; debounced `search` is in the key, `keepPreviousData` smooths transitions, `getNextPageParam` follows `nextSkip`. PDF page 19.
 
@@ -211,7 +211,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 **Validated.** Polls `/api/chat/me` (`withAuth`, `force-dynamic`) to learn whether the viewer is chat-blocked; the route runs `ChatUserRepository.findByUserId` and `BanEvasionService.check` in parallel and returns only `{ blocked }` (ban reasons never leak). `staleTime: 60s`, refetch on focus; `ChatBody` gates it via `enabled`. Validates the body with `parseResponse` against `chatMeResponseSchema` (drift throws `ResponseValidationError`); throws `Error('Failed to load chat status')` on non-OK. PDF page 28.
 
-### 29. useChatMessagesQuery
+### 29. useInfiniteChatMessagesQuery
 
 **Validated.** `useInfiniteQuery` over `/api/chat/messages` (`withAuth`); page 1 is the newest 20, each `fetchNextPage` requests an older `{ cursorCreatedAt, cursorId }` slice via `ChatService.listRecent` → `ChatMessageRepository.findRecent` (excludes hidden + disabled/banned authors). Flattens oldest→newest, caps in-memory history at 200. Validates each page with `parseResponse` against `chatMessagesPageSchema` (an array of `chatMessageDtoSchema`, drift throws `ResponseValidationError`); throws `Error('Failed to load chat messages')` on non-OK. PDF page 29.
 
@@ -227,11 +227,11 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 **Validated.** Fetches a paginated, sortable page of `ChatUser` moderation rows from `/api/admin/chat/users` (`withAdmin`) → `ChatAdminService.listChatUsers` → `ChatUserRepository.findManyPaginated` + `count`. `page`/`sortBy`/`sortDirection` are in the key. Validates the body with `parseResponse` against `listChatUsersResultSchema` (drift throws `ResponseValidationError`); throws `Error('Failed to load chat users')` on non-OK (incl. admin 401/403). PDF page 32.
 
-### 33. useAdminUserMessagesQuery
+### 33. useInfiniteAdminUserMessagesQuery
 
 **Validated.** `useInfiniteQuery` paginating one user's full chat history (including hidden, for audit) from `/api/admin/chat/users/{userId}/messages` (`withAdmin`) → `ChatAdminService.listUserMessages` → `ChatMessageRepository.findByUserIdForAdmin` (page size 25, computes `nextSkip`). Validates each page with `parseResponse` against `adminUserMessagesResponseSchema` (drift throws `ResponseValidationError`); throws `Error('Failed to load user messages')` on non-OK. PDF page 33.
 
-### 34. useReportedUsersQuery
+### 34. useInfiniteReportedUsersQuery
 
 **Validated.** `useInfiniteQuery` over `/api/admin/chat/reported-users` (`withAdmin`) paging users grouped by abuse-report count; the route fetches a globally-sorted `AbuseReportRepository.listReportedUsers` (`abuseReport.groupBy` + `user.findMany`) then applies the `search` filter and `skip`/`take=24` slice in memory. `windowDays`/`search` in the key, `keepPreviousData`; reporter identity omitted from the DTO. Validates each page with `parseResponse` against `paginatedResponseSchema(reportedUserDtoSchema)` (drift throws `ResponseValidationError`); throws `Error('Failed to load reported users')` on non-OK. PDF page 34.
 
@@ -249,12 +249,12 @@ cast.**
 
 All 34, by domain:
 
-- **Releases & catalog:** useReleasesQuery, usePublishedReleasesQuery, useReleaseListQuery, useReleaseQuery, useReleaseRelatedQuery, useReleaseDigitalFormatsQuery, useReleaseUserStatusQuery
-- **Artists & featured:** useArtistsQuery, useArtistListQuery, useArtistBySlugQuery, useArtistSearchQuery, useArtistNavSearchQuery, useFeaturedArtistsQuery, useActiveFeaturedArtistsQuery
+- **Releases & catalog:** useInfiniteReleasesQuery, useInfinitePublishedReleasesQuery, useReleaseListQuery, useReleaseQuery, useReleaseRelatedQuery, useReleaseDigitalFormatsQuery, useReleaseUserStatusQuery
+- **Artists & featured:** useInfiniteArtistsQuery, useArtistListQuery, useArtistBySlugQuery, useArtistSearchQuery, useArtistNavSearchQuery, useInfiniteFeaturedArtistsQuery, useActiveFeaturedArtistsQuery
 - **Downloads & commerce:** useDownloadQuotaQuery, useFreeDownloadStatusQuery, useDownloadAnalyticsQuery, useCollectionQuery
-- **Tours & venues:** useToursQuery, useTourQuery, useTourDatesQuery, useVenueSearchQuery, useVenueDetailQuery
+- **Tours & venues:** useInfiniteToursQuery, useTourQuery, useTourDatesQuery, useVenueSearchQuery, useVenueDetailQuery
 - **Banners & system:** useBannersQuery, useNotificationBannerSearchQuery, useCdnStatusQuery, useHealthStatusQuery
-- **Chat & moderation:** useChatMeQuery, useChatMessagesQuery, useChatPinnedMessagesQuery, useMentionSearchQuery, useChatAdminUsersQuery, useAdminUserMessagesQuery, useReportedUsersQuery
+- **Chat & moderation:** useChatMeQuery, useInfiniteChatMessagesQuery, useChatPinnedMessagesQuery, useMentionSearchQuery, useChatAdminUsersQuery, useInfiniteAdminUserMessagesQuery, useInfiniteReportedUsersQuery
 
 The final 16 (the manual-fetch and chat/admin hooks) were brought into this set
 by the most recent Zod-validation refactor; there are no remaining unchecked
