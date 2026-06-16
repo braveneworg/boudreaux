@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import {
   publishedReleaseDetailInclude,
   publishedReleaseListingSelect,
+  releaseListItemInclude,
 } from '@/lib/types/media-models';
 
 import { ReleaseRepository } from './release-repository';
@@ -94,7 +95,7 @@ describe('ReleaseRepository', () => {
   });
 
   describe('findMany', () => {
-    it('queries with the caller where, pagination, createdAt desc, and capped images', async () => {
+    it('queries with the caller where, pagination, createdAt desc, and the lightweight listing include', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease] as never);
       const where = { AND: [{ title: 'x' }] } as Prisma.ReleaseWhereInput;
 
@@ -106,10 +107,7 @@ describe('ReleaseRepository', () => {
         skip: 10,
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 3 },
-          ...detailIncludeNoImages,
-        },
+        include: releaseListItemInclude,
       });
     });
   });

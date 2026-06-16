@@ -7,12 +7,14 @@ import { prisma } from '@/lib/prisma';
 import {
   publishedReleaseDetailInclude,
   publishedReleaseListingSelect,
+  releaseListItemInclude,
 } from '@/lib/types/media-models';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
+  ReleaseListItem,
 } from '@/lib/types/media-models';
 
 import type { Prisma } from '@prisma/client';
@@ -114,29 +116,24 @@ export class ReleaseRepository {
 
   /**
    * Find many releases for the admin listing using a caller-built `where`
-   * clause. Images are capped at 3 (cover-art fallback) and ordered by
-   * `sortOrder`; results ordered by `createdAt` desc.
+   * clause. Uses the lightweight listing include (scalars, capped cover-art
+   * images, and artist join rows) — the grid never renders digital-format
+   * files or release URLs, so those relations are not loaded. Results ordered
+   * by `createdAt` desc.
    */
   static async findMany(params: {
     where: Prisma.ReleaseWhereInput;
     skip: number;
     take: number;
-  }): Promise<Release[]> {
+  }): Promise<ReleaseListItem[]> {
     const { where, skip, take } = params;
-    const releases = await prisma.release.findMany({
+    return prisma.release.findMany({
       where,
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: {
-        images: {
-          orderBy: { sortOrder: 'asc' },
-          take: 3,
-        },
-        ...releaseDetailInclude,
-      },
+      include: releaseListItemInclude,
     });
-    return releases as unknown as Release[];
   }
 
   /**

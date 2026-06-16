@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import { useDebounce } from '@/app/hooks/use-debounce';
 import { useReleasesQuery } from '@/app/hooks/use-releases-query';
 import { ENTITIES } from '@/lib/constants';
-import type { Release } from '@/lib/types/media-models';
+import type { ReleaseListItem } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 
 import { DataView } from './data-view';
@@ -16,13 +16,13 @@ import { DataView } from './data-view';
 /**
  * Computes the album artist display string from artistReleases
  */
-const getAlbumArtist = (release: Release): string => {
+const getAlbumArtist = (release: ReleaseListItem): string => {
   if (!release.artistReleases || release.artistReleases.length === 0) {
     return '-';
   }
 
   return release.artistReleases
-    .map((ar: Release['artistReleases'][number]) => getDisplayName(ar.artist))
+    .map((ar: ReleaseListItem['artistReleases'][number]) => getDisplayName(ar.artist))
     .filter(Boolean)
     .join(', ');
 };
@@ -77,7 +77,7 @@ export const ReleaseDataView = () => {
   }
 
   return (
-    <DataView<Release & { albumArtist: string }>
+    <DataView<ReleaseListItem & { albumArtist: string }>
       entity={ENTITIES.release}
       data={{ releases: rows }}
       fieldsToShow={fieldsToShow}

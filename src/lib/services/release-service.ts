@@ -15,6 +15,7 @@ import type {
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
+  ReleaseListItem,
 } from '@/lib/types/media-models';
 import { deleteS3Object } from '@/utils/s3-client';
 import { withCache } from '@/utils/simple-cache';
@@ -100,7 +101,7 @@ export class ReleaseService {
     artistIds?: string[];
     published?: boolean;
     deleted?: boolean;
-  }): Promise<ServiceResponse<Release[]>> {
+  }): Promise<ServiceResponse<ReleaseListItem[]>> {
     try {
       const { skip = 0, take = 50, search, artistIds, published, deleted } = params || {};
 

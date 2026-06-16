@@ -8,7 +8,6 @@ import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
 import { computeNextSkip } from '@/lib/types/pagination';
-import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
@@ -98,9 +97,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        // digitalFormats carry BigInt fileSize/totalFileSize which JSON.stringify
-        // cannot serialize; convert BigInt → Number for the response payload.
-        rows: serializeForResponse(result.data),
+        // The admin listing projection carries no BigInt fields (digital-format
+        // files/URLs are not loaded), so the payload is JSON-safe as-is.
+        rows: result.data,
         nextSkip: computeNextSkip(result.data.length, skip, take),
       },
       {

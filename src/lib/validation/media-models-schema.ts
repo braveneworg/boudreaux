@@ -13,6 +13,7 @@ import type {
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
+  ReleaseListItem,
 } from '@/lib/types/media-models';
 import { FORMATS } from '@/lib/types/media-models';
 import { jsonValueSchema } from '@/lib/validation/json-schema';
@@ -239,6 +240,23 @@ export const releaseSchema = releaseScalarSchema.extend({
     })
   ),
 }) satisfies z.ZodType<Release>;
+
+/**
+ * Lightweight `Release` for the admin listing — scalars, images, and the
+ * artist join rows used to derive the album-artist display name. Excludes the
+ * `digitalFormats`/`releaseUrls` relations the grid never renders.
+ */
+export const releaseListItemSchema = releaseScalarSchema.extend({
+  images: z.array(imageSchema),
+  artistReleases: z.array(
+    z.object({
+      id: z.string(),
+      artistId: z.string(),
+      releaseId: z.string(),
+      artist: artistScalarSchema,
+    })
+  ),
+}) satisfies z.ZodType<ReleaseListItem>;
 
 /** `FeaturedArtist` with its nested artists, digital format, and release. */
 export const featuredArtistSchema = z.object({
