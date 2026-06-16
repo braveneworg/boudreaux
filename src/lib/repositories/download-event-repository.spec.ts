@@ -18,6 +18,7 @@ vi.mock('@/lib/prisma', () => ({
       count: vi.fn(),
       findMany: vi.fn(),
       aggregate: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
@@ -470,6 +471,19 @@ describe('DownloadEventRepository', () => {
 
       const call = vi.mocked(prisma.downloadEvent.aggregate).mock.calls[0]?.[0];
       expect(call?.where?.success).toBe(true);
+    });
+  });
+
+  describe('deleteAllByReleaseId', () => {
+    it('deletes all download events for a release and returns the count', async () => {
+      vi.mocked(prisma.downloadEvent.deleteMany).mockResolvedValue({ count: 5 } as never);
+
+      const result = await repository.deleteAllByReleaseId(mockReleaseId);
+
+      expect(result).toBe(5);
+      expect(prisma.downloadEvent.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: mockReleaseId },
+      });
     });
   });
 });

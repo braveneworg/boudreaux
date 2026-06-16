@@ -44,6 +44,22 @@ export class PurchaseRepository {
     });
   }
 
+  /**
+   * Look up a purchase by the userId + releaseId composite unique key.
+   * Used by the download-authorization flow to verify ownership (any
+   * non-refunded state — refund handling is the caller's concern).
+   */
+  static async findByUserReleaseKey(userId: string, releaseId: string) {
+    return prisma.releasePurchase.findUnique({
+      where: {
+        userId_releaseId: {
+          userId,
+          releaseId,
+        },
+      },
+    });
+  }
+
   /** Find an active (non-refunded) purchase by userId + releaseId composite key. */
   static async findByUserAndRelease(userId: string, releaseId: string) {
     return prisma.releasePurchase.findFirst({
@@ -187,6 +203,28 @@ export class PurchaseRepository {
         },
       },
     });
+  }
+
+  /**
+   * Delete all purchase records for a release (release delete cascade).
+   * @returns Count of deleted records
+   */
+  static async deleteAllByReleaseId(releaseId: string): Promise<number> {
+    const result = await prisma.releasePurchase.deleteMany({
+      where: { releaseId },
+    });
+    return result.count;
+  }
+
+  /**
+   * Delete all download tracking records for a release (release delete cascade).
+   * @returns Count of deleted records
+   */
+  static async deleteAllDownloadsByReleaseId(releaseId: string): Promise<number> {
+    const result = await prisma.releaseDownload.deleteMany({
+      where: { releaseId },
+    });
+    return result.count;
   }
 
   /**

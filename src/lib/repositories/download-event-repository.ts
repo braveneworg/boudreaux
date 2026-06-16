@@ -44,6 +44,19 @@ export class DownloadEventRepository {
   }
 
   /**
+   * Delete all download-event records for a release (release delete cascade).
+   *
+   * @param releaseId - Release ID whose events should be removed
+   * @returns Count of deleted records
+   */
+  async deleteAllByReleaseId(releaseId: string): Promise<number> {
+    const result = await prisma.downloadEvent.deleteMany({
+      where: { releaseId },
+    });
+    return result.count;
+  }
+
+  /**
    * Get download analytics grouped by format for a specific release
    *
    * @param releaseId - Release ID to get analytics for

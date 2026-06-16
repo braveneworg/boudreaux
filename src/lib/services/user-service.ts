@@ -6,7 +6,7 @@ import 'server-only';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
-import { prisma } from '@/lib/prisma';
+import { UserRepository } from '@/lib/repositories/user-repository';
 
 /** Result of {@link UserService.updateUsername}. */
 export interface UpdateUsernameResult {
@@ -38,22 +38,18 @@ export const UserService = {
     email: string;
     role?: string;
   }) => {
-    const adminUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const adminUser = await UserRepository.findByEmail(email);
 
     if (!adminUser) {
       console.info('🌱 Creating admin user...');
-      await prisma.user.create({
-        data: {
-          firstName,
-          lastName,
-          phone,
-          email,
-          name: 'Admin',
-          role,
-          emailVerified: new Date(),
-        },
+      await UserRepository.create({
+        firstName,
+        lastName,
+        phone,
+        email,
+        name: 'Admin',
+        role,
+        emailVerified: new Date(),
       });
       console.info(`✅ Admin user, ${email}, created.`);
     } else {
@@ -64,7 +60,7 @@ export const UserService = {
   /**
    * Look up a user by email. Returns null when no match is found.
    */
-  findByEmail: async (email: string) => prisma.user.findUnique({ where: { email } }),
+  findByEmail: async (email: string) => UserRepository.findByEmail(email),
 
   /**
    * Look up a user's email address by id. Used by webhooks that need a
@@ -72,10 +68,7 @@ export const UserService = {
    * `customer_details.email` is empty).
    */
   findEmailById: async (id: string): Promise<string | null> => {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { email: true },
-    });
+    const user = await UserRepository.findEmailById(id);
     return user?.email ?? null;
   },
 
@@ -86,10 +79,7 @@ export const UserService = {
    */
   updateUsername: async (id: string, username: string): Promise<UpdateUsernameResult> => {
     try {
-      await prisma.user.update({
-        where: { id },
-        data: { username },
-      });
+      await UserRepository.updateUsername(id, username);
       return { success: true, duplicate: false };
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -108,21 +98,15 @@ export const UserService = {
   createGuestPurchaser: async (email: string): Promise<CreateGuestPurchaserResult> => {
     const placeholderUsername = generateUsername('', 0, 15);
     try {
-      const newUser = await prisma.user.create({
-        data: {
-          email,
-          emailVerified: new Date(),
-          username: placeholderUsername,
-        },
-        select: { id: true },
+      const newUser = await UserRepository.createGuest({
+        email,
+        emailVerified: new Date(),
+        username: placeholderUsername,
       });
       return { id: newUser.id, created: true };
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
-        const racedUser = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true },
-        });
+        const racedUser = await UserRepository.findIdByEmail(email);
         if (racedUser) {
           return { id: racedUser.id, created: false };
         }

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { prisma } from '@/lib/prisma';
+import { ImageRepository } from '@/lib/repositories/image-repository';
 
 /** Input for registering an image whose binary already lives in S3. */
 export interface RegisterImageInput {
@@ -63,10 +63,7 @@ async function registerImages({
   images: RegisterImageInput[];
 }): Promise<RegisteredImage[]> {
   const ownerData = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
-  const existing = await prisma.image.findMany({
-    where: ownerData,
-    select: { id: true },
-  });
+  const existing = await ImageRepository.findManyByOwner(ownerData, { id: true });
   const baseSortOrder = existing.length;
 
   // Inserts are independent — sortOrder is derived deterministically from the
@@ -75,14 +72,12 @@ async function registerImages({
   const results = await Promise.all(
     images.map(async (image, index) => {
       const sortOrder = baseSortOrder + index;
-      const dbImage = await prisma.image.create({
-        data: {
-          src: image.cdnUrl,
-          caption: image.caption,
-          altText: image.altText,
-          ...ownerData,
-          sortOrder,
-        },
+      const dbImage = await ImageRepository.create({
+        src: image.cdnUrl,
+        caption: image.caption,
+        altText: image.altText,
+        ...ownerData,
+        sortOrder,
       });
 
       return {

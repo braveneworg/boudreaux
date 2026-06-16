@@ -5,11 +5,11 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-import {
-  publishedReleaseDetailInclude,
-  publishedReleaseListingSelect,
-} from '@/lib/types/media-models';
+import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
+import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
@@ -28,34 +28,18 @@ import type { ServiceResponse } from './service.types';
  */
 const PUBLISHED_RELEASES_PAGE_SIZE = 24;
 
+const digitalFormatRepository = new ReleaseDigitalFormatRepository();
+const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
+const downloadEventRepository = new DownloadEventRepository();
+
 export class ReleaseService {
   /**
    * Create a new release
    */
   static async createRelease(data: Prisma.ReleaseCreateInput): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.create({
-        data,
-        include: {
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-          images: true,
-        },
-      });
-      return { success: true, data: release as unknown as Release };
+      const release = await ReleaseRepository.create(data);
+      return { success: true, data: release };
     } catch (error) {
       // Unique constraint violations
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -79,37 +63,13 @@ export class ReleaseService {
    */
   static async getReleaseById(id: string): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.findUnique({
-        where: { id },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' },
-              },
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      const release = await ReleaseRepository.findById(id);
 
       if (!release) {
         return { success: false, error: 'Release not found' };
       }
 
-      return { success: true, data: release as unknown as Release };
+      return { success: true, data: release };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
         console.error('Database connection failed:', error);
@@ -177,32 +137,9 @@ export class ReleaseService {
           }),
       };
 
-      const releases = await prisma.release.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 3,
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const releases = await ReleaseRepository.findMany({ where, skip, take });
 
-      return { success: true, data: releases as unknown as Release[] };
+      return { success: true, data: releases };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
         console.error('Database connection failed:', error);
@@ -222,32 +159,9 @@ export class ReleaseService {
     data: Prisma.ReleaseUpdateInput
   ): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.update({
-        where: { id },
-        data,
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' },
-              },
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      const release = await ReleaseRepository.update(id, data);
 
-      return { success: true, data: release as unknown as Release };
+      return { success: true, data: release };
     } catch (error) {
       // Record not found
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -277,15 +191,7 @@ export class ReleaseService {
   static async deleteRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
       // Verify release exists and fetch related data for S3 cleanup
-      const existing = await prisma.release.findUnique({
-        where: { id },
-        include: {
-          digitalFormats: {
-            include: { files: true },
-          },
-          images: true,
-        },
-      });
+      const existing = await ReleaseRepository.findForDeletion(id);
 
       if (!existing) {
         return { success: false, error: 'Release not found' };
@@ -322,47 +228,40 @@ export class ReleaseService {
       // Delete related records in dependency order (children first)
       // 1. Digital format files (child of ReleaseDigitalFormat)
       for (const format of existing.digitalFormats) {
-        await prisma.releaseDigitalFormatFile.deleteMany({
-          where: { formatId: format.id },
-        });
+        await digitalFormatFileRepository.deleteAllByFormatId(format.id);
       }
 
       // 2. Digital formats
-      await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: id } });
+      await digitalFormatRepository.deleteAllByReleaseId(id);
 
       // 3. Purchase and download records
-      await prisma.releasePurchase.deleteMany({ where: { releaseId: id } });
-      await prisma.releaseDownload.deleteMany({ where: { releaseId: id } });
+      await PurchaseRepository.deleteAllByReleaseId(id);
+      await PurchaseRepository.deleteAllDownloadsByReleaseId(id);
 
       // 4. Download events (no FK relation, just matching field)
-      await prisma.downloadEvent.deleteMany({ where: { releaseId: id } });
+      await downloadEventRepository.deleteAllByReleaseId(id);
 
       // 5. Release URLs (junction table)
-      await prisma.releaseUrl.deleteMany({ where: { releaseId: id } });
+      await ReleaseRepository.deleteReleaseUrls(id);
 
       // 6. Images (shared model — only delete images linked to this release)
-      await prisma.image.deleteMany({ where: { releaseId: id } });
+      await ReleaseRepository.deleteImages(id);
 
       // 7. ArtistRelease junction records (does NOT delete the Artist)
-      await prisma.artistRelease.deleteMany({ where: { releaseId: id } });
+      await ReleaseRepository.deleteArtistReleases(id);
 
       // 8. FeaturedArtist references (disconnect, don't delete the featured artist record)
-      await prisma.featuredArtist.updateMany({
-        where: { releaseId: id },
-        data: { releaseId: null },
-      });
+      await ReleaseRepository.clearFeaturedArtistReferences(id);
 
       // 9. Delete the release itself
-      const release = await prisma.release.delete({
-        where: { id },
-      });
+      const release = await ReleaseRepository.delete(id);
 
       // 10. Best-effort S3 cleanup (async, fire-and-forget)
       Promise.allSettled(s3KeysToDelete.map((key) => deleteS3Object(key))).catch(() => {
         // Silently ignore — S3 objects will be cleaned up by lifecycle rules
       });
 
-      return { success: true, data: release as unknown as Release };
+      return { success: true, data: release };
     } catch (error) {
       // Record not found
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -384,30 +283,9 @@ export class ReleaseService {
    */
   static async softDeleteRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.update({
-        where: { id },
-        data: { deletedOn: new Date() },
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      const release = await ReleaseRepository.softDelete(id);
 
-      return { success: true, data: release as unknown as Release };
+      return { success: true, data: release };
     } catch (error) {
       // Record not found
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -429,30 +307,9 @@ export class ReleaseService {
    */
   static async restoreRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.update({
-        where: { id },
-        data: { deletedOn: null },
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
-      });
+      const release = await ReleaseRepository.restore(id);
 
-      return { success: true, data: release as unknown as Release };
+      return { success: true, data: release };
     } catch (error) {
       // Record not found
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -493,46 +350,42 @@ export class ReleaseService {
     const fetchReleases = async (): Promise<ServiceResponse<PublishedReleaseListing[]>> => {
       try {
         const contains = { contains: search ?? '', mode: 'insensitive' as const };
-        const releases = await prisma.release.findMany({
-          where: {
-            publishedAt: { not: null },
-            // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-            // set to null, not missing fields. Use OR to handle both cases. The
-            // deletedOn OR and the search OR are combined under AND so they don't
-            // collide on the same `OR` key.
-            AND: [
-              { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
-              ...(search
-                ? [
-                    {
-                      OR: [
-                        { title: contains },
-                        { catalogNumber: contains },
-                        { description: contains },
-                        {
-                          artistReleases: {
-                            some: {
-                              artist: {
-                                OR: [
-                                  { firstName: contains },
-                                  { surname: contains },
-                                  { displayName: contains },
-                                ],
-                              },
+        const where: Prisma.ReleaseWhereInput = {
+          publishedAt: { not: null },
+          // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+          // set to null, not missing fields. Use OR to handle both cases. The
+          // deletedOn OR and the search OR are combined under AND so they don't
+          // collide on the same `OR` key.
+          AND: [
+            { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+            ...(search
+              ? [
+                  {
+                    OR: [
+                      { title: contains },
+                      { catalogNumber: contains },
+                      { description: contains },
+                      {
+                        artistReleases: {
+                          some: {
+                            artist: {
+                              OR: [
+                                { firstName: contains },
+                                { surname: contains },
+                                { displayName: contains },
+                              ],
                             },
                           },
                         },
-                      ],
-                    },
-                  ]
-                : []),
-            ],
-          },
-          orderBy: { releasedOn: 'desc' },
-          skip,
-          take,
-          select: publishedReleaseListingSelect,
-        });
+                      },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        };
+
+        const releases = await ReleaseRepository.findPublished({ where, skip, take });
 
         return {
           success: true,
@@ -564,14 +417,7 @@ export class ReleaseService {
    */
   static async getReleaseWithTracks(id: string): Promise<ServiceResponse<PublishedReleaseDetail>> {
     try {
-      const release = await prisma.release.findFirst({
-        where: {
-          id,
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        include: publishedReleaseDetailInclude,
-      });
+      const release = await ReleaseRepository.findPublishedWithTracks(id);
 
       if (!release) {
         return { success: false, error: 'Release not found' };
@@ -598,23 +444,12 @@ export class ReleaseService {
     excludeReleaseId: string
   ): Promise<ServiceResponse<ReleaseCarouselItem[]>> {
     try {
-      const releases = await prisma.release.findMany({
-        where: {
-          artistReleases: { some: { artistId } },
-          id: { not: excludeReleaseId },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        orderBy: { releasedOn: 'desc' },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 1,
-          },
-        },
-      });
+      const releases = await ReleaseRepository.findPublishedByArtistExcluding(
+        artistId,
+        excludeReleaseId
+      );
 
-      return { success: true, data: releases as unknown as ReleaseCarouselItem[] };
+      return { success: true, data: releases };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
         console.error('Database connection failed:', error);
@@ -636,20 +471,7 @@ export class ReleaseService {
     publishedAt: Date | null;
     deletedOn: Date | null;
   } | null> {
-    return prisma.release.findFirst({
-      where: {
-        title: {
-          equals: title,
-          mode: 'insensitive',
-        },
-      },
-      select: {
-        id: true,
-        title: true,
-        publishedAt: true,
-        deletedOn: true,
-      },
-    });
+    return ReleaseRepository.findByTitleInsensitive(title);
   }
 
   /**
@@ -670,10 +492,7 @@ export class ReleaseService {
     if (Object.keys(data).length === 0) {
       return;
     }
-    await prisma.release.update({
-      where: { id },
-      data,
-    });
+    await ReleaseRepository.updateData(id, data);
   }
 
   /**
@@ -682,10 +501,7 @@ export class ReleaseService {
    * need the title for the ZIP filename.
    */
   static async findPublishedTitleById(id: string): Promise<{ id: string; title: string } | null> {
-    return prisma.release.findFirst({
-      where: { id, publishedAt: { not: null } },
-      select: { id: true, title: true },
-    });
+    return ReleaseRepository.findPublishedTitleById(id);
   }
 
   /**
@@ -694,10 +510,7 @@ export class ReleaseService {
    * unpublished but the customer still needs the original title.
    */
   static async findTitleById(id: string): Promise<{ id: string; title: string } | null> {
-    return prisma.release.findUnique({
-      where: { id },
-      select: { id: true, title: true },
-    });
+    return ReleaseRepository.findTitleById(id);
   }
 
   /**
@@ -705,10 +518,6 @@ export class ReleaseService {
    * releaseId before performing a follow-up write.
    */
   static async existsById(id: string): Promise<boolean> {
-    const found = await prisma.release.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    return Boolean(found);
+    return ReleaseRepository.existsById(id);
   }
 }

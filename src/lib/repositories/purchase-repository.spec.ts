@@ -18,11 +18,13 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
     releaseDownload: {
       findUnique: vi.fn(),
       update: vi.fn(),
       upsert: vi.fn(),
+      deleteMany: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -365,6 +367,46 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markRefunded('pi_test_123');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('findByUserReleaseKey', () => {
+    it('should look up a purchase by the userId+releaseId composite unique key', async () => {
+      const mockRecord = { id: 'purchase-1', userId: 'user-123', releaseId: 'release-abc' };
+      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(mockRecord as never);
+
+      const result = await PurchaseRepository.findByUserReleaseKey('user-123', 'release-abc');
+
+      expect(result).toEqual(mockRecord);
+      expect(prisma.releasePurchase.findUnique).toHaveBeenCalledWith({
+        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
+      });
+    });
+  });
+
+  describe('deleteAllByReleaseId', () => {
+    it('should delete all purchases for a release and return the count', async () => {
+      vi.mocked(prisma.releasePurchase.deleteMany).mockResolvedValue({ count: 2 } as never);
+
+      const result = await PurchaseRepository.deleteAllByReleaseId('release-abc');
+
+      expect(result).toBe(2);
+      expect(prisma.releasePurchase.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-abc' },
+      });
+    });
+  });
+
+  describe('deleteAllDownloadsByReleaseId', () => {
+    it('should delete all download records for a release and return the count', async () => {
+      vi.mocked(prisma.releaseDownload.deleteMany).mockResolvedValue({ count: 4 } as never);
+
+      const result = await PurchaseRepository.deleteAllDownloadsByReleaseId('release-abc');
+
+      expect(result).toBe(4);
+      expect(prisma.releaseDownload.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-abc' },
+      });
     });
   });
 });

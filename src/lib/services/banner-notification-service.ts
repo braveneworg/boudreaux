@@ -10,7 +10,8 @@ import {
   DEFAULT_ROTATION_INTERVAL,
   ROTATION_INTERVAL_SETTINGS_KEY,
 } from '@/lib/constants/banner-slots';
-import { prisma } from '@/lib/prisma';
+import { BannerNotificationRepository } from '@/lib/repositories/banner-notification-repository';
+import { SiteSettingsRepository } from '@/lib/repositories/site-settings-repository';
 import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import { cache, withCache } from '@/lib/utils/simple-cache';
 
@@ -82,9 +83,7 @@ export class BannerNotificationService {
         async () => {
           const now = new Date();
 
-          const notifications = await prisma.bannerNotification.findMany({
-            orderBy: { slotNumber: 'asc' },
-          });
+          const notifications = await BannerNotificationRepository.findAllOrderedBySlot();
 
           const rotationInterval = await BannerNotificationService.getRotationInterval();
 
@@ -139,9 +138,7 @@ export class BannerNotificationService {
    */
   static async getAllNotifications(): Promise<ServiceResponse<BannerNotificationData[]>> {
     try {
-      const notifications = await prisma.bannerNotification.findMany({
-        orderBy: { slotNumber: 'asc' },
-      });
+      const notifications = await BannerNotificationRepository.findAllOrderedBySlot();
       return { success: true, data: notifications };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
@@ -169,28 +166,7 @@ export class BannerNotificationService {
     }
   ): Promise<ServiceResponse<BannerNotificationData>> {
     try {
-      const notification = await prisma.bannerNotification.upsert({
-        where: { slotNumber },
-        update: {
-          content: data.content,
-          textColor: data.textColor,
-          backgroundColor: data.backgroundColor,
-          displayFrom: data.displayFrom,
-          displayUntil: data.displayUntil,
-          repostedFromId: data.repostedFromId,
-          addedById: data.addedById,
-        },
-        create: {
-          slotNumber,
-          content: data.content,
-          textColor: data.textColor,
-          backgroundColor: data.backgroundColor,
-          displayFrom: data.displayFrom,
-          displayUntil: data.displayUntil,
-          repostedFromId: data.repostedFromId,
-          addedById: data.addedById,
-        },
-      });
+      const notification = await BannerNotificationRepository.upsertBySlot(slotNumber, data);
 
       BannerNotificationService.invalidateCache();
       return { success: true, data: notification };
@@ -205,9 +181,7 @@ export class BannerNotificationService {
    */
   static async deleteNotification(slotNumber: number): Promise<ServiceResponse<{ deleted: true }>> {
     try {
-      await prisma.bannerNotification.delete({
-        where: { slotNumber },
-      });
+      await BannerNotificationRepository.deleteBySlot(slotNumber);
       BannerNotificationService.invalidateCache();
       return { success: true, data: { deleted: true } };
     } catch (error) {
@@ -227,21 +201,7 @@ export class BannerNotificationService {
     take = 20
   ): Promise<ServiceResponse<SearchNotificationResult[]>> {
     try {
-      const notifications = await prisma.bannerNotification.findMany({
-        where: query
-          ? { content: { contains: query, mode: 'insensitive' } }
-          : { content: { not: null } },
-        select: {
-          id: true,
-          content: true,
-          textColor: true,
-          backgroundColor: true,
-          slotNumber: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take,
-      });
+      const notifications = await BannerNotificationRepository.searchByContent(query, take);
 
       return { success: true, data: notifications };
     } catch (error) {
@@ -255,9 +215,7 @@ export class BannerNotificationService {
    */
   static async getRotationInterval(): Promise<number> {
     try {
-      const setting = await prisma.siteSettings.findUnique({
-        where: { key: ROTATION_INTERVAL_SETTINGS_KEY },
-      });
+      const setting = await SiteSettingsRepository.findByKey(ROTATION_INTERVAL_SETTINGS_KEY);
       if (setting) {
         const parsed = parseFloat(setting.value);
         if (!isNaN(parsed) && parsed >= 3 && parsed <= 15) {
@@ -277,11 +235,7 @@ export class BannerNotificationService {
     interval: number
   ): Promise<ServiceResponse<{ interval: number }>> {
     try {
-      await prisma.siteSettings.upsert({
-        where: { key: ROTATION_INTERVAL_SETTINGS_KEY },
-        update: { value: String(interval) },
-        create: { key: ROTATION_INTERVAL_SETTINGS_KEY, value: String(interval) },
-      });
+      await SiteSettingsRepository.upsertByKey(ROTATION_INTERVAL_SETTINGS_KEY, String(interval));
       BannerNotificationService.invalidateCache();
       return { success: true, data: { interval } };
     } catch (error) {

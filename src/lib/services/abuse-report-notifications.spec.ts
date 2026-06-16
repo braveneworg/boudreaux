@@ -10,10 +10,8 @@ const sendEmailMock = vi.fn();
 const smsSendMock = vi.fn();
 const getSmsServiceMock = vi.fn(() => ({ send: smsSendMock }));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: { findMany: adminFindManyMock },
-  },
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: { findAdmins: adminFindManyMock },
 }));
 
 vi.mock('@/lib/email/send-abuse-report-notification', () => ({
@@ -106,6 +104,48 @@ describe('dispatchAbuseReportNotifications', () => {
       expect.stringContaining('Abuse report submitted against @target'),
       { transactional: true }
     );
+  });
+
+  it('logs and recovers when an SMS send resolves with a non-ok result', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    adminFindManyMock.mockResolvedValue([
+      {
+        id: 'a1',
+        email: 'a1@x.com',
+        username: 'admin1',
+        phone: '+15551234567',
+        allowSmsNotifications: true,
+      },
+    ]);
+    sendEmailMock.mockResolvedValue(true);
+    smsSendMock.mockResolvedValue({ ok: false, error: 'rate limited' });
+
+    await dispatchAbuseReportNotifications({ reportedUsername: 'target' });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('SMS failed for admin a1')
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('does not throw when an SMS send rejects', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    adminFindManyMock.mockResolvedValue([
+      {
+        id: 'a1',
+        email: 'a1@x.com',
+        username: 'admin1',
+        phone: '+15551234567',
+        allowSmsNotifications: true,
+      },
+    ]);
+    sendEmailMock.mockResolvedValue(true);
+    smsSendMock.mockRejectedValue(Error('SNS down'));
+
+    await expect(
+      dispatchAbuseReportNotifications({ reportedUsername: 'target' })
+    ).resolves.toBeUndefined();
+    consoleErrorSpy.mockRestore();
   });
 
   it('does not throw when one admin email send fails', async () => {

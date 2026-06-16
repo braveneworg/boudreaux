@@ -6,9 +6,13 @@ import { ChatMentionService } from './chat-mention-service';
 
 vi.mock('server-only', () => ({}));
 
-const mockFindMany = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/prisma', () => ({
-  prisma: { user: { findMany: mockFindMany } },
+const mockSearchByUsernamePrefix = vi.hoisted(() => vi.fn());
+const mockFindByUsernames = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    searchByUsernamePrefix: mockSearchByUsernamePrefix,
+    findByUsernames: mockFindByUsernames,
+  },
 }));
 
 const mockSendChatMentionEmail = vi.hoisted(() => vi.fn());
@@ -52,26 +56,18 @@ describe('ChatMentionService.searchByPrefix', () => {
   it('returns an empty array for an empty/whitespace prefix', async () => {
     const out = await ChatMentionService.searchByPrefix('   ', 'me');
     expect(out).toEqual([]);
-    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockSearchByUsernamePrefix).not.toHaveBeenCalled();
   });
 
-  it('queries prisma with the trimmed prefix and excludes the caller', async () => {
-    mockFindMany.mockResolvedValueOnce([
+  it('queries the repository with the trimmed prefix and excludes the caller', async () => {
+    mockSearchByUsernamePrefix.mockResolvedValueOnce([
       { id: 'u1', username: 'alice' },
       { id: 'u2', username: 'al-bert' },
     ]);
 
     const out = await ChatMentionService.searchByPrefix('  al  ', 'me');
 
-    expect(mockFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          username: { startsWith: 'al', mode: 'insensitive' },
-          NOT: { id: 'me' },
-        }),
-        take: 8,
-      })
-    );
+    expect(mockSearchByUsernamePrefix).toHaveBeenCalledWith('al', 'me', 8);
     expect(out).toEqual([
       { id: 'u1', username: 'alice' },
       { id: 'u2', username: 'al-bert' },
@@ -79,7 +75,7 @@ describe('ChatMentionService.searchByPrefix', () => {
   });
 
   it('filters out rows with a null username', async () => {
-    mockFindMany.mockResolvedValueOnce([
+    mockSearchByUsernamePrefix.mockResolvedValueOnce([
       { id: 'u1', username: 'alice' },
       { id: 'u2', username: null },
     ]);
@@ -93,25 +89,18 @@ describe('ChatMentionService.resolveMentions', () => {
   it('returns an empty array when the body has no mentions', async () => {
     const out = await ChatMentionService.resolveMentions('hello world', 'author-1');
     expect(out).toEqual([]);
-    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockFindByUsernames).not.toHaveBeenCalled();
   });
 
   it('queries by the extracted usernames and returns matching users', async () => {
-    mockFindMany.mockResolvedValueOnce([
+    mockFindByUsernames.mockResolvedValueOnce([
       { id: 'u1', username: 'alice', email: 'alice@example.com' },
       { id: 'u2', username: 'bob', email: 'bob@example.com' },
     ]);
 
     const out = await ChatMentionService.resolveMentions('hi @alice and @bob', 'author-1');
 
-    expect(mockFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          username: { in: ['alice', 'bob'], mode: 'insensitive' },
-          NOT: { id: 'author-1' },
-        }),
-      })
-    );
+    expect(mockFindByUsernames).toHaveBeenCalledWith(['alice', 'bob'], 'author-1');
     expect(out).toEqual([
       { id: 'u1', username: 'alice', email: 'alice@example.com' },
       { id: 'u2', username: 'bob', email: 'bob@example.com' },
@@ -119,7 +108,7 @@ describe('ChatMentionService.resolveMentions', () => {
   });
 
   it('drops rows missing username or email', async () => {
-    mockFindMany.mockResolvedValueOnce([
+    mockFindByUsernames.mockResolvedValueOnce([
       { id: 'u1', username: 'alice', email: 'a@x.com' },
       { id: 'u2', username: null, email: 'b@x.com' },
       { id: 'u3', username: 'bob', email: null },
@@ -336,6 +325,40 @@ describe('ChatMentionService.notifyMentions', () => {
     expect(mockLoggerError).toHaveBeenCalledWith(
       'Chat mention email failed',
       expect.objectContaining({ error: 'boom-string' })
+    );
+  });
+
+  it('defaults createdAt to the current time when messageCreatedAt is omitted', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    mockSendChatMentionEmail.mockResolvedValueOnce(true);
+    const { messageCreatedAt: _omit, ...paramsWithoutCreatedAt } = baseParams;
+
+    await ChatMentionService.notifyMentions(paramsWithoutCreatedAt);
+
+    expect(mockSendChatMentionEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mentions: [{ authorUsername: 'author', body: 'hey @recip', createdAt: expect.any(String) }],
+      })
+    );
+  });
+
+  it('accepts already-deserialized buffered entries (Upstash JSON auto-parse)', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    // Upstash can auto-deserialize JSON, returning an object rather than a string.
+    mockRedisLrange.mockResolvedValueOnce([
+      { authorUsername: 'a1', body: 'first', createdAt: '2026-05-18T11:00:00.000Z' },
+    ]);
+    mockSendChatMentionEmail.mockResolvedValueOnce(true);
+
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockSendChatMentionEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mentions: [
+          { authorUsername: 'a1', body: 'first', createdAt: '2026-05-18T11:00:00.000Z' },
+          { authorUsername: 'author', body: 'hey @recip', createdAt: '2026-05-18T12:00:00.000Z' },
+        ],
+      })
     );
   });
 

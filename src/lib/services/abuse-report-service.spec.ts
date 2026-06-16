@@ -9,10 +9,8 @@ const findUniqueMock = vi.fn();
 const createReportMock = vi.fn();
 const rateLimitMock = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: { findUnique: findUniqueMock },
-  },
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: { findByUsername: findUniqueMock },
 }));
 
 vi.mock('@/lib/repositories/abuse-report-repository', () => ({

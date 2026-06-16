@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { prisma } from '@/lib/prisma';
 import { AbuseReportRepository } from '@/lib/repositories/abuse-report-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import {
   checkAbuseReportRateLimit,
   type AbuseReportRateLimitTier,
@@ -46,10 +46,7 @@ export class AbuseReportService {
       return { ok: true };
     }
 
-    const reportedUser = await prisma.user.findUnique({
-      where: { username },
-      select: { id: true, username: true, email: true },
-    });
+    const reportedUser = await UserRepository.findByUsername(username);
 
     if (!reportedUser) {
       // Log for admin audit but tell the caller everything's fine — no

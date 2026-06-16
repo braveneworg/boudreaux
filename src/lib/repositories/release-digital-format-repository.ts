@@ -57,6 +57,25 @@ export class ReleaseDigitalFormatRepository {
   }
 
   /**
+   * Find the first active (non-deleted) format for a release + formatType
+   * using a strict `deletedAt: null` filter. Used by the download-authorization
+   * flow, which performs its own grace-period check on the returned record.
+   * Returns the bare format (no child files) or null.
+   */
+  async findActiveByReleaseAndFormat(
+    releaseId: string,
+    formatType: DigitalFormatType
+  ): Promise<ReleaseDigitalFormat | null> {
+    return await prisma.releaseDigitalFormat.findFirst({
+      where: {
+        releaseId,
+        formatType,
+        deletedAt: null,
+      },
+    });
+  }
+
+  /**
    * Find all active (non-deleted) digital formats for a release
    * Includes child track files ordered by trackNumber
    *
@@ -190,6 +209,18 @@ export class ReleaseDigitalFormatRepository {
         deletedAt: null, // Restore if soft-deleted
       },
     });
+  }
+
+  /**
+   * Delete all digital-format records for a release (used by the release
+   * delete cascade, after their child files have been removed).
+   * @returns Count of deleted records
+   */
+  async deleteAllByReleaseId(releaseId: string): Promise<number> {
+    const result = await prisma.releaseDigitalFormat.deleteMany({
+      where: { releaseId },
+    });
+    return result.count;
   }
 
   /**
