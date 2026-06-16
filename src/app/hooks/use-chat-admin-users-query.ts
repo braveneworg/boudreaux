@@ -52,7 +52,7 @@ const listChatUsersResultSchema = z.object({
  * @returns The parsed JSON response containing the chat users page.
  * @throws If the response status is not OK.
  */
-const fetchPage = async (
+const fetchChatAdminUsers = async (
   { page, perPage, sortBy, sortDirection }: UseChatAdminUsersQueryParams,
   signal?: AbortSignal
 ): Promise<ListChatUsersResult> => {
@@ -73,7 +73,7 @@ const fetchPage = async (
 /**
  * React Query hook for fetching a paginated list of admin chat users.
  *
- * Wraps {@link fetchPage} with a stable query key and exposes the request
+ * Wraps {@link fetchChatAdminUsers} with a stable query key and exposes the request
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
  *
  * @param params - The page, pagination, and sort parameters for the request.
@@ -87,6 +87,6 @@ export const useChatAdminUsersQuery = (
 ) =>
   useQuery({
     queryKey: queryKeys.chat.adminUsers(params.page, params.sortBy, params.sortDirection),
-    queryFn: ({ signal }) => fetchPage(params, signal),
+    queryFn: ({ signal }) => fetchChatAdminUsers(params, signal),
     ...options,
   });
