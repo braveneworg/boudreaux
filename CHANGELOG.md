@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.129.0] - 2026-06-16
+
+### Added
+
+- Refactor/rename fetch page to fetch entity (#503)\n- Refactor/rename fetch page to fetch entity (#503)\n- Refactor/rename fetch page to fetch entity (#503)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- Refactor/rename fetch page to fetch entity (#503)\n
+
 ## [4.128.0] - 2026-06-16
 
 ### Added
