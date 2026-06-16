@@ -12,10 +12,10 @@ import { toast } from 'sonner';
 
 import { useChatChannel } from '@/hooks/use-chat-channel';
 import { useChatMeQuery } from '@/hooks/use-chat-me-query';
-import { useChatMessagesQuery } from '@/hooks/use-chat-messages-query';
 import { useChatPinnedMessagesQuery } from '@/hooks/use-chat-pinned-messages-query';
 import { useChatTyping } from '@/hooks/use-chat-typing';
 import { useFingerprint } from '@/hooks/use-fingerprint';
+import { useChatMessagesQuery } from '@/hooks/use-infinite-chat-messages-query';
 import { useOptimisticChat, type OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import {
   deleteChatMessageAction,

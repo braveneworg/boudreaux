@@ -20,7 +20,9 @@ export type PublishedReleasesPaginatedResponse = PaginatedResponse<PublishedRele
 export const PUBLISHED_RELEASES_PAGE_SIZE = 24;
 
 /** Strict schema for one `/api/releases?listing=published` page. */
-const publishedReleasesPageSchema = paginatedResponseSchema(publishedReleaseListingSchema);
+const publishedReleasesPaginatedResponseSchema = paginatedResponseSchema(
+  publishedReleaseListingSchema
+);
 
 /** Max combobox quick-search results. */
 const SEARCH_RESULT_LIMIT = 20;
@@ -52,10 +54,14 @@ const fetchPublishedReleases = async (
   });
   if (search) params.set('search', search);
 
-  return fetchAndParse(`/api/releases?${params.toString()}`, publishedReleasesPageSchema, {
-    signal,
-    errorMessage: 'Failed to fetch releases',
-  });
+  return fetchAndParse(
+    `/api/releases?${params.toString()}`,
+    publishedReleasesPaginatedResponseSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch releases',
+    }
+  );
 };
 
 /**

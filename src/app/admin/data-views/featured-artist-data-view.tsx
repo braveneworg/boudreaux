@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Button } from '@/app/components/ui/button';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useFeaturedArtistsQuery } from '@/app/hooks/use-featured-artists-query';
+import { useFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';

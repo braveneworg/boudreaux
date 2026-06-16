@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
-import { TOURS_PAGE_SIZE } from '@/app/hooks/use-tours-query';
+import { TOURS_PAGE_SIZE } from '@/app/hooks/use-infinite-tours-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';

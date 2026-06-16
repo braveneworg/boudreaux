@@ -6,7 +6,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ArtistDataView } from './artist-data-view';
 
 const mockUseArtistsQuery = vi.fn();
-vi.mock('@/app/hooks/use-artists-query', () => ({
+vi.mock('@/app/hooks/use-infinite-artists-query', () => ({
   useArtistsQuery: (...args: unknown[]) => mockUseArtistsQuery(...args),
 }));
 

@@ -24,10 +24,10 @@ export interface ArtistsQueryParams {
 export type ArtistsPaginatedResponse = PaginatedResponse<Artist>;
 
 /** Page size requested per fetch. */
-export const ARTISTS_PAGE_SIZE = 24;
+export const ARTISTS_PAGE_SIZE = 10;
 
 /** Strict schema for one `/api/artists` page. */
-const artistsPageSchema = paginatedResponseSchema(artistSchema);
+const artistsPaginatedResponseSchema = paginatedResponseSchema(artistSchema);
 
 /**
  * Fetches one page of artists from the `/api/artists` route handler.
@@ -54,7 +54,7 @@ const fetchArtists = async (
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
 
-  return fetchAndParse(`/api/artists?${searchParams.toString()}`, artistsPageSchema, {
+  return fetchAndParse(`/api/artists?${searchParams.toString()}`, artistsPaginatedResponseSchema, {
     signal,
     errorMessage: 'Failed to fetch artists',
   });
