@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 
 import { auth } from '@/auth';
 import { ReleaseService } from '@/lib/services/release-service';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 import { GET, POST as postHandler } from './route';
 
@@ -114,10 +115,38 @@ describe('Release API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        rows: mockReleases,
+        // The admin response is BigInt-serialized (Date → ISO string, BigInt → Number),
+        // matching what NextResponse.json produces in production.
+        rows: serializeForResponse(mockReleases),
         nextSkip: null,
       });
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({ skip: 0, take: 24 });
+    });
+
+    it('serializes BigInt digital-format file sizes so JSON.stringify does not throw', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [
+          {
+            ...mockRelease,
+            digitalFormats: [
+              {
+                id: 'df-1',
+                fileSize: 1024n,
+                totalFileSize: 2048n,
+                files: [{ id: 'file-1', fileSize: 512n }],
+              },
+            ],
+          },
+        ] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.rows[0].digitalFormats[0].files[0].fileSize).toBe(512);
     });
 
     it('should return the next offset when a full page is returned', async () => {
