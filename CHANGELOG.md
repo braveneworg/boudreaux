@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.128.0] - 2026-06-16
+
+### Added
+
+- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n
+
 ## [4.127.0] - 2026-06-15
 
 ### Added
