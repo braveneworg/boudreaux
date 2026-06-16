@@ -80,7 +80,7 @@ const fetchChatMessages = async ({
  * `isPending`, `isError`, `error`, `hasNextPage`, `isFetchingNextPage`,
  * `fetchNextPage`, and `refetch`.
  */
-export const useChatMessagesQuery = (
+export const useInfiniteChatMessagesQuery = (
   options: InfiniteQueryOptionsOverride<ChatMessagesPage, ChatCursor | undefined> = {}
 ) => {
   const result = useInfiniteQuery({

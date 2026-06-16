@@ -21,7 +21,7 @@ export default async function ToursPage() {
   const queryClient = getQueryClient();
 
   // Prefetch the first (unsearched) page as an infinite query. The query key and
-  // initialPageParam must exactly match the client `useToursQuery('')` hook or
+  // initialPageParam must exactly match the client `useInfiniteToursQuery('')` hook or
   // hydration misses and the client refetches.
   await queryClient.prefetchInfiniteQuery({
     queryKey: queryKeys.tours.infinite(''),

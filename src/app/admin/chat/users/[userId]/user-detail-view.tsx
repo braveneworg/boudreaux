@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { useAdminUserMessagesQuery } from '@/hooks/use-infinite-admin-user-messages-query';
+import { useInfiniteAdminUserMessagesQuery } from '@/hooks/use-infinite-admin-user-messages-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -58,7 +58,7 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useAdminUserMessagesQuery(userId);
+  } = useInfiniteAdminUserMessagesQuery(userId);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 

@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 import { Loader2 } from 'lucide-react';
 
-import { usePublishedReleasesQuery } from '@/app/hooks/use-infinite-published-releases-query';
+import { useInfinitePublishedReleasesQuery } from '@/app/hooks/use-infinite-published-releases-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import {
@@ -47,7 +47,7 @@ const toCardRelease = (release: PublishedReleaseListing) => {
  */
 export const ReleasesContent = () => {
   const { data, isPending, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePublishedReleasesQuery();
+    useInfinitePublishedReleasesQuery();
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });

@@ -7,7 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import {
   RELEASES_PAGE_SIZE,
-  useReleasesQuery,
+  useInfiniteReleasesQuery,
   type ReleasesQueryParams,
 } from './use-infinite-releases-query';
 
@@ -27,7 +27,7 @@ interface ReleasesQueryOptions {
 
 const getOptions = (params: ReleasesQueryParams): ReleasesQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useReleasesQuery(params));
+  renderHook(() => useInfiniteReleasesQuery(params));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as ReleasesQueryOptions;
 };
 
@@ -35,7 +35,7 @@ beforeEach(() => useInfiniteQueryMock.mockReset());
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useReleasesQuery', () => {
+describe('useInfiniteReleasesQuery', () => {
   it('keys the query by the admin-infinite params and starts at skip 0', () => {
     const opts = getOptions({ search: 'Album', published: null, deleted: false });
 

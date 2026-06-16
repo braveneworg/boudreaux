@@ -104,7 +104,7 @@ A representative read hook — note the stable key and forwarded signal:
 
 ```ts
 // src/app/hooks/use-infinite-releases-query.ts (shape)
-export const useReleasesQuery = (params: ReleasesQueryParams) =>
+export const useInfiniteReleasesQuery = (params: ReleasesQueryParams) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchReleasesPage(params, pageParam, signal),

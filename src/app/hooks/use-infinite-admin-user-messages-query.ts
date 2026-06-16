@@ -73,7 +73,7 @@ const fetchAdminUserMessages = async ({
  * (e.g. `enabled`, `staleTime`).
  * @returns The full TanStack Query infinite-query result.
  */
-export const useAdminUserMessagesQuery = (
+export const useInfiniteAdminUserMessagesQuery = (
   userId: string,
   options: InfiniteQueryOptionsOverride<AdminUserMessagesResponse> = {}
 ) =>

@@ -7,7 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import {
   ARTISTS_PAGE_SIZE,
-  useArtistsQuery,
+  useInfiniteArtistsQuery,
   type ArtistsQueryParams,
 } from './use-infinite-artists-query';
 
@@ -27,7 +27,7 @@ interface ArtistsQueryOptions {
 
 const getOptions = (params: ArtistsQueryParams): ArtistsQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useArtistsQuery(params));
+  renderHook(() => useInfiniteArtistsQuery(params));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as ArtistsQueryOptions;
 };
 
@@ -35,7 +35,7 @@ beforeEach(() => useInfiniteQueryMock.mockReset());
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useArtistsQuery', () => {
+describe('useInfiniteArtistsQuery', () => {
   it('keys the query by the admin-infinite params and starts at skip 0', () => {
     const opts = getOptions({ search: 'John', published: null, deleted: false });
 

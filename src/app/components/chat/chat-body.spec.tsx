@@ -38,7 +38,7 @@ vi.mock('@/hooks/use-chat-me-query', () => ({
   useChatMeQuery: (...args: unknown[]) => useChatMeQueryMock(...args),
 }));
 vi.mock('@/hooks/use-infinite-chat-messages-query', () => ({
-  useChatMessagesQuery: (...args: unknown[]) => useChatMessagesQueryMock(...args),
+  useInfiniteChatMessagesQuery: (...args: unknown[]) => useChatMessagesQueryMock(...args),
 }));
 vi.mock('@/hooks/use-chat-pinned-messages-query', () => ({
   useChatPinnedMessagesQuery: (...args: unknown[]) => useChatPinnedMessagesQueryMock(...args),

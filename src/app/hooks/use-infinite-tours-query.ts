@@ -76,7 +76,7 @@ const fetchTours = async (
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useToursQuery = (
+export const useInfiniteToursQuery = (
   search: string,
   options: InfiniteQueryOptionsOverride<ToursPaginatedResponse> = {}
 ) =>

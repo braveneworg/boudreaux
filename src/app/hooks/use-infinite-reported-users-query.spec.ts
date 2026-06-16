@@ -7,7 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import {
   REPORTED_USERS_PAGE_SIZE,
-  useReportedUsersQuery,
+  useInfiniteReportedUsersQuery,
 } from './use-infinite-reported-users-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
@@ -26,14 +26,14 @@ interface InfiniteOptions {
 
 const getOptions = (params: { windowDays: number | null; search?: string }): InfiniteOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useReportedUsersQuery(params));
+  renderHook(() => useInfiniteReportedUsersQuery(params));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as InfiniteOptions;
 };
 
 beforeEach(() => useInfiniteQueryMock.mockReset());
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useReportedUsersQuery', () => {
+describe('useInfiniteReportedUsersQuery', () => {
   it('keys the query by window + search and starts at skip 0', () => {
     const opts = getOptions({ windowDays: null, search: 'Spam' });
 

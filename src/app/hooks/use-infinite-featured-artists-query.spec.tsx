@@ -7,7 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import {
   FEATURED_ARTISTS_PAGE_SIZE,
-  useFeaturedArtistsQuery,
+  useInfiniteFeaturedArtistsQuery,
   type FeaturedArtistsQueryParams,
 } from './use-infinite-featured-artists-query';
 
@@ -28,7 +28,7 @@ interface FeaturedArtistsQueryOptions {
 
 const getOptions = (params: FeaturedArtistsQueryParams): FeaturedArtistsQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useFeaturedArtistsQuery(params));
+  renderHook(() => useInfiniteFeaturedArtistsQuery(params));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as FeaturedArtistsQueryOptions;
 };
 
@@ -36,7 +36,7 @@ beforeEach(() => useInfiniteQueryMock.mockReset());
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('useFeaturedArtistsQuery', () => {
+describe('useInfiniteFeaturedArtistsQuery', () => {
   it('keys the query by the admin-infinite params and starts at skip 0', () => {
     const opts = getOptions({ search: 'Jazz', published: null, deleted: false });
 

@@ -1,16 +1,16 @@
-%% useToursQuery — paginated public tours listing (infinite scroll)
+%% useInfiniteToursQuery — paginated public tours listing (infinite scroll)
 sequenceDiagram
     autonumber
     actor U as Visitor
     participant C as Component<br/>(tours-content / home-content)
-    participant H as useToursQuery<br/>(useInfiniteQuery, keepPreviousData)
+    participant H as useInfiniteToursQuery<br/>(useInfiniteQuery, keepPreviousData)
     participant F as fetchAndParse
     participant R as GET /api/tours<br/>(withRateLimit: publicLimiter)
     participant RP as TourRepository.findAll
     participant DB as Prisma (tour.findMany)
     participant V as paginatedResponseSchema<br/>(tourWithRelationsSchema)
     participant RC as QueryCache.onError
-    C->>H: useToursQuery(search)
+    C->>H: useInfiniteToursQuery(search)
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/tours?skip&take=24&search, {signal})
     R->>RP: findAll({skip, take, search})

@@ -1,16 +1,16 @@
-%% useFeaturedArtistsQuery — admin featured-artists listing (infinite)
+%% useInfiniteFeaturedArtistsQuery — admin featured-artists listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(featured-artist-data-view)
-    participant H as useFeaturedArtistsQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteFeaturedArtistsQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/featured-artists<br/>(withRateLimit publicLimiter)
     participant SV as FeaturedArtistsService<br/>.getAllFeaturedArtists
     participant DB as Prisma · MongoDB
     participant V as paginatedResponseSchema<br/>(featuredArtistSchema)
     participant RC as QueryCache.onError
-    C->>H: useFeaturedArtistsQuery({search,published,deleted})
+    C->>H: useInfiniteFeaturedArtistsQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/featured-artists?skip&take=24 (NO active), {signal})
     R->>SV: auth admin · getAllFeaturedArtists({skip,take,filters})

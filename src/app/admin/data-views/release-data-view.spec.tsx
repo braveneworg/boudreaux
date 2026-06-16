@@ -7,13 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
+import { useInfiniteReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 
 import { ReleaseDataView } from './release-data-view';
 
-// Mock the useReleasesQuery hook
+// Mock the useInfiniteReleasesQuery hook
 vi.mock('@/app/hooks/use-infinite-releases-query', () => ({
-  useReleasesQuery: vi.fn(),
+  useInfiniteReleasesQuery: vi.fn(),
 }));
 
 // Mock next/navigation
@@ -86,7 +86,7 @@ describe('ReleaseDataView', () => {
   ];
 
   it('should render loading state when pending', () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue({
       ...toInfiniteResult([]),
       isPending: true,
       data: undefined,
@@ -98,7 +98,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should render error state when error occurs', () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue({
       ...toInfiniteResult([]),
       error: Error('Failed to fetch'),
       data: undefined,
@@ -110,7 +110,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should render releases when data is loaded', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -120,7 +120,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should display release fields correctly', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -131,7 +131,7 @@ describe('ReleaseDataView', () => {
 
   it('should call refetch function from hook', async () => {
     const mockRefetch = vi.fn();
-    vi.mocked(useReleasesQuery).mockReturnValue({
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue({
       ...toInfiniteResult(mockReleaseRows),
       refetch: mockRefetch,
     } as never);
@@ -146,7 +146,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should render with empty releases array', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult([]) as never);
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult([]) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -175,7 +175,7 @@ describe('ReleaseDataView', () => {
         },
       ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -205,7 +205,7 @@ describe('ReleaseDataView', () => {
         },
       ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -226,7 +226,7 @@ describe('ReleaseDataView', () => {
         },
       ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -252,7 +252,7 @@ describe('ReleaseDataView', () => {
         },
       ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -272,7 +272,7 @@ describe('ReleaseDataView', () => {
         },
       ];
 
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -284,7 +284,9 @@ describe('ReleaseDataView', () => {
     });
 
     it('should include albumArtist in fieldsToShow', async () => {
-      vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(
+        toInfiniteResult(mockReleaseRows) as never
+      );
 
       render(<ReleaseDataView />, { wrapper: createWrapper() });
 
@@ -295,7 +297,7 @@ describe('ReleaseDataView', () => {
   });
 
   it('should handle empty data when not pending and no error', () => {
-    vi.mocked(useReleasesQuery).mockReturnValue({
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue({
       ...toInfiniteResult([]),
       data: undefined,
     } as never);
@@ -308,12 +310,14 @@ describe('ReleaseDataView', () => {
   });
 
   it('passes a published filter to the query when the publish toggles differ', async () => {
-    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
     render(<ReleaseDataView />, { wrapper: createWrapper() });
 
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
-    expect(useReleasesQuery).toHaveBeenLastCalledWith(expect.objectContaining({ published: true }));
+    expect(useInfiniteReleasesQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ published: true })
+    );
   });
 });
