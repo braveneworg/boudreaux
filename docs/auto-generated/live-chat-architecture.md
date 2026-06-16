@@ -135,7 +135,7 @@ mutation.
   exposes ref-stashed callback props (`onNewMessage`,
   `onReactionUpdated`, `onTyping`) so re-renders don't re-bind handlers.
   `sendTyping` is throttled to 1500 ms.
-- [`useChatMessagesQuery`](../../src/app/hooks/use-chat-messages-query.ts)
+- [`useChatMessagesQuery`](../../src/app/hooks/use-infinite-chat-messages-query.ts)
   — TanStack infinite query. Flattens pages oldest → newest. Hard cap
   at `MAX_TOTAL_MESSAGES = 200`.
 - [`useFingerprint`](../../src/app/hooks/use-fingerprint.ts) —

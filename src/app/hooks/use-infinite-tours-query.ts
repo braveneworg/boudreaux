@@ -34,7 +34,7 @@ export type ToursPaginatedResponse = PaginatedResponse<TourWithRelations>;
 export const TOURS_PAGE_SIZE = 24;
 
 /** Strict schema for one `/api/tours` page. */
-const toursPageSchema = paginatedResponseSchema(tourWithRelationsSchema);
+const toursPaginatedResponseSchema = paginatedResponseSchema(tourWithRelationsSchema);
 
 /**
  * Fetches one page of tours from the `/api/tours` route handler.
@@ -56,7 +56,7 @@ const fetchTours = async (
   const params = new URLSearchParams({ skip: String(skip), take: String(TOURS_PAGE_SIZE) });
   if (search) params.set('search', search);
 
-  return fetchAndParse(`/api/tours?${params.toString()}`, toursPageSchema, {
+  return fetchAndParse(`/api/tours?${params.toString()}`, toursPaginatedResponseSchema, {
     signal,
     errorMessage: 'Failed to fetch tours',
   });

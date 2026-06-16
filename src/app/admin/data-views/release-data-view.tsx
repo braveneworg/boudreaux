@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useReleasesQuery } from '@/app/hooks/use-releases-query';
+import { useReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 import { ENTITIES } from '@/lib/constants';
 import type { ReleaseListItem } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';

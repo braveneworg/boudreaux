@@ -7,13 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useFeaturedArtistsQuery } from '@/app/hooks/use-featured-artists-query';
+import { useFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 
 import { FeaturedArtistDataView } from './featured-artist-data-view';
 
 // Mock the useFeaturedArtistsQuery hook
-vi.mock('@/app/hooks/use-featured-artists-query', () => ({
+vi.mock('@/app/hooks/use-infinite-featured-artists-query', () => ({
   useFeaturedArtistsQuery: vi.fn(),
 }));
 

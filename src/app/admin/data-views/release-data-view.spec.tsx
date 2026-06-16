@@ -7,12 +7,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useReleasesQuery } from '@/app/hooks/use-releases-query';
+import { useReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 
 import { ReleaseDataView } from './release-data-view';
 
 // Mock the useReleasesQuery hook
-vi.mock('@/app/hooks/use-releases-query', () => ({
+vi.mock('@/app/hooks/use-infinite-releases-query', () => ({
   useReleasesQuery: vi.fn(),
 }));
 

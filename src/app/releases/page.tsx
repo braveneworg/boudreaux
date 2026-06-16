@@ -14,7 +14,7 @@ import { ReleasesContent } from '@/app/components/releases-content';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
-import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/app/hooks/use-published-releases-query';
+import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/app/hooks/use-infinite-published-releases-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';

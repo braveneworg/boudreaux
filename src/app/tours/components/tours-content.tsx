@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { Loader2 } from 'lucide-react';
 
-import { useToursQuery } from '@/app/hooks/use-tours-query';
+import { useToursQuery } from '@/app/hooks/use-infinite-tours-query';
 
 import { ToursPageClient } from './tours-page-client';
 

@@ -103,7 +103,7 @@ interactions are client-smooth without a second fetch.
 A representative read hook — note the stable key and forwarded signal:
 
 ```ts
-// src/app/hooks/use-releases-query.ts (shape)
+// src/app/hooks/use-infinite-releases-query.ts (shape)
 export const useReleasesQuery = (params: ReleasesQueryParams) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),

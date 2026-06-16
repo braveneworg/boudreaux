@@ -17,7 +17,7 @@ interface ChatMessagesPage {
   messages: ChatMessageDto[];
 }
 
-const chatMessagesPageSchema = z.object({
+const chatMessagesPaginatedResponseSchema = z.object({
   messages: z.array(chatMessageDtoSchema),
 }) satisfies z.ZodType<ChatMessagesPage>;
 
@@ -56,7 +56,7 @@ const fetchChatMessages = async ({
     params.set('cursorId', pageParam.cursorId);
   }
   const url = `/api/chat/messages?${params.toString()}`;
-  return fetchAndParse(url, chatMessagesPageSchema, {
+  return fetchAndParse(url, chatMessagesPaginatedResponseSchema, {
     signal,
     cache: 'no-store',
     errorMessage: 'Failed to load chat messages',

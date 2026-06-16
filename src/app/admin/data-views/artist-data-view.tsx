@@ -5,8 +5,8 @@
 
 import { useMemo, useState } from 'react';
 
-import { useArtistsQuery } from '@/app/hooks/use-artists-query';
 import { useDebounce } from '@/app/hooks/use-debounce';
+import { useArtistsQuery } from '@/app/hooks/use-infinite-artists-query';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 

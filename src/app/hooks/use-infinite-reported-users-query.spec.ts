@@ -5,7 +5,10 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { REPORTED_USERS_PAGE_SIZE, useReportedUsersQuery } from './use-reported-users-query';
+import {
+  REPORTED_USERS_PAGE_SIZE,
+  useReportedUsersQuery,
+} from './use-infinite-reported-users-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 

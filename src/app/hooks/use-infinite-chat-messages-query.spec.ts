@@ -5,7 +5,7 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { MAX_TOTAL_MESSAGES, useChatMessagesQuery } from './use-chat-messages-query';
+import { MAX_TOTAL_MESSAGES, useChatMessagesQuery } from './use-infinite-chat-messages-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 
