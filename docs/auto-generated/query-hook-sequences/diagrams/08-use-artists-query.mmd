@@ -1,9 +1,9 @@
-%% useArtistsQuery — admin artists listing (infinite)
+%% useInfiniteArtistsQuery — admin artists listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(artist-data-view)
-    participant H as useArtistsQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteArtistsQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/artists
     participant A as auth()
@@ -11,7 +11,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB<br/>(artist.findMany)
     participant V as paginatedResponseSchema<br/>(artistSchema)
     participant RC as QueryCache.onError
-    C->>H: useArtistsQuery({search,published,deleted})
+    C->>H: useInfiniteArtistsQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/artists?skip&take=24&filters, {signal})
     R->>A: auth() — require role 'admin'

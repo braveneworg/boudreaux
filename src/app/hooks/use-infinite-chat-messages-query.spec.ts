@@ -5,7 +5,10 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { MAX_TOTAL_MESSAGES, useChatMessagesQuery } from './use-infinite-chat-messages-query';
+import {
+  MAX_TOTAL_MESSAGES,
+  useInfiniteChatMessagesQuery,
+} from './use-infinite-chat-messages-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 
@@ -23,11 +26,11 @@ const makeMsg = (id: string, createdAt: string) => ({
 
 beforeEach(() => useInfiniteQueryMock.mockReset());
 
-describe('useChatMessagesQuery query config', () => {
+describe('useInfiniteChatMessagesQuery query config', () => {
   it('uses the chat messages query key and the dedicated fetcher', () => {
     useInfiniteQueryMock.mockReturnValue({ isPending: true });
 
-    renderHook(() => useChatMessagesQuery());
+    renderHook(() => useInfiniteChatMessagesQuery());
 
     const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
       queryKey: unknown[];
@@ -49,7 +52,7 @@ describe('useChatMessagesQuery query config', () => {
       });
       vi.stubGlobal('fetch', fetchMock);
 
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
         queryFn: (ctx: { pageParam: undefined }) => Promise<unknown>;
       };
@@ -72,7 +75,7 @@ describe('useChatMessagesQuery query config', () => {
       });
       vi.stubGlobal('fetch', fetchMock);
 
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
         queryFn: (ctx: { pageParam: unknown }) => Promise<unknown>;
       };
@@ -93,7 +96,7 @@ describe('useChatMessagesQuery query config', () => {
       useInfiniteQueryMock.mockReturnValue({ isPending: true });
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
         queryFn: (ctx: { pageParam: undefined }) => Promise<unknown>;
       };
@@ -110,7 +113,7 @@ describe('useChatMessagesQuery query config', () => {
     it('returns undefined when the page is smaller than PAGE_SIZE', () => {
       useInfiniteQueryMock.mockReturnValue({ isPending: true });
 
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
         getNextPageParam: (page: { messages: unknown[] }) => unknown;
       };
@@ -123,7 +126,7 @@ describe('useChatMessagesQuery query config', () => {
     it('returns the oldest message as cursor when the page is full', () => {
       useInfiniteQueryMock.mockReturnValue({ isPending: true });
 
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as {
         getNextPageParam: (page: { messages: ReturnType<typeof makeMsg>[] }) => unknown;
       };
@@ -149,7 +152,7 @@ describe('useChatMessagesQuery query config', () => {
         isFetchingNextPage: false,
       });
 
-      const { result } = renderHook(() => useChatMessagesQuery());
+      const { result } = renderHook(() => useInfiniteChatMessagesQuery());
       expect(result.current.messages).toEqual([]);
     });
 
@@ -174,7 +177,7 @@ describe('useChatMessagesQuery query config', () => {
         isFetchingNextPage: false,
       });
 
-      const { result } = renderHook(() => useChatMessagesQuery());
+      const { result } = renderHook(() => useInfiniteChatMessagesQuery());
 
       expect(result.current.messages.map((m) => m.id)).toEqual([
         'older-1',
@@ -196,7 +199,7 @@ describe('useChatMessagesQuery query config', () => {
         isFetchingNextPage: false,
       });
 
-      const { result } = renderHook(() => useChatMessagesQuery());
+      const { result } = renderHook(() => useInfiniteChatMessagesQuery());
       expect(result.current.hasNextPage).toBe(false);
     });
   });
@@ -204,14 +207,14 @@ describe('useChatMessagesQuery query config', () => {
   describe('enabled flag', () => {
     it('defaults to enabled=true', () => {
       useInfiniteQueryMock.mockReturnValue({ isPending: true });
-      renderHook(() => useChatMessagesQuery());
+      renderHook(() => useInfiniteChatMessagesQuery());
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as { enabled: boolean };
       expect(opts.enabled).toBe(true);
     });
 
     it('forwards an explicit enabled=false', () => {
       useInfiniteQueryMock.mockReturnValue({ isPending: true });
-      renderHook(() => useChatMessagesQuery({ enabled: false }));
+      renderHook(() => useInfiniteChatMessagesQuery({ enabled: false }));
       const opts = useInfiniteQueryMock.mock.calls[0]?.[0] as { enabled: boolean };
       expect(opts.enabled).toBe(false);
     });

@@ -74,7 +74,7 @@ const fetchArtists = async (
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useArtistsQuery = (
+export const useInfiniteArtistsQuery = (
   params: ArtistsQueryParams,
   options: InfiniteQueryOptionsOverride<ArtistsPaginatedResponse> = {}
 ) =>

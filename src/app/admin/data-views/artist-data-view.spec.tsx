@@ -7,7 +7,7 @@ import { ArtistDataView } from './artist-data-view';
 
 const mockUseArtistsQuery = vi.fn();
 vi.mock('@/app/hooks/use-infinite-artists-query', () => ({
-  useArtistsQuery: (...args: unknown[]) => mockUseArtistsQuery(...args),
+  useInfiniteArtistsQuery: (...args: unknown[]) => mockUseArtistsQuery(...args),
 }));
 
 vi.mock('./data-view', () => ({

@@ -1,9 +1,9 @@
-%% useReleasesQuery — admin releases listing (infinite)
+%% useInfiniteReleasesQuery — admin releases listing (infinite)
 sequenceDiagram
     autonumber
     actor U as Admin
     participant C as Component<br/>(release-data-view)
-    participant H as useReleasesQuery<br/>(useInfiniteQuery)
+    participant H as useInfiniteReleasesQuery<br/>(useInfiniteQuery)
     participant F as fetchAndParse
     participant R as GET /api/releases
     participant A as auth()
@@ -11,7 +11,7 @@ sequenceDiagram
     participant DB as Prisma · MongoDB<br/>(release.findMany)
     participant V as paginatedResponseSchema<br/>(releaseSchema)
     participant RC as QueryCache.onError
-    C->>H: useReleasesQuery({search,published,deleted})
+    C->>H: useInfiniteReleasesQuery({search,published,deleted})
     H->>F: queryFn({pageParam=skip, signal})
     F->>R: fetch(/api/releases?skip&take=24&filters, {signal})
     R->>A: auth() — require role 'admin'

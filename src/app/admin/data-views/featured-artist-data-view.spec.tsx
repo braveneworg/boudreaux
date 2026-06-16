@@ -7,14 +7,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
+import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 
 import { FeaturedArtistDataView } from './featured-artist-data-view';
 
-// Mock the useFeaturedArtistsQuery hook
+// Mock the useInfiniteFeaturedArtistsQuery hook
 vi.mock('@/app/hooks/use-infinite-featured-artists-query', () => ({
-  useFeaturedArtistsQuery: vi.fn(),
+  useInfiniteFeaturedArtistsQuery: vi.fn(),
 }));
 
 // Mock next/navigation
@@ -94,7 +94,7 @@ describe('FeaturedArtistDataView', () => {
   ];
 
   it('should render loading state when pending', () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue({
       ...toInfiniteResult([]),
       isPending: true,
       data: undefined,
@@ -106,7 +106,7 @@ describe('FeaturedArtistDataView', () => {
   });
 
   it('should render error state when error occurs', () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue({
       ...toInfiniteResult([]),
       error: Error('Failed to fetch'),
       data: undefined,
@@ -118,7 +118,7 @@ describe('FeaturedArtistDataView', () => {
   });
 
   it('should render featured artists data when loaded', async () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -128,7 +128,7 @@ describe('FeaturedArtistDataView', () => {
   });
 
   it('should display correct fields for featured artist', async () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -154,7 +154,7 @@ describe('FeaturedArtistDataView', () => {
       },
     ];
 
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -176,7 +176,7 @@ describe('FeaturedArtistDataView', () => {
       },
     ];
 
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -194,7 +194,7 @@ describe('FeaturedArtistDataView', () => {
   });
 
   it('renders the controlled search input', async () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -205,7 +205,9 @@ describe('FeaturedArtistDataView', () => {
 
   describe('Publish to Landing Page button', () => {
     it('should render the publish button when data is loaded', () => {
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
+        toInfiniteResult(mockRows) as never
+      );
 
       render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -213,7 +215,7 @@ describe('FeaturedArtistDataView', () => {
     });
 
     it('should not render the publish button when loading', () => {
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue({
         ...toInfiniteResult([]),
         isPending: true,
         data: undefined,
@@ -227,7 +229,7 @@ describe('FeaturedArtistDataView', () => {
     });
 
     it('should not render the publish button when there is an error', () => {
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue({
         ...toInfiniteResult([]),
         error: Error('Failed'),
         data: undefined,
@@ -243,7 +245,9 @@ describe('FeaturedArtistDataView', () => {
     it('should call the publish action and show success toast on click', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({ success: true });
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
+        toInfiniteResult(mockRows) as never
+      );
 
       render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -263,7 +267,9 @@ describe('FeaturedArtistDataView', () => {
         success: false,
         error: 'Failed to publish',
       });
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
+        toInfiniteResult(mockRows) as never
+      );
 
       render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -281,7 +287,9 @@ describe('FeaturedArtistDataView', () => {
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
         success: false,
       });
-      vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+      vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
+        toInfiniteResult(mockRows) as never
+      );
 
       render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -309,7 +317,7 @@ describe('FeaturedArtistDataView', () => {
       },
     ];
 
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(rows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
@@ -319,13 +327,13 @@ describe('FeaturedArtistDataView', () => {
   });
 
   it('passes a published filter to the query when the publish toggles differ', async () => {
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
 
     render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
 
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
-    expect(useFeaturedArtistsQuery).toHaveBeenLastCalledWith(
+    expect(useInfiniteFeaturedArtistsQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ published: true })
     );
   });

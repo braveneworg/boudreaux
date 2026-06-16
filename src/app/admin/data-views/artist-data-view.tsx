@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useArtistsQuery } from '@/app/hooks/use-infinite-artists-query';
+import { useInfiniteArtistsQuery } from '@/app/hooks/use-infinite-artists-query';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 
@@ -42,7 +42,7 @@ export const ArtistDataView = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  } = useInfiniteArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
 
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
