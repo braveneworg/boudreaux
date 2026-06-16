@@ -143,6 +143,22 @@ jobs:
       - name: Update coverage badge
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
+          # Push a shields.io endpoint JSON to a public gist, retrying transient
+          # GitHub API failures. Badges are cosmetic, so a persistent failure
+          # (e.g. an expired GIST_TOKEN or a 401 on back-to-back gist writes)
+          # must never fail this gating job — warn and move on instead.
+          update_gist() {
+            local gist_id="$1" file="$2"
+            for i in $(seq 1 3); do
+              if gh gist edit "$gist_id" "$file"; then
+                return 0
+              fi
+              echo "gh gist edit $gist_id failed (attempt $i/3); retrying in 5s..." >&2
+              sleep 5
+            done
+            echo "::warning::Badge gist $gist_id could not be updated after 3 attempts; skipping (badge may be stale)."
+            return 0
+          }
           PCT="${{ steps.coverage-pct.outputs.pct }}"
           # Determine badge color based on coverage percentage
           if [ "$(echo "$PCT >= 90" | bc)" -eq 1 ]; then
@@ -161,17 +177,30 @@ jobs:
           BADGE_JSON="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${PCT}%\",\"color\":\"${COLOR}\"}"
           # Update coverage badge in public gist
           echo "$BADGE_JSON" > /tmp/coverage-badge.json
-          gh gist edit dfb9819d47ec197bb8df7c3165cf472d /tmp/coverage-badge.json
+          update_gist dfb9819d47ec197bb8df7c3165cf472d /tmp/coverage-badge.json
         env:
           GH_TOKEN: ${{ secrets.GIST_TOKEN }}
 
       - name: Update version badge
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
+          # See "Update coverage badge" for why badge failures are non-fatal.
+          update_gist() {
+            local gist_id="$1" file="$2"
+            for i in $(seq 1 3); do
+              if gh gist edit "$gist_id" "$file"; then
+                return 0
+              fi
+              echo "gh gist edit $gist_id failed (attempt $i/3); retrying in 5s..." >&2
+              sleep 5
+            done
+            echo "::warning::Badge gist $gist_id could not be updated after 3 attempts; skipping (badge may be stale)."
+            return 0
+          }
           VERSION=$(jq -r '.version' package.json)
           BADGE_JSON="{\"schemaVersion\":1,\"label\":\"version\",\"message\":\"v${VERSION}\",\"color\":\"blue\"}"
           echo "$BADGE_JSON" > /tmp/version-badge.json
-          gh gist edit 60abe6ab220986485503670eafd1ec2e /tmp/version-badge.json
+          update_gist 60abe6ab220986485503670eafd1ec2e /tmp/version-badge.json
         env:
           GH_TOKEN: ${{ secrets.GIST_TOKEN }}
 
