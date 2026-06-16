@@ -14,18 +14,18 @@ interface ChatMentionEmailData {
   signInUrl: string;
 }
 
-function truncate(text: string, max = 280): string {
+const truncate = (text: string, max = 280): string => {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1).trimEnd()}…`;
-}
+};
 
-function formatTimestamp(iso: string): string {
+const formatTimestamp = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toUTCString();
-}
+};
 
-export function buildChatMentionEmailText(data: ChatMentionEmailData): string {
+export const buildChatMentionEmailText = (data: ChatMentionEmailData): string => {
   const isDigest = data.mentions.length > 1;
   const heading = isDigest
     ? `FAKE FOUR INC. — ${data.mentions.length} CHAT MENTIONS`
@@ -56,4 +56,4 @@ ${data.signInUrl}
 
 --
 Fake Four Inc. — fakefourrecords.com`;
-}
+};

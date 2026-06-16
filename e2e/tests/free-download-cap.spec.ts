@@ -61,7 +61,7 @@ interface SeededIdentity {
   visitorId: string;
 }
 
-async function seedCapReached(releaseId: string): Promise<SeededIdentity> {
+const seedCapReached = async (releaseId: string): Promise<SeededIdentity> => {
   const visitorId = randomUUID();
   await prisma.visitorIdentity.create({
     data: {
@@ -84,14 +84,14 @@ async function seedCapReached(releaseId: string): Promise<SeededIdentity> {
     });
   }
   return { visitorId };
-}
+};
 
-async function clearSeededIdentity({ visitorId }: SeededIdentity): Promise<void> {
+const clearSeededIdentity = async ({ visitorId }: SeededIdentity): Promise<void> => {
   await prisma.downloadEvent.deleteMany({ where: { visitorId } });
   await prisma.visitorIdentity.deleteMany({ where: { visitorId } });
-}
+};
 
-function visitorCookie(visitorId: string, baseURL: string | undefined) {
+const visitorCookie = (visitorId: string, baseURL: string | undefined) => {
   const url = new URL(baseURL ?? 'http://127.0.0.1:3000');
   return {
     name: 'boudreaux_visitor_id',
@@ -102,7 +102,7 @@ function visitorCookie(visitorId: string, baseURL: string | undefined) {
     secure: false,
     sameSite: 'Lax' as const,
   };
-}
+};
 
 test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () => {
   test('US2: cap-reached state shows live countdown and disabled CTA', async ({

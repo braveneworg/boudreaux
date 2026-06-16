@@ -42,7 +42,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-
  * Must be called from a Next.js Route Handler or Server Action (the
  * `cookies()` API mutates the response).
  */
-export async function getOrIssueGuestVisitorId(): Promise<string> {
+export const getOrIssueGuestVisitorId = async (): Promise<string> => {
   const store = await cookies();
   const existing = store.get(VISITOR_ID_COOKIE)?.value;
 
@@ -59,7 +59,7 @@ export async function getOrIssueGuestVisitorId(): Promise<string> {
     maxAge: ONE_YEAR_SECONDS,
   });
   return value;
-}
+};
 
 /**
  * Read the existing `boudreaux_visitor_id` cookie value if present and
@@ -70,11 +70,11 @@ export async function getOrIssueGuestVisitorId(): Promise<string> {
  *
  * Feature: 007-free-digital-downloads
  */
-export async function readGuestVisitorId(): Promise<string | null> {
+export const readGuestVisitorId = async (): Promise<string | null> => {
   const store = await cookies();
   const existing = store.get(VISITOR_ID_COOKIE)?.value;
   return existing && UUID_REGEX.test(existing) ? existing : null;
-}
+};
 
 /**
  * Set the `boudreaux_visitor_id` cookie to the given canonical visitor id.
@@ -84,7 +84,7 @@ export async function readGuestVisitorId(): Promise<string | null> {
  *
  * Feature: 007-free-digital-downloads
  */
-export async function setGuestVisitorIdCookie(visitorId: string): Promise<void> {
+export const setGuestVisitorIdCookie = async (visitorId: string): Promise<void> => {
   const store = await cookies();
   store.set(VISITOR_ID_COOKIE, visitorId, {
     httpOnly: true,
@@ -93,4 +93,4 @@ export async function setGuestVisitorIdCookie(visitorId: string): Promise<void> 
     path: '/api',
     maxAge: ONE_YEAR_SECONDS,
   });
-}
+};

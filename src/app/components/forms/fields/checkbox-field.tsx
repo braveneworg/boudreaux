@@ -22,7 +22,7 @@ interface CheckboxFieldProps<
   setValue?: UseFormSetValue<TFieldValues>;
 }
 
-export function CheckboxField<
+export const CheckboxField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -32,35 +32,33 @@ export function CheckboxField<
   id,
   onUserInteraction,
   setValue,
-}: CheckboxFieldProps<TFieldValues, TName>) {
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="space-0 flex flex-row items-start">
-          <FormControl>
-            <Checkbox
-              checked={field.value}
-              onCheckedChange={(checked) => {
-                onUserInteraction?.();
-                const boolValue = checked === true;
-                if (setValue) {
-                  setValue(name, boolValue as TFieldValues[TName], {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  });
-                }
-                field.onChange(boolValue);
-              }}
-              id={id}
-            />
-          </FormControl>
-          <FormLabel className="block text-sm font-normal" htmlFor={id}>
-            {label}
-          </FormLabel>
-        </FormItem>
-      )}
-    />
-  );
-}
+}: CheckboxFieldProps<TFieldValues, TName>) => (
+  <FormField
+    control={control}
+    name={name}
+    render={({ field }) => (
+      <FormItem className="space-0 flex flex-row items-start">
+        <FormControl>
+          <Checkbox
+            checked={field.value}
+            onCheckedChange={(checked) => {
+              onUserInteraction?.();
+              const boolValue = checked === true;
+              if (setValue) {
+                setValue(name, boolValue as TFieldValues[TName], {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              }
+              field.onChange(boolValue);
+            }}
+            id={id}
+          />
+        </FormControl>
+        <FormLabel className="block text-sm font-normal" htmlFor={id}>
+          {label}
+        </FormLabel>
+      </FormItem>
+    )}
+  />
+);

@@ -11,7 +11,7 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
  * @param limit - Maximum number of featured artists to fetch (default: 7)
  * @returns Array of featured artists or empty array on error
  */
-export async function getFeaturedArtistsAction(limit = 7): Promise<FeaturedArtist[]> {
+export const getFeaturedArtistsAction = async (limit = 7): Promise<FeaturedArtist[]> => {
   const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), limit);
 
   if (!result.success) {
@@ -20,4 +20,4 @@ export async function getFeaturedArtistsAction(limit = 7): Promise<FeaturedArtis
   }
 
   return result.data;
-}
+};

@@ -29,7 +29,9 @@ type ActionResult =
  * Returns the clientSecret for the embedded Stripe Payment Element
  * and the sessionId used to poll for webhook confirmation.
  */
-export async function createPurchaseCheckoutSessionAction(input: unknown): Promise<ActionResult> {
+export const createPurchaseCheckoutSessionAction = async (
+  input: unknown
+): Promise<ActionResult> => {
   const parsed = purchaseCheckoutActionSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
@@ -141,4 +143,4 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     loggers.payments.error('Failed to create purchase checkout session', error);
     return { success: false, error: 'stripe_error' };
   }
-}
+};

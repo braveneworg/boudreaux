@@ -10,12 +10,12 @@ import type { Page } from '@playwright/test';
  * The signup/signin form renders a Skeleton loader until Turnstile verifies,
  * so we wait for the email input to become visible as verification confirmation.
  */
-async function waitForTurnstileVerification(page: Page, timeout = 15_000) {
+const waitForTurnstileVerification = async (page: Page, timeout = 15_000) => {
   await page.locator('input[id="email"]').waitFor({
     state: 'visible',
     timeout,
   });
-}
+};
 
 /**
  * Mock Turnstile by intercepting the Cloudflare challenge script and injecting
@@ -26,7 +26,7 @@ async function waitForTurnstileVerification(page: Page, timeout = 15_000) {
  * The library waits for the onload callback before calling `window.turnstile.render()`,
  * so the mock must call it after setting up the fake `window.turnstile` object.
  */
-async function mockTurnstile(page: Page) {
+const mockTurnstile = async (page: Page) => {
   // Ensure Turnstile is available before react-turnstile module code runs.
   // This makes both dev and production bundles skip external script timing races.
   await page.addInitScript(() => {
@@ -83,6 +83,6 @@ async function mockTurnstile(page: Page) {
       `,
     });
   });
-}
+};
 
 export { mockTurnstile, waitForTurnstileVerification };

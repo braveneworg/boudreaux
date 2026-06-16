@@ -18,15 +18,14 @@ import { cn } from '@/lib/utils';
 const DISMISS_COOKIE = 'ffi-ios-install-dismissed';
 const DISMISS_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
-function hasDismissed(): boolean {
-  return document.cookie.split('; ').some((entry) => entry === `${DISMISS_COOKIE}=1`);
-}
+const hasDismissed = (): boolean =>
+  document.cookie.split('; ').some((entry) => entry === `${DISMISS_COOKIE}=1`);
 
-function persistDismissal(): void {
+const persistDismissal = (): void => {
   document.cookie = `${DISMISS_COOKIE}=1; path=/; max-age=${DISMISS_MAX_AGE_SECONDS}; samesite=lax`;
-}
+};
 
-function isIosSafari(): boolean {
+const isIosSafari = (): boolean => {
   const ua = navigator.userAgent;
 
   // iPadOS 13+ reports a desktop ("MacIntel") UA, so fall back to touch points.
@@ -41,14 +40,14 @@ function isIosSafari(): boolean {
   // Exclude the in-app/third-party browsers that advertise their own token.
   const isOtherBrowser = /crios|fxios|edgios|opt\//i.test(ua);
   return !isOtherBrowser;
-}
+};
 
-function isStandalone(): boolean {
+const isStandalone = (): boolean => {
   const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
   return iosStandalone || globalThis.matchMedia('(display-mode: standalone)').matches;
-}
+};
 
-export function IosInstallPrompt(): React.ReactElement | null {
+export const IosInstallPrompt = (): React.ReactElement | null => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -97,4 +96,4 @@ export function IosInstallPrompt(): React.ReactElement | null {
       </div>
     </div>
   );
-}
+};

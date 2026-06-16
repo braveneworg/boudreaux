@@ -37,7 +37,7 @@ const requestMeta = (
  * Compose outside other decorators so it observes their responses too:
  * `export const GET = withLogging('RELEASES')(withAuth(handler))`
  */
-export function withLogging<TParams = unknown>(moduleName: string) {
+export const withLogging = <TParams = unknown>(moduleName: string) => {
   const logger = createLogger(moduleName);
 
   return (handler: LoggedHandler<TParams>): LoggedHandler<TParams> => {
@@ -63,7 +63,7 @@ export function withLogging<TParams = unknown>(moduleName: string) {
         }
       });
   };
-}
+};
 
 interface ActionLogContext {
   /** Acting user, when known */
@@ -83,12 +83,12 @@ interface ActionLogContext {
  *   ...
  * });
  */
-export async function logAction<TResult>(
+export const logAction = async <TResult>(
   moduleName: string,
   actionName: string,
   context: ActionLogContext,
   action: () => Promise<TResult>
-): Promise<TResult> {
+): Promise<TResult> => {
   const logger = createLogger(moduleName);
 
   // Server Actions have no Request to read a proxy header from — mint an id
@@ -119,4 +119,4 @@ export async function logAction<TResult>(
       throw error;
     }
   });
-}
+};

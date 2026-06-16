@@ -27,7 +27,7 @@ interface TextFieldProps<
   disabled?: boolean;
 }
 
-export function TextField<
+export const TextField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -42,7 +42,7 @@ export function TextField<
   setValue,
   value = '',
   disabled = false,
-}: TextFieldProps<TFieldValues, TName>) {
+}: TextFieldProps<TFieldValues, TName>) => {
   useEffect(() => {
     if (setValue && value) {
       setValue(name, value as TFieldValues[TName], {
@@ -82,4 +82,4 @@ export function TextField<
       )}
     />
   );
-}
+};

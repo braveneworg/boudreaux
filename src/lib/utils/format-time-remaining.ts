@@ -19,7 +19,7 @@
  *
  * Feature: 007-free-digital-downloads (US2, T052).
  */
-export function formatTimeRemaining(deltaMs: number): string {
+export const formatTimeRemaining = (deltaMs: number): string => {
   if (!Number.isFinite(deltaMs) || deltaMs <= 0) {
     return '0s';
   }
@@ -36,4 +36,4 @@ export function formatTimeRemaining(deltaMs: number): string {
     return `${totalMinutes}m`;
   }
   return `${totalSeconds}s`;
-}
+};

@@ -44,7 +44,7 @@ vi.mock('@radix-ui/react-slider', () => {
     [key: string]: unknown;
   }
 
-  function MockRoot({
+  const MockRoot = ({
     children,
     className,
     defaultValue,
@@ -56,7 +56,7 @@ vi.mock('@radix-ui/react-slider', () => {
     disabled,
     onValueChange,
     ...props
-  }: MockRootProps) {
+  }: MockRootProps) => {
     const initial = value ?? defaultValue ?? [min, max];
     const [values, setValues] = React.useState<number[]>(initial);
     const thumbIndexRef = React.useRef(0);
@@ -76,23 +76,19 @@ vi.mock('@radix-ui/react-slider', () => {
         </SliderContext.Provider>
       </span>
     );
-  }
+  };
 
-  function MockTrack({
+  const MockTrack = ({
     children,
     ...props
   }: {
     children?: React.ReactNode;
     [key: string]: unknown;
-  }) {
-    return <span {...props}>{children}</span>;
-  }
+  }) => <span {...props}>{children}</span>;
 
-  function MockRange(props: Record<string, unknown>) {
-    return <span {...props} />;
-  }
+  const MockRange = (props: Record<string, unknown>) => <span {...props} />;
 
-  function MockThumb(props: Record<string, unknown>) {
+  const MockThumb = (props: Record<string, unknown>) => {
     const ctx = React.useContext(SliderContext);
     const [myIndex] = React.useState(() => ctx.thumbIndexRef.current++);
 
@@ -136,7 +132,7 @@ vi.mock('@radix-ui/react-slider', () => {
         {...props}
       />
     );
-  }
+  };
 
   return { Root: MockRoot, Track: MockTrack, Range: MockRange, Thumb: MockThumb };
 });

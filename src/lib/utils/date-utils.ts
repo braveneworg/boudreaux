@@ -9,24 +9,24 @@
 /**
  * Format a date as "MMM D, YYYY" (e.g., "Mar 15, 2026")
  */
-export function formatTourDate(date: Date | string): string {
+export const formatTourDate = (date: Date | string): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-}
+};
 
 /**
  * Format a date range for tour display
  * If same day: "Mar 15, 2026"
  * If different days: "Mar 15 - 17, 2026" (same month) or "Mar 15 - Apr 2, 2026" (different months)
  */
-export function formatTourDateRange(
+export const formatTourDateRange = (
   startDate: Date | string,
   endDate?: Date | string | null
-): string {
+): string => {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
 
   if (!endDate) {
@@ -65,28 +65,28 @@ export function formatTourDateRange(
 
   // Different years
   return `${formatTourDate(start)} - ${formatTourDate(end)}`;
-}
+};
 
 /**
  * Format time as "h:mm AM/PM" (e.g., "8:00 PM")
  */
-export function formatShowTime(time: Date | string): string {
+export const formatShowTime = (time: Date | string): string => {
   const t = typeof time === 'string' ? new Date(time) : time;
   return t.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   });
-}
+};
 
 /**
  * Format time range for show display
  * "8:00 PM - 11:00 PM" or just "8:00 PM" if no end time
  */
-export function formatShowTimeRange(
+export const formatShowTimeRange = (
   startTime: Date | string,
   endTime?: Date | string | null
-): string {
+): string => {
   const formattedStart = formatShowTime(startTime);
 
   if (!endTime) {
@@ -95,56 +95,52 @@ export function formatShowTimeRange(
 
   const formattedEnd = formatShowTime(endTime);
   return `${formattedStart} - ${formattedEnd}`;
-}
+};
 
 /**
  * Format full tour date and time display
  * "Mar 15, 2026 · 8:00 PM - 11:00 PM"
  */
-export function formatTourDateTime(
+export const formatTourDateTime = (
   startDate: Date | string,
   endDate: Date | string | null | undefined,
   startTime: Date | string,
   endTime?: Date | string | null
-): string {
+): string => {
   const dateStr = formatTourDateRange(startDate, endDate);
   const timeStr = formatShowTimeRange(startTime, endTime);
   return `${dateStr} · ${timeStr}`;
-}
+};
 
 /**
  * Check if a tour date is in the past
  */
-export function isTourDatePast(date: Date | string): boolean {
+export const isTourDatePast = (date: Date | string): boolean => {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d < new Date();
-}
+};
 
 /**
  * Check if a tour date is upcoming (in the future)
  */
-export function isTourDateUpcoming(date: Date | string): boolean {
-  return !isTourDatePast(date);
-}
+export const isTourDateUpcoming = (date: Date | string): boolean => !isTourDatePast(date);
 
 /**
  * Sort tours by start date (most recent first)
  */
-export function sortToursByStartDateDesc<T extends { startDate: Date | string }>(tours: T[]): T[] {
-  return [...tours].sort((a, b) => {
+export const sortToursByStartDateDesc = <T extends { startDate: Date | string }>(tours: T[]): T[] =>
+  [...tours].sort((a, b) => {
     const dateA = typeof a.startDate === 'string' ? new Date(a.startDate) : a.startDate;
     const dateB = typeof b.startDate === 'string' ? new Date(b.startDate) : b.startDate;
     return dateB.getTime() - dateA.getTime();
   });
-}
 
 /**
  * Sort tours by start date (oldest first)
  */
-export function sortToursByStartDateAsc<T extends { startDate: Date | string }>(tours: T[]): T[] {
-  return [...tours].sort((a, b) => {
+export const sortToursByStartDateAsc = <T extends { startDate: Date | string }>(tours: T[]): T[] =>
+  [...tours].sort((a, b) => {
     const dateA = typeof a.startDate === 'string' ? new Date(a.startDate) : a.startDate;
     const dateB = typeof b.startDate === 'string' ? new Date(b.startDate) : b.startDate;
     return dateA.getTime() - dateB.getTime();
   });
-}

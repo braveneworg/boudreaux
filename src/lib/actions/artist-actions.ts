@@ -12,7 +12,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 
 import type { Prisma } from '@prisma/client';
 
-export async function createArtistAction(artist: Artist): Promise<ServiceResponse<Artist>> {
+export const createArtistAction = async (artist: Artist): Promise<ServiceResponse<Artist>> => {
   try {
     await requireRole('admin');
     const { images, urls, labels: _labels, releases: _releases, ...artistData } = artist;
@@ -44,4 +44,4 @@ export async function createArtistAction(artist: Artist): Promise<ServiceRespons
     console.error('Error creating artist:', error);
     return { success: false, error: 'Failed to create artist' };
   }
-}
+};

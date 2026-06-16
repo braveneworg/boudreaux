@@ -141,9 +141,8 @@ export type FreeFormatType = (typeof FREE_FORMAT_TYPES)[number];
 /**
  * Type guard: is a format type eligible for free download?
  */
-export function isFreeFormatType(formatType: DigitalFormatType): formatType is FreeFormatType {
-  return (FREE_FORMAT_TYPES as ReadonlyArray<DigitalFormatType>).includes(formatType);
-}
+export const isFreeFormatType = (formatType: DigitalFormatType): formatType is FreeFormatType =>
+  (FREE_FORMAT_TYPES as ReadonlyArray<DigitalFormatType>).includes(formatType);
 
 /**
  * S3 key pattern generator utility
@@ -154,19 +153,17 @@ export function isFreeFormatType(formatType: DigitalFormatType): formatType is F
  * @param extension - File extension (mp3, flac, wav, aac)
  * @returns S3 object key in the format: releases/{releaseId}/digital-formats/{formatType}/{fileId}.{ext}
  */
-export function generateS3Key(
+export const generateS3Key = (
   releaseId: string,
   formatType: DigitalFormatType,
   fileId: string,
   extension: string
-): string {
-  return `releases/${releaseId}/digital-formats/${formatType}/${fileId}.${extension}`;
-}
+): string => `releases/${releaseId}/digital-formats/${formatType}/${fileId}.${extension}`;
 
 /**
  * Get file extension from format type
  */
-export function getFileExtensionForFormat(formatType: DigitalFormatType): string {
+export const getFileExtensionForFormat = (formatType: DigitalFormatType): string => {
   const extensionMap: Record<DigitalFormatType, string> = {
     MP3_V0: 'mp3',
     MP3_320KBPS: 'mp3',
@@ -178,14 +175,13 @@ export function getFileExtensionForFormat(formatType: DigitalFormatType): string
     AIFF: 'aiff',
   };
   return extensionMap[formatType];
-}
+};
 
 /**
  * Get default MIME type for format (first in allowlist)
  */
-export function getDefaultMimeType(formatType: DigitalFormatType): string {
-  return FORMAT_MIME_TYPES[formatType][0];
-}
+export const getDefaultMimeType = (formatType: DigitalFormatType): string =>
+  FORMAT_MIME_TYPES[formatType][0];
 
 /**
  * Human-readable labels for digital format types

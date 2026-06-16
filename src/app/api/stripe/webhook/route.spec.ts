@@ -105,7 +105,7 @@ vi.mock('@/lib/services/user-service', () => ({
 
 const WEBHOOK_SECRET = 'whsec_test_secret';
 
-function createRequest(body: string, signature: string | null = 'sig_test'): NextRequest {
+const createRequest = (body: string, signature: string | null = 'sig_test'): NextRequest => {
   const headers = new Headers({ 'content-type': 'application/json' });
   if (signature) {
     headers.set('stripe-signature', signature);
@@ -115,7 +115,7 @@ function createRequest(body: string, signature: string | null = 'sig_test'): Nex
     body,
     headers,
   });
-}
+};
 
 describe('POST /api/stripe/webhook', () => {
   beforeEach(() => {

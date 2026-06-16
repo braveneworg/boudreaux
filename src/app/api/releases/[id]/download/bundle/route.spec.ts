@@ -226,8 +226,8 @@ vi.mock('archiver', () => ({
   },
 }));
 
-function makeRequest(formats = 'FLAC,WAV'): NextRequest {
-  return new NextRequest(
+const makeRequest = (formats = 'FLAC,WAV'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}`,
     {
       headers: {
@@ -236,10 +236,9 @@ function makeRequest(formats = 'FLAC,WAV'): NextRequest {
       },
     }
   );
-}
 
-function makeJsonRequest(formats = 'FLAC,WAV'): NextRequest {
-  return new NextRequest(
+const makeJsonRequest = (formats = 'FLAC,WAV'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=json`,
     {
       headers: {
@@ -248,15 +247,12 @@ function makeJsonRequest(formats = 'FLAC,WAV'): NextRequest {
       },
     }
   );
-}
 
-function makeParams(id = '507f1f77bcf86cd799439011') {
-  return { params: Promise.resolve({ id }) };
-}
+const makeParams = (id = '507f1f77bcf86cd799439011') => ({ params: Promise.resolve({ id }) });
 
-async function readSSEEvents(
+const readSSEEvents = async (
   response: Response
-): Promise<Array<{ event: string; data: Record<string, unknown> }>> {
+): Promise<Array<{ event: string; data: Record<string, unknown> }>> => {
   const text = await response.text();
   const events: Array<{ event: string; data: Record<string, unknown> }> = [];
   const blocks = text.split('\n\n');
@@ -273,7 +269,7 @@ async function readSSEEvents(
     }
   }
   return events;
-}
+};
 
 describe('GET /api/releases/[id]/download/bundle', () => {
   beforeEach(() => {
@@ -1607,8 +1603,8 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 });
 
-function makeStreamRequest(formats = 'FLAC,WAV'): NextRequest {
-  return new NextRequest(
+const makeStreamRequest = (formats = 'FLAC,WAV'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=stream`,
     {
       headers: {
@@ -1617,21 +1613,20 @@ function makeStreamRequest(formats = 'FLAC,WAV'): NextRequest {
       },
     }
   );
-}
 
-async function flushMicrotasks(): Promise<void> {
+const flushMicrotasks = async (): Promise<void> => {
   // Let queued microtasks (fire-and-forget cache-upload `.then` chains) settle.
   for (let i = 0; i < 5; i++) {
     await Promise.resolve();
   }
-}
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 007-free-digital-downloads — mode='free' guest flow
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeFreeRequest(formats = 'MP3_320KBPS,AAC'): NextRequest {
-  return new NextRequest(
+const makeFreeRequest = (formats = 'MP3_320KBPS,AAC'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&mode=free`,
     {
       headers: {
@@ -1641,7 +1636,6 @@ function makeFreeRequest(formats = 'MP3_320KBPS,AAC'): NextRequest {
       },
     }
   );
-}
 
 describe('GET /api/releases/[id]/download/bundle (mode=free)', () => {
   beforeEach(() => {
@@ -2400,19 +2394,17 @@ describe('GET /api/releases/[id]/download/bundle — preflight (respond=prefligh
 // SSE archiver error listeners, web-stream cancel, redirect archive-error pipe.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeFreeJsonRequest(formats = 'MP3_320KBPS'): NextRequest {
-  return new NextRequest(
+const makeFreeJsonRequest = (formats = 'MP3_320KBPS'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=json&mode=free`,
     { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
   );
-}
 
-function makeFreeStreamRequest(formats = 'MP3_320KBPS'): NextRequest {
-  return new NextRequest(
+const makeFreeStreamRequest = (formats = 'MP3_320KBPS'): NextRequest =>
+  new NextRequest(
     `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=stream&mode=free`,
     { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
   );
-}
 
 describe('GET /api/releases/[id]/download/bundle — additional branch coverage', () => {
   beforeEach(() => {

@@ -467,7 +467,7 @@ const createSampleDigitalFormats = async () => {
   console.info('✅ Sample digital formats created successfully.');
 };
 
-async function main() {
+const main = async () => {
   // Check for --drop-database flag
   const shouldDropDatabase = process.argv.includes('--drop-database');
   const isProduction = process.env.NODE_ENV === 'production';
@@ -534,7 +534,7 @@ async function main() {
 
     console.info('✅ Development database seeded.');
   }
-}
+};
 
 main()
   .catch((e) => {

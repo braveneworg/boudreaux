@@ -27,16 +27,14 @@ vi.mock('./banner-notification-strip', () => ({
   ),
 }));
 
-function bannerWith(slot: number, content: string | null): BannerSlotData {
-  return {
-    slotNumber: slot,
-    imageFilename: `banner-${slot}.jpg`,
-    notification:
-      content === null
-        ? null
-        : { id: `n${slot}`, content, textColor: '#fff', backgroundColor: '#000' },
-  };
-}
+const bannerWith = (slot: number, content: string | null): BannerSlotData => ({
+  slotNumber: slot,
+  imageFilename: `banner-${slot}.jpg`,
+  notification:
+    content === null
+      ? null
+      : { id: `n${slot}`, content, textColor: '#fff', backgroundColor: '#000' },
+});
 
 const TWO_NOTIFS: BannerSlotData[] = [bannerWith(1, 'First'), bannerWith(2, 'Second')];
 

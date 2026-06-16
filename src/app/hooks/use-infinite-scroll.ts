@@ -31,7 +31,7 @@ export interface UseInfiniteScrollOptions {
  * @param ref - Ref to the sentinel element rendered at the end of the list.
  * @param options - Paging state and behavior — see {@link UseInfiniteScrollOptions}.
  */
-export function useInfiniteScroll(
+export const useInfiniteScroll = (
   ref: RefObject<HTMLElement | null>,
   {
     hasNextPage,
@@ -40,7 +40,7 @@ export function useInfiniteScroll(
     rootMargin = '200px',
     enabled = true,
   }: UseInfiniteScrollOptions
-): void {
+): void => {
   useEffect(() => {
     // SSR / non-DOM environments have no IntersectionObserver.
     if (typeof globalThis.IntersectionObserver === 'undefined') return;
@@ -60,4 +60,4 @@ export function useInfiniteScroll(
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [ref, hasNextPage, isFetchingNextPage, fetchNextPage, rootMargin, enabled]);
-}
+};

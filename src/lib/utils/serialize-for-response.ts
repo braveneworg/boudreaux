@@ -6,13 +6,13 @@ const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE = BigInt(Number.MIN_SAFE_INTEGER);
 
 /** True for `{}`-style objects only — Date and other class instances are left intact. */
-function isPlainObject(value: object): boolean {
+const isPlainObject = (value: object): boolean => {
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
-}
+};
 
 /** Single-pass deep clone that converts every BigInt it encounters. */
-function convertBigInts(value: unknown): unknown {
+const convertBigInts = (value: unknown): unknown => {
   if (typeof value === 'bigint') {
     // Numbers outside the safe-integer range lose precision as `number`, so
     // emit them as a decimal string; the client coerces both forms back with
@@ -33,7 +33,7 @@ function convertBigInts(value: unknown): unknown {
   }
 
   return value;
-}
+};
 
 /**
  * Convert BigInt values so the payload survives JSON serialization. Unlike a
@@ -42,6 +42,4 @@ function convertBigInts(value: unknown): unknown {
  * serializer — `NextResponse.json` on API routes, the RSC boundary on pages —
  * to handle.
  */
-export function serializeForResponse<T>(data: T): T {
-  return convertBigInts(data) as T;
-}
+export const serializeForResponse = <T>(data: T): T => convertBigInts(data) as T;

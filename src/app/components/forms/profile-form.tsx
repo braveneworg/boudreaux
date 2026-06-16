@@ -44,7 +44,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export function ProfileForm() {
+export const ProfileForm = () => {
   const [formState, profileFormAction, isPending] = useActionState(
     updateProfileAction,
     initialFormState
@@ -662,4 +662,4 @@ export function ProfileForm() {
       </Card>
     </>
   );
-}
+};

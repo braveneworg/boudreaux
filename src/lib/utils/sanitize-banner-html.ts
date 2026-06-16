@@ -29,6 +29,5 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
  * `banner-notification-schema.ts` runs only on the admin preview before
  * submission and is a defense-in-depth layer, not the source of truth.
  */
-export function sanitizeBannerHtmlServer(html: string): string {
-  return sanitizeHtml(html, SANITIZE_OPTIONS).trim();
-}
+export const sanitizeBannerHtmlServer = (html: string): string =>
+  sanitizeHtml(html, SANITIZE_OPTIONS).trim();

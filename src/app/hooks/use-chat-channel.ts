@@ -59,14 +59,14 @@ type PresenceMembersSnapshot = {
  * The channel is left open on unmount only if disabled; otherwise we
  * unsubscribe to release the free-tier connection back to the pool.
  */
-export function useChatChannel({
+export const useChatChannel = ({
   enabled,
   onNewMessage,
   onReactionUpdated,
   onMessageDeleted,
   onMessagePinChanged,
   onTyping,
-}: UseChatChannelParams) {
+}: UseChatChannelParams) => {
   const [members, setMembers] = useState<PresenceMember[]>([]);
 
   const channelRef = useRef<PresenceChannel | null>(null);
@@ -158,4 +158,4 @@ export function useChatChannel({
   }, []);
 
   return { members, sendTyping };
-}
+};

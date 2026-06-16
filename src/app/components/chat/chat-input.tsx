@@ -52,14 +52,14 @@ const newTempId = (): string => `tmp-${Date.now()}-${Math.random().toString(36).
  * not currently inside a mention token — e.g. after a space, inside an
  * email address, or with no `@` to the left of the caret.
  */
-function findActiveMentionToken(
+const findActiveMentionToken = (
   value: string,
   caret: number
 ): {
   start: number;
   end: number;
   query: string;
-} | null {
+} | null => {
   const before = value.slice(0, caret);
   const atIndex = before.lastIndexOf('@');
   if (atIndex === -1) return null;
@@ -75,7 +75,7 @@ function findActiveMentionToken(
   // Only the conservative username charset is allowed.
   if (tokenPart.length > 0 && !/^[A-Za-z0-9_.-]+$/.test(tokenPart)) return null;
   return { start: atIndex, end: caret, query: tokenPart };
-}
+};
 
 /**
  * Auto-growing chat composer. Uses CSS `field-sizing: content` where

@@ -4,7 +4,7 @@
 
 import type { LoginVerificationEmailData } from './login-verification-email-html';
 
-export function buildLoginVerificationEmailText(data: LoginVerificationEmailData): string {
+export const buildLoginVerificationEmailText = (data: LoginVerificationEmailData): string => {
   const greeting = data.isNewUser ? 'Welcome to Fake Four Inc.!' : 'Welcome back!';
 
   const message = data.isNewUser
@@ -28,4 +28,4 @@ If you did not request this email, you can safely ignore it.
 
 — Fake Four Inc.
 fakefourrecords.com`;
-}
+};

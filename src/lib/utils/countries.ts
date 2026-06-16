@@ -253,12 +253,10 @@ export const COUNTRIES = [
 ];
 
 // Helper function to get country name by code
-export function getCountryName(code: string): string {
+export const getCountryName = (code: string): string => {
   const country = COUNTRIES.find((c) => c.code === code);
   return country?.name || code;
-}
+};
 
 // Helper function to get default country (United States)
-export function getDefaultCountry(): string {
-  return 'US';
-}
+export const getDefaultCountry = (): string => 'US';

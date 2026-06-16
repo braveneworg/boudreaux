@@ -25,7 +25,7 @@ interface SendChatMentionEmailInput {
  * the caller (ChatMentionService) is responsible for releasing the
  * Redis throttle slot on failure so subsequent mentions can retry.
  */
-export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Promise<boolean> {
+export const sendChatMentionEmail = async (input: SendChatMentionEmailInput): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     console.error('[sendChatMentionEmail] EMAIL_FROM is not configured');
@@ -95,4 +95,4 @@ export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Pr
     console.error(`Failed to send chat mention email to ${input.toEmail}:`, error);
     throw error;
   }
-}
+};

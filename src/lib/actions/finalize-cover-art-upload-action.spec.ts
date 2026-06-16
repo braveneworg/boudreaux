@@ -42,9 +42,10 @@ interface FakeS3Object {
   Key: string;
 }
 
-function listResponse(keys: string[]) {
-  return { Contents: keys.map((Key) => ({ Key }) as FakeS3Object), IsTruncated: false };
-}
+const listResponse = (keys: string[]) => ({
+  Contents: keys.map((Key) => ({ Key }) as FakeS3Object),
+  IsTruncated: false,
+});
 
 const RELEASE_ID = '69d473d0aed0e7b1d16243ac';
 

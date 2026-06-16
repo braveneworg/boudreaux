@@ -29,9 +29,8 @@ vi.mock('@/lib/repositories/download-event-repository', () => {
 const releaseId = 'release-abc123';
 const context = { params: Promise.resolve({ id: releaseId }) };
 
-function createRequest(url: string): NextRequest {
-  return new NextRequest(new URL(url, 'http://localhost:3000'));
-}
+const createRequest = (url: string): NextRequest =>
+  new NextRequest(new URL(url, 'http://localhost:3000'));
 
 describe('GET /api/releases/[id]/download-analytics', () => {
   beforeEach(() => {

@@ -23,7 +23,7 @@ import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-clo
  * await invalidateCloudFrontPaths(["/audio/ceschi/track123.mp3"]);
  * ```
  */
-export async function invalidateCloudFrontPaths(paths: string[]): Promise<void> {
+export const invalidateCloudFrontPaths = async (paths: string[]): Promise<void> => {
   const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
   if (!distributionId) {
@@ -50,4 +50,4 @@ export async function invalidateCloudFrontPaths(paths: string[]): Promise<void> 
       },
     })
   );
-}
+};

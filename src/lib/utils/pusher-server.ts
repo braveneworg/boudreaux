@@ -22,7 +22,7 @@ let cachedPusher: Pusher | null = null;
  * Singleton accessor for the server-side Pusher SDK. Lazy-initialized so
  * a missing config in build/test environments does not crash module load.
  */
-export function getPusherServer(): Pusher {
+export const getPusherServer = (): Pusher => {
   if (cachedPusher) return cachedPusher;
 
   const { PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER } = process.env;
@@ -41,7 +41,7 @@ export function getPusherServer(): Pusher {
     useTLS: true,
   });
   return cachedPusher;
-}
+};
 
 /**
  * Hard ceiling on how long we wait for Pusher's REST API before giving
@@ -58,7 +58,7 @@ const PUSHER_TRIGGER_TIMEOUT_MS = 3000;
  * Pusher outage cannot crash the calling Server Action — the message
  * is still persisted; clients will see it on the next fetch.
  */
-export async function triggerChatEvent(event: string, payload: unknown): Promise<void> {
+export const triggerChatEvent = async (event: string, payload: unknown): Promise<void> => {
   // E2E web server doesn't have Pusher credentials. Persistence still
   // happens; we just skip the broadcast so the unit-tested paths work
   // end-to-end without requiring real Pusher infra.
@@ -76,9 +76,9 @@ export async function triggerChatEvent(event: string, payload: unknown): Promise
   } catch (error) {
     console.error('Pusher trigger failed', { event, error });
   }
-}
+};
 
 /** Reset the singleton — testing aid only. */
-export function resetPusherServerForTesting(): void {
+export const resetPusherServerForTesting = (): void => {
   cachedPusher = null;
-}
+};

@@ -27,9 +27,9 @@ interface SendAbuseReportNotificationInput {
  * Reporter identity is NEVER passed to this function — by construction,
  * the function cannot leak what it does not receive.
  */
-export async function sendAbuseReportNotificationEmail(
+export const sendAbuseReportNotificationEmail = async (
   input: SendAbuseReportNotificationInput
-): Promise<boolean> {
+): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     console.error('[sendAbuseReportNotificationEmail] EMAIL_FROM is not configured');
@@ -90,4 +90,4 @@ export async function sendAbuseReportNotificationEmail(
     console.error(`Failed to send abuse-report notification email to ${input.toEmail}:`, error);
     throw error;
   }
-}
+};

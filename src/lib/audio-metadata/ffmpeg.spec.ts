@@ -36,7 +36,7 @@ vi.mock('node:child_process', () => ({
 const waitFor = <T>(cb: () => T | Promise<T>): Promise<T> =>
   vi.waitFor(cb, { interval: 0, timeout: 1000 });
 
-function createMockProcess(): ChildProcess {
+const createMockProcess = (): ChildProcess => {
   const proc = new EventEmitter() as ChildProcess;
   proc.stderr = new Readable({
     read() {
@@ -44,16 +44,16 @@ function createMockProcess(): ChildProcess {
     },
   });
   return proc;
-}
+};
 
 /**
  * Creates a mock ffprobe process that returns the given tags as JSON.
  * Emits close(0) after stdout has been fully consumed.
  */
-function createMockProbeProcess(tags: {
+const createMockProbeProcess = (tags: {
   formatTags?: Record<string, string>;
   streamTags?: Record<string, string>;
-}): ChildProcess {
+}): ChildProcess => {
   const proc = new EventEmitter() as ChildProcess;
   const output = {
     format: tags.formatTags ? { tags: tags.formatTags } : {},
@@ -70,12 +70,12 @@ function createMockProbeProcess(tags: {
   // Emit close after stdout ends so data events are delivered first
   proc.stdout.on('end', () => queueMicrotask(() => proc.emit('close', 0)));
   return proc;
-}
+};
 
 /**
  * Creates a mock ffprobe process that fails (non-zero exit).
  */
-function createFailingProbeProcess(): ChildProcess {
+const createFailingProbeProcess = (): ChildProcess => {
   const proc = new EventEmitter() as ChildProcess;
   proc.stdout = new Readable({
     read() {
@@ -85,15 +85,15 @@ function createFailingProbeProcess(): ChildProcess {
   proc.stderr = null as unknown as Readable;
   queueMicrotask(() => proc.emit('close', 1));
   return proc;
-}
+};
 
 /**
  * Sets up mockSpawn so the first call (ffprobe) returns probeProc
  * and the second call (ffmpeg) returns ffmpegProc.
  */
-function setupSpawnSequence(probeProc: ChildProcess, ffmpegProc: ChildProcess) {
+const setupSpawnSequence = (probeProc: ChildProcess, ffmpegProc: ChildProcess) => {
   mockSpawn.mockReturnValueOnce(probeProc).mockReturnValueOnce(ffmpegProc);
-}
+};
 
 describe('writeTagViaFfmpeg', () => {
   beforeEach(() => {

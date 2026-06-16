@@ -18,10 +18,10 @@
  */
 export const DEFAULT_INLINE_DATA_URI_LIMIT = 256;
 
-export function stripInlineImageDataUris<T>(
+export const stripInlineImageDataUris = <T>(
   value: T,
   maxLen: number = DEFAULT_INLINE_DATA_URI_LIMIT
-): T {
+): T => {
   if (typeof value === 'string') {
     if (value.length > maxLen && value.startsWith('data:')) {
       return null as T;
@@ -39,4 +39,4 @@ export function stripInlineImageDataUris<T>(
     return out as T;
   }
   return value;
-}
+};

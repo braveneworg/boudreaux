@@ -15,12 +15,11 @@
  * @param input - The string to slugify (e.g., a display name or full name)
  * @returns A lowercase, dash-separated slug (e.g., "john-doe")
  */
-export function generateSlug(input: string): string {
-  return input
+export const generateSlug = (input: string): string =>
+  input
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-}

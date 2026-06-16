@@ -43,7 +43,7 @@ interface ComboboxFieldProps<
   setValue?: UseFormSetValue<TFieldValues>;
 }
 
-export function ComboboxField<
+export const ComboboxField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -57,7 +57,7 @@ export function ComboboxField<
   popoverWidth = 'w-[300px]',
   onUserInteraction,
   setValue,
-}: ComboboxFieldProps<TFieldValues, TName>) {
+}: ComboboxFieldProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -171,4 +171,4 @@ export function ComboboxField<
       )}
     />
   );
-}
+};

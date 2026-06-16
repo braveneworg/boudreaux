@@ -6,10 +6,12 @@
  * @param fullName - The full name to split
  * @returns Object with firstName and lastName
  */
-export function splitFullName(fullName: string | null | undefined): {
+export const splitFullName = (
+  fullName: string | null | undefined
+): {
   firstName: string;
   lastName: string;
-} {
+} => {
   if (!fullName) {
     return { firstName: '', lastName: '' };
   }
@@ -31,14 +33,14 @@ export function splitFullName(fullName: string | null | undefined): {
   const lastName = names.slice(1).join(' ');
 
   return { firstName, lastName };
-}
+};
 
 /**
  * Formats a phone number for display
  * @param phone - The phone number to format
  * @returns Formatted phone number or empty string
  */
-export function formatPhoneNumber(phone: string | null | undefined): string {
+export const formatPhoneNumber = (phone: string | null | undefined): string => {
   if (!phone) return '';
 
   // Remove all non-digits
@@ -55,4 +57,4 @@ export function formatPhoneNumber(phone: string | null | undefined): string {
 
   // Return original if we can't format
   return phone;
-}
+};

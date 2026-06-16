@@ -67,19 +67,19 @@ const mockFormats = [
   { formatType: 'WAV' as const, fileName: 'album-wav.zip' },
 ];
 
-function mockFetchFormats(formats: Array<{ formatType: string; fileName: string }>) {
+const mockFetchFormats = (formats: Array<{ formatType: string; fileName: string }>) => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve({ formats }),
   });
-}
+};
 
-function mockFetchFailure() {
+const mockFetchFailure = () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: false,
     json: () => Promise.resolve({ error: 'Not found' }),
   });
-}
+};
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -49,7 +49,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
+export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
   const [content, setContent] = useState(slot.notification?.content ?? '');
   const [textColor, setTextColor] = useState(slot.notification?.textColor ?? '#ffffff');
   const [backgroundColor, setBackgroundColor] = useState(
@@ -263,4 +263,4 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
       </form>
     </div>
   );
-}
+};

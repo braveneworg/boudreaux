@@ -71,7 +71,7 @@ interface CoverArtFieldProps<
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-export function CoverArtField<
+export const CoverArtField = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -83,7 +83,7 @@ export function CoverArtField<
   entityType = 'releases',
   entityId,
   onUploadComplete,
-}: CoverArtFieldProps<TFieldValues, TName>) {
+}: CoverArtFieldProps<TFieldValues, TName>) => {
   const [isUploading, setIsUploading] = useState(false);
   const [localPreviewUrl, setLocalPreviewUrl] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -524,4 +524,4 @@ export function CoverArtField<
       )}
     />
   );
-}
+};

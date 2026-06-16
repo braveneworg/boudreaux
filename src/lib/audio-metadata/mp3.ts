@@ -17,11 +17,11 @@ import type { WriteCommentOptions } from './types/audio';
  * node-id3 is preferred over ffmpeg here because ffmpeg does not expose
  * the language and shortText subfields of the COMM frame.
  */
-export async function writeMp3Comment(
+export const writeMp3Comment = async (
   filePath: string,
   comment: string,
   options: WriteCommentOptions = {}
-): Promise<void> {
+): Promise<void> => {
   const { language = 'eng' } = options;
 
   const existingTags = NodeID3.read(filePath);
@@ -39,4 +39,4 @@ export async function writeMp3Comment(
   if (result !== true) {
     throw new Error(`node-id3 failed to write comment to "${filePath}": ${result}`);
   }
-}
+};

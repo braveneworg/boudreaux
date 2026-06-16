@@ -126,11 +126,11 @@ export const cache = new SimpleCache();
  * @param ttlSeconds - Time to live in seconds
  * @returns Cached or fresh data
  */
-export async function withCache<T>(
+export const withCache = async <T>(
   key: string,
   fn: () => Promise<T>,
   ttlSeconds = 3600
-): Promise<T> {
+): Promise<T> => {
   // Try to get from cache
   const cached = cache.get<T>(key);
   if (cached !== null) {
@@ -141,4 +141,4 @@ export async function withCache<T>(
   const result = await fn();
   cache.set(key, result, ttlSeconds);
   return result;
-}
+};

@@ -37,9 +37,9 @@ import type {
  * @param params - Release ID, format type, S3 key, file metadata
  * @returns ActionResult with created format ID
  */
-async function confirmDigitalFormatUploadActionHandler(
+const confirmDigitalFormatUploadActionHandler = async (
   params: UploadConfirmationParams
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string }>> => {
   try {
     // Validate input with Zod schema
     const validationResult = digitalFormatConfirmationSchema.safeParse(params);
@@ -117,18 +117,18 @@ async function confirmDigitalFormatUploadActionHandler(
       error: error instanceof Error ? error.message : 'Failed to confirm upload',
     };
   }
-}
+};
 
 /**
  * Server Action with admin authentication
  * Only admins can confirm uploads
  */
-export async function confirmDigitalFormatUploadAction(
+export const confirmDigitalFormatUploadAction = async (
   params: UploadConfirmationParams
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string }>> => {
   await requireRole('admin');
   return confirmDigitalFormatUploadActionHandler(params);
-}
+};
 
 /**
  * Server Action: Confirm multi-track digital format upload
@@ -137,9 +137,9 @@ export async function confirmDigitalFormatUploadAction(
  * and creates child ReleaseDigitalFormatFile records for each track.
  * If the format already has tracks, they are replaced (full re-upload).
  */
-async function confirmMultiTrackUploadActionHandler(
+const confirmMultiTrackUploadActionHandler = async (
   params: MultiTrackUploadConfirmationParams
-): Promise<ActionResult<{ formatId: string; fileCount: number }>> {
+): Promise<ActionResult<{ formatId: string; fileCount: number }>> => {
   try {
     const validationResult = multiTrackConfirmationSchema.safeParse(params);
 
@@ -197,14 +197,14 @@ async function confirmMultiTrackUploadActionHandler(
       error: error instanceof Error ? error.message : 'Failed to confirm multi-track upload',
     };
   }
-}
+};
 
 /**
  * Server Action with admin authentication for multi-track uploads
  */
-export async function confirmMultiTrackUploadAction(
+export const confirmMultiTrackUploadAction = async (
   params: MultiTrackUploadConfirmationParams
-): Promise<ActionResult<{ formatId: string; fileCount: number }>> {
+): Promise<ActionResult<{ formatId: string; fileCount: number }>> => {
   await requireRole('admin');
   return confirmMultiTrackUploadActionHandler(params);
-}
+};

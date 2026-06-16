@@ -12,7 +12,7 @@
  *
  * We never return http for production to avoid mixed content warnings.
  */
-export function getApiBaseUrl(): string {
+export const getApiBaseUrl = (): string => {
   const isDev = process.env.NODE_ENV === 'development';
 
   // Server-side context
@@ -49,4 +49,4 @@ export function getApiBaseUrl(): string {
     return `https://${hostname}${port ? `:${port}` : ''}`;
   }
   return window.location.origin;
-}
+};

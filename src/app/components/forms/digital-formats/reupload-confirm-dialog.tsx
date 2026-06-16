@@ -23,34 +23,32 @@ interface ReuploadConfirmDialogProps {
   onConfirm: () => void;
 }
 
-export function ReuploadConfirmDialog({
+export const ReuploadConfirmDialog = ({
   formatType,
   isDeleting,
   onCancel,
   onConfirm,
-}: ReuploadConfirmDialogProps) {
-  return (
-    <AlertDialog
-      open={formatType !== null}
-      onOpenChange={(open) => {
-        if (!open) onCancel();
-      }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Re-upload files?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This format already has files uploaded. Re-uploading will permanently delete the
-            existing files and replace them with the new ones. This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
-            {isDeleting ? 'Deleting...' : 'Delete & Re-upload'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+}: ReuploadConfirmDialogProps) => (
+  <AlertDialog
+    open={formatType !== null}
+    onOpenChange={(open) => {
+      if (!open) onCancel();
+    }}
+  >
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Re-upload files?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This format already has files uploaded. Re-uploading will permanently delete the existing
+          files and replace them with the new ones. This action cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+        <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
+          {isDeleting ? 'Deleting...' : 'Delete & Re-upload'}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);

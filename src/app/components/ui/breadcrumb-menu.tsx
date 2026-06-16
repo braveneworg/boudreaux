@@ -28,38 +28,36 @@ type BreadcrumbMenuProps = {
   className?: string;
 };
 
-export function BreadcrumbMenu({ items, className }: BreadcrumbMenuProps) {
-  return (
-    <div className={cn('relative left-5 mt-1 flex items-center gap-2 text-sm', className)}>
-      <Link href="/" className="hover:text-foreground text-zinc-950-foreground transition-colors">
-        <Home className="size-5" />
-        <span className="sr-only">Home</span>
-      </Link>
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          {items.map((item) => (
-            <div key={`${item.url}-${item.anchorText}`} className="contents">
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                {item.isActive ? (
-                  <BreadcrumbPage>
-                    <span className={item.className}>{item.anchorText}</span>
-                  </BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={item.url}>{item.anchorText}</Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </div>
-          ))}
-        </BreadcrumbList>
-      </Breadcrumb>
-    </div>
-  );
-}
+export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
+  <div className={cn('relative left-5 mt-1 flex items-center gap-2 text-sm', className)}>
+    <Link href="/" className="hover:text-foreground text-zinc-950-foreground transition-colors">
+      <Home className="size-5" />
+      <span className="sr-only">Home</span>
+    </Link>
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/">Home</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {items.map((item) => (
+          <div key={`${item.url}-${item.anchorText}`} className="contents">
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {item.isActive ? (
+                <BreadcrumbPage>
+                  <span className={item.className}>{item.anchorText}</span>
+                </BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link href={item.url}>{item.anchorText}</Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </div>
+        ))}
+      </BreadcrumbList>
+    </Breadcrumb>
+  </div>
+);

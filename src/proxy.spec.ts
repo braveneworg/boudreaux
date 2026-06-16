@@ -39,11 +39,11 @@ interface MockNextRequest {
   headers: MockHeaders;
 }
 
-function createMockRequest(
+const createMockRequest = (
   pathname: string,
   callbackUrl: string | null = null,
   headers: Record<string, string> = {}
-): MockNextRequest {
+): MockNextRequest => {
   const searchParams = new URLSearchParams();
   if (callbackUrl) {
     searchParams.set('callbackUrl', callbackUrl);
@@ -59,7 +59,7 @@ function createMockRequest(
       get: (key: string) => headers[key] || null,
     },
   };
-}
+};
 
 describe('proxy middleware', () => {
   beforeEach(() => {

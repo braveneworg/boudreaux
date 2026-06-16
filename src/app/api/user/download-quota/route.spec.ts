@@ -20,9 +20,8 @@ vi.mock('@/lib/services/quota-enforcement-service', () => {
   };
 });
 
-function makeRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/user/download-quota');
-}
+const makeRequest = (): NextRequest =>
+  new NextRequest('http://localhost:3000/api/user/download-quota');
 
 const ctx = { params: Promise.resolve({}) };
 

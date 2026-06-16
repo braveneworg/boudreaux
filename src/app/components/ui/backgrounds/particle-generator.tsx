@@ -121,7 +121,7 @@ const ParticleGenerator = ({
 };
 
 // Demo component with controls
-export function ParticleGeneratorDemo() {
+export const ParticleGeneratorDemo = () => {
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -364,4 +364,4 @@ export function ParticleGeneratorDemo() {
       </div>
     </ContentContainer>
   );
-}
+};

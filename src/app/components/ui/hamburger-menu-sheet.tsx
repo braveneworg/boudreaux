@@ -24,26 +24,24 @@ export interface HamburgerMenuSheetProps {
   children?: React.ReactNode;
 }
 
-export function HamburgerMenuSheet({
+export const HamburgerMenuSheet = ({
   isOpen,
   onOpenChange,
   menuItems,
   children,
-}: HamburgerMenuSheetProps) {
-  return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <div className="size-9">{children}</div>
-      <SheetContent
-        side="right"
-        className="mobile-nav-backdrop pointer-events-auto fixed inset-x-0 top-14 z-200 h-[calc(100vh-48px)] w-screen border-0 bg-zinc-950/95 bg-cover bg-center bg-no-repeat px-8 pt-0 backdrop-blur before:inset-0 sm:max-w-none md:top-36 md:h-[calc(100vh-144px)]"
-        aria-label="Navigation menu"
-      >
-        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-        <SheetDescription className="sr-only">
-          Site navigation links and account actions.
-        </SheetDescription>
-        <MobileMenu menuItems={menuItems} onNavigate={() => onOpenChange(false)} />
-      </SheetContent>
-    </Sheet>
-  );
-}
+}: HamburgerMenuSheetProps) => (
+  <Sheet open={isOpen} onOpenChange={onOpenChange}>
+    <div className="size-9">{children}</div>
+    <SheetContent
+      side="right"
+      className="mobile-nav-backdrop pointer-events-auto fixed inset-x-0 top-14 z-200 h-[calc(100vh-48px)] w-screen border-0 bg-zinc-950/95 bg-cover bg-center bg-no-repeat px-8 pt-0 backdrop-blur before:inset-0 sm:max-w-none md:top-36 md:h-[calc(100vh-144px)]"
+      aria-label="Navigation menu"
+    >
+      <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+      <SheetDescription className="sr-only">
+        Site navigation links and account actions.
+      </SheetDescription>
+      <MobileMenu menuItems={menuItems} onNavigate={() => onOpenChange(false)} />
+    </SheetContent>
+  </Sheet>
+);

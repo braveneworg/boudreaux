@@ -19,7 +19,7 @@ interface FetchApiOptions {
  * Uses getInternalApiUrl() for absolute URLs and optionally forwards
  * cookies from the incoming request for auth-gated endpoints.
  */
-export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
+export const fetchApi = async <T>(path: string, options?: FetchApiOptions): Promise<T> => {
   const url = getInternalApiUrl(path);
   const fetchOptions: globalThis.RequestInit =
     options?.revalidate != null
@@ -41,4 +41,4 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   }
 
   return response.json() as Promise<T>;
-}
+};

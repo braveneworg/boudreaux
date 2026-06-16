@@ -53,7 +53,7 @@ export const ImageService = {
  * The sortOrder seed counts existing rows for the owner and increments per
  * insert; this matches the prior in-action behavior.
  */
-async function registerImages({
+const registerImages = async ({
   ownerKey,
   ownerId,
   images,
@@ -61,7 +61,7 @@ async function registerImages({
   ownerKey: 'artistId' | 'releaseId';
   ownerId: string;
   images: RegisterImageInput[];
-}): Promise<RegisteredImage[]> {
+}): Promise<RegisteredImage[]> => {
   const ownerData = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
   const existing = await ImageRepository.findManyByOwner(ownerData, { id: true });
   const baseSortOrder = existing.length;
@@ -91,4 +91,4 @@ async function registerImages({
   );
 
   return results;
-}
+};

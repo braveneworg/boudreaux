@@ -13,11 +13,11 @@ import { DOWNLOAD_RESET_HOURS } from '@/lib/constants';
  *
  * The result is clamped between 1 and DOWNLOAD_RESET_HOURS (6).
  */
-export function computeResetInHours(lastDownloadedAt: Date | string | null): number | null {
+export const computeResetInHours = (lastDownloadedAt: Date | string | null): number | null => {
   if (!lastDownloadedAt) return null;
   const resetMs = DOWNLOAD_RESET_HOURS * 60 * 60 * 1000;
   const elapsed = Date.now() - new Date(lastDownloadedAt).getTime();
   const remainingMs = resetMs - elapsed;
   if (remainingMs <= 0) return null;
   return Math.min(DOWNLOAD_RESET_HOURS, Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000))));
-}
+};

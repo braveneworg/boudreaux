@@ -69,7 +69,7 @@ const colors = {
   reset: '\x1b[0m',
 };
 
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const tagColor = {
     info: colors.blue,
     success: colors.green,
@@ -80,7 +80,7 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
   if (type === 'error') console.error(line);
   else if (type === 'warning') console.warn(line);
   else console.info(line);
-}
+};
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -106,7 +106,7 @@ const DEFAULT_OPTIONS: CliOptions = {
   help: false,
 };
 
-export function parseArgs(argv: string[]): CliOptions {
+export const parseArgs = (argv: string[]): CliOptions => {
   const opts: CliOptions = { ...DEFAULT_OPTIONS };
 
   for (let i = 0; i < argv.length; i++) {
@@ -129,11 +129,10 @@ export function parseArgs(argv: string[]): CliOptions {
   }
 
   return opts;
-}
+};
 
-export function isDataUri(value: string | null | undefined): value is string {
-  return typeof value === 'string' && value.startsWith('data:');
-}
+export const isDataUri = (value: string | null | undefined): value is string =>
+  typeof value === 'string' && value.startsWith('data:');
 
 export interface ParsedDataUri {
   mimeType: string;
@@ -144,7 +143,7 @@ export interface ParsedDataUri {
  * Decode a `data:<mime>;base64,<payload>` URI into `{ mimeType, buffer }`.
  * Returns `null` if the input isn't a well-formed base64 data URI.
  */
-export function parseDataUri(uri: string): ParsedDataUri | null {
+export const parseDataUri = (uri: string): ParsedDataUri | null => {
   const match = uri.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
   try {
@@ -152,39 +151,38 @@ export function parseDataUri(uri: string): ParsedDataUri | null {
   } catch {
     return null;
   }
-}
+};
 
-export function buildS3Key(model: ModelName, id: string, ext: string): string {
-  return `media/releases/coverart/backfill-${model}-${id}.${ext}`;
-}
+export const buildS3Key = (model: ModelName, id: string, ext: string): string =>
+  `media/releases/coverart/backfill-${model}-${id}.${ext}`;
 
-export function buildCdnUrl(cdnDomain: string, key: string): string {
+export const buildCdnUrl = (cdnDomain: string, key: string): string => {
   const trimmed = cdnDomain.replace(/\/+$/, '');
   return `${trimmed}/${key}`;
-}
+};
 
 /** Extract the S3 object key from a CDN URL, or null if `url` isn't a valid URL. */
-export function extractS3KeyFromCdnUrl(url: string): string | null {
+export const extractS3KeyFromCdnUrl = (url: string): string | null => {
   try {
     return decodeURIComponent(new URL(url).pathname).replace(/^\//, '');
   } catch {
     return null;
   }
-}
+};
 
 /** Lowercase file extension including the leading dot, or '' when absent. */
-export function getFileExtension(value: string): string {
+export const getFileExtension = (value: string): string => {
   // Strip query/hash so `cover.jpg?v=1` returns `.jpg`.
   const cleaned = value.split('?')[0].split('#')[0];
   const dot = cleaned.lastIndexOf('.');
   return dot === -1 ? '' : cleaned.substring(dot).toLowerCase();
-}
+};
 
 /** Swap (or append) `.webp` on an S3 key, preserving the rest of the path. */
-export function swapKeyExtensionToWebp(key: string): string {
+export const swapKeyExtensionToWebp = (key: string): string => {
   const dot = key.lastIndexOf('.');
   return dot === -1 ? `${key}.webp` : `${key.substring(0, dot)}.webp`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Processing
@@ -204,14 +202,14 @@ interface RowResult {
   uploadedKey?: string;
 }
 
-async function downloadObjectFromS3(s3: S3Client, bucket: string, key: string): Promise<Buffer> {
+const downloadObjectFromS3 = async (s3: S3Client, bucket: string, key: string): Promise<Buffer> => {
   const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const stream = response.Body;
   if (!stream) throw new Error(`empty body for ${key}`);
   const chunks: Uint8Array[] = [];
   for await (const chunk of stream as AsyncIterable<Uint8Array>) chunks.push(chunk);
   return Buffer.concat(chunks);
-}
+};
 
 interface SourceImage {
   buffer: Buffer;
@@ -224,10 +222,10 @@ interface SourceImage {
  * value is already a `.webp`, an unsupported format, or otherwise not eligible
  * for transcoding.
  */
-async function resolveSourceImage(
+const resolveSourceImage = async (
   ctx: UploadContext,
   coverArt: string
-): Promise<{ source: SourceImage } | { skip: string }> {
+): Promise<{ source: SourceImage } | { skip: string }> => {
   if (isDataUri(coverArt)) {
     const parsed = parseDataUri(coverArt);
     if (!parsed) return { skip: 'could not parse data URI' };
@@ -253,14 +251,14 @@ async function resolveSourceImage(
     const msg = err instanceof Error ? err.message : 'unknown S3 error';
     return { skip: `S3 download failed: ${msg}` };
   }
-}
+};
 
-async function migrateRow(
+const migrateRow = async (
   ctx: UploadContext,
   model: ModelName,
   row: { id: string; coverArt: string | null },
   prisma: PrismaClient
-): Promise<RowResult> {
+): Promise<RowResult> => {
   const { id, coverArt } = row;
   if (!coverArt) {
     return { id, status: 'skipped', detail: 'no coverArt' };
@@ -335,36 +333,36 @@ async function migrateRow(
     detail: `transcoded ${resolved.source.buffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${cdnUrl}`,
     uploadedKey: key,
   };
-}
+};
 
 /** Simple bounded-parallelism runner. */
-async function mapWithConcurrency<T, R>(
+const mapWithConcurrency = async <T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>
-): Promise<R[]> {
+): Promise<R[]> => {
   const results: R[] = [];
   let index = 0;
-  async function worker(): Promise<void> {
+  const worker = async (): Promise<void> => {
     while (index < items.length) {
       const i = index++;
       results[i] = await fn(items[i]);
     }
-  }
+  };
   const workerCount = Math.min(concurrency, Math.max(1, items.length));
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results;
-}
+};
 
 // ---------------------------------------------------------------------------
 // CloudFront invalidation
 // ---------------------------------------------------------------------------
 
-async function invalidateCloudFront(
+const invalidateCloudFront = async (
   distributionId: string,
   keys: string[],
   region: string
-): Promise<void> {
+): Promise<void> => {
   if (keys.length === 0) return;
   const cloudfront = new CloudFrontClient({ region });
   const paths = keys.map((k) => `/${k}`);
@@ -379,7 +377,7 @@ async function invalidateCloudFront(
     })
   );
   log('CloudFront invalidation initiated', 'success');
-}
+};
 
 // ---------------------------------------------------------------------------
 // Main
@@ -413,7 +411,10 @@ ${colors.yellow}Required env:${colors.reset} S3_BUCKET, DATABASE_URL, AWS_ACCESS
 ${colors.yellow}Optional env:${colors.reset} AWS_REGION (default us-east-1), CLOUDFRONT_DISTRIBUTION_ID, NEXT_PUBLIC_CDN_DOMAIN
 `;
 
-export async function runBackfill(argv: string[], deps?: { prisma?: PrismaClient }): Promise<void> {
+export const runBackfill = async (
+  argv: string[],
+  deps?: { prisma?: PrismaClient }
+): Promise<void> => {
   const opts = parseArgs(argv);
   if (opts.help) {
     console.info(HELP);
@@ -522,7 +523,7 @@ export async function runBackfill(argv: string[], deps?: { prisma?: PrismaClient
   }
 
   if (totalFailed > 0) process.exit(1);
-}
+};
 
 /* istanbul ignore next -- top-level CLI entry */
 if (

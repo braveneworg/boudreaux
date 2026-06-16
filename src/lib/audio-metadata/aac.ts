@@ -12,10 +12,10 @@ import type { WriteCommentOptions } from './types/audio';
  * AAC is delivered in an MP4 container which uses iTunes-style atoms.
  * ffmpeg maps the generic 'comment' key to the ©cmt atom automatically.
  */
-export async function writeAacComment(
+export const writeAacComment = async (
   filePath: string,
   comment: string,
   _options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   await writeTagViaFfmpeg(filePath, 'comment', comment);
-}
+};

@@ -70,7 +70,7 @@ const cleanImageUrl = (url: string): string => {
  * @returns A React component that renders a searchable list view with create, edit, view,
  *   publish, and delete actions for admin entities
  */
-export function DataView<T extends Record<string, unknown>>({
+export const DataView = <T extends Record<string, unknown>>({
   entity,
   data,
   fieldsToShow,
@@ -132,7 +132,7 @@ export function DataView<T extends Record<string, unknown>>({
   showDeleted: boolean;
   /** Called when the "show deleted" toggle changes. */
   onShowDeletedChange: (value: boolean) => void;
-}) {
+}) => {
   const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -685,4 +685,4 @@ export function DataView<T extends Record<string, unknown>>({
       </Dialog>
     </div>
   );
-}
+};

@@ -81,12 +81,13 @@ interface FormRenderResult<T extends FieldValues> extends CustomRenderResult {
 /**
  * Creates a form wrapper component for testing
  */
-function createFormCapture<T extends FieldValues>(
-  capturedFormRef: { current: UseFormReturn<T> | null },
-  defaultValues?: DefaultValues<T>,
-  onSubmit?: SubmitHandler<T>
-) {
-  return function FormCapture({ children }: { children: React.ReactNode }) {
+const createFormCapture =
+  <T extends FieldValues>(
+    capturedFormRef: { current: UseFormReturn<T> | null },
+    defaultValues?: DefaultValues<T>,
+    onSubmit?: SubmitHandler<T>
+  ) =>
+  ({ children }: { children: React.ReactNode }) => {
     const methods = useForm<T>({
       defaultValues,
     });
@@ -100,20 +101,19 @@ function createFormCapture<T extends FieldValues>(
       </FormProvider>
     );
   };
-}
 
 /**
  * Render a component within a form context
  *
  * Useful for testing form fields that require react-hook-form context
  */
-export function renderWithForm<T extends FieldValues = FieldValues>(
+export const renderWithForm = <T extends FieldValues = FieldValues>(
   ui: React.ReactElement,
   options?: {
     defaultValues?: DefaultValues<T>;
     onSubmit?: SubmitHandler<T>;
   } & Omit<RenderOptions, 'wrapper'>
-): FormRenderResult<T> {
+): FormRenderResult<T> => {
   const { defaultValues, onSubmit, ...renderOptions } = options ?? {};
 
   const capturedFormRef: { current: UseFormReturn<T> | null } = { current: null };
@@ -127,7 +127,7 @@ export function renderWithForm<T extends FieldValues = FieldValues>(
     user,
     form: capturedFormRef.current!,
   };
-}
+};
 
 /**
  * Wait for async state updates to complete
@@ -167,13 +167,10 @@ export const createMockChangeEvent = (value: string): React.ChangeEvent<HTMLInpu
 /**
  * Type-safe mock for async functions
  */
-export function createAsyncMock<T>(resolvedValue: T) {
-  return vi.fn().mockResolvedValue(resolvedValue);
-}
+export const createAsyncMock = <T,>(resolvedValue: T) => vi.fn().mockResolvedValue(resolvedValue);
 
 /**
  * Type-safe mock for rejected async functions
  */
-export function createRejectedMock(error: Error | string) {
-  return vi.fn().mockRejectedValue(error instanceof Error ? error : new Error(error));
-}
+export const createRejectedMock = (error: Error | string) =>
+  vi.fn().mockRejectedValue(error instanceof Error ? error : new Error(error));

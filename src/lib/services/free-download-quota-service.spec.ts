@@ -16,8 +16,8 @@ import type { VisitorIdentity } from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 
-function makeRow(overrides?: Partial<VisitorIdentity>): VisitorIdentity {
-  return {
+const makeRow = (overrides?: Partial<VisitorIdentity>): VisitorIdentity =>
+  ({
     id: 'vi-1',
     visitorId: 'visitor-cookie',
     fingerprintHash: 'a'.repeat(64),
@@ -26,8 +26,7 @@ function makeRow(overrides?: Partial<VisitorIdentity>): VisitorIdentity {
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
-  } as VisitorIdentity;
-}
+  }) as VisitorIdentity;
 
 describe('FreeDownloadQuotaService', () => {
   const now = new Date('2026-05-08T12:00:00Z');

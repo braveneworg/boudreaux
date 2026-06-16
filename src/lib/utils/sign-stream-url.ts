@@ -21,7 +21,7 @@ interface StreamSigningConfig {
  * fall back to an unsigned CDN URL in dev / E2E / preview environments
  * where the CloudFront key pair is not provisioned.
  */
-function getStreamSigningConfig(): StreamSigningConfig | null {
+const getStreamSigningConfig = (): StreamSigningConfig | null => {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
   const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
@@ -35,7 +35,7 @@ function getStreamSigningConfig(): StreamSigningConfig | null {
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   return { keyPairId, privateKey, cdnDomain };
-}
+};
 
 /**
  * Generate a CloudFront signed URL for streaming a private S3 object
@@ -52,10 +52,10 @@ function getStreamSigningConfig(): StreamSigningConfig | null {
  * @returns Signed CloudFront URL, or `null` when signing is unconfigured
  *   (caller should fall back to an unsigned CDN URL via `buildCdnUrl`).
  */
-export function signStreamUrl(
+export const signStreamUrl = (
   s3Key: string | null | undefined,
   expiresInSeconds: number = PRESIGNED_URL_EXPIRATION.DOWNLOAD
-): string | null {
+): string | null => {
   if (!s3Key) {
     return null;
   }
@@ -80,4 +80,4 @@ export function signStreamUrl(
     console.error('CloudFront stream signing failed; falling back to unsigned URL:', err);
     return null;
   }
-}
+};

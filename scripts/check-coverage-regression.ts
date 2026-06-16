@@ -36,7 +36,7 @@ interface CoverageMetrics {
  * Read coverage thresholds from vitest.config.ts to ensure consistency
  * Parses the thresholds block to avoid duplication and drift
  */
-function loadThresholdsFromConfig(): CoverageMetrics {
+const loadThresholdsFromConfig = (): CoverageMetrics => {
   const configPath = path.join(process.cwd(), 'vitest.config.ts');
 
   if (!fs.existsSync(configPath)) {
@@ -96,7 +96,7 @@ function loadThresholdsFromConfig(): CoverageMetrics {
     functions: parsedThresholds.functions as number,
     lines: parsedThresholds.lines as number,
   };
-}
+};
 
 const THRESHOLDS: CoverageMetrics = loadThresholdsFromConfig();
 
@@ -109,7 +109,7 @@ const COVERAGE_SUMMARY_FILE = path.join(process.cwd(), 'coverage', 'coverage-sum
 /**
  * Parse the baseline metrics from COVERAGE_METRICS.md
  */
-function parseBaselineMetrics(): CoverageMetrics {
+const parseBaselineMetrics = (): CoverageMetrics => {
   if (!fs.existsSync(METRICS_FILE)) {
     console.error(
       '❌ COVERAGE_METRICS.md not found. Please run tests first to establish a baseline.'
@@ -143,12 +143,12 @@ function parseBaselineMetrics(): CoverageMetrics {
   }
 
   return metrics as CoverageMetrics;
-}
+};
 
 /**
  * Parse the current coverage from coverage-summary.json
  */
-function parseCurrentCoverage(): CoverageMetrics {
+const parseCurrentCoverage = (): CoverageMetrics => {
   if (!fs.existsSync(COVERAGE_SUMMARY_FILE)) {
     console.error('❌ coverage/coverage-summary.json not found.');
     console.error('Please run: pnpm run test:coverage');
@@ -170,12 +170,12 @@ function parseCurrentCoverage(): CoverageMetrics {
     functions: total.functions.pct,
     lines: total.lines.pct,
   };
-}
+};
 
 /**
  * Compare metrics and report any regressions
  */
-function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics): boolean {
+const checkForRegressions = (baseline: CoverageMetrics, current: CoverageMetrics): boolean => {
   const regressions: string[] = [];
   const toleratedDecreases: string[] = [];
 
@@ -254,12 +254,12 @@ function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics
     );
   }
   return true;
-}
+};
 
 /**
  * Update COVERAGE_METRICS.md with new values if coverage improved
  */
-function updateMetricsFile(current: CoverageMetrics): void {
+const updateMetricsFile = (current: CoverageMetrics): void => {
   const content = fs.readFileSync(METRICS_FILE, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
 
@@ -278,12 +278,12 @@ function updateMetricsFile(current: CoverageMetrics): void {
 
   fs.writeFileSync(METRICS_FILE, updatedContent);
   console.info(`📝 Updated COVERAGE_METRICS.md with new baseline (${today})\n`);
-}
+};
 
 /**
  * Main execution
  */
-function main(): void {
+const main = (): void => {
   console.info('🔍 Checking for coverage regression...\n');
 
   const baseline = parseBaselineMetrics();
@@ -303,6 +303,6 @@ function main(): void {
   }
 
   process.exit(passed ? 0 : 1);
-}
+};
 
 main();

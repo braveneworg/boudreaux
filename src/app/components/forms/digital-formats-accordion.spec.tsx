@@ -47,20 +47,18 @@ vi.mock('music-metadata', () => ({
 const mockReleaseId = '507f1f77bcf86cd799439011';
 
 /** Returns a resolved fetch response with JSON body */
-function mockFetchSuccess(s3Key = 'uploads/key') {
-  return vi.fn().mockResolvedValue({
+const mockFetchSuccess = (s3Key = 'uploads/key') =>
+  vi.fn().mockResolvedValue({
     ok: true,
     json: vi.fn().mockResolvedValue({ success: true, s3Key, contentType: 'audio/mpeg' }),
   });
-}
 
 /** Returns a rejected fetch response with a JSON error body */
-function mockFetchError(message = 'Upload failed') {
-  return vi.fn().mockResolvedValue({
+const mockFetchError = (message = 'Upload failed') =>
+  vi.fn().mockResolvedValue({
     ok: false,
     json: vi.fn().mockResolvedValue({ success: false, message }),
   });
-}
 
 describe('DigitalFormatsAccordion', () => {
   beforeEach(() => {

@@ -17,7 +17,7 @@ interface RotationIntervalFormProps {
   currentInterval: number;
 }
 
-export function RotationIntervalForm({ currentInterval }: RotationIntervalFormProps) {
+export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormProps) => {
   const [interval, setInterval] = useState(currentInterval);
   const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -76,4 +76,4 @@ export function RotationIntervalForm({ currentInterval }: RotationIntervalFormPr
       )}
     </div>
   );
-}
+};

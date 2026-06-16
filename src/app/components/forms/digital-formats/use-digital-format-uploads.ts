@@ -37,12 +37,12 @@ interface UseDigitalFormatUploadsOptions {
   onMetadataExtracted?: (metadata: ExtractedAudioMetadata) => void;
 }
 
-export function useDigitalFormatUploads({
+export const useDigitalFormatUploads = ({
   releaseId,
   existingFormats,
   onReleaseAutoCreated,
   onMetadataExtracted,
-}: UseDigitalFormatUploadsOptions) {
+}: UseDigitalFormatUploadsOptions) => {
   // Track upload state for each format
   const [uploadStates, setUploadStates] = useState<Record<DigitalFormatType, UploadState>>(
     {} as Record<DigitalFormatType, UploadState>
@@ -943,4 +943,4 @@ export function useDigitalFormatUploads({
     handleConfirmReupload,
     setConfirmReuploadFormat,
   };
-}
+};

@@ -38,7 +38,7 @@ interface NotificationSearchProps {
   }) => void;
 }
 
-export function NotificationSearch({ onSelect }: NotificationSearchProps) {
+export const NotificationSearch = ({ onSelect }: NotificationSearchProps) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const debouncedSearch = useDebounce(searchValue, 300);
@@ -118,4 +118,4 @@ export function NotificationSearch({ onSelect }: NotificationSearchProps) {
       </PopoverContent>
     </Popover>
   );
-}
+};

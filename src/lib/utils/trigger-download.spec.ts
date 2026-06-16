@@ -5,13 +5,13 @@
 
 import { triggerDownload } from './trigger-download';
 
-function requireCapturedAnchor(anchor: HTMLAnchorElement | null): HTMLAnchorElement {
+const requireCapturedAnchor = (anchor: HTMLAnchorElement | null): HTMLAnchorElement => {
   if (!anchor) {
     throw new Error('expected anchor click to capture element');
   }
 
   return anchor;
-}
+};
 
 describe('triggerDownload', () => {
   afterEach(() => {

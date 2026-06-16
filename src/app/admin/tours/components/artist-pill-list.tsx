@@ -46,12 +46,12 @@ interface SortableArtistPillProps {
   onRemove: (headlinerId: string, artistId: string | null) => Promise<void>;
 }
 
-function SortableArtistPill({
+const SortableArtistPill = ({
   headliner,
   index,
   onSetTimeUpdate,
   onRemove,
-}: SortableArtistPillProps) {
+}: SortableArtistPillProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: headliner.id,
   });
@@ -74,7 +74,7 @@ function SortableArtistPill({
       />
     </div>
   );
-}
+};
 
 interface ArtistPillListProps {
   tourDateId: string;
@@ -82,11 +82,11 @@ interface ArtistPillListProps {
   onHeadlinersChange: () => Promise<void>;
 }
 
-export function ArtistPillList({
+export const ArtistPillList = ({
   tourDateId,
   headliners: initialHeadliners,
   onHeadlinersChange,
-}: ArtistPillListProps) {
+}: ArtistPillListProps) => {
   const [headliners, setHeadliners] = useState(initialHeadliners);
   const prevInitialRef = useRef(initialHeadliners);
 
@@ -193,4 +193,4 @@ export function ArtistPillList({
       </SortableContext>
     </DndContext>
   );
-}
+};

@@ -12,10 +12,10 @@ import type { WriteCommentOptions } from './types/audio';
  * Vorbis Comments use a plain key=value format. The COMMENT key is the
  * conventional field for freeform comments.
  */
-export async function writeOggComment(
+export const writeOggComment = async (
   filePath: string,
   comment: string,
   _options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   await writeTagViaFfmpeg(filePath, 'COMMENT', comment);
-}
+};

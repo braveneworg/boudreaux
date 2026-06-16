@@ -32,16 +32,16 @@ const COMMENTLESS_EXTENSIONS = new Set(['.wav']);
  * Returns true if the file format supports writing comment metadata.
  * WAV files and unrecognized extensions are excluded.
  */
-export function supportsComment(filePath: string): boolean {
+export const supportsComment = (filePath: string): boolean => {
   const ext = path.extname(filePath).toLowerCase();
   return Object.hasOwn(EXT_TO_FORMAT, ext) && !COMMENTLESS_EXTENSIONS.has(ext);
-}
+};
 
 /**
  * Detects the audio format from the file extension.
  * Throws if the extension is not recognised.
  */
-export function detectFormat(filePath: string): AudioFormat {
+export const detectFormat = (filePath: string): AudioFormat => {
   const ext = path.extname(filePath).toLowerCase();
   const format = EXT_TO_FORMAT[ext];
   if (!format) {
@@ -50,7 +50,7 @@ export function detectFormat(filePath: string): AudioFormat {
     );
   }
   return format;
-}
+};
 
 /**
  * Writes or replaces the comment/description metadata field in an audio file.
@@ -65,11 +65,11 @@ export function detectFormat(filePath: string): AudioFormat {
  * await writeComment('./track.flac', 'Mastered 2024-01-15')
  * await writeComment('./track.mp3', 'Remaster', { language: 'eng' })
  */
-export async function writeComment(
+export const writeComment = async (
   filePath: string,
   comment: string,
   options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   const format = detectFormat(filePath);
 
   switch (format) {
@@ -84,7 +84,7 @@ export async function writeComment(
     case 'aiff':
       return writeAiffComment(filePath, comment, options);
   }
-}
+};
 
 export { writeOggComment, writeFlacComment, writeAacComment, writeMp3Comment, writeAiffComment };
 export type { AudioFormat, WriteCommentOptions };

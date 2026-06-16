@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 // in the root layout. Registration is skipped in development so the SW cache
 // never interferes with hot reloading, and in E2E builds where the SW's
 // network-first navigation cache makes mutation→reload flows nondeterministic.
-export function ServiceWorkerRegister(): null {
+export const ServiceWorkerRegister = (): null => {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
       return;
@@ -39,4 +39,4 @@ export function ServiceWorkerRegister(): null {
   }, []);
 
   return null;
-}
+};

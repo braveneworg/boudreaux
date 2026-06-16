@@ -9,16 +9,15 @@ export interface LoginVerificationEmailData {
   isNewUser: boolean;
 }
 
-function escapeHtml(text: string): string {
-  return text
+const escapeHtml = (text: string): string =>
+  text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
 
-export function buildLoginVerificationEmailHtml(data: LoginVerificationEmailData): string {
+export const buildLoginVerificationEmailHtml = (data: LoginVerificationEmailData): string => {
   const heading = data.isNewUser ? 'Welcome to Fake Four Inc.!' : 'Welcome back!';
   const message = data.isNewUser
     ? "We're glad you're here. Click the button below to sign in and start exploring our releases."
@@ -112,4 +111,4 @@ export function buildLoginVerificationEmailHtml(data: LoginVerificationEmailData
   </table>
 </body>
 </html>`;
-}
+};

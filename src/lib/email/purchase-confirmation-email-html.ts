@@ -11,17 +11,17 @@ export interface PurchaseConfirmationEmailData {
   downloadUrl: string;
 }
 
-function escapeHtml(text: string): string {
-  return text
+const escapeHtml = (text: string): string =>
+  text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
 
-export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEmailData): string {
-  return `<!DOCTYPE html>
+export const buildPurchaseConfirmationEmailHtml = (
+  data: PurchaseConfirmationEmailData
+): string => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -110,4 +110,3 @@ export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEma
   </table>
 </body>
 </html>`;
-}

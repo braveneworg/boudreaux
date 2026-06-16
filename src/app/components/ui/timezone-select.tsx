@@ -54,7 +54,7 @@ const POPULAR_TIMEZONES = [
   'UTC',
 ];
 
-function getSupportedTimezones(): string[] {
+const getSupportedTimezones = (): string[] => {
   try {
     // Intl.supportedValuesOf is available in all modern environments and
     // returns the runtime's full, up-to-date IANA timezone database.
@@ -65,21 +65,21 @@ function getSupportedTimezones(): string[] {
   } catch {
     return POPULAR_TIMEZONES;
   }
-}
+};
 
-function getRegion(tz: string): string {
+const getRegion = (tz: string): string => {
   const slash = tz.indexOf('/');
   return slash === -1 ? 'Other' : tz.slice(0, slash);
-}
+};
 
 /**
  * Produce a human-readable label for the timezone selector entry.
  * e.g. "America/New_York" → "New York (UTC-05:00)"
  */
-function formatTZLabel(tz: string): string {
+const formatTZLabel = (tz: string): string => {
   const localPart = tz.includes('/') ? tz.split('/').slice(1).join(' / ').replace(/_/g, ' ') : tz;
   return `${localPart} (${formatUTCOffset(tz)})`;
-}
+};
 
 export interface TimezoneSelectProps {
   value?: string | null;
@@ -89,13 +89,13 @@ export interface TimezoneSelectProps {
   placeholder?: string;
 }
 
-export function TimezoneSelect({
+export const TimezoneSelect = ({
   value,
   onChange,
   disabled,
   className,
   placeholder = 'Select timezone...',
-}: TimezoneSelectProps) {
+}: TimezoneSelectProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -210,4 +210,4 @@ export function TimezoneSelect({
       </PopoverContent>
     </Popover>
   );
-}
+};

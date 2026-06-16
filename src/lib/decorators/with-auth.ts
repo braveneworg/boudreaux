@@ -54,8 +54,9 @@ const logUnauthorized = (request: NextRequest, status: 401 | 403, userId?: strin
 // Authentication decorator
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
-export function withAuth<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
-  return async (request: NextRequest, context: { params: Promise<unknown> }) =>
+export const withAuth =
+  <TParams = unknown>(handler: AuthenticatedHandler<TParams>) =>
+  async (request: NextRequest, context: { params: Promise<unknown> }) =>
     runWithRequestContext(resolveRequestId(request.headers), async () => {
       const session = await auth();
 
@@ -68,13 +69,13 @@ export function withAuth<TParams = unknown>(handler: AuthenticatedHandler<TParam
       // Call the original handler with session
       return handler(request, context as { params: Promise<TParams> }, session as Session);
     });
-}
 
 // Admin role decorator
 // Usage: Wrap API route handlers that require admin role
 // Example: export const GET = withAdmin(async (req, res, session) => { ... });
-export function withAdmin<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
-  return async (request: NextRequest, context: { params: Promise<unknown> }) =>
+export const withAdmin =
+  <TParams = unknown>(handler: AuthenticatedHandler<TParams>) =>
+  async (request: NextRequest, context: { params: Promise<unknown> }) =>
     runWithRequestContext(resolveRequestId(request.headers), async () => {
       const session = await auth();
       const role = 'admin';
@@ -96,4 +97,3 @@ export function withAdmin<TParams = unknown>(handler: AuthenticatedHandler<TPara
 
       return handler(request, context as { params: Promise<TParams> }, session as Session);
     });
-}

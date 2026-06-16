@@ -59,7 +59,7 @@ type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
  * A resizable text box with marching ants border animation
  * Used in notification banner previews for positioning and sizing text overlays
  */
-export function ResizableTextBox({
+export const ResizableTextBox = ({
   children,
   width,
   height,
@@ -81,7 +81,7 @@ export function ResizableTextBox({
   maxWidth = 100,
   minHeight = 5,
   maxHeight = 100,
-}: ResizableTextBoxProps) {
+}: ResizableTextBoxProps) => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<ResizeDirection | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -360,4 +360,4 @@ export function ResizableTextBox({
       )}
     </div>
   );
-}
+};

@@ -72,16 +72,13 @@ const particleShapes: Record<keyof ParticleCounts, string> = {
 };
 
 // Utility functions
-function randomInRange(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
-}
+const randomInRange = (min: number, max: number): number => Math.random() * (max - min) + min;
 
-function randomIntInRange(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+const randomIntInRange = (min: number, max: number): number =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Generate particles for a specific type
-function generateParticles(type: keyof ParticleCounts, count: number, config: Config): string {
+const generateParticles = (type: keyof ParticleCounts, count: number, config: Config): string => {
   const particles: string[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -103,10 +100,10 @@ function generateParticles(type: keyof ParticleCounts, count: number, config: Co
   }
 
   return particles.join('\n');
-}
+};
 
 // Generate the complete SVG
-function generateSVG(config: Config): string {
+const generateSVG = (config: Config): string => {
   const particleDefs = Object.entries(particleShapes)
     .map(([type, shape]) => `    <g id="particle-${type}">\n      ${shape}\n    </g>`)
     .join('\n\n');
@@ -129,10 +126,10 @@ ${particleDefs}
 ${particleElements}
   </g>
 </svg>`;
-}
+};
 
 // Parse command line arguments
-function parseArgs(args: string[]): Config {
+const parseArgs = (args: string[]): Config => {
   const config = { ...defaultConfig, particleCounts: { ...defaultConfig.particleCounts } };
 
   for (let i = 0; i < args.length; i++) {
@@ -212,10 +209,10 @@ function parseArgs(args: string[]): Config {
   }
 
   return config;
-}
+};
 
 // Print help message
-function printHelp(): void {
+const printHelp = (): void => {
   console.info(`
 Stardust SVG Generator
 
@@ -246,10 +243,10 @@ Examples:
   pnpm exec tsx generate-stardust.ts --dots 10 --diamonds 8 --bg-color "#1a1a1a"
   pnpm exec tsx generate-stardust.ts --output custom-stardust.svg --wedges 15
   `);
-}
+};
 
 // Main execution
-function main(): void {
+const main = (): void => {
   const args = process.argv.slice(2);
   const config = parseArgs(args);
 
@@ -276,7 +273,7 @@ function main(): void {
   console.info(`📐 Dimensions: ${config.width}x${config.height}`);
   console.info(`✓ Brightness range: ${config.brightnessMin} - ${config.brightnessMax}`);
   console.info(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
-}
+};
 
 // Run if called directly (ESM-safe require.main === module)
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

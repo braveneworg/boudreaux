@@ -40,17 +40,17 @@ const {
 
 const adminSession = { user: { id: 'admin-1', role: 'admin' } };
 
-function buildUploadForm(
+const buildUploadForm = (
   files: File[],
   captions: string[] = [],
   altTexts: string[] = []
-): FormData {
+): FormData => {
   const fd = new FormData();
   for (const f of files) fd.append('files', f);
   for (const c of captions) fd.append('captions', c);
   for (const a of altTexts) fd.append('altTexts', a);
   return fd;
-}
+};
 
 const jpegFile = new File([new Uint8Array([0xff, 0xd8])], 'a.jpg', { type: 'image/jpeg' });
 

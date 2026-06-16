@@ -107,19 +107,19 @@ describe('ContactPage', () => {
     vi.restoreAllMocks();
   });
 
-  function importAndRender() {
+  const importAndRender = () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     const result = render(<ContactPage />);
     return { ...result, user };
-  }
+  };
 
   /** Simulate Turnstile verification before submission */
-  function simulateTurnstile(token = 'test-turnstile-token') {
+  const simulateTurnstile = (token = 'test-turnstile-token') => {
     act(() => {
       capturedSetIsVerified?.(true);
       capturedOnToken?.(token);
     });
-  }
+  };
 
   describe('rendering', () => {
     it('should render the page heading as an image', async () => {

@@ -30,18 +30,18 @@ interface FetchAndParseOptions {
  * @returns The parsed, schema-validated response body.
  * @throws If the response status is not OK, or the body fails schema validation.
  */
-export async function fetchAndParse<T>(
+export const fetchAndParse = async <T>(
   url: string,
   schema: ZodType<T>,
   { signal, cache, errorMessage = 'Request failed' }: FetchAndParseOptions = {}
-): Promise<T> {
+): Promise<T> => {
   const response = await fetch(url, { signal, ...(cache ? { cache } : {}) });
   if (!response.ok) {
     throw new Error(errorMessage);
   }
   const body: unknown = await response.json();
   return parseResponse(url, schema, body);
-}
+};
 
 /**
  * Error thrown when a response body fails Zod validation. Distinguished from
@@ -79,10 +79,10 @@ export class ResponseValidationError extends Error {
  * @returns The schema-validated body.
  * @throws {ResponseValidationError} If the body fails schema validation.
  */
-export function parseResponse<T>(url: string, schema: ZodType<T>, body: unknown): T {
+export const parseResponse = <T>(url: string, schema: ZodType<T>, body: unknown): T => {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     throw new ResponseValidationError(url, z.prettifyError(parsed.error));
   }
   return parsed.data;
-}
+};

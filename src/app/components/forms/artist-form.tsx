@@ -79,7 +79,7 @@ const PublishedToastContent = ({ fullName }: { fullName: string }) => (
   </>
 );
 
-export function ArtistForm({ artistId: initialArtistId }: ArtistFormProps) {
+export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createArtistAction,
     initialFormState
@@ -878,4 +878,4 @@ export function ArtistForm({ artistId: initialArtistId }: ArtistFormProps) {
       </Card>
     </>
   );
-}
+};

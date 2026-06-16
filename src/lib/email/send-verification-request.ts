@@ -52,9 +52,9 @@ export interface SendVerificationRequestParams {
  *
  * @throws If the email fails to send (Auth.js will surface the error to the user)
  */
-export async function sendVerificationRequest(
+export const sendVerificationRequest = async (
   params: SendVerificationRequestParams
-): Promise<void> {
+): Promise<void> => {
   const { identifier: email, url, provider } = params;
 
   const fromAddress = provider.from ?? process.env.EMAIL_FROM;
@@ -112,4 +112,4 @@ export async function sendVerificationRequest(
   });
 
   console.info(`[sendVerificationRequest] Verification email sent to ${email}`);
-}
+};

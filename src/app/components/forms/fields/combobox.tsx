@@ -19,7 +19,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-export function Combobox({
+export const Combobox = ({
   className,
   options,
   onSelectAction,
@@ -30,7 +30,7 @@ export function Combobox({
     label: string;
   }[];
   onSelectAction: (value: string) => void;
-}) {
+}) => {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState(options[0].value);
 
@@ -75,4 +75,4 @@ export function Combobox({
       </PopoverContent>
     </Popover>
   );
-}
+};

@@ -41,7 +41,7 @@ interface UseOptimisticChatParams {
  *   - When a send fails, mark the optimistic placeholder `failed: true`
  *     and keep it until the user retries or dismisses it.
  */
-export function useOptimisticChat({ baseMessages }: UseOptimisticChatParams) {
+export const useOptimisticChat = ({ baseMessages }: UseOptimisticChatParams) => {
   const [localMessages, setLocalMessages] = useState<OptimisticChatMessage[]>([]);
   const queryClient = useQueryClient();
 
@@ -183,4 +183,4 @@ export function useOptimisticChat({ baseMessages }: UseOptimisticChatParams) {
     updateMessage,
     removeMessage,
   };
-}
+};

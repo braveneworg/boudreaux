@@ -23,10 +23,10 @@ interface SparklingParticles {
  * Rounded to 4 decimal places so Node and browser `Math.sin` float
  * differences don't cause mismatched style strings.
  */
-function seededRandom(seed: number): number {
+const seededRandom = (seed: number): number => {
   const x = Math.sin(seed * 9301 + 49297) * 49979;
   return Math.round((x - Math.floor(x)) * 10000) / 10000;
-}
+};
 
 /**
  * Generates two stable sets of deterministically-positioned particles for the

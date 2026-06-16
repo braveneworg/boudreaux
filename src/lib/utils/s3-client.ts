@@ -20,7 +20,7 @@ import { buildContentDisposition } from '@/lib/utils/content-disposition';
  *
  * Lazy initialization pattern - creates client only when needed
  */
-export function getS3Client(): S3Client {
+export const getS3Client = (): S3Client => {
   const region = process.env.AWS_REGION || 'us-east-1';
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
@@ -36,14 +36,14 @@ export function getS3Client(): S3Client {
       secretAccessKey,
     },
   });
-}
+};
 
 /**
  * Get S3 bucket name from environment variables
  *
  * @throws {Error} If S3_BUCKET or AWS_S3_BUCKET_NAME not configured
  */
-export function getS3BucketName(): string {
+export const getS3BucketName = (): string => {
   const bucketName = process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET;
 
   if (!bucketName) {
@@ -53,7 +53,7 @@ export function getS3BucketName(): string {
   }
 
   return bucketName;
-}
+};
 
 /**
  * Generate presigned PUT URL for uploading digital audio files to S3
@@ -74,11 +74,11 @@ export function getS3BucketName(): string {
  * );
  * ```
  */
-export async function generatePresignedUploadUrl(
+export const generatePresignedUploadUrl = async (
   s3Key: string,
   formatType: DigitalFormatType,
   mimeType: string
-): Promise<{ uploadUrl: string; s3Key: string; contentType: string }> {
+): Promise<{ uploadUrl: string; s3Key: string; contentType: string }> => {
   const s3Client = getS3Client();
   const bucketName = getS3BucketName();
 
@@ -97,7 +97,7 @@ export async function generatePresignedUploadUrl(
   });
 
   return { uploadUrl, s3Key, contentType: resolvedContentType };
-}
+};
 
 /**
  * Generate presigned GET URL for downloading digital audio files from S3
@@ -115,11 +115,11 @@ export async function generatePresignedUploadUrl(
  * );
  * ```
  */
-export async function generatePresignedDownloadUrl(
+export const generatePresignedDownloadUrl = async (
   s3Key: string,
   fileName: string,
   expiresInSeconds: number = PRESIGNED_URL_EXPIRATION.DOWNLOAD
-): Promise<string> {
+): Promise<string> => {
   // Prefer CloudFront signed URLs when configured — bytes flow through the
   // CDN edge cache (cheap repeat downloads, ~$0 on cache hit) instead of
   // egressing direct from S3 every time. Falls back to S3 presigned URLs
@@ -149,7 +149,7 @@ export async function generatePresignedDownloadUrl(
   });
 
   return downloadUrl;
-}
+};
 
 /**
  * Verify S3 object exists (HEAD request)
@@ -159,7 +159,7 @@ export async function generatePresignedDownloadUrl(
  * @param s3Key - S3 object key to check
  * @returns True if object exists, false otherwise
  */
-export async function verifyS3ObjectExists(s3Key: string): Promise<boolean> {
+export const verifyS3ObjectExists = async (s3Key: string): Promise<boolean> => {
   try {
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
@@ -177,7 +177,7 @@ export async function verifyS3ObjectExists(s3Key: string): Promise<boolean> {
     // Object doesn't exist or access denied
     return false;
   }
-}
+};
 
 /**
  * Delete S3 object (for permanent hard delete after grace period)
@@ -185,7 +185,7 @@ export async function verifyS3ObjectExists(s3Key: string): Promise<boolean> {
  * @param s3Key - S3 object key to delete
  * @returns True if deletion succeeded, false otherwise
  */
-export async function deleteS3Object(s3Key: string): Promise<boolean> {
+export const deleteS3Object = async (s3Key: string): Promise<boolean> => {
   try {
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
@@ -202,4 +202,4 @@ export async function deleteS3Object(s3Key: string): Promise<boolean> {
     console.error('Failed to delete S3 object:', error);
     return false;
   }
-}
+};

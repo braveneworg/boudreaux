@@ -93,7 +93,7 @@ const colors = {
   reset: '\x1b[0m',
 };
 
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const colorMap = {
     info: colors.blue,
     success: colors.green,
@@ -110,21 +110,21 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
   } else {
     console.info(formatted);
   }
-}
+};
 
-function formatBytes(bytes: number): string {
+const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // S3 helpers
 // ---------------------------------------------------------------------------
 
-async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Promise<string[]> {
+const listAllObjects = async (s3: S3Client, bucket: string, prefix: string): Promise<string[]> => {
   const keys: string[] = [];
   let continuationToken: string | undefined;
 
@@ -146,9 +146,9 @@ async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Pro
   } while (continuationToken);
 
   return keys;
-}
+};
 
-async function downloadObject(s3: S3Client, bucket: string, key: string): Promise<Buffer> {
+const downloadObject = async (s3: S3Client, bucket: string, key: string): Promise<Buffer> => {
   const command = new GetObjectCommand({ Bucket: bucket, Key: key });
   const response = await s3.send(command);
   const stream = response.Body;
@@ -163,15 +163,15 @@ async function downloadObject(s3: S3Client, bucket: string, key: string): Promis
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
-}
+};
 
-async function uploadBuffer(
+const uploadBuffer = async (
   s3: S3Client,
   bucket: string,
   key: string,
   buffer: Buffer,
   contentType: string
-): Promise<void> {
+): Promise<void> => {
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -180,17 +180,17 @@ async function uploadBuffer(
     CacheControl: CACHE_CONTROL_IMMUTABLE,
   });
   await s3.send(command);
-}
+};
 
 // ---------------------------------------------------------------------------
 // CloudFront invalidation (mirrors upload-images.ts)
 // ---------------------------------------------------------------------------
 
-async function invalidateCloudFront(
+const invalidateCloudFront = async (
   distributionId: string,
   keys: string[],
   region: string
-): Promise<void> {
+): Promise<void> => {
   if (keys.length === 0) return;
 
   const cloudfront = new CloudFrontClient({ region });
@@ -227,33 +227,31 @@ async function invalidateCloudFront(
     })
   );
   log('CloudFront invalidation initiated', 'success');
-}
+};
 
 // ---------------------------------------------------------------------------
 // Image processing
 // ---------------------------------------------------------------------------
 
-function getExtension(key: string): string {
+const getExtension = (key: string): string => {
   const dot = key.lastIndexOf('.');
   return dot === -1 ? '' : key.substring(dot).toLowerCase();
-}
+};
 
-function isProcessableImage(key: string): boolean {
+const isProcessableImage = (key: string): boolean => {
   const ext = getExtension(key);
   return IMAGE_EXTENSIONS.has(ext) && !SKIP_EXTENSIONS.has(ext);
-}
+};
 
-function isExistingVariant(key: string): boolean {
-  return IMAGE_VARIANT_SUFFIX_REGEX.test(key);
-}
+const isExistingVariant = (key: string): boolean => IMAGE_VARIANT_SUFFIX_REGEX.test(key);
 
-function buildVariantKey(originalKey: string, width: number, overrideExt?: string): string {
+const buildVariantKey = (originalKey: string, width: number, overrideExt?: string): string => {
   const dot = originalKey.lastIndexOf('.');
   if (dot === -1) return `${originalKey}_w${width}${overrideExt ?? ''}`;
   const base = originalKey.substring(0, dot);
   const ext = overrideExt ?? originalKey.substring(dot);
   return `${base}_w${width}${ext}`;
-}
+};
 
 /**
  * Compute every variant key `processImage` would upload for an original — one
@@ -261,7 +259,7 @@ function buildVariantKey(originalKey: string, width: number, overrideExt?: strin
  * Used to detect originals that are already fully processed on S3 so we can
  * skip the download/resize/upload round-trip entirely.
  */
-function getExpectedVariantKeys(originalKey: string): string[] {
+const getExpectedVariantKeys = (originalKey: string): string[] => {
   const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(getExtension(originalKey));
   const keys: string[] = [];
 
@@ -273,12 +271,11 @@ function getExpectedVariantKeys(originalKey: string): string[] {
   }
 
   return keys;
-}
+};
 
 /** True when every expected variant for an original already exists on S3. */
-function hasAllVariants(originalKey: string, existingKeys: Set<string>): boolean {
-  return getExpectedVariantKeys(originalKey).every((key) => existingKeys.has(key));
-}
+const hasAllVariants = (originalKey: string, existingKeys: Set<string>): boolean =>
+  getExpectedVariantKeys(originalKey).every((key) => existingKeys.has(key));
 
 interface ProcessResult {
   originalKey: string;
@@ -288,12 +285,12 @@ interface ProcessResult {
   error?: string;
 }
 
-async function processImage(
+const processImage = async (
   s3: S3Client,
   bucket: string,
   key: string,
   dryRun: boolean
-): Promise<ProcessResult> {
+): Promise<ProcessResult> => {
   const result: ProcessResult = {
     originalKey: key,
     variantsUploaded: 0,
@@ -373,31 +370,31 @@ async function processImage(
   }
 
   return result;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Concurrency helper
 // ---------------------------------------------------------------------------
 
-async function mapWithConcurrency<T, R>(
+const mapWithConcurrency = async <T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>
-): Promise<R[]> {
+): Promise<R[]> => {
   const results: R[] = [];
   let index = 0;
 
-  async function worker(): Promise<void> {
+  const worker = async (): Promise<void> => {
     while (index < items.length) {
       const i = index++;
       results[i] = await fn(items[i]);
     }
-  }
+  };
 
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
   await Promise.all(workers);
   return results;
-}
+};
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -410,7 +407,7 @@ interface CliOptions {
   force: boolean;
 }
 
-function parseArgs(args: string[]): CliOptions {
+const parseArgs = (args: string[]): CliOptions => {
   const options: CliOptions = {
     prefix: 'media/',
     dryRun: false,
@@ -435,13 +432,13 @@ function parseArgs(args: string[]): CliOptions {
   }
 
   return options;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const args = process.argv.slice(2);
 
   if (args.includes('--help') || args.includes('-h')) {
@@ -563,6 +560,6 @@ ${colors.yellow}Environment Variables:${colors.reset}
   console.info('='.repeat(60));
 
   process.exit(totalErrors > 0 ? 1 : 0);
-}
+};
 
 main();

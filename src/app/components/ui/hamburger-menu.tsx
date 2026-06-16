@@ -12,7 +12,7 @@ import { useNavMenuItems } from '@/hooks/use-nav-menu-items';
 
 import { SheetTrigger } from './sheet';
 
-export function HamburgerMenu() {
+export const HamburgerMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuItems = useNavMenuItems();
 
@@ -33,4 +33,4 @@ export function HamburgerMenu() {
       </HamburgerMenuSheet>
     </div>
   );
-}
+};

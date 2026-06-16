@@ -13,10 +13,10 @@ let stripeClient: Stripe | null = null;
  * Returns the Stripe client, creating it lazily on first call.
  * Requires `initSecrets()` to have been called beforehand.
  */
-export function getStripe(): Stripe {
+export const getStripe = (): Stripe => {
   if (!stripeClient) {
     const { stripeSecretKey } = getSecrets();
     stripeClient = new Stripe(stripeSecretKey);
   }
   return stripeClient;
-}
+};

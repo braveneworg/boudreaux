@@ -36,16 +36,14 @@ interface ParseOptions {
  */
 const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:']);
 
-function normaliseHost(host: string): string {
-  return host.toLowerCase().replace(/:\d+$/, '');
-}
+const normaliseHost = (host: string): string => host.toLowerCase().replace(/:\d+$/, '');
 
 /**
  * Decide whether a safe href points outside the current site. Bare
  * paths (`/foo`) are always internal; everything else compares the URL
  * hostname against {@link ParseOptions.siteHost}.
  */
-function isExternalHref(href: string, siteHost: string | undefined): boolean {
+const isExternalHref = (href: string, siteHost: string | undefined): boolean => {
   if (href.startsWith('/') && !href.startsWith('//')) return false;
   try {
     const url = new URL(href);
@@ -59,14 +57,14 @@ function isExternalHref(href: string, siteHost: string | undefined): boolean {
     return false;
   }
   /* v8 ignore stop */
-}
+};
 
 /**
  * Verify the href is one we're willing to render as a clickable link.
  * Returns the normalised string on success or null when the link must
  * be downgraded to plain text.
  */
-function sanitiseHref(href: string): string | null {
+const sanitiseHref = (href: string): string | null => {
   const trimmed = href.trim();
   if (trimmed.length === 0) return null;
   if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
@@ -76,14 +74,14 @@ function sanitiseHref(href: string): string | null {
   } catch {
     return null;
   }
-}
+};
 
 interface InlineMatch {
   node: AdminMarkdownNode;
   consumed: number;
 }
 
-function tryLink(body: string, i: number, siteHost: string | undefined): InlineMatch | null {
+const tryLink = (body: string, i: number, siteHost: string | undefined): InlineMatch | null => {
   if (body[i] !== '[') return null;
   // Scan for the matching `]` that's followed immediately by `(`. Bail
   // out at newlines so a stray `[` near the end of one line can't
@@ -130,14 +128,14 @@ function tryLink(body: string, i: number, siteHost: string | undefined): InlineM
     },
     consumed: hrefEnd + 1 - i,
   };
-}
+};
 
-function tryDelimiter(
+const tryDelimiter = (
   body: string,
   i: number,
   marker: string,
   kind: 'bold' | 'em'
-): InlineMatch | null {
+): InlineMatch | null => {
   if (!body.startsWith(marker, i)) return null;
   const contentStart = i + marker.length;
   let close = -1;
@@ -157,7 +155,7 @@ function tryDelimiter(
     node: { kind, value },
     consumed: close + marker.length - i,
   };
-}
+};
 
 /**
  * Parse an admin-authored chat message body into an inline node list.
@@ -175,7 +173,10 @@ function tryDelimiter(
  * inside `value`/`text` are preserved verbatim so the renderer can
  * re-tokenise them on top of the formatting.
  */
-export function parseAdminMarkdown(body: string, options: ParseOptions = {}): AdminMarkdownNode[] {
+export const parseAdminMarkdown = (
+  body: string,
+  options: ParseOptions = {}
+): AdminMarkdownNode[] => {
   const nodes: AdminMarkdownNode[] = [];
   let buffer = '';
   let i = 0;
@@ -208,4 +209,4 @@ export function parseAdminMarkdown(body: string, options: ParseOptions = {}): Ad
 
   flushBuffer();
   return nodes;
-}
+};

@@ -32,10 +32,10 @@ const limiter = rateLimit({
  *
  * Does not return userId to prevent account enumeration.
  */
-export async function checkGuestPurchaseAction(
+export const checkGuestPurchaseAction = async (
   email: string,
   releaseId: string
-): Promise<GuestPurchaseStatus> {
+): Promise<GuestPurchaseStatus> => {
   const headersList = await headers();
   const ip =
     headersList.get('x-real-ip') ||
@@ -68,4 +68,4 @@ export async function checkGuestPurchaseAction(
     atCap: access.downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT,
     resetInHours: access.resetInHours,
   };
-}
+};

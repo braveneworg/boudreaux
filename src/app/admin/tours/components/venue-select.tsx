@@ -68,7 +68,7 @@ interface VenueSelectProps<
   onVenueSelect?: (venue: VenueOption) => void;
 }
 
-export function VenueSelect<
+export const VenueSelect = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -81,7 +81,7 @@ export function VenueSelect<
   emptyMessage = 'No venues found.',
   disabled = false,
   onVenueSelect,
-}: VenueSelectProps<TFieldValues, TName>) {
+}: VenueSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const queryClient = useQueryClient();
@@ -629,4 +629,4 @@ export function VenueSelect<
       </Dialog>
     </>
   );
-}
+};

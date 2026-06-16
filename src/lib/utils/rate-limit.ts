@@ -13,7 +13,7 @@ export type RateLimitOptions = {
  * @param options Configuration for rate limiting
  * @returns Object with check method to verify rate limits
  */
-export function rateLimit(options: RateLimitOptions) {
+export const rateLimit = (options: RateLimitOptions) => {
   const tokenCache = new LRUCache<string, number[]>({
     max: options.uniqueTokenPerInterval || 500,
     ttl: options.interval || 60000,
@@ -42,4 +42,4 @@ export function rateLimit(options: RateLimitOptions) {
         return isRateLimited ? reject(Error('Rate limit exceeded')) : resolve();
       }),
   };
-}
+};

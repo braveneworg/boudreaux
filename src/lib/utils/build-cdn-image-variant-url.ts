@@ -33,7 +33,7 @@ const EXISTING_WIDTH_SUFFIX_REGEX = /_w\d+$/;
  */
 const WEBP_TRANSCODE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']);
 
-function appendWidthSuffix(pathname: string, width: number): string {
+const appendWidthSuffix = (pathname: string, width: number): string => {
   const lastDot = pathname.lastIndexOf('.');
 
   if (lastDot === -1) {
@@ -54,7 +54,7 @@ function appendWidthSuffix(pathname: string, width: number): string {
 
   const outputExt = WEBP_TRANSCODE_EXTENSIONS.has(extLower) ? '.webp' : ext;
   return `${baseWithoutWidth}_w${width}${outputExt}`;
-}
+};
 
 /**
  * Build a CDN URL for a width-variant of an image.
@@ -64,7 +64,7 @@ function appendWidthSuffix(pathname: string, width: number): string {
  * @returns A direct CDN URL pointing to the pre-generated width variant,
  *   swapping the extension to `.webp` for transcodable raster formats.
  */
-export function buildCdnImageVariantUrl(src: string, width: number): string {
+export const buildCdnImageVariantUrl = (src: string, width: number): string => {
   if (src.startsWith('blob:') || src.startsWith('data:')) {
     return src;
   }
@@ -89,4 +89,4 @@ export function buildCdnImageVariantUrl(src: string, width: number): string {
   const rawPath = src.startsWith('/') ? src : `/${src}`;
   const encodedPath = rawPath.split('/').map(encodeURIComponent).join('/');
   return `${CDN_DOMAIN}${appendWidthSuffix(encodedPath, width)}`;
-}
+};

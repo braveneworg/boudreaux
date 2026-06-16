@@ -49,7 +49,7 @@ interface ReleaseMultiSelectProps<
   onReleasesChange?: (releases: ReleaseOption[]) => void;
 }
 
-export function ReleaseMultiSelect<
+export const ReleaseMultiSelect = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -64,7 +64,7 @@ export function ReleaseMultiSelect<
   trackId,
   disabled = false,
   onReleasesChange,
-}: ReleaseMultiSelectProps<TFieldValues, TName>) {
+}: ReleaseMultiSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
@@ -253,4 +253,4 @@ export function ReleaseMultiSelect<
       }}
     />
   );
-}
+};

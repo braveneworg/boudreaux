@@ -18,7 +18,7 @@ interface StateFieldProps {
   setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export function StateField({ control, onUserInteraction, setValue }: StateFieldProps) {
+export const StateField = ({ control, onUserInteraction, setValue }: StateFieldProps) => {
   const stateOptions = US_STATES.map((state) => ({
     value: state.code,
     label: `${state.name} - ${state.code}`,
@@ -39,4 +39,4 @@ export function StateField({ control, onUserInteraction, setValue }: StateFieldP
       setValue={setValue}
     />
   );
-}
+};

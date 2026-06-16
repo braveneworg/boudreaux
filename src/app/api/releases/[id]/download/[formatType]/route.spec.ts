@@ -55,8 +55,8 @@ vi.mock('@/lib/services/quota-enforcement-service', () => {
   };
 });
 
-function makeRequest(): NextRequest {
-  return new NextRequest(
+const makeRequest = (): NextRequest =>
+  new NextRequest(
     'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS',
     {
       headers: {
@@ -65,11 +65,10 @@ function makeRequest(): NextRequest {
       },
     }
   );
-}
 
-function makeParams(id = '507f1f77bcf86cd799439011', formatType = 'MP3_320KBPS') {
-  return { params: Promise.resolve({ id, formatType }) };
-}
+const makeParams = (id = '507f1f77bcf86cd799439011', formatType = 'MP3_320KBPS') => ({
+  params: Promise.resolve({ id, formatType }),
+});
 
 const mockFormat = {
   id: 'format-1',

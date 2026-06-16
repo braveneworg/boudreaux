@@ -21,22 +21,24 @@ const DISPOSABLE_EMAIL_DOMAINS = [
 /**
  * Check if an email domain is from a disposable email service
  */
-export function isDisposableEmail(email: string): boolean {
+export const isDisposableEmail = (email: string): boolean => {
   const domain = email.split('@')[1]?.toLowerCase();
   if (!domain) return false;
 
   return DISPOSABLE_EMAIL_DOMAINS.some(
     (disposable) => domain === disposable || domain.endsWith('.' + disposable)
   );
-}
+};
 
 /**
  * Enhanced email validation with security checks
  */
-export function validateEmailSecurity(email: string): {
+export const validateEmailSecurity = (
+  email: string
+): {
   isValid: boolean;
   error?: string;
-} {
+} => {
   // Basic format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
@@ -58,4 +60,4 @@ export function validateEmailSecurity(email: string): {
   }
 
   return { isValid: true };
-}
+};

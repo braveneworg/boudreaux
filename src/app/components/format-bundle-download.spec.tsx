@@ -14,9 +14,8 @@ vi.mock('@/lib/utils/trigger-download', () => ({
   triggerDownload: vi.fn(),
 }));
 
-function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
-  return events.map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`).join('');
-}
+const makeSSEBody = (events: Array<{ event: string; data: Record<string, unknown> }>): string =>
+  events.map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`).join('');
 
 const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
   { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
@@ -39,11 +38,10 @@ const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> 
   { event: 'complete', data: {} },
 ];
 
-function makeSSEResponse(events = defaultSSEEvents) {
-  return new Response(makeSSEBody(events), {
+const makeSSEResponse = (events = defaultSSEEvents) =>
+  new Response(makeSSEBody(events), {
     headers: { 'Content-Type': 'text/event-stream' },
   });
-}
 
 const freeSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
   {
@@ -64,13 +62,12 @@ const freeSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
   { event: 'complete', data: {} },
 ];
 
-function makeFreeSSEResponse(events = freeSSEEvents) {
-  return new Response(makeSSEBody(events), {
+const makeFreeSSEResponse = (events = freeSSEEvents) =>
+  new Response(makeSSEBody(events), {
     headers: { 'Content-Type': 'text/event-stream' },
   });
-}
 
-function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
+const makeThrowAfterReadyResponse = (events = defaultSSEEvents): Response => {
   const encoder = new TextEncoder();
   const chunk = encoder.encode(makeSSEBody(events));
   const read = vi
@@ -86,7 +83,7 @@ function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
       }),
     },
   } as unknown as Response;
-}
+};
 
 describe('FormatBundleDownload', () => {
   const defaultProps = {

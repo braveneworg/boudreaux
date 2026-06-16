@@ -14,11 +14,10 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-function prompt(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
-  return rl.question(question);
-}
+const prompt = (rl: ReturnType<typeof createInterface>, question: string): Promise<string> =>
+  rl.question(question);
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const slug = process.argv[2];
 
   if (!slug) {
@@ -151,7 +150,7 @@ async function main(): Promise<void> {
   } finally {
     rl.close();
   }
-}
+};
 
 main()
   .catch((e: unknown) => {

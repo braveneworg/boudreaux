@@ -21,17 +21,17 @@ interface TimePickerProps {
 }
 
 /** Convert "HH:mm" (24h) → "h:mm AM/PM" for display */
-function to12HourDisplay(time24: string): string {
+const to12HourDisplay = (time24: string): string => {
   const [hStr, mStr] = time24.split(':');
   const h = parseInt(hStr ?? '0', 10);
   const m = mStr ?? '00';
   const period = h < 12 ? 'AM' : 'PM';
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${h12}:${m} ${period}`;
-}
+};
 
 /** Parse an HH:mm (24h) string into { hour12, minute, period } for editing */
-function parse24(time24: string): { hour: string; minute: string; period: 'AM' | 'PM' } {
+const parse24 = (time24: string): { hour: string; minute: string; period: 'AM' | 'PM' } => {
   const [hStr, mStr] = time24.split(':');
   const h24 = parseInt(hStr ?? '12', 10);
   const period: 'AM' | 'PM' = h24 < 12 ? 'AM' : 'PM';
@@ -41,10 +41,10 @@ function parse24(time24: string): { hour: string; minute: string; period: 'AM' |
     minute: (mStr ?? '00').padStart(2, '0'),
     period,
   };
-}
+};
 
 /** Convert { hour12, minute, period } → "HH:mm" (24h) */
-function to24(hour: string, minute: string, period: 'AM' | 'PM'): string {
+const to24 = (hour: string, minute: string, period: 'AM' | 'PM'): string => {
   let h = parseInt(hour, 10) || 12;
   if (h < 1) h = 1;
   if (h > 12) h = 12;
@@ -53,7 +53,7 @@ function to24(hour: string, minute: string, period: 'AM' | 'PM'): string {
   else if (period === 'PM' && h !== 12) h24 = h + 12;
   const m = Math.min(59, Math.max(0, parseInt(minute, 10) || 0));
   return `${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
+};
 
 export const TimePicker = ({
   value,

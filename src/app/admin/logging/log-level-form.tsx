@@ -34,7 +34,7 @@ const DURATION_OPTIONS = [
   { value: '240', label: '4 hours' },
 ] as const;
 
-export function LogLevelForm({ initialState }: LogLevelFormProps) {
+export const LogLevelForm = ({ initialState }: LogLevelFormProps) => {
   const router = useRouter();
   const [state, setState] = useState<LogLevelState>(initialState);
   const [level, setLevel] = useState<LogLevel>(initialState.effectiveLevel);
@@ -158,4 +158,4 @@ export function LogLevelForm({ initialState }: LogLevelFormProps) {
       )}
     </div>
   );
-}
+};

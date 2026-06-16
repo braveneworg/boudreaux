@@ -67,7 +67,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export function TourForm({ tourId, initialTour = null }: TourFormProps) {
+export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
   const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
@@ -419,4 +419,4 @@ export function TourForm({ tourId, initialTour = null }: TourFormProps) {
       </Form>
     </div>
   );
-}
+};

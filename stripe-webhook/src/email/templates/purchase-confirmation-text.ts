@@ -4,8 +4,9 @@
 
 import type { PurchaseConfirmationEmailData } from '../types.js';
 
-export function buildPurchaseConfirmationEmailText(data: PurchaseConfirmationEmailData): string {
-  return `Fake Four Inc. — Purchase Confirmed
+export const buildPurchaseConfirmationEmailText = (
+  data: PurchaseConfirmationEmailData
+): string => `Fake Four Inc. — Purchase Confirmed
 
 Thank you for your purchase!
 
@@ -20,4 +21,3 @@ Questions? Contact us at support@fakefourinc.com
 
 — Fake Four Inc.
 fakefourrecords.com`;
-}

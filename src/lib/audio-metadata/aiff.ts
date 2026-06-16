@@ -13,10 +13,10 @@ import type { WriteCommentOptions } from './types/audio';
  * writes these tags transparently via `-metadata comment=…` with
  * `-codec copy` (no re-encode).
  */
-export async function writeAiffComment(
+export const writeAiffComment = async (
   filePath: string,
   comment: string,
   _options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   await writeTagViaFfmpeg(filePath, 'comment', comment);
-}
+};

@@ -32,7 +32,7 @@ export interface NavMenuItem {
  * `Videos`/`Merch` flip with auth state so the desktop row separators stay
  * correct as the inserted item shifts where each row wraps.
  */
-export function useNavMenuItems(): NavMenuItem[] {
+export const useNavMenuItems = (): NavMenuItem[] => {
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
 
@@ -115,4 +115,4 @@ export function useNavMenuItems(): NavMenuItem[] {
 
     return items;
   }, [isAuthenticated]);
-}
+};

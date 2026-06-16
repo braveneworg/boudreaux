@@ -17,10 +17,10 @@ import { signStreamUrl } from '@/lib/utils/sign-stream-url';
  */
 const PUBLIC_FORMAT_PATH_SEGMENTS = ['/MP3_320KBPS/'];
 
-function isPublicFormatKey(s3Key: string | null | undefined): boolean {
+const isPublicFormatKey = (s3Key: string | null | undefined): boolean => {
   if (!s3Key) return false;
   return PUBLIC_FORMAT_PATH_SEGMENTS.some((seg) => s3Key.includes(seg));
-}
+};
 
 /**
  * Minimal shape we mutate. We deliberately use a structural type (rather
@@ -51,12 +51,12 @@ interface DigitalFormatLike {
  * The function mutates in place and also returns the same reference for
  * ergonomic chaining inside route handlers.
  */
-export function attachStreamUrls<T>(payload: T): T {
+export const attachStreamUrls = <T>(payload: T): T => {
   walk(payload as unknown);
   return payload;
-}
+};
 
-function walk(node: unknown): void {
+const walk = (node: unknown): void => {
   if (!node || typeof node !== 'object') {
     return;
   }
@@ -90,9 +90,9 @@ function walk(node: unknown): void {
   for (const key of ['release', 'releases', 'artists', 'artist']) {
     if (key in obj) walk(obj[key]);
   }
-}
+};
 
-function signFiles(files: FileLike[]): void {
+const signFiles = (files: FileLike[]): void => {
   for (const file of files) {
     if (!file || typeof file !== 'object') continue;
     if (file.streamUrl) continue; // idempotent
@@ -102,4 +102,4 @@ function signFiles(files: FileLike[]): void {
     if (isPublicFormatKey(file.s3Key)) continue;
     file.streamUrl = signStreamUrl(file.s3Key);
   }
-}
+};

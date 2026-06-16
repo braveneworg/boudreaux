@@ -61,7 +61,7 @@ describe('file-helpers', () => {
   });
 
   describe('collectFilesFromEntry', () => {
-    function makeFileEntry(name: string): FileSystemFileEntry {
+    const makeFileEntry = (name: string): FileSystemFileEntry => {
       const file = new File(['data'], name, { type: 'audio/flac' });
       return {
         isFile: true,
@@ -69,7 +69,7 @@ describe('file-helpers', () => {
         name,
         file: (cb: (file: File) => void) => cb(file),
       } as unknown as FileSystemFileEntry;
-    }
+    };
 
     it('returns a single file for a file entry', async () => {
       const entry = makeFileEntry('a.flac');

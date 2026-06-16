@@ -36,13 +36,11 @@ vi.mock('mime', () => ({
 /**
  * Helper to create a fake S3 GetObject response body (async iterable).
  */
-function fakeS3Body(buffer: Buffer): AsyncIterable<Uint8Array> {
-  return {
-    async *[Symbol.asyncIterator]() {
-      yield new Uint8Array(buffer);
-    },
-  };
-}
+const fakeS3Body = (buffer: Buffer): AsyncIterable<Uint8Array> => ({
+  async *[Symbol.asyncIterator]() {
+    yield new Uint8Array(buffer);
+  },
+});
 
 describe('generateImageVariantsAction', () => {
   const imageBuffer = Buffer.from('fake-image-data');

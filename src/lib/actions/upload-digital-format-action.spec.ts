@@ -21,13 +21,13 @@ vi.mock('../services/upload-service', () => {
   };
 });
 
-function createFormData(data: Record<string, string>): FormData {
+const createFormData = (data: Record<string, string>): FormData => {
   const formData = new FormData();
   for (const [key, value] of Object.entries(data)) {
     formData.set(key, value);
   }
   return formData;
-}
+};
 
 describe('uploadDigitalFormatAction', () => {
   const mockSession = {

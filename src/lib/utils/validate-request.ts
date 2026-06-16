@@ -21,7 +21,7 @@ type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
  * Validates a request body against a Zod schema.
  * Returns validated data on success, or a 400 NextResponse with error details on failure.
  */
-export function validateBody<T>(schema: ZodType<T>, body: unknown): ValidationResult<T> {
+export const validateBody = <T>(schema: ZodType<T>, body: unknown): ValidationResult<T> => {
   const result = schema.safeParse(body);
 
   if (!result.success) {
@@ -41,4 +41,4 @@ export function validateBody<T>(schema: ZodType<T>, body: unknown): ValidationRe
   }
 
   return { success: true, data: result.data };
-}
+};

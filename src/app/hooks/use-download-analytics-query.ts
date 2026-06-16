@@ -32,7 +32,7 @@ const downloadAnalyticsResponseSchema = z.object({
   ),
 }) satisfies z.ZodType<DownloadAnalyticsResponse>;
 
-function getDateRange(range: string): { startDate?: string; endDate?: string } {
+const getDateRange = (range: string): { startDate?: string; endDate?: string } => {
   if (range === 'all') return {};
   const days = parseInt(range);
   const endDate = new Date();
@@ -42,7 +42,7 @@ function getDateRange(range: string): { startDate?: string; endDate?: string } {
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
   };
-}
+};
 
 /**
  * Fetches download analytics for a release from the

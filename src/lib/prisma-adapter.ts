@@ -14,7 +14,7 @@ import type { Adapter } from 'next-auth/adapters';
 /** The app singleton is an $extends-ed client (slow-query logging) */
 type AdapterPrismaClient = PrismaClient | typeof prisma;
 
-export function CustomPrismaAdapter(p: AdapterPrismaClient): Adapter {
+export const CustomPrismaAdapter = (p: AdapterPrismaClient): Adapter => {
   // @auth/prisma-adapter v2 declares `PrismaClient | ReturnType<PrismaClient["$extends"]>`,
   // which TypeScript cannot resolve against @prisma/client v6's deeply-generic client
   // type (TS2321 "Excessive stack depth"). Cast to the function's own parameter type
@@ -207,4 +207,4 @@ export function CustomPrismaAdapter(p: AdapterPrismaClient): Adapter {
       };
     },
   } as Adapter;
-}
+};

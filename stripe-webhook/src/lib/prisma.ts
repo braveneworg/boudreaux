@@ -12,9 +12,9 @@ let prismaClient: PrismaClient | null = null;
  * Reads `process.env.DATABASE_URL`, injected by the Lambda function
  * configuration.
  */
-export function getPrisma(): PrismaClient {
+export const getPrisma = (): PrismaClient => {
   if (!prismaClient) {
     prismaClient = new PrismaClient();
   }
   return prismaClient;
-}
+};
