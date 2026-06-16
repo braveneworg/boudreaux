@@ -164,31 +164,6 @@ export class FeaturedArtistsService {
   }
 
   /**
-   * Delete a featured artist by ID (soft delete by setting deletedOn)
-   */
-  static async deleteFeaturedArtist(id: string): Promise<ServiceResponse<FeaturedArtist>> {
-    try {
-      const featuredArtist = await FeaturedArtistRepository.update(id, {
-        // Note: FeaturedArtist model doesn't have deletedOn, so we do a hard delete
-      });
-
-      return { success: true, data: featuredArtist };
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Featured artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      console.error('Unexpected error:', error);
-      return { success: false, error: 'Failed to delete featured artist' };
-    }
-  }
-
-  /**
    * Hard delete a featured artist by ID
    */
   static async hardDeleteFeaturedArtist(id: string): Promise<ServiceResponse<FeaturedArtist>> {

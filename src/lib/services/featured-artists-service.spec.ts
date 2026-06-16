@@ -333,49 +333,6 @@ describe('FeaturedArtistsService', () => {
     });
   });
 
-  describe('deleteFeaturedArtist', () => {
-    it('should soft-delete and return the featured artist', async () => {
-      mockUpdate.mockResolvedValue(mockFeaturedArtist as never);
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({ success: true, data: mockFeaturedArtist });
-      expect(mockUpdate).toHaveBeenCalledWith('fa-1', {});
-    });
-
-    it('should return not found error on P2025', async () => {
-      mockUpdate.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('missing');
-
-      expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
-    });
-
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockUpdate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should return error on generic exception', async () => {
-      mockUpdate.mockRejectedValue(new Error('Delete failed'));
-
-      const result = await FeaturedArtistsService.deleteFeaturedArtist('fa-1');
-
-      expect(result).toMatchObject({
-        success: false,
-        error: 'Failed to delete featured artist',
-      });
-    });
-  });
-
   describe('hardDeleteFeaturedArtist', () => {
     it('should hard-delete and return the featured artist', async () => {
       mockDelete.mockResolvedValue(mockFeaturedArtist as never);

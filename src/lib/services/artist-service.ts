@@ -84,7 +84,7 @@ export class ArtistService {
    */
   static async getArtistById(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.findById(id)) as unknown as Artist | null;
+      const artist = await ArtistRepository.findById(id);
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };
@@ -174,11 +174,7 @@ export class ArtistService {
       // The repository owns the include shape (images take 3, labels, urls,
       // releases → release) required by `artistSchema`, which the admin artists
       // query validates against.
-      const artists = (await ArtistRepository.findMany({
-        where,
-        skip,
-        take,
-      })) as unknown as Artist[];
+      const artists = await ArtistRepository.findMany({ where, skip, take });
 
       return { success: true, data: artists };
     } catch (error) {
@@ -635,11 +631,7 @@ export class ArtistService {
 
       // The repository owns the orderBy + lightweight images/releases include
       // the public search UI consumes.
-      const artists = (await ArtistRepository.searchPublished({
-        where,
-        skip,
-        take,
-      })) as unknown as Artist[];
+      const artists = await ArtistRepository.searchPublished({ where, skip, take });
 
       return { success: true, data: artists };
     } catch (error) {
