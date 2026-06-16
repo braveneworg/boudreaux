@@ -9,7 +9,7 @@ import {
   PUBLISHED_RELEASES_PAGE_SIZE,
   usePublishedReleaseSearchQuery,
   usePublishedReleasesQuery,
-} from './use-published-releases-query';
+} from './use-infinite-published-releases-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());
 const useQueryMock = vi.hoisted(() => vi.fn());

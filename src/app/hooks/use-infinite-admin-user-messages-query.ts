@@ -40,7 +40,7 @@ const adminUserMessagesResponseSchema = paginatedResponseSchema(adminUserMessage
  * @returns The parsed JSON response containing the messages page.
  * @throws If the response status is not OK.
  */
-const fetchPage = async ({
+const fetchAdminUserMessages = async ({
   userId,
   skip,
   signal,
@@ -64,7 +64,7 @@ const fetchPage = async ({
 /**
  * React Query infinite-query hook for paginating an admin user's chat messages.
  *
- * Wraps {@link fetchPage} with a stable query key and exposes the infinite
+ * Wraps {@link fetchAdminUserMessages} with a stable query key and exposes the infinite
  * query state. Cancellation is handled automatically via the forwarded
  * `AbortSignal`.
  *
@@ -79,7 +79,7 @@ export const useAdminUserMessagesQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.chat.userMessages(userId),
-    queryFn: ({ pageParam, signal }) => fetchPage({ userId, skip: pageParam, signal }),
+    queryFn: ({ pageParam, signal }) => fetchAdminUserMessages({ userId, skip: pageParam, signal }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     ...options,

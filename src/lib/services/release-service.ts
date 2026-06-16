@@ -24,7 +24,8 @@ import type { ServiceResponse } from './service.types';
 
 /**
  * Default page size for the public published-releases listing. Mirrors the
- * client-side `PUBLISHED_RELEASES_PAGE_SIZE` in `use-published-releases-query`
+ * client-side `PUBLISHED_RELEASES_PAGE_SIZE` in
+ * `use-infinite-published-releases-query`
  * (kept as a separate constant because this module is `server-only`).
  */
 const PUBLISHED_RELEASES_PAGE_SIZE = 24;

@@ -4,33 +4,34 @@
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import type { Artist } from '@/lib/types/media-models';
+import type { FeaturedArtist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { artistSchema } from '@/lib/validation/media-models-schema';
+import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 
 import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 
-/** Filters that drive the admin artists infinite query. */
-export interface ArtistsQueryParams {
+/** Filters that drive the admin featured-artists infinite query. */
+export interface FeaturedArtistsQueryParams {
   search: string;
   published: boolean | null;
   deleted: boolean;
 }
 
-/** One skip/offset page of artists returned by `/api/artists`. */
-export type ArtistsPaginatedResponse = PaginatedResponse<Artist>;
+/** One skip/offset page of featured artists returned by `/api/featured-artists`. */
+export type FeaturedArtistsPaginatedResponse = PaginatedResponse<FeaturedArtist>;
 
 /** Page size requested per fetch. */
-export const ARTISTS_PAGE_SIZE = 24;
+export const FEATURED_ARTISTS_PAGE_SIZE = 24;
 
-/** Strict schema for one `/api/artists` page. */
-const artistsPageSchema = paginatedResponseSchema(artistSchema);
+/** Strict schema for one `/api/featured-artists` page. */
+const featuredArtistsPaginatedResponseSchema = paginatedResponseSchema(featuredArtistSchema);
 
 /**
- * Fetches one page of artists from the `/api/artists` route handler.
+ * Fetches one page of featured artists from the `/api/featured-artists` route
+ * handler (admin listing — no `active` param).
  *
  * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
@@ -38,51 +39,55 @@ const artistsPageSchema = paginatedResponseSchema(artistSchema);
  * @param params - Server-side search/published/deleted filters.
  * @param skip - Offset of the page to fetch.
  * @param signal - The query's abort signal.
- * @returns The page of artists plus the `nextSkip` cursor.
+ * @returns The page of featured artists plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchArtistsPage = async (
-  params: ArtistsQueryParams,
+const fetchFeaturedArtists = async (
+  params: FeaturedArtistsQueryParams,
   skip: number,
   signal?: AbortSignal
-): Promise<ArtistsPaginatedResponse> => {
+): Promise<FeaturedArtistsPaginatedResponse> => {
   const searchParams = new URLSearchParams({
     skip: String(skip),
-    take: String(ARTISTS_PAGE_SIZE),
+    take: String(FEATURED_ARTISTS_PAGE_SIZE),
   });
   if (params.search) searchParams.set('search', params.search);
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
 
-  return fetchAndParse(`/api/artists?${searchParams.toString()}`, artistsPageSchema, {
-    signal,
-    errorMessage: 'Failed to fetch artists',
-  });
+  return fetchAndParse(
+    `/api/featured-artists?${searchParams.toString()}`,
+    featuredArtistsPaginatedResponseSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch featured artists',
+    }
+  );
 };
 
 /**
- * React Query infinite hook for the admin artists listing.
+ * React Query infinite hook for the admin featured-artists listing.
  *
- * Pages through `/api/artists` via skip/offset, accumulating results for
- * infinite scroll. Search, published, and deleted filters are applied
+ * Pages through `/api/featured-artists` via skip/offset, accumulating results
+ * for infinite scroll. Search, published, and deleted filters are applied
  * server-side and are part of the query key, so changing any of them resets
- * pagination. `keepPreviousData` keeps the current results visible during a
- * filter transition. Cancellation is automatic via the forwarded `AbortSignal`.
+ * pagination. Always refetches on mount so create/edit returns show fresh data.
  *
  * @param params - The server-side search/published/deleted filters.
  * @param options - Caller overrides spread into the `useInfiniteQuery` call
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
-export const useArtistsQuery = (
-  params: ArtistsQueryParams,
-  options: InfiniteQueryOptionsOverride<ArtistsPaginatedResponse> = {}
+export const useFeaturedArtistsQuery = (
+  params: FeaturedArtistsQueryParams,
+  options: InfiniteQueryOptionsOverride<FeaturedArtistsPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
-    queryKey: queryKeys.artists.adminInfinite(params),
-    queryFn: ({ pageParam, signal }) => fetchArtistsPage(params, pageParam, signal),
+    queryKey: queryKeys.featuredArtists.adminInfinite(params),
+    queryFn: ({ pageParam, signal }) => fetchFeaturedArtists(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
+    refetchOnMount: 'always', // Always refetch when admin page mounts (e.g., after create/edit)
     ...options,
   });

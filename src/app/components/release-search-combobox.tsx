@@ -25,7 +25,7 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { usePublishedReleaseSearchQuery } from '@/app/hooks/use-published-releases-query';
+import { usePublishedReleaseSearchQuery } from '@/app/hooks/use-infinite-published-releases-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { getArtistDisplayNameForRelease, getReleaseCoverArt } from '@/lib/utils/release-helpers';
 

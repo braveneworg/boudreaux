@@ -17,7 +17,7 @@ interface ChatMessagesPage {
   messages: ChatMessageDto[];
 }
 
-const chatMessagesPageSchema = z.object({
+const chatMessagesPaginatedResponseSchema = z.object({
   messages: z.array(chatMessageDtoSchema),
 }) satisfies z.ZodType<ChatMessagesPage>;
 
@@ -43,7 +43,7 @@ export const MAX_TOTAL_MESSAGES = 200;
  * @returns The parsed JSON response containing one page of messages.
  * @throws If the response status is not OK.
  */
-const fetchPage = async ({
+const fetchChatMessages = async ({
   pageParam,
   signal,
 }: {
@@ -56,7 +56,7 @@ const fetchPage = async ({
     params.set('cursorId', pageParam.cursorId);
   }
   const url = `/api/chat/messages?${params.toString()}`;
-  return fetchAndParse(url, chatMessagesPageSchema, {
+  return fetchAndParse(url, chatMessagesPaginatedResponseSchema, {
     signal,
     cache: 'no-store',
     errorMessage: 'Failed to load chat messages',
@@ -71,7 +71,7 @@ const fetchPage = async ({
  * The flattened ordering — oldest → newest — is exposed via `messages`
  * on the returned object; UI code never has to think about pages.
  *
- * Wraps {@link fetchPage}; cancellation is handled automatically via the
+ * Wraps {@link fetchChatMessages}; cancellation is handled automatically via the
  * forwarded `AbortSignal`.
  *
  * @param options - Caller overrides spread into the `useInfiniteQuery` call
@@ -85,7 +85,7 @@ export const useChatMessagesQuery = (
 ) => {
   const result = useInfiniteQuery({
     queryKey: queryKeys.chat.messages(),
-    queryFn: ({ pageParam, signal }) => fetchPage({ pageParam, signal }),
+    queryFn: ({ pageParam, signal }) => fetchChatMessages({ pageParam, signal }),
     initialPageParam: undefined as ChatCursor | undefined,
     getNextPageParam: (lastPage) => {
       if (lastPage.messages.length < PAGE_SIZE) return undefined;

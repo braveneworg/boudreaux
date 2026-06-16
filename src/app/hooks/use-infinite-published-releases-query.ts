@@ -20,7 +20,9 @@ export type PublishedReleasesPaginatedResponse = PaginatedResponse<PublishedRele
 export const PUBLISHED_RELEASES_PAGE_SIZE = 24;
 
 /** Strict schema for one `/api/releases?listing=published` page. */
-const publishedReleasesPageSchema = paginatedResponseSchema(publishedReleaseListingSchema);
+const publishedReleasesPaginatedResponseSchema = paginatedResponseSchema(
+  publishedReleaseListingSchema
+);
 
 /** Max combobox quick-search results. */
 const SEARCH_RESULT_LIMIT = 20;
@@ -39,7 +41,7 @@ const SEARCH_RESULT_LIMIT = 20;
  * @returns The page of releases plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchPublishedReleasesPage = async (
+const fetchPublishedReleases = async (
   search: string,
   skip: number,
   take: number,
@@ -52,10 +54,14 @@ const fetchPublishedReleasesPage = async (
   });
   if (search) params.set('search', search);
 
-  return fetchAndParse(`/api/releases?${params.toString()}`, publishedReleasesPageSchema, {
-    signal,
-    errorMessage: 'Failed to fetch releases',
-  });
+  return fetchAndParse(
+    `/api/releases?${params.toString()}`,
+    publishedReleasesPaginatedResponseSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch releases',
+    }
+  );
 };
 
 /**
@@ -78,7 +84,7 @@ export const usePublishedReleasesQuery = (
   useInfiniteQuery({
     queryKey: queryKeys.releases.publishedInfinite(search),
     queryFn: ({ pageParam, signal }) =>
-      fetchPublishedReleasesPage(search, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
+      fetchPublishedReleases(search, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
@@ -103,7 +109,7 @@ export const usePublishedReleaseSearchQuery = (
 ) =>
   useQuery({
     queryKey: queryKeys.releases.publishedInfinite(`combobox:${search}`),
-    queryFn: ({ signal }) => fetchPublishedReleasesPage(search, 0, SEARCH_RESULT_LIMIT, signal),
+    queryFn: ({ signal }) => fetchPublishedReleases(search, 0, SEARCH_RESULT_LIMIT, signal),
     select: (page) => page.rows,
     placeholderData: keepPreviousData,
     ...options,

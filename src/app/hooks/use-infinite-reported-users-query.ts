@@ -47,7 +47,7 @@ interface UseReportedUsersQueryParams {
  * @returns The page of reported users plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchReportedUsersPage = async (
+const fetchReportedUsers = async (
   { windowDays, search }: UseReportedUsersQueryParams,
   skip: number,
   signal?: AbortSignal
@@ -86,7 +86,7 @@ export const useReportedUsersQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.chat.reportedUsersInfinite(params.windowDays ?? 'all', params.search),
-    queryFn: ({ pageParam, signal }) => fetchReportedUsersPage(params, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchReportedUsers(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

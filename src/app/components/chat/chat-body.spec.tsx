@@ -37,7 +37,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false 
 vi.mock('@/hooks/use-chat-me-query', () => ({
   useChatMeQuery: (...args: unknown[]) => useChatMeQueryMock(...args),
 }));
-vi.mock('@/hooks/use-chat-messages-query', () => ({
+vi.mock('@/hooks/use-infinite-chat-messages-query', () => ({
   useChatMessagesQuery: (...args: unknown[]) => useChatMessagesQueryMock(...args),
 }));
 vi.mock('@/hooks/use-chat-pinned-messages-query', () => ({

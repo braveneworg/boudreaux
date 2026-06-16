@@ -34,7 +34,7 @@ export type ToursPaginatedResponse = PaginatedResponse<TourWithRelations>;
 export const TOURS_PAGE_SIZE = 24;
 
 /** Strict schema for one `/api/tours` page. */
-const toursPageSchema = paginatedResponseSchema(tourWithRelationsSchema);
+const toursPaginatedResponseSchema = paginatedResponseSchema(tourWithRelationsSchema);
 
 /**
  * Fetches one page of tours from the `/api/tours` route handler.
@@ -48,7 +48,7 @@ const toursPageSchema = paginatedResponseSchema(tourWithRelationsSchema);
  * @returns The page of tours plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchToursPage = async (
+const fetchTours = async (
   search: string,
   skip: number,
   signal?: AbortSignal
@@ -56,7 +56,7 @@ const fetchToursPage = async (
   const params = new URLSearchParams({ skip: String(skip), take: String(TOURS_PAGE_SIZE) });
   if (search) params.set('search', search);
 
-  return fetchAndParse(`/api/tours?${params.toString()}`, toursPageSchema, {
+  return fetchAndParse(`/api/tours?${params.toString()}`, toursPaginatedResponseSchema, {
     signal,
     errorMessage: 'Failed to fetch tours',
   });
@@ -82,7 +82,7 @@ export const useToursQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.tours.infinite(search),
-    queryFn: ({ pageParam, signal }) => fetchToursPage(search, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchTours(search, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

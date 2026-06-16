@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { useAdminUserMessagesQuery } from '@/hooks/use-admin-user-messages-query';
+import { useAdminUserMessagesQuery } from '@/hooks/use-infinite-admin-user-messages-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
