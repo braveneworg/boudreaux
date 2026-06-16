@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { useReleasesQuery } from '@/app/hooks/use-releases-query';
 
@@ -58,6 +59,7 @@ const createWrapper = () => {
 /** Wraps an array of release rows in the infinite-query page shape. */
 const toInfiniteResult = (rows: unknown[]) => ({
   isPending: false,
+  isFetching: false,
   error: null,
   data: { pages: [{ rows, nextSkip: null }] },
   refetch: vi.fn(),
@@ -303,5 +305,15 @@ describe('ReleaseDataView', () => {
     // No pages → flattened rows are empty; renders without crashing.
     expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
     expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
+  });
+
+  it('passes a published filter to the query when the publish toggles differ', async () => {
+    vi.mocked(useReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
+
+    expect(useReleasesQuery).toHaveBeenLastCalledWith(expect.objectContaining({ published: true }));
   });
 });

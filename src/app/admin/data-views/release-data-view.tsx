@@ -48,8 +48,16 @@ export const ReleaseDataView = () => {
   // Both same → no publish filter; otherwise the enabled one.
   const published = showPublished === showUnpublished ? null : showPublished;
 
-  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  const {
+    data,
+    isPending,
+    isFetching,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
 
   // Flatten the infinite pages and add the computed albumArtist field.
   const rows = useMemo(
@@ -77,6 +85,7 @@ export const ReleaseDataView = () => {
       forceHardDelete
       refetch={refetch}
       isPending={isPending}
+      isFetching={isFetching}
       error={null}
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}
