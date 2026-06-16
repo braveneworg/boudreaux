@@ -42,7 +42,7 @@ const releasesPageSchema = paginatedResponseSchema(releaseListItemSchema);
  * @returns The page of releases plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchReleasesPage = async (
+const fetchReleases = async (
   params: ReleasesQueryParams,
   skip: number,
   signal?: AbortSignal
@@ -81,7 +81,7 @@ export const useReleasesQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),
-    queryFn: ({ pageParam, signal }) => fetchReleasesPage(params, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchReleases(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

@@ -42,7 +42,7 @@ const featuredArtistsPageSchema = paginatedResponseSchema(featuredArtistSchema);
  * @returns The page of featured artists plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchFeaturedArtistsPage = async (
+const fetchFeaturedArtists = async (
   params: FeaturedArtistsQueryParams,
   skip: number,
   signal?: AbortSignal
@@ -84,7 +84,7 @@ export const useFeaturedArtistsQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.featuredArtists.adminInfinite(params),
-    queryFn: ({ pageParam, signal }) => fetchFeaturedArtistsPage(params, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchFeaturedArtists(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

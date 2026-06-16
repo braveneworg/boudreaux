@@ -48,7 +48,7 @@ const toursPageSchema = paginatedResponseSchema(tourWithRelationsSchema);
  * @returns The page of tours plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchToursPage = async (
+const fetchTours = async (
   search: string,
   skip: number,
   signal?: AbortSignal
@@ -82,7 +82,7 @@ export const useToursQuery = (
 ) =>
   useInfiniteQuery({
     queryKey: queryKeys.tours.infinite(search),
-    queryFn: ({ pageParam, signal }) => fetchToursPage(search, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchTours(search, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

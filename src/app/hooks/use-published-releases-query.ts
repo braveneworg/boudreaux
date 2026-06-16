@@ -39,7 +39,7 @@ const SEARCH_RESULT_LIMIT = 20;
  * @returns The page of releases plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchPublishedReleasesPage = async (
+const fetchPublishedReleases = async (
   search: string,
   skip: number,
   take: number,
@@ -78,7 +78,7 @@ export const usePublishedReleasesQuery = (
   useInfiniteQuery({
     queryKey: queryKeys.releases.publishedInfinite(search),
     queryFn: ({ pageParam, signal }) =>
-      fetchPublishedReleasesPage(search, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
+      fetchPublishedReleases(search, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
@@ -103,7 +103,7 @@ export const usePublishedReleaseSearchQuery = (
 ) =>
   useQuery({
     queryKey: queryKeys.releases.publishedInfinite(`combobox:${search}`),
-    queryFn: ({ signal }) => fetchPublishedReleasesPage(search, 0, SEARCH_RESULT_LIMIT, signal),
+    queryFn: ({ signal }) => fetchPublishedReleases(search, 0, SEARCH_RESULT_LIMIT, signal),
     select: (page) => page.rows,
     placeholderData: keepPreviousData,
     ...options,
