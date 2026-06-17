@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.130.0] - 2026-06-17
+
+### Added
+
+- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n
+
 ## [4.129.0] - 2026-06-16
 
 ### Added
