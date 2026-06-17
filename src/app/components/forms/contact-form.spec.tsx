@@ -62,7 +62,7 @@ const defaultState: FormState = {
   success: false,
 };
 
-function renderContactForm(overrides?: Partial<React.ComponentProps<typeof ContactForm>>) {
+const renderContactForm = (overrides?: Partial<React.ComponentProps<typeof ContactForm>>) => {
   const defaultProps: React.ComponentProps<typeof ContactForm> = {
     control: undefined as never, // Will be overridden by Wrapper
     isPending: false,
@@ -75,7 +75,7 @@ function renderContactForm(overrides?: Partial<React.ComponentProps<typeof Conta
   };
 
   // We need a form context wrapper with the real control
-  function TestHarness() {
+  const TestHarness = () => {
     const methods = useForm<ContactFormSchemaType>({
       defaultValues: {
         reason: '',
@@ -91,12 +91,12 @@ function renderContactForm(overrides?: Partial<React.ComponentProps<typeof Conta
         <ContactForm {...defaultProps} control={methods.control} setValue={methods.setValue} />
       </FormProvider>
     );
-  }
+  };
 
   const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(<TestHarness />);
   return { ...result, user };
-}
+};
 
 describe('ContactForm', () => {
   describe('rendering', () => {

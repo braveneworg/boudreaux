@@ -25,12 +25,12 @@ import { useDigitalFormatUploads } from './digital-formats/use-digital-format-up
 
 import type { DigitalFormatsAccordionProps } from './digital-formats/types';
 
-export function DigitalFormatsAccordion({
+export const DigitalFormatsAccordion = ({
   releaseId,
   existingFormats = [],
   onReleaseAutoCreated,
   onMetadataExtracted,
-}: DigitalFormatsAccordionProps) {
+}: DigitalFormatsAccordionProps) => {
   const {
     selectedFiles,
     errorMessages,
@@ -208,4 +208,4 @@ export function DigitalFormatsAccordion({
       />
     </Card>
   );
-}
+};

@@ -28,7 +28,7 @@ const loadAgent = () => {
  * Returns `{ fingerprint: null, isReady: false }` until resolution; the
  * caller should block sends or surface a "preparing…" state.
  */
-export function useFingerprint(): UseFingerprintResult {
+export const useFingerprint = (): UseFingerprintResult => {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,9 +47,9 @@ export function useFingerprint(): UseFingerprintResult {
   }, []);
 
   return { fingerprint, isReady: fingerprint !== null };
-}
+};
 
 /** Reset the cached agent — testing aid only. */
-export function resetFingerprintAgentForTesting(): void {
+export const resetFingerprintAgentForTesting = (): void => {
   agentPromise = null;
-}
+};

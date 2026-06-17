@@ -6,7 +6,7 @@ import { getPrisma } from '../lib/prisma.js';
 
 import type Stripe from 'stripe';
 
-export async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+export const handleChargeRefunded = async (charge: Stripe.Charge): Promise<void> => {
   const paymentIntentId =
     typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
 
@@ -25,4 +25,4 @@ export async function handleChargeRefunded(charge: Stripe.Charge): Promise<void>
   } else {
     console.warn('charge.refunded: no matching un-refunded purchase found', { paymentIntentId });
   }
-}
+};

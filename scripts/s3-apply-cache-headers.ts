@@ -88,10 +88,10 @@ const MEDIA_EXTENSIONS = new Set([
   '.aiff',
 ]);
 
-function log(
+const log = (
   message: string,
   type: 'info' | 'success' | 'warning' | 'error' | 'dim' = 'info'
-): void {
+): void => {
   const colorMap = {
     info: colors.blue,
     success: colors.green,
@@ -114,20 +114,20 @@ function log(
       console.info(formatted);
       break;
   }
-}
+};
 
-function formatBytes(bytes: number): string {
+const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
-function isMediaFile(key: string): boolean {
+const isMediaFile = (key: string): boolean => {
   const ext = extname(key).toLowerCase();
   return MEDIA_EXTENSIONS.has(ext);
-}
+};
 
 interface ScanResult {
   totalObjects: number;
@@ -145,7 +145,7 @@ interface ParsedArgs {
   prefix: string;
 }
 
-export function parseArgs(args: string[]): ParsedArgs {
+export const parseArgs = (args: string[]): ParsedArgs => {
   const result: ParsedArgs = {
     apply: false,
     force: false,
@@ -165,7 +165,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   }
 
   return result;
-}
+};
 
 /**
  * Apply Cache-Control headers to existing S3 objects.
@@ -174,11 +174,11 @@ export function parseArgs(args: string[]): ParsedArgs {
  * an object's Cache-Control header is to copy the object to itself with
  * the new metadata using `MetadataDirective: 'REPLACE'`.
  */
-export async function applyCacheHeaders(
+export const applyCacheHeaders = async (
   bucket: string,
   options: ParsedArgs,
   region: string = AWS_REGION
-): Promise<ScanResult> {
+): Promise<ScanResult> => {
   const s3Client = new S3Client({ region });
   const result: ScanResult = {
     totalObjects: 0,
@@ -281,9 +281,9 @@ export async function applyCacheHeaders(
   } while (continuationToken);
 
   return result;
-}
+};
 
-function printSummary(result: ScanResult, options: ParsedArgs): void {
+const printSummary = (result: ScanResult, options: ParsedArgs): void => {
   console.info('\n' + '='.repeat(60));
   log('Summary', 'info');
   console.info('='.repeat(60));
@@ -304,9 +304,9 @@ function printSummary(result: ScanResult, options: ParsedArgs): void {
     log('This was a dry run. Run with --apply to make changes.', 'warning');
   }
   console.info('='.repeat(60));
-}
+};
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const args = process.argv.slice(2);
 
   if (args.includes('--help') || args.includes('-h')) {
@@ -350,7 +350,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
     log(`Fatal error: ${msg}`, 'error');
     process.exit(1);
   }
-}
+};
 
 // True when this file is executed directly, not imported (ESM-safe require.main === module)
 const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);

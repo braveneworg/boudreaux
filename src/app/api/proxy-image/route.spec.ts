@@ -93,10 +93,10 @@ describe('GET /api/proxy-image', () => {
 
   const dummyContext = { params: Promise.resolve({}) };
 
-  function createRequest(url?: string): NextRequest {
+  const createRequest = (url?: string): NextRequest => {
     const searchParams = url ? `?url=${encodeURIComponent(url)}` : '';
     return new NextRequest(`http://localhost:3000/api/proxy-image${searchParams}`);
-  }
+  };
 
   it('returns 429 when the rate limit is exceeded', async () => {
     limiterCheckMock.mockRejectedValue(new Error('rate limited'));

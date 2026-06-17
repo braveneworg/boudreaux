@@ -5,11 +5,10 @@ import 'server-only';
 
 import { SESClient } from '@aws-sdk/client-ses';
 
-function getSesClient(): SESClient {
-  return new SESClient({
+const getSesClient = (): SESClient =>
+  new SESClient({
     region: process.env.AWS_REGION || 'us-east-1',
   });
-}
 
 /**
  * Lazily initialized SES client.

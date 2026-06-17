@@ -15,7 +15,7 @@ let cachedClient: Redis | null = null;
  * a process pays the construction cost; everyone else reuses the cached
  * instance.
  */
-export function getRedisClient(): Redis {
+export const getRedisClient = (): Redis => {
   if (cachedClient) {
     return cachedClient;
   }
@@ -31,9 +31,9 @@ export function getRedisClient(): Redis {
 
   cachedClient = new Redis({ url, token });
   return cachedClient;
-}
+};
 
 /** Reset the singleton — testing aid only. */
-export function resetRedisClientForTesting(): void {
+export const resetRedisClientForTesting = (): void => {
   cachedClient = null;
-}
+};

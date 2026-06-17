@@ -19,7 +19,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const isDryRun = process.argv.includes('--dry-run');
 
-async function main() {
+const main = async () => {
   console.info(isDryRun ? '=== DRY RUN ===' : '=== LIVE RUN ===');
 
   // Find all featured artists with their connected artists and release artists
@@ -83,7 +83,7 @@ async function main() {
   }
 
   console.info(`\n${isDryRun ? 'Would fix' : 'Fixed'} ${fixedCount} featured artist(s)`);
-}
+};
 
 main()
   .catch((err) => {

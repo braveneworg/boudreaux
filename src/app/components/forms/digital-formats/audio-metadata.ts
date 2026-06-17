@@ -9,7 +9,7 @@ import type { ExtractedAudioMetadata, ExtractedTrackMetadata } from './types';
  * music-metadata. Best-effort: any error is swallowed and an empty object
  * is returned.
  */
-export async function extractAudioMetadata(file: File): Promise<ExtractedAudioMetadata> {
+export const extractAudioMetadata = async (file: File): Promise<ExtractedAudioMetadata> => {
   const out: ExtractedAudioMetadata = {};
   try {
     const { parseBlob } = await import('music-metadata');
@@ -31,12 +31,12 @@ export async function extractAudioMetadata(file: File): Promise<ExtractedAudioMe
     // Best-effort: not all formats expose ID3-style metadata.
   }
   return out;
-}
+};
 
 /**
  * Extract per-track metadata (title, duration) from an audio file. Best-effort.
  */
-export async function extractTrackMetadata(file: File): Promise<ExtractedTrackMetadata> {
+export const extractTrackMetadata = async (file: File): Promise<ExtractedTrackMetadata> => {
   try {
     const { parseBlob } = await import('music-metadata');
     const parsedTrack = await parseBlob(file);
@@ -47,4 +47,4 @@ export async function extractTrackMetadata(file: File): Promise<ExtractedTrackMe
   } catch {
     return {};
   }
-}
+};

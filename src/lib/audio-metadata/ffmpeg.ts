@@ -23,11 +23,11 @@ import path from 'node:path';
  * a deterministic result across containers (Ogg/FLAC/MP3/M4A/AIFF) while
  * preserving unrelated tags.
  */
-export async function writeTagViaFfmpeg(
+export const writeTagViaFfmpeg = async (
   filePath: string,
   tagKey: string,
   tagValue: string
-): Promise<void> {
+): Promise<void> => {
   const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
   const tmpPath = path.join(dir, `.__tmp_${randomUUID()}${ext}`);
@@ -107,7 +107,7 @@ export async function writeTagViaFfmpeg(
     await fs.unlink(tmpPath).catch(() => {});
     throw err;
   }
-}
+};
 
 /**
  * Probes an audio file with ffprobe and returns all metadata tags as a
@@ -119,8 +119,8 @@ export async function writeTagViaFfmpeg(
  *
  * Returns an empty object if ffprobe fails or finds no tags.
  */
-async function probeMetadata(filePath: string): Promise<Record<string, string>> {
-  return new Promise((resolve) => {
+const probeMetadata = async (filePath: string): Promise<Record<string, string>> =>
+  new Promise((resolve) => {
     const args = [
       '-v',
       'quiet',
@@ -173,4 +173,3 @@ async function probeMetadata(filePath: string): Promise<Record<string, string>> 
       resolve({});
     });
   });
-}

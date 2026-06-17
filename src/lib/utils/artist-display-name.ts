@@ -21,7 +21,7 @@ import type { Artist } from '@prisma/client';
  * // Returns: "Artist Name" or "John Doe" or null
  * ```
  */
-export function getArtistDisplayNameForTour(artist: Artist | null): string | null {
+export const getArtistDisplayNameForTour = (artist: Artist | null): string | null => {
   if (!artist) {
     return null;
   }
@@ -45,4 +45,4 @@ export function getArtistDisplayNameForTour(artist: Artist | null): string | nul
 
   // 3. No name available
   return null;
-}
+};

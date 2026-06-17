@@ -36,7 +36,7 @@ export interface MobileMenuProps {
  * staggered menu links. Active-route detection mirrors the desktop menu via
  * `isActiveHref`. Rendered inside the hamburger sheet.
  */
-export function MobileMenu({ menuItems, onNavigate }: MobileMenuProps) {
+export const MobileMenu = ({ menuItems, onNavigate }: MobileMenuProps) => {
   const pathname = usePathname();
 
   return (
@@ -67,4 +67,4 @@ export function MobileMenu({ menuItems, onNavigate }: MobileMenuProps) {
       </ul>
     </nav>
   );
-}
+};

@@ -22,8 +22,8 @@ vi.mock('@/lib/prisma', () => ({
 describe('VisitorIdentityRepository', () => {
   let repo: VisitorIdentityRepository;
 
-  function createRow(overrides?: Partial<VisitorIdentity>): VisitorIdentity {
-    return {
+  const createRow = (overrides?: Partial<VisitorIdentity>): VisitorIdentity =>
+    ({
       id: 'vi-1',
       visitorId: 'visitor-abc',
       fingerprintHash: 'a'.repeat(64),
@@ -32,8 +32,7 @@ describe('VisitorIdentityRepository', () => {
       createdAt: new Date('2026-01-01T00:00:00Z'),
       updatedAt: new Date('2026-01-01T00:00:00Z'),
       ...overrides,
-    } as VisitorIdentity;
-  }
+    }) as VisitorIdentity;
 
   beforeEach(() => {
     repo = new VisitorIdentityRepository();

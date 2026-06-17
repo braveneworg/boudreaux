@@ -12,10 +12,10 @@ import type { WriteCommentOptions } from './types/audio';
  * FLAC embeds Vorbis Comments in its VORBIS_COMMENT metadata block —
  * the same key=value spec used by Ogg Vorbis, so the tag key is identical.
  */
-export async function writeFlacComment(
+export const writeFlacComment = async (
   filePath: string,
   comment: string,
   _options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   await writeTagViaFfmpeg(filePath, 'COMMENT', comment);
-}
+};

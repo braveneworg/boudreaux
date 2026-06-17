@@ -12,8 +12,8 @@
  * incorrect per the RFC and causes Safari to misidentify the file
  * extension (appending `.download` instead of `.zip`).
  */
-export function buildContentDisposition(fileName: string): string {
+export const buildContentDisposition = (fileName: string): string => {
   const asciiSafe = fileName.replace(/[\\"/]/g, '_');
   const encoded = encodeURIComponent(fileName).replace(/%20/g, '+');
   return `attachment; filename="${asciiSafe}"; filename*=UTF-8''${encoded}`;
-}
+};

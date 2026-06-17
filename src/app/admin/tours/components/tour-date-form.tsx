@@ -105,13 +105,13 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export function TourDateForm({
+export const TourDateForm = ({
   tourId,
   tourDate,
   open,
   onOpenChange,
   onSuccess,
-}: TourDateFormProps) {
+}: TourDateFormProps) => {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
   const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
@@ -713,4 +713,4 @@ export function TourDateForm({
       </DialogContent>
     </Dialog>
   );
-}
+};

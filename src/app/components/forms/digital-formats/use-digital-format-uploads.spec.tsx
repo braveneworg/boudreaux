@@ -47,24 +47,22 @@ vi.mock('sonner', () => ({
 const mockReleaseId = '507f1f77bcf86cd799439011';
 
 /** Build a fetch mock that resolves to a successful upload response. */
-function mockFetchSuccess(s3Key = 'uploads/key'): typeof fetch {
-  return vi.fn().mockResolvedValue({
+const mockFetchSuccess = (s3Key = 'uploads/key'): typeof fetch =>
+  vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({ success: true, s3Key, contentType: 'audio/mpeg' }),
   }) as unknown as typeof fetch;
-}
 
 /** Render the hook with sensible defaults; overrides merge into the options. */
-function renderUploads(overrides: Partial<Parameters<typeof useDigitalFormatUploads>[0]> = {}) {
-  return renderHook(() =>
+const renderUploads = (overrides: Partial<Parameters<typeof useDigitalFormatUploads>[0]> = {}) =>
+  renderHook(() =>
     useDigitalFormatUploads({
       releaseId: mockReleaseId,
       existingFormats: [],
       ...overrides,
     })
   );
-}
 
 beforeEach(() => {
   global.fetch = mockFetchSuccess();

@@ -39,25 +39,23 @@ describe('DownloadAuthorizationService', () => {
   const mockS3Key = 'releases/123/digital-formats/MP3_320KBPS/album.mp3';
   const mockFileName = 'album.mp3';
 
-  function createMockFormat(overrides?: Partial<ReleaseDigitalFormat>): ReleaseDigitalFormat {
-    return {
-      id: 'format123',
-      releaseId: mockReleaseId,
-      formatType: mockFormatType,
-      s3Key: mockS3Key,
-      fileName: mockFileName,
-      fileSize: BigInt(50000000),
-      mimeType: 'audio/mpeg',
-      trackCount: 0,
-      totalFileSize: null,
-      checksum: null,
-      uploadedAt: new Date(),
-      deletedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...overrides,
-    };
-  }
+  const createMockFormat = (overrides?: Partial<ReleaseDigitalFormat>): ReleaseDigitalFormat => ({
+    id: 'format123',
+    releaseId: mockReleaseId,
+    formatType: mockFormatType,
+    s3Key: mockS3Key,
+    fileName: mockFileName,
+    fileSize: BigInt(50000000),
+    mimeType: 'audio/mpeg',
+    trackCount: 0,
+    totalFileSize: null,
+    checksum: null,
+    uploadedAt: new Date(),
+    deletedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
 
   beforeEach(() => {
     service = new DownloadAuthorizationService();

@@ -76,9 +76,8 @@ export class SnsSmsService implements SmsService {
   }
 }
 
-export function buildSnsSmsServiceFromEnv(): SnsSmsService {
-  return new SnsSmsService({
+export const buildSnsSmsServiceFromEnv = (): SnsSmsService =>
+  new SnsSmsService({
     region: process.env.AWS_REGION ?? 'us-east-1',
     originationNumber: process.env.SNS_SMS_ORIGINATION_NUMBER,
   });
-}

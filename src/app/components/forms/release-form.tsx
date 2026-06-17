@@ -115,7 +115,7 @@ const PublishedToastContent = ({ title }: { title: string }) => (
   </>
 );
 
-export function ReleaseForm({ releaseId: initialReleaseId }: ReleaseFormProps) {
+export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) => {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createReleaseAction,
     initialFormState
@@ -1028,4 +1028,4 @@ export function ReleaseForm({ releaseId: initialReleaseId }: ReleaseFormProps) {
       </Card>
     </>
   );
-}
+};

@@ -106,18 +106,18 @@ interface UploadOptions {
 /**
  * Format bytes to human-readable string
  */
-export function formatBytes(bytes: number): string {
+export const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
 /**
  * Log message with color
  */
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const colorMap = {
     info: colors.blue,
     success: colors.green,
@@ -139,30 +139,30 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
       console.info(formattedMessage);
       break;
   }
-}
+};
 
 /**
  * Check if a file has an allowed image extension
  */
-export function isImageFile(filePath: string): boolean {
+export const isImageFile = (filePath: string): boolean => {
   const ext = filePath.toLowerCase().substring(filePath.lastIndexOf('.'));
   return IMAGE_EXTENSIONS.has(ext);
-}
+};
 
 /**
  * Resolve relative or absolute path
  */
-export function resolvePath(filePath: string): string {
+export const resolvePath = (filePath: string): string => {
   if (isAbsolute(filePath)) {
     return normalize(filePath);
   }
   return resolve(process.cwd(), filePath);
-}
+};
 
 /**
  * Generate S3 key from file path
  */
-export function generateS3Key(filePath: string, prefix?: string): string {
+export const generateS3Key = (filePath: string, prefix?: string): string => {
   // Normalize the path and convert to forward slashes for cross-platform consistency
   const normalizedPath = normalize(filePath).split('\\').join('/');
   let key = normalizedPath;
@@ -193,18 +193,18 @@ export function generateS3Key(filePath: string, prefix?: string): string {
   }
 
   return key;
-}
+};
 
 /**
  * Upload a single file to S3
  */
-async function uploadFile(
+const uploadFile = async (
   s3Client: S3Client,
   bucket: string,
   localPath: string,
   s3Key: string,
   result: UploadResult
-): Promise<void> {
+): Promise<void> => {
   try {
     if (!existsSync(localPath)) {
       log(`File not found: ${localPath}`, 'error');
@@ -250,12 +250,12 @@ async function uploadFile(
     result.failed++;
     result.errors.push({ path: localPath, error: errorMessage });
   }
-}
+};
 
 /**
  * Recursively collect image files from a directory
  */
-export function collectImagesFromDirectory(dirPath: string): string[] {
+export const collectImagesFromDirectory = (dirPath: string): string[] => {
   const images: string[] = [];
 
   if (!existsSync(dirPath)) {
@@ -282,7 +282,7 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
   }
 
   return images;
-}
+};
 
 /**
  * Invalidate CloudFront cache for uploaded files.
@@ -290,11 +290,11 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
  * For 3,000 keys or fewer, a single invalidation with explicit paths is sent.
  * For more than 3,000 keys, a single wildcard invalidation is used instead.
  */
-async function invalidateCloudFront(
+const invalidateCloudFront = async (
   distributionId: string,
   keys: string[],
   region: string
-): Promise<void> {
+): Promise<void> => {
   if (keys.length === 0) {
     return;
   }
@@ -347,17 +347,17 @@ async function invalidateCloudFront(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     log(`Warning: Failed to invalidate CloudFront cache: ${errorMessage}`, 'warning');
   }
-}
+};
 
 /**
  * Upload images to S3
  */
-export async function uploadImages(
+export const uploadImages = async (
   bucket: string,
   filePaths: string[],
   options: UploadOptions = {},
   region = AWS_REGION
-): Promise<UploadResult> {
+): Promise<UploadResult> => {
   const result: UploadResult = {
     successful: 0,
     failed: 0,
@@ -410,18 +410,20 @@ export async function uploadImages(
   }
 
   return result;
-}
+};
 
 /**
  * Parse command line arguments
  */
-export function parseArgs(args: string[]): {
+export const parseArgs = (
+  args: string[]
+): {
   mode: 'files' | 'directory';
   paths: string[];
   prefix?: string;
   invalidateCache: boolean;
   baseDir?: string;
-} {
+} => {
   const result = {
     mode: 'files' as 'files' | 'directory',
     paths: [] as string[],
@@ -454,12 +456,12 @@ export function parseArgs(args: string[]): {
   }
 
   return result;
-}
+};
 
 /**
  * Main function
  */
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
@@ -558,7 +560,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
     log(`Fatal error: ${errorMessage}`, 'error');
     process.exit(1);
   }
-}
+};
 
 // Run main if this is the entry point
 if (isMainModule) {

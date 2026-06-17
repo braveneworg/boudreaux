@@ -16,28 +16,27 @@ export interface ChatMentionEmailData {
   signInUrl: string;
 }
 
-function escapeHtml(text: string): string {
-  return text
+const escapeHtml = (text: string): string =>
+  text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
 
 /** Trim long messages so the email preview stays readable. */
-function truncate(text: string, max = 280): string {
+const truncate = (text: string, max = 280): string => {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1).trimEnd()}…`;
-}
+};
 
-function formatTimestamp(iso: string): string {
+const formatTimestamp = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toUTCString();
-}
+};
 
-function renderMentionCard(mention: ChatMentionEntry, includeAuthor: boolean): string {
+const renderMentionCard = (mention: ChatMentionEntry, includeAuthor: boolean): string => {
   const safeBody = escapeHtml(truncate(mention.body));
   const safeAuthor = escapeHtml(mention.authorUsername);
   const timestamp = formatTimestamp(mention.createdAt);
@@ -52,9 +51,9 @@ function renderMentionCard(mention: ChatMentionEntry, includeAuthor: boolean): s
                 </td>
               </tr>
             </table>`;
-}
+};
 
-export function buildChatMentionEmailHtml(data: ChatMentionEmailData): string {
+export const buildChatMentionEmailHtml = (data: ChatMentionEmailData): string => {
   const isDigest = data.mentions.length > 1;
   const headerLabel = isDigest ? `Chat Mentions (${data.mentions.length})` : 'Chat Mention';
   const title = isDigest
@@ -137,4 +136,4 @@ export function buildChatMentionEmailHtml(data: ChatMentionEmailData): string {
   </table>
 </body>
 </html>`;
-}
+};

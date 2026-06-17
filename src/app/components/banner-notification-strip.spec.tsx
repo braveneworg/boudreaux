@@ -19,15 +19,13 @@ vi.mock('@/lib/validation/banner-notification-schema', () => ({
   addLinkAttributes: (html: string) => html,
 }));
 
-function makeNotification(overrides: Partial<BannerNotification> = {}): BannerNotification {
-  return {
-    id: 'n1',
-    content: 'Hello world',
-    textColor: '#fff',
-    backgroundColor: '#000',
-    ...overrides,
-  };
-}
+const makeNotification = (overrides: Partial<BannerNotification> = {}): BannerNotification => ({
+  id: 'n1',
+  content: 'Hello world',
+  textColor: '#fff',
+  backgroundColor: '#000',
+  ...overrides,
+});
 
 const baseProps = {
   outgoing: null,

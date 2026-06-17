@@ -50,7 +50,7 @@ const TEST_USERS: Record<string, TestUser> = {
  * before the replica set election completes. This helper retries a
  * lightweight write until it succeeds or the timeout is exceeded.
  */
-async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Promise<void> {
+const waitForReplicaSet = async (prisma: PrismaClient, maxWaitMs = 30_000): Promise<void> => {
   const start = Date.now();
   const retryIntervalMs = 1_000;
 
@@ -82,7 +82,7 @@ async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Prom
     `MongoDB replica set was not ready after ${maxWaitMs / 1000}s. ` +
       'Ensure the Docker container is running: pnpm run e2e:docker:up'
   );
-}
+};
 
 /**
  * Idempotent seed script for the E2E test database. Clears all collections
@@ -92,7 +92,7 @@ async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Prom
  * the local Docker MongoDB on `localhost:27018`. There is intentionally no
  * escape hatch — E2E must never touch a remote / production database.
  */
-async function seedTestDatabase() {
+const seedTestDatabase = async () => {
   try {
     new URL(E2E_DATABASE_URL);
   } catch {
@@ -592,6 +592,6 @@ async function seedTestDatabase() {
   } finally {
     await prisma.$disconnect();
   }
-}
+};
 
 export { seedTestDatabase, TEST_USERS };

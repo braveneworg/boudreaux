@@ -16,7 +16,7 @@ interface HealthCheckResult {
 /**
  * Check database connection health
  */
-export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
+export const checkDatabaseHealth = async (): Promise<HealthCheckResult> => {
   const start = Date.now();
 
   try {
@@ -36,12 +36,12 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
       error: error instanceof Error ? error.message : 'Unknown database error',
     };
   }
-}
+};
 
 /**
  * Retry database operation with exponential backoff
  */
-export async function withRetry<T>(
+export const withRetry = async <T>(
   operation: () => Promise<T>,
   options: {
     maxRetries?: number;
@@ -49,7 +49,7 @@ export async function withRetry<T>(
     maxDelay?: number;
     factor?: number;
   } = {}
-): Promise<T> {
+): Promise<T> => {
   const { maxRetries = 3, initialDelay = 1000, maxDelay = 10000, factor = 2 } = options;
 
   let lastError: Error | undefined;
@@ -78,12 +78,12 @@ export async function withRetry<T>(
   }
 
   throw lastError || Error('Operation failed after retries');
-}
+};
 
 /**
  * Determine if an error is retryable
  */
-function isRetryableError(error: Error): boolean {
+const isRetryableError = (error: Error): boolean => {
   const retryableMessages = [
     'ETIMEOUT',
     'ECONNRESET',
@@ -95,4 +95,4 @@ function isRetryableError(error: Error): boolean {
 
   const message = error.message.toLowerCase();
   return retryableMessages.some((msg) => message.includes(msg.toLowerCase()));
-}
+};

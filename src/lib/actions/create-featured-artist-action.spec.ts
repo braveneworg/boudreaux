@@ -26,7 +26,7 @@ const adminSession = { user: { id: 'admin-1', role: 'admin' } };
 const VALID_OBJECT_ID = 'abcdef1234567890abcdef12';
 const VALID_OBJECT_ID_2 = 'fedcba0987654321fedcba09';
 
-function buildFormData(fields: Record<string, string | string[]>): FormData {
+const buildFormData = (fields: Record<string, string | string[]>): FormData => {
   const fd = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (Array.isArray(value)) {
@@ -36,7 +36,7 @@ function buildFormData(fields: Record<string, string | string[]>): FormData {
     }
   }
   return fd;
-}
+};
 
 const initialFormState = {
   success: false,

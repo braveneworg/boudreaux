@@ -67,17 +67,15 @@ export const createMockToast = () =>
 /**
  * Factory for creating mock Prisma responses
  */
-export function createMockPrismaResponse<T>(data: T) {
-  return {
-    findMany: vi.fn().mockResolvedValue(Array.isArray(data) ? data : [data]),
-    findUnique: vi.fn().mockResolvedValue(data),
-    findFirst: vi.fn().mockResolvedValue(data),
-    create: vi.fn().mockResolvedValue(data),
-    update: vi.fn().mockResolvedValue(data),
-    delete: vi.fn().mockResolvedValue(data),
-    count: vi.fn().mockResolvedValue(Array.isArray(data) ? data.length : 1),
-  };
-}
+export const createMockPrismaResponse = <T>(data: T) => ({
+  findMany: vi.fn().mockResolvedValue(Array.isArray(data) ? data : [data]),
+  findUnique: vi.fn().mockResolvedValue(data),
+  findFirst: vi.fn().mockResolvedValue(data),
+  create: vi.fn().mockResolvedValue(data),
+  update: vi.fn().mockResolvedValue(data),
+  delete: vi.fn().mockResolvedValue(data),
+  count: vi.fn().mockResolvedValue(Array.isArray(data) ? data.length : 1),
+});
 
 /**
  * Mock FormData factory for testing server actions
@@ -93,15 +91,13 @@ export const createMockFormData = (entries: Record<string, string | Blob>) => {
 /**
  * Mock fetch response factory
  */
-export function createMockFetchResponse<T>(data: T, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi.fn().mockResolvedValue(data),
-    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
-    headers: new Headers(),
-  };
-}
+export const createMockFetchResponse = <T>(data: T, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: vi.fn().mockResolvedValue(data),
+  text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+  headers: new Headers(),
+});
 
 /**
  * Create a mock auth function that returns an admin session

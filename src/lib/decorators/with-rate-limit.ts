@@ -29,8 +29,9 @@ type RateLimitedHandler<TParams = unknown> = (
  * @param limiter - A rate limiter instance from `rateLimit()`
  * @param limit - Maximum number of requests allowed per window
  */
-export function withRateLimit<TParams = unknown>(limiter: RateLimiter, limit: number) {
-  return (handler: RateLimitedHandler<TParams>) => {
+export const withRateLimit =
+  <TParams = unknown>(limiter: RateLimiter, limit: number) =>
+  (handler: RateLimitedHandler<TParams>) => {
     return async (request: NextRequest, context: { params: Promise<unknown> }) =>
       runWithRequestContext(resolveRequestId(request.headers), async () => {
         // Skip rate limiting in E2E test mode to avoid 429 errors during test runs
@@ -60,4 +61,3 @@ export function withRateLimit<TParams = unknown>(limiter: RateLimiter, limit: nu
         return handler(request, context as { params: Promise<TParams> });
       });
   };
-}

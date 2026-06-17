@@ -62,7 +62,7 @@ interface MongoConnectionInfo {
 /**
  * Parse MongoDB connection string to extract database name and connection URI
  */
-export function parseMongoUri(uri: string): MongoConnectionInfo {
+export const parseMongoUri = (uri: string): MongoConnectionInfo => {
   try {
     // MongoDB URI format: mongodb[+srv]://username:password@host[:port]/database[?options]
     const url = new URL(uri);
@@ -89,14 +89,14 @@ export function parseMongoUri(uri: string): MongoConnectionInfo {
       `Failed to parse MongoDB URI: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
-}
+};
 
 /**
  * Clean up old backup files, keeping only the most recent ones
  * @param backupDir Directory containing backup files
  * @param keepCount Number of most recent backups to keep (default: 5)
  */
-export function cleanupOldBackups(backupDir: string, keepCount = 5): void {
+export const cleanupOldBackups = (backupDir: string, keepCount = 5): void => {
   if (!existsSync(backupDir)) {
     return;
   }
@@ -134,12 +134,12 @@ export function cleanupOldBackups(backupDir: string, keepCount = 5): void {
       error instanceof Error ? error.message : 'Unknown error'
     );
   }
-}
+};
 
 /**
  * Create a MongoDB dump
  */
-export function dumpDatabase(outputFile?: string, dbUrl?: string): void {
+export const dumpDatabase = (outputFile?: string, dbUrl?: string): void => {
   const { uri, database } = parseMongoUri(dbUrl || DATABASE_URL || '');
 
   // Generate default filename if not provided (ISO 8601 format: YYYY-MM-DDTHH-MM-SS-mongo-backup.archive)
@@ -194,12 +194,12 @@ export function dumpDatabase(outputFile?: string, dbUrl?: string): void {
     console.error('  Windows: Download from https://www.mongodb.com/try/download/database-tools');
     process.exit(1);
   }
-}
+};
 
 /**
  * Restore a MongoDB dump
  */
-export function restoreDatabase(inputFile: string, dbUrl?: string): void {
+export const restoreDatabase = (inputFile: string, dbUrl?: string): void => {
   const { uri, database } = parseMongoUri(dbUrl || DATABASE_URL || '');
   const backupPath = resolve(inputFile);
 
@@ -245,12 +245,12 @@ export function restoreDatabase(inputFile: string, dbUrl?: string): void {
     console.error('  Windows: Download from https://www.mongodb.com/try/download/database-tools');
     process.exit(1);
   }
-}
+};
 
 /**
  * Display usage information
  */
-export function showUsage(): void {
+export const showUsage = (): void => {
   console.info('MongoDB Backup and Restore Script');
   console.info('');
   console.info('Usage:');
@@ -262,7 +262,7 @@ export function showUsage(): void {
   console.info('  pnpm run mongo:dump backups/my-backup.archive');
   console.info('  pnpm run mongo:restore backups/my-backup.archive');
   console.info('');
-}
+};
 
 // Main execution - only run when script is executed directly
 if (isMainModule) {

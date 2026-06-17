@@ -22,7 +22,7 @@ interface DispatchInput {
  * Privacy: reporter identity is intentionally absent from both message
  * bodies. The function does not even accept a reporter parameter.
  */
-export async function dispatchAbuseReportNotifications(input: DispatchInput): Promise<void> {
+export const dispatchAbuseReportNotifications = async (input: DispatchInput): Promise<void> => {
   const admins = await UserRepository.findAdmins();
 
   if (admins.length === 0) {
@@ -75,4 +75,4 @@ export async function dispatchAbuseReportNotifications(input: DispatchInput): Pr
       await Promise.all([emailPromise, smsPromise]);
     })
   );
-}
+};

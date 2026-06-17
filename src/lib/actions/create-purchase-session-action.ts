@@ -30,7 +30,7 @@ const limiter = rateLimit({
  * Resolves the session cookie name and attributes to match the configuration
  * in `auth.ts`. This must stay in sync with the auth config.
  */
-function getSessionCookieConfig() {
+const getSessionCookieConfig = () => {
   const isSecure = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
   const name = isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token';
   return {
@@ -42,7 +42,7 @@ function getSessionCookieConfig() {
       secure: isSecure,
     },
   };
-}
+};
 
 interface CreatePurchaseSessionInput {
   sessionId: string;
@@ -60,9 +60,9 @@ interface CreatePurchaseSessionResult {
  * The Stripe checkout session ID is used as the trust anchor — only a client
  * that initiated the checkout possesses it.
  */
-export async function createPurchaseSessionAction(
+export const createPurchaseSessionAction = async (
   input: CreatePurchaseSessionInput
-): Promise<CreatePurchaseSessionResult> {
+): Promise<CreatePurchaseSessionResult> => {
   const { sessionId } = input;
 
   // Skip if the user is already authenticated.
@@ -152,4 +152,4 @@ export async function createPurchaseSessionAction(
     loggers.payments.error('createPurchaseSession: failed to create session', error);
     return { success: false, error: 'server_error' };
   }
-}
+};

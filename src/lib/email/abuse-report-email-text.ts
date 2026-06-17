@@ -8,8 +8,9 @@ interface AbuseReportEmailData {
   moderationUrl: string;
 }
 
-export function buildAbuseReportEmailText(data: AbuseReportEmailData): string {
-  return `FAKE FOUR INC. — ABUSE REPORT
+export const buildAbuseReportEmailText = (
+  data: AbuseReportEmailData
+): string => `FAKE FOUR INC. — ABUSE REPORT
 ==============================
 
 Hi ${data.recipientUsername},
@@ -22,4 +23,3 @@ ${data.moderationUrl}
 
 --
 Fake Four Inc. — fakefourrecords.com`;
-}

@@ -13,6 +13,7 @@ import importPlugin from 'eslint-plugin-import';
 import nextPlugin from '@next/eslint-plugin-next';
 import globals from 'globals';
 import unusedImports from 'eslint-plugin-unused-imports';
+import preferArrowFunctions from 'eslint-plugin-prefer-arrow-functions';
 import vitest from '@vitest/eslint-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,6 +69,7 @@ const eslintConfig = [
       import: importPlugin,
       prettier: prettierPlugin,
       'unused-imports': unusedImports,
+      'prefer-arrow-functions': preferArrowFunctions,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -233,7 +235,50 @@ const eslintConfig = [
       'object-shorthand': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-unneeded-ternary': 'error',
+
+      // Project convention: prefer arrow functions over `function` declarations and
+      // named function expressions. The plugin only reports/auto-fixes cases where the
+      // conversion preserves behaviour — it skips generators, functions that use `this`,
+      // `arguments`, or `new.target`, and `export default function` declarations.
+      // `returnStyle: 'unchanged'` keeps the rule scoped to function-vs-arrow only; it
+      // does not police the return-body style of existing arrow functions.
+      // Object methods stay as shorthand (`allowObjectProperties`) to avoid `this` churn.
+      'prefer-arrow-functions/prefer-arrow-functions': [
+        'error',
+        {
+          allowNamedFunctions: false,
+          allowObjectProperties: true,
+          classPropertiesAllowed: false,
+          returnStyle: 'unchanged',
+        },
+      ],
       ...prettierConfig.rules,
+    },
+  },
+  // Next.js App Router special files conventionally use named (often default-exported)
+  // function declarations — keep them as-is and exempt them from the arrow-function rule.
+  {
+    files: [
+      '**/page.tsx',
+      '**/layout.tsx',
+      '**/loading.tsx',
+      '**/error.tsx',
+      '**/global-error.tsx',
+      '**/not-found.tsx',
+      '**/template.tsx',
+      '**/default.tsx',
+      '**/route.ts',
+      '**/middleware.ts',
+      '**/instrumentation.ts',
+      '**/manifest.ts',
+      '**/sitemap.ts',
+      '**/robots.ts',
+      '**/opengraph-image.tsx',
+      '**/icon.tsx',
+      '**/apple-icon.tsx',
+    ],
+    rules: {
+      'prefer-arrow-functions/prefer-arrow-functions': 'off',
     },
   },
   // Vitest testing configuration

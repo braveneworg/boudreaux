@@ -35,25 +35,23 @@ describe('ReleaseDigitalFormatRepository', () => {
   const mockReleaseId = '507f1f77bcf86cd799439011';
   const mockS3Key = 'releases/123/digital-formats/MP3_320KBPS/album.mp3';
 
-  function createMockFormat(overrides?: Partial<ReleaseDigitalFormat>): ReleaseDigitalFormat {
-    return {
-      id: 'format123',
-      releaseId: mockReleaseId,
-      formatType: 'MP3_320KBPS',
-      s3Key: mockS3Key,
-      fileName: 'album.mp3',
-      fileSize: BigInt(50000000),
-      mimeType: 'audio/mpeg',
-      trackCount: 0,
-      totalFileSize: null,
-      checksum: null,
-      uploadedAt: new Date(),
-      deletedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...overrides,
-    };
-  }
+  const createMockFormat = (overrides?: Partial<ReleaseDigitalFormat>): ReleaseDigitalFormat => ({
+    id: 'format123',
+    releaseId: mockReleaseId,
+    formatType: 'MP3_320KBPS',
+    s3Key: mockS3Key,
+    fileName: 'album.mp3',
+    fileSize: BigInt(50000000),
+    mimeType: 'audio/mpeg',
+    trackCount: 0,
+    totalFileSize: null,
+    checksum: null,
+    uploadedAt: new Date(),
+    deletedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
 
   beforeEach(() => {
     repository = new ReleaseDigitalFormatRepository();

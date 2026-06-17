@@ -80,16 +80,16 @@ vi.mock('@/app/components/ui/checkbox', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({
+const TestWrapper = ({
   children,
   defaultValues = {},
 }: {
   children: React.ReactNode;
   defaultValues?: Record<string, unknown>;
-}) {
+}) => {
   const methods = useForm({ defaultValues });
   return <FormProvider {...methods}>{children}</FormProvider>;
-}
+};
 
 describe('CheckboxField', () => {
   const defaultProps = {

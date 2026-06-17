@@ -55,11 +55,11 @@ export interface ChatRateLimitResult {
  *
  * Skipped entirely in E2E mode to keep test suites deterministic.
  */
-export async function checkChatRateLimit(
+export const checkChatRateLimit = async (
   userId: string,
   fingerprint: string,
   ip: string
-): Promise<ChatRateLimitResult> {
+): Promise<ChatRateLimitResult> => {
   if (process.env.E2E_MODE === 'true') {
     return {
       success: true,
@@ -74,9 +74,9 @@ export async function checkChatRateLimit(
   const retryAfterSeconds = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
 
   return { success, remaining, reset, retryAfterSeconds };
-}
+};
 
 /** Reset the limiter singleton — testing aid only. */
-export function resetChatRateLimitForTesting(): void {
+export const resetChatRateLimitForTesting = (): void => {
   cachedLimiter = null;
-}
+};

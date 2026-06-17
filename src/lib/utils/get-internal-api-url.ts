@@ -16,7 +16,7 @@ import 'server-only';
  * undici resolves `localhost` to `::1` (IPv6) first, and Next.js by default binds the
  * standalone server to IPv4 only — causing self-fetches to fail with ECONNREFUSED.
  */
-export function getInternalApiUrl(path: string): string {
+export const getInternalApiUrl = (path: string): string => {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://127.0.0.1:3000';
   return `${baseUrl}${path}`;
-}
+};

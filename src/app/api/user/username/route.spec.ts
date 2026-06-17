@@ -48,13 +48,12 @@ vi.mock('@prisma/client/runtime/library', () => {
   return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
 });
 
-function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest('http://localhost:3000/api/user/username', {
+const createRequest = (body: Record<string, unknown>): NextRequest =>
+  new NextRequest('http://localhost:3000/api/user/username', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-}
 
 describe('POST /api/user/username', () => {
   beforeEach(() => {

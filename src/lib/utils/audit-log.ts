@@ -80,7 +80,7 @@ interface AuditLogEntry {
  * Log a security audit event
  * Emitted via the structured logger (timestamp is added by the logger)
  */
-export function logSecurityEvent(entry: Omit<AuditLogEntry, 'timestamp'>): void {
+export const logSecurityEvent = (entry: Omit<AuditLogEntry, 'timestamp'>): void => {
   const { event, userId, email, ip, userAgent, metadata } = entry;
 
   loggers.audit.info(event, {
@@ -96,12 +96,12 @@ export function logSecurityEvent(entry: Omit<AuditLogEntry, 'timestamp'>): void 
   if (shouldPersistEvent(event)) {
     // TODO: Store in audit_logs table
   }
-}
+};
 
 /**
  * Determine if event should be persisted to database
  */
-function shouldPersistEvent(event: AuditEvent): boolean {
+const shouldPersistEvent = (event: AuditEvent): boolean => {
   const criticalEvents: AuditEvent[] = [
     'auth.signin.failed',
     'user.email.changed',
@@ -109,17 +109,17 @@ function shouldPersistEvent(event: AuditEvent): boolean {
     'api.unauthorized_access',
   ];
   return criticalEvents.includes(event);
-}
+};
 
 /**
  * Extract safe request metadata for logging
  */
-export function extractRequestMetadata(request: Request): {
+export const extractRequestMetadata = (
+  request: Request
+): {
   ip?: string;
   userAgent?: string;
-} {
-  return {
-    ip: request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || undefined,
-    userAgent: request.headers.get('user-agent') || undefined,
-  };
-}
+} => ({
+  ip: request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || undefined,
+  userAgent: request.headers.get('user-agent') || undefined,
+});

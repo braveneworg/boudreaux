@@ -15,14 +15,14 @@ let cached: SmsService | null = null;
  * dispatch real SMS; set `SMS_PROVIDER=sns` in production to swap in
  * the SNS-backed implementation.
  */
-export function getSmsService(): SmsService {
+export const getSmsService = (): SmsService => {
   if (cached) return cached;
   const provider = resolveSmsProvider();
   cached = provider === 'sns' ? buildSnsSmsServiceFromEnv() : new NoOpSmsService();
   return cached;
-}
+};
 
 /** Test-only — drops the cached instance between specs. */
-export function resetSmsServiceForTesting(override?: SmsService): void {
+export const resetSmsServiceForTesting = (override?: SmsService): void => {
   cached = override ?? null;
-}
+};

@@ -6,7 +6,7 @@
  * Run this early in the application lifecycle to catch configuration errors
  */
 
-export function validateEnvironment() {
+export const validateEnvironment = () => {
   // Skip validation during build phase (secrets not available in Docker build)
   // or when explicitly disabled (e.g. E2E test runs that inject stub env vars).
   if (process.env.SKIP_ENV_VALIDATION === 'true') {
@@ -69,7 +69,7 @@ export function validateEnvironment() {
   }
 
   console.info('✅ Environment validation passed');
-}
+};
 
 // For production builds
 if (process.env.NODE_ENV === 'production') {

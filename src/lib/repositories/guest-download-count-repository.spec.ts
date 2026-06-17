@@ -24,8 +24,8 @@ describe('GuestDownloadCountRepository', () => {
   const visitorId = 'visitor-1';
   const releaseId = 'release-1';
 
-  function makeRow(overrides?: Partial<GuestDownloadCount>): GuestDownloadCount {
-    return {
+  const makeRow = (overrides?: Partial<GuestDownloadCount>): GuestDownloadCount =>
+    ({
       id: 'row-1',
       visitorId,
       releaseId,
@@ -34,8 +34,7 @@ describe('GuestDownloadCountRepository', () => {
       createdAt: new Date('2026-05-06T00:00:00.000Z'),
       updatedAt: new Date('2026-05-06T00:00:00.000Z'),
       ...overrides,
-    } as GuestDownloadCount;
-  }
+    }) as GuestDownloadCount;
 
   beforeEach(() => {
     repo = new GuestDownloadCountRepository();

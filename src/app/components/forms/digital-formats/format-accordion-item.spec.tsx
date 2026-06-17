@@ -25,7 +25,7 @@ const config: FormatConfig = {
 type Overrides = Partial<React.ComponentProps<typeof FormatAccordionItem>>;
 
 /** Render the accordion item inside an open Accordion so its content mounts. */
-function renderItem(overrides: Overrides = {}) {
+const renderItem = (overrides: Overrides = {}) => {
   const fileInputRef: MutableRefObject<Record<string, HTMLInputElement | null>> = { current: {} };
   const uploadButtonRef: MutableRefObject<Record<string, HTMLButtonElement | null>> = {
     current: {},
@@ -62,7 +62,7 @@ function renderItem(overrides: Overrides = {}) {
     ),
     uploadButtonRef,
   };
-}
+};
 
 describe('FormatAccordionItem', () => {
   describe('getStatusText default branch', () => {

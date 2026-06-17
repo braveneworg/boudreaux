@@ -14,10 +14,12 @@ export interface SSEEvent {
  * SSE events are delimited by double newlines (`\n\n`). Each block may
  * contain `event:` and `data:` fields.
  */
-export function parseSSEBuffer(buffer: string): {
+export const parseSSEBuffer = (
+  buffer: string
+): {
   events: SSEEvent[];
   remaining: string;
-} {
+} => {
   const events: SSEEvent[] = [];
   const blocks = buffer.split('\n\n');
 
@@ -44,4 +46,4 @@ export function parseSSEBuffer(buffer: string): {
   }
 
   return { events, remaining };
-}
+};

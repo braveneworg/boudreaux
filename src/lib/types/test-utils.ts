@@ -43,14 +43,9 @@ export type MockedFormReturn<TFieldValues extends FieldValues = FieldValues> = {
  * });
  * ```
  */
-export function createMockedForm<TFieldValues extends FieldValues = FieldValues>(
+export const createMockedForm = <TFieldValues extends FieldValues = FieldValues>(
   overrides: MockedFormReturn<TFieldValues>
-): UseFormReturn<TFieldValues> {
-  // Type assertion is necessary here because we're converting a partial mock
-  // to a full UseFormReturn type. This is safe in test contexts where we only
-  // interact with the mocked properties.
-  return overrides as unknown as UseFormReturn<TFieldValues>;
-}
+): UseFormReturn<TFieldValues> => overrides as unknown as UseFormReturn<TFieldValues>;
 
 /**
  * Type helper for mocking global objects with proper typing

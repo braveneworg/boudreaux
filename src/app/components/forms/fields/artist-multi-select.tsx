@@ -50,7 +50,7 @@ interface ArtistMultiSelectProps<
   initialArtists?: ArtistOption[];
 }
 
-export function ArtistMultiSelect<
+export const ArtistMultiSelect = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -65,7 +65,7 @@ export function ArtistMultiSelect<
   releaseId,
   disabled = false,
   initialArtists = [],
-}: ArtistMultiSelectProps<TFieldValues, TName>) {
+}: ArtistMultiSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [selectedArtistCache, setSelectedArtistCache] = useState<Map<string, ArtistOption>>(
@@ -299,4 +299,4 @@ export function ArtistMultiSelect<
       }}
     />
   );
-}
+};

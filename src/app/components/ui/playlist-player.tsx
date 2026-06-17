@@ -81,7 +81,7 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
   );
 };
 
-export function Home() {
+export const Home = () => {
   const sampleTracks = [
     {
       id: '1',
@@ -109,4 +109,4 @@ export function Home() {
       <PlaylistPlayer tracks={sampleTracks} />
     </main>
   );
-}
+};

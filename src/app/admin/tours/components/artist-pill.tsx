@@ -65,7 +65,7 @@ const PASTEL_COLORS = [
  * Given a relative luminance (0–1), returns true if the background
  * is bright enough for black text (WCAG AA contrast ratio >= 4.5).
  */
-function shouldUseBlackText(hexColor: string): boolean {
+const shouldUseBlackText = (hexColor: string): boolean => {
   const r = parseInt(hexColor.slice(1, 3), 16) / 255;
   const g = parseInt(hexColor.slice(3, 5), 16) / 255;
   const b = parseInt(hexColor.slice(5, 7), 16) / 255;
@@ -75,7 +75,7 @@ function shouldUseBlackText(hexColor: string): boolean {
 
   // Contrast ratio with black text (luminance 0): (L + 0.05) / 0.05
   return (luminance + 0.05) / 0.05 >= 4.5;
-}
+};
 
 export interface HeadlinerWithRelations extends TourDateHeadlinerFields {
   artist: ArtistFields | null;

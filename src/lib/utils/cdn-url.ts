@@ -15,7 +15,7 @@ const E2E_MP3_FALLBACK_PATH = '/e2e/audio/e2e-track-320.mp3';
 
 const isMp3AssetKey = (s3Key: string): boolean => /\.(mp3|mpeg)$/i.test(s3Key);
 
-export function buildCdnUrl(s3Key: string): string {
+export const buildCdnUrl = (s3Key: string): string => {
   const isE2EMode = process.env.NEXT_PUBLIC_E2E_MODE === 'true' || process.env.E2E_MODE === 'true';
 
   if (isE2EMode && isMp3AssetKey(s3Key)) {
@@ -30,7 +30,7 @@ export function buildCdnUrl(s3Key: string): string {
   }
 
   return `https://${cdnBase}/${s3Key}`;
-}
+};
 
 /**
  * Resolve a playable URL for a digital-format file.
@@ -46,11 +46,11 @@ export function buildCdnUrl(s3Key: string): string {
  * @returns A URL suitable for `<audio src>` / `<video src>`, or `null`
  *   when the file has neither a `streamUrl` nor an `s3Key`.
  */
-export function resolveStreamUrl(file: {
+export const resolveStreamUrl = (file: {
   s3Key?: string | null;
   streamUrl?: string | null;
-}): string | null {
+}): string | null => {
   if (file.streamUrl) return file.streamUrl;
   if (file.s3Key) return buildCdnUrl(file.s3Key);
   return null;
-}
+};

@@ -12,52 +12,53 @@ export const MULTI_EXT_MAP: Partial<Record<string, string[]>> = {
 };
 
 /** Format file size for display (Bytes / KB / MB / GB). */
-export function formatFileSize(bytes: number): string {
+export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
 /**
  * Get the list of valid file extensions for a given digital format type
  * (handles MULTI_EXT_MAP fallthrough).
  */
-export function getValidExtensionsForFormat(formatType: DigitalFormatType): string[] {
+export const getValidExtensionsForFormat = (formatType: DigitalFormatType): string[] => {
   const expectedExt = getFileExtensionForFormat(formatType);
   return MULTI_EXT_MAP[expectedExt] ?? [expectedExt];
-}
+};
 
 /** Find all files in a list that match a format's expected extension(s). */
-export function findMatchingFilesForFormat(files: File[], formatType: DigitalFormatType): File[] {
+export const findMatchingFilesForFormat = (
+  files: File[],
+  formatType: DigitalFormatType
+): File[] => {
   const validExts = getValidExtensionsForFormat(formatType);
   return files.filter((f) => {
     const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
     return validExts.includes(ext);
   });
-}
+};
 
 /**
  * Read a single file from a FileSystemFileEntry (drag-and-drop FileSystem API).
  */
-function readFileEntry(entry: FileSystemFileEntry): Promise<File> {
-  return new Promise((resolve, reject) => {
+const readFileEntry = (entry: FileSystemFileEntry): Promise<File> =>
+  new Promise((resolve, reject) => {
     entry.file(resolve, reject);
   });
-}
 
-function readDirectoryEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
-  return new Promise((resolve, reject) => {
+const readDirectoryEntries = (reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> =>
+  new Promise((resolve, reject) => {
     reader.readEntries(resolve, reject);
   });
-}
 
 /**
  * Recursively collect all files from a FileSystemEntry (file or directory).
  * Used to support folder drag-and-drop via DataTransferItem.webkitGetAsEntry().
  */
-export async function collectFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
+export const collectFilesFromEntry = async (entry: FileSystemEntry): Promise<File[]> => {
   if (entry.isFile) {
     const file = await readFileEntry(entry as FileSystemFileEntry);
     return [file];
@@ -76,4 +77,4 @@ export async function collectFilesFromEntry(entry: FileSystemEntry): Promise<Fil
     return files;
   }
   return [];
-}
+};

@@ -21,7 +21,7 @@ const PROVIDER_DOMAIN_MAP: Array<{ domains: string[]; provider: TicketProvider }
 /**
  * Parse a ticket URL and return the detected provider, or null if unrecognized.
  */
-export function getTicketProvider(url: string): TicketProvider | null {
+export const getTicketProvider = (url: string): TicketProvider | null => {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
     for (const entry of PROVIDER_DOMAIN_MAP) {
@@ -33,4 +33,4 @@ export function getTicketProvider(url: string): TicketProvider | null {
   } catch {
     return null;
   }
-}
+};

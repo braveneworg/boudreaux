@@ -87,9 +87,9 @@ const ToastContent = ({
   </>
 );
 
-export function FeaturedArtistForm({
+export const FeaturedArtistForm = ({
   featuredArtistId: initialFeaturedArtistId,
-}: FeaturedArtistFormProps) {
+}: FeaturedArtistFormProps) => {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
   const [isLoadingFeaturedArtist, setIsLoadingFeaturedArtist] = useState(!!initialFeaturedArtistId);
@@ -654,4 +654,4 @@ export function FeaturedArtistForm({
       </Form>
     </div>
   );
-}
+};

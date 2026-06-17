@@ -132,34 +132,34 @@ interface RestoreResult {
 /**
  * Format bytes to human-readable string
  */
-export function formatBytes(bytes: number): string {
+export const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
 /**
  * Generate timestamp for backup directory
  */
-export function generateTimestamp(): string {
+export const generateTimestamp = (): string => {
   const now = new Date();
   return now.toISOString().replace(/:/g, '-').replace(/\..+/, '');
-}
+};
 
 /**
  * Create default backup directory path
  */
-export function getDefaultBackupPath(): string {
+export const getDefaultBackupPath = (): string => {
   const timestamp = generateTimestamp();
   return join('backups', `s3-${timestamp}`);
-}
+};
 
 /**
  * Log message with color
  */
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const colorMap = {
     info: colors.blue,
     success: colors.green,
@@ -181,7 +181,7 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
       console.info(formattedMessage);
       break;
   }
-}
+};
 
 /**
  * Allowed file extensions for backup (images, audio, video only)
@@ -224,26 +224,26 @@ const ALLOWED_EXTENSIONS = new Set([
 /**
  * Check if a file key has an allowed media extension
  */
-function isAllowedMediaFile(key: string): boolean {
+const isAllowedMediaFile = (key: string): boolean => {
   const ext = extname(key).toLowerCase();
   return ALLOWED_EXTENSIONS.has(ext);
-}
+};
 
 /**
  * Determine the backups root directory from a given local directory path.
  * If localDir is a timestamped backup directory (starts with 's3-'), returns its parent.
  * Otherwise, returns localDir itself as the backups root.
  */
-export function getBackupRootDir(localDir: string): string {
+export const getBackupRootDir = (localDir: string): string => {
   const localDirBasename = basename(localDir);
   const isTimestampedBackup = localDirBasename.startsWith('s3-');
   return isTimestampedBackup ? dirname(localDir) : localDir;
-}
+};
 
 /**
  * Load the most recent backup's metadata for change detection
  */
-export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata | null {
+export const getLatestBackupMetadata = (backupDir = 'backups'): BackupMetadata | null => {
   if (!existsSync(backupDir)) {
     return null;
   }
@@ -277,16 +277,16 @@ export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata |
   } catch {
     return null;
   }
-}
+};
 
 /**
  * Check if the current S3 manifest matches the previous backup
  * Compares key, size, and lastModified for each file
  */
-function hasChangedSinceLastBackup(
+const hasChangedSinceLastBackup = (
   currentFiles: Array<{ key: string; size: number; lastModified: string }>,
   previousMetadata: BackupMetadata
-): boolean {
+): boolean => {
   if (currentFiles.length !== previousMetadata.files.length) {
     return true;
   }
@@ -303,17 +303,17 @@ function hasChangedSinceLastBackup(
   }
 
   return false;
-}
+};
 
 /**
  * Backup S3 bucket to local directory
  */
-export async function backupS3ToLocal(
+export const backupS3ToLocal = async (
   localDir: string,
   bucket: string = S3_BUCKET as string,
   prefix: string = S3_BACKUP_PREFIX,
   region: string = AWS_REGION
-): Promise<BackupMetadata> {
+): Promise<BackupMetadata> => {
   log(`Starting S3 backup from bucket: ${bucket}`, 'info');
   if (prefix) {
     log(`Filtering by prefix: ${prefix}`, 'info');
@@ -475,17 +475,17 @@ export async function backupS3ToLocal(
     log(`Backup failed: ${errorMessage}`, 'error');
     throw error;
   }
-}
+};
 
 /**
  * Restore backup from local directory to S3
  */
-export async function restoreLocalToS3(
+export const restoreLocalToS3 = async (
   localDir: string,
   bucket: string = S3_BUCKET as string,
   region: string = AWS_REGION,
   overwrite = false
-): Promise<RestoreResult> {
+): Promise<RestoreResult> => {
   log(`Starting restore to S3 bucket: ${bucket}`, 'info');
   log(`Restore source: ${localDir}`, 'info');
 
@@ -556,15 +556,15 @@ export async function restoreLocalToS3(
     log(`Restore failed: ${errorMessage}`, 'error');
     throw error;
   }
-}
+};
 
 /**
  * Invalidate CloudFront distribution cache after restoring files to S3
  */
-export async function invalidateCloudFrontCache(
+export const invalidateCloudFrontCache = async (
   distributionId: string = CLOUDFRONT_DISTRIBUTION_ID || '',
   region: string = AWS_REGION
-): Promise<string | null> {
+): Promise<string | null> => {
   if (!distributionId) {
     log('CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation', 'warning');
     return null;
@@ -602,12 +602,12 @@ export async function invalidateCloudFrontCache(
     log(`Failed to create CloudFront invalidation: ${errorMessage}`, 'error');
     throw error;
   }
-}
+};
 
 /**
  * Restore a single file to S3
  */
-async function restoreFile(
+const restoreFile = async (
   s3Client: S3Client,
   bucket: string,
   localDir: string,
@@ -615,7 +615,7 @@ async function restoreFile(
   contentType: string | undefined,
   overwrite: boolean,
   result: RestoreResult
-): Promise<void> {
+): Promise<void> => {
   // Sanitize the key to prevent path traversal (defense in depth)
   let sanitizedKey: string;
   try {
@@ -690,19 +690,19 @@ async function restoreFile(
     result.failed++;
     result.errors.push({ key, error: errorMessage });
   }
-}
+};
 
 /**
  * Recursively restore directory to S3
  */
-async function restoreDirectory(
+const restoreDirectory = async (
   s3Client: S3Client,
   bucket: string,
   baseDir: string,
   currentPath: string,
   overwrite: boolean,
   result: RestoreResult
-): Promise<void> {
+): Promise<void> => {
   const fullPath = join(baseDir, currentPath);
   const items = readdirSync(fullPath);
 
@@ -723,12 +723,12 @@ async function restoreDirectory(
       await restoreFile(s3Client, bucket, baseDir, relativePath, undefined, overwrite, result);
     }
   }
-}
+};
 
 /**
  * List available backups
  */
-export function listBackups(backupDir = 'backups'): void {
+export const listBackups = (backupDir = 'backups'): void => {
   if (!existsSync(backupDir)) {
     log('No backups directory found', 'warning');
     return;
@@ -778,12 +778,15 @@ export function listBackups(backupDir = 'backups'): void {
     }
     console.info('');
   }
-}
+};
 
 /**
  * Clean up old backups, keeping only the most recent N backups
  */
-export function cleanupOldBackups(backupDir = 'backups', maxBackups = MAX_BACKUPS_TO_KEEP): number {
+export const cleanupOldBackups = (
+  backupDir = 'backups',
+  maxBackups = MAX_BACKUPS_TO_KEEP
+): number => {
   if (!existsSync(backupDir)) {
     return 0;
   }
@@ -824,12 +827,12 @@ export function cleanupOldBackups(backupDir = 'backups', maxBackups = MAX_BACKUP
   }
 
   return deletedCount;
-}
+};
 
 /**
  * Recursively delete a directory and all its contents
  */
-function deleteDirectory(dirPath: string): void {
+const deleteDirectory = (dirPath: string): void => {
   if (!existsSync(dirPath)) {
     return;
   }
@@ -847,12 +850,12 @@ function deleteDirectory(dirPath: string): void {
   }
 
   rmdirSync(dirPath);
-}
+};
 
 /**
  * Main CLI handler
  */
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const args = process.argv.slice(2);
   const command = args[0];
 
@@ -942,7 +945,7 @@ async function main(): Promise<void> {
     log(`Command failed: ${errorMessage}`, 'error');
     process.exit(1);
   }
-}
+};
 
 // Run if called directly
 if (isMainModule) {

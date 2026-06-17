@@ -96,7 +96,7 @@ vi.mock('@/app/components/ui/popover', () => ({
 }));
 
 vi.mock('@/app/components/ui/command', () => {
-  const CommandInputMock = function CommandInput({
+  const CommandInputMock = ({
     ref,
     placeholder,
     value,
@@ -107,18 +107,16 @@ vi.mock('@/app/components/ui/command', () => {
     placeholder?: string;
     value?: string;
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  } & React.InputHTMLAttributes<HTMLInputElement>) {
-    return (
-      <input
-        ref={ref}
-        data-testid="command-input"
-        placeholder={placeholder}
-        value={value || ''}
-        onChange={onChange}
-        {...props}
-      />
-    );
-  };
+  } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input
+      ref={ref}
+      data-testid="command-input"
+      placeholder={placeholder}
+      value={value || ''}
+      onChange={onChange}
+      {...props}
+    />
+  );
 
   return {
     Command: ({
@@ -208,16 +206,16 @@ vi.mock('lucide-react', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({
+const TestWrapper = ({
   children,
   defaultValues = {},
 }: {
   children: React.ReactNode;
   defaultValues?: Record<string, unknown>;
-}) {
+}) => {
   const methods = useForm({ defaultValues });
   return <FormProvider {...methods}>{children}</FormProvider>;
-}
+};
 
 describe('ComboboxField', () => {
   const defaultOptions = [

@@ -7,23 +7,23 @@ import { ServiceWorkerRegister } from './service-worker-register';
 
 const register = vi.fn(() => Promise.resolve());
 
-function setReadyState(value: 'loading' | 'interactive' | 'complete'): void {
+const setReadyState = (value: 'loading' | 'interactive' | 'complete'): void => {
   Object.defineProperty(document, 'readyState', {
     configurable: true,
     get: () => value,
   });
-}
+};
 
-function stubServiceWorker(): void {
+const stubServiceWorker = (): void => {
   Object.defineProperty(navigator, 'serviceWorker', {
     configurable: true,
     value: { register },
   });
-}
+};
 
-function removeServiceWorker(): void {
+const removeServiceWorker = (): void => {
   Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'serviceWorker');
-}
+};
 
 describe('ServiceWorkerRegister', () => {
   afterEach(() => {

@@ -64,7 +64,7 @@ const colors = {
   reset: '\x1b[0m',
 };
 
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const colorMap = {
     info: colors.blue,
     success: colors.green,
@@ -75,21 +75,25 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
   if (type === 'error') console.error(formatted);
   else if (type === 'warning') console.warn(formatted);
   else console.info(formatted);
-}
+};
 
-function formatBytes(bytes: number): string {
+const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // S3 helpers
 // ---------------------------------------------------------------------------
 
-async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Promise<Set<string>> {
+const listAllObjects = async (
+  s3: S3Client,
+  bucket: string,
+  prefix: string
+): Promise<Set<string>> => {
   const keys = new Set<string>();
   let continuationToken: string | undefined;
 
@@ -110,9 +114,9 @@ async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Pro
   } while (continuationToken);
 
   return keys;
-}
+};
 
-async function downloadObject(s3: S3Client, bucket: string, key: string): Promise<Buffer> {
+const downloadObject = async (s3: S3Client, bucket: string, key: string): Promise<Buffer> => {
   const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const stream = response.Body;
   if (!stream) throw new Error(`Empty body for ${key}`);
@@ -122,14 +126,14 @@ async function downloadObject(s3: S3Client, bucket: string, key: string): Promis
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
-}
+};
 
-async function uploadBuffer(
+const uploadBuffer = async (
   s3: S3Client,
   bucket: string,
   key: string,
   buffer: Buffer
-): Promise<void> {
+): Promise<void> => {
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
@@ -139,13 +143,13 @@ async function uploadBuffer(
       CacheControl: 'public, max-age=31536000, immutable',
     })
   );
-}
+};
 
-async function invalidateCloudFront(
+const invalidateCloudFront = async (
   distributionId: string,
   keys: string[],
   region: string
-): Promise<void> {
+): Promise<void> => {
   if (keys.length === 0) return;
 
   const cloudfront = new CloudFrontClient({ region });
@@ -178,27 +182,27 @@ async function invalidateCloudFront(
     })
   );
   log('CloudFront invalidation initiated', 'success');
-}
+};
 
 // ---------------------------------------------------------------------------
 // Key helpers
 // ---------------------------------------------------------------------------
 
-function getExtension(key: string): string {
+const getExtension = (key: string): string => {
   const dot = key.lastIndexOf('.');
   return dot === -1 ? '' : key.substring(dot).toLowerCase();
-}
+};
 
-function isTranscodableOriginal(key: string): boolean {
+const isTranscodableOriginal = (key: string): boolean => {
   const ext = getExtension(key);
   return WEBP_TRANSCODE_EXTENSIONS.has(ext) && !IMAGE_VARIANT_SUFFIX_REGEX.test(key);
-}
+};
 
-function buildWebpVariantKey(originalKey: string, width: number): string {
+const buildWebpVariantKey = (originalKey: string, width: number): string => {
   const dot = originalKey.lastIndexOf('.');
   if (dot === -1) return `${originalKey}_w${width}.webp`;
   return `${originalKey.substring(0, dot)}_w${width}.webp`;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Per-image processing
@@ -212,13 +216,13 @@ interface ProcessResult {
   error?: string;
 }
 
-async function processImage(
+const processImage = async (
   s3: S3Client,
   bucket: string,
   key: string,
   existingKeys: Set<string>,
   dryRun: boolean
-): Promise<ProcessResult> {
+): Promise<ProcessResult> => {
   const result: ProcessResult = {
     originalKey: key,
     variantsUploaded: 0,
@@ -283,31 +287,31 @@ async function processImage(
   }
 
   return result;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Concurrency helper
 // ---------------------------------------------------------------------------
 
-async function mapWithConcurrency<T, R>(
+const mapWithConcurrency = async <T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>
-): Promise<R[]> {
+): Promise<R[]> => {
   const results: R[] = [];
   let index = 0;
 
-  async function worker(): Promise<void> {
+  const worker = async (): Promise<void> => {
     while (index < items.length) {
       const i = index++;
       results[i] = await fn(items[i]);
     }
-  }
+  };
 
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
   await Promise.all(workers);
   return results;
-}
+};
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -319,7 +323,7 @@ interface CliOptions {
   invalidateCache: boolean;
 }
 
-function parseArgs(args: string[]): CliOptions {
+const parseArgs = (args: string[]): CliOptions => {
   const options: CliOptions = {
     prefix: 'media/',
     dryRun: false,
@@ -339,13 +343,13 @@ function parseArgs(args: string[]): CliOptions {
   }
 
   return options;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const args = process.argv.slice(2);
 
   if (args.includes('--help') || args.includes('-h')) {
@@ -440,6 +444,6 @@ ${colors.yellow}Environment Variables:${colors.reset}
   console.info('='.repeat(60));
 
   process.exit(totalErrors > 0 ? 1 : 0);
-}
+};
 
 main();

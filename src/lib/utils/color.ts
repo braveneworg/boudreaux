@@ -10,7 +10,7 @@
  * Falls back to `true` (dark) for unparseable values so that
  * white link text is chosen as a safe default.
  */
-export function isDarkColor(hex: string | null | undefined): boolean {
+export const isDarkColor = (hex: string | null | undefined): boolean => {
   if (!hex) return true;
 
   const cleaned = hex.replace('#', '');
@@ -36,4 +36,4 @@ export function isDarkColor(hex: string | null | undefined): boolean {
   if (Number.isNaN(luminance)) return true;
 
   return luminance < 0.5;
-}
+};

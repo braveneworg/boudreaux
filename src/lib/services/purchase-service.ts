@@ -26,11 +26,11 @@ const guestRepo = new GuestDownloadCountRepository();
 /**
  * Returns true if the given timestamp is more than DOWNLOAD_RESET_HOURS ago.
  */
-function isResetWindowElapsed(lastDownloadedAt: Date | null): boolean {
+const isResetWindowElapsed = (lastDownloadedAt: Date | null): boolean => {
   if (!lastDownloadedAt) return false;
   const resetMs = DOWNLOAD_RESET_HOURS * 60 * 60 * 1000;
   return Date.now() - new Date(lastDownloadedAt).getTime() > resetMs;
-}
+};
 
 /**
  * Business logic for release purchases and download gating.

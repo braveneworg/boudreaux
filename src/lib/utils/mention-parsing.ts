@@ -24,7 +24,7 @@ export type MentionToken =
  * insertion order. Returns lowercased forms — callers should compare
  * against `User.username.toLowerCase()` to be case-insensitive.
  */
-export function extractMentionUsernames(body: string): string[] {
+export const extractMentionUsernames = (body: string): string[] => {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const match of body.matchAll(MENTION_REGEX)) {
@@ -34,7 +34,7 @@ export function extractMentionUsernames(body: string): string[] {
     out.push(username);
   }
   return out;
-}
+};
 
 /**
  * Split a message body into text + mention tokens for rendering. Each
@@ -43,7 +43,7 @@ export function extractMentionUsernames(body: string): string[] {
  * validity at compose time, and rendering every `@x` as styled lets the
  * UI stay schema-free.
  */
-export function tokenizeMentions(body: string): MentionToken[] {
+export const tokenizeMentions = (body: string): MentionToken[] => {
   const tokens: MentionToken[] = [];
   let cursor = 0;
   for (const match of body.matchAll(MENTION_REGEX)) {
@@ -62,4 +62,4 @@ export function tokenizeMentions(body: string): MentionToken[] {
     tokens.push({ kind: 'text', value: body.slice(cursor) });
   }
   return tokens;
-}
+};

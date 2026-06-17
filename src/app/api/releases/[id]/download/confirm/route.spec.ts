@@ -44,24 +44,18 @@ vi.mock('@/lib/repositories/download-event-repository', () => ({
   },
 }));
 
-function makeRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(
-    'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/confirm',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-forwarded-for': '127.0.0.1',
-        'user-agent': 'test-agent',
-      },
-      body: JSON.stringify(body),
-    }
-  );
-}
+const makeRequest = (body: Record<string, unknown>): NextRequest =>
+  new NextRequest('http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/confirm', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-forwarded-for': '127.0.0.1',
+      'user-agent': 'test-agent',
+    },
+    body: JSON.stringify(body),
+  });
 
-function makeParams(id = '507f1f77bcf86cd799439011') {
-  return { params: Promise.resolve({ id }) };
-}
+const makeParams = (id = '507f1f77bcf86cd799439011') => ({ params: Promise.resolve({ id }) });
 
 describe('POST /api/releases/[id]/download/confirm', () => {
   beforeEach(() => {

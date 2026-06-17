@@ -10,9 +10,11 @@ vi.mock('server-only', () => ({}));
 
 const sendMock = vi.fn();
 vi.mock('@aws-sdk/client-sns', () => {
+  // eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- constructor mock: invoked with `new` by the SUT, so it must be a function (arrows cannot be constructed).
   function ClientCtor() {
     return { send: sendMock };
   }
+  // eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- constructor mock: invoked with `new` by the SUT, so it must be a function (arrows cannot be constructed).
   function CommandCtor(input: Record<string, unknown>) {
     return { input };
   }

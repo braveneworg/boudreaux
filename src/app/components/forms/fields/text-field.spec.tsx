@@ -46,16 +46,16 @@ vi.mock('@/app/components/ui/input', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({
+const TestWrapper = ({
   children,
   defaultValues = {},
 }: {
   children: React.ReactNode;
   defaultValues?: FieldValues;
-}) {
+}) => {
   const methods = useForm({ defaultValues });
   return <FormProvider {...methods}>{children}</FormProvider>;
-}
+};
 
 describe('TextField', () => {
   const defaultProps = {

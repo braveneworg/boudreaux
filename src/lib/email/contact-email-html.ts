@@ -12,16 +12,15 @@ interface ContactEmailData {
   timestamp: string;
 }
 
-function escapeHtml(text: string): string {
-  return text
+const escapeHtml = (text: string): string =>
+  text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
 
-export function buildContactEmailHtml(data: ContactEmailData): string {
+export const buildContactEmailHtml = (data: ContactEmailData): string => {
   const messageHtml = escapeHtml(data.message).replace(/\n/g, '<br />');
   const logoUrl = 'https://fakefourrecords.com/fake-four-inc-black-hand-logo.svg';
 
@@ -120,4 +119,4 @@ export function buildContactEmailHtml(data: ContactEmailData): string {
   </table>
 </body>
 </html>`;
-}
+};

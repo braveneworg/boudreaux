@@ -67,16 +67,16 @@ vi.mock('@/lib/utils/states', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({
+const TestWrapper = ({
   children,
   defaultValues = {},
 }: {
   children: React.ReactNode;
   defaultValues?: Record<string, unknown>;
-}) {
+}) => {
   const methods = useForm({ defaultValues });
   return <FormProvider {...methods}>{children}</FormProvider>;
-}
+};
 
 describe('StateField', () => {
   const defaultProps = {

@@ -42,7 +42,7 @@ type CarouselContextProps = {
 
 const CarouselContext = createContext<CarouselContextProps | null>(null);
 
-function useCarousel() {
+const useCarousel = () => {
   const context = useContext(CarouselContext);
 
   if (!context) {
@@ -50,8 +50,8 @@ function useCarousel() {
   }
 
   return context;
-}
-function Carousel({
+};
+const Carousel = ({
   orientation = 'horizontal',
   opts,
   setApi,
@@ -59,7 +59,7 @@ function Carousel({
   className,
   children,
   ...props
-}: ComponentProps<'div'> & CarouselProps) {
+}: ComponentProps<'div'> & CarouselProps) => {
   const [carouselRef, api] = useEmblaCarousel(
     {
       ...opts,
@@ -162,9 +162,9 @@ function Carousel({
       </div>
     </CarouselContext.Provider>
   );
-}
+};
 
-function CarouselContent({ className, ...props }: ComponentProps<'div'>) {
+const CarouselContent = ({ className, ...props }: ComponentProps<'div'>) => {
   const { carouselRef, orientation } = useCarousel();
 
   return (
@@ -175,9 +175,9 @@ function CarouselContent({ className, ...props }: ComponentProps<'div'>) {
       />
     </div>
   );
-}
+};
 
-function CarouselItem({ className, onClick, ...props }: ComponentProps<'div'>) {
+const CarouselItem = ({ className, onClick, ...props }: ComponentProps<'div'>) => {
   const { orientation } = useCarousel();
 
   const handleClick = useCallback(
@@ -219,14 +219,14 @@ function CarouselItem({ className, onClick, ...props }: ComponentProps<'div'>) {
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
     </>
   );
-}
+};
 
-function CarouselPrevious({
+const CarouselPrevious = ({
   className,
   variant = 'ghost',
   size = 'icon',
   ...props
-}: ComponentProps<typeof Button>) {
+}: ComponentProps<typeof Button>) => {
   const { orientation, scrollPrev, canScrollPrev, opts } = useCarousel();
 
   return (
@@ -249,14 +249,14 @@ function CarouselPrevious({
       <span className="sr-only">Previous slide</span>
     </Button>
   );
-}
+};
 
-function CarouselNext({
+const CarouselNext = ({
   className,
   variant = 'ghost',
   size = 'icon',
   ...props
-}: ComponentProps<typeof Button>) {
+}: ComponentProps<typeof Button>) => {
   const { orientation, scrollNext, canScrollNext, opts } = useCarousel();
 
   return (
@@ -279,7 +279,7 @@ function CarouselNext({
       <span className="sr-only">Next slide</span>
     </Button>
   );
-}
+};
 
 export {
   type CarouselApi,

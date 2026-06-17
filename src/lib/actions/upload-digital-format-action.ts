@@ -37,9 +37,9 @@ const uploadActionSchema = z.object({
  * @param formData - Release ID and file metadata
  * @returns ActionResult with uploadUrl and s3Key
  */
-async function uploadDigitalFormatActionHandler(
+const uploadDigitalFormatActionHandler = async (
   formData: FormData
-): Promise<ActionResult<PresignedUploadResponse>> {
+): Promise<ActionResult<PresignedUploadResponse>> => {
   try {
     // Parse and validate input
     const rawData = {
@@ -101,15 +101,15 @@ async function uploadDigitalFormatActionHandler(
       error: error instanceof Error ? error.message : 'Failed to generate upload URL',
     };
   }
-}
+};
 
 /**
  * Server Action with admin authentication
  * Only admins can upload digital formats
  */
-export async function uploadDigitalFormatAction(
+export const uploadDigitalFormatAction = async (
   formData: FormData
-): Promise<ActionResult<PresignedUploadResponse>> {
+): Promise<ActionResult<PresignedUploadResponse>> => {
   await requireRole('admin');
   return uploadDigitalFormatActionHandler(formData);
-}
+};

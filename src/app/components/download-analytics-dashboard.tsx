@@ -47,7 +47,7 @@ const FORMAT_LABELS: Record<string, string> = {
   AIFF: 'AIFF',
 };
 
-export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashboardProps) {
+export const DownloadAnalyticsDashboard = ({ releaseId }: DownloadAnalyticsDashboardProps) => {
   const [dateRange, setDateRange] = useState('all');
   const { isPending: isLoading, data: analytics } = useDownloadAnalyticsQuery(releaseId, dateRange);
 
@@ -157,4 +157,4 @@ export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashb
       )}
     </div>
   );
-}
+};

@@ -25,9 +25,9 @@ interface SendPurchaseConfirmationInput {
  *
  * @returns `true` if the email was sent, `false` if it was skipped.
  */
-export async function sendPurchaseConfirmationEmail(
+export const sendPurchaseConfirmationEmail = async (
   input: SendPurchaseConfirmationInput
-): Promise<boolean> {
+): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     console.error('[sendPurchaseConfirmationEmail] EMAIL_FROM is not configured');
@@ -93,4 +93,4 @@ export async function sendPurchaseConfirmationEmail(
     console.error(`Failed to send purchase confirmation email to ${input.customerEmail}:`, error);
     return false;
   }
-}
+};

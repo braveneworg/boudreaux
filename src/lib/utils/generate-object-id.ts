@@ -12,7 +12,7 @@
  *
  * @returns A 24-character lowercase hex string valid as a MongoDB ObjectId
  */
-export function generateObjectId(): string {
+export const generateObjectId = (): string => {
   const timestamp = Math.floor(Date.now() / 1000)
     .toString(16)
     .padStart(8, '0');
@@ -20,4 +20,4 @@ export function generateObjectId(): string {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
   return timestamp + randomBytes;
-}
+};

@@ -106,19 +106,22 @@ const MANAGED_RULES: LifecycleRule[] = [
   },
 ];
 
-function log(prefix: string, color: keyof typeof colors, message: string): void {
+const log = (prefix: string, color: keyof typeof colors, message: string): void => {
   process.stdout.write(`${colors[color]}${prefix}${colors.reset} ${message}\n`);
-}
+};
 
+// eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- a `never`-returning function declaration enables control-flow narrowing at call sites (e.g. `if (!BUCKET_NAME) fail()`); an arrow const does not.
 function fail(message: string): never {
   process.stderr.write(`${colors.red}✗${colors.reset} ${message}\n`);
   process.exit(1);
 }
 
-function parseArgs(argv: readonly string[]): {
+const parseArgs = (
+  argv: readonly string[]
+): {
   apply: boolean;
   showOnly: boolean;
-} {
+} => {
   let apply = false;
   let showOnly = false;
   for (const arg of argv) {
@@ -140,9 +143,9 @@ function parseArgs(argv: readonly string[]): {
     }
   }
   return { apply, showOnly };
-}
+};
 
-async function fetchExistingRules(client: S3Client, bucket: string): Promise<LifecycleRule[]> {
+const fetchExistingRules = async (client: S3Client, bucket: string): Promise<LifecycleRule[]> => {
   try {
     const result = await client.send(
       new GetBucketLifecycleConfigurationCommand({ Bucket: bucket })
@@ -154,20 +157,20 @@ async function fetchExistingRules(client: S3Client, bucket: string): Promise<Lif
     }
     throw err;
   }
-}
+};
 
 /**
  * Merge our managed rules on top of whatever is already on the bucket so
  * running this script never wipes out unrelated rules a human may have set.
  * Managed rule IDs win; everything else is preserved.
  */
-function mergeRules(existing: readonly LifecycleRule[]): LifecycleRule[] {
+const mergeRules = (existing: readonly LifecycleRule[]): LifecycleRule[] => {
   const managedIds = new Set(MANAGED_RULES.map((rule) => rule.ID));
   const unchanged = existing.filter((rule) => rule.ID && !managedIds.has(rule.ID));
   return [...unchanged, ...MANAGED_RULES];
-}
+};
 
-function printRules(rules: readonly LifecycleRule[]): void {
+const printRules = (rules: readonly LifecycleRule[]): void => {
   if (rules.length === 0) {
     log('∅', 'dim', 'no rules');
     return;
@@ -189,9 +192,9 @@ function printRules(rules: readonly LifecycleRule[]): void {
       );
     }
   }
-}
+};
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const { apply, showOnly } = parseArgs(process.argv.slice(2));
 
   if (!BUCKET_NAME) {
@@ -227,7 +230,7 @@ async function main(): Promise<void> {
   );
 
   log('✓', 'green', 'Lifecycle configuration applied.');
-}
+};
 
 main().catch((err: unknown) => {
   process.stderr.write(

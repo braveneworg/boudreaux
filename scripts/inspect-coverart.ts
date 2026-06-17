@@ -10,27 +10,27 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-function classify(value: string | null): string {
+const classify = (value: string | null): string => {
   if (!value) return 'null/empty';
   if (value.startsWith('data:')) return 'data:URI';
   if (value.startsWith('http')) return 'http(s) URL';
   if (value.startsWith('/')) return 'relative path';
   return 'other';
-}
+};
 
-function head(value: string | null, n = 80): string {
+const head = (value: string | null, n = 80): string => {
   if (!value) return '<null>';
   return value.length > n ? value.substring(0, n) + '...' : value;
-}
+};
 
-function extension(value: string | null): string {
+const extension = (value: string | null): string => {
   if (!value) return '<null>';
   const cleaned = value.split('?')[0].split('#')[0];
   const dot = cleaned.lastIndexOf('.');
   return dot === -1 ? '<no ext>' : cleaned.substring(dot).toLowerCase();
-}
+};
 
-async function main() {
+const main = async () => {
   console.info('=== Release.coverArt sample (10) — FULL URLs ===');
   const releases = await prisma.release.findMany({
     select: { id: true, title: true, coverArt: true },
@@ -103,7 +103,7 @@ async function main() {
     faCounts[k] = (faCounts[k] ?? 0) + 1;
   }
   console.info('  FeaturedArtist.coverArt:', faCounts);
-}
+};
 
 main()
   .then(() => prisma.$disconnect())

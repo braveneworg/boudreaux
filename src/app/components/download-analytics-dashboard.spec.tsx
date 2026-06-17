@@ -56,19 +56,19 @@ const mockAnalyticsData = {
 };
 
 describe('DownloadAnalyticsDashboard', () => {
-  function mockFetchSuccess(data = mockAnalyticsData) {
+  const mockFetchSuccess = (data = mockAnalyticsData) => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(data),
     } as Response);
-  }
+  };
 
-  function mockFetchFailure() {
+  const mockFetchFailure = () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       json: () => Promise.resolve({ error: 'Server error' }),
     } as Response);
-  }
+  };
 
   describe('Loading state', () => {
     it('should display loading indicator while fetching analytics', () => {

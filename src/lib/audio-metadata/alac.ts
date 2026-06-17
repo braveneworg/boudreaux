@@ -12,10 +12,10 @@ import type { WriteCommentOptions } from './types/audio';
  * ALAC uses the same MP4 container as AAC, so metadata handling is
  * identical. The lossless audio encoding has no effect on tag behaviour.
  */
-export async function writeAlacComment(
+export const writeAlacComment = async (
   filePath: string,
   comment: string,
   _options?: WriteCommentOptions
-): Promise<void> {
+): Promise<void> => {
   await writeTagViaFfmpeg(filePath, 'comment', comment);
-}
+};

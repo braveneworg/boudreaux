@@ -30,7 +30,7 @@ export interface FingerprintInput {
  * address to its /64 prefix (first 4 hextets). Returns the empty string when
  * the input cannot be interpreted as IPv4/IPv4-mapped-IPv6/IPv6.
  */
-export function truncateIp(ip: string | null | undefined): string {
+export const truncateIp = (ip: string | null | undefined): string => {
   if (!ip) return '';
   const trimmed = ip.trim();
   if (!trimmed) return '';
@@ -59,16 +59,16 @@ export function truncateIp(ip: string | null | undefined): string {
   }
 
   return '';
-}
+};
 
 /**
  * Computes the deterministic SHA-256 fingerprint hash for an anonymous
  * visitor. Returns a 64-character lowercase hex digest.
  */
-export function computeFingerprintHash(input: FingerprintInput): string {
+export const computeFingerprintHash = (input: FingerprintInput): string => {
   const ua = (input.userAgent ?? '').trim();
   const lang = (input.acceptLanguage ?? '').trim();
   const ipPrefix = truncateIp(input.ip);
 
   return createHash('sha256').update(`${ua}|${lang}|${ipPrefix}`).digest('hex');
-}
+};

@@ -11,14 +11,13 @@ export interface AbuseReportEmailData {
   moderationUrl: string;
 }
 
-function escapeHtml(text: string): string {
-  return text
+const escapeHtml = (text: string): string =>
+  text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
 
 /**
  * Build the HTML body for the admin "new abuse report" alert email.
@@ -27,7 +26,7 @@ function escapeHtml(text: string): string {
  * The data shape does not even accept a reporter field — the build
  * function cannot leak what it never receives.
  */
-export function buildAbuseReportEmailHtml(data: AbuseReportEmailData): string {
+export const buildAbuseReportEmailHtml = (data: AbuseReportEmailData): string => {
   const safeUsername = escapeHtml(data.reportedUsername);
 
   return `<!DOCTYPE html>
@@ -110,4 +109,4 @@ export function buildAbuseReportEmailHtml(data: AbuseReportEmailData): string {
   </table>
 </body>
 </html>`;
-}
+};

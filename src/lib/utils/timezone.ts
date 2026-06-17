@@ -19,7 +19,7 @@
  * @param localDateTimeStr - A string in "YYYY-MM-DDTHH:mm" format (no trailing Z).
  * @param timeZone         - IANA timezone identifier, e.g. "America/Chicago".
  */
-export function localToUTC(localDateTimeStr: string, timeZone: string): Date {
+export const localToUTC = (localDateTimeStr: string, timeZone: string): Date => {
   const [datePart, timePart] = localDateTimeStr.split('T');
   const [year, month, day] = datePart.split('-').map(Number);
   const [hour, minute] = timePart.split(':').map(Number);
@@ -38,13 +38,15 @@ export function localToUTC(localDateTimeStr: string, timeZone: string): Date {
   /**
    * Given a UTC timestamp, return the local date-time parts in the target tz.
    */
-  function getLocalParts(utcMs: number): {
+  const getLocalParts = (
+    utcMs: number
+  ): {
     year: number;
     month: number;
     day: number;
     hour: number;
     minute: number;
-  } {
+  } => {
     const parts = Object.fromEntries(
       formatter.formatToParts(new Date(utcMs)).map(({ type, value }) => [type, value])
     );
@@ -55,7 +57,7 @@ export function localToUTC(localDateTimeStr: string, timeZone: string): Date {
       hour: parts.hour === '24' ? 0 : Number(parts.hour),
       minute: Number(parts.minute),
     };
-  }
+  };
 
   // Initial UTC estimate using the wall-clock values as if they were UTC.
   let estimate = Date.UTC(year, month - 1, day, hour, minute);
@@ -70,7 +72,7 @@ export function localToUTC(localDateTimeStr: string, timeZone: string): Date {
   }
 
   return new Date(estimate);
-}
+};
 
 /**
  * Return the UTC offset in minutes for an IANA timezone at a specific Date.
@@ -80,7 +82,7 @@ export function localToUTC(localDateTimeStr: string, timeZone: string): Date {
  * @param timeZone - IANA timezone identifier.
  * @param date     - The reference date (defaults to now).
  */
-export function getTimezoneOffsetMinutes(timeZone: string, date: Date = new Date()): number {
+export const getTimezoneOffsetMinutes = (timeZone: string, date: Date = new Date()): number => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -107,7 +109,7 @@ export function getTimezoneOffsetMinutes(timeZone: string, date: Date = new Date
   );
 
   return Math.round((localMs - date.getTime()) / 60_000);
-}
+};
 
 /**
  * Return a UTC offset label like "UTC-05:00" or "UTC+05:30".
@@ -115,14 +117,14 @@ export function getTimezoneOffsetMinutes(timeZone: string, date: Date = new Date
  * @param timeZone - IANA timezone identifier.
  * @param date     - Reference date (defaults to now).
  */
-export function formatUTCOffset(timeZone: string, date: Date = new Date()): string {
+export const formatUTCOffset = (timeZone: string, date: Date = new Date()): string => {
   const offsetMinutes = getTimezoneOffsetMinutes(timeZone, date);
   const sign = offsetMinutes >= 0 ? '+' : '-';
   const abs = Math.abs(offsetMinutes);
   const hh = String(Math.floor(abs / 60)).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
   return `UTC${sign}${hh}:${mm}`;
-}
+};
 
 /**
  * Format a stored UTC date for display in the given IANA timezone.
@@ -132,11 +134,11 @@ export function formatUTCOffset(timeZone: string, date: Date = new Date()): stri
  * @param timeZone - IANA timezone identifier.
  * @param options  - Additional Intl.DateTimeFormatOptions overrides.
  */
-export function formatTourDate(
+export const formatTourDate = (
   date: Date | string,
   timeZone?: string | null,
   options?: Intl.DateTimeFormatOptions
-): string {
+): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   const baseOptions: Intl.DateTimeFormatOptions = {
     month: 'short',
@@ -148,7 +150,7 @@ export function formatTourDate(
     baseOptions.timeZone = timeZone;
   }
   return new Intl.DateTimeFormat('en-US', baseOptions).format(d);
-}
+};
 
 /**
  * Format a stored UTC date as a time string in the given IANA timezone.
@@ -158,11 +160,11 @@ export function formatTourDate(
  * @param timeZone - IANA timezone identifier.
  * @param options  - Additional Intl.DateTimeFormatOptions overrides.
  */
-export function formatTourTime(
+export const formatTourTime = (
   date: Date | string,
   timeZone?: string | null,
   options?: Intl.DateTimeFormatOptions
-): string {
+): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   const baseOptions: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
@@ -174,7 +176,7 @@ export function formatTourTime(
     baseOptions.timeZone = timeZone;
   }
   return new Intl.DateTimeFormat('en-US', baseOptions).format(d);
-}
+};
 
 /**
  * Convert a stored UTC date back to a "YYYY-MM-DDTHH:mm" string expressed in
@@ -185,7 +187,7 @@ export function formatTourTime(
  * @param date     - UTC Date object or ISO string.
  * @param timeZone - IANA timezone identifier.
  */
-export function toLocalDateTimeString(date: Date | string, timeZone: string): string {
+export const toLocalDateTimeString = (date: Date | string, timeZone: string): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
 
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -205,4 +207,4 @@ export function toLocalDateTimeString(date: Date | string, timeZone: string): st
   // Intl sometimes returns "24" for midnight — normalise to "00".
   const hour = parts.hour === '24' ? '00' : parts.hour;
   return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}`;
-}
+};

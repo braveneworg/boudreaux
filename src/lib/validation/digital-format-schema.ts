@@ -15,9 +15,8 @@ import {
  * Create a MIME type schema that accepts known MIME types OR an empty string.
  * Browsers may report an empty MIME type for files selected via folder picker.
  */
-function mimeTypeSchema(mimeTypes: readonly [string, ...string[]], errorMessage: string) {
-  return z.union([z.literal(''), z.enum(mimeTypes, { message: errorMessage })]);
-}
+const mimeTypeSchema = (mimeTypes: readonly [string, ...string[]], errorMessage: string) =>
+  z.union([z.literal(''), z.enum(mimeTypes, { message: errorMessage })]);
 
 /**
  * Base schema for digital format fields common to all formats

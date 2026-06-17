@@ -13,7 +13,7 @@ const globalForStripe = globalThis as unknown as { stripe: Stripe };
  * build time — Next.js collects page data during `next build` and the
  * secret is only available at runtime.
  */
-function getStripe(): Stripe {
+const getStripe = (): Stripe => {
   if (globalForStripe.stripe) return globalForStripe.stripe;
 
   const key = process.env.STRIPE_SECRET_KEY;
@@ -26,7 +26,7 @@ function getStripe(): Stripe {
   globalForStripe.stripe = client;
 
   return client;
-}
+};
 
 export const stripe = new Proxy({} as Stripe, {
   get(_target, prop, receiver) {

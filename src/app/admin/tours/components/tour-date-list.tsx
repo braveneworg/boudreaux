@@ -83,7 +83,7 @@ interface TourDateListProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
-export function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) {
+export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) => {
   const sectionRef = useRef<HTMLElement>(null);
   const { isPending: isLoading, data: tourDatesData, refetch } = useTourDatesQuery(tourId);
   const tourDates = (tourDatesData?.tourDates ?? []) as unknown as TourDateWithRelations[];
@@ -347,4 +347,4 @@ export function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) 
       </AlertDialog>
     </>
   );
-}
+};

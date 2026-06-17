@@ -67,10 +67,10 @@ export interface AbuseReportRateLimitResult {
  * Skipped entirely in E2E mode (`E2E_MODE=true`) to keep deterministic
  * Playwright runs from tripping production-grade limits.
  */
-export async function checkAbuseReportRateLimit(params: {
+export const checkAbuseReportRateLimit = async (params: {
   reporterId: string;
   reportedUserId: string;
-}): Promise<AbuseReportRateLimitResult> {
+}): Promise<AbuseReportRateLimitResult> => {
   if (process.env.E2E_MODE === 'true') {
     return { success: true, blockedBy: null, retryAfterSeconds: 0 };
   }
@@ -95,10 +95,10 @@ export async function checkAbuseReportRateLimit(params: {
   }
 
   return { success: true, blockedBy: null, retryAfterSeconds: 0 };
-}
+};
 
 /** Reset both limiter singletons — testing aid only. */
-export function resetAbuseReportRateLimitForTesting(): void {
+export const resetAbuseReportRateLimitForTesting = (): void => {
   cachedPairLimiter = null;
   cachedGlobalLimiter = null;
-}
+};

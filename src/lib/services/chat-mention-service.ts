@@ -205,7 +205,7 @@ export class ChatMentionService {
   }
 }
 
-function parseBufferedMention(raw: string): BufferedMention | null {
+const parseBufferedMention = (raw: string): BufferedMention | null => {
   try {
     const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (
@@ -221,4 +221,4 @@ function parseBufferedMention(raw: string): BufferedMention | null {
   } catch {
     return null;
   }
-}
+};

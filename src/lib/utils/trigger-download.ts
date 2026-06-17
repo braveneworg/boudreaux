@@ -14,7 +14,7 @@
  * `ResponseContentDisposition` header (built with RFC 6266 compliant
  * `filename` / `filename*` parameters).
  */
-export function triggerDownload(url: string, fileName?: string): void {
+export const triggerDownload = (url: string, fileName?: string): void => {
   /* v8 ignore next 3 -- jsdom always defines `window` and `document`; SSR guard is unreachable in tests */
   if (typeof globalThis.window === 'undefined' || typeof globalThis.document === 'undefined') {
     return;
@@ -35,9 +35,9 @@ export function triggerDownload(url: string, fileName?: string): void {
   container.appendChild(anchor);
   anchor.click();
   anchor.remove();
-}
+};
 
-function normalizeDownloadUrl(url: string): string | null {
+const normalizeDownloadUrl = (url: string): string | null => {
   const trimmedUrl = url.trim();
   if (!trimmedUrl) {
     return null;
@@ -53,4 +53,4 @@ function normalizeDownloadUrl(url: string): string | null {
   } catch {
     return null;
   }
-}
+};

@@ -176,7 +176,7 @@ const createCroppedImage = async (
   });
 };
 
-export function ImageCropper({
+export const ImageCropper = ({
   imageSrc,
   open,
   onOpenChange,
@@ -184,7 +184,7 @@ export function ImageCropper({
   aspectRatio = GOLDEN_RATIO,
   lockAspectRatio = false,
   initialBackgroundColor,
-}: ImageCropperProps) {
+}: ImageCropperProps) => {
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [backgroundColor, setBackgroundColor] = useState(initialBackgroundColor || '#000000');
@@ -359,4 +359,4 @@ export function ImageCropper({
       </DialogContent>
     </Dialog>
   );
-}
+};

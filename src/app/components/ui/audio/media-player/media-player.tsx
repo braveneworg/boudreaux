@@ -139,140 +139,142 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
  * </MediaPlayer>
  * ```
  */
-const FeaturedArtistCarousel = memo(function FeaturedArtistCarousel({
-  featuredArtists,
-  selectedArtistId,
-  onSelect,
-}: {
-  featuredArtists: FeaturedArtist[];
-  selectedArtistId?: string;
-  onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
-}) {
-  // Sort by position (lower numbers first)
-  const sortedArtists = useMemo(
-    () => [...featuredArtists].sort((a, b) => a.position - b.position),
-    [featuredArtists]
-  );
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
-  const clickInitiatedRef = useRef(false);
+const FeaturedArtistCarousel = memo(
+  ({
+    featuredArtists,
+    selectedArtistId,
+    onSelect,
+  }: {
+    featuredArtists: FeaturedArtist[];
+    selectedArtistId?: string;
+    onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
+  }) => {
+    // Sort by position (lower numbers first)
+    const sortedArtists = useMemo(
+      () => [...featuredArtists].sort((a, b) => a.position - b.position),
+      [featuredArtists]
+    );
+    const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+    const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+    const clickInitiatedRef = useRef(false);
 
-  // Index of the externally-selected artist. The carousel must always center
-  // this slide so the visible center matches the playing cover art.
-  const selectedIndex = useMemo(() => {
-    if (!selectedArtistId) return 0;
-    const idx = sortedArtists.findIndex((a) => a.id === selectedArtistId);
-    return idx < 0 ? 0 : idx;
-  }, [sortedArtists, selectedArtistId]);
+    // Index of the externally-selected artist. The carousel must always center
+    // this slide so the visible center matches the playing cover art.
+    const selectedIndex = useMemo(() => {
+      if (!selectedArtistId) return 0;
+      const idx = sortedArtists.findIndex((a) => a.id === selectedArtistId);
+      return idx < 0 ? 0 : idx;
+    }, [sortedArtists, selectedArtistId]);
 
-  const handleSelect = (featured: FeaturedArtist, index: number) => {
-    if (!carouselApi) {
-      onSelect?.(featured, { autoPlay: true });
-      return;
-    }
+    const handleSelect = (featured: FeaturedArtist, index: number) => {
+      if (!carouselApi) {
+        onSelect?.(featured, { autoPlay: true });
+        return;
+      }
 
-    clickInitiatedRef.current = true;
-    carouselApi.scrollTo(index);
-    // If already on this slide, settle won't fire — call onSelect directly
-    if (carouselApi.selectedScrollSnap() === index) {
-      onSelect?.(featured, { autoPlay: true });
-      clickInitiatedRef.current = false;
-    }
-  };
-
-  /** Sync player state when the carousel settles on a new slide */
-  const handleSettle = useCallback(() => {
-    if (!carouselApi) return;
-    const index = carouselApi.selectedScrollSnap();
-    const artist = sortedArtists[index];
-    if (!artist) return;
-    const autoPlay = clickInitiatedRef.current;
-    clickInitiatedRef.current = false;
-    onSelect?.(artist, { autoPlay });
-  }, [carouselApi, sortedArtists, onSelect]);
-
-  useEffect(() => {
-    if (!carouselApi) return;
-    carouselApi.on('settle', handleSettle);
-    return () => {
-      carouselApi.off('settle', handleSettle);
+      clickInitiatedRef.current = true;
+      carouselApi.scrollTo(index);
+      // If already on this slide, settle won't fire — call onSelect directly
+      if (carouselApi.selectedScrollSnap() === index) {
+        onSelect?.(featured, { autoPlay: true });
+        clickInitiatedRef.current = false;
+      }
     };
-  }, [carouselApi, handleSettle]);
 
-  // Keep the carousel centered on the externally-selected artist. Runs on
-  // mount once the API is ready, and on any change to the selected id.
-  useEffect(() => {
-    if (!carouselApi) return;
-    if (carouselApi.selectedScrollSnap() === selectedIndex) return;
-    carouselApi.scrollTo(selectedIndex);
-  }, [carouselApi, selectedIndex]);
+    /** Sync player state when the carousel settles on a new slide */
+    const handleSettle = useCallback(() => {
+      if (!carouselApi) return;
+      const index = carouselApi.selectedScrollSnap();
+      const artist = sortedArtists[index];
+      if (!artist) return;
+      const autoPlay = clickInitiatedRef.current;
+      clickInitiatedRef.current = false;
+      onSelect?.(artist, { autoPlay });
+    }, [carouselApi, sortedArtists, onSelect]);
 
-  return (
-    <Carousel
-      aria-label="Featured Artists"
-      orientation="horizontal"
-      className="mb-0 w-full"
-      opts={{ loop: true, align: 'center' }}
-      setApi={setCarouselApi}
-    >
-      <div className="flex items-center">
-        <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
-        <CarouselContent className="-ml-2">
-          {sortedArtists.map((featured, index) => {
-            const coverArt = getFeaturedArtistCoverArt(featured);
-            const displayName = getFeaturedArtistDisplayName(featured);
-            const imageError = failedImages.has(featured.id);
-            const isSelectedArtist = selectedArtistId === featured.id;
+    useEffect(() => {
+      if (!carouselApi) return;
+      carouselApi.on('settle', handleSettle);
+      return () => {
+        carouselApi.off('settle', handleSettle);
+      };
+    }, [carouselApi, handleSettle]);
 
-            return (
-              <CarouselItem
-                key={featured.id}
-                className="shrink-0 basis-1/3 pt-1 pb-1 pl-2 sm:basis-1/5 lg:basis-[calc(100%/7)]"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSelect(featured, index)}
-                  className="group focus:ring-primary relative aspect-square w-full rounded-lg focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                  aria-label={`Select ${displayName}`}
+    // Keep the carousel centered on the externally-selected artist. Runs on
+    // mount once the API is ready, and on any change to the selected id.
+    useEffect(() => {
+      if (!carouselApi) return;
+      if (carouselApi.selectedScrollSnap() === selectedIndex) return;
+      carouselApi.scrollTo(selectedIndex);
+    }, [carouselApi, selectedIndex]);
+
+    return (
+      <Carousel
+        aria-label="Featured Artists"
+        orientation="horizontal"
+        className="mb-0 w-full"
+        opts={{ loop: true, align: 'center' }}
+        setApi={setCarouselApi}
+      >
+        <div className="flex items-center">
+          <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
+          <CarouselContent className="-ml-2">
+            {sortedArtists.map((featured, index) => {
+              const coverArt = getFeaturedArtistCoverArt(featured);
+              const displayName = getFeaturedArtistDisplayName(featured);
+              const imageError = failedImages.has(featured.id);
+              const isSelectedArtist = selectedArtistId === featured.id;
+
+              return (
+                <CarouselItem
+                  key={featured.id}
+                  className="shrink-0 basis-1/3 pt-1 pb-1 pl-2 sm:basis-1/5 lg:basis-[calc(100%/7)]"
                 >
-                  <div className="absolute inset-0 overflow-hidden rounded-lg">
-                    {coverArt && !imageError ? (
-                      <Image
-                        src={buildCdnImageVariantUrl(coverArt, 384)}
-                        alt={displayName ?? ''}
-                        fill
-                        unoptimized
-                        className="object-cover transition-transform group-hover:scale-105"
-                        sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 14vw"
-                        loading={isSelectedArtist ? 'eager' : undefined}
-                        fetchPriority={isSelectedArtist ? 'high' : 'low'}
-                        onError={() => {
-                          setFailedImages((prev) => new Set(prev).add(featured.id));
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-zinc-200">
-                        <span className="px-1 text-center text-xs text-zinc-950">
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(featured, index)}
+                    className="group focus:ring-primary relative aspect-square w-full rounded-lg focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                    aria-label={`Select ${displayName}`}
+                  >
+                    <div className="absolute inset-0 overflow-hidden rounded-lg">
+                      {coverArt && !imageError ? (
+                        <Image
+                          src={buildCdnImageVariantUrl(coverArt, 384)}
+                          alt={displayName ?? ''}
+                          fill
+                          unoptimized
+                          className="object-cover transition-transform group-hover:scale-105"
+                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 14vw"
+                          loading={isSelectedArtist ? 'eager' : undefined}
+                          fetchPriority={isSelectedArtist ? 'high' : 'low'}
+                          onError={() => {
+                            setFailedImages((prev) => new Set(prev).add(featured.id));
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-zinc-200">
+                          <span className="px-1 text-center text-xs text-zinc-950">
+                            {displayName}
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 flex items-end justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+                        <span className="max-w-full truncate px-1 pb-2 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
                           {displayName}
                         </span>
                       </div>
-                    )}
-                    <div className="absolute inset-0 flex items-end justify-center bg-black/0 transition-colors group-hover:bg-black/40">
-                      <span className="max-w-full truncate px-1 pb-2 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        {displayName}
-                      </span>
                     </div>
-                  </div>
-                </button>
-              </CarouselItem>
-            );
-          })}
-        </CarouselContent>
-        <CarouselNext className="relative top-auto right-auto shrink-0 translate-y-0" />
-      </div>
-    </Carousel>
-  );
-});
+                  </button>
+                </CarouselItem>
+              );
+            })}
+          </CarouselContent>
+          <CarouselNext className="relative top-auto right-auto shrink-0 translate-y-0" />
+        </div>
+      </Carousel>
+    );
+  }
+);
 
 /**
  * A view that displays the cover art for a given release and artist.

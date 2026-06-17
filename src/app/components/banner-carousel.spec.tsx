@@ -21,20 +21,21 @@ vi.mock('@/lib/validation/banner-notification-schema', () => ({
 
 /* ---------- helpers ---------- */
 
-function makeBanner(
+const makeBanner = (
   slot: number,
   notification: BannerSlotData['notification'] = null
-): BannerSlotData {
-  return {
-    slotNumber: slot,
-    imageFilename: `banner-${slot}.jpg`,
-    notification,
-  };
-}
+): BannerSlotData => ({
+  slotNumber: slot,
+  imageFilename: `banner-${slot}.jpg`,
+  notification,
+});
 
-function makeNotification(id: string, content: string): BannerSlotData['notification'] {
-  return { id, content, textColor: '#fff', backgroundColor: '#000' };
-}
+const makeNotification = (id: string, content: string): BannerSlotData['notification'] => ({
+  id,
+  content,
+  textColor: '#fff',
+  backgroundColor: '#000',
+});
 
 const THREE_BANNERS: BannerSlotData[] = [
   makeBanner(1, makeNotification('n1', 'Notification 1')),
@@ -48,39 +49,39 @@ const TWO_BANNERS: BannerSlotData[] = [
 ];
 
 /** Fire transitionend on the track element to complete a slide animation */
-function fireTransitionEnd() {
+const fireTransitionEnd = () => {
   const track = document.querySelector('[role="group"]');
   if (track) {
     fireEvent.transitionEnd(track);
   }
-}
+};
 
 /** Stub setPointerCapture/releasePointerCapture for jsdom */
-function stubPointerCapture() {
+const stubPointerCapture = () => {
   HTMLElement.prototype.setPointerCapture = vi.fn();
   HTMLElement.prototype.releasePointerCapture = vi.fn();
-}
+};
 
 /** Fire pointer events with correct clientX values (jsdom lacks PointerEvent constructor) */
-function firePointerDown(el: HTMLElement, clientX: number) {
+const firePointerDown = (el: HTMLElement, clientX: number) => {
   const event = new MouseEvent('pointerdown', { clientX, bubbles: true });
   Object.defineProperty(event, 'pointerId', { value: 1 });
   el.dispatchEvent(event);
-}
-function firePointerMove(el: HTMLElement, clientX: number) {
+};
+const firePointerMove = (el: HTMLElement, clientX: number) => {
   const event = new MouseEvent('pointermove', { clientX, bubbles: true });
   el.dispatchEvent(event);
-}
-function firePointerUp(el: HTMLElement, clientX: number) {
+};
+const firePointerUp = (el: HTMLElement, clientX: number) => {
   const event = new MouseEvent('pointerup', { clientX, bubbles: true });
   Object.defineProperty(event, 'pointerId', { value: 1 });
   el.dispatchEvent(event);
-}
-function firePointerCancel(el: HTMLElement, clientX: number) {
+};
+const firePointerCancel = (el: HTMLElement, clientX: number) => {
   const event = new MouseEvent('pointercancel', { clientX, bubbles: true });
   Object.defineProperty(event, 'pointerId', { value: 1 });
   el.dispatchEvent(event);
-}
+};
 
 /* ---------- tests ---------- */
 
@@ -574,17 +575,15 @@ describe('BannerCarousel', () => {
 
   describe('pointer / swipe navigation', () => {
     /** Get the track element used for pointer events */
-    function getTrack() {
-      return document.querySelector('[role="group"]') as HTMLElement;
-    }
+    const getTrack = () => document.querySelector('[role="group"]') as HTMLElement;
 
     /** Mock offsetWidth on the container so width-based calculations work in jsdom */
-    function mockContainerWidth(width = 800) {
+    const mockContainerWidth = (width = 800) => {
       const container = document.querySelector('[role="group"]')?.parentElement;
       if (container) {
         Object.defineProperty(container, 'offsetWidth', { value: width, configurable: true });
       }
-    }
+    };
 
     it('swipes left (negative deltaX) to navigate to the next slide', () => {
       render(<BannerCarousel banners={THREE_BANNERS} />);

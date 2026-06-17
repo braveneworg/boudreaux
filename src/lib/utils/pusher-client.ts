@@ -34,7 +34,7 @@ const buildNoopPusher = (): Pusher => {
  * gate construction behind an authenticated session so anonymous visitors
  * never open a socket.
  */
-export function getPusherClient(): Pusher {
+export const getPusherClient = (): Pusher => {
   if (cachedClient) return cachedClient;
 
   if (process.env.NEXT_PUBLIC_E2E_MODE === 'true') {
@@ -58,16 +58,16 @@ export function getPusherClient(): Pusher {
   });
 
   return cachedClient;
-}
+};
 
 /**
  * Tear down the singleton. Used when the user signs out (so the next
  * authenticated session re-authorises via /api/chat/pusher-auth) and in
  * tests.
  */
-export function disconnectPusherClient(): void {
+export const disconnectPusherClient = (): void => {
   if (cachedClient) {
     cachedClient.disconnect();
     cachedClient = null;
   }
-}
+};

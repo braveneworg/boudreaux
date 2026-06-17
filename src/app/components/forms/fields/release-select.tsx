@@ -57,7 +57,7 @@ interface ReleaseSelectProps<
   artistIds?: string[];
 }
 
-export function ReleaseSelect<
+export const ReleaseSelect = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -73,7 +73,7 @@ export function ReleaseSelect<
   showCreateLink = true,
   onReleaseChange,
   artistIds,
-}: ReleaseSelectProps<TFieldValues, TName>) {
+}: ReleaseSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
@@ -242,4 +242,4 @@ export function ReleaseSelect<
       }}
     />
   );
-}
+};

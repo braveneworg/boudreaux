@@ -54,7 +54,7 @@ const colors = {
   reset: '\x1b[0m',
 };
 
-function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
   const tag = {
     info: colors.blue,
     success: colors.green,
@@ -65,7 +65,7 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
   if (type === 'error') console.error(line);
   else if (type === 'warning') console.warn(line);
   else console.info(line);
-}
+};
 
 interface CliOptions {
   prefix: string;
@@ -74,7 +74,7 @@ interface CliOptions {
   help: boolean;
 }
 
-export function parseArgs(argv: string[]): CliOptions {
+export const parseArgs = (argv: string[]): CliOptions => {
   const opts: CliOptions = {
     prefix: 'media/featured-artists/',
     execute: false,
@@ -92,10 +92,10 @@ export function parseArgs(argv: string[]): CliOptions {
     }
   }
   return opts;
-}
+};
 
 /** Extract the S3 key from a CDN/HTTPS URL. Returns null for non-URL inputs. */
-export function extractS3KeyFromUrl(url: string | null | undefined): string | null {
+export const extractS3KeyFromUrl = (url: string | null | undefined): string | null => {
   if (!url || typeof url !== 'string') return null;
   if (!/^https?:\/\//.test(url)) return null;
   try {
@@ -103,15 +103,15 @@ export function extractS3KeyFromUrl(url: string | null | undefined): string | nu
   } catch {
     return null;
   }
-}
+};
 
 /** Parent prefix of an S3 key, including the trailing slash. */
-export function parentPrefix(key: string): string {
+export const parentPrefix = (key: string): string => {
   const lastSlash = key.lastIndexOf('/');
   return lastSlash === -1 ? '' : key.substring(0, lastSlash + 1);
-}
+};
 
-async function listAllKeys(s3: S3Client, bucket: string, prefix: string): Promise<string[]> {
+const listAllKeys = async (s3: S3Client, bucket: string, prefix: string): Promise<string[]> => {
   const keys: string[] = [];
   let token: string | undefined;
   do {
@@ -128,7 +128,7 @@ async function listAllKeys(s3: S3Client, bucket: string, prefix: string): Promis
     token = response.IsTruncated ? response.NextContinuationToken : undefined;
   } while (token);
   return keys;
-}
+};
 
 const HELP = `
 ${colors.cyan}Cleanup S3 orphan images${colors.reset}
@@ -153,7 +153,7 @@ ${colors.yellow}Required env:${colors.reset} S3_BUCKET, DATABASE_URL, AWS_*
 ${colors.yellow}Optional env:${colors.reset} AWS_REGION (default us-east-1), CLOUDFRONT_DISTRIBUTION_ID
 `;
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) {
     console.info(HELP);
@@ -290,7 +290,7 @@ async function main(): Promise<void> {
   } finally {
     await prisma.$disconnect();
   }
-}
+};
 
 /* istanbul ignore next -- top-level CLI entry */
 if (

@@ -18,17 +18,15 @@ vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   },
 }));
 
-function buildRequest(searchParams: Record<string, string> = {}): NextRequest {
+const buildRequest = (searchParams: Record<string, string> = {}): NextRequest => {
   const url = new URL('http://localhost/api/releases/507f1f77bcf86cd799439011/digital-formats');
   for (const [key, value] of Object.entries(searchParams)) {
     url.searchParams.set(key, value);
   }
   return new NextRequest(url);
-}
+};
 
-function buildContext(id = '507f1f77bcf86cd799439011') {
-  return { params: Promise.resolve({ id }) };
-}
+const buildContext = (id = '507f1f77bcf86cd799439011') => ({ params: Promise.resolve({ id }) });
 
 describe('GET /api/releases/[id]/digital-formats', () => {
   it('returns 400 for a malformed release ID', async () => {

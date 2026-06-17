@@ -29,7 +29,7 @@ const SSM_PATH_ENV_VARS = {
   webhookIpRanges: 'SSM_PATH_STRIPE_WEBHOOK_IP_RANGES',
 } as const;
 
-async function fetchSsmParameter(path: string): Promise<string> {
+const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({
     Name: path,
     WithDecryption: true,
@@ -43,7 +43,7 @@ async function fetchSsmParameter(path: string): Promise<string> {
   }
 
   return value;
-}
+};
 
 /**
  * Fetches static secrets from SSM Parameter Store once per cold start and
@@ -52,7 +52,7 @@ async function fetchSsmParameter(path: string): Promise<string> {
  * Must be called once at the start of each cold-start invocation before
  * any Stripe or Prisma client is used.
  */
-export async function initSecrets(): Promise<ResolvedSecrets> {
+export const initSecrets = async (): Promise<ResolvedSecrets> => {
   const paths: Record<keyof ResolvedSecrets, string> = {
     stripeSecretKey: '',
     stripeWebhookSecret: '',
@@ -84,14 +84,14 @@ export async function initSecrets(): Promise<ResolvedSecrets> {
 
   cachedSecrets = { ...cachedStaticSecrets, webhookIpRanges };
   return cachedSecrets;
-}
+};
 
 /**
  * Returns the cached secrets. Throws if `initSecrets()` has not been called.
  */
-export function getSecrets(): ResolvedSecrets {
+export const getSecrets = (): ResolvedSecrets => {
   if (!cachedSecrets) {
     throw new Error('Secrets not initialized — call initSecrets() before accessing secrets');
   }
   return cachedSecrets;
-}
+};

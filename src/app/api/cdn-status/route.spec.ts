@@ -10,10 +10,10 @@ vi.mock('@/lib/decorators/with-auth', () => ({
   withAuth: (handler: Function) => handler,
 }));
 
-function callGet() {
+const callGet = () => {
   const request = new NextRequest('http://localhost:3000/api/cdn-status');
   return (GET as Function)(request, { params: Promise.resolve({}) });
-}
+};
 
 const mockSend = vi.fn();
 

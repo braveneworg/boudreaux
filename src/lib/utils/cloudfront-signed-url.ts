@@ -30,11 +30,11 @@ interface CloudFrontSignedUrlInput {
  *  - `NEXT_PUBLIC_CDN_DOMAIN` (or `CDN_DOMAIN`) — the CloudFront domain
  *    the URL is signed for (must match the distribution serving the file).
  */
-function getCloudFrontSigningConfig(): {
+const getCloudFrontSigningConfig = (): {
   keyPairId: string;
   privateKey: string;
   cdnDomain: string;
-} | null {
+} | null => {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
   const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
@@ -50,12 +50,10 @@ function getCloudFrontSigningConfig(): {
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   return { keyPairId, privateKey, cdnDomain };
-}
+};
 
 /** Returns true when CloudFront URL signing is fully configured. */
-export function isCloudFrontSigningConfigured(): boolean {
-  return getCloudFrontSigningConfig() !== null;
-}
+export const isCloudFrontSigningConfigured = (): boolean => getCloudFrontSigningConfig() !== null;
 
 /**
  * Generate a CloudFront signed URL for a private S3 object served via the
@@ -67,7 +65,7 @@ export function isCloudFrontSigningConfigured(): boolean {
  * @returns A signed CloudFront URL, or `null` if CloudFront signing is not
  *   configured (the caller should then fall back to an S3 presigned URL).
  */
-export function generateCloudFrontSignedUrl(input: CloudFrontSignedUrlInput): string | null {
+export const generateCloudFrontSignedUrl = (input: CloudFrontSignedUrlInput): string | null => {
   const config = getCloudFrontSigningConfig();
   if (!config) {
     return null;
@@ -97,4 +95,4 @@ export function generateCloudFrontSignedUrl(input: CloudFrontSignedUrlInput): st
     console.error('CloudFront signing failed; falling back to S3 presigned URL:', err);
     return null;
   }
-}
+};

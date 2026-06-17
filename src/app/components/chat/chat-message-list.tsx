@@ -18,26 +18,26 @@ import { ChatMessageRow } from './chat-message-row';
  * useOptimisticChat's updates, and the render props are useCallback-stable
  * in chat-body.
  */
-const MemoizedMessageRow = memo(function MemoizedMessageRow({
-  message,
-  align,
-  renderReactionBar,
-  renderPinIndicator,
-}: {
-  message: OptimisticChatMessage;
-  align?: 'left' | 'right';
-  renderReactionBar?: (message: OptimisticChatMessage) => React.ReactNode;
-  renderPinIndicator?: (message: OptimisticChatMessage) => React.ReactNode;
-}) {
-  return (
+const MemoizedMessageRow = memo(
+  ({
+    message,
+    align,
+    renderReactionBar,
+    renderPinIndicator,
+  }: {
+    message: OptimisticChatMessage;
+    align?: 'left' | 'right';
+    renderReactionBar?: (message: OptimisticChatMessage) => React.ReactNode;
+    renderPinIndicator?: (message: OptimisticChatMessage) => React.ReactNode;
+  }) => (
     <ChatMessageRow
       message={message}
       align={align}
       reactionBar={renderReactionBar?.(message)}
       pinIndicator={renderPinIndicator?.(message)}
     />
-  );
-});
+  )
+);
 
 interface ChatMessageListProps {
   messages: OptimisticChatMessage[];

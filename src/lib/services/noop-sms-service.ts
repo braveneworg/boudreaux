@@ -49,8 +49,8 @@ export class NoOpSmsService implements SmsService {
   }
 }
 
-function redactPhone(to: string): string {
+const redactPhone = (to: string): string => {
   const trimmed = to.trim();
   if (trimmed.length <= 4) return '****';
   return `${trimmed.slice(0, 2)}***${trimmed.slice(-2)}`;
-}
+};

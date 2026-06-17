@@ -28,9 +28,9 @@ interface DeleteFormatFilesParams {
  * 4. Delete all child file records from DB
  * 5. Reset parent format's cached counts
  */
-async function deleteFormatFilesActionHandler(
+const deleteFormatFilesActionHandler = async (
   params: DeleteFormatFilesParams
-): Promise<ActionResult<{ deletedCount: number }>> {
+): Promise<ActionResult<{ deletedCount: number }>> => {
   try {
     const { releaseId, formatType } = params;
 
@@ -63,14 +63,14 @@ async function deleteFormatFilesActionHandler(
       error: error instanceof Error ? error.message : 'Failed to delete format files',
     };
   }
-}
+};
 
 /**
  * Server Action with admin authentication
  */
-export async function deleteFormatFilesAction(
+export const deleteFormatFilesAction = async (
   params: DeleteFormatFilesParams
-): Promise<ActionResult<{ deletedCount: number }>> {
+): Promise<ActionResult<{ deletedCount: number }>> => {
   await requireRole('admin');
 
   const parsed = deleteFormatFilesSchema.safeParse(params);
@@ -79,4 +79,4 @@ export async function deleteFormatFilesAction(
   }
 
   return deleteFormatFilesActionHandler(params);
-}
+};

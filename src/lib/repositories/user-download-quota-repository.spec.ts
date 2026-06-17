@@ -30,8 +30,8 @@ describe('UserDownloadQuotaRepository', () => {
   };
   const mockReleaseId = 'release-456';
 
-  function createUserQuota(overrides?: Partial<UserDownloadQuota>): UserDownloadQuota {
-    return {
+  const createUserQuota = (overrides?: Partial<UserDownloadQuota>): UserDownloadQuota =>
+    ({
       id: 'quota-1',
       userId: 'user-123',
       visitorId: null,
@@ -39,11 +39,10 @@ describe('UserDownloadQuotaRepository', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       ...overrides,
-    } as UserDownloadQuota;
-  }
+    }) as UserDownloadQuota;
 
-  function createGuestQuota(overrides?: Partial<UserDownloadQuota>): UserDownloadQuota {
-    return {
+  const createGuestQuota = (overrides?: Partial<UserDownloadQuota>): UserDownloadQuota =>
+    ({
       id: 'quota-g1',
       userId: null,
       visitorId: 'visitor-abc',
@@ -51,8 +50,7 @@ describe('UserDownloadQuotaRepository', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       ...overrides,
-    } as UserDownloadQuota;
-  }
+    }) as UserDownloadQuota;
 
   beforeEach(() => {
     repo = new UserDownloadQuotaRepository();

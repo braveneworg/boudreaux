@@ -13,13 +13,11 @@ export const MAIN_CONTENT_ID = 'main-content';
  * Rendered as the first focusable element on the page, so it is the first Tab
  * stop on both the mobile and desktop layouts.
  */
-export function SkipNavLink() {
-  return (
-    <a
-      href={`#${MAIN_CONTENT_ID}`}
-      className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-200 focus:rounded-md focus:bg-zinc-50 focus:px-4 focus:py-2 focus:font-semibold focus:text-zinc-950 focus:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
-    >
-      Skip to main content
-    </a>
-  );
-}
+export const SkipNavLink = () => (
+  <a
+    href={`#${MAIN_CONTENT_ID}`}
+    className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-200 focus:rounded-md focus:bg-zinc-50 focus:px-4 focus:py-2 focus:font-semibold focus:text-zinc-950 focus:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+  >
+    Skip to main content
+  </a>
+);

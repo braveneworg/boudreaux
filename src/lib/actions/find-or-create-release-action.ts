@@ -61,16 +61,12 @@ export interface FindOrCreateReleaseResult {
 /**
  * Determines the format based on metadata
  */
-function determineFormat(_lossless?: boolean): Format[] {
-  // Default to digital; could be enhanced with more metadata
-  // lossless flag could indicate FLAC vs MP3 in the future
-  return ['DIGITAL'];
-}
+const determineFormat = (_lossless?: boolean): Format[] => ['DIGITAL'];
 
 /**
  * Parses a release date from various formats
  */
-function parseReleaseDate(year?: number, dateStr?: string): Date | undefined {
+const parseReleaseDate = (year?: number, dateStr?: string): Date | undefined => {
   // Try full date string first (e.g., "2024-03-15")
   if (dateStr) {
     const parsed = new Date(dateStr);
@@ -86,7 +82,7 @@ function parseReleaseDate(year?: number, dateStr?: string): Date | undefined {
   }
 
   return undefined;
-}
+};
 
 /**
  * Options for find-or-create release behaviour
@@ -102,10 +98,10 @@ export interface FindOrCreateReleaseOptions {
  * Prefers `albumArtist` over `artist` (ID3 convention: albumArtist is album-level,
  * artist is per-track). Returns the artist ID if successful, undefined otherwise.
  */
-async function connectArtistFromMetadata(
+const connectArtistFromMetadata = async (
   metadata: ReleaseMetadata,
   releaseId: string
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   const artistName = metadata.albumArtist?.trim() || metadata.artist?.trim();
   if (!artistName) {
     return undefined;
@@ -122,7 +118,7 @@ async function connectArtistFromMetadata(
     console.warn('[findOrCreateRelease] Could not connect artist from metadata:', err);
   }
   return undefined;
-}
+};
 
 /**
  * Find an existing release by title (case-insensitive) or create a new one
@@ -132,10 +128,10 @@ async function connectArtistFromMetadata(
  * @param options  - Optional behaviour flags
  * @returns Result indicating success/failure and the release ID
  */
-export async function findOrCreateReleaseAction(
+export const findOrCreateReleaseAction = async (
   metadata: ReleaseMetadata,
   options: FindOrCreateReleaseOptions = {}
-): Promise<FindOrCreateReleaseResult> {
+): Promise<FindOrCreateReleaseResult> => {
   await requireRole('admin');
 
   // Validate required field
@@ -257,4 +253,4 @@ export async function findOrCreateReleaseAction(
       error: error instanceof Error ? error.message : 'An unexpected error occurred',
     };
   }
-}
+};

@@ -13,9 +13,8 @@ import type { PaginatedResponse } from '@/lib/types/pagination';
  * @param row - Zod schema describing a single row in the page.
  * @returns A schema validating a {@link PaginatedResponse} of that row type.
  */
-export function paginatedResponseSchema<T>(row: z.ZodType<T>): z.ZodType<PaginatedResponse<T>> {
-  return z.object({
+export const paginatedResponseSchema = <T>(row: z.ZodType<T>): z.ZodType<PaginatedResponse<T>> =>
+  z.object({
     rows: z.array(row),
     nextSkip: z.number().nullable(),
   });
-}

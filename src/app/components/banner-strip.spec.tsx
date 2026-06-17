@@ -35,9 +35,11 @@ vi.mock('./banner-notification-ticker', () => ({
   ),
 }));
 
-function makeBanner(slot: number): BannerSlotData {
-  return { slotNumber: slot, imageFilename: `banner-${slot}.jpg`, notification: null };
-}
+const makeBanner = (slot: number): BannerSlotData => ({
+  slotNumber: slot,
+  imageFilename: `banner-${slot}.jpg`,
+  notification: null,
+});
 
 const THREE_BANNERS: BannerSlotData[] = [makeBanner(1), makeBanner(2), makeBanner(3)];
 

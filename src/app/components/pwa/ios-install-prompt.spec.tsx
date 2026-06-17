@@ -13,15 +13,15 @@ const IOS_CHROME_UA =
 const ANDROID_UA =
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
 
-function setUserAgent(ua: string): void {
+const setUserAgent = (ua: string): void => {
   Object.defineProperty(navigator, 'userAgent', { configurable: true, value: ua });
-}
+};
 
-function setStandalone(value: boolean | undefined): void {
+const setStandalone = (value: boolean | undefined): void => {
   Object.defineProperty(navigator, 'standalone', { configurable: true, value });
-}
+};
 
-function setDisplayModeStandalone(matches: boolean): void {
+const setDisplayModeStandalone = (matches: boolean): void => {
   vi.mocked(globalThis.matchMedia).mockImplementation(
     (query: string) =>
       ({
@@ -35,7 +35,7 @@ function setDisplayModeStandalone(matches: boolean): void {
         dispatchEvent: vi.fn(),
       }) as unknown as MediaQueryList
   );
-}
+};
 
 describe('IosInstallPrompt', () => {
   beforeEach(() => {

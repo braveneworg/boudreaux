@@ -16,7 +16,7 @@ export interface LockoutStatus {
  * @param email User's email address
  * @returns Object indicating if locked and remaining lockout time
  */
-export async function checkAccountLockout(email: string): Promise<LockoutStatus> {
+export const checkAccountLockout = async (email: string): Promise<LockoutStatus> => {
   const user = await prisma.user.findUnique({
     where: { email },
     select: { lockedUntil: true, failedLoginAttempts: true },
@@ -42,14 +42,14 @@ export async function checkAccountLockout(email: string): Promise<LockoutStatus>
   }
 
   return { isLocked: false };
-}
+};
 
 /**
  * Record a failed login attempt and lock account if threshold reached
  * @param email User's email address
  * @returns Updated lockout status
  */
-export async function recordFailedLogin(email: string): Promise<LockoutStatus> {
+export const recordFailedLogin = async (email: string): Promise<LockoutStatus> => {
   const user = await prisma.user.findUnique({
     where: { email },
     select: { failedLoginAttempts: true },
@@ -72,13 +72,13 @@ export async function recordFailedLogin(email: string): Promise<LockoutStatus> {
     isLocked: shouldLock,
     remainingTime: shouldLock ? LOCKOUT_DURATION_MS : undefined,
   };
-}
+};
 
 /**
  * Reset failed login attempts for a user (e.g., after successful login)
  * @param email User's email address
  */
-export async function resetFailedLogins(email: string): Promise<void> {
+export const resetFailedLogins = async (email: string): Promise<void> => {
   await prisma.user.update({
     where: { email },
     data: {
@@ -86,14 +86,14 @@ export async function resetFailedLogins(email: string): Promise<void> {
       lockedUntil: null,
     },
   });
-}
+};
 
 /**
  * Format remaining lockout time in a human-readable format
  * @param ms Milliseconds remaining
  * @returns Formatted string (e.g., "14 minutes")
  */
-export function formatLockoutTime(ms: number): string {
+export const formatLockoutTime = (ms: number): string => {
   const minutes = Math.ceil(ms / 60000);
   return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
-}
+};

@@ -11,7 +11,7 @@
  * @param url - The full CDN or S3 URL
  * @returns The S3 key, or null if extraction fails
  */
-export function extractS3KeyFromUrl(url: string): string | null {
+export const extractS3KeyFromUrl = (url: string): string | null => {
   if (!url || url === 'pending://upload') {
     return null;
   }
@@ -33,4 +33,4 @@ export function extractS3KeyFromUrl(url: string): string | null {
   }
 
   return null;
-}
+};

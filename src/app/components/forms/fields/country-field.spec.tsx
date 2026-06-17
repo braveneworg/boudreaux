@@ -57,7 +57,7 @@ vi.mock('@/lib/utils/countries', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({ children }: { children: React.ReactNode }) {
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   const methods = useForm<ProfileFormData>({
     defaultValues: {
       firstName: '',
@@ -78,15 +78,15 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
       <form>{children}</form>
     </FormProvider>
   );
-}
+};
 
 // Helper component that renders CountryField with form context
-function CountryFieldWithContext({ onUserInteraction }: { onUserInteraction?: () => void }) {
+const CountryFieldWithContext = ({ onUserInteraction }: { onUserInteraction?: () => void }) => {
   const { control, setValue } = useFormContext<ProfileFormData>();
   return (
     <CountryField control={control} setValue={setValue} onUserInteraction={onUserInteraction} />
   );
-}
+};
 
 describe('CountryField', () => {
   it('should render with default props', () => {

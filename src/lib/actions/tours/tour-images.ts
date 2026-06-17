@@ -35,9 +35,9 @@ export interface TourImageActionResponse<T = unknown> {
  * Generate a presigned URL for uploading an image to S3
  * Requires admin role
  */
-export async function generateUploadUrlAction(
+export const generateUploadUrlAction = async (
   request: ImageUploadRequest
-): Promise<TourImageActionResponse<PresignedUrlResponse>> {
+): Promise<TourImageActionResponse<PresignedUrlResponse>> => {
   try {
     // Require admin authentication
     await requireRole('admin');
@@ -71,16 +71,16 @@ export async function generateUploadUrlAction(
 
     return { success: false, error: 'Failed to generate upload URL' };
   }
-}
+};
 
 /**
  * Confirm image upload by creating TourImage database record
  * Call this after successful client-side upload to S3
  * Requires admin role
  */
-export async function confirmUploadAction(
+export const confirmUploadAction = async (
   uploadData: ConfirmUploadRequest
-): Promise<TourImageActionResponse<ImageMetadata>> {
+): Promise<TourImageActionResponse<ImageMetadata>> => {
   try {
     // Require admin authentication
     const session = await requireRole('admin');
@@ -139,15 +139,15 @@ export async function confirmUploadAction(
 
     return { success: false, error: 'Failed to confirm upload' };
   }
-}
+};
 
 /**
  * Delete an image from tour (removes from S3 and database)
  * Requires admin role
  */
-export async function deleteImageAction(
+export const deleteImageAction = async (
   request: DeleteImageRequest
-): Promise<TourImageActionResponse<void>> {
+): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
     await requireRole('admin');
@@ -192,15 +192,15 @@ export async function deleteImageAction(
 
     return { success: false, error: 'Failed to delete image' };
   }
-}
+};
 
 /**
  * Reorder images for a tour
  * Requires admin role
  */
-export async function reorderImagesAction(
+export const reorderImagesAction = async (
   request: ImageReorder
-): Promise<TourImageActionResponse<void>> {
+): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
     await requireRole('admin');
@@ -239,15 +239,15 @@ export async function reorderImagesAction(
 
     return { success: false, error: 'Failed to reorder images' };
   }
-}
+};
 
 /**
  * Update alt text for an image
  * Requires admin role
  */
-export async function updateImageAltTextAction(
+export const updateImageAltTextAction = async (
   request: UpdateImageAltText
-): Promise<TourImageActionResponse<void>> {
+): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
     await requireRole('admin');
@@ -280,4 +280,4 @@ export async function updateImageAltTextAction(
 
     return { success: false, error: 'Failed to update alt text' };
   }
-}
+};

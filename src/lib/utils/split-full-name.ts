@@ -6,10 +6,12 @@
  * @param fullName - The full name to split
  * @returns An object with firstName and lastName properties
  */
-export function splitFullName(fullName: string): {
+export const splitFullName = (
+  fullName: string
+): {
   firstName: string;
   lastName: string;
-} {
+} => {
   const trimmedName = fullName.trim();
 
   if (!trimmedName) {
@@ -26,4 +28,4 @@ export function splitFullName(fullName: string): {
   const lastName = parts.slice(1).join(' ');
 
   return { firstName, lastName };
-}
+};

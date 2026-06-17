@@ -12,6 +12,5 @@ import { createHash } from 'crypto';
  * Computed server-side so peer emails are never broadcast over realtime
  * channels — only the public-by-design hash is exposed to other users.
  */
-export function gravatarHash(email: string): string {
-  return createHash('md5').update(email.trim().toLowerCase()).digest('hex');
-}
+export const gravatarHash = (email: string): string =>
+  createHash('md5').update(email.trim().toLowerCase()).digest('hex');

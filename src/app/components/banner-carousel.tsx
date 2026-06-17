@@ -38,13 +38,13 @@ interface BannerCarouselProps {
 }
 
 /** Insert the `_w{width}` suffix before the file extension, matching S3 variant keys. */
-export function buildBannerSrc(filename: string, width?: number): string {
+export const buildBannerSrc = (filename: string, width?: number): string => {
   const base = `/${BANNER_CDN_PATH}/${filename}`;
   if (!width) return base;
   const lastDot = base.lastIndexOf('.');
   if (lastDot === -1) return `${base}_w${width}`;
   return `${base.substring(0, lastDot)}_w${width}${base.substring(lastDot)}`;
-}
+};
 
 const SWIPE_THRESHOLD = 50;
 const VELOCITY_THRESHOLD = 500;
@@ -55,10 +55,10 @@ const EASING = 'cubic-bezier(0.42, 0, 0.58, 1)'; // ease-in-out
  * BannerCarousel displays rotating banner images with optional notification
  * strips. Uses CSS transitions and pointer events — zero JS animation libraries.
  */
-export function BannerCarousel({
+export const BannerCarousel = ({
   banners,
   rotationInterval = DEFAULT_ROTATION_INTERVAL,
-}: BannerCarouselProps) {
+}: BannerCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
   // Whether the carousel is scrolled into the viewport. Starts `true` so SSR,
@@ -528,4 +528,4 @@ export function BannerCarousel({
     </section>
   );
   /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
-}
+};

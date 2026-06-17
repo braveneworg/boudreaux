@@ -14,7 +14,7 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
  * Fetch all purchases for the currently authenticated user.
  * Returns an array of purchase records with release details.
  */
-export async function getCollectionAction() {
+export const getCollectionAction = async () => {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -28,12 +28,12 @@ export async function getCollectionAction() {
     console.error('[getCollectionAction] Failed to fetch collection:', error);
     return { success: false, error: 'Failed to load collection', data: [] };
   }
-}
+};
 
 /**
  * Delete a purchase record by ID. Admin-only operation for testing purposes.
  */
-export async function deletePurchaseAction(purchaseId: string) {
+export const deletePurchaseAction = async (purchaseId: string) => {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -52,4 +52,4 @@ export async function deletePurchaseAction(purchaseId: string) {
     console.error('[deletePurchaseAction] Failed to delete purchase:', error);
     return { success: false, error: 'Failed to delete purchase' };
   }
-}
+};

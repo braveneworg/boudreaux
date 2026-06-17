@@ -40,7 +40,7 @@ export interface GenerateImageVariantsResult {
  * Strips the protocol + domain, leaving the path portion which doubles as
  * the S3 key (e.g. `media/releases/coverart/foo-123.jpg`).
  */
-function extractS3Key(cdnUrl: string): string {
+const extractS3Key = (cdnUrl: string): string => {
   try {
     const url = new URL(cdnUrl);
     // Remove leading slash
@@ -49,13 +49,15 @@ function extractS3Key(cdnUrl: string): string {
     // If not a valid URL, treat the whole string as a key
     return cdnUrl.replace(/^\//, '');
   }
-}
+};
 
-function validateSourceKey(key: string): {
+const validateSourceKey = (
+  key: string
+): {
   isValid: boolean;
   shouldSkip: boolean;
   error?: string;
-} {
+} => {
   if (!key || key.trim().length === 0) {
     return { isValid: false, shouldSkip: false, error: 'Invalid image key' };
   }
@@ -73,20 +75,20 @@ function validateSourceKey(key: string): {
   }
 
   return { isValid: true, shouldSkip: false };
-}
+};
 
-function getExtension(key: string): string {
+const getExtension = (key: string): string => {
   const dot = key.lastIndexOf('.');
   return dot === -1 ? '' : key.substring(dot).toLowerCase();
-}
+};
 
-function buildVariantKey(originalKey: string, width: number, overrideExt?: string): string {
+const buildVariantKey = (originalKey: string, width: number, overrideExt?: string): string => {
   const dot = originalKey.lastIndexOf('.');
   if (dot === -1) return `${originalKey}_w${width}${overrideExt ?? ''}`;
   const base = originalKey.substring(0, dot);
   const ext = overrideExt ?? originalKey.substring(dot);
   return `${base}_w${width}${ext}`;
-}
+};
 
 /**
  * Server action: generate width-variant images for a freshly-uploaded image.

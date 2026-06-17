@@ -12,8 +12,7 @@ interface ContactEmailData {
   timestamp: string;
 }
 
-export function buildContactEmailText(data: ContactEmailData): string {
-  return `CONTACT FORM SUBMISSION
+export const buildContactEmailText = (data: ContactEmailData): string => `CONTACT FORM SUBMISSION
 =======================
 
 Reason: ${data.reason}
@@ -29,4 +28,3 @@ ${data.message}
 --------
 Sent via fakefourrecords.com contact form
 ${data.timestamp}`;
-}

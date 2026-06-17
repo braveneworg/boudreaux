@@ -20,7 +20,7 @@ export interface ActiveTyper {
  * whose TTL has elapsed so the indicator naturally clears without needing
  * an explicit "stopped typing" event from the sender.
  */
-export function useChatTyping(currentUserId: string | null) {
+export const useChatTyping = (currentUserId: string | null) => {
   // Map<userId, { username, expiresAt }>
   const [activeTypers, setActiveTypers] = useState<ActiveTyper[]>([]);
   const expiriesRef = useRef<Map<string, { username: string | null; expiresAt: number }>>(
@@ -69,4 +69,4 @@ export function useChatTyping(currentUserId: string | null) {
   );
 
   return { activeTypers, noteTyping };
-}
+};

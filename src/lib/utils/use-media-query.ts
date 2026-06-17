@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 /**
  * Hook that returns true if the media query matches.
  */
-export function useMediaQuery(query: string): boolean {
+export const useMediaQuery = (query: string): boolean => {
   // Initialize with the current match state
   const [matches, setMatches] = useState<boolean>(() =>
     /* v8 ignore next -- jsdom always defines `window`; SSR fallback is unreachable in tests */
@@ -33,4 +33,4 @@ export function useMediaQuery(query: string): boolean {
   }, [query]);
 
   return matches;
-}
+};

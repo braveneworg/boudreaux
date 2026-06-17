@@ -35,9 +35,9 @@ export interface TourDateImageActionResponse<T = unknown> {
  * Generate a presigned URL for uploading a tour date image to S3
  * Requires admin role
  */
-export async function generateTourDateUploadUrlAction(
+export const generateTourDateUploadUrlAction = async (
   request: TourDateImageUploadRequest
-): Promise<TourDateImageActionResponse<PresignedUrlResponse>> {
+): Promise<TourDateImageActionResponse<PresignedUrlResponse>> => {
   try {
     await requireRole('admin');
 
@@ -68,16 +68,16 @@ export async function generateTourDateUploadUrlAction(
 
     return { success: false, error: 'Failed to generate upload URL' };
   }
-}
+};
 
 /**
  * Confirm tour date image upload by creating TourDateImage database record
  * Call this after successful client-side upload to S3
  * Requires admin role
  */
-export async function confirmTourDateUploadAction(
+export const confirmTourDateUploadAction = async (
   uploadData: TourDateConfirmUploadRequest
-): Promise<TourDateImageActionResponse<TourDateImageMetadata>> {
+): Promise<TourDateImageActionResponse<TourDateImageMetadata>> => {
   try {
     const session = await requireRole('admin');
 
@@ -133,15 +133,15 @@ export async function confirmTourDateUploadAction(
 
     return { success: false, error: 'Failed to confirm upload' };
   }
-}
+};
 
 /**
  * Delete a tour date image (removes from S3 and database)
  * Requires admin role
  */
-export async function deleteTourDateImageAction(
+export const deleteTourDateImageAction = async (
   request: TourDateDeleteImageRequest
-): Promise<TourDateImageActionResponse<void>> {
+): Promise<TourDateImageActionResponse<void>> => {
   try {
     await requireRole('admin');
 
@@ -183,15 +183,15 @@ export async function deleteTourDateImageAction(
 
     return { success: false, error: 'Failed to delete image' };
   }
-}
+};
 
 /**
  * Reorder images for a tour date
  * Requires admin role
  */
-export async function reorderTourDateImagesAction(
+export const reorderTourDateImagesAction = async (
   request: TourDateImageReorder
-): Promise<TourDateImageActionResponse<void>> {
+): Promise<TourDateImageActionResponse<void>> => {
   try {
     await requireRole('admin');
 
@@ -227,15 +227,15 @@ export async function reorderTourDateImagesAction(
 
     return { success: false, error: 'Failed to reorder images' };
   }
-}
+};
 
 /**
  * Update alt text for a tour date image
  * Requires admin role
  */
-export async function updateTourDateImageAltTextAction(
+export const updateTourDateImageAltTextAction = async (
   request: TourDateUpdateImageAltText
-): Promise<TourDateImageActionResponse<void>> {
+): Promise<TourDateImageActionResponse<void>> => {
   try {
     await requireRole('admin');
 
@@ -265,4 +265,4 @@ export async function updateTourDateImageAltTextAction(
 
     return { success: false, error: 'Failed to update alt text' };
   }
-}
+};

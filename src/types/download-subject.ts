@@ -19,17 +19,13 @@ export type DownloadSubject =
 /**
  * Type guard: subject is an authenticated user.
  */
-export function isUserSubject(
+export const isUserSubject = (
   subject: DownloadSubject
-): subject is Extract<DownloadSubject, { kind: 'user' }> {
-  return subject.kind === 'user';
-}
+): subject is Extract<DownloadSubject, { kind: 'user' }> => subject.kind === 'user';
 
 /**
  * Type guard: subject is an anonymous guest.
  */
-export function isGuestSubject(
+export const isGuestSubject = (
   subject: DownloadSubject
-): subject is Extract<DownloadSubject, { kind: 'guest' }> {
-  return subject.kind === 'guest';
-}
+): subject is Extract<DownloadSubject, { kind: 'guest' }> => subject.kind === 'guest';

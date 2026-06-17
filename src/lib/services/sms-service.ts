@@ -36,9 +36,9 @@ export type SmsResult = { ok: true; messageId: string } | { ok: false; error: st
  * no-op so local dev/test never accidentally hits the network. Set
  * `SMS_PROVIDER=sns` in production to enable real delivery via SNS.
  */
-export function resolveSmsProvider(): 'sns' | 'noop' {
+export const resolveSmsProvider = (): 'sns' | 'noop' => {
   const explicit = process.env.SMS_PROVIDER?.trim().toLowerCase();
   if (explicit === 'sns') return 'sns';
   if (explicit === 'noop') return 'noop';
   return 'noop';
-}
+};

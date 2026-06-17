@@ -103,19 +103,18 @@ vi.spyOn(Readable, 'fromWeb').mockReturnValue(
   })
 );
 
-function makeBody(): ReadableStream {
-  return new ReadableStream({
+const makeBody = (): ReadableStream =>
+  new ReadableStream({
     start(controller) {
       controller.enqueue(Buffer.from('mock file data'));
       controller.close();
     },
   });
-}
 
-function makeRequest(overrides?: {
+const makeRequest = (overrides?: {
   headers?: Record<string, string>;
   noBody?: boolean;
-}): NextRequest {
+}): NextRequest => {
   const defaultHeaders: Record<string, string> = {
     'x-file-name': encodeURIComponent('album.mp3'),
     'x-file-size': '50000000',
@@ -130,11 +129,11 @@ function makeRequest(overrides?: {
     body: overrides?.noBody ? undefined : (makeBody() as unknown as string),
     duplex: 'half',
   });
-}
+};
 
-function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
-  return { params: Promise.resolve({ id, formatType }) };
-}
+const makeParams = (id = 'release-1', formatType = 'MP3_320KBPS') => ({
+  params: Promise.resolve({ id, formatType }),
+});
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   beforeEach(() => {

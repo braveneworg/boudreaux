@@ -36,36 +36,34 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-function buildPurchase(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'purchase-1',
-    amountPaid: 1000,
-    currency: 'usd',
-    purchasedAt: new Date('2026-01-15'),
-    release: {
-      id: 'rel-1',
-      title: 'Test Album',
-      coverArt: 'https://example.com/cover.jpg',
-      images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
-      artistReleases: [
-        {
-          artist: {
-            id: 'artist-1',
-            firstName: 'John',
-            surname: 'Doe',
-            displayName: 'JDoe',
-          },
+const buildPurchase = (overrides: Record<string, unknown> = {}) => ({
+  id: 'purchase-1',
+  amountPaid: 1000,
+  currency: 'usd',
+  purchasedAt: new Date('2026-01-15'),
+  release: {
+    id: 'rel-1',
+    title: 'Test Album',
+    coverArt: 'https://example.com/cover.jpg',
+    images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
+    artistReleases: [
+      {
+        artist: {
+          id: 'artist-1',
+          firstName: 'John',
+          surname: 'Doe',
+          displayName: 'JDoe',
         },
-      ],
-      digitalFormats: [
-        { formatType: 'FLAC', files: [{ fileName: 'track.flac' }] },
-        { formatType: 'WAV', files: [{ fileName: 'track.wav' }] },
-      ],
-      releaseDownloads: [{ downloadCount: 2, lastDownloadedAt: null as string | null }],
-    },
-    ...overrides,
-  };
-}
+      },
+    ],
+    digitalFormats: [
+      { formatType: 'FLAC', files: [{ fileName: 'track.flac' }] },
+      { formatType: 'WAV', files: [{ fileName: 'track.wav' }] },
+    ],
+    releaseDownloads: [{ downloadCount: 2, lastDownloadedAt: null as string | null }],
+  },
+  ...overrides,
+});
 
 describe('CollectionList', () => {
   const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
@@ -320,11 +318,8 @@ describe('CollectionList', () => {
 });
 
 describe('CollectionDownloadDialog', () => {
-  function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
-    return events
-      .map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
-      .join('');
-  }
+  const makeSSEBody = (events: Array<{ event: string; data: Record<string, unknown> }>): string =>
+    events.map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`).join('');
 
   const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
     { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
@@ -342,13 +337,12 @@ describe('CollectionDownloadDialog', () => {
     { event: 'complete', data: {} },
   ];
 
-  function makeSSEResponse(events = defaultSSEEvents) {
-    return new Response(makeSSEBody(events), {
+  const makeSSEResponse = (events = defaultSSEEvents) =>
+    new Response(makeSSEBody(events), {
       headers: { 'Content-Type': 'text/event-stream' },
     });
-  }
 
-  function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
+  const makeThrowAfterReadyResponse = (events = defaultSSEEvents): Response => {
     const encoder = new TextEncoder();
     const chunk = encoder.encode(makeSSEBody(events));
     const read = vi
@@ -364,13 +358,12 @@ describe('CollectionDownloadDialog', () => {
         }),
       },
     } as unknown as Response;
-  }
+  };
 
-  function makeConfirmResponse() {
-    return new Response(JSON.stringify({ success: true }), {
+  const makeConfirmResponse = () =>
+    new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
     });
-  }
 
   // Real timers by default so waitFor/findBy settle via MutationObserver
   // instead of shouldAdvanceTime ticks; the one test that advances the

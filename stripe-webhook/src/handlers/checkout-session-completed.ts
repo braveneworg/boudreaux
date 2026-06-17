@@ -22,17 +22,17 @@ const releaseMetadataSchema = z.object({
   type: z.literal('release_purchase'),
 });
 
-export async function handleCheckoutSessionCompleted(
+export const handleCheckoutSessionCompleted = async (
   session: Stripe.Checkout.Session
-): Promise<void> {
+): Promise<void> => {
   // Only payment-mode release purchases are handled.
   if (session.mode !== 'payment' || session.metadata?.type !== 'release_purchase') {
     return;
   }
   await handleReleasePurchaseCompleted(session);
-}
+};
 
-async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session): Promise<void> {
+const handleReleasePurchaseCompleted = async (session: Stripe.Checkout.Session): Promise<void> => {
   // Always retrieve the full session — webhook payload may have payment_intent: null.
   const retrievedSession = await getStripe().checkout.sessions.retrieve(session.id);
 
@@ -238,4 +238,4 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
       userId,
     });
   }
-}
+};

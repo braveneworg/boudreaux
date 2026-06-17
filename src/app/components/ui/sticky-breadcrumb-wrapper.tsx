@@ -11,11 +11,11 @@ type StickyBreadcrumbWrapperProps = {
   isVisible?: boolean;
 };
 
-export function StickyBreadcrumbWrapper({
+export const StickyBreadcrumbWrapper = ({
   children,
   offsetTop = 0,
   isVisible = true,
-}: StickyBreadcrumbWrapperProps) {
+}: StickyBreadcrumbWrapperProps) => {
   const [isSticky, setIsSticky] = useState(false);
 
   useEffect(() => {
@@ -44,4 +44,4 @@ export function StickyBreadcrumbWrapper({
       <div className="container mx-auto w-full max-w-full px-4">{children}</div>
     </div>
   );
-}
+};

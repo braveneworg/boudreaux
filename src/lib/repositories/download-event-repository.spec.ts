@@ -30,22 +30,20 @@ describe('DownloadEventRepository', () => {
   const mockReleaseId = '507f1f77bcf86cd799439012';
   const mockFormatType: DigitalFormatType = 'MP3_320KBPS';
 
-  function createMockEvent(overrides?: Partial<DownloadEvent>): DownloadEvent {
-    return {
-      id: 'event123',
-      userId: mockUserId,
-      visitorId: null,
-      releaseId: mockReleaseId,
-      formatType: mockFormatType,
-      success: true,
-      errorCode: null,
-      ipAddress: '192.168.1.1',
-      userAgent: 'Mozilla/5.0',
-      downloadedAt: new Date(),
-      createdAt: new Date(),
-      ...overrides,
-    };
-  }
+  const createMockEvent = (overrides?: Partial<DownloadEvent>): DownloadEvent => ({
+    id: 'event123',
+    userId: mockUserId,
+    visitorId: null,
+    releaseId: mockReleaseId,
+    formatType: mockFormatType,
+    success: true,
+    errorCode: null,
+    ipAddress: '192.168.1.1',
+    userAgent: 'Mozilla/5.0',
+    downloadedAt: new Date(),
+    createdAt: new Date(),
+    ...overrides,
+  });
 
   beforeEach(() => {
     repository = new DownloadEventRepository();

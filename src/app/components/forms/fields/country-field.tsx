@@ -18,7 +18,7 @@ interface CountryFieldProps {
   setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export function CountryField({ control, onUserInteraction, setValue }: CountryFieldProps) {
+export const CountryField = ({ control, onUserInteraction, setValue }: CountryFieldProps) => {
   const countryOptions = COUNTRIES.map((country) => ({
     value: country.code,
     label: country.name,
@@ -39,4 +39,4 @@ export function CountryField({ control, onUserInteraction, setValue }: CountryFi
       setValue={setValue}
     />
   );
-}
+};

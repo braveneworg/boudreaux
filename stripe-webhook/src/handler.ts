@@ -123,7 +123,7 @@ export const lambdaHandler = async (
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
 
-async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+const handleStripeEvent = async (event: Stripe.Event): Promise<void> => {
   console.info(`Processing Stripe event: ${event.type} [${event.id}]`);
 
   switch (event.type) {
@@ -138,4 +138,4 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     default:
       console.warn(`Unhandled event type: ${event.type}`);
   }
-}
+};

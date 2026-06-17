@@ -34,7 +34,7 @@ const ALLOWED_ENTITY_TYPES = new Set([
  * leftovers from a prior upload at a different extension and should be
  * deleted.
  */
-function isOrphan(fileName: string, newExt: string): boolean {
+const isOrphan = (fileName: string, newExt: string): boolean => {
   const match = fileName.match(/^cover(_w\d+)?(\.[^.]+)$/);
   if (!match) return false;
   const isVariant = !!match[1];
@@ -46,7 +46,7 @@ function isOrphan(fileName: string, newExt: string): boolean {
   // because they live at `cover.webp`, not the new key.
   if (isVariant && ext === '.webp') return false;
   return true;
-}
+};
 
 /**
  * Run AFTER a successful cover-art upload + variant generation. Two jobs:

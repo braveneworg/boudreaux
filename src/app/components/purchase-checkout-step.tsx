@@ -22,12 +22,12 @@ import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
 import { queryKeys } from '@/lib/query-keys';
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
-function getStripe() {
+const getStripe = () => {
   if (!stripePromise) {
     stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
   }
   return stripePromise;
-}
+};
 
 const POLL_INTERVAL_MS = 3500;
 const MAX_POLL_COUNT = 30;
@@ -43,9 +43,8 @@ const SESSION_ERROR_MESSAGES: Record<string, string> = {
  * Maps a machine-readable error code returned by the server action to a
  * human-friendly message suitable for display.
  */
-function getSessionErrorMessage(code: string): string {
-  return SESSION_ERROR_MESSAGES[code] ?? 'Something went wrong. Please try again.';
-}
+const getSessionErrorMessage = (code: string): string =>
+  SESSION_ERROR_MESSAGES[code] ?? 'Something went wrong. Please try again.';
 
 interface PurchaseCheckoutStepProps {
   releaseId: string;
@@ -58,9 +57,7 @@ interface PurchaseCheckoutStepProps {
 }
 
 /** Formats an integer cent amount to a USD display string, e.g. 500 → "$5.00". */
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+const formatCents = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
 
 interface PurchaseCheckoutFormProps {
   amountCents: number;

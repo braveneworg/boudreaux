@@ -48,7 +48,7 @@ const ICON_SPECS: readonly IconSpec[] = [
   { fileName: 'apple-touch-icon.png', size: 180, contentScale: 0.72 },
 ];
 
-async function generateIcon(spec: IconSpec): Promise<void> {
+const generateIcon = async (spec: IconSpec): Promise<void> => {
   const logoSize = Math.round(spec.size * spec.contentScale);
 
   // Render the SVG mark to a transparent raster at the target inner size, then
@@ -73,13 +73,13 @@ async function generateIcon(spec: IconSpec): Promise<void> {
     .toFile(outputPath);
 
   console.info(`✓ ${spec.fileName} (${spec.size}×${spec.size})`);
-}
+};
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   await mkdir(OUTPUT_DIR, { recursive: true });
   await Promise.all(ICON_SPECS.map(generateIcon));
   console.info(`\nGenerated ${ICON_SPECS.length} icons in public/icons/`);
-}
+};
 
 main().catch((error: unknown) => {
   console.error('Failed to generate PWA icons:', error);
