@@ -100,6 +100,21 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
+/**
+ * Shape of a single entry in a Recharts tooltip `payload`. Recharts 3 no longer
+ * surfaces `active`/`payload`/`label` through the `Tooltip` component props
+ * (they are read from context), so the tooltip content props are typed
+ * explicitly here instead of intersecting with `RechartsPrimitive.Tooltip`.
+ */
+type ChartTooltipPayloadItem = {
+  value?: number | string;
+  name?: number | string;
+  dataKey?: number | string;
+  color?: string;
+  type?: string;
+  payload?: Record<string, unknown> & { fill?: string };
+};
+
 const ChartTooltipContent = ({
   active,
   payload,
@@ -114,14 +129,26 @@ const ChartTooltipContent = ({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<'div'> & {
-    hideLabel?: boolean;
-    hideIndicator?: boolean;
-    indicator?: 'line' | 'dot' | 'dashed';
-    nameKey?: string;
-    labelKey?: string;
-  }) => {
+}: React.ComponentProps<'div'> & {
+  active?: boolean;
+  payload?: ChartTooltipPayloadItem[];
+  label?: React.ReactNode;
+  labelClassName?: string;
+  labelFormatter?: (value: React.ReactNode, payload: ChartTooltipPayloadItem[]) => React.ReactNode;
+  formatter?: (
+    value: number | string | undefined,
+    name: number | string,
+    item: ChartTooltipPayloadItem,
+    index: number,
+    itemPayload: ChartTooltipPayloadItem['payload']
+  ) => React.ReactNode;
+  color?: string;
+  hideLabel?: boolean;
+  hideIndicator?: boolean;
+  indicator?: 'line' | 'dot' | 'dashed';
+  nameKey?: string;
+  labelKey?: string;
+}) => {
   const { config } = useChart();
 
   const tooltipLabel = React.useMemo(() => {
@@ -170,7 +197,7 @@ const ChartTooltipContent = ({
           .map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || 'value'}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload.fill || item.color;
+            const indicatorColor = color || item.payload?.fill || item.color;
 
             return (
               <div
@@ -220,9 +247,11 @@ const ChartTooltipContent = ({
                           {itemConfig?.label || item.name}
                         </span>
                       </div>
-                      {item.value && (
+                      {item.value !== undefined && (
                         <span className="text-foreground font-mono font-medium tabular-nums">
-                          {item.value.toLocaleString()}
+                          {typeof item.value === 'number'
+                            ? item.value.toLocaleString()
+                            : item.value}
                         </span>
                       )}
                     </div>
@@ -238,17 +267,26 @@ const ChartTooltipContent = ({
 
 const ChartLegend = RechartsPrimitive.Legend;
 
+/** Shape of a single entry in a Recharts legend `payload` (typed explicitly for Recharts 3). */
+type ChartLegendPayloadItem = {
+  value?: number | string;
+  dataKey?: number | string;
+  color?: string;
+  type?: string;
+};
+
 const ChartLegendContent = ({
   className,
   hideIcon = false,
   payload,
   verticalAlign = 'bottom',
   nameKey,
-}: React.ComponentProps<'div'> &
-  Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
-    hideIcon?: boolean;
-    nameKey?: string;
-  }) => {
+}: React.ComponentProps<'div'> & {
+  payload?: ChartLegendPayloadItem[];
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+  hideIcon?: boolean;
+  nameKey?: string;
+}) => {
   const { config } = useChart();
 
   if (!payload?.length) {
