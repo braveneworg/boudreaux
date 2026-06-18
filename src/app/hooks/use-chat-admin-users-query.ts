@@ -86,7 +86,7 @@ export const useChatAdminUsersQuery = (
   options: QueryOptionsOverride<ListChatUsersResult> = {}
 ) =>
   useQuery({
-    queryKey: queryKeys.chat.adminUsers(params.page, params.sortBy, params.sortDirection),
+    queryKey: queryKeys.chat.adminUsers(params),
     queryFn: ({ signal }) => fetchChatAdminUsers(params, signal),
     ...options,
   });

@@ -159,7 +159,7 @@ export const PurchaseCheckoutStep = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
-  const [pollCount, setPollCount] = useState(0);
+  const [pollLimitReached, setPollLimitReached] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,17 +199,25 @@ export const PurchaseCheckoutStep = ({
     };
   }, [releaseId, releaseTitle, amountCents, customerEmail, onError]);
 
+  // Poll count is read from TanStack Query's own `query.state.dataUpdateCount`
+  // inside `refetchInterval` (which stops polling at the cap), rather than a
+  // counter mutated inside `queryFn` — a `queryFn` side effect the query
+  // exhaustive-deps rule rightly flags. Reaching the cap latches
+  // `pollLimitReached` so the render can show the timeout UI.
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
     queryKey: queryKeys.purchaseStatus.bySession(releaseId, sessionId ?? ''),
     queryFn: async () => {
-      setPollCount((prev) => prev + 1);
       const res = await fetch(`/api/releases/${releaseId}/purchase-status?sessionId=${sessionId}`);
       if (!res.ok) throw new Error('Failed to fetch purchase status');
       return res.json() as Promise<PurchaseStatusResponse>;
     },
     enabled: paymentComplete && sessionId !== null,
     refetchInterval: (query) => {
-      if (query.state.data?.confirmed || pollCount >= MAX_POLL_COUNT) return false;
+      if (query.state.data?.confirmed) return false;
+      if (query.state.dataUpdateCount >= MAX_POLL_COUNT) {
+        setPollLimitReached(true);
+        return false;
+      }
       return POLL_INTERVAL_MS;
     },
     retry: false,
@@ -242,7 +250,7 @@ export const PurchaseCheckoutStep = ({
     };
   }, [purchaseStatus, sessionId, onConfirmed]);
 
-  const timedOut = paymentComplete && pollCount >= MAX_POLL_COUNT && !purchaseStatus?.confirmed;
+  const timedOut = paymentComplete && pollLimitReached && !purchaseStatus?.confirmed;
 
   if (sessionError) {
     return (

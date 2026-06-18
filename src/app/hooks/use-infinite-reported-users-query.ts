@@ -85,7 +85,7 @@ export const useInfiniteReportedUsersQuery = (
   options: InfiniteQueryOptionsOverride<ReportedUsersResponse> = {}
 ) =>
   useInfiniteQuery({
-    queryKey: queryKeys.chat.reportedUsersInfinite(params.windowDays ?? 'all', params.search),
+    queryKey: queryKeys.chat.reportedUsersInfinite(params),
     queryFn: ({ pageParam, signal }) => fetchReportedUsers(params, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,

@@ -12,6 +12,7 @@ import globals from 'globals';
 import unusedImports from 'eslint-plugin-unused-imports';
 import preferArrowFunctions from 'eslint-plugin-prefer-arrow-functions';
 import vitest from '@vitest/eslint-plugin';
+import pluginQuery from '@tanstack/eslint-plugin-query';
 
 // typescript-eslint's recommended preset ships as an array of flat-config objects:
 // [0] base (registers parser/plugin), [1] eslint-recommended (disables core rules TS
@@ -25,6 +26,7 @@ const tsEslintRecommendedRules = Object.assign(
 );
 
 const eslintConfig = [
+  ...pluginQuery.configs['flat/recommended'],
   {
     files: ['./src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
     settings: {

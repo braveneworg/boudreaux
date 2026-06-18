@@ -33,49 +33,7 @@ describe('getFeaturedArtistDisplayName', () => {
     expect(getFeaturedArtistDisplayName(featured)).toBe('John Doe');
   });
 
-  it('should fall back to release artistReleases when no artists array', () => {
-    const featured = {
-      displayName: null,
-      artists: [],
-      release: {
-        artistReleases: [
-          {
-            artist: { displayName: 'Release Artist', firstName: 'Jane', surname: 'Smith' },
-          },
-        ],
-      },
-    } as unknown as FeaturedArtist;
-
-    expect(getFeaturedArtistDisplayName(featured)).toBe('Release Artist');
-  });
-
-  it('should return firstName + surname from release artist when displayName is null', () => {
-    const featured = {
-      displayName: null,
-      artists: [],
-      release: {
-        artistReleases: [
-          {
-            artist: { displayName: null, firstName: 'Jane', surname: 'Smith' },
-          },
-        ],
-      },
-    } as unknown as FeaturedArtist;
-
-    expect(getFeaturedArtistDisplayName(featured)).toBe('Jane Smith');
-  });
-
-  it('should return null when no name can be resolved', () => {
-    const featured = {
-      displayName: null,
-      artists: [],
-      release: { artistReleases: [] },
-    } as unknown as FeaturedArtist;
-
-    expect(getFeaturedArtistDisplayName(featured)).toBeNull();
-  });
-
-  it('should return null when release is null', () => {
+  it('should return null when displayName is null and artists is empty', () => {
     const featured = {
       displayName: null,
       artists: [],
@@ -85,10 +43,9 @@ describe('getFeaturedArtistDisplayName', () => {
     expect(getFeaturedArtistDisplayName(featured)).toBeNull();
   });
 
-  it('should return null when artists is undefined and release has no artistReleases', () => {
+  it('should return null when artists is undefined', () => {
     const featured = {
       displayName: null,
-      release: { artistReleases: [] },
     } as unknown as FeaturedArtist;
 
     expect(getFeaturedArtistDisplayName(featured)).toBeNull();

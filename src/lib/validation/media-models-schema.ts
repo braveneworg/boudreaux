@@ -273,19 +273,26 @@ export const featuredArtistSchema = z.object({
   coverArt: nullableString,
   featuredTrackNumber: z.number().nullable(),
   releaseId: nullableString,
-  artists: z.array(artistScalarSchema.extend({ images: z.array(imageSchema) })),
+  // Projected to only the fields the carousel/player + display-name/cover-art
+  // utils read (see `featuredArtistInclude`), so the schema mirrors the slim
+  // payload rather than full Artist/Release documents.
+  artists: z.array(
+    z.object({
+      id: z.string(),
+      displayName: nullableString,
+      firstName: z.string(),
+      surname: z.string(),
+      slug: z.string(),
+      images: z.array(z.object({ src: nullableString })),
+    })
+  ),
   digitalFormat: digitalFormatWithFilesSchema.nullable(),
-  release: releaseScalarSchema
-    .extend({
-      images: z.array(imageSchema),
-      artistReleases: z.array(
-        z.object({
-          id: z.string(),
-          artistId: z.string(),
-          releaseId: z.string(),
-          artist: artistScalarSchema,
-        })
-      ),
+  release: z
+    .object({
+      id: z.string(),
+      title: z.string(),
+      coverArt: z.string(),
+      images: z.array(z.object({ src: nullableString })),
     })
     .nullable(),
 }) satisfies z.ZodType<FeaturedArtist>;

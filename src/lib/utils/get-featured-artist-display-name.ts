@@ -9,7 +9,7 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
  * @param featured - The featured artist object
  * @returns The display name in the following priority, or null if no name resolves:
  *   1. FeaturedArtist.displayName if set
- *   2. First artist's displayName or firstName + surname
+ *   2. First connected artist's displayName or firstName + surname
  *   3. null (no name available)
  *
  * @example
@@ -26,11 +26,6 @@ export const getFeaturedArtistDisplayName = (featured: FeaturedArtist): string |
   // Fall back to first connected artist's display name
   if (featured.artists && featured.artists.length > 0) {
     const artist = featured.artists[0];
-    return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-  }
-  // Fall back to release's associated artists
-  if (featured.release?.artistReleases && featured.release.artistReleases.length > 0) {
-    const artist = featured.release.artistReleases[0].artist;
     return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
   }
   return null;

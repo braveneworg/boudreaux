@@ -197,8 +197,13 @@ export interface Instrument {
 export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
   include: {
     artists: {
-      include: {
-        images: true;
+      select: {
+        id: true;
+        displayName: true;
+        firstName: true;
+        surname: true;
+        slug: true;
+        images: { select: { src: true } };
       };
     };
     digitalFormat: {
@@ -207,13 +212,11 @@ export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
       };
     };
     release: {
-      include: {
-        images: true;
-        artistReleases: {
-          include: {
-            artist: true;
-          };
-        };
+      select: {
+        id: true;
+        title: true;
+        coverArt: true;
+        images: { select: { src: true } };
       };
     };
   };
