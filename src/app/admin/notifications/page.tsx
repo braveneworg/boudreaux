@@ -1,8 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Bell } from 'lucide-react';
+
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Heading } from '@/app/components/ui/heading';
+import { SectionHeader } from '@/app/components/ui/section-header';
 import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 
@@ -46,7 +48,7 @@ export default async function NotificationsPage() {
   }
 
   return (
-    <div className="container mx-auto">
+    <div className="space-y-6">
       <BreadcrumbMenu
         items={[
           { anchorText: 'Admin', url: '/admin', isActive: false },
@@ -54,20 +56,15 @@ export default async function NotificationsPage() {
         ]}
       />
 
-      <div className="mt-4 mb-4">
-        <Heading level={1} className="h-auto">
-          Banner Notifications
-        </Heading>
-      </div>
-
-      <p className="text-zinc-950-foreground mb-4 px-6">
-        Manage the notification text strips for each banner slot. Each slot has a fixed CDN image;
-        you can optionally attach a notification strip with styled text.
-      </p>
+      <SectionHeader
+        icon={Bell}
+        title="Banner Notifications"
+        helpText="Manage the notification text strip for each banner slot. Each slot has a fixed CDN image; you can optionally attach a strip with styled text and a display window."
+      />
 
       <RotationIntervalForm currentInterval={rotationInterval} />
 
-      <div className="mt-8 space-y-6">
+      <div className="space-y-6">
         {slots.map((slot) => (
           <BannerSlotCard key={slot.slotNumber} slot={slot} onDelete={handleDelete} />
         ))}

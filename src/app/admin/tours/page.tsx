@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { Plus } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
+import { SectionHeader } from '@/app/components/ui/section-header';
 import { TourService, type TourWithDisplayNames } from '@/lib/services/tours/tour-service';
 
 export const dynamic = 'force-dynamic';
@@ -46,7 +47,7 @@ export default async function ToursPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="space-y-6">
       <BreadcrumbMenu
         items={[
           { anchorText: 'Admin', url: '/admin', isActive: false },
@@ -54,8 +55,12 @@ export default async function ToursPage() {
         ]}
       />
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Tours</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionHeader
+          icon={CalendarDays}
+          title="Tours"
+          helpText="Manage tours and their dates, venues, and headlining artists. Open a tour to add or edit its dates."
+        />
         <Button asChild>
           <Link href="/admin/tours/new">
             <Plus className="mr-2 h-4 w-4" />
@@ -64,7 +69,7 @@ export default async function ToursPage() {
         </Button>
       </div>
 
-      <div className="mt-6 grid gap-4">
+      <div className="grid gap-4">
         {fetchError ? (
           <Card>
             <CardContent className="text-destructive py-8 text-center">{fetchError}</CardContent>

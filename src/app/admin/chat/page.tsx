@@ -1,14 +1,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+import { MessageSquare } from 'lucide-react';
+
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Heading } from '@/app/components/ui/heading';
+import { SectionHeader } from '@/app/components/ui/section-header';
 
 import { ChatModerationTabs } from './chat-moderation-tabs';
 
 export default function AdminChatPage() {
   return (
-    <div className="container mx-auto">
+    <div className="space-y-6">
       <BreadcrumbMenu
         items={[
           { anchorText: 'Admin', url: '/admin', isActive: false },
@@ -16,16 +18,11 @@ export default function AdminChatPage() {
         ]}
       />
 
-      <div className="mt-4 mb-4">
-        <Heading level={1} className="h-auto">
-          Chat Moderation
-        </Heading>
-      </div>
-
-      <p className="text-zinc-950-foreground mb-4 px-6">
-        Review chat activity, flag abusive senders, and disable accounts that violate community
-        guidelines. Disabled users cannot send new messages or react until re-enabled here.
-      </p>
+      <SectionHeader
+        icon={MessageSquare}
+        title="Chat Moderation"
+        helpText="Review chat activity, flag abusive senders, and disable accounts that violate community guidelines. Disabled users cannot send messages or react until re-enabled here."
+      />
 
       <ChatModerationTabs />
     </div>
