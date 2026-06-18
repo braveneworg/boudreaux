@@ -278,7 +278,13 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                       isPlaying={isPlaying}
                       onTogglePlay={handleTogglePlay}
                       className="shadow-lg"
-                      priority
+                      // No `priority`: `FeaturedArtistsPlayer` is dynamically
+                      // imported with `ssr: false` (see home-content.tsx), so its
+                      // `next/image` `priority` preload would be injected client-
+                      // side, after `window.load` — guaranteeing Chrome's
+                      // "preloaded but not used within a few seconds" warning. The
+                      // intent (documented in page.tsx) is for this cover art to
+                      // load without a preload link.
                     />
                   );
                 })()}

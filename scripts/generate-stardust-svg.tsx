@@ -133,7 +133,7 @@ const parseArgs = (args: string[]): Config => {
   const config = { ...defaultConfig, particleCounts: { ...defaultConfig.particleCounts } };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args.at(i);
     const value = args[i + 1];
 
     switch (arg) {
@@ -201,7 +201,7 @@ const parseArgs = (args: string[]): Config => {
         process.exit(0);
         break;
       default:
-        if (arg.startsWith('--')) {
+        if (arg?.startsWith('--')) {
           console.error(`Unknown option: ${arg}`);
           process.exit(1);
         }

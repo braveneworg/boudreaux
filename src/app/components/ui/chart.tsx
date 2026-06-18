@@ -317,7 +317,9 @@ const getPayloadConfigFromPayload = (config: ChartConfig, payload: unknown, key:
     configLabelKey = payloadPayload[key as keyof typeof payloadPayload] as string;
   }
 
-  return configLabelKey in config ? config[configLabelKey] : config[key as keyof typeof config];
+  return configLabelKey in config
+    ? new Map(Object.entries(config)).get(configLabelKey)
+    : config[key as keyof typeof config];
 };
 
 export {

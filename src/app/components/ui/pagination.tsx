@@ -36,8 +36,13 @@ type PaginationLinkProps = {
 } & Pick<React.ComponentProps<typeof Button>, 'size'> &
   React.ComponentProps<'a'>;
 
-const PaginationLink = ({ className, isActive, size = 'icon', ...props }: PaginationLinkProps) => (
-  // eslint-disable-next-line jsx-a11y/anchor-has-content -- content provided via spread props by consumers
+const PaginationLink = ({
+  className,
+  isActive,
+  size = 'icon',
+  children,
+  ...props
+}: PaginationLinkProps) => (
   <a
     aria-current={isActive ? 'page' : undefined}
     data-slot="pagination-link"
@@ -50,7 +55,9 @@ const PaginationLink = ({ className, isActive, size = 'icon', ...props }: Pagina
       className
     )}
     {...props}
-  />
+  >
+    {children}
+  </a>
 );
 
 const PaginationPrevious = ({

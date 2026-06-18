@@ -1,7 +1,3 @@
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-import prettierConfig from 'eslint-config-prettier';
-import prettierPlugin from 'eslint-plugin-prettier';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import js from '@eslint/js';
 import typescript from '@typescript-eslint/eslint-plugin';
@@ -11,15 +7,32 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
 import nextPlugin from '@next/eslint-plugin-next';
+import security from 'eslint-plugin-security';
 import globals from 'globals';
 import unusedImports from 'eslint-plugin-unused-imports';
 import preferArrowFunctions from 'eslint-plugin-prefer-arrow-functions';
 import vitest from '@vitest/eslint-plugin';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// typescript-eslint's recommended preset ships as an array of flat-config objects:
+// [0] base (registers parser/plugin), [1] eslint-recommended (disables core rules TS
+// already covers), [2] the recommended rule set. We apply [1] + [2]'s rules in a
+// TS-scoped block below; the plugin itself is registered in the main config block.
+const tsEslintRecommendedRules = Object.assign(
+  {},
+  ...typescript.configs['flat/recommended']
+    .filter((config) => config.rules)
+    .map((config) => config.rules)
+);
 
 const eslintConfig = [
+  {
+    files: ['./src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
+    settings: {
+      'better-tailwindcss': {
+        cwd: './src/app',
+      },
+    },
+  },
   {
     ignores: [
       '**/node_modules/**',
@@ -67,7 +80,6 @@ const eslintConfig = [
       react,
       'react-hooks': reactHooks,
       import: importPlugin,
-      prettier: prettierPlugin,
       'unused-imports': unusedImports,
       'prefer-arrow-functions': preferArrowFunctions,
     },
@@ -106,6 +118,9 @@ const eslintConfig = [
       },
     },
     rules: {
+      // typescript-eslint recommended preset; project-specific overrides below win.
+      ...tsEslintRecommendedRules,
+
       // Next.js rules (previously from next/core-web-vitals)
       '@next/next/no-html-link-for-pages': 'error',
       '@next/next/no-img-element': 'warn',
@@ -113,7 +128,6 @@ const eslintConfig = [
       '@next/next/no-sync-scripts': 'error',
       '@next/next/no-script-component-in-head': 'error',
 
-      'react/jsx-boolean-value': ['error', 'never'],
       'no-unused-vars': 'off', // Disable the core ESLint rule
       'unused-imports/no-unused-imports': 'error', // Report unused imports
       'unused-imports/no-unused-vars': [
@@ -125,7 +139,6 @@ const eslintConfig = [
           argsIgnorePattern: '^_',
         },
       ],
-      'prettier/prettier': 'error',
       // Add any custom rules here
       // TypeScript rules
       '@typescript-eslint/no-unused-vars': [
@@ -137,6 +150,12 @@ const eslintConfig = [
         },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
+      // Enforce CLAUDE.md conventions: no non-null assertions, no unexplained ts-comments.
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true, 'ts-nocheck': true },
+      ],
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -252,7 +271,6 @@ const eslintConfig = [
           returnStyle: 'unchanged',
         },
       ],
-      ...prettierConfig.rules,
     },
   },
   // Next.js App Router special files conventionally use named (often default-exported)
@@ -283,14 +301,7 @@ const eslintConfig = [
   },
   // Vitest testing configuration
   {
-    files: [
-      '**/*.spec.ts',
-      '**/*.spec.tsx',
-      '**/*.test.ts',
-      '**/*.test.tsx',
-      'tests/**',
-      '**/test-utils/**',
-    ],
+    files: ['**/*.spec.ts', '**/*.spec.tsx', 'tests/**', '**/test-utils/**'],
     plugins: {
       vitest,
     },
@@ -309,12 +320,28 @@ const eslintConfig = [
       },
     },
   },
-  eslintPluginPrettierRecommended,
+  // Security linting (full recommended rule set, applied everywhere).
+  security.configs.recommended,
+  // ── Sole scoped rule exception ───────────────────────────────────────────────
+  // The project forbids inline eslint-disable comments. `detect-non-literal-fs-filename`
+  // is purely syntactic (it flags any non-literal path argument with no "validated/safe"
+  // escape), so code doing real file I/O on runtime-computed paths cannot satisfy it:
+  // CLI/build scripts, the os-tmpdir upload temp file, and the ffmpeg sibling temp file.
+  // These paths are all server-generated, never user input. Every other rule is satisfied
+  // in code repo-wide.
   {
+    files: [
+      'scripts/**/*.{ts,tsx}',
+      'docs/**/*.{js,mjs}',
+      // `*` (not the literal `[id]`/`[formatType]`) — minimatch reads `[...]` as a char class.
+      'src/app/api/releases/*/upload/*/route.ts',
+      'src/lib/audio-metadata/ffmpeg.ts',
+    ],
     rules: {
-      'tailwindcss/classnames-order': 'off', // Prevents conflicts with Prettier sorting
+      'security/detect-non-literal-fs-filename': 'off',
     },
   },
+  eslintPluginPrettierRecommended,
 ];
 
 export default eslintConfig;

@@ -34,8 +34,12 @@ const createTourViaUi = async (adminPage: Page, title: string): Promise<string> 
     await expect(tourLink).toBeVisible({ timeout: 3000 });
   }).toPass({ timeout: 25_000 });
   const href = await tourLink.getAttribute('href');
-  expect(href).toBeTruthy();
-  return href!.split('/').at(-1)!;
+  if (!href) throw new Error('expected the link to have an href');
+
+  const id = href.split('/').at(-1);
+  if (!id) throw new Error('expected an id segment in the link href');
+
+  return id;
 };
 
 /**
@@ -98,10 +102,7 @@ test.describe('Admin Venue Edit', () => {
     const venueButton = dialog.getByRole('combobox').nth(1);
     await venueButton.click();
     await adminPage.getByPlaceholder('Search venues...').fill(venueName);
-    await adminPage
-      .getByRole('option', { name: new RegExp(venueName) })
-      .first()
-      .click();
+    await adminPage.getByRole('option', { name: venueName }).first().click();
 
     // Pencil button should now be visible next to the venue dropdown
     const editButton = dialog.getByRole('button', { name: 'Edit venue' });
@@ -120,10 +121,7 @@ test.describe('Admin Venue Edit', () => {
     const venueButton = dialog.getByRole('combobox').nth(1);
     await venueButton.click();
     await adminPage.getByPlaceholder('Search venues...').fill(venueName);
-    await adminPage
-      .getByRole('option', { name: new RegExp(venueName) })
-      .first()
-      .click();
+    await adminPage.getByRole('option', { name: venueName }).first().click();
 
     // Click the edit pencil button
     const editButton = dialog.getByRole('button', { name: 'Edit venue' });
@@ -156,10 +154,7 @@ test.describe('Admin Venue Edit', () => {
     const venueButton = dialog.getByRole('combobox').nth(1);
     await venueButton.click();
     await adminPage.getByPlaceholder('Search venues...').fill(venueName);
-    await adminPage
-      .getByRole('option', { name: new RegExp(venueName) })
-      .first()
-      .click();
+    await adminPage.getByRole('option', { name: venueName }).first().click();
 
     // Click the edit pencil button
     const editButton = dialog.getByRole('button', { name: 'Edit venue' });
@@ -204,10 +199,7 @@ test.describe('Admin Venue Edit', () => {
     const venueButton = dialog.getByRole('combobox').nth(1);
     await venueButton.click();
     await adminPage.getByPlaceholder('Search venues...').fill(venueName);
-    await adminPage
-      .getByRole('option', { name: new RegExp(venueName) })
-      .first()
-      .click();
+    await adminPage.getByRole('option', { name: venueName }).first().click();
 
     // Click the edit pencil button
     const editButton = dialog.getByRole('button', { name: 'Edit venue' });

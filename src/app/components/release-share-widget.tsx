@@ -51,7 +51,7 @@ export const ReleaseShareWidget = ({
 
   const handleShare2IconClick = useCallback(() => {
     if (!selectedArtist) {
-      featuredArtists.length > 0 && setSelectedArtist?.(featuredArtists.slice(1, 2)[0]);
+      if (featuredArtists.length > 0) setSelectedArtist?.(featuredArtists.slice(1, 2)[0]);
       return;
     }
 

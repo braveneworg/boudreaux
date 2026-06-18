@@ -217,7 +217,7 @@ export class ReleaseService {
       for (const url of imageUrls) {
         let s3Key: string | null = null;
         if (cdnDomain && url.includes(cdnDomain)) {
-          s3Key = url.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
+          s3Key = url.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
         } else if (url.includes('.s3.')) {
           const urlParts = url.split('.s3.');
           if (urlParts[1]) {

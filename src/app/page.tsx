@@ -37,7 +37,9 @@ export const dynamic = 'force-dynamic';
  * slide in `BannerCarousel` is rendered with `priority`, which produces a
  * `<link rel=preload as=image>` with matching `imagesrcset`/`imagesizes`,
  * so the browser preload-picker selects the exact variant the rendered
- * `<img>` will use. The featured-artist cover art is intentionally NOT
+ * `<img>` will use. This is REQUIRED for mobile LCP (HomeContent hydrates from
+ * a client query cache, so without the preload the banner isn't discovered
+ * until hydration). The featured-artist cover art is intentionally NOT
  * preloaded here: the `FeaturedArtistsPlayer` is dynamic-imported with
  * `ssr: false`, so the `<img>` that would consume the preload doesn't
  * render until after Video.js's chunk has loaded — well past the

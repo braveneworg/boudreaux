@@ -56,7 +56,7 @@ const createMockRequest = (
     },
     url: `http://localhost:3000${pathname}`,
     headers: {
-      get: (key: string) => headers[key] || null,
+      get: (key: string) => Object.entries(headers).find(([name]) => name === key)?.[1] || null,
     },
   };
 };

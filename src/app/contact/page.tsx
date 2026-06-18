@@ -99,8 +99,9 @@ const ContactPage = () => {
             'message',
           ] as const;
 
+          const errorsByField = new Map(Object.entries(result.errors ?? {}));
           errorFields.forEach((field) => {
-            const messages = result.errors?.[field];
+            const messages = errorsByField.get(field);
 
             if (!messages || messages.length === 0) {
               return;

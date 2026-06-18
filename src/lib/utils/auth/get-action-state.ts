@@ -11,20 +11,21 @@ const getActionState = <TForm>(
   formSchema: ZodType<TForm>
 ) => {
   // Preserve the values entered into the fields
-  const fields: Record<string, boolean | string> = {};
-  // Every form in this application should follow this formState initial state
-  const formState: FormState = { errors: {}, fields, success: false, hasTimeout: false };
-  const formData = Object.fromEntries(data);
+  const fields = new Map<string, boolean | string>();
+  // Working copy of the form data, keyed by field name. A Map keeps dynamic
+  // string keys off of a plain object (avoids object-injection sinks).
+  const formData = new Map<string, FormDataEntryValue | boolean | number | unknown[]>(
+    Object.entries(Object.fromEntries(data))
+  );
 
-  for (const key in formData) {
+  for (const key of [...formData.keys()]) {
     if (!permittedFieldNames.includes(key)) {
-      delete formData[key];
+      formData.delete(key);
     }
   }
 
   // Populate the formState fields with form data
-  for (const key of Object.keys(formData)) {
-    const rawValue = formData[key];
+  for (const [key, rawValue] of formData) {
     if (rawValue === undefined || rawValue === null) continue;
     const stringValue = rawValue.toString();
     let value: boolean | string = stringValue;
@@ -37,26 +38,23 @@ const getActionState = <TForm>(
     }
 
     // Store original string values in fields for form state
-    fields[key] = stringValue;
+    fields.set(key, stringValue);
 
     // Update formData with converted boolean values for schema validation
-    formData[key] = value as FormDataEntryValue;
+    formData.set(key, value);
   }
-
-  formState.fields = fields;
 
   // Parse JSON-stringified arrays back to actual arrays before validation.
   // The client serializes arrays via JSON.stringify() when appending to FormData,
   // so they arrive as strings like '["value1","value2"]'. Zod expects real arrays.
   // Also coerce numeric strings to numbers (FormData sends all values as strings).
-  for (const key of Object.keys(formData)) {
-    const val = formData[key];
+  for (const [key, val] of formData) {
     if (typeof val === 'string') {
       if (val.startsWith('[')) {
         try {
           const jsonParsed = JSON.parse(val);
           if (Array.isArray(jsonParsed)) {
-            formData[key] = jsonParsed as unknown as FormDataEntryValue;
+            formData.set(key, jsonParsed);
           }
         } catch {
           // Not valid JSON, keep as string
@@ -65,13 +63,21 @@ const getActionState = <TForm>(
         // Convert numeric strings to numbers so Zod z.number() fields validate correctly.
         // Non-numeric fields (URLs, dates, ObjectIds) contain non-numeric characters
         // and won't match this check.
-        formData[key] = Number(val) as unknown as FormDataEntryValue;
+        formData.set(key, Number(val));
       }
     }
   }
 
+  // Every form in this application should follow this formState initial state
+  const formState: FormState = {
+    errors: {},
+    fields: Object.fromEntries(fields),
+    success: false,
+    hasTimeout: false,
+  };
+
   // Validate the form data
-  const parsed = formSchema.safeParse(formData);
+  const parsed = formSchema.safeParse(Object.fromEntries(formData));
 
   return { formState, parsed };
 };

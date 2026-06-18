@@ -13,7 +13,7 @@ const mockSession = {
 };
 
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAuth: (handler: Function) => (request: unknown, context: unknown) =>
+  withAuth: (handler: (...args: unknown[]) => unknown) => (request: unknown, context: unknown) =>
     handler(request, context, mockSession),
 }));
 

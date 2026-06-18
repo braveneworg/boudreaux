@@ -40,39 +40,38 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
     setCurrentTrack(index);
   };
 
-  if (tracks.length === 0) {
+  const activeTrack = tracks.at(currentTrack);
+
+  if (tracks.length === 0 || !activeTrack) {
     return <div>No tracks available</div>;
   }
 
   return (
     <div className="mx-auto max-w-2xl p-4">
       <div className="mb-6">
-        <h2 className="mb-2 text-3xl font-bold">{tracks[currentTrack].title}</h2>
-        <p className="text-gray-600">{tracks[currentTrack].artist}</p>
+        <h2 className="mb-2 text-3xl font-bold">{activeTrack.title}</h2>
+        <p className="text-gray-600">{activeTrack.artist}</p>
       </div>
 
-      <AudioPlayer
-        src={tracks[currentTrack].src}
-        poster={tracks[currentTrack].poster}
-        onReady={handlePlayerReady}
-      />
+      <AudioPlayer src={activeTrack.src} poster={activeTrack.poster} onReady={handlePlayerReady} />
 
       <div className="mt-6">
         <h3 className="mb-3 text-lg font-semibold">Playlist</h3>
         <ul className="space-y-2">
           {tracks.map((track, index) => (
-            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection in playlist player
-            <li
-              key={track.id}
-              className={`cursor-pointer rounded p-3 transition-colors ${
-                index === currentTrack
-                  ? 'border-l-4 border-blue-500 bg-blue-100'
-                  : 'bg-gray-50 hover:bg-gray-100'
-              }`}
-              onClick={() => playTrack(index)}
-            >
-              <div className="font-medium">{track.title}</div>
-              <div className="text-sm text-gray-600">{track.artist}</div>
+            <li key={track.id}>
+              <button
+                type="button"
+                className={`w-full cursor-pointer rounded p-3 text-left transition-colors ${
+                  index === currentTrack
+                    ? 'border-l-4 border-blue-500 bg-blue-100'
+                    : 'bg-gray-50 hover:bg-gray-100'
+                }`}
+                onClick={() => playTrack(index)}
+              >
+                <div className="font-medium">{track.title}</div>
+                <div className="text-sm text-gray-600">{track.artist}</div>
+              </button>
             </li>
           ))}
         </ul>

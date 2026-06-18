@@ -82,14 +82,14 @@ interface InlineMatch {
 }
 
 const tryLink = (body: string, i: number, siteHost: string | undefined): InlineMatch | null => {
-  if (body[i] !== '[') return null;
+  if (body.charAt(i) !== '[') return null;
   // Scan for the matching `]` that's followed immediately by `(`. Bail
   // out at newlines so a stray `[` near the end of one line can't
   // greedily swallow content from a later line.
   let depth = 1;
   let close = -1;
   for (let j = i + 1; j < body.length; j++) {
-    const ch = body[j];
+    const ch = body.charAt(j);
     if (ch === '\n') return null;
     if (ch === '[') depth += 1;
     else if (ch === ']') {
@@ -100,12 +100,12 @@ const tryLink = (body: string, i: number, siteHost: string | undefined): InlineM
       }
     }
   }
-  if (close === -1 || body[close + 1] !== '(') return null;
+  if (close === -1 || body.charAt(close + 1) !== '(') return null;
 
   const hrefStart = close + 2;
   let hrefEnd = -1;
   for (let j = hrefStart; j < body.length; j++) {
-    const ch = body[j];
+    const ch = body.charAt(j);
     if (ch === '\n') return null;
     if (ch === ')') {
       hrefEnd = j;
@@ -140,11 +140,11 @@ const tryDelimiter = (
   const contentStart = i + marker.length;
   let close = -1;
   for (let j = contentStart; j < body.length; j++) {
-    if (body[j] === '\n') return null;
+    if (body.charAt(j) === '\n') return null;
     if (body.startsWith(marker, j)) {
       // Reject the asterisk/underscore case where `*` or `_` is part of
       // a larger delimiter (`**` / `__`) we already handle elsewhere.
-      if (marker.length === 1 && body[j + 1] === marker) continue;
+      if (marker.length === 1 && body.charAt(j + 1) === marker) continue;
       close = j;
       break;
     }
@@ -203,7 +203,7 @@ export const parseAdminMarkdown = (
       continue;
     }
 
-    buffer += body[i];
+    buffer += body.charAt(i);
     i += 1;
   }
 

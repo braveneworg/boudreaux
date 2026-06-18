@@ -53,20 +53,18 @@ const fetchSsmParameter = async (path: string): Promise<string> => {
  * any Stripe or Prisma client is used.
  */
 export const initSecrets = async (): Promise<ResolvedSecrets> => {
-  const paths: Record<keyof ResolvedSecrets, string> = {
-    stripeSecretKey: '',
-    stripeWebhookSecret: '',
-    databaseUrl: '',
-    webhookIpRanges: '',
-  };
+  const env = new Map(Object.entries(process.env));
+  const resolvedPaths = new Map<keyof ResolvedSecrets, string>();
 
   for (const [key, envVar] of Object.entries(SSM_PATH_ENV_VARS)) {
-    const path = process.env[envVar];
+    const path = env.get(envVar);
     if (!path) {
       throw new Error(`Missing environment variable: ${envVar}`);
     }
-    paths[key as keyof ResolvedSecrets] = path;
+    resolvedPaths.set(key as keyof ResolvedSecrets, path);
   }
+
+  const paths = Object.fromEntries(resolvedPaths) as Record<keyof ResolvedSecrets, string>;
 
   if (!cachedStaticSecrets) {
     const [stripeSecretKey, stripeWebhookSecret, databaseUrl] = await Promise.all([

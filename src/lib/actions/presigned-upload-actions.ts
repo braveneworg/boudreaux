@@ -128,7 +128,7 @@ const validateFile = (
     };
   }
 
-  const maxFileSize = MAX_FILE_SIZES[category];
+  const maxFileSize = category === 'image' ? MAX_FILE_SIZES.image : MAX_FILE_SIZES.audio;
   const maxSizeMB = Math.round(maxFileSize / (1024 * 1024));
 
   if (fileSize > maxFileSize) {

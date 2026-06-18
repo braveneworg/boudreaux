@@ -75,8 +75,7 @@ const main = async (): Promise<void> => {
   }
 
   console.info(`\nAvailable releases to link (${allReleases.length}):\n`);
-  for (let i = 0; i < allReleases.length; i++) {
-    const r = allReleases[i];
+  for (const [i, r] of allReleases.entries()) {
     const published = r.publishedAt ? 'published' : 'unpublished';
     console.info(`  [${i + 1}] ${r.title}  (${published}, ${r.id})`);
   }
@@ -112,7 +111,10 @@ const main = async (): Promise<void> => {
         return;
       }
 
-      selectedReleases = indices.map((i) => allReleases[i]);
+      selectedReleases = indices.flatMap((i) => {
+        const release = allReleases.at(i);
+        return release ? [release] : [];
+      });
     }
 
     // 5. Show confirmation

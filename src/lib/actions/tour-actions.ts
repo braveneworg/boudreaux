@@ -31,15 +31,14 @@ export const createTourAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
-    const errors = formState.errors ?? {};
-    formState.errors = errors;
+    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!errors[field]) {
-        errors[field] = [];
-      }
-      errors[field].push(issue.message);
+      const messages = errors.get(field) ?? [];
+      messages.push(issue.message);
+      errors.set(field, messages);
     }
+    formState.errors = Object.fromEntries(errors);
     return formState;
   }
 
@@ -94,15 +93,14 @@ export const updateTourAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
-    const errors = formState.errors ?? {};
-    formState.errors = errors;
+    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!errors[field]) {
-        errors[field] = [];
-      }
-      errors[field].push(issue.message);
+      const messages = errors.get(field) ?? [];
+      messages.push(issue.message);
+      errors.set(field, messages);
     }
+    formState.errors = Object.fromEntries(errors);
     return formState;
   }
 

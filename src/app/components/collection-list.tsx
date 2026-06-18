@@ -39,6 +39,15 @@ import { parseSSEBuffer } from '@/lib/utils/parse-sse';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 import { triggerDownload } from '@/lib/utils/trigger-download';
 
+/**
+ * Lookup map for format labels keyed by format type. Backed by a `Map` so
+ * dynamic format-type keys are read without object-injection risk; falls back
+ * to the raw format type when no label is registered.
+ */
+const FORMAT_LABEL_MAP = new Map(Object.entries(FORMAT_LABELS));
+const getFormatLabel = (formatType: string): string =>
+  FORMAT_LABEL_MAP.get(formatType) ?? formatType;
+
 interface CollectionPurchase {
   id: string;
   amountPaid: number;
@@ -320,7 +329,7 @@ const CollectionDownloadDialog = ({
     setFormatProgress(
       selectedFormats.map((ft) => ({
         formatType: ft,
-        label: FORMAT_LABELS[ft] ?? ft,
+        label: getFormatLabel(ft),
         status: 'pending' as const,
       }))
     );
@@ -486,10 +495,10 @@ const CollectionDownloadDialog = ({
                 <ToggleGroupItem
                   key={formatType}
                   value={formatType}
-                  aria-label={`Select ${FORMAT_LABELS[formatType] ?? formatType}`}
+                  aria-label={`Select ${getFormatLabel(formatType)}`}
                   className="rounded-md px-3"
                 >
-                  {FORMAT_LABELS[formatType] ?? formatType}
+                  {getFormatLabel(formatType)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>

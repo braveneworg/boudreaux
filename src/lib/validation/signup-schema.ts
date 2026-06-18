@@ -3,12 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
+import { isValidEmailFormat } from '@/lib/utils/auth/auth-utils';
 
 const termsAndConditionsMessage = 'You must accept the terms and conditions';
 
 export const signupSchema = z.object({
-  email: z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' }),
+  email: z
+    .string()
+    .refine((value) => isValidEmailFormat(value), { message: 'Invalid email address' }),
   termsAndConditions: z
     .boolean({ message: termsAndConditionsMessage })
     .refine((val) => val === true, {

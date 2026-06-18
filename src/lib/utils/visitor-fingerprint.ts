@@ -37,7 +37,7 @@ export const truncateIp = (ip: string | null | undefined): string => {
 
   // IPv4 (covers IPv4-mapped IPv6 like ::ffff:1.2.3.4 by stripping the prefix)
   const v4Candidate = trimmed.replace(/^::ffff:/i, '');
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4Candidate)) {
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v4Candidate)) {
     const octets = v4Candidate.split('.');
     if (octets.every((o) => Number(o) >= 0 && Number(o) <= 255)) {
       return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;

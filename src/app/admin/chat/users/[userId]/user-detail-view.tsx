@@ -159,7 +159,7 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
                 <div className="min-w-0 flex-1">
                   <p
                     className={cn(
-                      'text-sm break-words whitespace-pre-wrap',
+                      'text-sm wrap-break-word whitespace-pre-wrap',
                       isHidden && 'text-muted-foreground line-through'
                     )}
                   >

@@ -44,9 +44,8 @@ describe('FormInput', () => {
     expect(document.getElementById('test-input')).toHaveAttribute('type', 'password');
   });
 
-  it('can have autoFocus', () => {
-    // eslint-disable-next-line jsx-a11y/no-autofocus
-    render(<FormInput {...defaultProps} autoFocus />);
+  it('focuses on mount when autoFocusOnMount is set', () => {
+    render(<FormInput {...defaultProps} autoFocusOnMount />);
 
     expect(screen.getByRole('textbox')).toHaveFocus();
   });

@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import * as z from 'zod';
 
-import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
+import { isValidEmailFormat } from '@/lib/utils/auth/auth-utils';
 
 export const signinSchema = z.object({
-  email: z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' }),
+  email: z
+    .string()
+    .refine((value) => isValidEmailFormat(value), { message: 'Invalid email address' }),
   general: z.string().optional(),
 });
 

@@ -53,11 +53,16 @@ export const HomeContent = () => {
       <ContentContainer>
         <section>
           <ArtistSearchInput />
+          {/* No `priority`: this heading sits below the banner and search
+              input, so it's not the LCP. `ImageHeading` is a client component
+              whose `sizes` flips on `useIsMobile()` between SSR and client, so a
+              `priority` preload (chosen from the SSR `sizes`) would pick a
+              different variant than the hydrated `<img>` ends up using —
+              surfacing "preloaded but not used". It lazy-loads normally instead. */}
           <ImageHeading
             src="/media/headings/FEATURED.webp"
             alt="featured artists"
             imageHeight={480}
-            priority
           />
           <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
         </section>

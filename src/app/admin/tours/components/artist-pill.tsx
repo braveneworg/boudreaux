@@ -59,7 +59,9 @@ const PASTEL_COLORS = [
   { bg: '#D4A5A5', textClass: 'text-white' }, // muted rose
   { bg: '#7EB5A6', textClass: 'text-white' }, // muted teal
   { bg: '#8B7EC8', textClass: 'text-white' }, // muted purple
-];
+] as const;
+
+const DEFAULT_PASTEL_COLOR = PASTEL_COLORS[0];
 
 /**
  * Given a relative luminance (0–1), returns true if the background
@@ -109,7 +111,7 @@ const ArtistPill = ({
   const [isRemoving, setIsRemoving] = useState(false);
 
   const colorIndex = index % PASTEL_COLORS.length;
-  const color = PASTEL_COLORS[colorIndex];
+  const color = PASTEL_COLORS.at(colorIndex) ?? DEFAULT_PASTEL_COLOR;
   const useBlack = shouldUseBlackText(color.bg);
   const textColor = useBlack ? '#000000' : '#ffffff';
 

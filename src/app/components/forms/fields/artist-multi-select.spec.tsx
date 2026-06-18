@@ -120,11 +120,13 @@ vi.mock('@/app/components/ui/popover', () => ({
     asChild?: boolean;
     onOpenChange?: (open: boolean) => void;
   }) => (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       data-testid="popover-trigger"
       data-aschild={asChild}
       onClick={() => onOpenChange?.(!mockPopoverOpen)}
+      onKeyDown={() => onOpenChange?.(!mockPopoverOpen)}
+      role="button"
+      tabIndex={0}
     >
       {children}
     </div>
@@ -194,8 +196,15 @@ vi.mock('@/app/components/ui/command', () => ({
     value?: string;
     onSelect?: () => void;
   }) => (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-    <div data-testid={`command-item-${value}`} data-value={value} onClick={onSelect}>
+    <div
+      data-testid={`command-item-${value}`}
+      data-value={value}
+      onClick={onSelect}
+      onKeyDown={onSelect}
+      role="option"
+      aria-selected={false}
+      tabIndex={0}
+    >
       {children}
     </div>
   ),

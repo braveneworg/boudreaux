@@ -114,7 +114,7 @@ export const releaseBaseSchema = z.object({
     .refine(
       (val) => {
         if (!val || val === '') return true;
-        return /^\d+(\.\d{1,2})?$/.test(val);
+        return /^\d+(?:\.\d\d|\.\d)?$/.test(val);
       },
       { message: 'Suggested price must have at most 2 decimal places' }
     ),

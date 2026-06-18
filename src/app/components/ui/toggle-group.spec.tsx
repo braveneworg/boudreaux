@@ -15,7 +15,9 @@ describe('ToggleGroup', () => {
         </ToggleGroup>
       );
 
-      expect(screen.getByRole('group')).toBeInTheDocument();
+      // A `type="single"` ToggleGroup exposes the ARIA `radiogroup` role
+      // (its items are `radio`); only `type="multiple"` would differ.
+      expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     });
 
     it('has data-slot attribute', () => {

@@ -65,7 +65,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(!!initialReleaseId);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
-  const selectedArtistRelease = releases[selectedReleaseIndex];
+  const selectedArtistRelease = releases.at(selectedReleaseIndex);
   const selectedRelease = selectedArtistRelease?.release;
 
   const files = useMemo(
@@ -74,7 +74,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
     [selectedRelease?.digitalFormats]
   );
 
-  const currentFile = files[currentTrackIndex] ?? null;
+  const currentFile = files.at(currentTrackIndex) ?? null;
   const hasFiles = files.length > 0;
 
   const audioSrc = useMemo<string | null>(() => {
@@ -227,7 +227,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                 />
                 <NowPlayingHeading
                   artistName={artistName}
-                  title={selectedRelease.title ?? ''}
+                  title={selectedRelease?.title ?? ''}
                   visibleHeading
                 />
               </div>

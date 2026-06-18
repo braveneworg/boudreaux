@@ -67,7 +67,7 @@ test.describe('Admin Digital Formats Accordion', () => {
     const formats = ['MP3 320kbps', 'MP3 V0', 'AAC', 'Ogg Vorbis', 'FLAC', 'ALAC', 'WAV', 'AIFF'];
 
     for (const format of formats) {
-      await expect(adminPage.getByRole('button', { name: new RegExp(format) })).toBeVisible();
+      await expect(adminPage.getByRole('button', { name: format })).toBeVisible();
     }
   });
 

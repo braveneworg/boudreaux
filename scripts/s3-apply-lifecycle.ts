@@ -106,15 +106,18 @@ const MANAGED_RULES: LifecycleRule[] = [
   },
 ];
 
+const colorByName = new Map<keyof typeof colors, string>(
+  Object.entries(colors) as [keyof typeof colors, string][]
+);
+
 const log = (prefix: string, color: keyof typeof colors, message: string): void => {
-  process.stdout.write(`${colors[color]}${prefix}${colors.reset} ${message}\n`);
+  process.stdout.write(`${colorByName.get(color) ?? ''}${prefix}${colors.reset} ${message}\n`);
 };
 
-// eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- a `never`-returning function declaration enables control-flow narrowing at call sites (e.g. `if (!BUCKET_NAME) fail()`); an arrow const does not.
-function fail(message: string): never {
+const fail = (message: string): never => {
   process.stderr.write(`${colors.red}✗${colors.reset} ${message}\n`);
   process.exit(1);
-}
+};
 
 const parseArgs = (
   argv: readonly string[]
@@ -199,13 +202,15 @@ const main = async (): Promise<void> => {
 
   if (!BUCKET_NAME) {
     fail('AWS_S3_BUCKET_NAME (or S3_BUCKET) is not set.');
+    return;
   }
+  const bucketName: string = BUCKET_NAME;
 
   const client = new S3Client({ region: AWS_REGION });
 
-  log('→', 'blue', `Bucket: ${BUCKET_NAME} (region: ${AWS_REGION})`);
+  log('→', 'blue', `Bucket: ${bucketName} (region: ${AWS_REGION})`);
 
-  const existing = await fetchExistingRules(client, BUCKET_NAME);
+  const existing = await fetchExistingRules(client, bucketName);
 
   log('→', 'blue', 'Current lifecycle rules on bucket:');
   printRules(existing);
@@ -224,7 +229,7 @@ const main = async (): Promise<void> => {
 
   await client.send(
     new PutBucketLifecycleConfigurationCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucketName,
       LifecycleConfiguration: { Rules: next },
     })
   );

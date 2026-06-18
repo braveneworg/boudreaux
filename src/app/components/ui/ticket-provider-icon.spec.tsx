@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { createElement } from 'react';
+
 import { render, screen } from '@testing-library/react';
 
 import { BandsintownIcon } from '@/app/components/icons/ticket-providers';
@@ -10,8 +12,9 @@ import { getTicketProvider } from '@/lib/utils/ticket-provider';
 import { TicketProviderIcon } from './ticket-provider-icon';
 
 vi.mock('next/image', () => ({
-  // eslint-disable-next-line @next/next/no-img-element
-  default: vi.fn(({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />),
+  default: vi.fn(({ alt, src }: { alt: string; src: string }) =>
+    createElement('img', { alt, src })
+  ),
 }));
 
 vi.mock('@/lib/utils/ticket-provider', () => ({

@@ -17,7 +17,9 @@ describe('Footer', () => {
       render(<Footer />);
 
       const currentYear = new Date().getFullYear();
-      expect(screen.getByText(new RegExp(`© ${currentYear} Fake Four Inc\\.`))).toBeInTheDocument();
+      expect(
+        screen.getByText((content) => content.includes(`© ${currentYear} Fake Four Inc.`))
+      ).toBeInTheDocument();
       expect(screen.getByText(/All rights reserved/)).toBeInTheDocument();
     });
 

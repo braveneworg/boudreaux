@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
+import { isValidEmailFormat } from '@/lib/utils/auth/auth-utils';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
 
@@ -36,7 +36,9 @@ export const contactSchema = z.object({
     .string()
     .min(1, { message: 'Last name is required' })
     .max(50, { message: 'Last name must be 50 characters or less' }),
-  email: z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' }),
+  email: z
+    .string()
+    .refine((value) => isValidEmailFormat(value), { message: 'Invalid email address' }),
   phone: z
     .string()
     .optional()

@@ -109,12 +109,13 @@ vi.mock('@/app/components/ui/command', () => ({
     value?: string;
     className?: string;
   }) => (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
     <div
       data-testid={`command-item-${value}`}
       onClick={onSelect}
+      onKeyDown={onSelect}
       role="option"
       aria-selected={false}
+      tabIndex={0}
     >
       {children}
     </div>
@@ -412,7 +413,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should show loading state while fetching', async () => {
-    let resolvePromise: (value: { results: never[] }) => void;
+    let resolvePromise!: (value: { results: never[] }) => void;
     const pendingPromise = new Promise<{ results: never[] }>((resolve) => {
       resolvePromise = resolve;
     });
@@ -432,7 +433,7 @@ describe('ArtistSearchInput', () => {
     });
 
     // Resolve to avoid dangling promise
-    resolvePromise!({ results: [] });
+    resolvePromise({ results: [] });
   });
 
   it('should handle fetch errors gracefully', async () => {

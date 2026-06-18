@@ -13,6 +13,8 @@ import {
   sanitizeFilePath,
 } from './sanitization';
 
+import type * as NodePath from 'path';
+
 describe('sanitization utilities', () => {
   describe('sanitizeHtml', () => {
     it('returns empty string for empty input', () => {
@@ -361,8 +363,7 @@ describe('sanitization utilities', () => {
       it('should throw when relative path calculation shows escape from base directory', async () => {
         vi.resetModules();
         vi.doMock('path', async () => {
-          // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-          const actual = await vi.importActual<typeof import('path')>('path');
+          const actual = await vi.importActual<typeof NodePath>('path');
           return {
             ...actual,
             relative: () => '../escaped/path',

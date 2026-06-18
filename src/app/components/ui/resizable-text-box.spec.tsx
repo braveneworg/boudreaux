@@ -4,6 +4,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { requireElement } from '@/test-utils';
+
 import { ResizableTextBox } from './resizable-text-box';
 
 describe('ResizableTextBox', () => {
@@ -207,7 +209,7 @@ describe('ResizableTextBox', () => {
       expect(northHandle).toBeInTheDocument();
 
       // Start resize
-      fireEvent.mouseDown(northHandle!);
+      fireEvent.mouseDown(requireElement(northHandle));
 
       // Simulate mouse move
       fireEvent.mouseMove(document, { clientX: 100, clientY: 50 });
@@ -227,7 +229,7 @@ describe('ResizableTextBox', () => {
       const eastHandle = container.querySelector('.cursor-ew-resize.-right-1');
       expect(eastHandle).toBeInTheDocument();
 
-      fireEvent.mouseDown(eastHandle!);
+      fireEvent.mouseDown(requireElement(eastHandle));
       fireEvent.mouseMove(document, { clientX: 200, clientY: 100 });
       fireEvent.mouseUp(document);
     });
@@ -236,7 +238,7 @@ describe('ResizableTextBox', () => {
       const { container } = render(<ResizableTextBox {...defaultProps} isSelected />);
 
       const eastHandle = container.querySelector('.cursor-ew-resize.-right-1');
-      fireEvent.mouseDown(eastHandle!);
+      fireEvent.mouseDown(requireElement(eastHandle));
 
       // Mouse up should stop the resize
       fireEvent.mouseUp(document);
@@ -257,7 +259,7 @@ describe('ResizableTextBox', () => {
       const northHandle = container.querySelector('.cursor-ns-resize.-top-1');
       expect(northHandle).toBeInTheDocument();
 
-      fireEvent.touchStart(northHandle!, {
+      fireEvent.touchStart(requireElement(northHandle), {
         touches: [{ clientX: 100, clientY: 100 }],
       });
 

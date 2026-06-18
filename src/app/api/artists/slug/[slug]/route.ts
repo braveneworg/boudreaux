@@ -27,8 +27,17 @@ export const GET = withRateLimit<{ slug: string }>(
   try {
     const { slug } = await params;
 
-    // Validate slug format: lowercase alphanumeric + hyphens, max 100 chars
-    if (!/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)) {
+    // Validate slug format: lowercase alphanumeric + hyphens, max 100 chars,
+    // must start and end with an alphanumeric character.
+    const firstChar = slug.at(0) ?? '';
+    const lastChar = slug.at(-1) ?? '';
+    const isValidSlug =
+      slug.length >= 1 &&
+      slug.length <= 100 &&
+      /^[a-z0-9]$/.test(firstChar) &&
+      /^[a-z0-9]$/.test(lastChar) &&
+      /^[a-z0-9-]+$/.test(slug);
+    if (!isValidSlug) {
       return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
     }
 

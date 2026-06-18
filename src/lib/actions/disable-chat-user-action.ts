@@ -48,12 +48,14 @@ export const disableChatUserAction = async (
 
   const parsed = disableChatUserSchema.safeParse(input);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string[]> = {};
+    const fieldErrors = new Map<string, string[]>();
     for (const issue of parsed.error.issues) {
       const key = issue.path.join('.') || '_form';
-      (fieldErrors[key] ??= []).push(issue.message);
+      const messages = fieldErrors.get(key) ?? [];
+      messages.push(issue.message);
+      fieldErrors.set(key, messages);
     }
-    return { success: false, error: 'invalid', fieldErrors };
+    return { success: false, error: 'invalid', fieldErrors: Object.fromEntries(fieldErrors) };
   }
 
   const adminId = session.user.id;
@@ -88,12 +90,14 @@ export const enableChatUserAction = async (
 
   const parsed = enableChatUserSchema.safeParse(input);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string[]> = {};
+    const fieldErrors = new Map<string, string[]>();
     for (const issue of parsed.error.issues) {
       const key = issue.path.join('.') || '_form';
-      (fieldErrors[key] ??= []).push(issue.message);
+      const messages = fieldErrors.get(key) ?? [];
+      messages.push(issue.message);
+      fieldErrors.set(key, messages);
     }
-    return { success: false, error: 'invalid', fieldErrors };
+    return { success: false, error: 'invalid', fieldErrors: Object.fromEntries(fieldErrors) };
   }
 
   await ChatAdminService.enableChatUser(parsed.data.userId);

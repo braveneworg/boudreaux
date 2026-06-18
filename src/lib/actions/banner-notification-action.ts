@@ -53,18 +53,17 @@ export const createOrUpdateBannerNotificationAction = async (
   const parsed = bannerNotificationSchema.safeParse(raw);
 
   if (!parsed.success) {
-    const fieldErrors: Record<string, string[]> = {};
+    const fieldErrors = new Map<string, string[]>();
     for (const issue of parsed.error.issues) {
       const key = issue.path.join('.');
-      if (!fieldErrors[key]) {
-        fieldErrors[key] = [];
-      }
-      fieldErrors[key].push(issue.message);
+      const messages = fieldErrors.get(key) ?? [];
+      messages.push(issue.message);
+      fieldErrors.set(key, messages);
     }
     return {
       fields: {},
       success: false,
-      errors: fieldErrors,
+      errors: Object.fromEntries(fieldErrors),
     };
   }
 

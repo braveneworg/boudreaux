@@ -51,6 +51,14 @@ const cleanImageUrl = (url: string): string => {
 };
 
 /**
+ * Safely reads a dynamic field from a record without exposing the codebase to
+ * prototype-pollution-style object injection. Returns `undefined` when the key
+ * is absent.
+ */
+const readField = (record: Record<string, unknown>, key: string): unknown =>
+  new Map(Object.entries(record)).get(key);
+
+/**
  * A generic data view component for displaying and managing admin entities.
  *
  * @template T - The entity type extending a record with string keys and unknown values
@@ -354,7 +362,7 @@ export const DataView = <T extends Record<string, unknown>>({
                       {(() => {
                         // First check for direct coverArt URL field
                         let coverArtUrl = coverArtField
-                          ? (item[coverArtField] as string | undefined)
+                          ? (readField(item, coverArtField) as string | undefined)
                           : undefined;
 
                         // Fallback: check releaseTracks for coverArt (for tracks)
@@ -367,7 +375,7 @@ export const DataView = <T extends Record<string, unknown>>({
 
                         // Then check for images array
                         const images = imageField
-                          ? (item[imageField] as
+                          ? (readField(item, imageField) as
                               | Array<{ src?: string; altText?: string }>
                               | undefined)
                           : undefined;
@@ -389,12 +397,14 @@ export const DataView = <T extends Record<string, unknown>>({
                                 className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
                               >
                                 {isBase64 ? (
-                                  // Use native img for base64 data URLs
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
+                                  // Base64 data URLs are passed through unoptimized
+                                  <Image
                                     src={resolvedCoverArtUrl}
                                     alt="Cover art"
-                                    className="h-full w-full object-cover"
+                                    fill
+                                    unoptimized
+                                    className="object-cover"
+                                    sizes="64px"
                                   />
                                 ) : (
                                   <Image
@@ -452,8 +462,9 @@ export const DataView = <T extends Record<string, unknown>>({
                       </div>
                       <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
                       {fieldsToShow.map((field: string, index: number) => {
+                        const fieldValue = readField(item, field);
                         if (field.endsWith('At') || field.endsWith('On')) {
-                          const dateValue = item[field] ? new Date(item[field] as string) : null;
+                          const dateValue = fieldValue ? new Date(fieldValue as string) : null;
                           /**
                            * The formatted date string in locale-specific format (M/D/YYYY).
                            * Uses the default locale with numeric representation for year, month, and day.
@@ -490,9 +501,9 @@ export const DataView = <T extends Record<string, unknown>>({
                             </b>
                             :{' '}
                             <span>
-                              {field === 'displayName' && !item[field]
+                              {field === 'displayName' && !fieldValue
                                 ? resolveDisplayName(item)
-                                : String(item[field] ?? '-')}
+                                : String(fieldValue ?? '-')}
                             </span>
                           </span>
                         );
@@ -659,11 +670,13 @@ export const DataView = <T extends Record<string, unknown>>({
           {previewImage && (
             <div className="relative aspect-auto max-h-[85vh] w-full">
               {previewImage.src.startsWith('data:') ? (
-                // Use native img for base64 data URLs
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                // Base64 data URLs are passed through unoptimized
+                <Image
                   src={previewImage.src}
                   alt={previewImage.altText || 'Image preview'}
+                  width={1200}
+                  height={800}
+                  unoptimized
                   className="h-auto max-h-[85vh] w-full object-contain"
                 />
               ) : (

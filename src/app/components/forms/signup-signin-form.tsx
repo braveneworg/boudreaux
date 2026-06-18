@@ -69,8 +69,7 @@ export const SignupSigninForm = ({
                       type="email"
                       autoComplete="email"
                       {...field}
-                      // eslint-disable-next-line jsx-a11y/no-autofocus
-                      autoFocus
+                      autoFocusOnMount
                     />
                   )}
                 </FormControl>

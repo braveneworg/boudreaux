@@ -11,7 +11,8 @@ import { Logo } from './logo';
 /**
  * Mobile / tablet header chrome (below `xl`). Hidden at `xl` via the wrapper's
  * `contents` ↔ `hidden` toggle so the desktop chrome takes over. Its images
- * lazy-load so they aren't fetched on desktop, where this branch is hidden.
+ * lazy-load so they aren't fetched on desktop, where this branch is hidden, and
+ * so they don't compete with the banner — the homepage LCP — for early bandwidth.
  */
 const HeaderMobile = () => (
   <div className="contents xl:hidden">

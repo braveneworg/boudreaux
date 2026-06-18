@@ -236,7 +236,7 @@ export const ChatInput = ({
         return;
       }
       if (event.key === 'Enter' || event.key === 'Tab') {
-        const choice = mentionMatchesRef.current[mentionActiveIndex];
+        const choice = mentionMatchesRef.current.at(mentionActiveIndex);
         if (choice) {
           event.preventDefault();
           insertMention(choice);

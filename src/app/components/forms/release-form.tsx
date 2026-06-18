@@ -505,12 +505,15 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
         throw Error(`Failed to upload ${failedUploads.length} image(s)`);
       }
 
-      const imageInfos = presignedResult.data.map((presigned, index) => ({
-        s3Key: presigned.s3Key,
-        cdnUrl: presigned.cdnUrl,
-        caption: imagesToUpload[index].caption || '',
-        altText: imagesToUpload[index].altText || '',
-      }));
+      const imageInfos = presignedResult.data.map((presigned, index) => {
+        const imageToUpload = imagesToUpload.at(index);
+        return {
+          s3Key: presigned.s3Key,
+          cdnUrl: presigned.cdnUrl,
+          caption: imageToUpload?.caption || '',
+          altText: imageToUpload?.altText || '',
+        };
+      });
 
       const registerResult = await registerReleaseImagesAction(targetReleaseId, imageInfos);
 
@@ -519,8 +522,8 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
           const uploadedData = registerResult.data || [];
           let uploadIndex = 0;
           return prev.map((img) => {
-            if (img.file && !img.uploadedUrl && uploadedData[uploadIndex]) {
-              const uploaded = uploadedData[uploadIndex];
+            const uploaded = uploadedData.at(uploadIndex);
+            if (img.file && !img.uploadedUrl && uploaded) {
               uploadIndex++;
               return {
                 ...img,
@@ -985,13 +988,13 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
               <Separator />
 
-              {isEditMode && (
+              {isEditMode && initialReleaseId && (
                 <>
                   <Separator />
 
                   {/* Download Analytics Section - Edit mode only */}
                   <section className="space-y-4">
-                    <DownloadAnalyticsDashboard releaseId={initialReleaseId!} />
+                    <DownloadAnalyticsDashboard releaseId={initialReleaseId} />
                   </section>
                 </>
               )}

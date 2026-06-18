@@ -41,7 +41,12 @@ export const validateEnvironment = () => {
     'UPSTASH_REDIS_REST_TOKEN',
   ];
 
-  const missing = required.filter((key) => !process.env[key]);
+  const presentEnvKeys = new Set(
+    Object.entries(process.env)
+      .filter(([, value]) => Boolean(value))
+      .map(([key]) => key)
+  );
+  const missing = required.filter((key) => !presentEnvKeys.has(key));
 
   if (missing.length > 0) {
     throw Error(

@@ -79,8 +79,8 @@ export const uploadArtistImagesAction = async (
           file: Buffer.from(arrayBuffer),
           fileName: file.name,
           contentType: file.type,
-          caption: captions[index] || undefined,
-          altText: altTexts[index] || undefined,
+          caption: captions.at(index) || undefined,
+          altText: altTexts.at(index) || undefined,
         };
       })
     );

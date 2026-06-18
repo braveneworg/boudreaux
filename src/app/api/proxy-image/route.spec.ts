@@ -14,8 +14,8 @@ vi.mock('node:dns/promises', () => ({
 }));
 
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: Function) => handler,
-  withAuth: (handler: Function) => handler,
+  withAdmin: <H>(handler: H): H => handler,
+  withAuth: <H>(handler: H): H => handler,
 }));
 
 vi.mock('next/server', async (importOriginal) => {

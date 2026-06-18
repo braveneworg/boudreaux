@@ -45,7 +45,7 @@ export const artistBaseSchema = z.object({
     .string()
     .min(1, { message: 'Slug is required' })
     .max(200, { message: 'Slug must be less than 200 characters' })
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    .regex(/^[a-z0-9](?:[a-z0-9]|-[a-z0-9])*$/, {
       message: 'Slug must be lowercase, alphanumeric, and dash-separated (e.g., "john-doe")',
     }),
   bio: z

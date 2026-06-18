@@ -24,10 +24,12 @@ export type BannerNotificationSize = 'default' | 'lg';
  * Per-size body spacing/typography + reserved height. `lg` (desktop) is a
  * little taller with a larger font; `default` matches the mobile carousel.
  */
-const SIZE_STYLES: Record<BannerNotificationSize, { minHeight: string; body: string }> = {
-  default: { minHeight: '2.5rem', body: 'px-4 py-2 text-sm' },
-  lg: { minHeight: '3.25rem', body: 'px-6 py-3 text-base' },
-};
+const SIZE_STYLES = new Map<BannerNotificationSize, { minHeight: string; body: string }>([
+  ['default', { minHeight: '2.5rem', body: 'px-4 py-2 text-sm' }],
+  ['lg', { minHeight: '3.25rem', body: 'px-6 py-3 text-base' }],
+]);
+
+const DEFAULT_SIZE_STYLE = { minHeight: '2.5rem', body: 'px-4 py-2 text-sm' };
 
 interface BannerNotificationStripProps {
   /** The notification on screen (the incoming one during a transition). */
@@ -71,7 +73,7 @@ export const BannerNotificationStrip = ({
   outgoingKey,
   size = 'default',
 }: BannerNotificationStripProps) => {
-  const { minHeight, body } = SIZE_STYLES[size];
+  const { minHeight, body } = SIZE_STYLES.get(size) ?? DEFAULT_SIZE_STYLE;
 
   return (
     <div

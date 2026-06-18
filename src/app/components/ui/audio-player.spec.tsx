@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { createElement } from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { AudioPlayer } from './audio-player';
@@ -42,15 +44,13 @@ vi.mock('@/app/components/ui/audio/audio-controls', () => ({
 
 // Mock video.js
 vi.mock('video.js', () => {
-  const components: Record<string, unknown> = {
-    Button: class MockButton {},
-  };
+  const components = new Map<string, unknown>([['Button', class MockButton {}]]);
   const videojs = Object.assign(
     vi.fn(() => mockPlayer),
     {
-      getComponent: vi.fn((name: string) => components[name] ?? null),
+      getComponent: vi.fn((name: string) => components.get(name) ?? null),
       registerComponent: vi.fn((name: string, comp: unknown) => {
-        components[name] = comp;
+        components.set(name, comp);
       }),
     }
   );
@@ -63,10 +63,8 @@ vi.mock('video.js/dist/video-js.css', () => ({}));
 // Mock next/image
 vi.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} {...props} />
-  ),
+  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) =>
+    createElement('img', { src, alt, ...props }),
 }));
 
 describe('AudioPlayer', () => {

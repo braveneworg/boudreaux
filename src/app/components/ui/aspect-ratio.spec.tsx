@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import Image from 'next/image';
+
 import { render, screen } from '@testing-library/react';
 
 import { AspectRatio } from './aspect-ratio';
@@ -39,8 +41,7 @@ describe('AspectRatio', () => {
   it('renders image inside aspect ratio', () => {
     render(
       <AspectRatio ratio={16 / 9}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Testing aspect ratio with plain img */}
-        <img src="/test.jpg" alt="Test" data-testid="image" />
+        <Image src="/test.jpg" alt="Test" width={16} height={9} data-testid="image" />
       </AspectRatio>
     );
 

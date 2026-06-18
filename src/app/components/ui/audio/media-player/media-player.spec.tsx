@@ -30,19 +30,15 @@ vi.mock('video.js', () => {
     el: vi.fn().mockReturnValue(document.createElement('div')),
   };
 
-  const componentRegistry: Record<string, unknown> = {
-    Button: function Button() {
-      return null;
-    },
-  };
+  const componentRegistry = new Map<string, unknown>([['Button', () => null]]);
 
   const mockVideojs = Object.assign(
     vi.fn(() => mockPlayer),
     {
       registerComponent: vi.fn((name: string, component: unknown) => {
-        componentRegistry[name] = component;
+        componentRegistry.set(name, component);
       }),
-      getComponent: vi.fn((name: string) => componentRegistry[name] ?? null),
+      getComponent: vi.fn((name: string) => componentRegistry.get(name) ?? null),
     }
   );
 
@@ -167,10 +163,8 @@ vi.mock('@/components/ui/carousel', () => ({
 
 // Mock next/image
 vi.mock('next/image', () => ({
-  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className={className} data-testid="next-image" />
-  ),
+  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) =>
+    React.createElement('img', { src, alt, className, 'data-testid': 'next-image' }),
 }));
 
 // Mock lucide-react icons

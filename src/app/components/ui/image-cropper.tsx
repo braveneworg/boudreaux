@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import NextImage from 'next/image';
+
 import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -271,7 +273,7 @@ export const ImageCropper = ({
         <div className="space-y-4">
           {/* Cropper area */}
           <div
-            className="relative flex h-[400px] w-full items-center justify-center rounded-lg"
+            className="relative flex h-100 w-full items-center justify-center rounded-lg"
             style={{ backgroundColor: useBackgroundColor ? backgroundColor : '#0a0a0a' }}
           >
             <ReactCrop
@@ -282,14 +284,16 @@ export const ImageCropper = ({
               ruleOfThirds
               className="max-h-full max-w-full [&_.ReactCrop__crop-selection]:touch-none [&_.ReactCrop__drag-bar.ord-e]:-right-1! [&_.ReactCrop__drag-bar.ord-e]:w-2! [&_.ReactCrop__drag-bar.ord-n]:-top-1! [&_.ReactCrop__drag-bar.ord-n]:h-2! [&_.ReactCrop__drag-bar.ord-s]:-bottom-1! [&_.ReactCrop__drag-bar.ord-s]:h-2! [&_.ReactCrop__drag-bar.ord-w]:-left-1! [&_.ReactCrop__drag-bar.ord-w]:w-2! [&_.ReactCrop__drag-handle]:h-3 [&_.ReactCrop__drag-handle]:w-3 [&_.ReactCrop__drag-handle.ord-e]:-right-1.5! [&_.ReactCrop__drag-handle.ord-n]:-top-1.5! [&_.ReactCrop__drag-handle.ord-s]:-bottom-1.5! [&_.ReactCrop__drag-handle.ord-w]:-left-1.5!"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <NextImage
                 ref={imgRef}
                 src={imageSrc}
                 alt="Crop preview"
                 onLoad={onImageLoad}
-                style={{ maxHeight: '380px', maxWidth: '100%' }}
-                crossOrigin="anonymous"
+                width={0}
+                height={0}
+                sizes="100vw"
+                unoptimized
+                style={{ maxHeight: '380px', maxWidth: '100%', width: 'auto', height: 'auto' }}
               />
             </ReactCrop>
           </div>

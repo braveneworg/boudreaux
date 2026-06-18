@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Ref } from 'react';
 
 import Link from 'next/link';
 
@@ -42,6 +43,24 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+
+  // Focus the email input on mount via a ref + effect instead of the native
+  // `autoFocus` attribute (jsx-a11y/no-autofocus), preserving identical behavior.
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    emailInputRef.current?.focus();
+  }, []);
+
+  // Merge the internal focus ref with React Hook Form's `field.ref` so neither
+  // consumer clobbers the other.
+  const setEmailRef = useCallback((fieldRef: Ref<HTMLInputElement>) => {
+    return (node: HTMLInputElement | null) => {
+      emailInputRef.current = node;
+      if (typeof fieldRef === 'function') fieldRef(node);
+      else if (fieldRef) fieldRef.current = node;
+    };
+  }, []);
 
   const form = useForm<EmailStepFormSchemaType>({
     resolver: zodResolver(emailStepSchema),
@@ -85,8 +104,12 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-                  <Input type="email" placeholder="you@example.com" autoFocus {...field} />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    {...field}
+                    ref={setEmailRef(field.ref)}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

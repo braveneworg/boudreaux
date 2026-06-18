@@ -51,6 +51,19 @@ import type { DownloadSubject } from '@/types/download-subject';
 export const maxDuration = 300;
 const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
 const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
+
+/**
+ * Map view over the shared `FORMAT_LABELS` record for safe, key-checked
+ * lookups without dynamic object indexing.
+ */
+const FORMAT_LABEL_MAP = new Map<string, string>(Object.entries(FORMAT_LABELS));
+
+/**
+ * Resolve the human-readable label for a digital format, falling back to the
+ * format type itself when no label is registered.
+ */
+const resolveFormatLabel = (formatType: DigitalFormatType): string =>
+  FORMAT_LABEL_MAP.get(formatType) ?? formatType;
 /**
  * Temp bundle ZIPs are written to `tmp/bundles/{userId}/{uuid}.zip`.
  * Cleanup contract: an S3 lifecycle rule expires anything under that prefix
@@ -153,7 +166,11 @@ function startBufferPrefetch(
   const inFlight: Array<Promise<Buffer | null>> = [];
   const initial = Math.min(depth, keys.length);
   for (let i = 0; i < initial; i++) {
-    inFlight.push(issuePrefetch(s3Client, bucket, keys[i]));
+    const key = keys.at(i);
+    if (key === undefined) {
+      break;
+    }
+    inFlight.push(issuePrefetch(s3Client, bucket, key));
   }
   return inFlight;
 }
@@ -629,7 +646,7 @@ export async function GET(
             // a fresh download URL.
             if (await verifyS3ObjectExists(tempZipKey)) {
               for (const { formatType } of resolvedFormats) {
-                const label = FORMAT_LABELS[formatType] ?? formatType;
+                const label = resolveFormatLabel(formatType);
                 send('progress', { formatType, label, status: 'zipping' });
                 completedFormats.push(formatType);
                 send('progress', { formatType, label, status: 'done' });
@@ -742,7 +759,7 @@ export async function GET(
               isLastForFormat: boolean;
             }> = [];
             for (const { formatType, files } of resolvedFormats) {
-              const label = FORMAT_LABELS[formatType] ?? formatType;
+              const label = resolveFormatLabel(formatType);
               const safeFolderName = safeArchiveEntryName(label);
               files.forEach((file, idx) => {
                 flatEntries.push({
@@ -768,14 +785,18 @@ export async function GET(
 
             const formatHasError = new Set<DigitalFormatType>();
             for (let i = 0; i < flatEntries.length; i++) {
-              const entry = flatEntries[i];
+              const entry = flatEntries.at(i);
+              if (entry === undefined) {
+                continue;
+              }
               try {
-                const buffer = await inFlight[i];
+                const buffer = await inFlight.at(i);
                 const nextIndex = i + S3_PREFETCH_DEPTH;
-                if (nextIndex < flatEntries.length) {
-                  inFlight.push(issuePrefetch(s3ClientForZip, bucketForZip, flatKeys[nextIndex]));
+                const nextKey = flatKeys.at(nextIndex);
+                if (nextIndex < flatEntries.length && nextKey !== undefined) {
+                  inFlight.push(issuePrefetch(s3ClientForZip, bucketForZip, nextKey));
                 }
-                if (buffer === null) continue;
+                if (buffer === null || buffer === undefined) continue;
                 if (archiveError) throw archiveError;
                 // archiver maintains its own internal queue; appending without
                 // awaiting `entry` lets multiple appends pipeline through the
@@ -1012,7 +1033,7 @@ export async function GET(
       // append. Errors here destroy both the response and cache streams.
       const useSubfolders = resolvedFormats.length > 1;
       const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
-        const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
+        const folderName = safeArchiveEntryName(resolveFormatLabel(formatType));
         return files.map((file) => ({
           formatType,
           archivePath: useSubfolders
@@ -1053,13 +1074,17 @@ export async function GET(
       void (async () => {
         try {
           for (let i = 0; i < fileEntries.length; i++) {
-            const entry = fileEntries[i];
-            const buffer = await streamInFlight[i];
-            const nextIndex = i + S3_PREFETCH_DEPTH;
-            if (nextIndex < fileEntries.length) {
-              streamInFlight.push(issuePrefetch(s3Client, bucketName, streamKeys[nextIndex]));
+            const entry = fileEntries.at(i);
+            if (entry === undefined) {
+              continue;
             }
-            if (buffer === null) continue;
+            const buffer = await streamInFlight.at(i);
+            const nextIndex = i + S3_PREFETCH_DEPTH;
+            const nextKey = streamKeys.at(nextIndex);
+            if (nextIndex < fileEntries.length && nextKey !== undefined) {
+              streamInFlight.push(issuePrefetch(s3Client, bucketName, nextKey));
+            }
+            if (buffer === null || buffer === undefined) continue;
             archive.append(buffer, { name: entry.archivePath });
           }
           archive.finalize();
@@ -1189,7 +1214,7 @@ export async function GET(
     // so the zip filename (release title) is the only label the user sees.
     const useSubfolders = resolvedFormats.length > 1;
     const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
-      const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
+      const folderName = safeArchiveEntryName(resolveFormatLabel(formatType));
       return files.map((file) => ({
         archivePath: useSubfolders
           ? `${folderName}/${safeArchiveEntryName(file.fileName)}`
@@ -1206,17 +1231,33 @@ export async function GET(
       const inFlight = startBufferPrefetch(s3Client, bucketName, keys, S3_PREFETCH_DEPTH);
 
       for (let i = 0; i < fileEntries.length; i++) {
-        const fileEntry = fileEntries[i];
-        const buffer = await inFlight[i];
+        const fileEntry = fileEntries.at(i);
+        if (fileEntry === undefined) {
+          continue;
+        }
+        const buffer = await inFlight.at(i);
         const nextIndex = i + S3_PREFETCH_DEPTH;
-        if (nextIndex < fileEntries.length) {
-          inFlight.push(issuePrefetch(s3Client, bucketName, keys[nextIndex]));
+        const nextKey = keys.at(nextIndex);
+        if (nextIndex < fileEntries.length && nextKey !== undefined) {
+          inFlight.push(issuePrefetch(s3Client, bucketName, nextKey));
         }
 
-        if (buffer === null) continue;
+        if (buffer === null || buffer === undefined) continue;
         await new Promise<void>((resolve, reject) => {
-          archive.once('entry', () => resolve());
-          archive.once('error', reject);
+          // `once` only self-removes the listener that fires. On the happy path
+          // `entry` resolves and the `error` listener would linger, leaking one
+          // listener per appended file (→ MaxListenersExceededWarning at 11
+          // files). Pair them so whichever fires removes the other.
+          const onEntry = () => {
+            archive.removeListener('error', onError);
+            resolve();
+          };
+          const onError = (err: Error) => {
+            archive.removeListener('entry', onEntry);
+            reject(err);
+          };
+          archive.once('entry', onEntry);
+          archive.once('error', onError);
           archive.append(buffer, { name: fileEntry.archivePath });
         });
       }

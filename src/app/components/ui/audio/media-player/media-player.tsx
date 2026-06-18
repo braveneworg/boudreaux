@@ -185,7 +185,7 @@ const FeaturedArtistCarousel = memo(
     const handleSettle = useCallback(() => {
       if (!carouselApi) return;
       const index = carouselApi.selectedScrollSnap();
-      const artist = sortedArtists[index];
+      const artist = sortedArtists.at(index);
       if (!artist) return;
       const autoPlay = clickInitiatedRef.current;
       clickInitiatedRef.current = false;
@@ -699,17 +699,14 @@ const TrackListDrawer = ({
               const isCurrentTrack = currentTrackId === file.id;
               const coverArt = release.coverArt || null;
 
-              const trackItem = (
-                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection handled by parent player component
-                <li
-                  key={file.id}
-                  className={`flex items-center justify-between gap-4 p-3 transition-colors ${
-                    isCurrentTrack
-                      ? 'bg-zinc-800 text-zinc-50'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  } ${onTrackSelect ? 'cursor-pointer' : ''}`}
-                  onClick={() => onTrackSelect?.(file.id)}
-                >
+              const rowClassName = `flex items-center justify-between gap-4 p-3 transition-colors ${
+                isCurrentTrack
+                  ? 'bg-zinc-800 text-zinc-50'
+                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              } ${onTrackSelect ? 'cursor-pointer' : ''}`;
+
+              const rowContent = (
+                <>
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span
                       className={`w-6 shrink-0 text-right text-sm font-medium ${
@@ -747,16 +744,27 @@ const TrackListDrawer = ({
                   >
                     {formatDuration(file.duration ?? 0)}
                   </span>
-                </li>
+                </>
               );
 
-              // Wrap with DrawerClose if onTrackSelect is provided to close drawer on selection
-              return onTrackSelect ? (
-                <DrawerClose key={file.id} asChild>
-                  {trackItem}
-                </DrawerClose>
-              ) : (
-                trackItem
+              // When interactive, render a real <button> (native keyboard + click)
+              // wrapped by DrawerClose so selection also dismisses the drawer.
+              return (
+                <li key={file.id}>
+                  {onTrackSelect ? (
+                    <DrawerClose asChild>
+                      <button
+                        type="button"
+                        className={`w-full text-left ${rowClassName}`}
+                        onClick={() => onTrackSelect(file.id)}
+                      >
+                        {rowContent}
+                      </button>
+                    </DrawerClose>
+                  ) : (
+                    <div className={rowClassName}>{rowContent}</div>
+                  )}
+                </li>
               );
             })}
           </ol>
@@ -869,17 +877,14 @@ const FormatFileListDrawer = ({
               const isCurrentFile = currentFileId === file.id;
               const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
 
-              const fileItem = (
-                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- file selection handled by parent player component
-                <li
-                  key={file.id}
-                  className={`flex items-center justify-between gap-4 p-3 transition-colors ${
-                    isCurrentFile
-                      ? 'bg-zinc-800 text-zinc-50'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  } ${onFileSelect ? 'cursor-pointer' : ''}`}
-                  onClick={() => onFileSelect?.(file.id)}
-                >
+              const rowClassName = `flex items-center justify-between gap-4 p-3 transition-colors ${
+                isCurrentFile
+                  ? 'bg-zinc-800 text-zinc-50'
+                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              } ${onFileSelect ? 'cursor-pointer' : ''}`;
+
+              const rowContent = (
+                <>
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span
                       className={`w-6 shrink-0 text-right text-sm font-medium ${
@@ -916,15 +921,25 @@ const FormatFileListDrawer = ({
                       {formatDuration(file.duration)}
                     </span>
                   )}
-                </li>
+                </>
               );
 
-              return onFileSelect ? (
-                <DrawerClose key={file.id} asChild>
-                  {fileItem}
-                </DrawerClose>
-              ) : (
-                fileItem
+              return (
+                <li key={file.id}>
+                  {onFileSelect ? (
+                    <DrawerClose asChild>
+                      <button
+                        type="button"
+                        className={`w-full text-left ${rowClassName}`}
+                        onClick={() => onFileSelect(file.id)}
+                      >
+                        {rowContent}
+                      </button>
+                    </DrawerClose>
+                  ) : (
+                    <div className={rowClassName}>{rowContent}</div>
+                  )}
+                </li>
               );
             })}
           </ol>

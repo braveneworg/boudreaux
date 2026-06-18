@@ -14,7 +14,15 @@ import type { Adapter } from 'next-auth/adapters';
 /** The app singleton is an $extends-ed client (slow-query logging) */
 type AdapterPrismaClient = PrismaClient | typeof prisma;
 
-export const CustomPrismaAdapter = (p: AdapterPrismaClient): Adapter => {
+/**
+ * The base `Adapter` type marks every method optional, but this adapter always
+ * implements `createUser`, `updateUser`, and `useVerificationToken`. Marking them
+ * required lets callers use them without non-null assertions.
+ */
+type CustomAdapter = Adapter &
+  Required<Pick<Adapter, 'createUser' | 'updateUser' | 'useVerificationToken'>>;
+
+export const CustomPrismaAdapter = (p: AdapterPrismaClient): CustomAdapter => {
   // @auth/prisma-adapter v2 declares `PrismaClient | ReturnType<PrismaClient["$extends"]>`,
   // which TypeScript cannot resolve against @prisma/client v6's deeply-generic client
   // type (TS2321 "Excessive stack depth"). Cast to the function's own parameter type
@@ -206,5 +214,5 @@ export const CustomPrismaAdapter = (p: AdapterPrismaClient): Adapter => {
         username: user.username ?? undefined,
       };
     },
-  } as Adapter;
+  } as CustomAdapter;
 };

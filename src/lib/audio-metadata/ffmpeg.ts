@@ -152,18 +152,18 @@ const probeMetadata = async (filePath: string): Promise<Record<string, string>> 
         };
 
         // Merge format tags first, then stream tags on top (stream wins)
-        const tags: Record<string, string> = {};
+        const tags = new Map<string, string>();
         const formatTags = parsed.format?.tags ?? {};
         for (const [k, v] of Object.entries(formatTags)) {
-          tags[k] = v;
+          tags.set(k, v);
         }
         for (const stream of parsed.streams ?? []) {
           for (const [k, v] of Object.entries(stream.tags ?? {})) {
-            tags[k] = v;
+            tags.set(k, v);
           }
         }
 
-        resolve(tags);
+        resolve(Object.fromEntries(tags));
       } catch {
         resolve({});
       }
