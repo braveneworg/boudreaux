@@ -35,3 +35,35 @@ test.describe('Admin featured artist create form', () => {
     await expect(adminPage).toHaveURL(/\/admin\/featured-artists\/new$/);
   });
 });
+
+test.describe('Admin featured artist edit form', () => {
+  test('opens the edit view for the seeded featured artist from the list', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/featured-artists');
+
+    const editLink = adminPage.getByRole('link', { name: /edit/i }).first();
+    await expect(editLink).toBeVisible({ timeout: 15_000 });
+    await editLink.click();
+
+    await expect(adminPage).toHaveURL(/\/admin\/featured-artists\/[a-f0-9]{24}$/);
+    await expect(
+      adminPage.getByRole('heading', { name: 'Edit Featured Artist', exact: true })
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('loads the seeded featured artist data into the form', async ({ adminPage }) => {
+    await adminPage.goto('/admin/featured-artists');
+
+    const editLink = adminPage.getByRole('link', { name: /edit/i }).first();
+    await expect(editLink).toBeVisible({ timeout: 15_000 });
+    await editLink.click();
+
+    await expect(adminPage.locator('[name="displayName"]')).toHaveValue('E2E Featured Artist', {
+      timeout: 15_000,
+    });
+    await expect(
+      adminPage.getByRole('button', { name: 'Save Changes', exact: true })
+    ).toBeVisible();
+  });
+});

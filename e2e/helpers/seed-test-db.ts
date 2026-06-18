@@ -244,6 +244,19 @@ const seedTestDatabase = async () => {
       },
     });
 
+    // A featured artist so the admin featured-artists list and edit view have a
+    // record to render (linked to E2E Artist + E2E Album One).
+    await prisma.featuredArtist.create({
+      data: {
+        displayName: 'E2E Featured Artist',
+        description: 'Seeded featured artist for admin edit e2e coverage.',
+        position: 0,
+        featuredOn: new Date(),
+        artists: { connect: { id: e2eArtist.id } },
+        release: { connect: { id: e2eRelease1.id } },
+      },
+    });
+
     const e2eRelease2 = await prisma.release.create({
       data: {
         title: 'E2E Album Two',
