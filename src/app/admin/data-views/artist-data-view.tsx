@@ -60,6 +60,7 @@ export const ArtistDataView = () => {
       data={{ artists: rows }}
       fieldsToShow={fieldsToShow}
       imageField="images"
+      canCreate={false}
       refetch={refetch}
       isPending={isPending}
       isFetching={isFetching}

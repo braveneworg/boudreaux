@@ -54,6 +54,12 @@ type FormFieldName = keyof ArtistFormData;
 
 interface ArtistFormProps {
   artistId?: string;
+  /**
+   * Where to navigate after a successful create. Used by the create-from-release
+   * flow to return to the originating release instead of the new artist's edit
+   * page. Ignored in edit mode.
+   */
+  returnTo?: string;
 }
 
 const initialFormState: FormState = {
@@ -91,7 +97,7 @@ const PublishedToastContent = ({ fullName }: { fullName: string }) => (
   </>
 );
 
-export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
+export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormProps) => {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createArtistAction,
     initialFormState
@@ -220,14 +226,20 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
     fetchArtist();
   }, [initialArtistId, artistForm, user?.id]);
 
-  // Navigate to the edit URL after artist creation, outside of startTransition so the
-  // router navigation doesn't keep isTransitionPending true for the form submission.
+  // After artist creation, navigate away — outside of startTransition so the router
+  // navigation doesn't keep isTransitionPending true for the form submission. When a
+  // `returnTo` is provided (create-from-release flow) go back there; otherwise drop
+  // into the new artist's edit page.
   useEffect(() => {
     if (artistId && !initialArtistId && !hasNavigatedToEditRef.current) {
       hasNavigatedToEditRef.current = true;
-      router.replace(`/admin/artists/${artistId}`, { scroll: false });
+      if (returnTo) {
+        router.push(returnTo);
+      } else {
+        router.replace(`/admin/artists/${artistId}`, { scroll: false });
+      }
     }
-  }, [artistId, initialArtistId, router]);
+  }, [artistId, initialArtistId, returnTo, router]);
 
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);
