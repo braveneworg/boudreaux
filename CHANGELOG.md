@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.132.0] - 2026-06-18
+
+### Added
+
+- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n
+
 ## [4.131.0] - 2026-06-18
 
 ### Added
