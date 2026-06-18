@@ -5,9 +5,10 @@ runs:
   using: 'composite'
   steps:
     - name: Install pnpm
+      # No `version:` here — pnpm/action-setup reads the version from the
+      # `packageManager` field in package.json. Pinning it in both places
+      # causes ERR_PNPM_BAD_PM_VERSION when they drift.
       uses: pnpm/action-setup@v5
-      with:
-        version: '11.3.0+sha512.2c403d6594527287672b1f7056343a1f7c3634036a67ffabfcc2b3d7595d843768f8787148d1b57cf7956c90606bbd192857c363af19e96d2d0ec9ec5741d215'
 
     - name: Setup Node.js
       uses: actions/setup-node@v6
