@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { createElement } from 'react';
+
 import { render, screen } from '@testing-library/react';
 
 import type { Artist } from '@/lib/types/media-models';
@@ -9,10 +11,13 @@ import { CarouselNumberUp } from './carousel-number-up';
 
 // Mock next/image
 vi.mock('next/image', () => ({
-  default: function MockImage(props: { src: string; alt: string; width: number; height: number }) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={props.src} alt={props.alt} width={props.width} height={props.height} />;
-  },
+  default: (props: { src: string; alt: string; width: number; height: number }) =>
+    createElement('img', {
+      src: props.src,
+      alt: props.alt,
+      width: props.width,
+      height: props.height,
+    }),
 }));
 
 // Mock carousel components

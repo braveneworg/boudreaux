@@ -1082,7 +1082,7 @@ describe('CustomPrismaAdapter', () => {
       // Create a fresh adapter that uses the re-mocked PrismaAdapter
       const freshAdapter = CustomPrismaAdapter(mockPrisma as never);
 
-      const result = await freshAdapter.useVerificationToken!({
+      const result = await freshAdapter.useVerificationToken({
         identifier: 'test@example.com',
         token: 'abc123',
       });

@@ -253,7 +253,7 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
 
   it('does not update state when component unmounts before fetch resolves', async () => {
     expect.assertions(0);
-    let resolveFetch: (value: unknown) => void;
+    let resolveFetch!: (value: unknown) => void;
     global.fetch = vi.fn().mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -275,7 +275,7 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
     unmount();
 
     // Resolve after unmount — cancelled guard should prevent setState calls
-    resolveFetch!({
+    resolveFetch({
       ok: true,
       json: () => Promise.resolve({ formats: mockFormats }),
     });
@@ -283,7 +283,7 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
 
   it('does not update state when component unmounts before a failed fetch resolves', async () => {
     expect.assertions(0);
-    let resolveFetch: (value: unknown) => void;
+    let resolveFetch!: (value: unknown) => void;
     global.fetch = vi.fn().mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -306,7 +306,7 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
 
     // Resolve with a non-ok response after unmount — cancelled guard should
     // prevent the setFormats call in the !res.ok branch.
-    resolveFetch!({ ok: false });
+    resolveFetch({ ok: false });
   });
 });
 

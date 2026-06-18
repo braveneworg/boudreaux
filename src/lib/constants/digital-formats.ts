@@ -164,24 +164,36 @@ export const generateS3Key = (
  * Get file extension from format type
  */
 export const getFileExtensionForFormat = (formatType: DigitalFormatType): string => {
-  const extensionMap: Record<DigitalFormatType, string> = {
-    MP3_V0: 'mp3',
-    MP3_320KBPS: 'mp3',
-    AAC: 'aac',
-    OGG_VORBIS: 'ogg',
-    FLAC: 'flac',
-    ALAC: 'm4a',
-    WAV: 'wav',
-    AIFF: 'aiff',
-  };
-  return extensionMap[formatType];
+  const extensionMap = new Map<DigitalFormatType, string>([
+    ['MP3_V0', 'mp3'],
+    ['MP3_320KBPS', 'mp3'],
+    ['AAC', 'aac'],
+    ['OGG_VORBIS', 'ogg'],
+    ['FLAC', 'flac'],
+    ['ALAC', 'm4a'],
+    ['WAV', 'wav'],
+    ['AIFF', 'aiff'],
+  ]);
+  const extension = extensionMap.get(formatType);
+  if (extension === undefined) {
+    throw new Error(`Unknown digital format type: ${formatType}`);
+  }
+  return extension;
 };
 
 /**
  * Get default MIME type for format (first in allowlist)
  */
-export const getDefaultMimeType = (formatType: DigitalFormatType): string =>
-  FORMAT_MIME_TYPES[formatType][0];
+export const getDefaultMimeType = (formatType: DigitalFormatType): string => {
+  const mimeTypesByFormat = new Map<DigitalFormatType, ReadonlyArray<string>>(
+    Object.entries(FORMAT_MIME_TYPES) as Array<[DigitalFormatType, ReadonlyArray<string>]>
+  );
+  const mimeTypes = mimeTypesByFormat.get(formatType);
+  if (mimeTypes === undefined || mimeTypes[0] === undefined) {
+    throw new Error(`Unknown digital format type: ${formatType}`);
+  }
+  return mimeTypes[0];
+};
 
 /**
  * Human-readable labels for digital format types

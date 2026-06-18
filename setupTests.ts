@@ -30,7 +30,6 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('next/server', () => {
   class MockNextRequest extends Request {
     nextUrl: URL;
-    // eslint-disable-next-line no-undef
     constructor(url: string | URL, options?: RequestInit) {
       super(url, options);
       this.nextUrl = new URL(url);
@@ -41,7 +40,6 @@ vi.mock('next/server', () => {
   // shapes are intentionally narrower than the native Response statics.
   class MockNextResponse extends Response {}
   Object.assign(MockNextResponse, {
-    // eslint-disable-next-line no-undef
     json: vi.fn((data: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
       json: async () => data,
       status: init?.status ?? 200,
@@ -262,7 +260,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   for (const key of Object.keys(process.env)) {
     if (!(key in PRISTINE_ENV)) {
-      delete process.env[key];
+      Reflect.deleteProperty(process.env, key);
     }
   }
   Object.assign(process.env, PRISTINE_ENV);

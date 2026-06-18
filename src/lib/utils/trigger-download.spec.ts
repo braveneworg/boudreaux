@@ -13,6 +13,27 @@ const requireCapturedAnchor = (anchor: HTMLAnchorElement | null): HTMLAnchorElem
   return anchor;
 };
 
+/**
+ * Captures the anchor that `triggerDownload` creates, returning a getter for it.
+ * Spies on `document.createElement` to grab the anchor at creation time (avoiding any
+ * reliance on `this`) and stubs the click so no real navigation occurs.
+ */
+const captureClickedAnchor = (): (() => HTMLAnchorElement | null) => {
+  let captured: HTMLAnchorElement | null = null;
+  const createElement = document.createElement.bind(document);
+  vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+    const element = createElement(tagName);
+    if (tagName === 'a') {
+      captured = element as HTMLAnchorElement;
+    }
+
+    return element;
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+  return () => captured;
+};
+
 describe('triggerDownload', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -47,44 +68,29 @@ describe('triggerDownload', () => {
   });
 
   it('sets the download attribute when fileName is provided', () => {
-    let capturedAnchor: HTMLAnchorElement | null = null;
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement
-    ) {
-      capturedAnchor = this;
-    });
+    const getAnchor = captureClickedAnchor();
 
     triggerDownload('https://example.com/uuid.zip', 'my-release.zip');
 
-    const anchor = requireCapturedAnchor(capturedAnchor);
+    const anchor = requireCapturedAnchor(getAnchor());
     expect(anchor.download).toBe('my-release.zip');
   });
 
   it('omits the download attribute when fileName is not provided', () => {
-    let capturedAnchor: HTMLAnchorElement | null = null;
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement
-    ) {
-      capturedAnchor = this;
-    });
+    const getAnchor = captureClickedAnchor();
 
     triggerDownload('https://example.com/uuid.zip');
 
-    const anchor = requireCapturedAnchor(capturedAnchor);
+    const anchor = requireCapturedAnchor(getAnchor());
     expect(anchor.download).toBe('');
   });
 
   it('sets the anchor href to the normalized URL', () => {
-    let capturedAnchor: HTMLAnchorElement | null = null;
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement
-    ) {
-      capturedAnchor = this;
-    });
+    const getAnchor = captureClickedAnchor();
 
     triggerDownload('https://example.com/file.zip', 'release.zip');
 
-    const anchor = requireCapturedAnchor(capturedAnchor);
+    const anchor = requireCapturedAnchor(getAnchor());
     expect(anchor.href).toBe('https://example.com/file.zip');
   });
 

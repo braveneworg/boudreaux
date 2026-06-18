@@ -77,8 +77,8 @@ export const BannerNotificationTicker = ({
   if (total === 0) return null;
 
   const isTransitioning = incomingIndex !== null;
-  const outgoing = notifications[index] ?? null;
-  const active = isTransitioning ? (notifications[incomingIndex] ?? null) : outgoing;
+  const outgoing = notifications.at(index) ?? null;
+  const active = incomingIndex !== null ? (notifications.at(incomingIndex) ?? null) : outgoing;
   const visible = active !== null && isTabVisible;
 
   return (

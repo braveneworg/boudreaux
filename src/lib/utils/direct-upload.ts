@@ -104,7 +104,13 @@ export const uploadFilesToS3 = async (
     throw Error('Files and presigned URLs count mismatch');
   }
 
-  const uploadPromises = files.map((file, index) => uploadFileToS3(file, presignedUrls[index]));
+  const uploadPromises = files.map((file, index) => {
+    const presignedUrl = presignedUrls.at(index);
+    if (presignedUrl === undefined) {
+      throw Error('Files and presigned URLs count mismatch');
+    }
+    return uploadFileToS3(file, presignedUrl);
+  });
 
   return Promise.all(uploadPromises);
 };

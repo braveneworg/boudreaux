@@ -122,10 +122,14 @@ export const renderWithForm = <T extends FieldValues = FieldValues>(
   const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
   const result = render(ui, { wrapper: FormCapture, ...renderOptions });
 
+  if (!capturedFormRef.current) {
+    throw new Error('FormCapture did not capture a form instance during render');
+  }
+
   return {
     ...result,
     user,
-    form: capturedFormRef.current!,
+    form: capturedFormRef.current,
   };
 };
 

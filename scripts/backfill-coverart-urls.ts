@@ -70,12 +70,12 @@ const colors = {
 };
 
 const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
-  const tagColor = {
-    info: colors.blue,
-    success: colors.green,
-    warning: colors.yellow,
-    error: colors.red,
-  }[type];
+  const tagColor = new Map([
+    ['info', colors.blue],
+    ['success', colors.green],
+    ['warning', colors.yellow],
+    ['error', colors.red],
+  ]).get(type);
   const line = `${tagColor}[BACKFILL-COVERART]${colors.reset} ${message}`;
   if (type === 'error') console.error(line);
   else if (type === 'warning') console.warn(line);
@@ -110,7 +110,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   const opts: CliOptions = { ...DEFAULT_OPTIONS };
 
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+    const arg = argv.at(i);
     if (arg === '--execute') opts.execute = true;
     else if (arg === '--no-invalidate') opts.invalidate = false;
     else if (arg === '--help' || arg === '-h') opts.help = true;
@@ -341,12 +341,14 @@ const mapWithConcurrency = async <T, R>(
   concurrency: number,
   fn: (item: T) => Promise<R>
 ): Promise<R[]> => {
-  const results: R[] = [];
-  let index = 0;
+  const queue = items.map((item, index) => ({ item, index }));
+  const results: R[] = new Array<R>(items.length);
+  let cursor = 0;
   const worker = async (): Promise<void> => {
-    while (index < items.length) {
-      const i = index++;
-      results[i] = await fn(items[i]);
+    while (cursor < queue.length) {
+      const entry = queue.at(cursor++);
+      if (entry === undefined) break;
+      results.splice(entry.index, 1, await fn(entry.item));
     }
   };
   const workerCount = Math.min(concurrency, Math.max(1, items.length));

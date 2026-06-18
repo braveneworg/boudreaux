@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
+import { createElement } from 'react';
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -26,8 +28,7 @@ vi.mock('@/lib/utils/trigger-download', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  // eslint-disable-next-line jsx-a11y/alt-text, @next/next/no-img-element
-  default: (props: Record<string, unknown>) => <img {...props} />,
+  default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
 vi.mock('next/link', () => ({

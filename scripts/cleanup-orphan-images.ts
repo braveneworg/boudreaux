@@ -55,12 +55,12 @@ const colors = {
 };
 
 const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
-  const tag = {
-    info: colors.blue,
-    success: colors.green,
-    warning: colors.yellow,
-    error: colors.red,
-  }[type];
+  const tag = new Map([
+    ['info', colors.blue],
+    ['success', colors.green],
+    ['warning', colors.yellow],
+    ['error', colors.red],
+  ]).get(type);
   const line = `${tag}[CLEANUP-ORPHANS]${colors.reset} ${message}`;
   if (type === 'error') console.error(line);
   else if (type === 'warning') console.warn(line);
@@ -82,7 +82,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     help: false,
   };
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+    const arg = argv.at(i);
     if (arg === '--execute') opts.execute = true;
     else if (arg === '--no-invalidate') opts.invalidate = false;
     else if (arg === '--help' || arg === '-h') opts.help = true;

@@ -16,7 +16,9 @@ vi.mock('@/lib/services/artist-service', () => ({
 // Mock rate limiting to pass through
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
   withRateLimit:
-    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+    (_limiter: unknown, _limit: number) =>
+    (handler: (...args: unknown[]) => unknown) =>
+    (req: unknown, ctx: unknown) =>
       handler(req, ctx),
   extractClientIp: () => '127.0.0.1',
 }));

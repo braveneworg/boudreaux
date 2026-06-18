@@ -91,7 +91,7 @@ describe('GenerateUsernameButton', () => {
         username: 'existing-username',
         confirmUsername: 'existing-username',
       };
-      return name ? values[name] : values;
+      return name ? Object.entries(values).find(([key]) => key === name)?.[1] : values;
     });
 
     mockForm = createMockedForm<MockFormData>({
@@ -461,7 +461,7 @@ describe('GenerateUsernameButton', () => {
         setValue: vi.fn(),
         getValues: vi.fn((name?: keyof MockFormData) => {
           const values = { username: '', confirmUsername: '' };
-          return name ? values[name] : values;
+          return name ? Object.entries(values).find(([key]) => key === name)?.[1] : values;
         }),
         trigger: vi.fn().mockResolvedValue(true),
         formState: {

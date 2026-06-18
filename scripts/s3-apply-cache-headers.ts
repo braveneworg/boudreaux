@@ -92,15 +92,15 @@ const log = (
   message: string,
   type: 'info' | 'success' | 'warning' | 'error' | 'dim' = 'info'
 ): void => {
-  const colorMap = {
-    info: colors.blue,
-    success: colors.green,
-    warning: colors.yellow,
-    error: colors.red,
-    dim: colors.dim,
-  };
+  const colorMap = new Map([
+    ['info', colors.blue],
+    ['success', colors.green],
+    ['warning', colors.yellow],
+    ['error', colors.red],
+    ['dim', colors.dim],
+  ]);
 
-  const color = colorMap[type];
+  const color = colorMap.get(type);
   const formatted = `${color}[S3-CACHE]${colors.reset} ${message}`;
 
   switch (type) {
@@ -121,7 +121,7 @@ const formatBytes = (bytes: number): string => {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes.at(i)}`;
 };
 
 const isMediaFile = (key: string): boolean => {
@@ -153,7 +153,7 @@ export const parseArgs = (args: string[]): ParsedArgs => {
   };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args.at(i);
     if (arg === '--apply') {
       result.apply = true;
     } else if (arg === '--force') {

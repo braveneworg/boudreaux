@@ -21,7 +21,7 @@ export const extractS3KeyFromUrl = (url: string): string | null => {
 
   if (cdnDomain && url.includes(cdnDomain)) {
     // Extract key from CDN URL (handles both correct and malformed URLs with double https://)
-    return url.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
+    return url.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
   }
 
   if (url.includes('.s3.')) {

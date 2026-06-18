@@ -15,12 +15,12 @@ vi.mock('server-only', () => ({}));
 
 const mockCheckoutState = vi.fn();
 
-let capturedPaymentOnChange: ((event: { complete: boolean }) => void) | undefined;
+let capturedPaymentOnChange!: (event: { complete: boolean }) => void;
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
   CheckoutElementsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   PaymentElement: ({ onChange }: { onChange?: (event: { complete: boolean }) => void }) => {
-    capturedPaymentOnChange = onChange;
+    if (onChange) capturedPaymentOnChange = onChange;
     return null;
   },
   useCheckout: () => mockCheckoutState(),
@@ -411,7 +411,7 @@ describe('PurchaseCheckoutStep', () => {
 
   it('handles the cancelled race condition when component unmounts before action resolves', async () => {
     expect.assertions(0);
-    let resolveAction: (value: unknown) => void;
+    let resolveAction!: (value: unknown) => void;
     mockCreatePurchaseCheckoutSessionAction.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -426,13 +426,13 @@ describe('PurchaseCheckoutStep', () => {
     unmount();
 
     // Resolve the action after unmount — the cancelled check should prevent state updates
-    resolveAction!({ success: true, clientSecret: 'cs_xxx', paymentIntentId: 'pi_xxx' });
+    resolveAction({ success: true, clientSecret: 'cs_xxx', paymentIntentId: 'pi_xxx' });
     // No assertion needed — just ensuring no errors from setState after unmount
   });
 
   it('handles cancelled race condition when action throws after unmount', async () => {
     expect.assertions(0);
-    let rejectAction: (reason: unknown) => void;
+    let rejectAction!: (reason: unknown) => void;
     mockCreatePurchaseCheckoutSessionAction.mockImplementation(
       () =>
         new Promise((_resolve, reject) => {
@@ -448,7 +448,7 @@ describe('PurchaseCheckoutStep', () => {
     unmount();
 
     // Reject after unmount — the cancelled check should prevent state updates
-    rejectAction!(new Error('Network failure'));
+    rejectAction(new Error('Network failure'));
     consoleSpy.mockRestore();
   });
 
@@ -622,7 +622,7 @@ describe('PurchaseCheckoutStep', () => {
       expect(payButton).toBeDisabled();
 
       // Simulate PaymentElement calling onChange with complete: true
-      capturedPaymentOnChange!({ complete: true });
+      capturedPaymentOnChange({ complete: true });
 
       // Pay button should now be enabled because paymentComplete is true
       await waitFor(() => {

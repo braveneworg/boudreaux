@@ -18,6 +18,15 @@ import {
 } from '@/lib/constants/digital-formats';
 import { triggerDownload } from '@/lib/utils/trigger-download';
 
+/**
+ * Lookup map for format labels keyed by format type. Backed by a `Map` so
+ * dynamic format-type keys are read without object-injection risk; falls back
+ * to the raw format type when no label is registered.
+ */
+const FORMAT_LABEL_MAP = new Map(Object.entries(FORMAT_LABELS));
+const getFormatLabel = (formatType: string): string =>
+  FORMAT_LABEL_MAP.get(formatType) ?? formatType;
+
 interface AvailableFormat {
   formatType: string;
   fileName: string;
@@ -75,6 +84,10 @@ export const FormatBundleDownload = ({
 }: FormatBundleDownloadProps) => {
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartRef = useRef(false);
+  // Holds the latest `handleDownload` closure so the mount auto-start effect can
+  // invoke it without listing it as a dependency (it is recreated every render).
+  // The effect stays gated on the auto-start conditions, not on this function.
+  const handleDownloadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const { isPending: isLoadingFormats, data: formatsData } = useReleaseDigitalFormatsQuery(
     releaseId,
     { enabled: initialFormats.length === 0 }
@@ -111,7 +124,7 @@ export const FormatBundleDownload = ({
     () =>
       (filteredFormats ?? []).map(({ formatType }) => ({
         value: formatType,
-        label: FORMAT_LABELS[formatType] ?? formatType,
+        label: getFormatLabel(formatType),
       })),
     [filteredFormats]
   );
@@ -146,11 +159,10 @@ export const FormatBundleDownload = ({
     if (resolvedFormats.length === 0) return;
     if (selectedFormats.length === 0) return;
     autoStartRef.current = true;
-    void handleDownload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once
+    void handleDownloadRef.current();
   }, [autoStart, resolvedFormats.length, selectedFormats.length]);
 
-  const handleDownload = async () => {
+  const handleDownload = async (): Promise<void> => {
     if (!hasSelection || atLimit || isDownloading) return;
 
     const joined = selectedFormats.join(',');
@@ -170,7 +182,7 @@ export const FormatBundleDownload = ({
     setFormatProgress(
       selectedFormats.map((ft) => ({
         formatType: ft,
-        label: FORMAT_LABELS[ft] ?? ft,
+        label: getFormatLabel(ft),
         status: 'uploading' as const,
       }))
     );
@@ -214,6 +226,7 @@ export const FormatBundleDownload = ({
       setDownloadError('Something went wrong. Please try again.');
     }
   };
+  handleDownloadRef.current = handleDownload;
 
   if (isLoadingFormatsResolved) {
     return (

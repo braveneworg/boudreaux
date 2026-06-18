@@ -58,7 +58,7 @@ const SENSITIVE_KEYS = [
  * Safely serializes data for logging, filtering sensitive fields
  */
 const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> => {
-  const result: Record<string, unknown> = {};
+  const result = new Map<string, unknown>();
 
   for (const [key, value] of Object.entries(data)) {
     const lowerKey = key.toLowerCase();
@@ -67,23 +67,26 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     );
 
     if (isSensitive) {
-      result[key] = '[REDACTED]';
+      result.set(key, '[REDACTED]');
     } else if (Array.isArray(value)) {
       // Recursively sanitize arrays containing objects
-      result[key] = value.map((item) => {
-        if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-          return safeSerialize(item as Record<string, unknown>);
-        }
-        return item;
-      });
+      result.set(
+        key,
+        value.map((item) => {
+          if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+            return safeSerialize(item as Record<string, unknown>);
+          }
+          return item;
+        })
+      );
     } else if (typeof value === 'object' && value !== null) {
-      result[key] = safeSerialize(value as Record<string, unknown>);
+      result.set(key, safeSerialize(value as Record<string, unknown>));
     } else {
-      result[key] = value;
+      result.set(key, value);
     }
   }
 
-  return result;
+  return Object.fromEntries(result);
 };
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -122,10 +125,16 @@ const computeModuleLevel = (module: string): LogLevel =>
 /** Security audit events must keep flowing even when verbosity is dialed down */
 const AUDIT_MODULE = 'AUDIT';
 
-const LEVEL_WEIGHT: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
+const LEVEL_WEIGHT = new Map<LogLevel, number>([
+  ['debug', 0],
+  ['info', 1],
+  ['warn', 2],
+  ['error', 3],
+]);
+const INFO_LEVEL_WEIGHT = 1;
 
 const clampLevelForModule = (module: string, level: LogLevel): LogLevel =>
-  module === AUDIT_MODULE && LEVEL_WEIGHT[level] > LEVEL_WEIGHT.info ? 'info' : level;
+  module === AUDIT_MODULE && (LEVEL_WEIGHT.get(level) ?? 0) > INFO_LEVEL_WEIGHT ? 'info' : level;
 
 export interface LogLevelState {
   /** Level resolved from env at process start */

@@ -32,7 +32,7 @@ export type PurchaseCheckoutActionSchemaType = z.infer<typeof purchaseCheckoutAc
 
 /** Validates the raw dollar-amount string input from the PWYW field. */
 export const amountInputSchema = z.object({
-  amount: z.string().regex(/^\$?\d+(\.\d{1,2})?$/, 'Enter a valid dollar amount (e.g. 5.00)'),
+  amount: z.string().regex(/^\$?\d+(?:\.\d\d|\.\d)?$/, 'Enter a valid dollar amount (e.g. 5.00)'),
 });
 
 export type AmountInputSchemaType = z.infer<typeof amountInputSchema>;

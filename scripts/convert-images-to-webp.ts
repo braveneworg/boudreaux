@@ -65,13 +65,13 @@ const colors = {
 };
 
 const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
-  const colorMap = {
-    info: colors.blue,
-    success: colors.green,
-    warning: colors.yellow,
-    error: colors.red,
-  };
-  const formatted = `${colorMap[type]}[CONVERT-WEBP]${colors.reset} ${message}`;
+  const colorMap = new Map([
+    ['info', colors.blue],
+    ['success', colors.green],
+    ['warning', colors.yellow],
+    ['error', colors.red],
+  ]);
+  const formatted = `${colorMap.get(type)}[CONVERT-WEBP]${colors.reset} ${message}`;
   if (type === 'error') console.error(formatted);
   else if (type === 'warning') console.warn(formatted);
   else console.info(formatted);
@@ -82,7 +82,7 @@ const formatBytes = (bytes: number): string => {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes.at(i)}`;
 };
 
 // ---------------------------------------------------------------------------
@@ -298,13 +298,15 @@ const mapWithConcurrency = async <T, R>(
   concurrency: number,
   fn: (item: T) => Promise<R>
 ): Promise<R[]> => {
-  const results: R[] = [];
-  let index = 0;
+  const queue = items.map((item, index) => ({ item, index }));
+  const results: R[] = new Array<R>(items.length);
+  let cursor = 0;
 
   const worker = async (): Promise<void> => {
-    while (index < items.length) {
-      const i = index++;
-      results[i] = await fn(items[i]);
+    while (cursor < queue.length) {
+      const entry = queue.at(cursor++);
+      if (entry === undefined) break;
+      results.splice(entry.index, 1, await fn(entry.item));
     }
   };
 
@@ -331,7 +333,7 @@ const parseArgs = (args: string[]): CliOptions => {
   };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args.at(i);
     if (arg === '--dry-run') {
       options.dryRun = true;
     } else if (arg === '--no-invalidate') {

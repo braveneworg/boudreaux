@@ -315,7 +315,7 @@ describe('ImageUploadService', () => {
 
       extensions.forEach((ext) => {
         const key = ImageUploadService.generateS3Key('tour123', `poster.${ext}`);
-        expect(key).toMatch(new RegExp(`\\.${ext}$`));
+        expect(key.endsWith(`.${ext}`)).toBe(true);
       });
     });
 
@@ -458,7 +458,7 @@ describe('ImageUploadService', () => {
 
       extensions.forEach((ext) => {
         const key = ImageUploadService.generateTourDateS3Key('tourdate123', `flyer.${ext}`);
-        expect(key).toMatch(new RegExp(`\\.${ext}$`));
+        expect(key.endsWith(`.${ext}`)).toBe(true);
       });
     });
 

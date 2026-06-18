@@ -102,7 +102,7 @@ describe('PlaylistPlayer', () => {
     render(<PlaylistPlayer tracks={mockTracks} />);
 
     // The current track should have special styling
-    const trackItems = screen.getAllByRole('listitem');
+    const trackItems = screen.getAllByRole('button');
     expect(trackItems[0]).toHaveClass('bg-blue-100');
     expect(trackItems[0]).toHaveClass('border-l-4');
     expect(trackItems[0]).toHaveClass('border-blue-500');
@@ -111,7 +111,7 @@ describe('PlaylistPlayer', () => {
   it('non-current tracks have default styling', () => {
     render(<PlaylistPlayer tracks={mockTracks} />);
 
-    const trackItems = screen.getAllByRole('listitem');
+    const trackItems = screen.getAllByRole('button');
     expect(trackItems[1]).toHaveClass('bg-gray-50');
     expect(trackItems[2]).toHaveClass('bg-gray-50');
   });
@@ -122,7 +122,7 @@ describe('PlaylistPlayer', () => {
     render(<PlaylistPlayer tracks={mockTracks} />);
 
     // Click on the second track
-    const trackItems = screen.getAllByRole('listitem');
+    const trackItems = screen.getAllByRole('button');
     await user.click(trackItems[1]);
 
     // Now the second track should be current
@@ -136,11 +136,11 @@ describe('PlaylistPlayer', () => {
     render(<PlaylistPlayer tracks={mockTracks} />);
 
     // Click on the third track
-    const trackItems = screen.getAllByRole('listitem');
+    const trackItems = screen.getAllByRole('button');
     await user.click(trackItems[2]);
 
     // The third track should now be highlighted
-    const updatedTrackItems = screen.getAllByRole('listitem');
+    const updatedTrackItems = screen.getAllByRole('button');
     expect(updatedTrackItems[2]).toHaveClass('bg-blue-100');
     expect(updatedTrackItems[0]).toHaveClass('bg-gray-50');
   });
@@ -148,7 +148,7 @@ describe('PlaylistPlayer', () => {
   it('renders with cursor-pointer for clickable tracks', () => {
     render(<PlaylistPlayer tracks={mockTracks} />);
 
-    const trackItems = screen.getAllByRole('listitem');
+    const trackItems = screen.getAllByRole('button');
     trackItems.forEach((item) => {
       expect(item).toHaveClass('cursor-pointer');
     });

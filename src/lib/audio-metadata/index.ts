@@ -14,16 +14,16 @@ import { writeOggComment } from './ogg';
 
 import type { AudioFormat, WriteCommentOptions } from './types/audio';
 
-const EXT_TO_FORMAT: Record<string, AudioFormat> = {
-  '.ogg': 'ogg',
-  '.oga': 'ogg',
-  '.flac': 'flac',
-  '.m4a': 'aac', // covers both AAC and ALAC — tag handling is identical
-  '.aac': 'aac',
-  '.mp3': 'mp3',
-  '.aiff': 'aiff',
-  '.aif': 'aiff',
-};
+const EXT_TO_FORMAT = new Map<string, AudioFormat>([
+  ['.ogg', 'ogg'],
+  ['.oga', 'ogg'],
+  ['.flac', 'flac'],
+  ['.m4a', 'aac'], // covers both AAC and ALAC — tag handling is identical
+  ['.aac', 'aac'],
+  ['.mp3', 'mp3'],
+  ['.aiff', 'aiff'],
+  ['.aif', 'aiff'],
+]);
 
 /** Format extensions that do not support metadata comment tags. */
 const COMMENTLESS_EXTENSIONS = new Set(['.wav']);
@@ -34,7 +34,7 @@ const COMMENTLESS_EXTENSIONS = new Set(['.wav']);
  */
 export const supportsComment = (filePath: string): boolean => {
   const ext = path.extname(filePath).toLowerCase();
-  return Object.hasOwn(EXT_TO_FORMAT, ext) && !COMMENTLESS_EXTENSIONS.has(ext);
+  return EXT_TO_FORMAT.has(ext) && !COMMENTLESS_EXTENSIONS.has(ext);
 };
 
 /**
@@ -43,10 +43,10 @@ export const supportsComment = (filePath: string): boolean => {
  */
 export const detectFormat = (filePath: string): AudioFormat => {
   const ext = path.extname(filePath).toLowerCase();
-  const format = EXT_TO_FORMAT[ext];
+  const format = EXT_TO_FORMAT.get(ext);
   if (!format) {
     throw new Error(
-      `Unsupported file extension "${ext}". Supported: ${Object.keys(EXT_TO_FORMAT).join(', ')}`
+      `Unsupported file extension "${ext}". Supported: ${[...EXT_TO_FORMAT.keys()].join(', ')}`
     );
   }
   return format;

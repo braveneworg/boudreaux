@@ -66,16 +66,14 @@ export const createFeaturedArtistAction = async (
 
   if (!baseParsed.success) {
     formState.success = false;
-    if (!formState.errors) {
-      formState.errors = {};
-    }
+    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
     for (const issue of baseParsed.error.issues) {
       const field = issue.path[0]?.toString() ?? 'general';
-      if (!formState.errors[field]) {
-        formState.errors[field] = [];
-      }
-      formState.errors[field].push(issue.message);
+      const messages = errors.get(field) ?? [];
+      messages.push(issue.message);
+      errors.set(field, messages);
     }
+    formState.errors = Object.fromEntries(errors);
     return formState;
   }
 

@@ -87,8 +87,9 @@ const walk = (node: unknown): void => {
   // Recurse into nested release / releases / artists structures so the
   // artist-with-releases payload (releases[].release.digitalFormats[]) and
   // featured-artist payload (artists[].digitalFormat) get covered.
-  for (const key of ['release', 'releases', 'artists', 'artist']) {
-    if (key in obj) walk(obj[key]);
+  const recurseKeys = new Set(['release', 'releases', 'artists', 'artist']);
+  for (const [key, value] of Object.entries(obj)) {
+    if (recurseKeys.has(key)) walk(value);
   }
 };
 

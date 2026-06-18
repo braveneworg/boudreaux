@@ -48,9 +48,12 @@ export const profileSchema = z.object({
     .or(z.literal('')),
   zipCode: z
     .string()
-    .regex(/^[0-9]{5}(-[0-9]{4})?$|^[A-Z][0-9][A-Z]\s?[0-9][A-Z][0-9]$/, {
-      message: 'Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)',
-    })
+    .regex(
+      /^[0-9][0-9][0-9][0-9][0-9](?:-[0-9][0-9][0-9][0-9])?$|^[A-Z][0-9][A-Z]\s?[0-9][A-Z][0-9]$/,
+      {
+        message: 'Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)',
+      }
+    )
     .optional()
     .or(z.literal('')),
   country: z

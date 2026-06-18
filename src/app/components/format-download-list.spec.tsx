@@ -481,7 +481,7 @@ describe('FormatDownloadList', () => {
 
   describe('Loading state', () => {
     it('should show spinner on the clicked button while download is in progress', async () => {
-      let resolveDownload: (value: Response) => void;
+      let resolveDownload!: (value: Response) => void;
       const downloadPromise = new Promise<Response>((resolve) => {
         resolveDownload = resolve;
       });
@@ -511,7 +511,7 @@ describe('FormatDownloadList', () => {
       });
 
       // Resolve the download to clean up
-      resolveDownload!({
+      resolveDownload({
         ok: true,
         json: () =>
           Promise.resolve({
@@ -529,7 +529,7 @@ describe('FormatDownloadList', () => {
     });
 
     it('should not disable other format buttons while one is downloading', async () => {
-      let resolveDownload: (value: Response) => void;
+      let resolveDownload!: (value: Response) => void;
       const downloadPromise = new Promise<Response>((resolve) => {
         resolveDownload = resolve;
       });
@@ -557,7 +557,7 @@ describe('FormatDownloadList', () => {
         expect(screen.getByText('FLAC').closest('button')).not.toBeDisabled();
       });
 
-      resolveDownload!({
+      resolveDownload({
         ok: true,
         json: () =>
           Promise.resolve({

@@ -81,8 +81,9 @@ vi.mock('@/lib/utils/tailwind-utils', () => ({
       .map((arg) => {
         if (typeof arg === 'string') return arg;
         if (typeof arg === 'object' && arg !== null) {
-          return Object.keys(arg)
-            .filter((key) => arg[key])
+          return Object.entries(arg)
+            .filter(([, value]) => value)
+            .map(([key]) => key)
             .join(' ');
         }
         return '';

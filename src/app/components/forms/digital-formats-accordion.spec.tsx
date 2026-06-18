@@ -12,6 +12,7 @@ import {
 } from '@/lib/actions/confirm-upload-action';
 import { deleteFormatFilesAction } from '@/lib/actions/delete-format-files-action';
 import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-action';
+import { requireElement } from '@/test-utils';
 
 import { DigitalFormatsAccordion } from './digital-formats-accordion';
 
@@ -160,7 +161,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       // Create a mock FLAC file inside a folder
       const flacFile = new File(['audio'], 'album.flac', { type: 'audio/flac' });
@@ -210,7 +211,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       // Folder with only a non-audio file (no format matches)
       const txtFile = new File(['readme'], 'notes.txt', { type: 'text/plain' });
@@ -750,7 +751,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('MP3 320kbps'));
       const dropZone = await screen.findByText(/drag and drop a mp3/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       // Simulate dragover
       fireEvent.dragOver(dropTarget, {
@@ -824,7 +825,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       const flacFile = new File(['audio'], 'album.flac', { type: 'audio/flac' });
       const dataTransfer = {
@@ -846,7 +847,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       const mp3File = new File(['audio'], 'song.mp3', { type: 'audio/mpeg' });
       const dataTransfer = {
@@ -871,7 +872,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       const flacFileWithWrongMime = new File(['audio'], 'album.flac', { type: 'audio/mpeg' });
       const dataTransfer = {
@@ -1307,8 +1308,8 @@ describe('DigitalFormatsAccordion', () => {
   describe('Batch upload scenarios', () => {
     it('should show batch progress during multi-file upload', async () => {
       // Slow fetch to keep uploading state visible
-      let resolveFirst: ((value: Response) => void) | undefined;
-      let resolveSecond: ((value: Response) => void) | undefined;
+      let resolveFirst!: (value: Response) => void;
+      let resolveSecond!: (value: Response) => void;
       let callCount = 0;
       global.fetch = vi.fn().mockImplementation(() => {
         callCount++;
@@ -1344,7 +1345,7 @@ describe('DigitalFormatsAccordion', () => {
       });
 
       // Resolve first upload
-      resolveFirst!({
+      resolveFirst({
         ok: true,
         json: () => Promise.resolve({ success: true, s3Key: 'uploads/key1' }),
       } as Response);
@@ -1353,7 +1354,7 @@ describe('DigitalFormatsAccordion', () => {
       await waitFor(() => {
         expect(resolveSecond).toBeDefined();
       });
-      resolveSecond!({
+      resolveSecond({
         ok: true,
         json: () => Promise.resolve({ success: true, s3Key: 'uploads/key2' }),
       } as Response);
@@ -1455,7 +1456,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       // Mock a directory entry whose reader throws an error
       const mockDirEntry = {
@@ -1488,7 +1489,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await user.click(screen.getByText('FLAC'));
       const dropZone = await screen.findByText(/drag and drop a flac/i);
-      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+      const dropTarget = requireElement(dropZone.closest('[class*="border-dashed"]'));
 
       global.fetch = vi.fn();
 

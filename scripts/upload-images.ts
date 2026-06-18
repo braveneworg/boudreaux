@@ -111,21 +111,21 @@ export const formatBytes = (bytes: number): string => {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes.at(i)}`;
 };
 
 /**
  * Log message with color
  */
 const log = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void => {
-  const colorMap = {
-    info: colors.blue,
-    success: colors.green,
-    warning: colors.yellow,
-    error: colors.red,
-  };
+  const colorMap = new Map([
+    ['info', colors.blue],
+    ['success', colors.green],
+    ['warning', colors.yellow],
+    ['error', colors.red],
+  ]);
 
-  const color = colorMap[type];
+  const color = colorMap.get(type);
   const formattedMessage = `${color}[UPLOAD-IMAGES]${colors.reset} ${message}`;
 
   switch (type) {
@@ -433,7 +433,7 @@ export const parseArgs = (
   };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args.at(i);
 
     if (arg === '--dir' || arg === '-d') {
       result.mode = 'directory';
@@ -448,7 +448,7 @@ export const parseArgs = (
       }
     } else if (arg === '--no-invalidate') {
       result.invalidateCache = false;
-    } else if (!arg.startsWith('--') && !arg.startsWith('-')) {
+    } else if (arg !== undefined && !arg.startsWith('--') && !arg.startsWith('-')) {
       // Handle comma-separated paths
       const paths = arg.split(',').map((p) => p.trim());
       result.paths.push(...paths);

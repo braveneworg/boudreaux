@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import Image from 'next/image';
 
@@ -121,6 +121,7 @@ export const AudioPlayer = ({
   const lastPreviousClickRef = useRef(0);
 
   // Use refs for callbacks to avoid re-running the effect when they change
+  const onReadyRef = useRef(onReady);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
   const onEndedRef = useRef(onEnded);
@@ -128,76 +129,93 @@ export const AudioPlayer = ({
   const onNextTrackRef = useRef(onNextTrack);
   const controlsRefCallback = useRef(controlsRef);
 
+  // Use refs for the source props so the mount-once init effect can read the
+  // latest value without listing them as dependencies (which would re-init the
+  // player). Subsequent source changes are handled by the dedicated effect below.
+  const srcRef = useRef(src);
+  const typeRef = useRef(type);
+
   // Keep refs up to date
   useEffect(() => {
+    onReadyRef.current = onReady;
     onPlayRef.current = onPlay;
     onPauseRef.current = onPause;
     onEndedRef.current = onEnded;
     onPreviousTrackRef.current = onPreviousTrack;
     onNextTrackRef.current = onNextTrack;
     controlsRefCallback.current = controlsRef;
-  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef]);
+    srcRef.current = src;
+    typeRef.current = type;
+  }, [onReady, onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef, src, type]);
 
-  const createPlayer = useCallback(
-    (container: HTMLDivElement, audioSrc: string, audioType?: string) => {
-      // Create audio element dynamically
-      const audioEl = document.createElement('audio');
-      audioEl.className = 'video-js vjs-default-skin';
-      // iOS requires playsinline for inline media playback
-      audioEl.setAttribute('playsinline', '');
-      audioEl.setAttribute('webkit-playsinline', '');
-      container.appendChild(audioEl);
-      audioElRef.current = audioEl;
+  /**
+   * Creates and configures the Video.js player on the given container using the
+   * supplied source. Reads no component state — only its arguments and
+   * module-level helpers — so it is safe to call from the mount-once init effect.
+   */
+  const createPlayer = (
+    container: HTMLDivElement,
+    audioSrc: string,
+    audioType?: string
+  ): Player => {
+    // Create audio element dynamically
+    const audioEl = document.createElement('audio');
+    audioEl.className = 'video-js vjs-default-skin';
+    // iOS requires playsinline for inline media playback
+    audioEl.setAttribute('playsinline', '');
+    audioEl.setAttribute('webkit-playsinline', '');
+    container.appendChild(audioEl);
+    audioElRef.current = audioEl;
 
-      const mimeType = audioType ?? getAudioMimeType(audioSrc);
+    const mimeType = audioType ?? getAudioMimeType(audioSrc);
 
-      const player = videojs(audioEl, {
-        controls: true,
-        autoplay: false,
-        preload: 'auto',
-        playsinline: true,
-        responsive: true,
-        inactivityTimeout: 0,
-        userActions: {
-          hotkeys: true,
+    const player = videojs(audioEl, {
+      controls: true,
+      autoplay: false,
+      preload: 'auto',
+      playsinline: true,
+      responsive: true,
+      inactivityTimeout: 0,
+      userActions: {
+        hotkeys: true,
+      },
+      sources: [
+        {
+          src: audioSrc,
+          type: mimeType,
         },
-        sources: [
+      ],
+      fluid: false,
+      fill: false,
+      controlBar: {
+        children: [
+          'currentTimeDisplay',
+          'progressControl',
+          'durationDisplay',
+          'skipPreviousButton',
           {
-            src: audioSrc,
-            type: mimeType,
+            name: 'audioRewindButton',
+            seconds: SKIP_TIME,
           },
+          'playToggle',
+          {
+            name: 'audioFastForwardButton',
+            seconds: SKIP_TIME,
+          },
+          'skipNextButton',
+          'volumePanel',
         ],
-        fluid: false,
-        fill: false,
-        controlBar: {
-          children: [
-            'currentTimeDisplay',
-            'progressControl',
-            'durationDisplay',
-            'skipPreviousButton',
-            {
-              name: 'audioRewindButton',
-              seconds: SKIP_TIME,
-            },
-            'playToggle',
-            {
-              name: 'audioFastForwardButton',
-              seconds: SKIP_TIME,
-            },
-            'skipNextButton',
-            'volumePanel',
-          ],
-          volumePanel: {
-            inline: false,
-            vertical: false,
-          },
+        volumePanel: {
+          inline: false,
+          vertical: false,
         },
-      });
+      },
+    });
 
-      return player;
-    },
-    []
-  );
+    return player;
+  };
+  const createPlayerRef = useRef(createPlayer);
+  createPlayerRef.current = createPlayer;
 
   // Initialize player once
   useEffect(() => {
@@ -232,7 +250,7 @@ export const AudioPlayer = ({
     const initializePlayer = () => {
       if (!containerRef.current || isInitializedRef.current || cancelled) return;
 
-      const player = createPlayer(containerRef.current, src, type);
+      const player = createPlayerRef.current(containerRef.current, srcRef.current, typeRef.current);
 
       playerRef.current = player;
       isInitializedRef.current = true;
@@ -242,7 +260,7 @@ export const AudioPlayer = ({
         player.addClass('vjs-has-started');
         player.userActive(true);
 
-        onReady?.(player);
+        onReadyRef.current?.(player);
 
         // Expose player controls via controlsRef after player is ready
         if (controlsRefCallback.current) {
@@ -335,7 +353,6 @@ export const AudioPlayer = ({
         isInitializedRef.current = false;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update source when src changes (without recreating player)

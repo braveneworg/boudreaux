@@ -64,7 +64,7 @@ export const deleteReleaseImageAction = async (
       let s3Key: string | null = null;
 
       if (cdnDomain && image.src.includes(cdnDomain)) {
-        s3Key = image.src.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
+        s3Key = image.src.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
       } else if (image.src.includes('.s3.')) {
         const urlParts = image.src.split('.s3.');
         if (urlParts[1]) {

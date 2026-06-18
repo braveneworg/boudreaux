@@ -24,15 +24,15 @@ interface TicketProviderIconProps {
 }
 
 /** Map of provider keys to their inline SVG components */
-const PROVIDER_ICON_MAP: Record<
+const PROVIDER_ICON_MAP = new Map<
   TicketProvider,
   React.ComponentType<{ size?: number; className?: string }>
-> = {
-  bandsintown: BandsintownIcon,
-  eventbrite: EventbriteIcon,
-  stubhub: StubhubIcon,
-  ticketmaster: TicketmasterIcon,
-};
+>([
+  ['bandsintown', BandsintownIcon],
+  ['eventbrite', EventbriteIcon],
+  ['stubhub', StubhubIcon],
+  ['ticketmaster', TicketmasterIcon],
+]);
 
 /**
  * Renders the appropriate ticket provider icon.
@@ -60,8 +60,10 @@ export const TicketProviderIcon = ({
   // Priority 2: Auto-detected provider icon
   const provider = getTicketProvider(ticketsUrl);
   if (provider) {
-    const IconComponent = PROVIDER_ICON_MAP[provider];
-    return <IconComponent size={size} className={className} />;
+    const IconComponent = PROVIDER_ICON_MAP.get(provider);
+    if (IconComponent) {
+      return <IconComponent size={size} className={className} />;
+    }
   }
 
   // Priority 3: No icon available

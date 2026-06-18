@@ -8,6 +8,18 @@ import { generatePresignedUploadUrl } from '@/lib/utils/s3-client';
 import type { DigitalFormatType, FileInfo } from '@/types/digital-format';
 
 /**
+ * Per-format lookups keyed by format type. Built once from the exported
+ * constant records so format-specific values can be read by a dynamic
+ * `formatType` without indexing a plain object.
+ */
+const formatSizeLimitByType = new Map<DigitalFormatType, number>(
+  Object.entries(FORMAT_SIZE_LIMITS) as Array<[DigitalFormatType, number]>
+);
+const formatMimeTypesByType = new Map<DigitalFormatType, ReadonlyArray<string>>(
+  Object.entries(FORMAT_MIME_TYPES) as Array<[DigitalFormatType, ReadonlyArray<string>]>
+);
+
+/**
  * Service for handling digital format upload operations
  * Validates file info, generates presigned URLs, creates metadata
  */
@@ -32,7 +44,10 @@ export class UploadService {
     }
 
     // Format-specific size validation
-    const sizeLimit = FORMAT_SIZE_LIMITS[formatType];
+    const sizeLimit = formatSizeLimitByType.get(formatType);
+    if (sizeLimit === undefined) {
+      return { valid: false, error: `Unknown format type: ${formatType}` };
+    }
     if (fileSize > sizeLimit) {
       const limitMB = Math.floor(sizeLimit / (1024 * 1024));
       return {
@@ -42,7 +57,7 @@ export class UploadService {
     }
 
     // MIME type validation
-    const validMimeTypes: readonly string[] = FORMAT_MIME_TYPES[formatType];
+    const validMimeTypes: readonly string[] = formatMimeTypesByType.get(formatType) ?? [];
     if (!validMimeTypes.includes(mimeType)) {
       return {
         valid: false,

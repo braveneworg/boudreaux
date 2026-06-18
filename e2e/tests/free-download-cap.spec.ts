@@ -147,7 +147,9 @@ test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () =>
       // Pay-what-you-want upsell CTA points to the release's purchase entry.
       const pwywLink = page.getByRole('link', { name: /Pay what you want/i });
       await expect(pwywLink).toBeVisible();
-      await expect(pwywLink).toHaveAttribute('href', new RegExp(`/releases/${cappedReleaseId}`));
+      await expect
+        .poll(() => pwywLink.getAttribute('href'))
+        .toContain(`/releases/${cappedReleaseId}`);
 
       // The format combobox is replaced by the cap-reached layout.
       await expect(page.getByRole('combobox')).toHaveCount(0);

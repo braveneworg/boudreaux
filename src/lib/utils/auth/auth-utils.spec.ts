@@ -4,15 +4,10 @@
 // Mock bcrypt to speed up tests
 import type { FormState } from '@/lib/types/form-state';
 
-import { isValidEmail, setUnknownError, EMAIL_REGEX } from './auth-utils';
+import { isValidEmail, isValidEmailFormat, setUnknownError } from './auth-utils';
 
 describe('auth-utils', () => {
-  describe('EMAIL_REGEX', () => {
-    it('should be defined', () => {
-      expect(EMAIL_REGEX).toBeDefined();
-      expect(EMAIL_REGEX).toBeInstanceOf(RegExp);
-    });
-
+  describe('isValidEmailFormat', () => {
     it('should match valid email formats', () => {
       const validEmails = [
         'test@example.com',
@@ -23,7 +18,7 @@ describe('auth-utils', () => {
       ];
 
       validEmails.forEach((email) => {
-        expect(EMAIL_REGEX.test(email)).toBe(true);
+        expect(isValidEmailFormat(email)).toBe(true);
       });
     });
 
@@ -39,7 +34,7 @@ describe('auth-utils', () => {
       ];
 
       invalidEmails.forEach((email) => {
-        expect(EMAIL_REGEX.test(email)).toBe(false);
+        expect(isValidEmailFormat(email)).toBe(false);
       });
     });
   });

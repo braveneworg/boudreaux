@@ -32,19 +32,19 @@ const getStripe = () => {
 const POLL_INTERVAL_MS = 3500;
 const MAX_POLL_COUNT = 30;
 
-const SESSION_ERROR_MESSAGES: Record<string, string> = {
-  already_purchased: ALREADY_PURCHASED_ERROR,
-  amount_below_minimum: 'The minimum purchase amount is $0.50.',
-  release_unavailable: 'This release is no longer available for purchase.',
-  stripe_error: 'A payment error occurred. Please try again or contact support.',
-};
+const SESSION_ERROR_MESSAGES = new Map<string, string>([
+  ['already_purchased', ALREADY_PURCHASED_ERROR],
+  ['amount_below_minimum', 'The minimum purchase amount is $0.50.'],
+  ['release_unavailable', 'This release is no longer available for purchase.'],
+  ['stripe_error', 'A payment error occurred. Please try again or contact support.'],
+]);
 
 /**
  * Maps a machine-readable error code returned by the server action to a
  * human-friendly message suitable for display.
  */
 const getSessionErrorMessage = (code: string): string =>
-  SESSION_ERROR_MESSAGES[code] ?? 'Something went wrong. Please try again.';
+  SESSION_ERROR_MESSAGES.get(code) ?? 'Something went wrong. Please try again.';
 
 interface PurchaseCheckoutStepProps {
   releaseId: string;

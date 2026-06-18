@@ -44,7 +44,7 @@ vi.mock('winston', () => {
       warn: makeLevelMethod('warn', module),
       error: makeLevelMethod('error', module),
     };
-    harness.instances[module] = instance;
+    harness.instances = { ...harness.instances, [module]: instance };
     return instance;
   };
 
@@ -77,9 +77,7 @@ const importLogger = async (): Promise<typeof loggerModule> => {
   harness.logCalls.length = 0;
   harness.createdOptions.length = 0;
   harness.printfTemplates.length = 0;
-  for (const key of Object.keys(harness.instances)) {
-    delete harness.instances[key];
-  }
+  harness.instances = {};
   return import('./logger');
 };
 
@@ -97,7 +95,7 @@ describe('Logger', () => {
       const baseline = harness.createdOptions.length;
       createLogger('TEST_MODULE');
 
-      expect(harness.createdOptions[baseline].defaultMeta).toEqual({
+      expect(harness.createdOptions.at(baseline)?.defaultMeta).toEqual({
         service: 'boudreaux',
         module: 'TEST_MODULE',
       });

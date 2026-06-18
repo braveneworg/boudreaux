@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-/* eslint-disable jsx-a11y/no-static-element-interactions -- canvas-like drag/resize component uses mouse/touch handlers on divs */
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -229,9 +228,10 @@ export const ResizableTextBox = ({
   };
 
   return (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- interactive canvas element for text box positioning
     <div
       ref={containerRef}
+      role="button"
+      tabIndex={0}
       className="absolute"
       style={{
         left: `${positionX}%`,
@@ -241,6 +241,13 @@ export const ResizableTextBox = ({
         transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
       }}
       onClick={handleClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect?.();
+        }
+      }}
     >
       {/* Marching ants border - only shown when selected */}
       {isSelected && (
@@ -260,6 +267,9 @@ export const ResizableTextBox = ({
 
       {/* Content area */}
       <div
+        role="button"
+        tabIndex={-1}
+        aria-label="Drag to move text box"
         className={cn(
           'flex h-full w-full items-center justify-center',
           'cursor-grab transition-shadow select-none',
@@ -285,6 +295,9 @@ export const ResizableTextBox = ({
           {/* Edge handles */}
           {/* North */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from top edge"
             className="absolute -top-1 left-1/2 h-2 w-6 -translate-x-1/2 cursor-ns-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'n')}
             onTouchStart={(e) => handleResizeStart(e, 'n')}
@@ -292,6 +305,9 @@ export const ResizableTextBox = ({
           />
           {/* South */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from bottom edge"
             className="absolute -bottom-1 left-1/2 h-2 w-6 -translate-x-1/2 cursor-ns-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 's')}
             onTouchStart={(e) => handleResizeStart(e, 's')}
@@ -299,6 +315,9 @@ export const ResizableTextBox = ({
           />
           {/* East */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from right edge"
             className="absolute top-1/2 -right-1 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'e')}
             onTouchStart={(e) => handleResizeStart(e, 'e')}
@@ -306,6 +325,9 @@ export const ResizableTextBox = ({
           />
           {/* West */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from left edge"
             className="absolute top-1/2 -left-1 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'w')}
             onTouchStart={(e) => handleResizeStart(e, 'w')}
@@ -315,6 +337,9 @@ export const ResizableTextBox = ({
           {/* Corner handles */}
           {/* Northeast */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from top-right corner"
             className="absolute -top-1.5 -right-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'ne')}
             onTouchStart={(e) => handleResizeStart(e, 'ne')}
@@ -322,6 +347,9 @@ export const ResizableTextBox = ({
           />
           {/* Northwest */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from top-left corner"
             className="absolute -top-1.5 -left-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'nw')}
             onTouchStart={(e) => handleResizeStart(e, 'nw')}
@@ -329,6 +357,9 @@ export const ResizableTextBox = ({
           />
           {/* Southeast */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from bottom-right corner"
             className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'se')}
             onTouchStart={(e) => handleResizeStart(e, 'se')}
@@ -336,6 +367,9 @@ export const ResizableTextBox = ({
           />
           {/* Southwest */}
           <div
+            role="button"
+            tabIndex={-1}
+            aria-label="Resize from bottom-left corner"
             className="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'sw')}
             onTouchStart={(e) => handleResizeStart(e, 'sw')}

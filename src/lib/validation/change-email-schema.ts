@@ -3,12 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import * as z from 'zod';
 
-// More robust email validation
-// Regex that prevents consecutive dots in local part and requires domain extension
-const EMAIL_REGEX =
-  /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+import { isValidEmailFormat } from '@/lib/utils/auth/auth-utils';
 
-const emailRegex = z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' });
+const emailRegex = z
+  .string()
+  .refine((value) => isValidEmailFormat(value), { message: 'Invalid email address' });
 export const changeEmailSchema = z
   .object({
     email: emailRegex,

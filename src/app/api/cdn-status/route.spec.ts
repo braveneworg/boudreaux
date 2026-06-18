@@ -6,13 +6,18 @@ import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: Function) => handler,
-  withAuth: (handler: Function) => handler,
+  withAdmin: <H>(handler: H): H => handler,
+  withAuth: <H>(handler: H): H => handler,
 }));
 
 const callGet = () => {
   const request = new NextRequest('http://localhost:3000/api/cdn-status');
-  return (GET as Function)(request, { params: Promise.resolve({}) });
+  return (
+    GET as (
+      request: NextRequest,
+      context: { params: Promise<Record<string, string>> }
+    ) => Promise<Response>
+  )(request, { params: Promise.resolve({}) });
 };
 
 const mockSend = vi.fn();

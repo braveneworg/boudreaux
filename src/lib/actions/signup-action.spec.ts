@@ -108,7 +108,9 @@ describe('signupAction', () => {
     mockFormData.set('termsAndConditions', 'true');
     mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
 
-    vi.mocked(CustomPrismaAdapter).mockReturnValue(mockAdapter);
+    vi.mocked(CustomPrismaAdapter).mockReturnValue(
+      mockAdapter as unknown as ReturnType<typeof CustomPrismaAdapter>
+    );
     vi.mocked(mockGenerateUsername).mockReturnValue('test-user-1234');
     // Default to passing Turnstile verification
     mockVerifyTurnstile.mockResolvedValue({ success: true });

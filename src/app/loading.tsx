@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import Image from 'next/image';
+
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 
@@ -13,16 +15,20 @@ export default function HomeLoading() {
           paints in the first HTML flush during route transitions. The
           hydrated BannerCarousel uses Next/Image's `priority` to emit a
           responsive preload (with matching `imagesrcset`/`imagesizes`) for
-          the actual rendered slide. We intentionally use a single-width
-          `src` (no `srcSet`/`sizes`) here so this fallback `<img>` paints
-          immediately without the browser running its preload-picker
-          algorithm in the suspense interval. */}
+          the actual rendered slide. We use `unoptimized` with a single-width
+          `src` (so next/image emits no `srcSet`/`sizes`) and `loading="eager"`
+          so this fallback paints immediately without the browser running its
+          preload-picker algorithm in the suspense interval. `width`/`height`
+          carry the source 1920×1097 aspect ratio; CSS controls the rendered box. */}
       <div className="bg-muted relative w-full" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
-        <img
+        <Image
           data-testid="lcp-banner-img"
           src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 750)}
           alt=""
+          width={1920}
+          height={1097}
+          unoptimized
+          loading="eager"
           fetchPriority="high"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"

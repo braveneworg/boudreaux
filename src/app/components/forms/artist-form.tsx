@@ -61,6 +61,18 @@ const initialFormState: FormState = {
   success: false,
 };
 
+/**
+ * Validates a URL slug (lowercase alphanumeric segments joined by single
+ * dashes, with no leading/trailing/double dashes). Implemented with a single
+ * character-class quantifier plus boundary checks to avoid the catastrophic
+ * backtracking risk of a nested-quantifier pattern.
+ */
+const isValidSlug = (value: string): boolean =>
+  /^[a-z0-9-]+$/.test(value) &&
+  !value.startsWith('-') &&
+  !value.endsWith('-') &&
+  !value.includes('--');
+
 const ToastContent = ({ fullName }: { fullName: string }) => (
   <>
     Artist <b>{`${fullName}`}</b> created successfully.
@@ -316,12 +328,15 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
                   }
 
                   // Step 3: Register uploaded images in the database
-                  const imageInfos = presignedResult.data.map((presigned, index) => ({
-                    s3Key: presigned.s3Key,
-                    cdnUrl: presigned.cdnUrl,
-                    caption: imagesWithFiles[index].caption || '',
-                    altText: imagesWithFiles[index].altText || '',
-                  }));
+                  const imageInfos = presignedResult.data.map((presigned, index) => {
+                    const imageWithFile = imagesWithFiles.at(index);
+                    return {
+                      s3Key: presigned.s3Key,
+                      cdnUrl: presigned.cdnUrl,
+                      caption: imageWithFile?.caption || '',
+                      altText: imageWithFile?.altText || '',
+                    };
+                  });
 
                   const registerResult = await registerArtistImagesAction(artistId, imageInfos);
 
@@ -330,8 +345,8 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
                       const uploadedData = registerResult.data || [];
                       let uploadIndex = 0;
                       return prev.map((img) => {
-                        if (img.file && !img.uploadedUrl && uploadedData[uploadIndex]) {
-                          const uploaded = uploadedData[uploadIndex];
+                        const uploaded = uploadedData.at(uploadIndex);
+                        if (img.file && !img.uploadedUrl && uploaded) {
                           uploadIndex++;
                           return {
                             ...img,
@@ -437,12 +452,15 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
                     }
 
                     // Step 3: Register uploaded images in the database
-                    const imageInfos = presignedResult.data.map((presigned, index) => ({
-                      s3Key: presigned.s3Key,
-                      cdnUrl: presigned.cdnUrl,
-                      caption: imagesWithFiles[index].caption || '',
-                      altText: imagesWithFiles[index].altText || '',
-                    }));
+                    const imageInfos = presignedResult.data.map((presigned, index) => {
+                      const imageWithFile = imagesWithFiles.at(index);
+                      return {
+                        s3Key: presigned.s3Key,
+                        cdnUrl: presigned.cdnUrl,
+                        caption: imageWithFile?.caption || '',
+                        altText: imageWithFile?.altText || '',
+                      };
+                    });
 
                     const registerResult = await registerArtistImagesAction(
                       createdArtistId,
@@ -454,13 +472,14 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
                       setImages((prev) => {
                         const uploadedData = registerResult.data || [];
                         return prev.map((img, index) => {
-                          if (img.file && !img.uploadedUrl && uploadedData[index]) {
+                          const uploaded = uploadedData.at(index);
+                          if (img.file && !img.uploadedUrl && uploaded) {
                             return {
                               ...img,
-                              id: uploadedData[index].id,
-                              uploadedUrl: uploadedData[index].src,
+                              id: uploaded.id,
+                              uploadedUrl: uploaded.src,
                               isUploading: false,
-                              sortOrder: uploadedData[index].sortOrder,
+                              sortOrder: uploaded.sortOrder,
                             };
                           }
                           return { ...img, isUploading: false };
@@ -549,7 +568,7 @@ export const ArtistForm = ({ artistId: initialArtistId }: ArtistFormProps) => {
 
   // Clear slug error when the value becomes valid (lowercase alphanumeric with dashes)
   useEffect(() => {
-    if (slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    if (slug && isValidSlug(slug)) {
       artistForm.clearErrors('slug');
     }
   }, [slug, artistForm]);

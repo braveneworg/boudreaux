@@ -105,19 +105,19 @@ export const TimezoneSelect = ({
   const popular = POPULAR_TIMEZONES.filter((tz) => allTimezones.includes(tz));
   const nonPopular = allTimezones.filter((tz) => !POPULAR_TIMEZONES.includes(tz));
 
-  // Group non-popular timezones by IANA region prefix.
-  const grouped = nonPopular.reduce<Record<string, string[]>>((acc, tz) => {
+  // Group non-popular timezones by IANA region prefix. A Map keeps the dynamic
+  // region keys free of object-injection risk.
+  const grouped = nonPopular.reduce<Map<string, string[]>>((acc, tz) => {
     const region = getRegion(tz);
-    if (!acc[region]) acc[region] = [];
-    acc[region].push(tz);
+    const existing = acc.get(region) ?? [];
+    existing.push(tz);
+    acc.set(region, existing);
     return acc;
-  }, {});
+  }, new Map());
 
   const orderedRegions = [
-    ...REGION_ORDER.filter((r) => r in grouped),
-    ...Object.keys(grouped)
-      .filter((r) => !REGION_ORDER.includes(r))
-      .sort(),
+    ...REGION_ORDER.filter((r) => grouped.has(r)),
+    ...[...grouped.keys()].filter((r) => !REGION_ORDER.includes(r)).sort(),
   ];
 
   const filterTZ = (tz: string) => {
@@ -127,11 +127,11 @@ export const TimezoneSelect = ({
   };
 
   const filteredPopular = popular.filter(filterTZ);
-  const filteredGrouped = orderedRegions.reduce<Record<string, string[]>>((acc, region) => {
-    const matches = (grouped[region] ?? []).filter(filterTZ);
-    if (matches.length > 0) acc[region] = matches;
+  const filteredGrouped = orderedRegions.reduce<Map<string, string[]>>((acc, region) => {
+    const matches = (grouped.get(region) ?? []).filter(filterTZ);
+    if (matches.length > 0) acc.set(region, matches);
     return acc;
-  }, {});
+  }, new Map());
 
   const selectedLabel = value ? formatTZLabel(value) : null;
 
@@ -161,7 +161,7 @@ export const TimezoneSelect = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[calc(100vw-2rem)] p-0 sm:w-[420px]"
+        className="w-[calc(100vw-2rem)] p-0 sm:w-105"
         align="start"
         avoidCollisions
         collisionPadding={8}
@@ -192,10 +192,10 @@ export const TimezoneSelect = ({
             )}
 
             {orderedRegions
-              .filter((r) => (filteredGrouped[r]?.length ?? 0) > 0)
+              .filter((r) => (filteredGrouped.get(r)?.length ?? 0) > 0)
               .map((region) => (
                 <CommandGroup key={region} heading={region}>
-                  {filteredGrouped[region].map((tz) => (
+                  {(filteredGrouped.get(region) ?? []).map((tz) => (
                     <CommandItem key={tz} value={tz} onSelect={() => handleSelect(tz)}>
                       <Check
                         className={cn('mr-2 h-4 w-4', value === tz ? 'opacity-100' : 'opacity-0')}

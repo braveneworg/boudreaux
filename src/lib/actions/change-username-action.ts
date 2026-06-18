@@ -27,14 +27,12 @@ export const changeUsernameAction = async (
 
   // Handle Zod validation errors
   if (!parsed.success) {
-    if (!formState.errors) {
-      formState.errors = {};
-    }
-
-    // Extract field-level errors from Zod
+    // Extract field-level errors from Zod, seeding from any pre-existing errors.
+    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
     for (const [field, error] of Object.entries(parsed.error.flatten().fieldErrors)) {
-      formState.errors[field] = error as string[];
+      errors.set(field, error ?? []);
     }
+    formState.errors = Object.fromEntries(errors);
 
     // If there are general errors, add them as well
     const generalErrors = parsed.error.flatten().formErrors;
@@ -62,7 +60,7 @@ export const changeUsernameAction = async (
       const { username } = parsed.data;
       const previousUsername = session.user.username;
 
-      await adapter.updateUser!({
+      await adapter.updateUser({
         id,
         username,
       } as Pick<AdapterUser, 'username' | 'id'>);

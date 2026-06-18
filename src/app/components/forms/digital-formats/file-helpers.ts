@@ -11,13 +11,19 @@ export const MULTI_EXT_MAP: Partial<Record<string, string[]>> = {
   aac: ['aac', 'm4a'],
 };
 
+/**
+ * `Map` view of {@link MULTI_EXT_MAP} used for safe dynamic-key lookups
+ * (avoids object-injection on a variable extension key).
+ */
+const MULTI_EXT_LOOKUP = new Map(Object.entries(MULTI_EXT_MAP));
+
 /** Format file size for display (Bytes / KB / MB / GB). */
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes.at(i)}`;
 };
 
 /**
@@ -26,7 +32,7 @@ export const formatFileSize = (bytes: number): string => {
  */
 export const getValidExtensionsForFormat = (formatType: DigitalFormatType): string[] => {
   const expectedExt = getFileExtensionForFormat(formatType);
-  return MULTI_EXT_MAP[expectedExt] ?? [expectedExt];
+  return MULTI_EXT_LOOKUP.get(expectedExt) ?? [expectedExt];
 };
 
 /** Find all files in a list that match a format's expected extension(s). */

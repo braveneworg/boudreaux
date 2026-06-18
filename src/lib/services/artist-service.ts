@@ -420,7 +420,7 @@ export class ArtistService {
 
         if (cdnDomain && image.src.includes(cdnDomain)) {
           // Extract key from CDN URL (handles both correct and malformed URLs with double https://)
-          s3Key = image.src.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
+          s3Key = image.src.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
         } else if (image.src.includes('.s3.')) {
           // Extract key from S3 URL
           const urlParts = image.src.split('.s3.');

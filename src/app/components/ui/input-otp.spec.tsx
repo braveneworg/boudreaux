@@ -224,8 +224,7 @@ describe('Full InputOTP Integration', () => {
 describe('InputOTPSlot with fake caret', () => {
   it('renders fake caret when slot has focus', async () => {
     const { container } = render(
-      // eslint-disable-next-line jsx-a11y/no-autofocus
-      <InputOTP maxLength={4} autoFocus>
+      <InputOTP maxLength={4}>
         <InputOTPGroup>
           <InputOTPSlot index={0} />
           <InputOTPSlot index={1} />
@@ -235,8 +234,12 @@ describe('InputOTPSlot with fake caret', () => {
       </InputOTP>
     );
 
-    // When autofocus is true and no value, the first slot should have hasFakeCaret
-    // Check for the caret element
+    // Focus the underlying OTP input programmatically (instead of the native
+    // `autoFocus` attribute) to drive the same focused-slot behavior.
+    const otpInput = container.querySelector<HTMLInputElement>('[data-slot="input-otp"]');
+    otpInput?.focus();
+
+    // When focused and no value, the first slot should have hasFakeCaret.
     const _caretElement = container.querySelector('.animate-caret-blink');
     // The caret may or may not be present depending on focus state
     // We just need to ensure the render completes without error

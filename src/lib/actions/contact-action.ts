@@ -73,16 +73,15 @@ export const contactAction = async (
   if (!parsed.success) {
     // Map Zod validation errors to formState
     if (parsed.error) {
+      // Seed from any pre-existing errors so new issues append rather than replace.
+      const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
       for (const issue of parsed.error.issues) {
         const fieldName = issue.path[0]?.toString() || 'general';
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        if (!formState.errors[fieldName]) {
-          formState.errors[fieldName] = [];
-        }
-        formState.errors[fieldName].push(issue.message);
+        const messages = errors.get(fieldName) ?? [];
+        messages.push(issue.message);
+        errors.set(fieldName, messages);
       }
+      formState.errors = Object.fromEntries(errors);
     }
     return formState;
   }

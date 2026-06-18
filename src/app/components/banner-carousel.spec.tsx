@@ -146,12 +146,12 @@ describe('BannerCarousel', () => {
     });
 
     it('emits a Next Image preload tag for the initial banner only', () => {
-      // The LCP banner is preloaded by `next/image`'s built-in `priority`
-      // mechanism on the first slide so the emitted `<link rel=preload>`
-      // includes `imagesrcset`/`imagesizes` matching the rendered `<img>`'s
-      // responsive srcset. Without this, the browser preload-picker can
-      // select a different variant and surface "preloaded but not used"
-      // warnings. Subsequent slides must NOT re-emit a preload tag.
+      // The first slide is rendered with `priority`, which is REQUIRED for mobile
+      // LCP: HomeContent hydrates from a client query cache, so without the
+      // server-rendered `<link rel=preload>` the browser can't discover the banner
+      // until hydration, pushing LCP to ~9s. Subsequent slides must NOT re-emit a
+      // preload tag. (On desktop the carousel is hidden and this preload goes
+      // unused — an accepted cosmetic trade-off; see banner-carousel.tsx.)
       document.head.querySelectorAll('link[rel="preload"][as="image"]').forEach((node) => {
         node.remove();
       });
@@ -164,6 +164,14 @@ describe('BannerCarousel', () => {
 
       const preloads = document.head.querySelectorAll('link[rel="preload"][as="image"]');
       expect(preloads).toHaveLength(1);
+    });
+
+    it('eager-loads the initial banner with high fetch priority', () => {
+      render(<BannerCarousel banners={[makeBanner(1)]} />);
+
+      const img = screen.getByAltText('Banner 1');
+      expect(img).toHaveAttribute('loading', 'eager');
+      expect(img).toHaveAttribute('fetchpriority', 'high');
     });
   });
 

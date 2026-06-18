@@ -66,11 +66,17 @@ const loadThresholdsFromConfig = (): CoverageMetrics => {
   }
 
   const thresholdsBlock = thresholdsBlockMatch[1];
-  const metricKeys: (keyof CoverageMetrics)[] = ['lines', 'functions', 'branches', 'statements'];
-  const parsedThresholds: Partial<CoverageMetrics> = {};
+  // Static per-metric regexes (literals) keyed by metric name. Equivalent to the
+  // previously dynamic `new RegExp(\`\\b${key}\\s*:...\`)` but without a non-literal RegExp.
+  const metricRegexes = new Map<keyof CoverageMetrics, RegExp>([
+    ['lines', /\blines\s*:\s*(\d+\.?\d*)/],
+    ['functions', /\bfunctions\s*:\s*(\d+\.?\d*)/],
+    ['branches', /\bbranches\s*:\s*(\d+\.?\d*)/],
+    ['statements', /\bstatements\s*:\s*(\d+\.?\d*)/],
+  ]);
+  const parsedThresholds = new Map<keyof CoverageMetrics, number>();
 
-  for (const key of metricKeys) {
-    const keyRegex = new RegExp(`\\b${key}\\s*:\\s*(\\d+(?:\\.\\d+)?)`);
+  for (const [key, keyRegex] of metricRegexes) {
     const match = thresholdsBlock.match(keyRegex);
 
     if (!match) {
@@ -87,14 +93,23 @@ const loadThresholdsFromConfig = (): CoverageMetrics => {
       process.exit(1);
     }
 
-    parsedThresholds[key] = value;
+    parsedThresholds.set(key, value);
   }
 
+  const readMetric = (key: keyof CoverageMetrics): number => {
+    const value = parsedThresholds.get(key);
+    if (value === undefined) {
+      console.error(`❌ Missing "${key}" coverage threshold in vitest.config.ts`);
+      process.exit(1);
+    }
+    return value;
+  };
+
   return {
-    statements: parsedThresholds.statements as number,
-    branches: parsedThresholds.branches as number,
-    functions: parsedThresholds.functions as number,
-    lines: parsedThresholds.lines as number,
+    statements: readMetric('statements'),
+    branches: readMetric('branches'),
+    functions: readMetric('functions'),
+    lines: readMetric('lines'),
   };
 };
 
@@ -122,27 +137,32 @@ const parseBaselineMetrics = (): CoverageMetrics => {
   // Parse the current coverage summary table
   // Format: | Statements | 98.47%   |
   const metricsRegex = /\|\s*(Statements|Branches|Functions|Lines)\s*\|\s*(\d+\.?\d*)%\s*\|/gi;
-  const metrics: Partial<CoverageMetrics> = {};
+  const metrics = new Map<keyof CoverageMetrics, number>();
 
   let match;
   while ((match = metricsRegex.exec(content)) !== null) {
     const metricName = match[1].toLowerCase() as keyof CoverageMetrics;
     const value = parseFloat(match[2]);
-    metrics[metricName] = value;
+    metrics.set(metricName, value);
   }
 
+  const statements = metrics.get('statements');
+  const branches = metrics.get('branches');
+  const functions = metrics.get('functions');
+  const lines = metrics.get('lines');
+
   if (
-    metrics.statements === undefined ||
-    metrics.branches === undefined ||
-    metrics.functions === undefined ||
-    metrics.lines === undefined
+    statements === undefined ||
+    branches === undefined ||
+    functions === undefined ||
+    lines === undefined
   ) {
     console.error('❌ Could not parse all metrics from COVERAGE_METRICS.md');
-    console.error('Found:', metrics);
+    console.error('Found:', Object.fromEntries(metrics));
     process.exit(1);
   }
 
-  return metrics as CoverageMetrics;
+  return { statements, branches, functions, lines };
 };
 
 /**
@@ -185,10 +205,24 @@ const checkForRegressions = (baseline: CoverageMetrics, current: CoverageMetrics
 
   const metricNames: (keyof CoverageMetrics)[] = ['statements', 'branches', 'functions', 'lines'];
 
+  // Literal property access for a fixed-shape metric, avoiding computed key indexing.
+  const readMetric = (source: CoverageMetrics, metric: keyof CoverageMetrics): number => {
+    switch (metric) {
+      case 'statements':
+        return source.statements;
+      case 'branches':
+        return source.branches;
+      case 'functions':
+        return source.functions;
+      case 'lines':
+        return source.lines;
+    }
+  };
+
   for (const metric of metricNames) {
-    const baselineValue = baseline[metric];
-    const currentValue = current[metric];
-    const threshold = THRESHOLDS[metric];
+    const baselineValue = readMetric(baseline, metric);
+    const currentValue = readMetric(current, metric);
+    const threshold = readMetric(THRESHOLDS, metric);
     const diff = currentValue - baselineValue;
     const diffStr = diff >= 0 ? `+${diff.toFixed(2)}%` : `${diff.toFixed(2)}%`;
     const arrowStatus = diff < 0 ? '⬇️' : diff > 0 ? '⬆️' : '➡️';

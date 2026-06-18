@@ -179,6 +179,12 @@ export const Controls = ({
   const onNextTrackRef = useRef(onNextTrack);
   const controlsRefCallback = useRef(controlsRef);
 
+  // Use a ref for the source prop so the mount-once init effect can read the
+  // latest value (initial source + error-recovery fallback) without listing it
+  // as a dependency, which would re-create the player. Source changes are
+  // handled by the dedicated effect below.
+  const audioSrcRef = useRef(audioSrc);
+
   // Keep refs up to date
   useEffect(() => {
     onPlayRef.current = onPlay;
@@ -187,7 +193,8 @@ export const Controls = ({
     onPreviousTrackRef.current = onPreviousTrack;
     onNextTrackRef.current = onNextTrack;
     controlsRefCallback.current = controlsRef;
-  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef]);
+    audioSrcRef.current = audioSrc;
+  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef, audioSrc]);
 
   // Initialize player once
   useEffect(() => {
@@ -245,7 +252,7 @@ export const Controls = ({
         userActions: {
           hotkeys: true,
         },
-        sources: [{ src: audioSrc, type: getAudioMimeType(audioSrc) }],
+        sources: [{ src: audioSrcRef.current, type: getAudioMimeType(audioSrcRef.current) }],
         fluid: false,
         fill: false,
         controlBar: {
@@ -348,7 +355,7 @@ export const Controls = ({
             typeof playerWithCurrentSrc.currentSrc === 'function'
               ? playerWithCurrentSrc.currentSrc()
               : playerWithCurrentSrc.currentSrc;
-          const sourceToRetry = currentSrcValue || audioSrc;
+          const sourceToRetry = currentSrcValue || audioSrcRef.current;
           const shouldResume = pendingResumePlaybackRef.current || !player.paused();
 
           clearPlayerErrorState(player);
@@ -444,7 +451,6 @@ export const Controls = ({
         isInitializedRef.current = false;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update source when audioSrc changes (without recreating player)

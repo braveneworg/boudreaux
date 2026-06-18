@@ -76,6 +76,24 @@ interface FileToUpload {
 
 // Content types are now handled automatically by mime.getType() during upload
 
+/**
+ * Tests whether `value` matches a simple glob `pattern` where `*` matches any run of
+ * characters. Mirrors the previous unanchored `new RegExp(pattern.replace('*', '.*'))`
+ * — the literal segments must occur in order — without building a RegExp from runtime
+ * input (which tripped `security/detect-non-literal-regexp`).
+ */
+const matchesGlob = (pattern: string, value: string): boolean => {
+  let cursor = 0;
+  for (const segment of pattern.split('*')) {
+    if (segment === '') continue;
+    const found = value.indexOf(segment, cursor);
+    if (found === -1) return false;
+    cursor = found + segment.length;
+  }
+
+  return true;
+};
+
 class CDNSync {
   private config: SyncConfig;
   private s3Client: S3Client;
@@ -102,14 +120,14 @@ class CDNSync {
   }
 
   private log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
-    const colorMap = {
-      info: colors.blue,
-      success: colors.green,
-      warning: colors.yellow,
-      error: colors.red,
-    };
+    const colorMap = new Map([
+      ['info', colors.blue],
+      ['success', colors.green],
+      ['warning', colors.yellow],
+      ['error', colors.red],
+    ]);
 
-    console.info(`${colorMap[type]}[CDN-SYNC]${colors.reset} ${message}`);
+    console.info(`${colorMap.get(type)}[CDN-SYNC]${colors.reset} ${message}`);
   }
 
   private async execCommand(command: string, options: { quiet?: boolean } = {}): Promise<string> {
@@ -353,11 +371,10 @@ class CDNSync {
           const fullPath = join(currentDir, item);
           const stat = statSync(fullPath);
 
-          // Check if file should be excluded
-          const shouldExclude = excludePatterns.some((pattern) => {
-            const regex = new RegExp(pattern.replace('*', '.*'));
-            return regex.test(item);
-          });
+          // Check if file should be excluded. Match the glob (`*` = any run of
+          // characters, every other character literal) without building a dynamic
+          // RegExp from the pattern.
+          const shouldExclude = excludePatterns.some((pattern) => matchesGlob(pattern, item));
 
           if (shouldExclude) continue;
 
@@ -450,8 +467,11 @@ class CDNSync {
         return;
       }
 
-      // Delete objects in batches (S3 allows max 1000 objects per delete request)
-      const objectsToDelete = response.Contents.map((obj) => ({ Key: obj.Key! }));
+      // Delete objects in batches (S3 allows max 1000 objects per delete request).
+      // Skip any object without a Key rather than asserting one is present.
+      const objectsToDelete = response.Contents.flatMap((obj) =>
+        obj.Key ? [{ Key: obj.Key }] : []
+      );
 
       const deleteCommand = new DeleteObjectsCommand({
         Bucket: this.config.s3Bucket,

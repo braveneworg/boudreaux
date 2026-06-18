@@ -47,7 +47,7 @@ export const changeEmailAction = async (
 
       formState.hasTimeout = false;
 
-      await adapter.updateUser!({
+      await adapter.updateUser({
         id: session.user.id,
         email: parsed.data.email,
         previousEmail,

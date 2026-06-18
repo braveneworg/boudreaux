@@ -37,6 +37,21 @@ interface UseDigitalFormatUploadsOptions {
   onMetadataExtracted?: (metadata: ExtractedAudioMetadata) => void;
 }
 
+/**
+ * Returns a shallow copy of `record` with `key` removed. Implemented via
+ * `Object.entries` to avoid object-injection on the dynamic `key`. The record
+ * shape (and its key union) is preserved for callers.
+ */
+const omitKey = <T extends object>(record: T, key: keyof T): T =>
+  Object.fromEntries(Object.entries(record).filter(([entryKey]) => entryKey !== key)) as T;
+
+/**
+ * Reads `record[key]` for a dynamic `key` without object-injection risk by
+ * routing the lookup through a `Map`. Returns `undefined` when absent.
+ */
+const readByKey = <T extends object>(record: T, key: keyof T): T[keyof T] | undefined =>
+  new Map(Object.entries(record)).get(String(key)) as T[keyof T] | undefined;
+
 export const useDigitalFormatUploads = ({
   releaseId,
   existingFormats,
@@ -438,7 +453,8 @@ export const useDigitalFormatUploads = ({
       let failCount = 0;
 
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+        const file = files.at(i);
+        if (!file) continue;
         console.info(
           `[batch-upload] Uploading ${i + 1}/${files.length}: ${formatType} → ${file.name}`
         );
@@ -810,11 +826,7 @@ export const useDigitalFormatUploads = ({
   }, []);
 
   const handleRemoveFile = useCallback((formatType: DigitalFormatType) => {
-    setSelectedFiles((prev) => {
-      const next = { ...prev };
-      delete next[formatType];
-      return next;
-    });
+    setSelectedFiles((prev) => omitKey(prev, formatType));
     setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'idle' } }));
     setUploadedFormats((prev) => {
       const next = new Set(prev);
@@ -822,13 +834,9 @@ export const useDigitalFormatUploads = ({
       return next;
     });
     setErrorMessages((prev) => ({ ...prev, [formatType]: null }));
-    setUploadedFilesList((prev) => {
-      const next = { ...prev };
-      delete next[formatType];
-      return next;
-    });
+    setUploadedFilesList((prev) => omitKey(prev, formatType));
 
-    const input = fileInputRefs.current[formatType];
+    const input = readByKey(fileInputRefs.current, formatType);
     if (input) {
       input.value = '';
     }
@@ -836,7 +844,7 @@ export const useDigitalFormatUploads = ({
 
   const getUploadState = useCallback(
     (formatType: DigitalFormatType): UploadState => {
-      return uploadStates[formatType] ?? { status: 'idle' };
+      return readByKey(uploadStates, formatType) ?? { status: 'idle' };
     },
     [uploadStates]
   );
@@ -863,7 +871,7 @@ export const useDigitalFormatUploads = ({
         setConfirmReuploadFormat(formatType);
         return;
       }
-      fileInputRefs.current[formatType]?.click();
+      readByKey(fileInputRefs.current, formatType)?.click();
     },
     [isUploaded]
   );
@@ -890,25 +898,17 @@ export const useDigitalFormatUploads = ({
         next.delete(formatType);
         return next;
       });
-      setUploadedFilesList((prev) => {
-        const next = { ...prev };
-        delete next[formatType];
-        return next;
-      });
-      setSelectedFiles((prev) => {
-        const next = { ...prev };
-        delete next[formatType];
-        return next;
-      });
+      setUploadedFilesList((prev) => omitKey(prev, formatType));
+      setSelectedFiles((prev) => omitKey(prev, formatType));
       setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'idle' } }));
       setErrorMessages((prev) => ({ ...prev, [formatType]: null }));
 
-      const input = fileInputRefs.current[formatType];
+      const input = readByKey(fileInputRefs.current, formatType);
       if (input) {
         input.value = '';
       }
 
-      fileInputRefs.current[formatType]?.click();
+      readByKey(fileInputRefs.current, formatType)?.click();
     } catch {
       toast.error('Failed to delete existing files');
     } finally {

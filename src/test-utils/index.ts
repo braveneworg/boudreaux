@@ -24,9 +24,11 @@ export {
   createRejectedMock,
 } from './render-utils';
 
+// Re-export DOM assertion helpers
+export { requireElement } from './require-element';
+
 // Re-export shared mocks
 export {
-  mockServerOnly,
   createMockRouter,
   createMockSession,
   createMockToast,

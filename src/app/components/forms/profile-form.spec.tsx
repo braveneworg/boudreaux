@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { createElement } from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -36,7 +38,8 @@ const watched = vi.hoisted(() => ({ values: {} as Record<string, unknown> }));
 
 vi.mock('react-hook-form', () => ({
   useForm: (opts: { resolver: { __tag: string } }) => forms.current[opts.resolver.__tag],
-  useWatch: ({ name }: { name: string }) => watched.values[name],
+  useWatch: ({ name }: { name: string }) =>
+    Object.entries(watched.values).find(([key]) => key === name)?.[1],
   Controller: ({
     render,
   }: {
@@ -71,8 +74,7 @@ vi.mock('@/lib/actions/change-username-action', () => ({
 vi.mock('sonner', () => ({ toast: toastMock }));
 
 vi.mock('next/image', () => ({
-  // eslint-disable-next-line jsx-a11y/alt-text, @next/next/no-img-element
-  default: (props: Record<string, unknown>) => <img {...props} />,
+  default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
 vi.mock('@/app/components/ui/form', () => ({

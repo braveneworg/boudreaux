@@ -35,10 +35,15 @@ const ALLOWED_ENTITY_TYPES = new Set([
  * deleted.
  */
 const isOrphan = (fileName: string, newExt: string): boolean => {
-  const match = fileName.match(/^cover(_w\d+)?(\.[^.]+)$/);
-  if (!match) return false;
-  const isVariant = !!match[1];
-  const ext = match[2].toLowerCase();
+  // Split into two non-nested patterns (a bare `cover.ext` and a width
+  // variant `cover_w{N}.ext`) so neither regex nests a quantifier inside an
+  // optional group — equivalent to the prior `^cover(_w\d+)?(\.[^.]+)$`.
+  const isVariant = /^cover_w\d+\.[^.]+$/.test(fileName);
+  const isBase = /^cover\.[^.]+$/.test(fileName);
+  if (!isVariant && !isBase) return false;
+  const extMatch = fileName.match(/(\.[^.]+)$/);
+  if (!extMatch) return false;
+  const ext = extMatch[1].toLowerCase();
   if (ext === newExt) return false;
   // WebP variants get rewritten by the variant generator (it transcodes every
   // raster format to .webp). Same-key overwrite means they're already fresh,

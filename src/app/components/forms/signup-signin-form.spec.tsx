@@ -23,7 +23,7 @@ let lastFormInputProps: FormInputProps | null = null;
 
 vi.mock('@/app/components/ui/form-input', () => ({
   FormInput: (props: FormInputProps) => {
-    const { id, placeholder, type, autoFocus, ...rest } = props;
+    const { id, placeholder, type, autoFocusOnMount, ...rest } = props;
     lastFormInputProps = props; // Store props for testing
 
     const inputProps: Record<string, unknown> = {
@@ -34,7 +34,7 @@ vi.mock('@/app/components/ui/form-input', () => ({
       ...rest,
     };
 
-    if (autoFocus) {
+    if (autoFocusOnMount) {
       inputProps.autoFocus = true;
     }
 
@@ -109,8 +109,14 @@ vi.mock('@/app/components/ui/button', () => ({
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
   TurnstileWidget: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-    <div data-testid="turnstile-widget" onClick={() => setIsVerified?.(true)} {...props}>
+    <div
+      data-testid="turnstile-widget"
+      onClick={() => setIsVerified?.(true)}
+      onKeyDown={() => setIsVerified?.(true)}
+      role="button"
+      tabIndex={0}
+      {...props}
+    >
       Turnstile Widget
     </div>
   ),
@@ -134,7 +140,7 @@ interface FormInputProps {
   id: string;
   placeholder: string;
   type: string;
-  autoFocus?: boolean;
+  autoFocusOnMount?: boolean;
   [key: string]: unknown;
 }
 
@@ -229,11 +235,11 @@ describe('SignupSigninForm', () => {
     it('should autofocus email input field on page load', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      // Verify that the FormInput component received the autoFocus prop
+      // Verify that the FormInput component received the autoFocusOnMount prop
       // Note: JSDOM doesn't fully support autofocus behavior, but we can verify
       // that the component is configured correctly
       expect(lastFormInputProps).not.toBeNull();
-      expect(lastFormInputProps?.autoFocus).toBe(true);
+      expect(lastFormInputProps?.autoFocusOnMount).toBe(true);
       expect(lastFormInputProps?.id).toBe('email');
     });
 

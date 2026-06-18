@@ -65,7 +65,7 @@ export const ReleasePlayer = ({
     [release.digitalFormats]
   );
 
-  const currentFile = files[currentFileIndex] ?? null;
+  const currentFile = files.at(currentFileIndex) ?? null;
   const hasFiles = files.length > 0;
 
   const audioSrc = useMemo<string | null>(() => {

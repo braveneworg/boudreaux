@@ -11,6 +11,15 @@ import { Button } from '@/app/components/ui/button';
 import { useDownloadQuotaQuery } from '@/app/hooks/use-download-quota-query';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
+/**
+ * Lookup map for format labels keyed by format type. Backed by a `Map` so
+ * dynamic format-type keys are read without object-injection risk; falls back
+ * to the raw format type when no label is registered.
+ */
+const FORMAT_LABEL_MAP = new Map(Object.entries(FORMAT_LABELS));
+const getFormatLabel = (formatType: string): string =>
+  FORMAT_LABEL_MAP.get(formatType) ?? formatType;
+
 interface AvailableFormat {
   formatType: string;
   fileName: string;
@@ -111,7 +120,7 @@ export const FormatDownloadList = ({
             ) : (
               <Download className="size-4" />
             )}
-            {FORMAT_LABELS[formatType] ?? formatType}
+            {getFormatLabel(formatType)}
           </Button>
         );
       })}

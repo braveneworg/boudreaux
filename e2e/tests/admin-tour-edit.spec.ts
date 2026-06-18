@@ -42,9 +42,12 @@ const createTourViaUi = async (
   }).toPass({ timeout: 25_000 });
 
   const href = await tourLink.getAttribute('href');
-  expect(href).toBeTruthy();
+  if (!href) throw new Error('expected the link to have an href');
 
-  return href!.split('/').at(-1)!;
+  const id = href.split('/').at(-1);
+  if (!id) throw new Error('expected an id segment in the link href');
+
+  return id;
 };
 
 test.describe('Admin Tour Editing', () => {

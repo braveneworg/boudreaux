@@ -14,7 +14,7 @@ import type Stripe from 'stripe';
 
 vi.mock('ipaddr.js', () => ({
   default: {
-    isValid: (ip: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) || ip.includes(':'),
+    isValid: (ip: string) => /^\d+\.\d+\.\d+\.\d+$/.test(ip) || ip.includes(':'),
     parse: (ip: string) => ({
       kind: () => (ip.includes(':') ? 'ipv6' : 'ipv4'),
       toNormalizedString: () => ip,
@@ -24,7 +24,7 @@ vi.mock('ipaddr.js', () => ({
       throw new Error('Not implemented in mock');
     },
   },
-  isValid: (ip: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) || ip.includes(':'),
+  isValid: (ip: string) => /^\d+\.\d+\.\d+\.\d+$/.test(ip) || ip.includes(':'),
   parse: (ip: string) => ({
     kind: () => (ip.includes(':') ? 'ipv6' : 'ipv4'),
     toNormalizedString: () => ip,

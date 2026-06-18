@@ -72,18 +72,17 @@ describe('GET /api/releases/[id]/download/free-status', () => {
     vi.mocked(ReleaseService.existsById).mockReset().mockResolvedValue(true);
     vi.mocked(ReleaseDigitalFormatRepository)
       .mockReset()
-      // eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- constructor mock: invoked with `new`, so it must be a function expression (arrows cannot be constructed).
-      .mockImplementation(function () {
-        return {
-          findAllByRelease: vi
+      .mockImplementation(
+        class {
+          findAllByRelease = vi
             .fn()
             .mockResolvedValue([
               { formatType: 'MP3_320KBPS' },
               { formatType: 'AAC' },
               { formatType: 'FLAC' },
-            ]),
-        } as never as never;
-      });
+            ]);
+        } as never
+      );
     vi.mocked(freeDownloadQuotaService.resolveVisitorIdentity)
       .mockReset()
       .mockResolvedValue({
@@ -148,14 +147,13 @@ describe('GET /api/releases/[id]/download/free-status', () => {
   });
 
   it('intersects FREE_FORMAT_TYPES with published formats correctly', async () => {
-    // eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- constructor mock: invoked with `new`, so it must be a function expression (arrows cannot be constructed).
-    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(function () {
-      return {
-        findAllByRelease: vi
+    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(
+      class {
+        findAllByRelease = vi
           .fn()
-          .mockResolvedValue([{ formatType: 'MP3_320KBPS' }, { formatType: 'WAV' }]),
-      } as never as never;
-    });
+          .mockResolvedValue([{ formatType: 'MP3_320KBPS' }, { formatType: 'WAV' }]);
+      } as never
+    );
 
     const response = await GET(buildRequest(), dummyContext);
     const body = await response.json();
@@ -163,12 +161,11 @@ describe('GET /api/releases/[id]/download/free-status', () => {
   });
 
   it('returns blockedReason="no-free-formats" when intersection is empty', async () => {
-    // eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- constructor mock: invoked with `new`, so it must be a function expression (arrows cannot be constructed).
-    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(function () {
-      return {
-        findAllByRelease: vi.fn().mockResolvedValue([{ formatType: 'FLAC' }]),
-      } as never as never;
-    });
+    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(
+      class {
+        findAllByRelease = vi.fn().mockResolvedValue([{ formatType: 'FLAC' }]);
+      } as never
+    );
 
     const response = await GET(buildRequest(), dummyContext);
     expect(response.status).toBe(200);

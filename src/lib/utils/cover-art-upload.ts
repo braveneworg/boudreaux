@@ -33,14 +33,14 @@ const getMimeTypeFromDataUrl = (dataUrl: string): string => {
  * Get file extension from MIME type
  */
 const getExtensionFromMimeType = (mimeType: string): string => {
-  const mimeToExt: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'image/tiff': 'tiff',
-  };
-  return mimeToExt[mimeType] || 'jpg';
+  const mimeToExt = new Map<string, string>([
+    ['image/jpeg', 'jpg'],
+    ['image/png', 'png'],
+    ['image/gif', 'gif'],
+    ['image/webp', 'webp'],
+    ['image/tiff', 'tiff'],
+  ]);
+  return mimeToExt.get(mimeType) ?? 'jpg';
 };
 
 /**
@@ -50,11 +50,7 @@ const base64ToFile = (dataUrl: string, fileName: string): File => {
   const mimeType = getMimeTypeFromDataUrl(dataUrl);
   const base64Data = dataUrl.split(',')[1];
   const byteString = atob(base64Data);
-  const byteArray = new Uint8Array(byteString.length);
-
-  for (let i = 0; i < byteString.length; i++) {
-    byteArray[i] = byteString.charCodeAt(i);
-  }
+  const byteArray = Uint8Array.from(byteString, (char) => char.charCodeAt(0));
 
   const blob = new Blob([byteArray], { type: mimeType });
   return new File([blob], fileName, { type: mimeType });

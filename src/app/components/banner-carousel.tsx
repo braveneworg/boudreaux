@@ -198,10 +198,9 @@ export const BannerCarousel = ({
 
   // Derive outgoing and incoming notification strips for seamless crossfade
   const isTransitioning = incomingIndex !== null;
-  const outgoingNotification = banners[currentIndex]?.notification ?? null;
-  const incomingNotification = isTransitioning
-    ? (banners[incomingIndex]?.notification ?? null)
-    : null;
+  const outgoingNotification = banners.at(currentIndex)?.notification ?? null;
+  const incomingNotification =
+    incomingIndex !== null ? (banners.at(incomingIndex)?.notification ?? null) : null;
   // Show the strip container when either the static notification or incoming notification exists
   const activeNotification = isTransitioning ? incomingNotification : outgoingNotification;
   const stripVisible = activeNotification !== null && isTabVisible;
@@ -219,10 +218,10 @@ export const BannerCarousel = ({
       ),
     [banners]
   );
-  const outgoingHtml = sanitizedHtmlByIndex[currentIndex] ?? null;
+  const outgoingHtml = sanitizedHtmlByIndex.at(currentIndex) ?? null;
   const activeHtml =
     isTransitioning && incomingIndex !== null
-      ? (sanitizedHtmlByIndex[incomingIndex] ?? null)
+      ? (sanitizedHtmlByIndex.at(incomingIndex) ?? null)
       : outgoingHtml;
 
   // Keyboard navigation
@@ -356,14 +355,15 @@ export const BannerCarousel = ({
   const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
   const nextIndex = (currentIndex + 1) % totalSlides;
 
-  /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard interaction per WAI-ARIA carousel pattern */
   return (
     <section
       className="relative w-full overflow-hidden md:hidden"
       aria-label="Banner carousel"
       aria-roledescription="carousel"
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
+      // Capture-phase keydown so arrow keys steer the carousel while focus rests on
+      // its inner controls (the dot buttons below), without making the region landmark
+      // itself a tab stop — mirrors the shadcn Carousel pattern in ui/carousel.tsx.
+      onKeyDownCapture={handleKeyDown}
     >
       {/* Notification strip — always reserves 2.5rem to prevent CLS */}
       <div
@@ -464,16 +464,18 @@ export const BannerCarousel = ({
                 }}
               >
                 {shouldRenderImage && (
-                  // `priority` is set only on the first slide during the
-                  // initial render (when `currentIndex === 0`). This makes
-                  // `next/image` emit a server-rendered `<link rel=preload>`
-                  // with matching `imagesrcset`/`imagesizes`, so the browser
-                  // preload-picker selects the same variant the rendered
-                  // `<img>` will use across viewports — preventing
-                  // "preloaded but not used" warnings. Once the carousel
-                  // advances, slide 0 loses priority so it no longer
-                  // competes for bandwidth when offscreen. Subsequent slides
-                  // rely on `fetchPriority` + `loading` hints below.
+                  // `priority` on the first slide is REQUIRED for mobile LCP.
+                  // HomeContent is a client component hydrated from a TanStack
+                  // Query cache, so without the server-rendered `<link rel=preload>`
+                  // that `priority` emits, the browser can't discover the banner
+                  // until hydration completes — pushing LCP to ~9s in Lighthouse
+                  // (mobile, where this carousel is the visible treatment).
+                  // Trade-off: on desktop the carousel is `md:hidden` and the
+                  // `BannerStrip` is shown, so this preload is "preloaded but not
+                  // used" there. That is an accepted, cosmetic dev-console warning —
+                  // a media-scoped preload isn't expressible via `next/image`, and
+                  // the mobile LCP win far outweighs it. DO NOT remove `priority`
+                  // to silence that warning (doing so regressed LCP 90→67).
                   <Image
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
@@ -527,5 +529,4 @@ export const BannerCarousel = ({
       )}
     </section>
   );
-  /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
 };

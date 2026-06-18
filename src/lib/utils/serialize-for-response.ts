@@ -25,11 +25,11 @@ const convertBigInts = (value: unknown): unknown => {
   }
 
   if (value !== null && typeof value === 'object' && isPlainObject(value)) {
-    const result: Record<string, unknown> = {};
+    const result = new Map<string, unknown>();
     for (const [key, val] of Object.entries(value)) {
-      result[key] = convertBigInts(val);
+      result.set(key, convertBigInts(val));
     }
-    return result;
+    return Object.fromEntries(result);
   }
 
   return value;

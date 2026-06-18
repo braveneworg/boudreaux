@@ -32,11 +32,11 @@ export const stripInlineImageDataUris = <T>(
     return value.map((v) => stripInlineImageDataUris(v, maxLen)) as unknown as T;
   }
   if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
+    const out = new Map<string, unknown>();
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = stripInlineImageDataUris(v, maxLen);
+      out.set(k, stripInlineImageDataUris(v, maxLen));
     }
-    return out as T;
+    return Object.fromEntries(out) as T;
   }
   return value;
 };

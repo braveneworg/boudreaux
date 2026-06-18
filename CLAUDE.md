@@ -1,6 +1,6 @@
 # boudreaux Development Guidelines
 
-Last updated: 2026-06-14
+Last updated: 2026-06-16
 
 ## How to work in this repo
 
@@ -87,9 +87,9 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - No `any`, no non-null assertion (`!`). Reaching for either means: define a narrower type or handle the null explicitly. Prefer specific types over `unknown` / `Record<string, unknown>`.
 - Explicit types on function params and return values. `interface` for object shapes; discriminated unions for variants. Reuse existing types before adding new ones.
 - `as const` over enums (`const enum` if an enum is unavoidable).
-- **Arrow functions over `function`** — declare functions and callbacks as arrow expressions (`const foo = () => …`), not `function` declarations or named function expressions. Enforced by `prefer-arrow-functions/prefer-arrow-functions` (auto-fixed by `pnpm run lint`). Documented exceptions, each keep a `function` and need an inline `// eslint-disable-next-line prefer-arrow-functions/prefer-arrow-functions -- <reason>`: (1) Next.js App Router special files — `page`, `layout`, `loading`, `error`, `global-error`, `not-found`, `template`, `default`, `route`, `middleware`, `instrumentation`, and metadata files (`manifest`/`sitemap`/`robots`/`opengraph-image`/`icon`) — which are exempted by config, not a disable comment; (2) `never`-returning functions relied on for control-flow narrowing (an arrow const does not narrow); (3) constructors / class-constructor mocks invoked with `new` (arrows cannot be constructed); (4) functions that need their own `this`, `arguments`, or `new.target`. Keep the existing implicit-return rule below.
+- **Arrow functions over `function`** — declare functions and callbacks as arrow expressions (`const foo = () => …`), not `function` declarations or named function expressions. Enforced by `prefer-arrow-functions/prefer-arrow-functions` (auto-fixed by `pnpm run lint`). Next.js App Router special files (`page`/`layout`/`loading`/`error`/`global-error`/`not-found`/`template`/`default`/`route`/`middleware`/`instrumentation`/`manifest`/`sitemap`/`robots`/`opengraph-image`/`icon`) are exempted in config. Where a `function` is genuinely required, refactor instead of suppressing: things constructed with `new` (incl. constructor mocks) → declare a `class`; code needing its own `this`/`arguments`/`new.target` → restructure to avoid it. Keep the existing implicit-return rule below.
 - **Named exports only** — except App Router files that require a default export: `page`, `layout`, `loading`, `error`, `not-found`, `template`, `default`, `route`, `middleware`.
-- No `ts-ignore` / `eslint-disable` without an inline reason comment. No deprecated syntax. JSDoc only for genuinely complex functions.
+- **Never use `eslint-disable` comments** — not inline (`// eslint-disable-line` / `// eslint-disable-next-line`), not block (`/* eslint-disable */`), not file-level, for any rule. The same goes for `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck`. A lint or type error means the code is wrong for the rule: fix the code to satisfy the rule (preferred), or, only when a rule is genuinely inapplicable to a context, adjust `eslint.config.mjs` (e.g. a `files`-scoped rule setting) — never a comment. No deprecated syntax. JSDoc only for genuinely complex functions.
 
 ## Components, forms, styling
 
@@ -162,7 +162,7 @@ Conventional Commits, enforced by commitlint (`commitlint.config.mjs`, `commit-m
 - Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Store config and secrets in environment variables — never hardcode them.
 - **Dependencies**: reuse an existing one before adding (check `package.json`); weigh bundle size, maintenance burden, and security; ensure MPL-2.0 compatibility; keep the tree lean and patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/auto-generated/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
-- No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
+- No `eslint-disable` comments of any kind (inline, block, or file-level) and no global ESLint/Prettier disable directives — see the TypeScript section; fix the code or scope a rule in `eslint.config.mjs`. No new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
 
 # Refactoring
 

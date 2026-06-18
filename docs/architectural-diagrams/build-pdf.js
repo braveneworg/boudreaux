@@ -9,19 +9,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 const diagramsDir = join(here, 'diagrams');
 
 // Page title per file (kept in sync with the documentation TOC).
-const titles = {
-  '01-frontend-architecture.mmd': '1. Frontend Architecture',
-  '02-backend-architecture.mmd': '2. Backend Architecture (Layered)',
-  '03-integrations-infrastructure.mmd': '3. Integrations & Infrastructure',
-  '04-data-model-catalog-commerce.mmd': '4. Data Model — Catalog & Commerce',
-  '05-data-model-events-community.mmd': '5. Data Model — Events & Community',
-  '06-sequence-purchase-checkout.mmd': '6. Sequence — PWYW Checkout & Webhook',
-  '07-sequence-download-authorization.mmd': '7. Sequence — Download Authorization',
-  '08-sequence-magic-link-auth.mmd': '8. Sequence — Magic-Link Authentication',
-  '09-sequence-chat-message.mmd': '9. Sequence — Live Chat Message',
-  '10-workflow-fan-journey.mmd': '10. User Workflow — Fan Journey',
-  '11-workflow-admin-management.mmd': '11. User Workflow — Admin Management',
-};
+const titles = new Map([
+  ['01-frontend-architecture.mmd', '1. Frontend Architecture'],
+  ['02-backend-architecture.mmd', '2. Backend Architecture (Layered)'],
+  ['03-integrations-infrastructure.mmd', '3. Integrations & Infrastructure'],
+  ['04-data-model-catalog-commerce.mmd', '4. Data Model — Catalog & Commerce'],
+  ['05-data-model-events-community.mmd', '5. Data Model — Events & Community'],
+  ['06-sequence-purchase-checkout.mmd', '6. Sequence — PWYW Checkout & Webhook'],
+  ['07-sequence-download-authorization.mmd', '7. Sequence — Download Authorization'],
+  ['08-sequence-magic-link-auth.mmd', '8. Sequence — Magic-Link Authentication'],
+  ['09-sequence-chat-message.mmd', '9. Sequence — Live Chat Message'],
+  ['10-workflow-fan-journey.mmd', '10. User Workflow — Fan Journey'],
+  ['11-workflow-admin-management.mmd', '11. User Workflow — Admin Management'],
+]);
 
 const files = readdirSync(diagramsDir)
   .filter((f) => f.endsWith('.mmd'))
@@ -30,7 +30,7 @@ const files = readdirSync(diagramsDir)
 const pages = files
   .map((f) => {
     const src = readFileSync(join(diagramsDir, f), 'utf8');
-    const title = titles[f] ?? f;
+    const title = titles.get(f) ?? f;
     // <pre class="mermaid"> preserves whitespace; Mermaid reads textContent.
     return `<section class="page">
       <h2>${title}</h2>

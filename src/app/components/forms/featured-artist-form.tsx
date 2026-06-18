@@ -338,19 +338,25 @@ export const FeaturedArtistForm = ({
     setIsPending(true);
     try {
       if (isEditMode && featuredArtistId) {
-        // In edit mode, use the PATCH API route
-        const patchBody: Record<string, unknown> = {};
+        // In edit mode, use the PATCH API route. Build the body in a Map so the
+        // dynamic field keys are assigned without object-injection risk, then
+        // materialize the plain object at the JSON boundary.
+        const patchEntries = new Map<string, unknown>();
         for (const [key, value] of Object.entries(values)) {
           if (value !== undefined && value !== null && value !== '') {
-            patchBody[key] =
-              key === 'position' || key === 'featuredTrackNumber' ? Number(value) : value;
+            patchEntries.set(
+              key,
+              key === 'position' || key === 'featuredTrackNumber' ? Number(value) : value
+            );
           }
         }
 
         // Include derived artistIds so the PATCH handler can reconnect the artists relation
         if (derivedArtistIds.length > 0) {
-          patchBody.artistIds = derivedArtistIds;
+          patchEntries.set('artistIds', derivedArtistIds);
         }
+
+        const patchBody: Record<string, unknown> = Object.fromEntries(patchEntries);
 
         const response = await fetch(`/api/featured-artists/${featuredArtistId}`, {
           method: 'PATCH',

@@ -34,23 +34,22 @@ export const sanitizeHtml = (input: string): string => {
 export const sanitizeString = (input: string): string => {
   if (!input) return '';
 
-  // Remove null bytes and control characters
-  // Build regex pattern dynamically to avoid no-control-regex lint error
-  const controlCharsPattern =
-    '[' +
-    String.fromCharCode(0x00) +
-    '-' +
-    String.fromCharCode(0x08) +
-    String.fromCharCode(0x0b) +
-    String.fromCharCode(0x0c) +
-    String.fromCharCode(0x0e) +
-    '-' +
-    String.fromCharCode(0x1f) +
-    String.fromCharCode(0x7f) +
-    ']';
-  const controlCharsRegex = new RegExp(controlCharsPattern, 'g');
+  // Remove null bytes and control characters (0x00–0x08, 0x0b, 0x0c, 0x0e–0x1f, 0x7f)
+  // by code point. A regex literal containing these would trip core `no-control-regex`,
+  // and a RegExp built from a string would trip `security/detect-non-literal-regexp`.
+  let stripped = '';
+  for (const char of input) {
+    const code = char.charCodeAt(0);
+    const isControl =
+      code <= 0x08 ||
+      code === 0x0b ||
+      code === 0x0c ||
+      (code >= 0x0e && code <= 0x1f) ||
+      code === 0x7f;
+    if (!isControl) stripped += char;
+  }
 
-  return input.replace(/\0/g, '').replace(controlCharsRegex, '').trim();
+  return stripped.trim();
 };
 
 /**
@@ -149,23 +148,16 @@ export const sanitizeFilePath = (pathKey: string, baseDir: string): string => {
     throw new Error('Path contains null bytes');
   }
 
-  // Check for control characters (code points < 32, excluding tab and newline)
-  // Build regex pattern dynamically to avoid no-control-regex lint error
-  const controlCharsPattern =
-    '[' +
-    String.fromCharCode(0x00) +
-    '-' +
-    String.fromCharCode(0x08) +
-    String.fromCharCode(0x0b) +
-    String.fromCharCode(0x0c) +
-    String.fromCharCode(0x0e) +
-    '-' +
-    String.fromCharCode(0x1f) +
-    ']';
-  const controlCharsRegex = new RegExp(controlCharsPattern, 'g');
-
-  if (controlCharsRegex.test(cleanPath)) {
-    throw new Error('Path contains control characters');
+  // Check for control characters (code points < 32, excluding tab and newline) by code
+  // point. A regex literal with these chars trips core `no-control-regex`; a RegExp built
+  // from a string trips `security/detect-non-literal-regexp`.
+  for (const char of cleanPath) {
+    const code = char.charCodeAt(0);
+    const isControl =
+      code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f);
+    if (isControl) {
+      throw new Error('Path contains control characters');
+    }
   }
 
   // Reject absolute paths

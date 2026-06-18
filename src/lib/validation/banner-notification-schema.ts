@@ -117,7 +117,7 @@ export const hexColorSchema = z
  * `sanitizeNotificationHtml` should have already rejected it upstream.
  */
 export const addLinkAttributes = (html: string): string => {
-  return html.replace(/<a(\s[^>]*)?\/?>/g, (match) => {
+  return html.replace(/<a\s[^>]*\/?>|<a\/?>/g, (match) => {
     const cleaned = match
       .replace(/\s*href\s*=\s*["']([^"']*)["']/gi, (hrefAttr, href: string) =>
         isSafeHref(href) ? hrefAttr : ''

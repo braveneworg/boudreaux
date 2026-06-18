@@ -93,7 +93,7 @@ vi.mock('@radix-ui/react-slider', () => {
     const [myIndex] = React.useState(() => ctx.thumbIndexRef.current++);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-      const currentVal = ctx.values[myIndex] ?? 0;
+      const currentVal = ctx.values.at(myIndex) ?? 0;
       let newVal = currentVal;
 
       switch (e.key) {
@@ -114,8 +114,7 @@ vi.mock('@radix-ui/react-slider', () => {
       }
 
       if (newVal !== currentVal) {
-        const newValues = [...ctx.values];
-        newValues[myIndex] = newVal;
+        const newValues = ctx.values.map((value, index) => (index === myIndex ? newVal : value));
         ctx.setValues(newValues);
         ctx.onValueChange?.(newValues);
       }
@@ -127,7 +126,7 @@ vi.mock('@radix-ui/react-slider', () => {
         tabIndex={0}
         aria-valuemin={ctx.min}
         aria-valuemax={ctx.max}
-        aria-valuenow={ctx.values[myIndex]}
+        aria-valuenow={ctx.values.at(myIndex)}
         onKeyDown={handleKeyDown}
         {...props}
       />

@@ -4,6 +4,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { requireElement } from '@/test-utils';
+
 import {
   MediaUploader,
   type MediaItem,
@@ -136,7 +138,7 @@ describe('MediaUploader', () => {
       const dropZone = screen.getByText(/click to upload/i).closest('div');
       expect(dropZone).toBeInTheDocument();
 
-      fireEvent.dragOver(dropZone!);
+      fireEvent.dragOver(requireElement(dropZone));
 
       expect(dropZone).toHaveClass('border-primary');
     });
@@ -147,8 +149,8 @@ describe('MediaUploader', () => {
       const dropZone = screen.getByText(/click to upload/i).closest('div');
       expect(dropZone).toBeInTheDocument();
 
-      fireEvent.dragOver(dropZone!);
-      fireEvent.dragLeave(dropZone!);
+      fireEvent.dragOver(requireElement(dropZone));
+      fireEvent.dragLeave(requireElement(dropZone));
 
       expect(dropZone).not.toHaveClass('border-primary');
     });

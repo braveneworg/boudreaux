@@ -16,6 +16,15 @@ import {
   type FreeFormatType,
 } from '@/lib/constants/digital-formats';
 
+/**
+ * Lookup map for format labels keyed by format type. Backed by a `Map` so
+ * dynamic format-type keys are read without object-injection risk; falls back
+ * to the raw format type when no label is registered.
+ */
+const FORMAT_LABEL_MAP = new Map(Object.entries(FORMAT_LABELS));
+const getFormatLabel = (formatType: string): string =>
+  FORMAT_LABEL_MAP.get(formatType) ?? formatType;
+
 interface FreeFormatSelectStepProps {
   releaseId: string;
   /**
@@ -120,7 +129,7 @@ export const FreeFormatSelectStep = ({
 
   const availableFormats = availableFreeFormats.map((formatType) => ({
     formatType,
-    fileName: FORMAT_LABELS[formatType] ?? formatType,
+    fileName: getFormatLabel(formatType),
   }));
 
   return (

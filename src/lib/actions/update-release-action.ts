@@ -64,17 +64,15 @@ export const updateReleaseAction = async (
   if (!parsed.success) {
     // Schema validation failed - add validation errors to formState
     formState.success = false;
-    if (!formState.errors) {
-      formState.errors = {};
-    }
     // Add Zod validation errors
+    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
     for (const error of parsed.error.issues) {
       const field = error.path[0]?.toString() || 'general';
-      if (!formState.errors[field]) {
-        formState.errors[field] = [];
-      }
-      formState.errors[field].push(error.message);
+      const messages = errors.get(field) ?? [];
+      messages.push(error.message);
+      errors.set(field, messages);
     }
+    formState.errors = Object.fromEntries(errors);
     return formState;
   }
 

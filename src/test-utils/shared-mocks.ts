@@ -13,13 +13,6 @@
 import { vi } from 'vitest';
 
 /**
- * Mock for 'server-only' package - commonly needed for server actions
- */
-export const mockServerOnly = () => {
-  vi.mock('server-only', () => ({}));
-};
-
-/**
  * Mock for next/navigation with customizable router behavior
  */
 export const createMockRouter = () => ({
