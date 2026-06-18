@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CalendarDays } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -16,7 +17,6 @@ import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload'
 import { TextField } from '@/app/components/forms/fields';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import {
   Form,
   FormControl,
@@ -26,6 +26,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/app/components/ui/form';
+import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createTourAction, updateTourAction, deleteTourAction } from '@/lib/actions/tour-actions';
@@ -265,7 +266,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="space-y-6">
       <BreadcrumbMenu
         items={[
           { anchorText: 'Admin', url: '/admin', isActive: false },
@@ -278,143 +279,144 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
         ]}
       />
 
+      <SectionHeader
+        icon={CalendarDays}
+        title={isEditMode ? 'Edit Tour' : 'Create New Tour'}
+        helpText="Set the tour's basic information, then add tour dates, venues, and headlining artists. Images can be added after the tour is created."
+      />
+
       <Form {...form}>
-        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{isEditMode ? 'Edit Tour' : 'Create New Tour'}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Basic Information Section */}
-              <section className="space-y-4">
-                <h3>Basic Information</h3>
+        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-6">
+            {/* Basic Information Section */}
+            <section className="space-y-4">
+              <h3>Basic Information</h3>
 
-                <TextField
-                  control={control}
-                  name="title"
-                  label="Tour Title"
-                  placeholder="Enter tour title"
-                />
+              <TextField
+                control={control}
+                name="title"
+                label="Tour Title"
+                placeholder="Enter tour title"
+              />
 
-                <TextField
-                  control={control}
-                  name="subtitle"
-                  label="Subtitle"
-                  placeholder="Optional subtitle"
-                />
+              <TextField
+                control={control}
+                name="subtitle"
+                label="Subtitle"
+                placeholder="Optional subtitle"
+              />
 
-                <TextField
-                  control={control}
-                  name="subtitle2"
-                  label="Second Subtitle"
-                  placeholder="Optional second subtitle"
-                />
+              <TextField
+                control={control}
+                name="subtitle2"
+                label="Second Subtitle"
+                placeholder="Optional second subtitle"
+              />
 
-                <FormField
-                  control={control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value || ''}
-                          placeholder="Enter tour description"
-                          rows={4}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value || ''}
+                        placeholder="Enter tour description"
+                        rows={4}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value || ''}
-                          placeholder="Internal notes (not displayed publicly)"
-                          rows={3}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        These notes are for internal use only and will not be shown to the public.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </section>
+              <FormField
+                control={control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value || ''}
+                        placeholder="Internal notes (not displayed publicly)"
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      These notes are for internal use only and will not be shown to the public.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
-              {/* Tour Dates - Only show in edit mode */}
-              {isEditMode && tourId && (
-                <>
-                  <Separator />
-                  <TourDateList tourId={tourId} onDialogOpenChange={setIsTourDateDialogOpen} />
-                </>
-              )}
+            {/* Tour Dates - Only show in edit mode */}
+            {isEditMode && tourId && (
+              <>
+                <Separator />
+                <TourDateList tourId={tourId} onDialogOpenChange={setIsTourDateDialogOpen} />
+              </>
+            )}
 
-              {/* Images Section - Only show in edit mode after tour is created */}
-              {isEditMode && tourId && (
-                <>
-                  <Separator />
-                  <section className="space-y-4">
-                    <div className="space-y-2">
-                      <h3>Tour Images</h3>
-                      <p className="text-zinc-950-foreground text-sm">
-                        Upload images for this tour. You can add up to 10 images. Images can be
-                        reordered by dragging and dropping.
-                      </p>
-                    </div>
-                    <TourImageUpload
-                      tourId={tourId}
-                      initialImages={tourImages}
-                      onUploadComplete={handleImageUploadComplete}
-                      disabled={isPending || isDeleting}
-                    />
-                  </section>
-                </>
-              )}
-            </CardContent>
+            {/* Images Section - Only show in edit mode after tour is created */}
+            {isEditMode && tourId && (
+              <>
+                <Separator />
+                <section className="space-y-4">
+                  <div className="space-y-2">
+                    <h3>Tour Images</h3>
+                    <p className="text-zinc-950-foreground text-sm">
+                      Upload images for this tour. You can add up to 10 images. Images can be
+                      reordered by dragging and dropping.
+                    </p>
+                  </div>
+                  <TourImageUpload
+                    tourId={tourId}
+                    initialImages={tourImages}
+                    onUploadComplete={handleImageUploadComplete}
+                    disabled={isPending || isDeleting}
+                  />
+                </section>
+              </>
+            )}
+          </div>
 
-            <CardFooter className="flex justify-between">
-              <div className="flex gap-2">
+          <div className="flex justify-between pt-6">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={isPending || isDeleting}
+              >
+                Cancel
+              </Button>
+              {isEditMode && (
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => router.back()}
+                  variant="destructive"
+                  onClick={handleDelete}
                   disabled={isPending || isDeleting}
                 >
-                  Cancel
+                  {isDeleting ? 'Deleting...' : 'Delete Tour'}
                 </Button>
-                {isEditMode && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isPending || isDeleting}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete Tour'}
-                  </Button>
-                )}
-              </div>
-              <Button type="submit" disabled={isPending || isDeleting || isTourDateDialogOpen}>
-                {isPending
-                  ? isEditMode
-                    ? 'Updating...'
-                    : 'Creating...'
-                  : isEditMode
-                    ? 'Update Tour'
-                    : 'Create Tour'}
-              </Button>
-            </CardFooter>
-          </Card>
+              )}
+            </div>
+            <Button type="submit" disabled={isPending || isDeleting || isTourDateDialogOpen}>
+              {isPending
+                ? isEditMode
+                  ? 'Updating...'
+                  : 'Creating...'
+                : isEditMode
+                  ? 'Update Tour'
+                  : 'Create Tour'}
+            </Button>
+          </div>
         </form>
       </Form>
     </div>

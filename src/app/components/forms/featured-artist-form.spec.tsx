@@ -184,7 +184,7 @@ describe('FeaturedArtistForm', () => {
       render(<FeaturedArtistForm />);
 
       expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /create featured artist/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Featured Artist' })).toBeInTheDocument();
     });
   });
 
@@ -369,7 +369,7 @@ describe('FeaturedArtistForm', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       await user.click(screen.getByRole('button', { name: /cancel/i }));
 
-      expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist');
+      expect(mockPush).toHaveBeenCalledWith('/admin/featured-artists');
     });
   });
 

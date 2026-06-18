@@ -8,20 +8,13 @@ import { useActionState, useCallback, useEffect, useRef, useState, useTransition
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
 import {
   Form,
   FormField,
@@ -31,6 +24,7 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
@@ -613,19 +607,18 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   // Ensure form is fully initialized before rendering
   if (!artistForm || !control || isLoadingArtist) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{initialArtistId ? 'Edit Artist' : 'Create New Artist'}</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <SectionHeader
+          icon={Users}
+          title={initialArtistId ? 'Edit Artist' : 'Create New Artist'}
+          helpText="Loading artist details…"
+        />
+        <div className="space-y-4">
+          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+        </div>
+      </div>
     );
   }
 
@@ -645,15 +638,19 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
           },
         ]}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEditMode ? 'Edit Artist' : 'Create New Artist'}</CardTitle>
-          <CardDescription>
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <SectionHeader
+            icon={Users}
+            title={isEditMode ? 'Edit Artist' : 'Create New Artist'}
+            helpText="Manage the artist's name, images, biography, music metadata, and key dates. Required fields are marked with an asterisk."
+          />
+          <p className="text-muted-foreground text-sm">
             {isEditMode
               ? 'Update artist information. Changes are saved when you click Save.'
               : 'Required fields are marked with an asterisk *'}
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
         <Form {...artistForm}>
           <form
             action={formAction}
@@ -664,7 +661,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             })}
             noValidate
           >
-            <CardContent className="space-y-6">
+            <div className="space-y-6">
               <Separator />
               {/* Name Section */}
               <section className="space-y-4 pt-0">
@@ -874,9 +871,9 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                 />
                 <p className="text-zinc-950-foreground text-xs">Only used for bands</p>
               </section>
-            </CardContent>
+            </div>
 
-            <CardFooter className="flex justify-end gap-4">
+            <div className="flex justify-end gap-4 pt-6">
               {isEditMode ? (
                 // Edit mode buttons
                 <>
@@ -903,10 +900,10 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                   </Button>
                 </>
               )}
-            </CardFooter>
+            </div>
           </form>
         </Form>
-      </Card>
+      </div>
     </>
   );
 };

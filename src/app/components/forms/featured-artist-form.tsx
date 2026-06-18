@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, Star, XCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -17,14 +17,6 @@ import { TextField } from '@/app/components/forms/fields';
 import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
 import { ReleaseSelect, type ReleaseOption } from '@/app/components/forms/fields/release-select';
 import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
 import {
   Form,
   FormField,
@@ -35,6 +27,7 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
+import { SectionHeader } from '@/app/components/ui/section-header';
 import {
   Select,
   SelectContent,
@@ -403,7 +396,7 @@ export const FeaturedArtistForm = ({
   };
 
   const handleCancel = () => {
-    router.push('/admin?entity=featuredArtist');
+    router.push('/admin/featured-artists');
   };
 
   if (isLoadingFeaturedArtist) {
@@ -415,247 +408,248 @@ export const FeaturedArtistForm = ({
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="space-y-6">
       <BreadcrumbMenu
         items={[
           { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Featured Artists', url: '/admin?entity=featuredArtist', isActive: false },
+          { anchorText: 'Featured Artists', url: '/admin/featured-artists', isActive: false },
           { anchorText: isEditMode ? 'Edit' : 'New', url: '#', isActive: true },
         ]}
       />
 
+      <div className="space-y-1">
+        <SectionHeader
+          icon={Star}
+          title={isEditMode ? 'Edit Featured Artist' : 'Create Featured Artist'}
+          helpText="Spotlight an artist and track on the landing page. Associate a release; the MP3 320kbps format is used for playback."
+        />
+        <p className="text-muted-foreground text-sm">
+          {isEditMode
+            ? 'Update the featured artist details below.'
+            : 'Create a new featured artist entry to highlight on the landing page.'}
+        </p>
+      </div>
+
       <Form {...form}>
-        <form ref={formRef} onSubmit={handleSubmit} noValidate className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {isEditMode ? 'Edit Featured Artist' : 'Create Featured Artist'}
-              </CardTitle>
-              <CardDescription>
-                {isEditMode
-                  ? 'Update the featured artist details below.'
-                  : 'Create a new featured artist entry to highlight on the landing page.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Media Associations */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Media Associations</h3>
-                <p className="text-zinc-950-foreground text-sm">
-                  Associate this featured artist with a release. The MP3 320kbps digital format is
-                  automatically used for audio playback.
-                </p>
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
+          <div className="space-y-6">
+            {/* Media Associations */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Media Associations</h3>
+              <p className="text-zinc-950-foreground text-sm">
+                Associate this featured artist with a release. The MP3 320kbps digital format is
+                automatically used for audio playback.
+              </p>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <ReleaseSelect
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <ReleaseSelect
+                    control={control}
+                    name="releaseId"
+                    label="Release"
+                    placeholder="Select a release..."
+                    setValue={setValue}
+                    onReleaseChange={handleReleaseChange}
+                  />
+
+                  {/* Digital format status indicator */}
+                  {formatStatus === 'loading' && (
+                    <p className="text-zinc-950-foreground text-sm">
+                      Checking for MP3 320kbps format...
+                    </p>
+                  )}
+                  {formatStatus === 'found' && (
+                    <p className="flex items-center gap-1.5 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      MP3 320kbps format available ({formatFileCount}{' '}
+                      {formatFileCount === 1 ? 'file' : 'files'})
+                    </p>
+                  )}
+                  {formatStatus === 'missing' && (
+                    <p className="text-destructive flex items-center gap-1.5 text-sm">
+                      <XCircle className="h-4 w-4" />
+                      No MP3 320kbps format found. Please upload format files first.
+                    </p>
+                  )}
+
+                  {/* Featured Track selector */}
+                  {formatStatus === 'found' && formatTracks.length > 0 && (
+                    <FormField
                       control={control}
-                      name="releaseId"
-                      label="Release"
-                      placeholder="Select a release..."
-                      setValue={setValue}
-                      onReleaseChange={handleReleaseChange}
+                      name="featuredTrackNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Featured Track (Optional)</FormLabel>
+                          <Select
+                            value={field.value != null ? String(field.value) : ''}
+                            onValueChange={(val) => {
+                              field.onChange(val ? parseInt(val, 10) : undefined);
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Default (Track 1)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {formatTracks.map((track) => (
+                                <SelectItem
+                                  key={track.trackNumber}
+                                  value={String(track.trackNumber)}
+                                >
+                                  {track.trackNumber}.{' '}
+                                  {getTrackDisplayTitle(track.title, track.fileName)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Select the track that plays first when a user clicks play. Defaults to
+                            track 1.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-
-                    {/* Digital format status indicator */}
-                    {formatStatus === 'loading' && (
-                      <p className="text-zinc-950-foreground text-sm">
-                        Checking for MP3 320kbps format...
-                      </p>
-                    )}
-                    {formatStatus === 'found' && (
-                      <p className="flex items-center gap-1.5 text-sm text-green-600">
-                        <CheckCircle2 className="h-4 w-4" />
-                        MP3 320kbps format available ({formatFileCount}{' '}
-                        {formatFileCount === 1 ? 'file' : 'files'})
-                      </p>
-                    )}
-                    {formatStatus === 'missing' && (
-                      <p className="text-destructive flex items-center gap-1.5 text-sm">
-                        <XCircle className="h-4 w-4" />
-                        No MP3 320kbps format found. Please upload format files first.
-                      </p>
-                    )}
-
-                    {/* Featured Track selector */}
-                    {formatStatus === 'found' && formatTracks.length > 0 && (
-                      <FormField
-                        control={control}
-                        name="featuredTrackNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Featured Track (Optional)</FormLabel>
-                            <Select
-                              value={field.value != null ? String(field.value) : ''}
-                              onValueChange={(val) => {
-                                field.onChange(val ? parseInt(val, 10) : undefined);
-                              }}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Default (Track 1)" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {formatTracks.map((track) => (
-                                  <SelectItem
-                                    key={track.trackNumber}
-                                    value={String(track.trackNumber)}
-                                  >
-                                    {track.trackNumber}.{' '}
-                                    {getTrackDisplayTitle(track.title, track.fileName)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>
-                              Select the track that plays first when a user clicks play. Defaults to
-                              track 1.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Derived artists indicator */}
-                {derivedArtistNames.length > 0 && (
-                  <p className="text-zinc-950-foreground text-sm">
-                    Associated artists: {derivedArtistNames.join(', ')}
-                  </p>
-                )}
-
-                <Separator />
-
-                {/* Display Name */}
-                <TextField
-                  control={control}
-                  name="displayName"
-                  label="Display Name (Optional)"
-                  placeholder="Override display name when featured"
-                />
-                <p className="text-zinc-950-foreground -mt-4 text-sm">
-                  If not provided, the artist&apos;s default display name will be used.
+              {/* Derived artists indicator */}
+              {derivedArtistNames.length > 0 && (
+                <p className="text-zinc-950-foreground text-sm">
+                  Associated artists: {derivedArtistNames.join(', ')}
                 </p>
+              )}
 
-                {/* Description */}
+              <Separator />
+
+              {/* Display Name */}
+              <TextField
+                control={control}
+                name="displayName"
+                label="Display Name (Optional)"
+                placeholder="Override display name when featured"
+              />
+              <p className="text-zinc-950-foreground -mt-4 text-sm">
+                If not provided, the artist&apos;s default display name will be used.
+              </p>
+
+              {/* Description */}
+              <FormField
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="A brief description for when this artist is featured..."
+                        className="min-h-25"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Keep it brief. Markdown will be supported post-MVP.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Display Settings */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Display Settings</h3>
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={control}
-                  name="description"
+                  name="position"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Position</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="A brief description for when this artist is featured..."
-                          className="min-h-25"
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
                           {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
                         />
                       </FormControl>
                       <FormDescription>
-                        Keep it brief. Markdown will be supported post-MVP.
+                        Lower numbers appear first in the featured list.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <Separator />
-
-              {/* Display Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Display Settings</h3>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FormField
-                    control={control}
-                    name="position"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Position</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Lower numbers appear first in the featured list.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                <FormItem className="flex flex-col">
+                  <FormLabel>Featured Date</FormLabel>
+                  <DatePicker
+                    fieldName="featuredOn"
+                    onSelect={handleDateSelect}
+                    value={form.watch('featuredOn')}
                   />
+                  <FormDescription>When this artist should start being featured.</FormDescription>
+                  <FormMessage />
+                </FormItem>
 
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Featured Date</FormLabel>
-                    <DatePicker
-                      fieldName="featuredOn"
-                      onSelect={handleDateSelect}
-                      value={form.watch('featuredOn')}
-                    />
-                    <FormDescription>When this artist should start being featured.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Featured Until (Optional)</FormLabel>
-                    <DatePicker
-                      fieldName="featuredUntil"
-                      onSelect={handleDateSelect}
-                      value={form.watch('featuredUntil')}
-                    />
-                    <FormDescription>
-                      When this artist should stop being featured. Leave blank for indefinite.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                </div>
-
-                <CoverArtField
-                  control={control}
-                  name="coverArt"
-                  setValue={setValue}
-                  artistIds={derivedArtistIds}
-                  entityType="featured-artists"
-                  disabled={isPending}
-                  entityId={preGeneratedId}
-                  onUploadComplete={
-                    featuredArtistId
-                      ? async (cdnUrl) => {
-                          // Edit mode only: persist the new cover art to the
-                          // featured-artist row immediately (after S3 upload +
-                          // variant generation + orphan sweep + CloudFront
-                          // invalidation). For create mode there's no row to
-                          // update yet — submit will save it then.
-                          const result = await updateFeaturedArtistCoverArtAction(
-                            featuredArtistId,
-                            cdnUrl
-                          );
-                          if (!result.success) {
-                            throw new Error(result.error ?? 'Failed to save cover art');
-                          }
-                        }
-                      : undefined
-                  }
-                />
+                <FormItem className="flex flex-col">
+                  <FormLabel>Featured Until (Optional)</FormLabel>
+                  <DatePicker
+                    fieldName="featuredUntil"
+                    onSelect={handleDateSelect}
+                    value={form.watch('featuredUntil')}
+                  />
+                  <FormDescription>
+                    When this artist should stop being featured. Leave blank for indefinite.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button type="button" variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Featured Artist'}
-              </Button>
-            </CardFooter>
-          </Card>
+
+              <CoverArtField
+                control={control}
+                name="coverArt"
+                setValue={setValue}
+                artistIds={derivedArtistIds}
+                entityType="featured-artists"
+                disabled={isPending}
+                entityId={preGeneratedId}
+                onUploadComplete={
+                  featuredArtistId
+                    ? async (cdnUrl) => {
+                        // Edit mode only: persist the new cover art to the
+                        // featured-artist row immediately (after S3 upload +
+                        // variant generation + orphan sweep + CloudFront
+                        // invalidation). For create mode there's no row to
+                        // update yet — submit will save it then.
+                        const result = await updateFeaturedArtistCoverArtAction(
+                          featuredArtistId,
+                          cdnUrl
+                        );
+                        if (!result.success) {
+                          throw new Error(result.error ?? 'Failed to save cover art');
+                        }
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+          <div className="flex justify-between pt-6">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Featured Artist'}
+            </Button>
+          </div>
         </form>
       </Form>
     </div>
