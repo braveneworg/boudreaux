@@ -75,7 +75,10 @@ export default async function AdminDashboardPage() {
         helpText="An at-a-glance overview of your content and moderation queues. Each tile links to its section; the chart compares published and unpublished content."
       />
 
-      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul
+        aria-label="Section overview"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         {ADMIN_NAV_ITEMS.map((item) => {
           const tile = tiles[item.href];
           const Icon = item.icon;

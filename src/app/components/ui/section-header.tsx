@@ -1,14 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-'use client';
-
 import * as React from 'react';
 
-import { HelpCircle } from 'lucide-react';
-
 import { Heading } from '@/app/components/ui/heading';
-import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { SectionHelp } from '@/app/components/ui/section-help';
 import { cn } from '@/lib/utils';
 
 import type { LucideIcon } from 'lucide-react';
@@ -27,8 +23,9 @@ export interface SectionHeaderProps {
 
 /**
  * Consistent admin section header: a leading icon, a title, and a tap-friendly
- * help popover that surfaces guidance for the admin. Uses a Popover (rather than
- * a hover-only tooltip) so the guidance is reachable on touch devices too.
+ * help popover that surfaces guidance for the admin. This is a shared (server)
+ * component so server-rendered pages can pass a lucide icon component directly;
+ * only the interactive help popover ({@link SectionHelp}) is a client component.
  */
 export const SectionHeader = ({
   icon: Icon,
@@ -42,14 +39,6 @@ export const SectionHeader = ({
     <Heading level={level} className="h-auto">
       {title}
     </Heading>
-    <Popover>
-      <PopoverTrigger
-        aria-label={`About ${title}`}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-7 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px]"
-      >
-        <HelpCircle className="size-5" />
-      </PopoverTrigger>
-      <PopoverContent className="text-sm leading-relaxed">{helpText}</PopoverContent>
-    </Popover>
+    <SectionHelp label={`About ${title}`}>{helpText}</SectionHelp>
   </div>
 );
