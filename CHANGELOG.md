@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.131.0] - 2026-06-18
+
+### Added
+
+- refactor: ♻️ ban eslint disables, audit config (#504)\n- refactor: ♻️ ban eslint disables, audit config (#504)\n- refactor: ♻️ ban eslint disables, audit config (#504)\n
+
 ## [4.130.0] - 2026-06-17
 
 ### Added
