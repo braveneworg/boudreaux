@@ -208,7 +208,10 @@ describe('ChatAdminService.listReportedUsers', () => {
 
     const result = await ChatAdminService.listReportedUsers();
 
-    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: null });
+    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({
+      windowDays: null,
+      search: undefined,
+    });
     expect(result).toEqual({ rows: [], nextSkip: null });
   });
 
@@ -217,17 +220,23 @@ describe('ChatAdminService.listReportedUsers', () => {
 
     await ChatAdminService.listReportedUsers({ windowDays: 7 });
 
-    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: 7 });
+    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({
+      windowDays: 7,
+      search: undefined,
+    });
   });
 
-  it('filters by a case-insensitive username/email search term', async () => {
+  it('forwards the search term to the repository (DB-side filtering)', async () => {
     vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([
       makeSummary('u1', 'Spammer', 'spam@example.com'),
-      makeSummary('u2', 'Goodie', 'good@example.com'),
     ]);
 
     const result = await ChatAdminService.listReportedUsers({ search: 'SPAM' });
 
+    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({
+      windowDays: null,
+      search: 'SPAM',
+    });
     expect(result.rows.map((r) => r.userId)).toEqual(['u1']);
   });
 

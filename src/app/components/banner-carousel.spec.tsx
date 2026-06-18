@@ -145,13 +145,11 @@ describe('BannerCarousel', () => {
       );
     });
 
-    it('emits a Next Image preload tag for the initial banner only', () => {
-      // The first slide is rendered with `priority`, which is REQUIRED for mobile
-      // LCP: HomeContent hydrates from a client query cache, so without the
-      // server-rendered `<link rel=preload>` the browser can't discover the banner
-      // until hydration, pushing LCP to ~9s. Subsequent slides must NOT re-emit a
-      // preload tag. (On desktop the carousel is hidden and this preload goes
-      // unused — an accepted cosmetic trade-off; see banner-carousel.tsx.)
+    it('does NOT emit its own image preload tag (the mobile preload is media-scoped in page.tsx)', () => {
+      // `priority` was removed from the carousel `<Image>` because it emits an
+      // unconditional `<link rel=preload>` the browser also fetches on desktop —
+      // where the carousel is `md:hidden` — triggering "preloaded but not used".
+      // The required mobile LCP preload is a media-scoped link in app/page.tsx.
       document.head.querySelectorAll('link[rel="preload"][as="image"]').forEach((node) => {
         node.remove();
       });
@@ -163,7 +161,7 @@ describe('BannerCarousel', () => {
       );
 
       const preloads = document.head.querySelectorAll('link[rel="preload"][as="image"]');
-      expect(preloads).toHaveLength(1);
+      expect(preloads).toHaveLength(0);
     });
 
     it('eager-loads the initial banner with high fetch priority', () => {

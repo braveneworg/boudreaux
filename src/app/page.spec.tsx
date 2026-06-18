@@ -174,6 +174,53 @@ describe('Home Page', () => {
     expect(screen.getByTestId('home-content')).toBeInTheDocument();
   });
 
+  describe('mobile banner preload', () => {
+    const seedFirstBanner = () =>
+      mockGetQueryData.mockImplementation((key: string[]) =>
+        key[0] === 'banners'
+          ? {
+              banners: [{ slotNumber: 1, imageFilename: 'hero-banner.jpg', notification: null }],
+              rotationInterval: 5000,
+            }
+          : undefined
+      );
+
+    it('emits an image preload link for the first banner slot', async () => {
+      seedFirstBanner();
+
+      render(await Home());
+
+      const preload = document.querySelector('link[rel="preload"][as="image"]');
+      expect(preload).not.toBeNull();
+    });
+
+    it('scopes the preload to the mobile breakpoint so desktop never fetches it', async () => {
+      seedFirstBanner();
+
+      render(await Home());
+
+      const preload = document.querySelector('link[rel="preload"][as="image"]');
+      expect(preload?.getAttribute('media')).toBe('(max-width: 767.98px)');
+    });
+
+    it('builds the srcset from the first banner filename', async () => {
+      seedFirstBanner();
+
+      render(await Home());
+
+      const preload = document.querySelector('link[rel="preload"][as="image"]');
+      expect(preload?.getAttribute('imagesrcset')).toContain('hero-banner');
+    });
+
+    it('emits no preload link when no banners are cached', async () => {
+      mockGetQueryData.mockReturnValue(undefined);
+
+      render(await Home());
+
+      expect(document.querySelector('link[rel="preload"][as="image"]')).toBeNull();
+    });
+  });
+
   it('does not emit a manual ReactDOM.preload for the featured-artist cover art', async () => {
     // The FeaturedArtistsPlayer is dynamic-imported with `ssr: false`, so the
     // <img> consumer renders well after window.load and a manual preload would

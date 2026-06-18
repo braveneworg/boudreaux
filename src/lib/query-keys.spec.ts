@@ -237,9 +237,14 @@ describe('queryKeys', () => {
       expect(key).toEqual(['chat', 'pinned']);
     });
 
-    it('should return adminUsers key with page and sort params', () => {
-      const key = queryKeys.chat.adminUsers(2, 'createdAt', 'desc');
-      expect(key).toEqual(['chat', 'adminUsers', 2, 'createdAt', 'desc']);
+    it('should return adminUsers key with page, perPage and sort params', () => {
+      const key = queryKeys.chat.adminUsers({
+        page: 2,
+        perPage: 50,
+        sortBy: 'createdAt',
+        sortDirection: 'desc',
+      });
+      expect(key).toEqual(['chat', 'adminUsers', 2, 50, 'createdAt', 'desc']);
     });
 
     it('should return mentionSearch key with query', () => {
@@ -290,13 +295,13 @@ describe('queryKeys', () => {
     });
 
     it('builds the reported-users infinite key with window and search', () => {
-      expect(queryKeys.chat.reportedUsersInfinite(30, 'Spammer')).toEqual([
+      expect(queryKeys.chat.reportedUsersInfinite({ windowDays: 30, search: 'Spammer' })).toEqual([
         'chat',
         'reportedUsersInfinite',
         30,
         'spammer',
       ]);
-      expect(queryKeys.chat.reportedUsersInfinite('all')).toEqual([
+      expect(queryKeys.chat.reportedUsersInfinite({ windowDays: null })).toEqual([
         'chat',
         'reportedUsersInfinite',
         'all',

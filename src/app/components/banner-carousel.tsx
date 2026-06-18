@@ -464,18 +464,19 @@ export const BannerCarousel = ({
                 }}
               >
                 {shouldRenderImage && (
-                  // `priority` on the first slide is REQUIRED for mobile LCP.
-                  // HomeContent is a client component hydrated from a TanStack
-                  // Query cache, so without the server-rendered `<link rel=preload>`
-                  // that `priority` emits, the browser can't discover the banner
-                  // until hydration completes — pushing LCP to ~9s in Lighthouse
-                  // (mobile, where this carousel is the visible treatment).
-                  // Trade-off: on desktop the carousel is `md:hidden` and the
-                  // `BannerStrip` is shown, so this preload is "preloaded but not
-                  // used" there. That is an accepted, cosmetic dev-console warning —
-                  // a media-scoped preload isn't expressible via `next/image`, and
-                  // the mobile LCP win far outweighs it. DO NOT remove `priority`
-                  // to silence that warning (doing so regressed LCP 90→67).
+                  // No `priority` here. `priority` makes `next/image` emit an
+                  // unconditional `<link rel=preload>` that the browser also
+                  // honors on desktop — where this carousel is `md:hidden` and
+                  // the `BannerStrip` is shown instead — producing Chrome's
+                  // "preloaded but not used" warning. The mobile LCP preload
+                  // (still REQUIRED: HomeContent hydrates from a client query
+                  // cache, so without a server-rendered preload the banner isn't
+                  // discovered until hydration, pushing LCP to ~9s) is instead
+                  // emitted from `app/page.tsx` as a media-scoped
+                  // `<link rel=preload media="(max-width: 767.98px)">`, so only
+                  // viewports that actually render this carousel fetch it.
+                  // `loading="eager"` + high `fetchPriority` on the current slide
+                  // keep it first in the request queue once it does render.
                   <Image
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
@@ -483,11 +484,10 @@ export const BannerCarousel = ({
                     // The carousel is full-bleed below `xl` but its `<main>`
                     // ancestor caps width at `max-w-7xl` (1280px) from the `xl`
                     // breakpoint up, so above 1280px the banner never fills the
-                    // viewport. Match `sizes` to that layout so the browser (and
-                    // the `priority` preload) picks the 1280px variant instead
-                    // of a needlessly large full-viewport one on wide screens.
+                    // viewport. Match `sizes` to that layout so the browser picks
+                    // the 1280px variant instead of a needlessly large
+                    // full-viewport one on wide screens.
                     sizes="(min-width: 1280px) 1280px, 100vw"
-                    priority={idx === 0 && currentIndex === 0}
                     fetchPriority={isCurrentSlide ? 'high' : 'low'}
                     loading={isCurrentSlide ? 'eager' : 'lazy'}
                     className="object-cover"

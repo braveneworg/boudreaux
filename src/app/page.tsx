@@ -4,9 +4,13 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import { BannerNotificationService } from '@/lib/services/banner-notification-service';
+import {
+  type BannersApiResponse,
+  BannerNotificationService,
+} from '@/lib/services/banner-notification-service';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
@@ -33,18 +37,22 @@ export const dynamic = 'force-dynamic';
  * Home page — Server Component that prefetches banners and featured artists,
  * then hydrates client components for interactivity.
  *
- * The hero banner LCP preload is emitted by `next/image` itself: the first
- * slide in `BannerCarousel` is rendered with `priority`, which produces a
- * `<link rel=preload as=image>` with matching `imagesrcset`/`imagesizes`,
- * so the browser preload-picker selects the exact variant the rendered
- * `<img>` will use. This is REQUIRED for mobile LCP (HomeContent hydrates from
- * a client query cache, so without the preload the banner isn't discovered
- * until hydration). The featured-artist cover art is intentionally NOT
- * preloaded here: the `FeaturedArtistsPlayer` is dynamic-imported with
- * `ssr: false`, so the `<img>` that would consume the preload doesn't
- * render until after Video.js's chunk has loaded — well past the
- * `window.load` event — which causes Chrome to log
- * "preloaded using link preload but not used within a few seconds".
+ * The hero banner LCP preload is emitted here as a media-scoped
+ * `<link rel=preload as=image media="(max-width: 767.98px)">` for the first
+ * banner slot. It is REQUIRED for mobile LCP — HomeContent hydrates from a
+ * client query cache, so without a server-rendered preload the banner isn't
+ * discovered until hydration (pushing LCP to ~9s). Scoping it to the mobile
+ * breakpoint matters because the `BannerCarousel` is `md:hidden` on desktop
+ * (the `BannerStrip` shows instead); an unconditional preload — e.g. the one
+ * `next/image` `priority` emits — would be fetched on desktop and never used,
+ * triggering Chrome's "preloaded but not used" warning. The `imagesrcset`
+ * mirrors what the carousel's `<Image>` requests (via `buildBannerPreloadSrcSet`,
+ * same custom loader), so the preload cache hits the rendered `<img>`.
+ *
+ * The featured-artist cover art is intentionally NOT preloaded: the
+ * `FeaturedArtistsPlayer` is dynamic-imported with `ssr: false`, so the `<img>`
+ * that would consume the preload doesn't render until after Video.js's chunk
+ * loads — well past `window.load` — which also logs "preloaded but not used".
  */
 export default async function Home() {
   const queryClient = getQueryClient();
@@ -83,8 +91,23 @@ export default async function Home() {
     }),
   ]);
 
+  // Read the prefetched banners back out of the query cache (no extra service
+  // call) to build the first-slot preload. `banners[0]` is carousel slide 0.
+  const bannersData = queryClient.getQueryData<BannersApiResponse>(queryKeys.banners.active());
+  const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
+      {firstBannerFilename && (
+        <link
+          rel="preload"
+          as="image"
+          media="(max-width: 767.98px)"
+          imageSrcSet={buildBannerPreloadSrcSet(firstBannerFilename)}
+          imageSizes="100vw"
+          fetchPriority="high"
+        />
+      )}
       <PageContainer>
         <HomeContent />
       </PageContainer>

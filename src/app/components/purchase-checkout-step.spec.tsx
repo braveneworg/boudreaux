@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { PurchaseCheckoutStep } from './purchase-checkout-step';
 
@@ -228,7 +228,7 @@ describe('PurchaseCheckoutStep', () => {
   });
 
   describe('useQuery polling branches', () => {
-    it('queryFn fetches purchase status and increments poll count', async () => {
+    it('queryFn fetches purchase status', async () => {
       // Capture the useQuery config to invoke queryFn directly
       let capturedConfig: Record<string, unknown> = {};
       mockUseQuery.mockImplementation((config: Record<string, unknown>) => {
@@ -686,7 +686,7 @@ describe('PurchaseCheckoutStep', () => {
     expect(result).toBe(3500);
   });
 
-  it('shows timeout UI when pollCount reaches MAX_POLL_COUNT without confirmation', async () => {
+  it('shows timeout UI when the query has polled MAX_POLL_COUNT times without confirmation', async () => {
     mockCheckoutState.mockReturnValue({
       type: 'success',
       checkout: {
@@ -695,6 +695,9 @@ describe('PurchaseCheckoutStep', () => {
       },
     });
 
+    // The poll cap + timeout UI are driven by TanStack Query's own
+    // `query.state.dataUpdateCount` inside `refetchInterval` (no setState in
+    // queryFn). Capture the config so we can simulate the limit being reached.
     let capturedConfig: Record<string, unknown> = {};
     mockUseQuery.mockImplementation((config: Record<string, unknown>) => {
       capturedConfig = config;
@@ -718,25 +721,17 @@ describe('PurchaseCheckoutStep', () => {
     // Click Pay to trigger paymentComplete
     fireEvent.click(screen.getByText(/Pay \$/));
 
-    // Wait for payment received UI
-    await waitFor(() => {
-      expect(screen.getByText('Payment received!')).toBeDefined();
+    // Simulate the query reaching MAX_POLL_COUNT polls without confirmation:
+    // refetchInterval latches pollLimitReached and stops polling.
+    const refetchInterval = capturedConfig.refetchInterval as (query: unknown) => number | false;
+    act(() => {
+      refetchInterval({
+        state: { data: { confirmed: false }, dataUpdateCount: 30, fetchStatus: 'idle' },
+      });
     });
 
-    // Now call queryFn 30 times to increment pollCount to MAX_POLL_COUNT
-    const queryFn = capturedConfig.queryFn as () => Promise<unknown>;
-    const mockFetch = vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ confirmed: false }),
-    } as Response);
-
-    for (let i = 0; i < 30; i++) {
-      await queryFn();
-    }
-
-    mockFetch.mockRestore();
-
-    // After 30 polls, the timeout UI should be shown
+    // With paymentComplete + the poll limit reached + unconfirmed, the timeout
+    // UI should be shown.
     await waitFor(() => {
       expect(screen.getByText(/taking longer than expected/)).toBeDefined();
     });

@@ -69,6 +69,7 @@ model User {
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
+  @@index([role]) // Admin notification fan-out (findAdmins)
 }
 
 model Account {
@@ -297,6 +298,7 @@ model Artist {
   @@index([isActive])
   @@index([firstName, surname])
   @@index([displayName])
+  @@index([createdAt]) // Admin listing sort (findMany orderBy createdAt desc)
 }
 
 model FeaturedArtist {
@@ -871,5 +873,7 @@ model ChatRateLimitLog {
   attemptedAt DateTime @default(now())
 
   @@index([attemptedAt])
-  @@index([fingerprint])
+  // Rolling-window breach count (countByFingerprintSince): fingerprint filter +
+  // attemptedAt range. Prefix also serves fingerprint-only lookups.
+  @@index([fingerprint, attemptedAt])
 }

@@ -13,9 +13,20 @@ import type { Prisma } from '@prisma/client';
  * `FeaturedArtist` payload type consumed by the service and its Zod schemas.
  */
 export const featuredArtistInclude = {
+  // Project to only the fields the carousel/player and the display-name and
+  // cover-art utils actually read — full Artist documents are large (bio,
+  // notes[], addresses, …) and were shipped wholesale. `release.artistReleases`
+  // (a 4th relation-fetch level — Prisma/MongoDB issues one query per relation
+  // edge) is intentionally dropped: it only fed a third-priority display-name
+  // fallback for records with no `displayName` and no connected `artists[]`.
   artists: {
-    include: {
-      images: true,
+    select: {
+      id: true,
+      displayName: true,
+      firstName: true,
+      surname: true,
+      slug: true,
+      images: { select: { src: true } },
     },
   },
   digitalFormat: {
@@ -26,13 +37,11 @@ export const featuredArtistInclude = {
     },
   },
   release: {
-    include: {
-      images: true,
-      artistReleases: {
-        include: {
-          artist: true,
-        },
-      },
+    select: {
+      id: true,
+      title: true,
+      coverArt: true,
+      images: { select: { src: true } },
     },
   },
 } satisfies Prisma.FeaturedArtistInclude;

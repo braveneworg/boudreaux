@@ -145,6 +145,62 @@ describe('AbuseReportRepository.listReportedUsers', () => {
     });
   });
 
+  it('pushes the search term into the where via the reportedUser relation', async () => {
+    vi.mocked(prisma.abuseReport.groupBy).mockResolvedValue([] as never);
+
+    await AbuseReportRepository.listReportedUsers({ windowDays: null, search: '  SPAM  ' });
+
+    expect(prisma.abuseReport.groupBy).toHaveBeenCalledWith({
+      by: ['reportedUserId'],
+      where: {
+        reportedUser: {
+          OR: [
+            { username: { contains: 'SPAM', mode: 'insensitive' } },
+            { email: { contains: 'SPAM', mode: 'insensitive' } },
+          ],
+        },
+      },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+  });
+
+  it('combines the window and search filters in the same where clause', async () => {
+    vi.mocked(prisma.abuseReport.groupBy).mockResolvedValue([] as never);
+    const fixedNow = new Date('2026-05-14T00:00:00Z').getTime();
+    vi.spyOn(Date, 'now').mockReturnValue(fixedNow);
+
+    await AbuseReportRepository.listReportedUsers({ windowDays: 7, search: 'bob' });
+
+    expect(prisma.abuseReport.groupBy).toHaveBeenCalledWith({
+      by: ['reportedUserId'],
+      where: {
+        createdAt: { gte: new Date(fixedNow - 7 * 24 * 60 * 60 * 1000) },
+        reportedUser: {
+          OR: [
+            { username: { contains: 'bob', mode: 'insensitive' } },
+            { email: { contains: 'bob', mode: 'insensitive' } },
+          ],
+        },
+      },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+  });
+
+  it('ignores a blank/whitespace-only search term', async () => {
+    vi.mocked(prisma.abuseReport.groupBy).mockResolvedValue([] as never);
+
+    await AbuseReportRepository.listReportedUsers({ windowDays: null, search: '   ' });
+
+    expect(prisma.abuseReport.groupBy).toHaveBeenCalledWith({
+      by: ['reportedUserId'],
+      where: {},
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+  });
+
   it('joins users, computes chatDisabled, and sorts newest-first', async () => {
     vi.mocked(prisma.abuseReport.groupBy).mockResolvedValue([
       {

@@ -5,6 +5,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import type { Prisma } from '@prisma/client';
+
 interface CreateAbuseReportData {
   reportedUserId: string;
   reporterId: string;
@@ -14,6 +16,12 @@ interface CreateAbuseReportData {
 interface ListReportedUsersParams {
   /** Only count reports whose `createdAt` is within this many days. `null` = all-time. */
   windowDays: number | null;
+  /**
+   * Case-insensitive username/email filter. Pushed into the `groupBy` `where`
+   * via the `reportedUser` relation so the database only groups matching
+   * reports — the admin search never fetches the full reported-user set.
+   */
+  search?: string;
 }
 
 export interface ReportedUserSummary {
@@ -86,11 +94,21 @@ export class AbuseReportRepository {
    */
   static async listReportedUsers({
     windowDays,
+    search,
   }: ListReportedUsersParams): Promise<ReportedUserSummary[]> {
-    const where =
-      windowDays === null
-        ? {}
-        : { createdAt: { gte: new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000) } };
+    const where: Prisma.AbuseReportWhereInput = {};
+    if (windowDays !== null) {
+      where.createdAt = { gte: new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000) };
+    }
+    const term = search?.trim();
+    if (term) {
+      where.reportedUser = {
+        OR: [
+          { username: { contains: term, mode: 'insensitive' } },
+          { email: { contains: term, mode: 'insensitive' } },
+        ],
+      };
+    }
 
     const grouped = await prisma.abuseReport.groupBy({
       by: ['reportedUserId'],

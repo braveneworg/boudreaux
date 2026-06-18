@@ -127,10 +127,12 @@ export class ChatAdminService {
    * Returns one skip/offset page of reported users for the moderation table's
    * default view, newest report first. Pass `windowDays: null` for all-time.
    *
-   * The underlying repository computes a grouped + globally-sorted array (a
-   * MongoDB `groupBy` that doesn't paginate cleanly at the DB), so the
-   * case-insensitive username/email search and the skip/take slice are applied
-   * here in memory. Report volume is small, so this is acceptable.
+   * The case-insensitive username/email `search` is pushed into the repository's
+   * `groupBy` query (filtered via the `reportedUser` relation), so searching no
+   * longer fetches the full reported-user set. The repository returns a grouped,
+   * globally-sorted array — bounded by the number of distinct reported users —
+   * which a MongoDB `groupBy` cannot page cleanly at the DB, so the skip/take
+   * slice is applied here. Report volume is small, so this is acceptable.
    */
   static async listReportedUsers({
     windowDays = null,
@@ -143,19 +145,10 @@ export class ChatAdminService {
     skip?: number;
     take?: number;
   } = {}): Promise<{ rows: ReportedUserSummary[]; nextSkip: number | null }> {
-    const all = await AbuseReportRepository.listReportedUsers({ windowDays });
+    const matches = await AbuseReportRepository.listReportedUsers({ windowDays, search });
 
-    const term = search?.trim().toLowerCase();
-    const filtered = term
-      ? all.filter(
-          (row) =>
-            (row.username?.toLowerCase().includes(term) ?? false) ||
-            row.email.toLowerCase().includes(term)
-        )
-      : all;
-
-    const rows = filtered.slice(skip, skip + take);
-    const nextSkip = skip + take < filtered.length ? skip + take : null;
+    const rows = matches.slice(skip, skip + take);
+    const nextSkip = skip + take < matches.length ? skip + take : null;
 
     return { rows, nextSkip };
   }
