@@ -10,11 +10,9 @@ import { EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useInfiniteAdminUserMessagesQuery } from '@/hooks/use-infinite-admin-user-messages-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import { useIsMobile } from '@/hooks/use-mobile';
 import {
   disableChatUserAction,
   enableChatUserAction,
@@ -38,7 +36,7 @@ interface UserDetailViewProps {
  * user's chat messages newest-first and exposes:
  *
  * - A top-level disable/enable toggle (audit-aware via {@link disableChatUserAction})
- * - A per-message hide control: toggle switch on mobile, checkbox on desktop
+ * - A per-message hide toggle switch
  *
  * Hide controls call {@link toggleMessageHiddenAction} which records
  * `hiddenReason: "admin_flagged"` so the hide survives re-enabling the
@@ -46,7 +44,6 @@ interface UserDetailViewProps {
  * removes both per-message and disable-author hides from public chat.
  */
 export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewProps) => {
-  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [chatDisabled, setChatDisabled] = useState(initialChatDisabled);
   const [isPending, startTransition] = useTransition();
@@ -176,29 +173,15 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
                   </p>
                 </div>
 
-                {isMobile ? (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Hide</span>
-                    <Switch
-                      aria-label={`${isHidden ? 'Unhide' : 'Hide'} message`}
-                      checked={isHidden}
-                      disabled={isPending}
-                      onCheckedChange={(checked) => handleToggleMessageHidden(message.id, checked)}
-                    />
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground inline-flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={isHidden}
-                      disabled={isPending}
-                      onCheckedChange={(checked) =>
-                        handleToggleMessageHidden(message.id, checked === true)
-                      }
-                      aria-label={`${isHidden ? 'Unhide' : 'Hide'} message`}
-                    />
-                    <span>Hide</span>
-                  </span>
-                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Hide</span>
+                  <Switch
+                    aria-label={`${isHidden ? 'Unhide' : 'Hide'} message`}
+                    checked={isHidden}
+                    disabled={isPending}
+                    onCheckedChange={(checked) => handleToggleMessageHidden(message.id, checked)}
+                  />
+                </div>
               </li>
             );
           })}
