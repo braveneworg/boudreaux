@@ -136,6 +136,11 @@ export class ReleaseRepository {
     });
   }
 
+  /** Count releases matching an optional filter (used by the admin dashboard). */
+  static async count(where: Prisma.ReleaseWhereInput = {}): Promise<number> {
+    return prisma.release.count({ where });
+  }
+
   /**
    * Update a release by id with the full detail include (images unbounded).
    */

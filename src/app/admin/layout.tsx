@@ -5,6 +5,8 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { ContentContainer } from '@/ui/content-container';
 import { PageContainer } from '@/ui/page-container';
 
+import { AdminNav } from './components/admin-nav';
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Enforce admin role for all admin routes
   await requireRole('admin');
@@ -12,7 +14,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <PageContainer>
       <ContentContainer>
-        <section>{children}</section>
+        <AdminNav />
+        <section className="py-6">{children}</section>
       </ContentContainer>
     </PageContainer>
   );

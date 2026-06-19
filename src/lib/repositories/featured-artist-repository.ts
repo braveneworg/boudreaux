@@ -105,6 +105,11 @@ export class FeaturedArtistRepository {
     });
   }
 
+  /** Count featured artists matching an optional filter (used by the admin dashboard). */
+  static async count(where: Prisma.FeaturedArtistWhereInput = {}): Promise<number> {
+    return prisma.featuredArtist.count({ where });
+  }
+
   /** Find a single featured artist by id, or `null` if it does not exist. */
   static async findById(id: string) {
     return prisma.featuredArtist.findUnique({

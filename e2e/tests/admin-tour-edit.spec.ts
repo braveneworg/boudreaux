@@ -63,9 +63,7 @@ test.describe('Admin Tour Editing', () => {
 
     await adminPage.goto(`/admin/tours/${tourId}`);
 
-    await expect(
-      adminPage.locator('[data-slot="card-title"]', { hasText: 'Edit Tour' })
-    ).toBeVisible();
+    await expect(adminPage.getByRole('heading', { name: 'Edit Tour', exact: true })).toBeVisible();
     await expect(adminPage.locator('[name="title"]')).toHaveValue(title);
     await expect(adminPage.locator('[name="subtitle"]')).toHaveValue('Original Subtitle');
     await expect(adminPage.locator('[name="subtitle2"]')).toHaveValue('Original Subtitle 2');
@@ -149,8 +147,6 @@ test.describe('Admin Tour Editing', () => {
   test('should handle non-existent tour route', async ({ adminPage }) => {
     await adminPage.goto('/admin/tours/nonexistent-id');
 
-    await expect(
-      adminPage.locator('[data-slot="card-title"]', { hasText: 'Edit Tour' })
-    ).toBeVisible();
+    await expect(adminPage.getByRole('heading', { name: 'Edit Tour', exact: true })).toBeVisible();
   });
 });

@@ -391,7 +391,7 @@ jobs:
           NEXT_PUBLIC_BANNER_INTERVAL: "1000"
           NEXT_PUBLIC_E2E_MODE: "true"
           NODE_ENV: "production"
-          AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           AUTH_URL: "http://localhost:3000"
         run: pnpm exec next build --webpack
 
@@ -444,7 +444,7 @@ jobs:
           NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
           NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
           NODE_ENV: "production"
-          AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           AUTH_URL: "http://localhost:3000"
         run: pnpm exec next build --webpack
 

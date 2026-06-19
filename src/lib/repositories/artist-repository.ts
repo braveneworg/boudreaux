@@ -91,6 +91,11 @@ export class ArtistRepository {
     }) as Promise<Artist[]>;
   }
 
+  /** Count artists matching an optional filter (used by the admin dashboard). */
+  static async count(where: Prisma.ArtistWhereInput = {}): Promise<number> {
+    return prisma.artist.count({ where });
+  }
+
   /** Update an artist by id. */
   static async update(id: string, data: Prisma.ArtistUpdateInput): Promise<PrismaArtist> {
     return prisma.artist.update({ where: { id }, data });

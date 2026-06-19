@@ -58,3 +58,15 @@ describe('DataView refresh overlay', () => {
     expect(screen.getByRole('status', { name: 'Loading artists' })).toBeInTheDocument();
   });
 });
+
+describe('DataView create button', () => {
+  it('shows the create button by default', () => {
+    renderDataView();
+    expect(screen.getByRole('button', { name: /create artist/i })).toBeInTheDocument();
+  });
+
+  it('hides the create button when canCreate is false', () => {
+    renderDataView({ canCreate: false });
+    expect(screen.queryByRole('button', { name: /create artist/i })).not.toBeInTheDocument();
+  });
+});

@@ -101,6 +101,7 @@ export const DataView = <T extends Record<string, unknown>>({
   onShowUnpublishedChange,
   showDeleted,
   onShowDeletedChange,
+  canCreate = true,
 }: {
   entity: AdminEntity;
   data: Record<string, T[]> | null;
@@ -140,6 +141,11 @@ export const DataView = <T extends Record<string, unknown>>({
   showDeleted: boolean;
   /** Called when the "show deleted" toggle changes. */
   onShowDeletedChange: (value: boolean) => void;
+  /**
+   * Whether the "Create {entity}" button is shown. Defaults to true. Artists set
+   * this to false because new artists are created only from a release.
+   */
+  canCreate?: boolean;
 }) => {
   const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
   const router = useRouter();
@@ -308,10 +314,12 @@ export const DataView = <T extends Record<string, unknown>>({
 
   return (
     <div className="mx-1">
-      <Button
-        className="w-full"
-        onClick={handleCreateEntityButtonClick}
-      >{`Create ${entityDisplayLabel}`}</Button>
+      {canCreate && (
+        <Button
+          className="w-full"
+          onClick={handleCreateEntityButtonClick}
+        >{`Create ${entityDisplayLabel}`}</Button>
+      )}
       {error && <div className="mb-2 text-red-600">{error}</div>}
       <Input
         className="my-4 w-full"

@@ -245,6 +245,13 @@ export class TourDateRepository {
     });
   }
 
+  /** Count tour dates scheduled on or after now (used by the admin dashboard). */
+  static async countUpcoming(): Promise<number> {
+    return prisma.tourDate.count({
+      where: { startDate: { gte: new Date() } },
+    });
+  }
+
   /**
    * Update the setTime for a specific headliner on a tour date
    */

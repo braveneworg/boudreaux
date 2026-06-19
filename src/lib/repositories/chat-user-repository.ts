@@ -130,4 +130,14 @@ export class ChatUserRepository {
   static async count() {
     return prisma.chatUser.count();
   }
+
+  /** Count flagged chat users (used by the admin dashboard). */
+  static async countFlagged(): Promise<number> {
+    return prisma.chatUser.count({ where: { flagged: true } });
+  }
+
+  /** Count chat users with disabled access (used by the admin dashboard). */
+  static async countDisabled(): Promise<number> {
+    return prisma.chatUser.count({ where: { disabled: true } });
+  }
 }

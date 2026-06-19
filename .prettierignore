@@ -41,3 +41,10 @@ prisma/migrations
 
 # Public assets
 public/
+
+# CI / infra configs — these conventionally use double-quoted YAML (GitHub
+# Actions, Docker Compose, Codecov). Leave them to their own quoting style so
+# Prettier (e.g. format-on-save) doesn't churn quotes on every edit.
+.github/
+docker-compose*.yml
+codecov.yml

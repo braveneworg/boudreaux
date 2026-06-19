@@ -2,22 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 
-import AdminPage from './page';
+import type { AdminStats } from '@/lib/services/admin-stats-service';
 
-// Mock next/navigation
-const mockPush = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: vi.fn(),
-    prefetch: vi.fn(),
-  }),
+import AdminDashboardPage from './page';
+
+vi.mock('server-only', () => ({}));
+
+const mockGetStats = vi.fn();
+vi.mock('@/lib/services/admin-stats-service', () => ({
+  AdminStatsService: { getStats: () => mockGetStats() },
 }));
 
-// Mock BreadcrumbMenu
-vi.mock('../components/ui/breadcrumb-menu', () => ({
+vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
   BreadcrumbMenu: ({ items }: { items: { anchorText: string; url: string }[] }) => (
     <nav data-testid="breadcrumb">
       {items.map((item) => (
@@ -29,149 +26,61 @@ vi.mock('../components/ui/breadcrumb-menu', () => ({
   ),
 }));
 
-// Mock Combobox
-vi.mock('@/components/forms/fields/combobox', () => ({
-  Combobox: ({
-    options,
-    onSelectAction,
-  }: {
-    options: { value: string; label: string }[];
-    onSelectAction: (value: string) => void;
-  }) => (
-    <div data-testid="combobox">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onSelectAction(opt.value)}
-          data-testid={`option-${opt.value}`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  ),
+vi.mock('./components/dashboard-charts', () => ({
+  DashboardCharts: () => <div data-testid="dashboard-charts">charts</div>,
 }));
 
-// Mock DataView components
-vi.mock('./data-views/artist-data-view', () => ({
-  ArtistDataView: () => <div data-testid="artist-data-view">Artist Data View</div>,
-}));
+const stats: AdminStats = {
+  releases: { total: 10, published: 7, draft: 3 },
+  featuredArtists: { total: 3 },
+  artists: { total: 20, published: 12 },
+  notifications: { activeSlots: 2 },
+  chat: { flaggedUsers: 4, disabledUsers: 1 },
+  tours: { total: 5, upcomingDates: 8 },
+};
 
-vi.mock('./data-views/release-data-view', () => ({
-  ReleaseDataView: () => <div data-testid="release-data-view">Release Data View</div>,
-}));
-
-vi.mock('./data-views/featured-artist-data-view', () => ({
-  FeaturedArtistDataView: () => (
-    <div data-testid="featured-artist-data-view">Featured Artist Data View</div>
-  ),
-}));
-
-describe('AdminPage', () => {
-  const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-  it('renders breadcrumb with Admin link', () => {
-    render(<AdminPage />);
-
-    expect(screen.getByTestId('breadcrumb')).toBeInTheDocument();
-    expect(screen.getByText('Admin')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin');
+describe('AdminDashboardPage', () => {
+  beforeEach(() => {
+    mockGetStats.mockResolvedValue(stats);
   });
 
-  it('renders combobox with entity options', () => {
-    render(<AdminPage />);
+  it('renders the dashboard heading', async () => {
+    render(await AdminDashboardPage());
 
-    expect(screen.getByTestId('combobox')).toBeInTheDocument();
-    expect(screen.getByTestId('option-artist')).toBeInTheDocument();
-    expect(screen.getByTestId('option-release')).toBeInTheDocument();
-    expect(screen.getByTestId('option-featured artist')).toBeInTheDocument();
-    expect(screen.getByTestId('option-notifications')).toBeInTheDocument();
-    expect(screen.getByTestId('option-tours')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
   });
 
-  it('displays title cased options', () => {
-    render(<AdminPage />);
+  it('renders a tile link for every admin section', async () => {
+    render(await AdminDashboardPage());
 
-    expect(screen.getByText('Artist')).toBeInTheDocument();
-    expect(screen.getByText('Release')).toBeInTheDocument();
-    expect(screen.getByText('Featured Artist')).toBeInTheDocument();
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
-    expect(screen.getByText('Tours')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
+      'href',
+      '/admin/releases'
+    );
+    expect(screen.getByRole('link', { name: 'Tours' })).toHaveAttribute('href', '/admin/tours');
   });
 
-  it('shows artist data view by default', () => {
-    render(<AdminPage />);
+  it('shows the release totals and breakdown', async () => {
+    render(await AdminDashboardPage());
 
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('release-data-view')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('featured-artist-data-view')).not.toBeInTheDocument();
+    expect(screen.getByText('7 published · 3 draft')).toBeInTheDocument();
   });
 
-  it('switches to release view when release is selected', async () => {
-    render(<AdminPage />);
+  it('shows tour upcoming dates', async () => {
+    render(await AdminDashboardPage());
 
-    await user.click(screen.getByTestId('option-release'));
-
-    expect(screen.getByTestId('release-data-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('artist-data-view')).not.toBeInTheDocument();
+    expect(screen.getByText('8 upcoming dates')).toBeInTheDocument();
   });
 
-  it('switches to featured artist view when featured artist is selected', async () => {
-    render(<AdminPage />);
+  it('renders the published-vs-unpublished chart', async () => {
+    render(await AdminDashboardPage());
 
-    await user.click(screen.getByTestId('option-featured artist'));
-
-    expect(screen.getByTestId('featured-artist-data-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('artist-data-view')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument();
   });
 
-  it('navigates to notifications page when notifications is selected', async () => {
-    render(<AdminPage />);
+  it('no longer renders the section combobox', async () => {
+    render(await AdminDashboardPage());
 
-    await user.click(screen.getByTestId('option-notifications'));
-
-    expect(mockPush).toHaveBeenCalledWith('/admin/notifications');
-    // Should still show artist view since we navigated away
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-  });
-
-  it('navigates to tours page when tours is selected', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-tours'));
-
-    expect(mockPush).toHaveBeenCalledWith('/admin/tours');
-    // Should still show artist view since we navigated away
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-  });
-
-  it('navigates to chat moderation page when chat is selected', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-chat'));
-
-    expect(mockPush).toHaveBeenCalledWith('/admin/chat');
-    // Should still show artist view since we navigated away
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-  });
-
-  it('navigates to logging page when logging is selected', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-logging'));
-
-    expect(mockPush).toHaveBeenCalledWith('/admin/logging');
-    // Should still show artist view since we navigated away
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-  });
-
-  it('can switch back to artist view after selecting another view', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-release'));
-    expect(screen.getByTestId('release-data-view')).toBeInTheDocument();
-
-    await user.click(screen.getByTestId('option-artist'));
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('release-data-view')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('combobox')).not.toBeInTheDocument();
   });
 });

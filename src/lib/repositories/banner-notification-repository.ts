@@ -34,6 +34,13 @@ export class BannerNotificationRepository {
     });
   }
 
+  /** Count banner slots that have content (used by the admin dashboard). */
+  static async countActive(): Promise<number> {
+    return prisma.bannerNotification.count({
+      where: { content: { not: null } },
+    });
+  }
+
   /**
    * Search past notifications for the repost combobox.
    * When `query` is provided, performs a case-insensitive `contains` match;

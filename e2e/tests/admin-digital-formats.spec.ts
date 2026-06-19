@@ -4,14 +4,28 @@
 
 import { expect, test } from '../fixtures/base.fixture';
 
+import type { Page } from '@playwright/test';
+
+/**
+ * Open the edit page for "E2E Album One" from the releases list. The list is the
+ * searchable DataView, so filter by title and follow the matching Edit link
+ * (the title is plain text here, not a named link).
+ */
+const openE2EAlbumOneEdit = async (adminPage: Page): Promise<void> => {
+  await adminPage.goto('/admin/releases');
+  await adminPage.getByPlaceholder(/search releases/i).fill('E2E Album One');
+  // Scope to the card for this exact title — search may also surface the other
+  // "E2E Album" releases, which have different format counts.
+  const card = adminPage.locator('li').filter({ hasText: 'E2E Album One' });
+  const editLink = card.getByRole('link', { name: /edit/i }).first();
+  await expect(editLink).toBeVisible({ timeout: 15_000 });
+  await editLink.click();
+  await expect(adminPage).toHaveURL(/\/admin\/releases\/[a-f0-9]{24}$/);
+};
+
 test.describe('Admin Digital Formats Accordion', () => {
   test('displays digital formats accordion on release edit page', async ({ adminPage }) => {
-    // Navigate to admin releases list
-    await adminPage.goto('/admin/releases');
-    await expect(adminPage.getByRole('heading', { name: 'Releases' })).toBeVisible();
-
-    // Click on E2E Album One (has MP3, FLAC, WAV formats seeded)
-    await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
+    await openE2EAlbumOneEdit(adminPage);
 
     // Verify the digital formats card is present
     await expect(adminPage.getByText('Digital Formats')).toBeVisible();
@@ -23,8 +37,7 @@ test.describe('Admin Digital Formats Accordion', () => {
   });
 
   test('shows checkmark indicators for uploaded formats', async ({ adminPage }) => {
-    await adminPage.goto('/admin/releases');
-    await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
+    await openE2EAlbumOneEdit(adminPage);
 
     // Wait for the formats card to render (signals the release detail view is hydrated)
     await expect(adminPage.getByText('Digital Formats')).toBeVisible({ timeout: 15_000 });
@@ -37,8 +50,7 @@ test.describe('Admin Digital Formats Accordion', () => {
   });
 
   test('shows format badge count in accordion header', async ({ adminPage }) => {
-    await adminPage.goto('/admin/releases');
-    await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
+    await openE2EAlbumOneEdit(adminPage);
 
     // Wait for the formats card to render before asserting the badge
     await expect(adminPage.getByText('Digital Formats')).toBeVisible({ timeout: 15_000 });
@@ -48,8 +60,7 @@ test.describe('Admin Digital Formats Accordion', () => {
   });
 
   test('can expand accordion item to see format details', async ({ adminPage }) => {
-    await adminPage.goto('/admin/releases');
-    await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
+    await openE2EAlbumOneEdit(adminPage);
 
     // Expand the MP3 320kbps accordion item
     const mp3Trigger = adminPage.getByRole('button', { name: /MP3 320kbps/ });
@@ -60,8 +71,7 @@ test.describe('Admin Digital Formats Accordion', () => {
   });
 
   test('displays all 8 format types in accordion', async ({ adminPage }) => {
-    await adminPage.goto('/admin/releases');
-    await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
+    await openE2EAlbumOneEdit(adminPage);
 
     // All 8 format accordion triggers should be present
     const formats = ['MP3 320kbps', 'MP3 V0', 'AAC', 'Ogg Vorbis', 'FLAC', 'ALAC', 'WAV', 'AIFF'];
