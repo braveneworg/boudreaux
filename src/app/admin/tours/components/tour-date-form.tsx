@@ -36,7 +36,10 @@ import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { TimePicker } from '@/app/components/ui/timepicker';
 import { TimezoneSelect } from '@/app/components/ui/timezone-select';
-import { createTourDateAction, updateTourDateAction } from '@/lib/actions/tour-date-actions';
+import {
+  useCreateTourDateMutation,
+  useUpdateTourDateMutation,
+} from '@/app/hooks/mutations/use-tour-date-mutations';
 import type { FormState } from '@/lib/types/form-state';
 import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
 import {
@@ -116,6 +119,8 @@ export const TourDateForm = ({
   const [isPending, setIsPending] = useState(false);
   const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
   const isEditMode = !!tourDate;
+  const createTourDate = useCreateTourDateMutation();
+  const updateTourDate = useUpdateTourDateMutation();
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourDateUpdateSchema : tourDateCreateSchema),
@@ -289,9 +294,9 @@ export const TourDateForm = ({
 
       let result: FormState;
       if (isEditMode && tourDate?.id) {
-        result = await updateTourDateAction(tourDate.id, formState, formData);
+        result = await updateTourDate.mutateAsync({ tourDateId: tourDate.id, formState, formData });
       } else {
-        result = await createTourDateAction(formState, formData);
+        result = await createTourDate.mutateAsync({ formState, formData });
       }
 
       setFormState(result);

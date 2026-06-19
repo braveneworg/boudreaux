@@ -40,6 +40,11 @@ import { Input } from '@/app/components/ui/input';
 import { Separator } from '@/app/components/ui/separator';
 import { Switch } from '@/app/components/ui/switch';
 import { Textarea } from '@/app/components/ui/textarea';
+import {
+  useCreateReleaseMutation,
+  useUpdateReleaseCoverArtMutation,
+  useUpdateReleaseMutation,
+} from '@/app/hooks/mutations/use-release-mutations';
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
@@ -47,8 +52,6 @@ import {
   deleteReleaseImageAction,
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
-import { updateReleaseAction } from '@/lib/actions/update-release-action';
-import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { FormState } from '@/lib/types/form-state';
@@ -121,6 +124,9 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
+  const createRelease = useCreateReleaseMutation();
+  const updateRelease = useUpdateReleaseMutation();
+  const updateReleaseCoverArt = useUpdateReleaseCoverArtMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isLoadingRelease, setIsLoadingRelease] = useState(!!initialReleaseId);
@@ -405,7 +411,11 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
           if (releaseId) {
             // Update existing release
-            const newFormState = await updateReleaseAction(releaseId, formState, formData);
+            const newFormState = await updateRelease.mutateAsync({
+              releaseId,
+              formState,
+              formData,
+            });
             if (newFormState.success) {
               // Upload any pending images
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -427,7 +437,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
             }
           } else {
             // Create new release
-            const newFormState = await createReleaseAction(formState, formData);
+            const newFormState = await createRelease.mutateAsync({ formState, formData });
             if (newFormState.success) {
               const createdReleaseId = newFormState.data?.releaseId as string | undefined;
 
@@ -463,7 +473,17 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
         }
       });
     },
-    [formState, images, releaseId, isPublished, releaseForm, router, preGeneratedId]
+    [
+      formState,
+      images,
+      releaseId,
+      isPublished,
+      releaseForm,
+      router,
+      preGeneratedId,
+      createRelease,
+      updateRelease,
+    ]
   );
 
   const uploadImages = async (
@@ -767,7 +787,10 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
                           // navigates away before submitting the full form.
                           // For new releases there's no row to update yet —
                           // the create flow will save it on form submit.
-                          const result = await updateReleaseCoverArtAction(releaseId, cdnUrl);
+                          const result = await updateReleaseCoverArt.mutateAsync({
+                            releaseId,
+                            coverArt: cdnUrl,
+                          });
                           if (!result.success) {
                             throw new Error(result.error ?? 'Failed to save cover art');
                           }

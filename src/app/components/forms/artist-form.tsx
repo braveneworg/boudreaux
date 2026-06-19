@@ -28,13 +28,16 @@ import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
+  useCreateArtistMutation,
+  useUpdateArtistMutation,
+} from '@/app/hooks/mutations/use-artist-mutations';
+import {
   deleteArtistImageAction,
   reorderArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
-import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
@@ -97,6 +100,8 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
+  const createArtist = useCreateArtistMutation();
+  const updateArtist = useUpdateArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isLoadingArtist, setIsLoadingArtist] = useState(!!initialArtistId);
@@ -289,7 +294,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
           // If we already have an artistId, this is an update
           if (artistId) {
-            const newFormState = await updateArtistAction(artistId, formState, formData);
+            const newFormState = await updateArtist.mutateAsync({ artistId, formState, formData });
             if (newFormState.success) {
               // Upload any pending images for existing artist
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -400,7 +405,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             }
           } else {
             // This is a create action
-            const newFormState = await createArtistAction(formState, formData);
+            const newFormState = await createArtist.mutateAsync({ formState, formData });
             if (newFormState.success) {
               const createdArtistId = newFormState.data?.artistId as string | undefined;
 
@@ -540,7 +545,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
         }
       });
     },
-    [formState, images, artistId, isPublished, artistForm]
+    [formState, images, artistId, isPublished, artistForm, createArtist, updateArtist]
   );
 
   const isSubmitting = isPending || isTransitionPending || isUploadingImages;

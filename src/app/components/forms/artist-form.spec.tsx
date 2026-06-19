@@ -3,9 +3,24 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as rtlRender, screen } from '@testing-library/react';
 
 import { ArtistForm } from './artist-form';
+
+/**
+ * Render helper that wraps the form in a fresh TanStack Query client so the
+ * mutation hooks the form now uses have a provider in scope. Mirrors the
+ * `render` signature so existing call sites are unchanged.
+ */
+const render = (ui: React.ReactElement) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  Wrapper.displayName = 'QueryClientTestWrapper';
+  return rtlRender(ui, { wrapper: Wrapper });
+};
 
 // The previous suite (see git history) mocked react-hook-form's `control`,
 // which never satisfied the Control interface and broke the tests. We keep
