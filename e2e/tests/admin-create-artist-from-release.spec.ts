@@ -52,7 +52,7 @@ test.describe('Create artist from a release', () => {
 
     await adminPage.getByRole('button', { name: 'Create', exact: true }).click();
 
-    await expect(adminPage).toHaveURL(new RegExp(`/admin/releases/${releaseId}$`), {
+    await expect(adminPage).toHaveURL((url) => url.pathname === `/admin/releases/${releaseId}`, {
       timeout: 20_000,
     });
   });
