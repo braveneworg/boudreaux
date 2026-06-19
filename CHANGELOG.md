@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.134.0] - 2026-06-19
+
+### Added
+
+- test: ✅ fix artist-from-release e2e hydration double (#508)\n- test: ✅ fix artist-from-release e2e hydration double (#508)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- test: ✅ fix artist-from-release e2e hydration double (#508)\n
+
 ## [4.133.0] - 2026-06-19
 
 ### Added
