@@ -40,13 +40,6 @@ export default async function NotificationsPage() {
     };
   });
 
-  async function handleDelete(slotNumber: number) {
-    'use server';
-    const { deleteBannerNotificationAction } =
-      await import('@/lib/actions/banner-notification-action');
-    return deleteBannerNotificationAction(slotNumber);
-  }
-
   return (
     <div className="space-y-6">
       <BreadcrumbMenu
@@ -66,7 +59,7 @@ export default async function NotificationsPage() {
 
       <div className="space-y-6">
         {slots.map((slot) => (
-          <BannerSlotCard key={slot.slotNumber} slot={slot} onDelete={handleDelete} />
+          <BannerSlotCard key={slot.slotNumber} slot={slot} />
         ))}
       </div>
     </div>

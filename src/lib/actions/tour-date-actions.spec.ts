@@ -112,6 +112,7 @@ describe('Tour Date Headliner Actions', () => {
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
       expect(revalidatePath).toHaveBeenCalledWith('/tours');
+      expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
     });
 
     it('should handle repository errors', async () => {
@@ -256,6 +257,7 @@ describe('Tour Date Headliner Actions', () => {
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
       expect(revalidatePath).toHaveBeenCalledWith('/tours');
+      expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
     });
 
     it('should handle repository errors', async () => {
@@ -388,6 +390,7 @@ describe('Tour Date Headliner Actions', () => {
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
       expect(revalidatePath).toHaveBeenCalledWith('/tours');
+      expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
     });
 
     it('should handle repository errors', async () => {
@@ -520,6 +523,7 @@ describe('createTourDateAction', () => {
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
     expect(revalidatePath).toHaveBeenCalledWith('/tours');
+    expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
   });
 
   it('handles repository errors', async () => {
@@ -655,6 +659,7 @@ describe('updateTourDateAction', () => {
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
     expect(revalidatePath).toHaveBeenCalledWith('/tours');
+    expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
   });
 
   it('handles repository errors', async () => {
@@ -721,6 +726,7 @@ describe('deleteTourDateAction', () => {
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
     expect(revalidatePath).toHaveBeenCalledWith('/tours');
+    expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
   });
 
   it('handles repository errors gracefully', async () => {

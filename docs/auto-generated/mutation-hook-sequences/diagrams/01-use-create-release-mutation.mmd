@@ -1,0 +1,35 @@
+%% useCreateReleaseMutation — create a release
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(release-form)
+    participant H as useCreateReleaseMutation<br/>(useMutation)
+    participant A as createReleaseAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as ReleaseService<br/>.createRelease
+    participant DB as Prisma · MongoDB<br/>(release.create)
+    participant NC as next/cache + ReleaseService<br/>.invalidateCache
+    participant QC as QueryClient
+    U->>C: submit new release
+    C->>H: mutateAsync({formState, formData})
+    H->>A: mutationFn(formState, formData)
+    A->>RR: requireRole('admin')
+    alt not admin
+        RR-->>A: throw
+        A-->>H: promise rejects
+        H-->>C: onError (no invalidation)
+    else admin
+        A->>SV: createRelease(data)
+        SV->>DB: release.create (+ artistRelease.createMany)
+        DB-->>SV: release
+        SV-->>A: { success, data }
+        alt success
+            A->>NC: revalidatePath('/releases','/artists/[slug]') + invalidateCache()
+            A-->>H: FormState { success:true, data:{releaseId} }
+            H->>QC: onSuccess → invalidateQueries(releases.all), (artists.all)
+            H-->>C: FormState → toast + redirect
+        else service/validation failure
+            A-->>H: FormState { success:false, errors }
+            H-->>C: onSuccess no-op (guard) → render field errors
+        end
+    end

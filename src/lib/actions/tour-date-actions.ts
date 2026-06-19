@@ -86,6 +86,7 @@ export const createTourDateAction = async (
     // Revalidate paths
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
   } catch {
     formState.success = false;
     setUnknownError(formState);
@@ -160,6 +161,7 @@ export const updateTourDateAction = async (
     // Revalidate paths
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
   } catch {
     formState.success = false;
     setUnknownError(formState);
@@ -198,6 +200,7 @@ export const deleteTourDateAction = async (
     // Revalidate paths
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
 
     return { success: true };
   } catch {
@@ -242,6 +245,7 @@ export const updateHeadlinerSetTimeAction = async (
 
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
 
     return { success: true };
   } catch (error) {
@@ -274,6 +278,7 @@ export const updateHeadlinerSetTimeAction = async (
 
           revalidatePath('/admin/tours');
           revalidatePath('/tours');
+          revalidatePath('/tours/[tourId]', 'page');
 
           return { success: true };
         }
@@ -318,6 +323,7 @@ export const removeHeadlinerAction = async (
 
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
 
     return { success: true };
   } catch (error) {
@@ -349,6 +355,7 @@ export const removeHeadlinerAction = async (
 
           revalidatePath('/admin/tours');
           revalidatePath('/tours');
+          revalidatePath('/tours/[tourId]', 'page');
 
           return { success: true };
         }
@@ -397,6 +404,7 @@ export const reorderHeadlinersAction = async (
 
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    revalidatePath('/tours/[tourId]', 'page');
 
     return { success: true };
   } catch (error) {

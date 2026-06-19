@@ -1,0 +1,33 @@
+%% useUpdateVenueMutation — inline venue edit
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(venue-select)
+    participant H as useUpdateVenueMutation<br/>(useMutation)
+    participant A as updateVenueAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as VenueService.update
+    participant DB as Prisma · MongoDB<br/>(venue.update)
+    participant NC as next/cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({venueId, formState, formData})
+    H->>A: mutationFn(venueId, formState, formData)
+    A->>RR: requireRole('admin')
+    alt not admin / invalid id
+        A-->>H: throw or FormState { success:false }
+        H-->>C: onError / onSuccess no-op → error
+    else admin
+        A->>SV: update(venueId, data)
+        SV->>DB: venue.update
+        DB-->>SV: venue
+        SV-->>A: venue
+        alt success
+            A->>NC: revalidatePath('/admin/tours/new','/admin/tours','/tours','/tours/[tourId]')
+            A-->>H: FormState { success:true }
+            H->>QC: onSuccess → invalidateQueries(venues.all), (tours.all)
+            H-->>C: FormState → close dialog
+        else failure
+            A-->>H: FormState { success:false, errors }
+            H-->>C: onSuccess no-op → inline error
+        end
+    end

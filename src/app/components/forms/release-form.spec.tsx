@@ -3,10 +3,25 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
+
+/**
+ * Render helper that wraps the form in a fresh TanStack Query client so the
+ * mutation hooks the form now uses have a provider in scope. Mirrors the
+ * `render` signature so existing call sites are unchanged.
+ */
+const render = (ui: React.ReactElement) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  Wrapper.displayName = 'QueryClientTestWrapper';
+  return rtlRender(ui, { wrapper: Wrapper });
+};
 
 // Mock next/navigation
 const mockPush = vi.fn();

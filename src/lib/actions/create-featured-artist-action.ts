@@ -13,6 +13,7 @@ import { FeaturedArtistsService } from '@/lib/services/featured-artists-service'
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { cache } from '@/lib/utils/simple-cache';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
@@ -138,6 +139,13 @@ export const createFeaturedArtistAction = async (
     // Revalidate the create page and featured artists list
     revalidatePath('/admin/featured-artists/new');
     revalidatePath('/admin');
+
+    // Clear the cached home-page carousel so the new featured artist can show
+    // through before the in-memory TTL expires.
+    if (response.success) {
+      cache.deleteByPrefix('featured-artists:');
+      revalidatePath('/');
+    }
   } catch {
     formState.success = false;
     setUnknownError(formState);

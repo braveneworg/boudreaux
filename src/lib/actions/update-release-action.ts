@@ -220,6 +220,16 @@ export const updateReleaseAction = async (
 
     // Revalidate the release page to reflect updates
     revalidatePath(`/admin/releases/${releaseId}`);
+
+    // Propagate the edit to every public surface that renders this release:
+    // the cached listing, the listing page, the detail page, and any artist
+    // discography pages it appears on.
+    if (response.success) {
+      ReleaseService.invalidateCache();
+      revalidatePath('/releases');
+      revalidatePath(`/releases/${releaseId}`);
+      revalidatePath('/artists/[slug]', 'page');
+    }
   } catch {
     formState.success = false;
     setUnknownError(formState);

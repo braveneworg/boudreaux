@@ -1,0 +1,31 @@
+%% useUpdateReleaseCoverArtMutation — persist cover art immediately
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(release-form · CoverArtField)
+    participant H as useUpdateReleaseCoverArtMutation<br/>(useMutation)
+    participant A as updateReleaseCoverArtAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant DB as Prisma · MongoDB<br/>(release.update coverArt)
+    participant NC as next/cache
+    participant QC as QueryClient
+    U->>C: upload cover art (S3 + variants done)
+    C->>H: mutateAsync({releaseId, coverArt})
+    H->>A: mutationFn(releaseId, coverArt)
+    A->>RR: requireRole('admin')
+    alt not admin
+        RR-->>A: throw
+        A-->>H: rejects → onError
+    else admin
+        A->>DB: release.update({ coverArt })
+        DB-->>A: ok
+        alt success
+            A->>NC: revalidatePath('/','/releases/{id}')
+            A-->>H: { success:true }
+            H->>QC: onSuccess → invalidateQueries(releases.all), (artists.all)
+            H-->>C: success
+        else failure
+            A-->>H: { success:false, error }
+            H-->>C: onSuccess no-op → throw (CoverArtField surfaces error)
+        end
+    end

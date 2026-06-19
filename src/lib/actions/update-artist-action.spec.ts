@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -20,6 +21,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/auth');
 vi.mock('../services/artist-service');
+vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
@@ -631,6 +633,54 @@ describe('updateArtistAction', () => {
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
       expect(revalidatePath).toHaveBeenCalledWith('/artists/john-doe');
+    });
+
+    it('should clear the release cache and revalidate the public releases listing on success', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).toHaveBeenCalled();
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
+    });
+
+    it('should not touch the release cache when the update fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).not.toHaveBeenCalled();
+      expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
     });
 
     it('should revalidate paths even on failure', async () => {

@@ -540,6 +540,57 @@ describe('createReleaseAction', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/admin/releases/new');
     });
 
+    it('should clear the cached listing and revalidate public surfaces on success', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).toHaveBeenCalled();
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
+      expect(revalidatePath).toHaveBeenCalledWith('/artists/[slug]', 'page');
+    });
+
+    it('should not clear the cache or revalidate public surfaces on failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).not.toHaveBeenCalled();
+      expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
+    });
+
     it('should revalidate release creation page on failure', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },

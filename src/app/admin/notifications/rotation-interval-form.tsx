@@ -9,8 +9,8 @@ import { Loader2, Save } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
+import { useUpdateRotationIntervalMutation } from '@/app/hooks/mutations/use-banner-mutations';
 import { Label } from '@/components/ui/label';
-import { updateRotationIntervalAction } from '@/lib/actions/banner-notification-action';
 import { MAX_ROTATION_INTERVAL, MIN_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
 
 interface RotationIntervalFormProps {
@@ -19,14 +19,14 @@ interface RotationIntervalFormProps {
 
 export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormProps) => {
   const [interval, setInterval] = useState(currentInterval);
-  const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const updateRotation = useUpdateRotationIntervalMutation();
+  const isPending = updateRotation.isPending;
 
   const handleSave = async () => {
-    setIsPending(true);
     setMessage(null);
     try {
-      const result = await updateRotationIntervalAction(interval);
+      const result = await updateRotation.mutateAsync({ interval });
       if (result.success) {
         setMessage({ type: 'success', text: 'Rotation interval updated.' });
       } else {
@@ -34,8 +34,6 @@ export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormPr
       }
     } catch {
       setMessage({ type: 'error', text: 'An unexpected error occurred.' });
-    } finally {
-      setIsPending(false);
     }
   };
 

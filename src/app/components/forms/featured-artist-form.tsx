@@ -37,8 +37,10 @@ import {
 } from '@/app/components/ui/select';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
-import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
-import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
+import {
+  useCreateFeaturedArtistMutation,
+  useUpdateFeaturedArtistCoverArtMutation,
+} from '@/app/hooks/mutations/use-featured-artist-mutations';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
@@ -95,6 +97,8 @@ export const FeaturedArtistForm = ({
   const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
+  const createFeaturedArtist = useCreateFeaturedArtistMutation();
+  const updateFeaturedArtistCoverArt = useUpdateFeaturedArtistCoverArtMutation();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -366,8 +370,8 @@ export const FeaturedArtistForm = ({
           toast.error(errorData.error || 'Failed to update featured artist');
         }
       } else {
-        // In create mode, use the server action
-        const result = await createFeaturedArtistAction(formState, formData);
+        // In create mode, use the server action via the mutation hook
+        const result = await createFeaturedArtist.mutateAsync({ formState, formData });
         setFormState(result);
 
         if (result.success && result.data?.featuredArtistId) {
@@ -629,10 +633,10 @@ export const FeaturedArtistForm = ({
                         // variant generation + orphan sweep + CloudFront
                         // invalidation). For create mode there's no row to
                         // update yet — submit will save it then.
-                        const result = await updateFeaturedArtistCoverArtAction(
+                        const result = await updateFeaturedArtistCoverArt.mutateAsync({
                           featuredArtistId,
-                          cdnUrl
-                        );
+                          coverArt: cdnUrl,
+                        });
                         if (!result.success) {
                           throw new Error(result.error ?? 'Failed to save cover art');
                         }

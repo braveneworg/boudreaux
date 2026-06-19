@@ -11,9 +11,12 @@ import { Loader2, Save, Trash2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { DatePicker } from '@/app/components/ui/datepicker';
+import {
+  useDeleteBannerNotificationMutation,
+  useUpsertBannerNotificationMutation,
+} from '@/app/hooks/mutations/use-banner-mutations';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { createOrUpdateBannerNotificationAction } from '@/lib/actions/banner-notification-action';
 import { BANNER_CDN_PATH } from '@/lib/constants/banner-slots';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
@@ -41,7 +44,6 @@ export interface BannerSlotFormData {
 
 interface BannerSlotCardProps {
   slot: BannerSlotFormData;
-  onDelete: (slotNumber: number) => Promise<{ success: boolean; error?: string }>;
 }
 
 const initialFormState: FormState = {
@@ -49,7 +51,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
+export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   const [content, setContent] = useState(slot.notification?.content ?? '');
   const [textColor, setTextColor] = useState(slot.notification?.textColor ?? '#ffffff');
   const [backgroundColor, setBackgroundColor] = useState(
@@ -58,7 +60,8 @@ export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
   const [displayFrom, setDisplayFrom] = useState(slot.notification?.displayFrom ?? '');
   const [displayUntil, setDisplayUntil] = useState(slot.notification?.displayUntil ?? '');
   const [repostedFromId, setRepostedFromId] = useState(slot.notification?.repostedFromId ?? '');
-  const [isDeleting, setIsDeleting] = useState(false);
+  const upsertBanner = useUpsertBannerNotificationMutation();
+  const deleteBanner = useDeleteBannerNotificationMutation();
 
   const boundAction = useCallback(
     async (_prevState: FormState, formData: FormData): Promise<FormState> => {
@@ -71,7 +74,9 @@ export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
       if (repostedFromId) {
         formData.set('repostedFromId', repostedFromId);
       }
-      return createOrUpdateBannerNotificationAction(_prevState, formData);
+      // Routes through the mutation hook so the banner caches are invalidated on
+      // success; the hook returns the action's FormState unchanged.
+      return upsertBanner.mutateAsync({ formState: _prevState, formData });
     },
     [
       slot.slotNumber,
@@ -81,6 +86,7 @@ export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
       displayFrom,
       displayUntil,
       repostedFromId,
+      upsertBanner,
     ]
   );
 
@@ -90,17 +96,14 @@ export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
   );
 
   const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await onDelete(slot.slotNumber);
+    const result = await deleteBanner.mutateAsync({ slotNumber: slot.slotNumber });
+    if (result.success) {
       setContent('');
       setTextColor('#ffffff');
       setBackgroundColor('#000000');
       setDisplayFrom('');
       setDisplayUntil('');
       setRepostedFromId('');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -248,10 +251,10 @@ export const BannerSlotCard = ({ slot, onDelete }: BannerSlotCardProps) => {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={isDeleting}
+              disabled={deleteBanner.isPending}
               onClick={handleDelete}
             >
-              {isDeleting ? (
+              {deleteBanner.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="mr-2 h-4 w-4" />

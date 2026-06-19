@@ -1,0 +1,29 @@
+%% useDeleteTourMutation — delete a tour ({success,error} contract)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(tour-form)
+    participant H as useDeleteTourMutation<br/>(useMutation)
+    participant A as deleteTourAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as TourService.delete
+    participant DB as Prisma · MongoDB<br/>(tour.delete)
+    participant NC as next/cache
+    participant QC as QueryClient
+    U->>C: confirm delete
+    C->>H: mutateAsync({tourId})
+    H->>A: mutationFn(tourId)
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized or invalid id
+        A-->>H: { success:false, error }
+        H-->>C: onSuccess no-op → toast error
+    else authorized
+        A->>SV: delete(tourId)
+        SV->>DB: tour.delete (+ cascade)
+        DB-->>SV: ok
+        SV-->>A: ok
+        A->>NC: revalidatePath('/admin/tours','/tours')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(tours.all)
+        H-->>C: success → toast + redirect
+    end

@@ -1,0 +1,35 @@
+%% useUpdateHeadlinerSetTimeMutation — set time, with tourDate/artist fallback
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(artist-pill-list)
+    participant H as useUpdateHeadlinerSetTimeMutation<br/>(useMutation)
+    participant A as updateHeadlinerSetTimeAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant RP as TourDateRepository<br/>.updateHeadlinerSetTime
+    participant DB as Prisma · MongoDB
+    participant NC as next/cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({headlinerId, setTime, tourDateId?, artistId?})
+    H->>A: mutationFn(headlinerId, setTime, tourDateId, artistId)
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized / invalid id / bad time
+        A-->>H: { success:false, error }
+        H-->>C: onSuccess no-op → toast error
+    else authorized
+        A->>RP: updateHeadlinerSetTime(headlinerId, date)
+        alt record not found (P2025) + ids present
+            RP-->>A: throw P2025
+            A->>RP: updateHeadlinerSetTimeByTourDateAndArtist(...)
+            RP->>DB: update via (tourDate, artist)
+            DB-->>RP: updated
+        else direct hit
+            RP->>DB: update by headlinerId
+            DB-->>RP: ok
+        end
+        RP-->>A: ok
+        A->>NC: revalidatePath('/admin/tours','/tours','/tours/[tourId]')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(tours.all)
+        H-->>C: success → toast + local state update
+    end

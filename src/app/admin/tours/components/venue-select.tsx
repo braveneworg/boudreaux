@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from 'react';
 
-import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Pencil, Plus } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
@@ -36,10 +35,12 @@ import { Input } from '@/app/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TimezoneSelect } from '@/app/components/ui/timezone-select';
+import {
+  useCreateVenueMutation,
+  useUpdateVenueMutation,
+} from '@/app/hooks/mutations/use-venue-mutations';
 import { useVenueDetailQuery } from '@/app/hooks/use-venue-detail-query';
 import { useVenueSearchQuery } from '@/app/hooks/use-venue-search-query';
-import { createVenueAction, updateVenueAction } from '@/lib/actions/venue-actions';
-import { queryKeys } from '@/lib/query-keys';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 
@@ -84,7 +85,8 @@ export const VenueSelect = <
 }: VenueSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const queryClient = useQueryClient();
+  const createVenue = useCreateVenueMutation();
+  const updateVenue = useUpdateVenueMutation();
 
   // Venue list fetching via TanStack Query
   const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, {
@@ -156,7 +158,7 @@ export const VenueSelect = <
       if (newVenueTimeZone) formData.append('timeZone', newVenueTimeZone);
 
       const initialFormState: FormState = { fields: {}, success: false };
-      const result = await createVenueAction(initialFormState, formData);
+      const result = await createVenue.mutateAsync({ formState: initialFormState, formData });
 
       if (result.success && result.data?.venueId) {
         const newVenue: VenueOption = {
@@ -166,7 +168,6 @@ export const VenueSelect = <
           state: newVenueState.trim() || null,
           timeZone: newVenueTimeZone || null,
         };
-        await queryClient.invalidateQueries({ queryKey: queryKeys.venues.all });
         field.onChange(newVenue.id);
         onVenueSelect?.(newVenue);
 
@@ -211,7 +212,11 @@ export const VenueSelect = <
       if (editVenueTimeZone) formData.append('timeZone', editVenueTimeZone);
 
       const initialFormState: FormState = { fields: {}, success: false };
-      const result = await updateVenueAction(editVenueId, initialFormState, formData);
+      const result = await updateVenue.mutateAsync({
+        venueId: editVenueId,
+        formState: initialFormState,
+        formData,
+      });
 
       if (result.success) {
         const updatedVenue: VenueOption = {
@@ -221,7 +226,6 @@ export const VenueSelect = <
           state: editVenueState.trim() || null,
           timeZone: editVenueTimeZone || null,
         };
-        await queryClient.invalidateQueries({ queryKey: queryKeys.venues.all });
         onVenueSelect?.(updatedVenue);
         setEditDialogOpen(false);
       } else {

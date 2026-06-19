@@ -763,6 +763,58 @@ describe('updateReleaseAction', () => {
 
       expect(revalidatePath).toHaveBeenCalledWith(`/admin/releases/${mockReleaseId}`);
     });
+
+    it('should clear the cached listing and revalidate public surfaces on success', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).toHaveBeenCalled();
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
+      expect(revalidatePath).toHaveBeenCalledWith(`/releases/${mockReleaseId}`);
+      expect(revalidatePath).toHaveBeenCalledWith('/artists/[slug]', 'page');
+    });
+
+    it('should not clear the cache or revalidate public surfaces on failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.invalidateCache).not.toHaveBeenCalled();
+      expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
+    });
   });
 
   describe('Error Handling', () => {

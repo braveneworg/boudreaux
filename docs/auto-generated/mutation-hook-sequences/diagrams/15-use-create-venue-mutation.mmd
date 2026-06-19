@@ -1,0 +1,35 @@
+%% useCreateVenueMutation — inline venue creation from tour-date form
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(venue-select)
+    participant H as useCreateVenueMutation<br/>(useMutation)
+    participant A as createVenueAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as VenueService<br/>.checkDuplicateName + create
+    participant DB as Prisma · MongoDB<br/>(venue.create)
+    participant NC as next/cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({formState, formData})
+    H->>A: mutationFn(formState, formData)
+    A->>RR: requireRole('admin')
+    alt not admin
+        RR-->>A: throw
+        A-->>H: rejects → onError
+    else admin
+        A->>SV: checkDuplicateName(name, city)
+        alt duplicate
+            SV-->>A: true
+            A-->>H: FormState { success:false, errors.general }
+            H-->>C: onSuccess no-op → inline error
+        else unique
+            A->>SV: create(data)
+            SV->>DB: venue.create
+            DB-->>SV: venue
+            SV-->>A: venue
+            A->>NC: revalidatePath('/admin/tours/new','/admin/tours')
+            A-->>H: FormState { success:true, data:{venueId} }
+            H->>QC: onSuccess → invalidateQueries(venues.all), (tours.all)
+            H-->>C: FormState → select new venue + close dialog
+        end
+    end

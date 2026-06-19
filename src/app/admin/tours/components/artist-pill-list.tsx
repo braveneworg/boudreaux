@@ -26,10 +26,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 
 import {
-  removeHeadlinerAction,
-  reorderHeadlinersAction,
-  updateHeadlinerSetTimeAction,
-} from '@/lib/actions/tour-date-actions';
+  useRemoveHeadlinerMutation,
+  useReorderHeadlinersMutation,
+  useUpdateHeadlinerSetTimeMutation,
+} from '@/app/hooks/mutations/use-tour-date-mutations';
 
 import { ArtistPill } from './artist-pill';
 
@@ -89,6 +89,9 @@ export const ArtistPillList = ({
 }: ArtistPillListProps) => {
   const [headliners, setHeadliners] = useState(initialHeadliners);
   const prevInitialRef = useRef(initialHeadliners);
+  const reorderHeadliners = useReorderHeadlinersMutation();
+  const updateHeadlinerSetTime = useUpdateHeadlinerSetTimeMutation();
+  const removeHeadliner = useRemoveHeadlinerMutation();
 
   // Keep local state in sync with parent prop updates
   // (e.g., after the parent refetches tour dates).
@@ -118,10 +121,10 @@ export const ArtistPillList = ({
       const reordered = arrayMove(headliners, oldIndex, newIndex);
       setHeadliners(reordered);
 
-      const result = await reorderHeadlinersAction(
+      const result = await reorderHeadliners.mutateAsync({
         tourDateId,
-        reordered.map((h) => h.id)
-      );
+        headlinerIds: reordered.map((h) => h.id),
+      });
 
       if (result.success) {
         toast.success('Artist order updated');
@@ -131,17 +134,17 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to reorder artists');
       }
     },
-    [headliners, tourDateId]
+    [headliners, tourDateId, reorderHeadliners]
   );
 
   const handleSetTimeUpdate = useCallback(
     async (headlinerId: string, artistId: string | null, setTime: string | null) => {
-      const result = await updateHeadlinerSetTimeAction(
+      const result = await updateHeadlinerSetTime.mutateAsync({
         headlinerId,
         setTime,
         tourDateId,
-        artistId ?? undefined
-      );
+        artistId: artistId ?? undefined,
+      });
 
       if (result.success) {
         toast.success('Set time updated');
@@ -155,12 +158,16 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to update set time');
       }
     },
-    [tourDateId]
+    [tourDateId, updateHeadlinerSetTime]
   );
 
   const handleRemove = useCallback(
     async (headlinerId: string, artistId: string | null) => {
-      const result = await removeHeadlinerAction(headlinerId, tourDateId, artistId ?? undefined);
+      const result = await removeHeadliner.mutateAsync({
+        headlinerId,
+        tourDateId,
+        artistId: artistId ?? undefined,
+      });
       if (result.success) {
         toast.success('Artist removed from tour date');
         setHeadliners((prev) => prev.filter((h) => h.id !== headlinerId));
@@ -169,7 +176,7 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to remove artist');
       }
     },
-    [onHeadlinersChange, tourDateId]
+    [onHeadlinersChange, tourDateId, removeHeadliner]
   );
 
   if (headliners.length === 0) {

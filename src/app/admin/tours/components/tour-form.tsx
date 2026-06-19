@@ -29,7 +29,11 @@ import {
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
-import { createTourAction, updateTourAction, deleteTourAction } from '@/lib/actions/tour-actions';
+import {
+  useCreateTourMutation,
+  useDeleteTourMutation,
+  useUpdateTourMutation,
+} from '@/app/hooks/mutations/use-tour-mutations';
 import type { FormState } from '@/lib/types/form-state';
 import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
 
@@ -78,6 +82,9 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const isEditMode = !!tourId;
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const createTour = useCreateTourMutation();
+  const updateTour = useUpdateTourMutation();
+  const deleteTour = useDeleteTourMutation();
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
@@ -178,9 +185,9 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
 
       let result: FormState;
       if (isEditMode && tourId) {
-        result = await updateTourAction(tourId, formState, formData);
+        result = await updateTour.mutateAsync({ tourId, formState, formData });
       } else {
-        result = await createTourAction(formState, formData);
+        result = await createTour.mutateAsync({ formState, formData });
       }
 
       setFormState(result);
@@ -224,7 +231,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
 
     setIsDeleting(true);
     try {
-      const result = await deleteTourAction(tourId);
+      const result = await deleteTour.mutateAsync({ tourId });
       if (result.success) {
         toast.success('Tour deleted successfully');
         router.push('/admin/tours');

@@ -3,16 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/app/components/ui/button';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
+import { usePublishFeaturedArtistsMutation } from '@/app/hooks/mutations/use-featured-artist-mutations';
 import { useDebounce } from '@/app/hooks/use-debounce';
 import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
-import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
@@ -20,7 +20,8 @@ import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-di
 import { DataView } from './data-view';
 
 export const FeaturedArtistDataView = () => {
-  const [isPublishing, startPublishTransition] = useTransition();
+  const publishFeaturedArtists = usePublishFeaturedArtistsMutation();
+  const isPublishing = publishFeaturedArtists.isPending;
   const fieldsToShow = [
     'displayName',
     'featuredOn',
@@ -54,16 +55,14 @@ export const FeaturedArtistDataView = () => {
 
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
-  const handlePublish = useCallback(() => {
-    startPublishTransition(async () => {
-      const result = await publishFeaturedArtistsToSiteAction();
-      if (result.success) {
-        toast.success('Featured artists published to landing page');
-      } else {
-        toast.error(result.error ?? 'Failed to publish');
-      }
-    });
-  }, []);
+  const handlePublish = useCallback(async () => {
+    const result = await publishFeaturedArtists.mutateAsync();
+    if (result.success) {
+      toast.success('Featured artists published to landing page');
+    } else {
+      toast.error(result.error ?? 'Failed to publish');
+    }
+  }, [publishFeaturedArtists]);
 
   if (error) {
     return <div>Error loading featured artists</div>;

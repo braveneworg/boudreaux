@@ -1,0 +1,28 @@
+%% useUpsertBannerNotificationMutation — save/replace a banner slot
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(banner-slot-card · useActionState)
+    participant H as useUpsertBannerNotificationMutation<br/>(useMutation)
+    participant A as createOrUpdateBannerNotificationAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as BannerNotificationService<br/>.upsertNotification
+    participant DB as Prisma · MongoDB<br/>(bannerNotification.upsert)
+    participant NC as next/cache + service cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({formState, formData})
+    H->>A: mutationFn(formState, formData)
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized / invalid
+        A-->>H: FormState { success:false, errors._form }
+        H-->>C: onSuccess no-op → field errors
+    else authorized
+        A->>SV: upsertNotification(slot, data) (server-sanitized HTML)
+        SV->>DB: bannerNotification.upsert (+ invalidate service cache)
+        DB-->>SV: notification
+        SV-->>A: { success, data }
+        A->>NC: revalidatePath('/','/admin/notifications')
+        A-->>H: FormState { success:true, data:{notificationId} }
+        H->>QC: onSuccess → invalidateQueries(banners.all)
+        H-->>C: FormState → "Saved successfully"
+    end

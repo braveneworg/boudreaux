@@ -1,0 +1,28 @@
+%% useUpdateRotationIntervalMutation — set banner rotation interval ({success,error})
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(rotation-interval-form)
+    participant H as useUpdateRotationIntervalMutation<br/>(useMutation)
+    participant A as updateRotationIntervalAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as BannerNotificationService<br/>.updateRotationInterval
+    participant DB as Prisma · MongoDB
+    participant NC as next/cache + service cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({interval})
+    H->>A: mutationFn(interval)
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized / out of range (3–15)
+        A-->>H: { success:false, error }
+        H-->>C: onSuccess no-op → error message
+    else authorized
+        A->>SV: updateRotationInterval(interval)
+        SV->>DB: persist interval (+ invalidate service cache)
+        DB-->>SV: ok
+        SV-->>A: { success }
+        A->>NC: revalidatePath('/')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(banners.all)
+        H-->>C: success → "Rotation interval updated"
+    end
