@@ -9,9 +9,10 @@ import { expect, test } from '../fixtures/auth.fixture';
  * and the server action's `revalidatePath('/')` + cache invalidation) must show
  * up on a clean load of the public home page.
  *
- * The desktop BannerStrip (rendered at the default 1280px viewport) stitches
- * every active banner into the server-rendered HTML, so the freshly saved text
- * is present on first paint — no carousel navigation or hydration timing needed.
+ * The desktop notification ticker (default 1280px viewport) rotates through the
+ * active banners one at a time on an interval (the seed pins it to 3s), so after
+ * a single home-page load the retrying locator catches the freshly saved text
+ * once the ticker cycles onto that slot.
  */
 test.describe('Admin banner edit reflects on the public home page', () => {
   test('a saved banner notification appears in the home banner strip', async ({ adminPage }) => {
@@ -30,14 +31,12 @@ test.describe('Admin banner edit reflects on the public home page', () => {
 
     await expect(adminPage.getByText('Saved successfully.')).toBeVisible({ timeout: 15_000 });
 
-    // Re-load the public home page and assert the new banner text is in the
-    // stitched desktop strip. Wrapped in toPass so a transient hydration
-    // double-render can't fail the assertion mid-flight.
-    await expect(async () => {
-      await adminPage.goto('/');
-      await expect(
-        adminPage.locator('.banner-strip-slide', { hasText: uniqueText }).first()
-      ).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 20_000 });
+    // Load the public home page once; the desktop ticker rotates through the
+    // active banners, so the retrying locator catches the new text when the
+    // ticker cycles onto slot 2 (a couple of rotation intervals at most).
+    await adminPage.goto('/');
+    await expect(
+      adminPage.locator('.banner-strip-slide', { hasText: uniqueText }).first()
+    ).toBeVisible({ timeout: 20_000 });
   });
 });
