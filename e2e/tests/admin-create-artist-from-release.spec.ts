@@ -33,9 +33,12 @@ test.describe('Create artist from a release', () => {
       `/admin/artists/new?releaseId=${releaseId}&returnTo=${encodeURIComponent(returnTo)}`
     );
 
-    await expect(
-      adminPage.getByRole('heading', { name: 'Create New Artist', exact: true })
-    ).toBeVisible({ timeout: 15_000 });
+    // The admin form is a client component; under CI's production build + load
+    // its hydration can briefly mount a second copy before settling to one.
+    // Wait for a single heading so this assertion can't trip on the transient.
+    const heading = adminPage.getByRole('heading', { name: 'Create New Artist', exact: true });
+    await expect(heading).toHaveCount(1, { timeout: 15_000 });
+    await expect(heading).toBeVisible();
   });
 
   test('creating the artist returns to the originating release', async ({ adminPage }) => {
@@ -47,7 +50,12 @@ test.describe('Create artist from a release', () => {
       `/admin/artists/new?releaseId=${releaseId}&returnTo=${encodeURIComponent(returnTo)}`
     );
 
-    await adminPage.locator('[name="displayName"]').fill(`E2E From Release ${unique}`);
+    // Wait for the client form to settle to a single instance before filling —
+    // hydration can transiently double-mount it under CI's production build,
+    // which would otherwise trip strict-mode on the name="displayName" locator.
+    const displayNameInput = adminPage.locator('[name="displayName"]');
+    await expect(displayNameInput).toHaveCount(1, { timeout: 15_000 });
+    await displayNameInput.fill(`E2E From Release ${unique}`);
     await adminPage.locator('[name="slug"]').fill(`e2e-from-release-${unique}`);
 
     await adminPage.getByRole('button', { name: 'Create', exact: true }).click();
