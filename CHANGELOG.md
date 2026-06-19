@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.133.0] - 2026-06-19
+
+### Added
+
+- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n
+
 ## [4.132.0] - 2026-06-18
 
 ### Added
