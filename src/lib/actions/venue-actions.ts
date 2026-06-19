@@ -163,6 +163,8 @@ export const updateVenueAction = async (
     revalidatePath('/admin/tours/new');
     revalidatePath('/admin/tours');
     revalidatePath('/tours');
+    // Tour dates embed venue data, so refresh every tour detail page.
+    revalidatePath('/tours/[tourId]', 'page');
   } catch {
     formState.success = false;
     setUnknownError(formState);

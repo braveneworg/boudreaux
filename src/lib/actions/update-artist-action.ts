@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { ArtistService } from '@/lib/services/artist-service';
+import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
@@ -144,6 +145,13 @@ export const updateArtistAction = async (
     // Revalidate the artist pages
     revalidatePath('/admin/artists');
     revalidatePath(`/artists/${slug}`);
+
+    // The artist's display name renders on release cards/listings, so refresh
+    // the public release surfaces too.
+    if (response.success) {
+      ReleaseService.invalidateCache();
+      revalidatePath('/releases');
+    }
   } catch {
     formState.success = false;
     setUnknownError(formState);

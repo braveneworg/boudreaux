@@ -18,7 +18,7 @@ import type {
   ReleaseListItem,
 } from '@/lib/types/media-models';
 import { deleteS3Object } from '@/utils/s3-client';
-import { withCache } from '@/utils/simple-cache';
+import { cache, withCache } from '@/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
 
@@ -29,6 +29,13 @@ import type { ServiceResponse } from './service.types';
  * (kept as a separate constant because this module is `server-only`).
  */
 const PUBLISHED_RELEASES_PAGE_SIZE = 24;
+
+/**
+ * Cache-key prefix for the cached public published-releases listing pages.
+ * Shared between {@link ReleaseService.getPublishedReleases} (which writes the
+ * entries) and {@link ReleaseService.invalidateCache} (which clears them).
+ */
+const PUBLISHED_RELEASES_CACHE_PREFIX = 'published-releases:';
 
 const digitalFormatRepository = new ReleaseDigitalFormatRepository();
 const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
@@ -403,7 +410,19 @@ export class ReleaseService {
       return fetchReleases();
     }
 
-    return withCache(`published-releases:${take}`, fetchReleases, 600);
+    return withCache(`${PUBLISHED_RELEASES_CACHE_PREFIX}${take}`, fetchReleases, 600);
+  }
+
+  /**
+   * Clear the cached public published-releases listing pages.
+   *
+   * The default first page is cached for 10 minutes by
+   * {@link ReleaseService.getPublishedReleases}; call this after any mutation
+   * that changes which releases are published — or how they render — so the
+   * public `/releases` listing reflects the change before the TTL expires.
+   */
+  static invalidateCache(): void {
+    cache.deleteByPrefix(PUBLISHED_RELEASES_CACHE_PREFIX);
   }
 
   /**

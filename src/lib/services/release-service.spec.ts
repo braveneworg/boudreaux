@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type { Format } from '@/lib/types/media-models';
+import { cache } from '@/lib/utils/simple-cache';
 
 import { ReleaseService } from './release-service';
 
@@ -68,6 +69,7 @@ vi.mock('@/lib/repositories/download-event-repository', () => ({
 
 vi.mock('../utils/simple-cache', () => ({
   withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
+  cache: { deleteByPrefix: vi.fn() },
 }));
 
 describe('ReleaseService', () => {
@@ -1100,6 +1102,14 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.existsById('missing-id');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('invalidateCache', () => {
+    it('clears the cached published-releases listing pages by prefix', () => {
+      ReleaseService.invalidateCache();
+
+      expect(cache.deleteByPrefix).toHaveBeenCalledWith('published-releases:');
     });
   });
 });

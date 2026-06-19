@@ -9,8 +9,11 @@ const requireRoleMock = vi.fn();
 const createFeaturedArtistMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const logSecurityEventMock = vi.fn();
+const deleteByPrefixMock = vi.fn();
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
+
+vi.mock('@/lib/utils/simple-cache', () => ({ cache: { deleteByPrefix: deleteByPrefixMock } }));
 
 vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
 
@@ -50,6 +53,7 @@ describe('createFeaturedArtistAction', () => {
     createFeaturedArtistMock.mockReset();
     revalidatePathMock.mockReset();
     logSecurityEventMock.mockReset();
+    deleteByPrefixMock.mockReset();
   });
 
   it('throws when admin session lacks a user id', async () => {
@@ -91,6 +95,8 @@ describe('createFeaturedArtistAction', () => {
     expect(createArg.artists.connect).toEqual([{ id: 'a1' }, { id: 'a2' }]);
     expect(logSecurityEventMock).toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin/featured-artists/new');
+    expect(deleteByPrefixMock).toHaveBeenCalledWith('featured-artists:');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/');
   });
 
   it('surfaces service errors as form errors', async () => {

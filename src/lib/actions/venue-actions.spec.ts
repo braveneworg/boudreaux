@@ -288,6 +288,7 @@ describe('Venue Actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tours/new');
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
       expect(revalidatePath).toHaveBeenCalledWith('/tours');
+      expect(revalidatePath).toHaveBeenCalledWith('/tours/[tourId]', 'page');
     });
 
     it('should handle validation errors with field-level error messages', async () => {

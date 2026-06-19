@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
+import { cache } from '@/lib/utils/simple-cache';
 import { requireRole } from '@/utils/auth/require-role';
 
 import { updateFeaturedArtistCoverArtAction } from './update-featured-artist-cover-art-action';
@@ -19,6 +20,7 @@ vi.mock('../prisma', () => ({
   },
 }));
 vi.mock('../utils/auth/require-role');
+vi.mock('../utils/simple-cache', () => ({ cache: { deleteByPrefix: vi.fn() } }));
 
 const VALID_FEATURED_ARTIST_ID = '507f1f77bcf86cd799439011';
 const VALID_COVER_URL = 'https://cdn.example.com/cover.webp';
@@ -103,6 +105,7 @@ describe('updateFeaturedArtistCoverArtAction', () => {
       where: { id: VALID_FEATURED_ARTIST_ID },
       data: { coverArt: VALID_COVER_URL },
     });
+    expect(cache.deleteByPrefix).toHaveBeenCalledWith('featured-artists:');
     expect(revalidatePath).toHaveBeenCalledWith('/');
   });
 

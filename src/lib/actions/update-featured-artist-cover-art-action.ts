@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { cache } from '@/lib/utils/simple-cache';
 import { updateFeaturedArtistCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
 export interface UpdateFeaturedArtistCoverArtResult {
@@ -45,7 +46,8 @@ export const updateFeaturedArtistCoverArtAction = async (
   }
 
   // The featured-artist carousel renders on the home page; no public detail
-  // page for featured artists, so just refresh /.
+  // page for featured artists. Clear the cached carousel and refresh /.
+  cache.deleteByPrefix('featured-artists:');
   revalidatePath('/');
 
   return { success: true };
