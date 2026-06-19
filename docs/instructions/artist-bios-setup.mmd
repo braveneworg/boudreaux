@@ -1,0 +1,42 @@
+%% Setup, secrets & configuration flow for the AI artist-bio feature.
+flowchart TD
+    subgraph MANUAL["Manual sign-up / one-time"]
+        GROQ["Groq account<br/>console.groq.com/keys<br/>create API key"]
+        OIDC["GitHub OIDC role<br/>secret: AWS_DEPLOY_ROLE_ARN<br/>+ ALERT_EMAIL"]
+    end
+
+    subgraph AWS["AWS account (us-east-1)"]
+        SSM["SSM Parameter Store<br/>SecureString<br/>/fakefour/groq/api-key"]
+        LAMBDA["Lambda: fakefour-bio-generator<br/>(SAM stack)<br/>reads SSM_PATH_GROQ_API_KEY"]
+        S3["S3 media bucket<br/>media/artists/&#123;id&#125;/bio/...<br/>+ _w&#123;width&#125;.webp variants"]
+        CF["CloudFront<br/>NEXT_PUBLIC_CDN_DOMAIN"]
+    end
+
+    subgraph DEPLOY["Deploy the Lambda"]
+        SAM["sam build && sam deploy<br/>(CI: deploy-bio-generator.yml<br/>or local SAM CLI)"]
+    end
+
+    subgraph WEBAPP["Web app runtime env"]
+        ENV["BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator<br/>AWS_REGION / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY<br/>AWS_S3_BUCKET_NAME / NEXT_PUBLIC_CDN_DOMAIN<br/>(BIO_GENERATOR_FAKE=true for dev/E2E)"]
+        IAM["App IAM:<br/>lambda:InvokeFunction<br/>s3:PutObject media/artists/*/bio/*"]
+    end
+
+    GROQ -->|aws ssm put-parameter| SSM
+    OIDC --> SAM
+    SAM -->|creates / updates| LAMBDA
+    SAM -.->|FunctionName output| ENV
+    SSM -->|GetParameter + KMS Decrypt| LAMBDA
+
+    ENV --> APP["BioGenerationService"]
+    IAM --> APP
+    APP -->|InvokeCommand| LAMBDA
+    APP -->|fetch image -> PutObject| S3
+    S3 --> CF
+    CF -->|next/image custom loader| PUBLIC["Public pages:<br/>/artists, /artists/&#123;slug&#125;/bio"]
+
+    classDef manual fill:#fde68a,stroke:#b45309,color:#000;
+    classDef aws fill:#bfdbfe,stroke:#1d4ed8,color:#000;
+    classDef app fill:#bbf7d0,stroke:#15803d,color:#000;
+    class GROQ,OIDC manual;
+    class SSM,LAMBDA,S3,CF aws;
+    class ENV,IAM,APP,PUBLIC app;
