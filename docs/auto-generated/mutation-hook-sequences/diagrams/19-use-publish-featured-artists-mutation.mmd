@@ -1,0 +1,23 @@
+%% usePublishFeaturedArtistsMutation — publish carousel to the home page
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(featured-artist-data-view)
+    participant H as usePublishFeaturedArtistsMutation<br/>(useMutation)
+    participant A as publishFeaturedArtistsToSiteAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant NC as next/cache + simple-cache<br/>(featured-artists:)
+    participant QC as QueryClient
+    U->>C: click "Publish to Landing Page"
+    C->>H: mutateAsync()
+    H->>A: mutationFn()
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized
+        A-->>H: { success:false, error:'Unauthorized' }
+        H-->>C: onSuccess no-op → toast error
+    else authorized
+        A->>NC: cache.deleteByPrefix('featured-artists:'), revalidatePath('/')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(featuredArtists.all)
+        H-->>C: success → toast
+    end

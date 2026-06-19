@@ -1,0 +1,29 @@
+%% useReorderHeadlinersMutation — persist new headliner order
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(artist-pill-list · dnd-kit)
+    participant H as useReorderHeadlinersMutation<br/>(useMutation)
+    participant A as reorderHeadlinersAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant RP as TourDateRepository<br/>.reorderHeadliners
+    participant DB as Prisma · MongoDB
+    participant NC as next/cache
+    participant QC as QueryClient
+    U->>C: drag-and-drop reorder (optimistic local order)
+    C->>H: mutateAsync({tourDateId, headlinerIds})
+    H->>A: mutationFn(tourDateId, headlinerIds)
+    A->>RR: requireRole('admin') — caught internally
+    alt unauthorized / invalid id in list
+        A-->>H: { success:false, error }
+        H-->>C: onSuccess no-op → revert order + toast error
+    else authorized
+        A->>RP: reorderHeadliners(tourDateId, ids)
+        RP->>DB: update displayOrder per headliner
+        DB-->>RP: ok
+        RP-->>A: ok
+        A->>NC: revalidatePath('/admin/tours','/tours','/tours/[tourId]')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(tours.all)
+        H-->>C: success → keep order + toast
+    end

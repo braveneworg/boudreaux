@@ -1,0 +1,33 @@
+%% useUpdateReleaseMutation — update a release
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(release-form)
+    participant H as useUpdateReleaseMutation<br/>(useMutation)
+    participant A as updateReleaseAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as ReleaseService<br/>.updateRelease
+    participant DB as Prisma · MongoDB<br/>(release.update)
+    participant NC as next/cache + ReleaseService<br/>.invalidateCache
+    participant QC as QueryClient
+    C->>H: mutateAsync({releaseId, formState, formData})
+    H->>A: mutationFn(releaseId, formState, formData)
+    A->>RR: requireRole('admin')
+    alt not admin
+        RR-->>A: throw
+        A-->>H: rejects → onError
+    else admin
+        A->>SV: updateRelease(releaseId, data)
+        SV->>DB: release.update (+ sync artistReleases)
+        DB-->>SV: release
+        SV-->>A: { success }
+        alt success
+            A->>NC: revalidatePath('/releases','/releases/{id}','/artists/[slug]') + invalidateCache()
+            A-->>H: FormState { success:true }
+            H->>QC: onSuccess → invalidateQueries(releases.all), (artists.all)
+            H-->>C: FormState → toast, then image uploads
+        else failure
+            A-->>H: FormState { success:false, errors }
+            H-->>C: onSuccess no-op → field errors
+        end
+    end

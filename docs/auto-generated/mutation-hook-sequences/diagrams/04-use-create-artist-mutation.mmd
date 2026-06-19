@@ -1,0 +1,33 @@
+%% useCreateArtistMutation — create an artist
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(artist-form)
+    participant H as useCreateArtistMutation<br/>(useMutation)
+    participant A as createArtistAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant SV as ArtistService<br/>.createArtist
+    participant DB as Prisma · MongoDB<br/>(artist.create)
+    participant NC as next/cache
+    participant QC as QueryClient
+    C->>H: mutateAsync({formState, formData})
+    H->>A: mutationFn(formState, formData)
+    A->>RR: requireRole('admin')
+    alt not admin
+        RR-->>A: throw
+        A-->>H: rejects → onError
+    else admin
+        A->>SV: createArtist(data)
+        SV->>DB: artist.create
+        DB-->>SV: artist
+        SV-->>A: { success, data }
+        alt success
+            A->>NC: revalidatePath('/admin/artist/new')
+            A-->>H: FormState { success:true, data:{artistId} }
+            H->>QC: onSuccess → invalidateQueries(artists.all), (releases.all)
+            H-->>C: FormState → toast, then image uploads
+        else failure
+            A-->>H: FormState { success:false, errors }
+            H-->>C: onSuccess no-op → field errors
+        end
+    end

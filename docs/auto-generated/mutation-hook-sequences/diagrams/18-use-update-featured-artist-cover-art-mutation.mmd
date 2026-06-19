@@ -1,0 +1,26 @@
+%% useUpdateFeaturedArtistCoverArtMutation — persist cover art (edit mode)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant C as Component<br/>(featured-artist-form · CoverArtField)
+    participant H as useUpdateFeaturedArtistCoverArtMutation<br/>(useMutation)
+    participant A as updateFeaturedArtistCoverArtAction<br/>('use server')
+    participant RR as requireRole('admin')
+    participant DB as Prisma · MongoDB<br/>(featuredArtist.update)
+    participant NC as next/cache + simple-cache<br/>(featured-artists:)
+    participant QC as QueryClient
+    U->>C: upload cover art (S3 + variants done)
+    C->>H: mutateAsync({featuredArtistId, coverArt})
+    H->>A: mutationFn(featuredArtistId, coverArt)
+    A->>RR: requireRole('admin')
+    alt not admin / invalid input
+        A-->>H: throw or { success:false, error }
+        H-->>C: onError / onSuccess no-op → throw
+    else admin
+        A->>DB: featuredArtist.update({ coverArt })
+        DB-->>A: ok
+        A->>NC: cache.deleteByPrefix('featured-artists:'), revalidatePath('/')
+        A-->>H: { success:true }
+        H->>QC: onSuccess → invalidateQueries(featuredArtists.all)
+        H-->>C: success
+    end
