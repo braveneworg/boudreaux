@@ -2,11 +2,29 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 
 import { defineConfig, type ViteUserConfig } from 'vitest/config';
 
 import packageJson from './package.json' with { type: 'json' };
+
+// html-react-parser is hard to load under Vitest: its ESM entry is loaded
+// natively by Node (so `server.deps.inline` never applies), and its server
+// build of html-dom-parser require()s ESM-only `domhandler` and crashes. We
+// force the CJS entry (so Vite inlines+transforms it, routing every require
+// through Vite) and alias html-dom-parser to its DOMParser-based client build,
+// which jsdom satisfies without domhandler.
+const require = createRequire(import.meta.url);
+const htmlReactParserCjs = require.resolve('html-react-parser/lib/index');
+const htmlDomParserClient = require.resolve('html-dom-parser/lib/client/html-to-dom');
+
+// Specs that import html-react-parser must run under the `forks` pool: the
+// default `vmThreads` pool ignores `server.deps.inline`, so the aliases above
+// can't redirect html-dom-parser to its jsdom-friendly client build and the
+// CJS→ESM (`domhandler`) boundary crashes. Keep this list tight — every other
+// `.spec.tsx` stays on the faster `vmThreads` pool.
+const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx'];
 
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {
@@ -47,6 +65,10 @@ export default defineConfig((): ViteUserConfig => {
             name: 'node',
             environment: 'node',
             include: ['**/*.spec.ts'],
+            // The Lambda projects are separate pnpm workspaces with their own
+            // vitest runners/configs; their specs exercise real default deps
+            // (e.g. live MusicBrainz fetches) and must not run under the app suite.
+            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
           },
         },
         {
@@ -55,9 +77,37 @@ export default defineConfig((): ViteUserConfig => {
             name: 'jsdom',
             environment: 'jsdom',
             include: ['**/*.spec.tsx'],
+            exclude: [
+              '**/node_modules/**',
+              'bio-generator/**',
+              'stripe-webhook/**',
+              ...HTML_PARSER_SPECS,
+            ],
+          },
+        },
+        {
+          // html-react-parser specs need the `forks` pool so `server.deps.inline`
+          // (and thus the html-dom-parser client alias) takes effect. See the
+          // HTML_PARSER_SPECS note above.
+          extends: true,
+          test: {
+            name: 'jsdom-forks',
+            environment: 'jsdom',
+            pool: 'forks',
+            include: HTML_PARSER_SPECS,
+            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
           },
         },
       ],
+
+      // Inline the html-react-parser CJS chain so Vite transforms every
+      // `require()` through its resolver (applying the aliases below and
+      // handling the ESM-only `domhandler`). See the alias note at the top.
+      server: {
+        deps: {
+          inline: [/html-react-parser/, /html-dom-parser/, /domhandler/],
+        },
+      },
 
       // Performance optimizations
       css: false, // Don't process CSS in tests
@@ -263,6 +313,8 @@ export default defineConfig((): ViteUserConfig => {
 
     resolve: {
       alias: [
+        { find: /^html-react-parser$/, replacement: htmlReactParserCjs },
+        { find: /^html-dom-parser$/, replacement: htmlDomParserClient },
         { find: '@/components', replacement: path.resolve(process.cwd(), './src/app/components') },
         { find: '@/lib', replacement: path.resolve(process.cwd(), './src/lib') },
         { find: '@/ui', replacement: path.resolve(process.cwd(), './src/app/components/ui') },

@@ -6,8 +6,10 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import {
+  artistListWithBioInclude,
   artistWithPublishedReleasesInclude,
   type Artist,
+  type ArtistListWithBio,
   type ArtistWithPublishedReleases,
 } from '@/lib/types/media-models';
 
@@ -65,6 +67,31 @@ export class ArtistRepository {
   /** Find an artist by slug (no relations). */
   static async findBySlug(slug: string): Promise<PrismaArtist | null> {
     return prisma.artist.findUnique({ where: { slug } });
+  }
+
+  /**
+   * List published, active, non-deleted artists for the public `/artists`
+   * index, including their primary bio images. Ordered by display name.
+   */
+  static async listPublishedWithBio({
+    skip,
+    take,
+  }: {
+    skip: number;
+    take: number;
+  }): Promise<ArtistListWithBio[]> {
+    return prisma.artist.findMany({
+      where: {
+        isActive: true,
+        publishedOn: { not: null },
+        // Mongo: `deletedOn: null` misses absent fields — OR with isSet:false.
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+      orderBy: { displayName: 'asc' },
+      skip,
+      take,
+      include: artistListWithBioInclude,
+    });
   }
 
   /**
@@ -210,6 +237,55 @@ export class ArtistRepository {
       data,
       select,
     }) as Promise<ArtistNameRecord>;
+  }
+
+  /**
+   * Replace an artist's AI-generated bio content in a single transaction:
+   * overwrite the short/long bio, genres, and provenance fields, then delete
+   * and recreate the discovered images/links. Deleting first means a
+   * regeneration never leaves stale rows behind.
+   *
+   * @param artistId - The artist to update.
+   * @param content - Sanitized bio content to persist.
+   */
+  static async replaceBioContent(
+    artistId: string,
+    content: {
+      shortBio: string;
+      bio: string;
+      genres: string | null;
+      bioModel: string;
+      images: Array<{
+        url: string;
+        thumbnailUrl: string | null;
+        title: string | null;
+        attribution: string | null;
+        license: string | null;
+        sourceUrl: string | null;
+        width: number | null;
+        height: number | null;
+        isPrimary: boolean;
+        sortOrder: number;
+      }>;
+      links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;
+    }
+  ): Promise<void> {
+    await prisma.$transaction([
+      prisma.artistBioImage.deleteMany({ where: { artistId } }),
+      prisma.artistBioLink.deleteMany({ where: { artistId } }),
+      prisma.artist.update({
+        where: { id: artistId },
+        data: {
+          shortBio: content.shortBio,
+          bio: content.bio,
+          genres: content.genres,
+          bioModel: content.bioModel,
+          bioGeneratedAt: new Date(),
+          bioImages: { create: content.images },
+          bioLinks: { create: content.links },
+        },
+      }),
+    ]);
   }
 
   /**

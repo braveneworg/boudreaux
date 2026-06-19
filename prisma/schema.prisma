@@ -261,6 +261,8 @@ model Artist {
   bio                   String? // Markdown supported post-MVP, for now just plain text blurb
   shortBio              String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
   altBio                String? // Ditto md support; An alternative bio for special use cases
+  bioGeneratedAt        DateTime? // When the short/long bio was last AI-generated; null = hand-authored only
+  bioModel              String? // AI model id used to generate the bio, e.g. "groq/llama-3.3-70b-versatile"
   slug                  String                 @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
   genres                String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
   bornOn                DateTime? // Always feature artist on their birthday if known
@@ -290,6 +292,8 @@ model Artist {
   isActive              Boolean                @default(true) // Whether the artist is currently active; used for filtering in listings
   instruments           String? // If stored with commas, split into array on retrieval; list of instruments the artist plays from primary to occasional
   artistUrls            ArtistUrl[]
+  bioImages             ArtistBioImage[] // Images discovered during AI bio generation (Wikimedia etc.)
+  bioLinks              ArtistBioLink[] // External links discovered during AI bio generation
   artistFeaturedArtists ArtistFeaturedArtist[]
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
@@ -379,6 +383,46 @@ model ArtistUrl {
   @@unique([artistId, platform])
   @@index([artistId])
   @@index([platform])
+}
+
+// Images discovered for an artist during AI bio generation. Re-hosted into our
+// own S3 (with `sharp` variants) and served via the CDN — `url` is a CDN URL,
+// not an external one. `isPrimary` marks the 2–3 best images surfaced beside
+// the short bio on listings and the detail page.
+model ArtistBioImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist       Artist   @relation(fields: [artistId], references: [id])
+  artistId     String   @db.ObjectId
+  url          String // Re-hosted full-resolution CDN image URL
+  thumbnailUrl String? // Optional smaller variant for grids/thumbnails
+  title        String? // Human-readable image title/caption
+  attribution  String? // Optional source attribution (unused for re-hosted images)
+  license      String? // e.g. "CC BY-SA 4.0"
+  sourceUrl    String? // Original page the image came from
+  width        Int?
+  height       Int?
+  isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([artistId])
+  @@index([sortOrder])
+}
+
+// External links discovered for an artist during AI bio generation (Wikipedia,
+// official site, MusicBrainz, socials). Kept separate from the curated `urls`/
+// `artistUrls` relations so regeneration never clobbers hand-entered links.
+model ArtistBioLink {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  artist    Artist  @relation(fields: [artistId], references: [id])
+  artistId  String  @db.ObjectId
+  label     String // Display label, e.g. "Wikipedia"
+  url       String
+  kind      String? // wikipedia | official | musicbrainz | social | other
+  sortOrder Int     @default(0)
+
+  @@index([artistId])
+  @@index([sortOrder])
 }
 
 // Add to Tag collection as new tags are created. Remove hash before storing

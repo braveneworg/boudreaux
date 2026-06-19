@@ -76,6 +76,33 @@ const urlSchema = z.object({
   url: z.string(),
 });
 
+/** `ArtistBioImage` scalars (the shape produced by `bioImages: true`). */
+const artistBioImageSchema = z.object({
+  id: z.string(),
+  artistId: z.string(),
+  url: z.string(),
+  thumbnailUrl: nullableString,
+  title: nullableString,
+  attribution: nullableString,
+  license: nullableString,
+  sourceUrl: nullableString,
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  isPrimary: z.boolean(),
+  sortOrder: z.number(),
+  createdAt: date,
+});
+
+/** `ArtistBioLink` scalars (the shape produced by `bioLinks: true`). */
+const artistBioLinkSchema = z.object({
+  id: z.string(),
+  artistId: z.string(),
+  label: z.string(),
+  url: z.string(),
+  kind: nullableString,
+  sortOrder: z.number(),
+});
+
 /** `ArtistLabel` join-row scalars (the shape produced by `labels: true`). */
 const artistLabelSchema = z.object({
   id: z.string(),
@@ -144,6 +171,8 @@ export const artistScalarSchema = z.object({
   bio: nullableString,
   shortBio: nullableString,
   altBio: nullableString,
+  bioGeneratedAt: nullableDate,
+  bioModel: nullableString,
   slug: z.string(),
   genres: nullableString,
   bornOn: nullableDate,
@@ -362,6 +391,8 @@ export const artistWithPublishedReleasesSchema = artistScalarSchema.extend({
   images: z.array(imageSchema),
   labels: z.array(artistLabelSchema),
   urls: z.array(urlSchema),
+  bioImages: z.array(artistBioImageSchema),
+  bioLinks: z.array(artistBioLinkSchema),
   members: z.array(artistMemberSchema),
   releases: z.array(
     z.object({

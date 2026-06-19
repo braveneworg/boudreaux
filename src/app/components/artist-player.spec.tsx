@@ -228,30 +228,34 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-// Mock carousel components
-vi.mock('@/app/components/ui/carousel', () => ({
-  Carousel: ({
-    children,
-    'aria-label': ariaLabel,
+// Mock the release combobox with simple option buttons so release-switching
+// behaviour is exercised without driving the Radix Popover/Command internals.
+vi.mock('./release-combobox', () => ({
+  ReleaseCombobox: ({
+    releases,
+    selectedId,
+    onSelect,
+    ariaLabel,
   }: {
-    children: ReactNode;
-    opts?: Record<string, unknown>;
-    'aria-label'?: string;
+    releases: Array<{ id: string; title: string; coverArtSrc: string | null }>;
+    selectedId: string;
+    onSelect: (id: string) => void;
+    ariaLabel?: string;
   }) => (
-    <div data-testid="carousel" aria-label={ariaLabel}>
-      {children}
+    <div data-testid="release-combobox" aria-label={ariaLabel} data-selected-id={selectedId}>
+      {releases.map((release) => (
+        <button
+          key={release.id}
+          type="button"
+          aria-label={`Play ${release.title}`}
+          aria-pressed={release.id === selectedId}
+          onClick={() => onSelect(release.id)}
+        >
+          {release.title}
+        </button>
+      ))}
     </div>
   ),
-  CarouselContent: ({ children, className }: { children: ReactNode; className?: string }) => (
-    <div data-testid="carousel-content" className={className}>
-      {children}
-    </div>
-  ),
-  CarouselItem: ({ children }: { children: ReactNode }) => (
-    <div data-testid="carousel-item">{children}</div>
-  ),
-  CarouselPrevious: () => <button data-testid="carousel-previous">Previous</button>,
-  CarouselNext: () => <button data-testid="carousel-next">Next</button>,
 }));
 
 // Mock utilities
@@ -390,18 +394,11 @@ describe('ArtistPlayer', () => {
     const release = createRelease('release-1', 'Test Album', [mockFile1, mockFile2, mockFile3]);
     const artist = createArtistWithReleases([release]);
 
-    it('should not render the media player with carousel for a single release', () => {
+    it('should not render the release combobox for a single release', () => {
       render(<ArtistPlayer artist={artist} />);
 
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
-      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
-    });
-
-    it('should not show carousel navigation for a single release', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('release-combobox')).not.toBeInTheDocument();
     });
 
     it('should not render CoverArtView for a single release', () => {
@@ -587,63 +584,36 @@ describe('ArtistPlayer', () => {
 
     const artist = createArtistWithReleases([release1, release2, release3]);
 
-    it('should render the carousel', () => {
+    it('should render the release combobox', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
+      expect(screen.getByTestId('release-combobox')).toBeInTheDocument();
     });
 
-    it('should center carousel items for 3+ releases', () => {
+    it('should render the combobox with correct aria-label', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
+      expect(screen.getByTestId('release-combobox')).toHaveAttribute(
+        'aria-label',
+        'Select a release by John Doe'
+      );
     });
 
-    it('should render carousel with correct aria-label', () => {
+    it('should render an option for each release', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel')).toHaveAttribute('aria-label', 'Releases by John Doe');
+      const options = screen.getAllByRole('button', { name: /Play Album/ });
+      expect(options).toHaveLength(3);
     });
 
-    it('should render carousel items for each release', () => {
+    it('should mark the selected release option as pressed', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      const items = screen.getAllByTestId('carousel-item');
-      expect(items).toHaveLength(3);
-    });
-
-    it('should render release thumbnails as images', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      const images = screen.getAllByTestId('next-image');
-      expect(images).toHaveLength(3);
-    });
-
-    it('should render release thumbnail buttons with aria attributes', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      const buttons = screen.getAllByRole('button', { name: /Play/ });
+      const buttons = screen.getAllByRole('button', { name: /Play Album/ });
       expect(buttons[0]).toHaveAttribute('aria-label', 'Play Album One');
       expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
       expect(buttons[1]).toHaveAttribute('aria-label', 'Play Album Two');
       expect(buttons[1]).toHaveAttribute('aria-pressed', 'false');
-    });
-
-    it('should show carousel navigation for > 3 releases', () => {
-      const release4 = createRelease('release-4', 'Album Four', [mockFile1]);
-      const manyReleasesArtist = createArtistWithReleases([release1, release2, release3, release4]);
-
-      render(<ArtistPlayer artist={manyReleasesArtist} />);
-
-      expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
-      expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
-    });
-
-    it('should not show carousel navigation for exactly 3 releases', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     });
 
     it('should render the artist name heading', () => {
@@ -719,28 +689,6 @@ describe('ArtistPlayer', () => {
       fireEvent.click(playButtons[1]);
 
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'true');
-    });
-
-    it('should render fallback initial for release without cover art', () => {
-      const noCoverRelease1 = { ...release1, coverArt: '' };
-      const noCoverRelease2 = { ...release2, coverArt: '' };
-      const noCoverRelease3 = { ...release3, coverArt: '' };
-      const noCoverArtist = createArtistWithReleases([
-        noCoverRelease1,
-        noCoverRelease2,
-        noCoverRelease3,
-      ]);
-
-      const { container } = render(<ArtistPlayer artist={noCoverArtist} />);
-
-      // Should display fallback initial letters (not images)
-      expect(screen.queryAllByTestId('next-image')).toHaveLength(0);
-      // Fallback divs contain the first letter of each release title
-      const fallbackDivs = container.querySelectorAll('.flex.items-center.justify-center.bg-muted');
-      expect(fallbackDivs).toHaveLength(3);
-      expect(fallbackDivs[0].textContent).toBe('A'); // Album One
-      expect(fallbackDivs[1].textContent).toBe('A'); // Album Two
-      expect(fallbackDivs[2].textContent).toBe('A'); // Album Three
     });
   });
 
@@ -842,29 +790,17 @@ describe('ArtistPlayer', () => {
     const release2 = createRelease('release-2', 'Album Two', [mockFile2]);
     const artist = createArtistWithReleases([release1, release2]);
 
-    it('should render carousel for 2 releases', () => {
+    it('should render the release combobox for 2 releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
+      expect(screen.getByTestId('release-combobox')).toBeInTheDocument();
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
-    });
-
-    it('should center the carousel items when there are 2 releases', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
     });
 
     it('should display the first release by default', () => {
       render(<ArtistPlayer artist={artist} />);
 
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
-    });
-    it('should not render carousel navigation arrows for 2 releases', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     });
   });
 

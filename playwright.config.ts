@@ -70,6 +70,10 @@ export default defineConfig({
       AUTH_URL: E2E_BASE_URL,
       NEXT_PUBLIC_BASE_URL: E2E_BASE_URL,
       NEXT_PUBLIC_E2E_MODE: 'true',
+      // Use the deterministic bio-generation fixture instead of invoking the
+      // AWS Lambda / Groq during E2E so the admin "Generate bios" flow is
+      // offline and reproducible.
+      BIO_GENERATOR_FAKE: 'true',
       NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: '1x00000000000000000000AA',
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,

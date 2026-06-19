@@ -1,0 +1,41 @@
+erDiagram
+    Artist ||--o{ ArtistBioImage : "bioImages"
+    Artist ||--o{ ArtistBioLink : "bioLinks"
+
+    Artist {
+        String id PK
+        String displayName
+        String shortBio "HTML, sanitized"
+        String bio "HTML, sanitized"
+        String genres "CSV, nullable"
+        Boolean isActive
+        DateTime publishedOn "nullable"
+        DateTime deletedOn "nullable"
+        DateTime bioGeneratedAt "NEW - null = hand-authored"
+        String bioModel "NEW - LLM id, nullable"
+    }
+
+    ArtistBioImage {
+        String id PK
+        String artistId FK
+        String url "re-hosted CDN url"
+        String thumbnailUrl "nullable"
+        String title "nullable"
+        String attribution "nullable"
+        String license "nullable"
+        String sourceUrl "nullable"
+        Int width "nullable"
+        Int height "nullable"
+        Boolean isPrimary "default false"
+        Int sortOrder "default 0"
+        DateTime createdAt
+    }
+
+    ArtistBioLink {
+        String id PK
+        String artistId FK
+        String label
+        String url
+        String kind "wikipedia|official|musicbrainz|social|other"
+        Int sortOrder "default 0"
+    }

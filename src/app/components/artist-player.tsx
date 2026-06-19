@@ -11,22 +11,13 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import Image from 'next/image';
-
 import { Download } from 'lucide-react';
 
 import { MediaActionLink } from '@/app/components/media-action-link';
+import { ReleaseCombobox } from '@/app/components/release-combobox';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/app/components/ui/carousel';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
-import { cn } from '@/lib/utils';
 import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
@@ -162,51 +153,25 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Release thumbnail carousel — shown when 2+ releases */}
+      {/* Release selector — shown when 2+ releases. Selecting loads + streams. */}
       {releases.length >= 2 && (
-        <Carousel opts={{ align: 'start', loop: false }} aria-label={`Releases by ${artistName}`}>
-          <CarouselContent className={cn('-ml-2', 'justify-center')}>
-            {releases.map((ar: ArtistWithPublishedReleases['releases'][number], index: number) => {
-              const releaseCoverArt = getReleaseCoverArt(ar.release);
-              const isSelected = index === selectedReleaseIndex;
-
-              return (
-                <CarouselItem key={ar.release.id} className="basis-auto pl-2">
-                  <button
-                    type="button"
-                    onClick={() => handleReleaseSelect(index)}
-                    className={cn(
-                      'relative overflow-hidden rounded-md transition-all',
-                      isSelected && 'ring-primary ring-2'
-                    )}
-                    aria-label={`Play ${ar.release.title}`}
-                    aria-pressed={isSelected}
-                  >
-                    {releaseCoverArt ? (
-                      <Image
-                        src={releaseCoverArt.src}
-                        alt={releaseCoverArt.alt}
-                        width={80}
-                        height={80}
-                        className="size-20 object-cover"
-                      />
-                    ) : (
-                      <div className="bg-muted text-zinc-950-foreground flex size-20 items-center justify-center text-xs">
-                        {ar.release.title.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </button>
-                </CarouselItem>
-              );
-            })}
-          </CarouselContent>
-          {releases.length > 3 && (
-            <>
-              <CarouselPrevious />
-              <CarouselNext />
-            </>
-          )}
-        </Carousel>
+        <ReleaseCombobox
+          ariaLabel={`Select a release by ${artistName}`}
+          selectedId={selectedRelease?.id ?? ''}
+          releases={releases.map((ar: ArtistWithPublishedReleases['releases'][number]) => ({
+            id: ar.release.id,
+            title: ar.release.title,
+            coverArtSrc: getReleaseCoverArt(ar.release)?.src ?? null,
+          }))}
+          onSelect={(id) => {
+            const index = releases.findIndex(
+              (ar: ArtistWithPublishedReleases['releases'][number]) => ar.release.id === id
+            );
+            if (index >= 0) {
+              handleReleaseSelect(index);
+            }
+          }}
+        />
       )}
 
       {/* Media player */}

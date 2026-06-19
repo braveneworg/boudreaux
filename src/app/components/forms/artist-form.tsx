@@ -3,8 +3,17 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +22,7 @@ import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { ArtistBioGenerationSection } from '@/app/components/forms/artist-bio-generation-section';
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -24,9 +34,9 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
-import { Textarea } from '@/app/components/ui/textarea';
 import {
   useCreateArtistMutation,
   useUpdateArtistMutation,
@@ -42,6 +52,7 @@ import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
@@ -63,6 +74,16 @@ const initialFormState: FormState = {
   fields: {},
   success: false,
 };
+
+// Admin-only rich-text editor for the bio fields. Lazy + `ssr: false` so the
+// Tiptap/ProseMirror bundle never ships to (or runs on) public pages.
+const RichTextEditor = dynamic(
+  () => import('@/app/components/ui/rich-text-editor').then((mod) => mod.RichTextEditor),
+  {
+    ssr: false,
+    loading: () => <div className="border-input min-h-40 rounded-md border" aria-busy="true" />,
+  }
+);
 
 /**
  * Validates a URL slug (lowercase alphanumeric segments joined by single
@@ -103,6 +124,9 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   const createArtist = useCreateArtistMutation();
   const updateArtist = useUpdateArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
+  // Re-hosted bio images (existing + freshly generated) offered in the
+  // rich-text editor's insert-image picker, alongside uploaded images.
+  const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isLoadingArtist, setIsLoadingArtist] = useState(!!initialArtistId);
   // artistId will be set after artist creation or from URL param for persisting image reordering
@@ -117,6 +141,27 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
+
+  // Images selectable in the bio editor: uploaded artist images plus re-hosted
+  // bio images, deduped by URL (uploaded first).
+  const bioEditorImages = useMemo<RichTextEditorImage[]>(() => {
+    const seen = new Set<string>();
+    const collected: RichTextEditorImage[] = [];
+    for (const image of images) {
+      const url = image.uploadedUrl;
+      if (url && !seen.has(url)) {
+        seen.add(url);
+        collected.push({ url, alt: image.altText ?? '' });
+      }
+    }
+    for (const image of bioPickerImages) {
+      if (!seen.has(image.url)) {
+        seen.add(image.url);
+        collected.push(image);
+      }
+    }
+    return collected;
+  }, [images, bioPickerImages]);
   const formRef = useRef<HTMLFormElement>(null);
   const artistForm = useForm<ArtistFormData>({
     resolver: zodResolver(createArtistSchema),
@@ -141,7 +186,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
       publishedOn: '',
     },
   });
-  const { control } = artistForm;
+  const { control, setValue } = artistForm;
 
   // Fetch artist data when initialArtistId is provided
   useEffect(() => {
@@ -177,9 +222,11 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
           title: artist.title || '',
           suffix: artist.suffix || '',
           slug: artist.slug || '',
-          bio: artist.bio || '',
-          shortBio: artist.shortBio || '',
-          altBio: artist.altBio || '',
+          // Convert legacy plain-text bios to HTML so the rich-text editor
+          // preserves their line breaks instead of collapsing them.
+          bio: plainTextToBioHtml(artist.bio),
+          shortBio: plainTextToBioHtml(artist.shortBio),
+          altBio: plainTextToBioHtml(artist.altBio),
           genres: artist.genres || '',
           tags: artist.tags || '',
           bornOn: formatDate(artist.bornOn),
@@ -213,6 +260,20 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             })
           );
           setImages(existingImages);
+        }
+
+        // Load existing re-hosted bio images for the editor's image picker.
+        if (artist.bioImages && artist.bioImages.length > 0) {
+          setBioPickerImages(
+            artist.bioImages.map(
+              (img: {
+                url: string;
+                title?: string | null;
+                width?: number | null;
+                height?: number | null;
+              }) => ({ url: img.url, alt: img.title ?? '', width: img.width, height: img.height })
+            )
+          );
         }
       } catch (err) {
         error('Failed to fetch artist:', err);
@@ -752,6 +813,25 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
               {/* Biography Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Biography</h2>
+
+                {/* AI Bio Generation — first action; edit mode only (needs a
+                    persisted artist). Populates the bio fields below. */}
+                {isEditMode && artistId && (
+                  <ArtistBioGenerationSection
+                    artistId={artistId}
+                    onGenerated={(content) => {
+                      setValue('shortBio', content.shortBio, { shouldDirty: true });
+                      setValue('bio', content.longBio, { shouldDirty: true });
+                      if (content.genres) {
+                        setValue('genres', content.genres, { shouldDirty: true });
+                      }
+                      setBioPickerImages(
+                        content.images.map((image) => ({ url: image.url, alt: image.title ?? '' }))
+                      );
+                    }}
+                  />
+                )}
+
                 <FormField
                   control={control}
                   name="bio"
@@ -759,7 +839,12 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                     <FormItem>
                       <FormLabel>Bio</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Artist biography" className="min-h-32" {...field} />
+                        <RichTextEditor
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          images={bioEditorImages}
+                          ariaLabel="Bio"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -772,10 +857,11 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                     <FormItem>
                       <FormLabel>Short Bio</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Brief artist description"
-                          className="min-h-20"
-                          {...field}
+                        <RichTextEditor
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          images={bioEditorImages}
+                          ariaLabel="Short Bio"
                         />
                       </FormControl>
                       <FormMessage />
@@ -789,10 +875,11 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                     <FormItem>
                       <FormLabel>Alternative Bio</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Alternative biography for special use cases"
-                          className="min-h-20"
-                          {...field}
+                        <RichTextEditor
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          images={bioEditorImages}
+                          ariaLabel="Alternative Bio"
                         />
                       </FormControl>
                       <FormMessage />

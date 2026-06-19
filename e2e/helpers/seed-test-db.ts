@@ -127,6 +127,10 @@ const seedTestDatabase = async () => {
     await prisma.artistRelease.deleteMany({});
     await prisma.artistLabel.deleteMany({});
     await prisma.artistUrl.deleteMany({});
+    // Bio images/links have a required Artist relation, so they must be removed
+    // before the artists they belong to.
+    await prisma.artistBioImage.deleteMany({});
+    await prisma.artistBioLink.deleteMany({});
     await prisma.releaseUrl.deleteMany({});
     await prisma.bannerNotification.deleteMany({});
     await prisma.siteSettings.deleteMany({});
@@ -231,6 +235,38 @@ const seedTestDatabase = async () => {
         slug: 'e2e-artist',
         displayName: 'E2E Artist',
         publishedOn: new Date(),
+        shortBio: 'E2E Artist is a genre-blurring act seeded for end-to-end tests.',
+        // Long bio carries an inline link (rendered as a Next Link, nofollow)
+        // and a CDN <img> (rendered as a Next Image with `_w{width}` variant
+        // srcset) so the bio page exercises the BioHtml renderer end-to-end.
+        bio:
+          '<p><strong>E2E Artist</strong> makes immersive soundscapes.</p>' +
+          '<p>Seeded long bio with an <a href="https://en.wikipedia.org/wiki/Music">inline link</a> for the full bio page.</p>' +
+          '<p><img src="https://cdn.fakefourrecords.com/media/artists/e2e-artist/bio/inline.jpg" alt="E2E inline bio image" width="1200" height="800"></p>',
+        genres: 'Experimental, Electronic',
+        bioModel: 'fake/deterministic',
+        bioGeneratedAt: new Date(),
+        bioImages: {
+          create: [
+            {
+              url: 'https://picsum.photos/seed/e2e-bio/1200/800',
+              thumbnailUrl: 'https://picsum.photos/seed/e2e-bio/400/300',
+              title: 'E2E Artist portrait',
+              isPrimary: true,
+              sortOrder: 0,
+            },
+          ],
+        },
+        bioLinks: {
+          create: [
+            {
+              label: 'Wikipedia',
+              url: 'https://en.wikipedia.org/wiki/Music',
+              kind: 'wikipedia',
+              sortOrder: 0,
+            },
+          ],
+        },
       },
     });
 

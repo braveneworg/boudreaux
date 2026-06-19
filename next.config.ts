@@ -63,6 +63,21 @@ const config = {
         port: '',
         pathname: '/**',
       },
+      // Wikimedia hosts artist bio images discovered during AI bio generation.
+      // These are external; bio image components render them with `unoptimized`
+      // so the custom CDN loader leaves their URLs untouched.
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'commons.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   // Empty turbopack config to allow Turbopack builds (Next.js 16+ default)

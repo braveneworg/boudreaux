@@ -4,67 +4,95 @@
 import { test, expect } from '../../fixtures/base.fixture';
 
 test.describe('Artist Page', () => {
-  test.describe('Release Carousel', () => {
-    test('should display the artist page with release carousel', async ({ page }) => {
+  test.describe('Release Combobox', () => {
+    test('should display the artist page with the release combobox', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      // The artist name should be visible (use .first() — text appears in breadcrumb, heading, and ticker)
+      // The artist name should be visible (use .first() — text appears in breadcrumb and ticker)
       await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
 
-      // The carousel should be rendered (aria-label pattern: "Releases by <name>").
-      // During the SSR → client hydration handoff the region can momentarily
-      // appear twice; wait for the DOM to settle to a single carousel before the
-      // strict-mode visibility assertion so it doesn't catch the transient state.
-      const carousel = page.getByLabel(/releases by e2e artist/i);
-      await expect(carousel).toHaveCount(1, { timeout: 10_000 });
-      await expect(carousel).toBeVisible();
+      // The release combobox replaces the old carousel. It can momentarily
+      // appear twice during the SSR → client hydration handoff; settle to one
+      // before the strict-mode visibility assertion.
+      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
+      await expect(combobox).toHaveCount(1, { timeout: 10_000 });
+      await expect(combobox).toBeVisible();
     });
 
-    test('should display release thumbnails in the carousel', async ({ page }) => {
+    test('should default to the newest release', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
-
-      // Each release should have a thumbnail button in the carousel
-      await expect(page.getByRole('button', { name: /play e2e album one/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /play e2e album two/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /play e2e album three/i })).toBeVisible();
+      // Releases are sorted newest-first, so "E2E Album Three" (Sep 2024) shows
+      // in the combobox trigger by default.
+      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
+      await expect(combobox).toContainText('E2E Album Three', { timeout: 15_000 });
     });
 
-    test('should hide carousel navigation arrows for 3 or fewer releases', async ({ page }) => {
+    test('should switch releases via the combobox', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
+      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
+      await expect(combobox).toHaveCount(1, { timeout: 10_000 });
+      await combobox.click();
 
-      // With 3 releases, navigation arrows should be hidden (threshold is > 3)
-      await expect(page.getByRole('button', { name: /previous slide/i })).toBeHidden();
-      await expect(page.getByRole('button', { name: /next slide/i })).toBeHidden();
-    });
-
-    test('should select a different release when clicking its thumbnail', async ({ page }) => {
-      await page.goto('/artists/e2e-artist');
-
-      await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
-
-      // Click the second release thumbnail (sorted newest-first: Three, Two, One)
-      await page.getByRole('button', { name: /play e2e album two/i }).click();
-
-      // The selected release should update — verify by checking the track name changes
+      // Selecting an option loads and streams it immediately — verify the track
+      // name updates to the chosen release's track.
+      await page.getByRole('option', { name: /e2e album two/i }).click();
       await expect(page.getByText('E2E Track Beta')).toBeVisible({ timeout: 5_000 });
     });
+  });
 
-    test('should mark the first release as selected by default', async ({ page }) => {
+  test.describe('Bio surfaces', () => {
+    test('should show the short bio, genres, and a Read full bio link', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/genre-blurring act/i)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Experimental')).toBeVisible();
+      await expect(page.getByRole('link', { name: /read full bio/i })).toBeVisible();
+    });
 
-      // Releases are sorted newest-first, so "E2E Album Three" (Sep 2024) is first
-      const firstButton = page.getByRole('button', { name: /play e2e album three/i });
-      await expect(firstButton).toHaveAttribute('aria-pressed', 'true');
+    test('should open the full bio page with the long bio and a nofollow link', async ({
+      page,
+    }) => {
+      await page.goto('/artists/e2e-artist');
 
-      // Other releases should not be pressed
-      const secondButton = page.getByRole('button', { name: /play e2e album two/i });
-      await expect(secondButton).toHaveAttribute('aria-pressed', 'false');
+      await page.getByRole('link', { name: /read full bio/i }).click();
+      await expect(page).toHaveURL(/\/artists\/e2e-artist\/bio$/);
+
+      await expect(page.getByText(/immersive soundscapes/i)).toBeVisible({ timeout: 15_000 });
+
+      const wikiLink = page.getByRole('link', { name: 'Wikipedia' });
+      await expect(wikiLink).toBeVisible();
+      await expect(wikiLink).toHaveAttribute('rel', 'nofollow noopener noreferrer');
+      await expect(wikiLink).toHaveAttribute('target', '_blank');
+
+      // BioHtml maps the inline <a> in the bio body to a hardened Next Link.
+      const inlineLink = page.getByRole('link', { name: 'inline link' });
+      await expect(inlineLink).toBeVisible();
+      await expect(inlineLink).toHaveAttribute('rel', 'nofollow noopener noreferrer');
+
+      // BioHtml maps the inline CDN <img> to a Next Image whose srcset uses the
+      // `_w{width}` variant convention (custom CDN loader, no `unoptimized`).
+      const inlineImage = page.getByRole('img', { name: 'E2E inline bio image' });
+      await expect(inlineImage).toHaveAttribute('srcset', /_w\d+/);
+    });
+  });
+
+  test.describe('Artists index', () => {
+    test('should list the artist with a short bio and View more link', async ({ page }) => {
+      await page.goto('/artists');
+
+      await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText(/genre-blurring act/i)).toBeVisible();
+
+      // "View more" navigates to the detail page.
+      await page
+        .getByRole('link', { name: /view more/i })
+        .first()
+        .click();
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
     });
   });
 });

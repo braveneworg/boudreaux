@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant Form as artist-form /<br/>BioGenerationSection
+    participant Hook as useGenerateArtistBioMutation
+    participant Action as generateArtistBioAction<br/>(Server Action)
+    participant Svc as BioGenerationService
+    participant Lambda as fakefour-bio-generator<br/>(or fixture)
+    participant Img as BioImageService
+    participant S3 as S3 / CDN
+    participant Repo as ArtistRepository
+    participant DB as MongoDB
+
+    Admin->>Form: Enter links + description, click "Generate bios"
+    Form->>Hook: mutateAsync({ artistId, links?, description? })
+    Hook->>Action: generateArtistBioAction(input)
+    Action->>Action: requireRole('admin') + validate (Zod)
+    Action->>Svc: generateForArtist(artistId, opts)
+    Svc->>Repo: findById(artistId)
+    Repo->>DB: read artist (names, genres)
+    Svc->>Lambda: invoke (InvokeCommand) /<br/>fakeBioGeneration if BIO_GENERATOR_FAKE
+    Note over Lambda: MusicBrainz → Wikidata →<br/>Wikimedia → Groq prose
+    Lambda-->>Svc: { ok, data: {shortBio,longBio,genres,images,links,model} }
+    Svc->>Svc: sanitizeBioHtml / sanitizeBioText
+    loop each discovered image
+        Svc->>Img: rehostWithVariants(url, artistId, i)
+        Img->>S3: upload original + _w variants (sharp/WebP)
+        S3-->>Img: CDN url + dims
+    end
+    Svc->>Repo: replaceBioContent(artistId, content)
+    Repo->>DB: tx: delete old images/links,<br/>update Artist, create new rows
+    Svc-->>Action: { ok, data, slug }
+    Action->>Action: logSecurityEvent + revalidatePath(*)
+    Action-->>Hook: { success:true, data: GeneratedBioContent }
+    Hook->>Hook: invalidateQueries(artists.all)
+    Hook-->>Form: onGenerated(content) → populate RichTextEditor fields
+    Admin->>Form: Edit + Save
