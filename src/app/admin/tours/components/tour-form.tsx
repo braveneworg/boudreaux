@@ -82,9 +82,9 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const isEditMode = !!tourId;
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const createTour = useCreateTourMutation();
-  const updateTour = useUpdateTourMutation();
-  const deleteTour = useDeleteTourMutation();
+  const { mutateAsync: createTour } = useCreateTourMutation();
+  const { mutateAsync: updateTour } = useUpdateTourMutation();
+  const { mutateAsync: deleteTour } = useDeleteTourMutation();
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
@@ -185,9 +185,9 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
 
       let result: FormState;
       if (isEditMode && tourId) {
-        result = await updateTour.mutateAsync({ tourId, formState, formData });
+        result = await updateTour({ tourId, formState, formData });
       } else {
-        result = await createTour.mutateAsync({ formState, formData });
+        result = await createTour({ formState, formData });
       }
 
       setFormState(result);
@@ -231,7 +231,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
 
     setIsDeleting(true);
     try {
-      const result = await deleteTour.mutateAsync({ tourId });
+      const result = await deleteTour({ tourId });
       if (result.success) {
         toast.success('Tour deleted successfully');
         router.push('/admin/tours');

@@ -119,8 +119,8 @@ export const TourDateForm = ({
   const [isPending, setIsPending] = useState(false);
   const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
   const isEditMode = !!tourDate;
-  const createTourDate = useCreateTourDateMutation();
-  const updateTourDate = useUpdateTourDateMutation();
+  const { mutateAsync: createTourDate } = useCreateTourDateMutation();
+  const { mutateAsync: updateTourDate } = useUpdateTourDateMutation();
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourDateUpdateSchema : tourDateCreateSchema),
@@ -294,9 +294,9 @@ export const TourDateForm = ({
 
       let result: FormState;
       if (isEditMode && tourDate?.id) {
-        result = await updateTourDate.mutateAsync({ tourDateId: tourDate.id, formState, formData });
+        result = await updateTourDate({ tourDateId: tourDate.id, formState, formData });
       } else {
-        result = await createTourDate.mutateAsync({ formState, formData });
+        result = await createTourDate({ formState, formData });
       }
 
       setFormState(result);

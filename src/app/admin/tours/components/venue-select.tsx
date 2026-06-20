@@ -85,8 +85,8 @@ export const VenueSelect = <
 }: VenueSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const createVenue = useCreateVenueMutation();
-  const updateVenue = useUpdateVenueMutation();
+  const { mutateAsync: createVenue } = useCreateVenueMutation();
+  const { mutateAsync: updateVenue } = useUpdateVenueMutation();
 
   // Venue list fetching via TanStack Query
   const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, {
@@ -158,7 +158,7 @@ export const VenueSelect = <
       if (newVenueTimeZone) formData.append('timeZone', newVenueTimeZone);
 
       const initialFormState: FormState = { fields: {}, success: false };
-      const result = await createVenue.mutateAsync({ formState: initialFormState, formData });
+      const result = await createVenue({ formState: initialFormState, formData });
 
       if (result.success && result.data?.venueId) {
         const newVenue: VenueOption = {
@@ -212,7 +212,7 @@ export const VenueSelect = <
       if (editVenueTimeZone) formData.append('timeZone', editVenueTimeZone);
 
       const initialFormState: FormState = { fields: {}, success: false };
-      const result = await updateVenue.mutateAsync({
+      const result = await updateVenue({
         venueId: editVenueId,
         formState: initialFormState,
         formData,
