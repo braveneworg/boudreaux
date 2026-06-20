@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.137.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n
+
 ## [4.136.0] - 2026-06-20
 
 ### Added
