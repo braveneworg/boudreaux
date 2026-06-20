@@ -48,6 +48,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [4.140.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n
+
+## [4.139.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n
+
 ## [4.138.0] - 2026-06-20
 
 ### Added
