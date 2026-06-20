@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.142.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n
+
 ## [4.141.0] - 2026-06-20
 
 ### Added
