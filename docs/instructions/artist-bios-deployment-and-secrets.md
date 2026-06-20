@@ -97,13 +97,56 @@ Model choice (optional): the Groq model id is the SAM parameter `GroqModel`
 **Repo → Settings → Secrets and variables → Actions**
 (<https://github.com/braveneworg/boudreaux/settings/secrets/actions>):
 
-| Secret                | Purpose                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------- |
-| `AWS_DEPLOY_ROLE_ARN` | IAM role assumed via OIDC; needs CloudFormation/Lambda/IAM/S3/SSM-describe + SAM-bucket perms |
-| `ALERT_EMAIL`         | SNS subscription email for the Lambda error alarm (empty disables the alarm)                  |
+| Secret                | Purpose                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `AWS_DEPLOY_ROLE_ARN` | IAM role assumed via OIDC; needs CloudFormation/Lambda/IAM/S3/SSM-describe + **SNS + CloudWatch** + SAM-bucket perms |
+| `ALERT_EMAIL`         | SNS subscription email for the Lambda error alarm (empty disables the alarm)                                         |
 
 OIDC trust setup (one-time, if not already present): create a GitHub OIDC provider and a role per
 <https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services>.
+
+**Deploy-role SNS + CloudWatch permissions.** When `ALERT_EMAIL` is set, the stack creates an SNS
+topic and a CloudWatch alarm, so the OIDC role needs permission to manage both — otherwise stack
+creation rolls back. The usual symptom is `SNS:GetTopicAttributes ... AccessDenied` (CloudFormation
+reads the topic back after creating it), leaving the stack in `ROLLBACK_COMPLETE`. Grant the role
+(run with **admin** creds; the OIDC role can't widen its own policy — replace `<ACCOUNT_ID>` and
+`<DEPLOY_ROLE_NAME>`):
+
+```bash
+cat > deploy-sns-cw-perms.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic", "sns:DeleteTopic",
+        "sns:GetTopicAttributes", "sns:SetTopicAttributes",
+        "sns:Subscribe", "sns:ListSubscriptionsByTopic",
+        "sns:TagResource", "sns:UntagResource", "sns:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:<ACCOUNT_ID>:fakefour-bio-generator-alarms"
+    },
+    { "Effect": "Allow", "Action": ["sns:Unsubscribe", "sns:GetSubscriptionAttributes"], "Resource": "*" },
+    { "Effect": "Allow",
+      "Action": ["cloudwatch:PutMetricAlarm", "cloudwatch:DescribeAlarms", "cloudwatch:DeleteAlarms"],
+      "Resource": "*" }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name <DEPLOY_ROLE_NAME> \
+  --policy-name bio-generator-sns-cloudwatch \
+  --policy-document file://deploy-sns-cw-perms.json
+
+rm deploy-sns-cw-perms.json
+```
+
+> The subscription actions (`sns:Unsubscribe`, `sns:GetSubscriptionAttributes`) and CloudWatch
+> actions use `Resource: "*"` because they key off dynamic subscription/alarm ARNs, not the topic
+> ARN. To avoid this whole permission class, deploy with an empty `AlarmEmail` (clear `ALERT_EMAIL`)
+> — `template.yaml` gates the SNS topic on `HasAlarmEmail`, so no topic is created.
 
 ### 4.3 Web-app runtime environment (so the app can invoke the Lambda + write S3)
 
@@ -361,14 +404,16 @@ editors; generation is routed through `useGenerateArtistBioMutation`.
 
 ## 10. Troubleshooting
 
-| Symptom                                                                | Likely cause                               | Fix                                                                                                                           |
-| ---------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)`    | App runtime env missing the var            | Set `BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator` (4.3)                                                                  |
-| Lambda error: `SSM parameter /fakefour/groq/api-key returned no value` | Secret not created or wrong region         | Re-run the `aws ssm put-parameter` (4.1) in `us-east-1`                                                                       |
-| Lambda `AccessDenied` on `ssm:GetParameter`/`kms:Decrypt`              | Stack out of date                          | Re-deploy; IAM policy is in `template.yaml`                                                                                   |
-| App `AccessDenied` invoking Lambda / `PutObject`                       | App IAM missing perms                      | Attach the policy in 4.4                                                                                                      |
-| `Invalid src prop … hostname not configured`                           | New image host not allow-listed            | The custom `loaderFile` normally bypasses this; add the host to `next.config.ts` `remotePatterns` if using the default loader |
-| Bio images 403 on the CDN                                              | Requested width has no `_w{width}` variant | Ensure `images.imageSizes`/`deviceSizes` match `IMAGE_VARIANT_DEVICE_SIZES`; variants are written by `image-variants.ts`      |
-| `git push` fails pre-push `tsc` under Node v22                         | Hook ran with system Node                  | `nvm use` (Node 24) **before** `git push`                                                                                     |
-| MusicBrainz lookups return nothing / 503                               | Missing `User-Agent` or 1 req/s rate limit | `User-Agent` is set in `types.ts`; the handler degrades to prose-only on failure                                              |
-| E2E hits real S3/Groq                                                  | Fake mode not set                          | Ensure `BIO_GENERATOR_FAKE=true` (Playwright web server sets it)                                                              |
+| Symptom                                                                      | Likely cause                                                  | Fix                                                                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)`          | App runtime env missing the var                               | Set `BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator` (4.3)                                                                       |
+| Lambda error: `SSM parameter /fakefour/groq/api-key returned no value`       | Secret not created or wrong region                            | Re-run the `aws ssm put-parameter` (4.1) in `us-east-1`                                                                            |
+| Lambda `AccessDenied` on `ssm:GetParameter`/`kms:Decrypt`                    | Stack out of date                                             | Re-deploy; IAM policy is in `template.yaml`                                                                                        |
+| SAM deploy rolls back; events show `SNS:GetTopicAttributes ... AccessDenied` | Deploy role lacks SNS/CloudWatch perms                        | Add the SNS + CloudWatch policy to the OIDC role (4.2), delete the rolled-back stack, then redeploy                                |
+| `sam deploy` fails: waiter matched `ROLLBACK_COMPLETE`                       | First-create failed; the stack can't be updated in this state | `aws cloudformation delete-stack --stack-name fakefour-bio-generator` + `wait stack-delete-complete`, fix the root cause, redeploy |
+| App `AccessDenied` invoking Lambda / `PutObject`                             | App IAM missing perms                                         | Attach the policy in 4.4                                                                                                           |
+| `Invalid src prop … hostname not configured`                                 | New image host not allow-listed                               | The custom `loaderFile` normally bypasses this; add the host to `next.config.ts` `remotePatterns` if using the default loader      |
+| Bio images 403 on the CDN                                                    | Requested width has no `_w{width}` variant                    | Ensure `images.imageSizes`/`deviceSizes` match `IMAGE_VARIANT_DEVICE_SIZES`; variants are written by `image-variants.ts`           |
+| `git push` fails pre-push `tsc` under Node v22                               | Hook ran with system Node                                     | `nvm use` (Node 24) **before** `git push`                                                                                          |
+| MusicBrainz lookups return nothing / 503                                     | Missing `User-Agent` or 1 req/s rate limit                    | `User-Agent` is set in `types.ts`; the handler degrades to prose-only on failure                                                   |
+| E2E hits real S3/Groq                                                        | Fake mode not set                                             | Ensure `BIO_GENERATOR_FAKE=true` (Playwright web server sets it)                                                                   |
