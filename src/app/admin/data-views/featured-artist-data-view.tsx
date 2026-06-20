@@ -20,8 +20,8 @@ import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-di
 import { DataView } from './data-view';
 
 export const FeaturedArtistDataView = () => {
-  const publishFeaturedArtists = usePublishFeaturedArtistsMutation();
-  const isPublishing = publishFeaturedArtists.isPending;
+  const { mutateAsync: publishFeaturedArtists, isPending: isPublishing } =
+    usePublishFeaturedArtistsMutation();
   const fieldsToShow = [
     'displayName',
     'featuredOn',
@@ -56,7 +56,7 @@ export const FeaturedArtistDataView = () => {
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
   const handlePublish = useCallback(async () => {
-    const result = await publishFeaturedArtists.mutateAsync();
+    const result = await publishFeaturedArtists();
     if (result.success) {
       toast.success('Featured artists published to landing page');
     } else {
