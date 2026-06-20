@@ -147,3 +147,22 @@ describe('RichTextEditor', () => {
     );
   });
 });
+
+// ProseMirror's coordsAtPos (reached via scrollToSelection on insert) builds a
+// Range and calls getClientRects() on it. jsdom leaves both Range rect methods
+// undefined, so the editor throws "target.getClientRects is not a function"
+// asynchronously after the test completes — a flaky unhandled exception that
+// fails the whole shard. setupTests.ts polyfills them; this locks that in.
+describe('jsdom Range rect polyfill (prevents prosemirror flake)', () => {
+  it('exposes a callable Range.getClientRects returning an array-like with length', () => {
+    const rects = globalThis.document.createRange().getClientRects();
+
+    expect(typeof rects.length).toBe('number');
+  });
+
+  it('exposes a callable Range.getBoundingClientRect returning a rect', () => {
+    const rect = globalThis.document.createRange().getBoundingClientRect();
+
+    expect(rect).toMatchObject({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 });
+  });
+});

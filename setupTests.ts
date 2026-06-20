@@ -189,6 +189,35 @@ if (typeof window !== 'undefined') {
   // Mock scrollIntoView for JSDOM
   Element.prototype.scrollIntoView = vi.fn();
 
+  // Polyfill Range rect methods for jsdom. ProseMirror/Tiptap's coordsAtPos
+  // (reached via scrollToSelection when content is inserted) builds a Range and
+  // calls getClientRects()/getBoundingClientRect() on it, both of which jsdom
+  // leaves undefined. Without these the editor throws "target.getClientRects is
+  // not a function" asynchronously after a test finishes — a flaky unhandled
+  // exception that fails the whole vitest shard (see rich-text-editor.spec.tsx).
+  // Empty rects are correct here: jsdom has no layout, and singleRect() falls
+  // through to getBoundingClientRect() when getClientRects() is empty.
+  const emptyDomRect: DOMRect = {
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    toJSON: () => ({}),
+  };
+  Range.prototype.getClientRects = vi.fn(
+    () =>
+      ({
+        length: 0,
+        item: () => null,
+        [Symbol.iterator]: [][Symbol.iterator].bind([]),
+      }) as unknown as DOMRectList
+  );
+  Range.prototype.getBoundingClientRect = vi.fn(() => emptyDomRect);
+
   // Override HTMLFormElement.requestSubmit for jsdom (jsdom@26 defines it but throws
   // "Not implemented" when called). Use Object.defineProperty because jsdom may
   // define the property as non-writable, making plain assignment silently fail.
