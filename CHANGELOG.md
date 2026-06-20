@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.138.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n
+
 ## [4.137.0] - 2026-06-20
 
 ### Added
