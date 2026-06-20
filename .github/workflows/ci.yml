@@ -328,7 +328,7 @@ jobs:
           E2E_DATABASE_URL: mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0
           SKIP_ENV_VALIDATION: "true"
           # Use the deterministic bio-generation fixture instead of invoking the
-          # AWS Lambda / Groq, so the admin "Generate bios" flow is offline and
+          # AWS Lambda / Gemini, so the admin "Generate bios" flow is offline and
           # reproducible in CI.
           BIO_GENERATOR_FAKE: "true"
           # Real AWS credentials so the pre-built standalone server can reach

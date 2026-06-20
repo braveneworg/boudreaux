@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
 /**
  * E2E coverage for the admin AI Bio Generation flow. The web server runs with
  * BIO_GENERATOR_FAKE=true (see playwright.config.ts), so generation returns a
- * deterministic fixture instead of invoking the AWS Lambda / Groq.
+ * deterministic fixture instead of invoking the AWS Lambda / Gemini.
  */
 
 const openFirstArtistEdit = async (adminPage: Page): Promise<void> => {

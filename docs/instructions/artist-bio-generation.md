@@ -19,7 +19,7 @@ This branch adds an end-to-end **AI artist-bio pipeline**. An admin opens the ar
 form, optionally supplies reference links and a description, and clicks **Generate bios**. A
 Server Action invokes a standalone **`fakefour-bio-generator` AWS Lambda** (a separate SAM
 project under [`bio-generator/`](../../bio-generator)) that grounds an LLM on free public
-music databases — **MusicBrainz → Wikidata → Wikimedia Commons → Groq** — and returns a
+music databases — **MusicBrainz → Wikidata → Wikimedia Commons → Gemini** — and returns a
 short bio, a long HTML bio, genres, and _real_ (never LLM-invented) image and link URLs. The
 web app sanitizes everything, **re-hosts the discovered images into our own S3/CDN** with
 `sharp` width variants, and persists the result (bios + `ArtistBioImage` / `ArtistBioLink`
@@ -40,19 +40,19 @@ editor** rather than a plain textarea.
 
 ### Standalone Lambda — `bio-generator/` (new SAM project, separate pnpm workspace)
 
-| File                                                                                                       | Purpose                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `template.yaml`                                                                                            | SAM template: `BioGeneratorFunction` (Node 24, arm64, 29s/512MB), SSM/KMS read policy, error CloudWatch alarm + SNS topic             |
-| `src/handler.ts`                                                                                           | Orchestrates MusicBrainz → Wikidata → Wikimedia → Groq; graceful prose-only degradation; returns discriminated `{ ok, ... }` envelope |
-| `src/musicbrainz.ts`                                                                                       | Resolve artist by name → Wikidata id + external relations                                                                             |
-| `src/wikidata.ts`                                                                                          | Read `P18` image file names, `P856` official site, English Wikipedia sitelink                                                         |
-| `src/wikimedia.ts`                                                                                         | Resolve Commons file names to hotlinkable URLs + attribution/license                                                                  |
-| `src/groq.ts`                                                                                              | Write short/long bio prose in JSON mode, grounded on the gathered facts                                                               |
-| `src/types.ts`                                                                                             | **Contract**: request/response Zod schemas + `USER_AGENT`, `DEFAULT_GROQ_MODEL`                                                       |
-| `src/lib/secrets.ts`                                                                                       | Read the Groq API key from SSM Parameter Store at runtime                                                                             |
-| `events/sample.json`                                                                                       | Sample event for `sam local invoke`                                                                                                   |
-| `package.json`, `tsconfig.json`, `vitest.config.ts`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `.gitignore` | Workspace scaffold (mirrors `stripe-webhook/`)                                                                                        |
-| `src/*.spec.ts`                                                                                            | Unit tests — all `fetch`/SSM mocked, deterministic & offline                                                                          |
+| File                                                                                                       | Purpose                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `template.yaml`                                                                                            | SAM template: `BioGeneratorFunction` (Node 24, arm64, 29s/512MB), SSM/KMS read policy, error CloudWatch alarm + SNS topic               |
+| `src/handler.ts`                                                                                           | Orchestrates MusicBrainz → Wikidata → Wikimedia → Gemini; graceful prose-only degradation; returns discriminated `{ ok, ... }` envelope |
+| `src/musicbrainz.ts`                                                                                       | Resolve artist by name → Wikidata id + external relations                                                                               |
+| `src/wikidata.ts`                                                                                          | Read `P18` image file names, `P856` official site, English Wikipedia sitelink                                                           |
+| `src/wikimedia.ts`                                                                                         | Resolve Commons file names to hotlinkable URLs + attribution/license                                                                    |
+| `src/gemini.ts`                                                                                            | Write short/long bio prose in JSON mode, grounded on the gathered facts                                                                 |
+| `src/types.ts`                                                                                             | **Contract**: request/response Zod schemas + `USER_AGENT`, `DEFAULT_GEMINI_MODEL`                                                       |
+| `src/lib/secrets.ts`                                                                                       | Read the Gemini API key from SSM Parameter Store at runtime                                                                             |
+| `events/sample.json`                                                                                       | Sample event for `sam local invoke`                                                                                                     |
+| `package.json`, `tsconfig.json`, `vitest.config.ts`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `.gitignore` | Workspace scaffold (mirrors `stripe-webhook/`)                                                                                          |
+| `src/*.spec.ts`                                                                                            | Unit tests — all `fetch`/SSM mocked, deterministic & offline                                                                            |
 
 ### Data layer
 
@@ -142,7 +142,7 @@ editor** rather than a plain textarea.
 
 - Node 24, pnpm 11 (separate workspace)
 - **AWS SAM CLI** + Docker (for `sam build` / `sam local invoke`)
-- **Groq API key** stored in SSM (`/fakefour/groq/api-key`) — free tier, OpenAI-compatible
+- **Gemini API key** stored in SSM (`/fakefour/gemini/api-key`) — free tier
 - AWS deploy role assumed via OIDC in CI (`AWS_DEPLOY_ROLE_ARN`)
 
 ---
@@ -166,12 +166,12 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 
 ### Lambda config (no app/CI secret)
 
-| Where                  | Name                                            | Purpose                                     |
-| ---------------------- | ----------------------------------------------- | ------------------------------------------- |
-| AWS SSM (SecureString) | `/fakefour/groq/api-key`                        | Groq key — **Lambda-only**, read at runtime |
-| Web app IAM identity   | `lambda:InvokeFunction` on the function         | Lets the app invoke it                      |
-| SAM param              | `GroqModel` (default `llama-3.3-70b-versatile`) | Prose model                                 |
-| SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`)        | Error-alarm SNS subscription                |
+| Where                  | Name                                     | Purpose                                       |
+| ---------------------- | ---------------------------------------- | --------------------------------------------- |
+| AWS SSM (SecureString) | `/fakefour/gemini/api-key`               | Gemini key — **Lambda-only**, read at runtime |
+| Web app IAM identity   | `lambda:InvokeFunction` on the function  | Lets the app invoke it                        |
+| SAM param              | `GeminiModel` (default `gemini-3-flash`) | Prose model                                   |
+| SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`) | Error-alarm SNS subscription                  |
 
 ---
 
@@ -198,9 +198,9 @@ cd bio-generator
 pnpm install
 pnpm run test:run             # offline unit tests
 
-# One-time: store the Groq key
-aws ssm put-parameter --name /fakefour/groq/api-key \
-  --type SecureString --value "<YOUR_GROQ_API_KEY>" --overwrite
+# One-time: store the Gemini key
+aws ssm put-parameter --name /fakefour/gemini/api-key \
+  --type SecureString --value "<YOUR_GEMINI_API_KEY>" --overwrite
 
 sam build
 sam deploy --guided           # first deploy; note the FunctionName output
@@ -236,7 +236,7 @@ sam deploy --guided           # first deploy; note the FunctionName output
 ```bash
 cd bio-generator
 sam build
-sam local invoke BioGeneratorFunction -e events/sample.json   # needs Groq key reachable via SSM
+sam local invoke BioGeneratorFunction -e events/sample.json   # needs Gemini key reachable via SSM
 ```
 
 Expected envelope:
@@ -250,7 +250,7 @@ Expected envelope:
     "genres": "...",
     "images": [{ "url": "...", "attribution": "...", "isPrimary": true }],
     "links": [{ "label": "Wikipedia", "url": "...", "kind": "wikipedia" }],
-    "model": "llama-3.3-70b-versatile",
+    "model": "gemini-3-flash",
   },
 }
 ```
@@ -314,7 +314,7 @@ rm docs/instructions/artist-bios-*.pdf
 # Tear down the Lambda stack entirely (removes function, alarm, SNS topic)
 cd bio-generator && sam delete --stack-name fakefour-bio-generator --region us-east-1
 # (Optionally) remove the SSM key:
-aws ssm delete-parameter --name /fakefour/groq/api-key
+aws ssm delete-parameter --name /fakefour/gemini/api-key
 ```
 
 Re-hosted S3 objects live under `media/artists/{artistId}/bio/…` — delete that prefix to
@@ -370,7 +370,7 @@ provenance.
 
 ### Why the LLM never invents URLs
 
-The Lambda gathers facts from MusicBrainz/Wikidata/Wikimedia first, then asks Groq only to
+The Lambda gathers facts from MusicBrainz/Wikidata/Wikimedia first, then asks Gemini only to
 write prose and _rank_ which gathered images best identify the artist. Image/link URLs come
 exclusively from the real sources — which is why generated bios don't 404.
 

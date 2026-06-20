@@ -22,10 +22,10 @@ Parameters:
     Type: String
     Default: production
     AllowedValues: [production, staging]
-  GroqModel:
+  GeminiModel:
     Type: String
-    Default: llama-3.3-70b-versatile
-    Description: Groq model id used to write bio prose
+    Default: gemini-3-flash
+    Description: Gemini model id used to write bio prose
   AlarmEmail:
     Type: String
     Default: ''
@@ -41,30 +41,26 @@ Resources:
       FunctionName: fakefour-bio-generator
       CodeUri: src/
       Handler: handler.lambdaHandler
-      Description: Generates short/long artist bios from MusicBrainz + Wikidata + Groq
+      Description: Generates short/long artist bios from MusicBrainz + Wikidata + Gemini
       Policies:
         - Statement:
             - Effect: Allow
               Action:
                 - ssm:GetParameter
               Resource:
-                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/api-key'
-                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/tpm-limit'
-                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/search/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/gemini/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/jina/api-key'
             - Effect: Allow
               Action:
                 - kms:Decrypt
               Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
       Environment:
         Variables:
-          SSM_PATH_GROQ_API_KEY: '/fakefour/groq/api-key'
-          # Optional web-search fallback (Tavily). If the parameter does not
-          # exist the function degrades gracefully to a facts-only bio.
-          SSM_PATH_SEARCH_API_KEY: '/fakefour/search/api-key'
-          # Groq per-request token (TPM) ceiling. If the parameter is unset the
-          # function falls back to the free-tier default (12k) in code.
-          SSM_PATH_GROQ_TPM_LIMIT: '/fakefour/groq/tpm-limit'
-          GROQ_MODEL: !Ref GroqModel
+          SSM_PATH_GEMINI_API_KEY: '/fakefour/gemini/api-key'
+          # Optional Jina (web scrape) key. Jina works keyless at a lower rate
+          # limit, so an absent parameter just means unauthenticated scraping.
+          SSM_PATH_JINA_API_KEY: '/fakefour/jina/api-key'
+          GEMINI_MODEL: !Ref GeminiModel
     Metadata:
       BuildMethod: esbuild
       BuildProperties:

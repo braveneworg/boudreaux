@@ -19,6 +19,18 @@ describe('sanitizeBioHtml', () => {
     expect(result).toBe('<p><strong>Bold</strong> and <em>italic</em></p>');
   });
 
+  it('keeps <b> and <i> formatting tags', () => {
+    const result = sanitizeBioHtml('<p><b>bold</b> and <i>italic</i></p>');
+
+    expect(result).toBe('<p><b>bold</b> and <i>italic</i></p>');
+  });
+
+  it('keeps list tags', () => {
+    const result = sanitizeBioHtml('<ul><li>one</li></ul><ol><li>two</li></ol>');
+
+    expect(result).toBe('<ul><li>one</li></ul><ol><li>two</li></ol>');
+  });
+
   it('forces rel="nofollow noopener noreferrer" on links', () => {
     const result = sanitizeBioHtml('<a href="https://example.com">link</a>');
 
@@ -35,6 +47,19 @@ describe('sanitizeBioHtml', () => {
     const result = sanitizeBioHtml('<a href="javascript:alert(1)">x</a>');
 
     expect(result).not.toContain('javascript:');
+  });
+
+  it('strips the href from listening-service links, keeping the anchor text', () => {
+    const result = sanitizeBioHtml('<a href="https://open.spotify.com/artist/1">listen</a>');
+
+    expect(result).not.toContain('spotify.com');
+    expect(result).toContain('listen');
+  });
+
+  it('keeps the href on informative links', () => {
+    const result = sanitizeBioHtml('<a href="https://radiohead.com">official site</a>');
+
+    expect(result).toContain('href="https://radiohead.com"');
   });
 
   it('keeps section headings h2 through h4', () => {

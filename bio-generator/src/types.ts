@@ -7,16 +7,12 @@ import { z } from 'zod';
 /** Descriptive User-Agent required by MusicBrainz / Wikimedia APIs. */
 export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourrecords.com )';
 
-/** Default Groq model — fast, free-tier friendly, supports JSON mode. */
-export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
-
 /**
- * Default per-request token ceiling — Groq's free-tier TPM for
- * {@link DEFAULT_GROQ_MODEL}. Groq counts prompt + reserved completion tokens
- * against this and 413s when the sum exceeds it. Overridden at runtime by the
- * `/fakefour/groq/tpm-limit` SSM parameter (see `getGroqTpmLimit`).
+ * Default Gemini model — Gemini 3 Flash: fast, free-tier friendly, a 1M-token
+ * context window (so source material never needs trimming), and native JSON
+ * output. Overridable per environment via the `GEMINI_MODEL` env var.
  */
-export const DEFAULT_GROQ_TOKEN_LIMIT = 12_000;
+export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash';
 
 /**
  * Input the web app sends to the Lambda. Names drive the metadata lookup;
@@ -80,14 +76,14 @@ export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
 export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 
 /** Just the prose the LLM is responsible for — validated before assembly. */
-export const groqProseSchema = z.object({
+export const bioProseSchema = z.object({
   shortBio: z.string().min(1),
   longBio: z.string().min(1),
   genres: z.string().optional(),
   primaryImageIndexes: z.array(z.number().int().nonnegative()).optional(),
 });
 
-export type GroqProse = z.infer<typeof groqProseSchema>;
+export type BioProse = z.infer<typeof bioProseSchema>;
 
 /** Grounding facts gathered from MusicBrainz/Wikidata, passed to the LLM. */
 export interface ArtistFacts {

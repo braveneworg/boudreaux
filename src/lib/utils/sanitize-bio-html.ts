@@ -5,19 +5,38 @@ import 'server-only';
 
 import sanitizeHtml from 'sanitize-html';
 
+import { isListeningServiceUrl } from './is-listening-service-url';
+
 /**
  * Rich-text allowlist for the long bio (Tiptap editor output + AI prose).
  * Section headings (`<h2>`–`<h4>`) are permitted so extensive, encyclopedic
  * bios can be structured; `<h1>` is intentionally excluded and reserved for the
- * page title. Links are force-rewritten to carry `rel="nofollow noopener
- * noreferrer"` and `target="_blank"` so an opened tab can never reach back
- * through `window.opener`. Inline `<img>` (re-hosted images) and `<span>`
- * font-size styling are permitted; the host of every `<img>`/`<a>` is
- * additionally gated by next/image `remotePatterns` and the `BioHtml` renderer
- * at display time.
+ * page title. Both semantic (`<strong>`/`<em>`) and presentational (`<b>`/`<i>`)
+ * emphasis are kept so no generated emphasis is ever stripped. Links are
+ * force-rewritten to carry `rel="nofollow noopener noreferrer"` and
+ * `target="_blank"` so an opened tab can never reach back through
+ * `window.opener`. Inline `<img>` (re-hosted images) and `<span>` font-size
+ * styling are permitted; the host of every `<img>`/`<a>` is additionally gated
+ * by next/image `remotePatterns` and the `BioHtml` renderer at display time.
  */
 const BIO_HTML_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'img', 'span', 'h2', 'h3', 'h4'],
+  allowedTags: [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'ul',
+    'ol',
+    'li',
+    'a',
+    'img',
+    'span',
+    'h2',
+    'h3',
+    'h4',
+  ],
   allowedAttributes: {
     a: ['href', 'rel', 'target'],
     img: ['src', 'alt', 'width', 'height'],
@@ -44,10 +63,20 @@ const BIO_HTML_OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
   allowedSchemesAppliedToAttributes: ['href', 'src'],
   transformTags: {
-    a: sanitizeHtml.simpleTransform('a', {
-      rel: 'nofollow noopener noreferrer',
-      target: '_blank',
-    }),
+    // Harden every link, and neutralise links to streaming/listening services:
+    // dropping the href leaves the anchor text in place (BioHtml renders an
+    // hrefless <a> as plain text), so a bio never links out to another listening
+    // experience while its prose stays intact.
+    a: (tagName, attribs) => {
+      if (attribs.href && isListeningServiceUrl(attribs.href)) {
+        const { href: _href, ...rest } = attribs;
+        return { tagName, attribs: rest };
+      }
+      return {
+        tagName,
+        attribs: { ...attribs, rel: 'nofollow noopener noreferrer', target: '_blank' },
+      };
+    },
   },
 };
 
