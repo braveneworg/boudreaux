@@ -77,6 +77,32 @@ describe('generateProse', () => {
     expect(JSON.parse(fetchFn.mock.calls[0][1].body).max_tokens).toBeGreaterThan(2000);
   });
 
+  it('uses the research persona naming the artist in the system prompt', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(
+      { ...facts, realName: 'Thomas Yorke', displayName: 'Thom Yorke' },
+      'k',
+      undefined,
+      fetchFn
+    );
+
+    const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).messages[0].content;
+    expect(systemMessage).toContain('exceptional writer');
+    expect(systemMessage).toContain('Thomas Yorke (Thom Yorke)');
+  });
+
+  it('instructs inline images and lists in the long bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).messages[1].content;
+    expect(userMessage).toContain('<img src="image:N"');
+    expect(userMessage).toContain('<ul>');
+    expect(userMessage).toContain('VARY the');
+  });
+
   it('throws when Groq returns a non-OK status', async () => {
     const fetchFn = vi.fn().mockResolvedValue(new Response('quota', { status: 429 }));
 

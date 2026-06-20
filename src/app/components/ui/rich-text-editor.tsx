@@ -20,6 +20,8 @@ import {
   Italic,
   Link2,
   Link2Off,
+  List,
+  ListOrdered,
   Pilcrow,
   Type,
 } from 'lucide-react';
@@ -172,6 +174,8 @@ export const RichTextEditor = ({
       isLink: instance?.isActive('link') ?? false,
       isHeading2: instance?.isActive('heading', { level: 2 }) ?? false,
       isHeading3: instance?.isActive('heading', { level: 3 }) ?? false,
+      isBulletList: instance?.isActive('bulletList') ?? false,
+      isOrderedList: instance?.isActive('orderedList') ?? false,
     }),
   });
 
@@ -253,6 +257,27 @@ export const RichTextEditor = ({
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         >
           <Heading3 className="size-4" aria-hidden />
+        </Button>
+
+        <Button
+          type="button"
+          size="icon"
+          variant={toolbarState?.isBulletList ? 'secondary' : 'ghost'}
+          aria-label="Bulleted list"
+          aria-pressed={toolbarState?.isBulletList}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
+          <List className="size-4" aria-hidden />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant={toolbarState?.isOrderedList ? 'secondary' : 'ghost'}
+          aria-label="Numbered list"
+          aria-pressed={toolbarState?.isOrderedList}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          <ListOrdered className="size-4" aria-hidden />
         </Button>
 
         <DropdownMenu>

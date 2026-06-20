@@ -52,6 +52,12 @@ vi.mock('@/app/components/ui/image-uploader', () => ({
   ImageUploader: ({ label }: { label?: string }) => <div data-testid="image-uploader">{label}</div>,
 }));
 
+// Mock BioHtml (pulled in transitively via the bio-generation section) so this
+// spec stays on the fast vmThreads pool; the real BioHtml needs the forks pool.
+vi.mock('@/app/components/bio-html', () => ({
+  BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
+}));
+
 vi.mock('@/ui/breadcrumb-menu', () => ({
   BreadcrumbMenu: () => <div data-testid="breadcrumb-menu">BreadcrumbMenu</div>,
 }));

@@ -139,21 +139,30 @@ const gatherMetadata = async (
     console.warn('Bio metadata gathering degraded:', err);
   }
 
-  // Fallback grounding: when the structured sources yielded no article body
-  // (no MusicBrainz/Wikipedia match), search the web so even artists absent
-  // from those catalogs still get a real bio. Optional — skipped when no search
-  // key is configured, and never throws (degrades to a facts-only bio).
-  if (!facts.sourceText) {
-    const searchKey = await deps.getSearchApiKey();
-    if (searchKey) {
-      const searchName = input.realName?.trim() || input.displayName;
-      const found = await deps.searchArtistSources(searchName, searchKey);
-      if (found) {
-        facts.sourceText = found.sourceText;
-        facts.sourceUrls = found.sourceUrls;
-        for (const url of found.sourceUrls) {
-          links.push({ label: 'Reference', url, kind: 'other' });
-        }
+  // Web search as additional grounding *context*, not just a fallback: always
+  // gather it when a key is configured and MERGE it with any Wikipedia article
+  // body, so both the extensive long bio and the informed short bio draw on the
+  // fullest possible material. Optional + best-effort (never throws).
+  const searchKey = await deps.getSearchApiKey();
+  if (searchKey) {
+    const searchName = input.realName?.trim() || input.displayName;
+    const found = await deps.searchArtistSources(searchName, searchKey);
+    if (found) {
+      facts.sourceText = facts.sourceText
+        ? `${facts.sourceText}\n\n${found.sourceText}`
+        : found.sourceText;
+      facts.sourceUrls = [
+        ...new Set(
+          [
+            facts.wikipediaUrl,
+            facts.officialUrl,
+            ...(facts.sourceUrls ?? []),
+            ...found.sourceUrls,
+          ].filter((url): url is string => Boolean(url))
+        ),
+      ];
+      for (const url of found.sourceUrls) {
+        links.push({ label: 'Reference', url, kind: 'other' });
       }
     }
   }

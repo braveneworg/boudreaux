@@ -11,6 +11,13 @@ vi.mock('./expandable-thumbnail', () => ({
   ExpandableThumbnail: ({ alt }: { alt: string }) => <span data-testid="thumb" data-alt={alt} />,
 }));
 
+// Mock BioHtml so this spec stays on the fast vmThreads pool (the real BioHtml
+// pulls in html-react-parser, which requires the forks pool). BioHtml behavior
+// is covered in bio-html.spec; here we only need the teaser body to render.
+vi.mock('./bio-html', () => ({
+  BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
+}));
+
 vi.mock('@/lib/utils/get-artist-display-name', () => ({
   getArtistDisplayName: (artist: { displayName?: string | null }) =>
     artist.displayName ?? 'Unknown',

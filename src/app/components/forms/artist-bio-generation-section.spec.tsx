@@ -13,6 +13,13 @@ vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
   useGenerateArtistBioMutation: () => ({ mutateAsync: generateMock, isPending: false }),
 }));
 
+// Mock BioHtml so this spec stays on the fast vmThreads pool (the real BioHtml
+// pulls in html-react-parser, which requires the forks pool). BioHtml behavior
+// is covered in bio-html.spec; here the short-bio preview just needs to render.
+vi.mock('@/app/components/bio-html', () => ({
+  BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
+}));
+
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock('sonner', () => ({

@@ -9,6 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import parse, { domToReact, Element } from 'html-react-parser';
+import { ExternalLink } from 'lucide-react';
 
 import type { DOMNode, HTMLReactParserOptions } from 'html-react-parser';
 
@@ -43,9 +44,17 @@ const replace: HTMLReactParserOptions['replace'] = (domNode) => {
     // An anchor stripped of its href by the sanitizer renders as plain text.
     if (!href) return <>{domToReact(domNode.children as DOMNode[], options)}</>;
 
+    // Trailing "opens in a new tab" affordance after the link text. The icon is
+    // aria-hidden so the link's accessible name stays the text content only.
     return (
-      <Link href={href} rel="nofollow noopener noreferrer" target="_blank">
+      <Link
+        href={href}
+        rel="nofollow noopener noreferrer"
+        target="_blank"
+        className="inline-flex items-baseline gap-0.5"
+      >
         {domToReact(domNode.children as DOMNode[], options)}
+        <ExternalLink className="size-3 self-center" aria-hidden />
       </Link>
     );
   }

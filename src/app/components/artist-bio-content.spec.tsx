@@ -30,7 +30,7 @@ const artist = {
   displayName: 'Test Artist',
   slug: 'test-artist',
   shortBio: 'Short teaser.',
-  bio: '<p>Long <strong>bio</strong> body.</p>',
+  bio: '<p>Long <strong>bio</strong> body, see <a href="https://en.wikipedia.org/wiki/x">Wikipedia</a>.</p>',
   genres: 'jazz, funk',
   bioImages: [
     {
@@ -76,13 +76,22 @@ describe('ArtistBioContent', () => {
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
   });
 
-  it('renders external links with nofollow noopener noreferrer', () => {
+  it('renders bio links inline in the prose (link hardening covered in bio-html.spec)', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
 
     render(<ArtistBioContent slug="test-artist" />);
 
-    const link = screen.getByRole('link', { name: 'Wikipedia' });
-    expect(link).toHaveAttribute('rel', 'nofollow noopener noreferrer');
-    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: 'Wikipedia' })).toHaveAttribute(
+      'href',
+      'https://en.wikipedia.org/wiki/x'
+    );
+  });
+
+  it('no longer renders a separate links list section', () => {
+    useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
+
+    render(<ArtistBioContent slug="test-artist" />);
+
+    expect(screen.queryByRole('heading', { name: 'Links' })).not.toBeInTheDocument();
   });
 });

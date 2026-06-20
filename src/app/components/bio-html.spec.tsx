@@ -103,6 +103,13 @@ describe('BioHtml', () => {
     expect(screen.getByText('Bold')).toBeInTheDocument();
   });
 
+  it('appends a trailing open-in-new-tab icon to links without changing their name', () => {
+    render(<BioHtml html='<a href="https://example.com">Wikipedia</a>' />);
+
+    const link = screen.getByRole('link', { name: 'Wikipedia' });
+    expect(link.querySelector('svg')).toBeInTheDocument();
+  });
+
   it('renders section headings as native heading elements', () => {
     render(<BioHtml html="<h2>Career</h2><h3>Early years</h3><p>bio</p>" />);
 

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { ExternalLink, Globe, Loader2, Music2 } from 'lucide-react';
+import { Loader2, Music2 } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { useArtistBySlugQuery } from '@/app/hooks/use-artist-by-slug-query';
@@ -61,7 +61,7 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
   const artist = data as unknown as ArtistWithPublishedReleases;
   const displayName = getArtistDisplayName(artist);
   const genres = splitList(artist.genres);
-  const { bioImages, bioLinks } = artist;
+  const { bioImages } = artist;
 
   const breadcrumbItems = [
     { anchorText: 'Home', url: '/', isActive: false },
@@ -120,38 +120,16 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
       )}
 
       {artist.bio ? (
-        <article className="prose prose-zinc dark:prose-invert max-w-none">
+        <article className="prose prose-zinc dark:prose-invert max-w-none [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6">
           {/* The bio HTML is sanitized server-side on read (sanitizeBioHtml) and
               again at generation time; BioHtml maps its <a>/<img> tags to Next
-              Link/Image instead of dangerouslySetInnerHTML. */}
+              Link/Image instead of dangerouslySetInnerHTML. Links are woven
+              inline in the prose, so there is no separate link list. Section
+              <h2>s get top spacing + a rule to visually separate sections. */}
           <BioHtml html={artist.bio} />
         </article>
       ) : (
         <p className="text-muted-foreground">No biography has been written for this artist yet.</p>
-      )}
-
-      {bioLinks.length > 0 && (
-        <section aria-label="External links" className="space-y-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <Globe className="size-4" aria-hidden />
-            Links
-          </h2>
-          <ul className="space-y-1.5">
-            {bioLinks.map((link) => (
-              <li key={link.id}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="nofollow noopener noreferrer"
-                  className="text-primary inline-flex items-center gap-2 text-sm hover:underline"
-                >
-                  <ExternalLink className="size-3.5" aria-hidden />
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
     </div>
   );

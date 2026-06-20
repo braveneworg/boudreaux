@@ -23,15 +23,16 @@ width-variant pipeline, serves them from **CloudFront**, and renders the sanitiz
 Next.js `Link`/`Image`. Admins generate and edit bios from the artist form; the public sees them
 on `/artists`, `/artists/[slug]`, and `/artists/[slug]/bio`.
 
-The Lambda grounds the model on real source material — the **full Wikipedia article body** plus
-enriched MusicBrainz facts — so bios read as extensive, original, section-structured articles. When
-an artist has no MusicBrainz/Wikipedia match, an **optional web-search fallback (Tavily)** supplies
-source material instead.
+The Lambda grounds the model on real source material — the **full Wikipedia article body**, enriched
+MusicBrainz facts, and (when configured) **always-on Tavily web-search context** — so bios read as
+extensive, original, image-rich, section-structured articles. The web-search context is merged with
+the Wikipedia body for every artist (not just a fallback), and also covers artists absent from
+MusicBrainz/Wikipedia.
 
 This guide focuses on **what you must sign up for, which secrets/keys to create, and the exact
 commands to configure them** so the feature works against your deployed app. Only **one external
-paid/keyed service is required: Groq.** The **Tavily** web-search key is optional (the fallback is
-skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (only a descriptive
+paid/keyed service is required: Groq.** The **Tavily** web-search key is optional (web-search context
+is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (only a descriptive
 `User-Agent`, already set).
 
 ---
@@ -42,7 +43,7 @@ skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (only 
 | --------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Lambda          | `bio-generator/src/handler.ts`                                                                     | Orchestrates lookup → prose → assemble; returns a result envelope                       |
 | Lambda          | `bio-generator/src/{musicbrainz,wikidata,wikimedia,wikipedia,groq}.ts`                             | External source clients (no keys except Groq); `wikipedia.ts` pulls the article body    |
-| Lambda          | `bio-generator/src/websearch.ts`                                                                   | Optional Tavily web-search fallback grounding                                           |
+| Lambda          | `bio-generator/src/websearch.ts`                                                                   | Optional always-on Tavily web-search context (merged with the Wikipedia body)           |
 | Lambda          | `bio-generator/src/lib/secrets.ts`                                                                 | Reads Groq key + optional search key from SSM (`SSM_PATH_GROQ_API_KEY` / `_SEARCH_`)    |
 | Lambda          | `bio-generator/template.yaml`                                                                      | SAM stack: function, IAM (SSM/KMS), CloudWatch alarm, SNS                               |
 | CI/CD           | `.github/workflows/deploy-bio-generator.yml`                                                       | OIDC → `sam build`/`sam deploy` on `bio-generator/**` changes                           |
@@ -267,12 +268,14 @@ loader (`src/lib/image-loader.ts`). Ensure your CloudFront distribution fronts t
 (`cdn.fakefourrecords.com`, `picsum.photos`, `upload.wikimedia.org`, `commons.wikimedia.org`);
 add your CDN hostname there if it differs.
 
-### 4.6 Tavily web-search key (optional — fallback grounding for obscure artists)
+### 4.6 Tavily web-search key (optional — always-on web context)
 
-The Lambda's primary grounding is the **full Wikipedia article body**. For artists with **no
-MusicBrainz/Wikipedia match**, it falls back to a **Tavily** web search for source material. This is
-**entirely optional**: when the SSM parameter below is absent, `getSearchApiKey()` returns `null`
-and the Lambda produces a facts-only bio instead of aborting.
+The Lambda grounds on the **full Wikipedia article body** and, when this key is configured, **always**
+merges in **Tavily** web-search content as additional context for every artist (not just a fallback)
+— this also covers artists with no MusicBrainz/Wikipedia match. It is **entirely optional**: when the
+SSM parameter below is absent, `getSearchApiKey()` returns `null` and the Lambda grounds on Wikipedia
+
+- facts alone rather than aborting.
 
 1. **Sign up / sign in:** <https://app.tavily.com> (free tier sufficient for testing).
 2. **Create a key** and store it as a SecureString at the path the Lambda reads
@@ -288,8 +291,9 @@ aws ssm put-parameter \
 ```
 
 > Like the Groq key, this lives **only** in SSM. The IAM policy in `template.yaml` already grants the
-> function `ssm:GetParameter` on this path. To disable the fallback later, delete the parameter — no
-> redeploy needed.
+> function `ssm:GetParameter` on this path. To disable web-search context later, delete the parameter
+> — no redeploy needed. The function `Timeout` is **600s (10 min)** to allow the always-on search
+> plus lengthy, image-rich generation; the web app's invoke client uses a matching request timeout.
 
 ---
 

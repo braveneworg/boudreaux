@@ -51,6 +51,37 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('button', { name: 'Heading 3' })).toBeInTheDocument();
   });
 
+  it('renders the bulleted and numbered list buttons in the toolbar', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    expect(screen.getByRole('button', { name: 'Bulleted list' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Numbered list' })).toBeInTheDocument();
+  });
+
+  it('converts the current block into a bulleted list when clicked', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p>Item</p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bulleted list' }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<ul>')));
+  });
+
   it('wraps the current block in an h2 when the Heading 2 button is clicked', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
