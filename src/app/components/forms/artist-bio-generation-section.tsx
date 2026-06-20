@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { ExternalLink, Link2, Plus, RefreshCw, Sparkles, Star, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { BioHtml } from '@/app/components/bio-html';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -178,7 +179,7 @@ export const ArtistBioGenerationSection = ({
         <div className="space-y-4 border-t pt-4">
           <div className="space-y-1">
             <h3 className="text-sm font-semibold">Short bio</h3>
-            <p className="text-muted-foreground text-sm">{result.shortBio}</p>
+            <BioHtml html={result.shortBio} className="text-muted-foreground text-sm" />
           </div>
 
           {result.images.length > 0 && (

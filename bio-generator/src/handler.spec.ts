@@ -121,8 +121,10 @@ describe('runBioGeneration', () => {
     expect(result.links.some((l) => l.url === 'https://x.example')).toBe(true);
   });
 
-  it('skips web search when a Wikipedia extract was already found', async () => {
-    const searchArtistSources = vi.fn();
+  it('merges web search context with the Wikipedia extract when both exist', async () => {
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValue({ sourceText: 'Extra web context.', sourceUrls: ['https://x.example'] });
     const deps = makeDeps({
       getSearchApiKey: vi.fn().mockResolvedValue('tvly-key'),
       searchArtistSources,
@@ -130,7 +132,12 @@ describe('runBioGeneration', () => {
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    expect(searchArtistSources).not.toHaveBeenCalled();
+    expect(searchArtistSources).toHaveBeenCalled();
+    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(facts.sourceText).toContain('formed in Abingdon in 1985');
+    expect(facts.sourceText).toContain('Extra web context.');
+    expect(facts.sourceUrls).toContain('https://en.wikipedia.org/wiki/Radiohead');
+    expect(facts.sourceUrls).toContain('https://x.example');
   });
 
   it('skips web search when no search key is configured', async () => {

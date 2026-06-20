@@ -208,6 +208,40 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(content.bioModel).toBe('llama-3.3-70b-versatile');
   });
 
+  it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        longBio: '<p>Intro</p><img src="image:0" alt="Portrait"><p>More</p>',
+      },
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.longBio).toContain(
+      'src="https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg"'
+    );
+    expect(result.data.longBio).not.toContain('image:0');
+  });
+
+  it('drops an inline image:N placeholder that has no re-hosted url', async () => {
+    rehostMock.mockRejectedValueOnce(new Error('fetch failed'));
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: { ...generateResult.data, longBio: '<p>Intro</p><img src="image:0" alt="x">' },
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    // The unresolved placeholder is a non-http(s) src, so the sanitizer drops it.
+    expect(result.data.longBio).not.toContain('image:0');
+  });
+
   it('drops a discovered link whose URL is not http(s)', async () => {
     generateSpy.mockResolvedValue({
       ...generateResult,

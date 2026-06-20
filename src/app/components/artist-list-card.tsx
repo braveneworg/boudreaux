@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/app/components/ui/card';
 import type { ArtistListWithBio } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
+import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 
 interface ArtistListCardProps {
@@ -80,7 +81,10 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           )}
 
           {artist.shortBio && (
-            <p className="text-muted-foreground line-clamp-3 text-sm">{artist.shortBio}</p>
+            <BioHtml
+              html={artist.shortBio}
+              className="text-muted-foreground line-clamp-3 text-sm"
+            />
           )}
 
           <Link

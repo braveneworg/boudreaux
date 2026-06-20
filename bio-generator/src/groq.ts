@@ -15,19 +15,26 @@ interface GroqChatResponse {
 }
 
 /** Allowed inline HTML in the longBio — must stay within the web app's sanitizer allowlist. */
-const ALLOWED_TAGS = '<p>, <strong>, <em>, <ul>, <ol>, <li>, <a>, <h2>, <h3>, <h4>';
+const ALLOWED_TAGS = '<p>, <strong>, <em>, <ul>, <ol>, <li>, <a>, <img>, <h2>, <h3>, <h4>';
 
-/** Upper bound on completion length so an extensive multi-section bio is not truncated. */
-const MAX_COMPLETION_TOKENS = 4096;
+/** Upper bound on completion length so an extensive, image-rich bio is not truncated. */
+const MAX_COMPLETION_TOKENS = 8000;
 
-const SYSTEM_PROMPT = [
-  'You are a music journalist writing an extensive, encyclopedic artist biography for a record label website.',
-  'Write in a neutral, factual, Wikipedia-style tone with real depth.',
-  'Ground every claim ONLY in the provided source material and facts.',
-  'Never invent discographies, dates, awards, members, labels, or URLs; omit anything unknown rather than guessing.',
-  'Rewrite all source material in your own original words — never copy sentences or distinctive phrasing.',
-  'Respond with a single JSON object and nothing else.',
-].join(' ');
+/** Combines real and display names for the research persona line. */
+const artistFullName = (facts: ArtistFacts): string =>
+  facts.realName && facts.realName !== facts.displayName
+    ? `${facts.realName} (${facts.displayName})`
+    : facts.displayName;
+
+const buildSystemPrompt = (facts: ArtistFacts): string =>
+  [
+    'You are an exceptional writer across all domains with years of experience researching',
+    `musical artists and their backgrounds. Investigate deeply the biography of ${artistFullName(facts)}.`,
+    'Ground every claim ONLY in the provided source material and facts; never invent discographies,',
+    'dates, awards, members, labels, or URLs, and omit anything unknown rather than guessing.',
+    'Rewrite all source material in your own original words — never copy sentences or distinctive phrasing.',
+    'Respond with a single JSON object and nothing else.',
+  ].join(' ');
 
 /** Formats the active-years line from MusicBrainz life-span data, if present. */
 const activeYears = (facts: ArtistFacts): string => {
@@ -71,19 +78,27 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
       ? `Reference URLs available for inline links (use ONLY these, verbatim): ${sourceUrls.join(', ')}`
       : 'No reference URLs are available; do not add any links.',
     '',
-    'Write the longBio as an extensive biography of roughly 600–1200 words, organized into',
-    'several <h2> sections (e.g. Background, Career, Musical style, Notable works,',
-    'Collaborations, Legacy) with <h3> subsections where helpful. Scale the length down',
-    'gracefully when sources are thin — never pad with invented detail.',
-    'Weave 1–4 of the reference URLs above into the prose as inline <a href="..."> links where',
-    'they read naturally. Do NOT add a "Sources", "References", or attribution list, and do NOT',
-    'tell the reader to visit a link — describe the information directly instead.',
+    'shortBio: a vivid 2–3 sentence teaser. It may weave in at most ONE inline <a href="..."> link',
+    'from the reference URLs; never append a list of links.',
+    '',
+    'longBio: an extensive, in-depth biography of roughly 800–1500 words. Requirements:',
+    '- Organize into several <h2> sections (e.g. Background, Career, Musical style, Notable works,',
+    '  Collaborations, Legacy), each with <h3> subheadings where the material warrants it.',
+    '- Weave several inline <a href="..."> links from the reference URLs into the prose. VARY the',
+    '  wording around each link — never reuse one phrase (e.g. not "visit X for more info" repeatedly).',
+    '- Embed several inline images of the artist and related artwork using <img src="image:N" alt="...">,',
+    '  where N is the 0-indexed position from the Available images list above; place them between',
+    '  paragraphs near the relevant text. The app swaps each placeholder for the hosted image URL.',
+    '- Use <ul> and <ol> lists where appropriate (e.g. notable releases, collaborators, influences).',
+    '- Do NOT add a "Sources", "References", or attribution list, and do NOT tell the reader to visit',
+    '  a link — describe the information directly instead.',
+    '- Scale length down gracefully when sources are thin; never pad with invented detail.',
     `Use only these HTML tags: ${ALLOWED_TAGS}.`,
     '',
     'Return JSON with this exact shape:',
     '{',
-    '  "shortBio": "2-3 sentence plain-text teaser (no HTML)",',
-    '  "longBio": "the extensive HTML article described above",',
+    '  "shortBio": "2-3 sentence teaser; plain text or a single inline <a> link, no other HTML",',
+    '  "longBio": "the extensive, image-rich HTML article described above",',
     '  "genres": "comma-separated genres or empty string",',
     '  "primaryImageIndexes": [indexes of the 2-3 images that best identify the artist]',
     '}',
@@ -121,7 +136,7 @@ export const generateProse = async (
       max_tokens: MAX_COMPLETION_TOKENS,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(facts) },
         { role: 'user', content: buildUserPrompt(facts) },
       ],
     }),

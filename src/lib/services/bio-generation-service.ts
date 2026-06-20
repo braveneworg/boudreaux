@@ -6,6 +6,7 @@ import 'server-only';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import {
@@ -181,6 +182,14 @@ export class BioGenerationService {
       })
     );
 
+    // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
+    // `<img src="image:N">` placeholders can be resolved to hosted images before
+    // sanitizing. Keyed by original index because re-hosting may drop failures.
+    const imageUrlByIndex = new Map<number, string>();
+    rehosted.forEach((image, index) => {
+      if (image) imageUrlByIndex.set(index, image.url);
+    });
+
     // Re-index sortOrder after dropping failed images. The Lambda already caps
     // the number of primaries (and which images are primary is its choice, not
     // a function of array position), so preserve isPrimary as-is.
@@ -207,8 +216,11 @@ export class BioGenerationService {
     }, []);
 
     const content: GeneratedBioContent = {
-      shortBio: sanitizeBioText(result.data.shortBio),
-      longBio: sanitizeBioHtml(result.data.longBio),
+      // Short bio is rich HTML too (it may carry a single inline link); the
+      // sanitizer strips anything outside the allowlist. Consumers that need
+      // plain text (cards, meta descriptions) strip tags with sanitizeBioText.
+      shortBio: sanitizeBioHtml(result.data.shortBio),
+      longBio: sanitizeBioHtml(replaceBioImagePlaceholders(result.data.longBio, imageUrlByIndex)),
       genres,
       images: persistedImages.map(
         ({ width: _width, height: _height, sortOrder: _sortOrder, ...rest }) => rest
