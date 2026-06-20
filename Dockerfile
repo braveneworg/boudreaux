@@ -110,6 +110,14 @@ COPY --from=builder --chown=appuser:nodegroup /app/.next/static ./.next/static
 # Copy public files
 COPY --from=builder --chown=appuser:nodegroup /app/public ./public
 
+# The standalone bundle is traced on glibc (ubuntu CI runner), so it ships the
+# glibc sharp binary (@img/sharp-linux-x64). This image is Alpine (musl), so we
+# reinstall sharp's musl native binary over it; otherwise next/image optimization
+# fails at runtime with "Could not load the sharp module using the linuxmusl-x64 runtime".
+RUN SHARP_VER="$(node -p "require('/app/node_modules/sharp/package.json').version")" \
+    && npm install --no-save --os=linux --libc=musl --cpu=x64 "sharp@${SHARP_VER}" \
+    && chown -R appuser:nodegroup /app/node_modules
+
 USER appuser
 
 # Expose the listening port
