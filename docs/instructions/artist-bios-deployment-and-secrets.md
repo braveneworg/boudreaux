@@ -249,8 +249,8 @@ aws ssm put-parameter \
 
 > Like the Groq key, this lives **only** in SSM. The IAM policy in `template.yaml` already grants the
 > function `ssm:GetParameter` on this path. To disable web-search context later, delete the parameter
-> — no redeploy needed. The function `Timeout` is **300s (5 min)** to allow the always-on search plus
-> extensive, image-rich generation.
+> — no redeploy needed. The function `Timeout` is **600s (10 min)** to allow the always-on search
+> plus lengthy, image-rich generation; the web app's invoke client uses a matching request timeout.
 
 ---
 

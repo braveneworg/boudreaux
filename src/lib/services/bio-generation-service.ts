@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
@@ -20,9 +21,17 @@ import { BioImageService } from './bio-image-service';
 
 let lambdaClient: LambdaClient | null = null;
 
+// Bio generation runs a synchronous (RequestResponse) invoke that can take up to
+// the Lambda's 10-minute timeout. Give the HTTP client a slightly larger request
+// timeout so it never aborts the call before the function finishes.
+const INVOKE_REQUEST_TIMEOUT_MS = 11 * 60 * 1000;
+
 const getLambdaClient = (): LambdaClient => {
   if (!lambdaClient) {
-    lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
+    lambdaClient = new LambdaClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+      requestHandler: new NodeHttpHandler({ requestTimeout: INVOKE_REQUEST_TIMEOUT_MS }),
+    });
   }
   return lambdaClient;
 };

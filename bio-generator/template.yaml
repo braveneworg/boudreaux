@@ -4,10 +4,11 @@ Description: Fake Four Records - AI artist bio generator
 
 Globals:
   Function:
-    # 5 minutes: headroom for metadata + always-on web search + extensive,
+    # 10 minutes: headroom for metadata + always-on web search + lengthy,
     # image-rich generation. Invoked directly (not via API Gateway), so the 29s
-    # gateway limit does not apply; Lambda's hard ceiling is 900s.
-    Timeout: 300
+    # gateway limit does not apply; Lambda's hard ceiling is 900s. The web app's
+    # invoke client uses a matching (larger) request timeout so it waits this out.
+    Timeout: 600
     MemorySize: 512
     Runtime: nodejs24.x
     Architectures:
