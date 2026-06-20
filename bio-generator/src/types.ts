@@ -11,6 +11,14 @@ export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourre
 export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 /**
+ * Default per-request token ceiling — Groq's free-tier TPM for
+ * {@link DEFAULT_GROQ_MODEL}. Groq counts prompt + reserved completion tokens
+ * against this and 413s when the sum exceeds it. Overridden at runtime by the
+ * `/fakefour/groq/tpm-limit` SSM parameter (see `getGroqTpmLimit`).
+ */
+export const DEFAULT_GROQ_TOKEN_LIMIT = 12_000;
+
+/**
  * Input the web app sends to the Lambda. Names drive the metadata lookup;
  * `links` and `description` are optional admin-supplied context. The LLM only
  * writes prose — it never invents the image/link URLs returned to the caller.

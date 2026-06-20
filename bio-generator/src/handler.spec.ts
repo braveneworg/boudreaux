@@ -55,6 +55,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     primaryImageIndexes: [0],
   }),
   getGroqApiKey: vi.fn().mockResolvedValue('test-key'),
+  getGroqTpmLimit: vi.fn().mockResolvedValue(12_000),
   getSearchApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
   ...overrides,
@@ -69,6 +70,14 @@ describe('runBioGeneration', () => {
     expect(result.genres).toBe('alternative rock');
     expect(result.images).toHaveLength(2);
     expect(result.links.some((l) => l.kind === 'wikipedia')).toBe(true);
+  });
+
+  it('passes the SSM-resolved Groq token ceiling to prose generation', async () => {
+    const deps = makeDeps({ getGroqTpmLimit: vi.fn().mockResolvedValue(6000) });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect((deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][4]).toBe(6000);
   });
 
   it('feeds the Wikipedia article extract to the model as source text', async () => {
