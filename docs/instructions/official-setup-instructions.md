@@ -231,6 +231,33 @@ Three workflows are relevant:
 
 - Injects `BIO_GENERATOR_LAMBDA_NAME=${{ vars.BIO_GENERATOR_LAMBDA_NAME || 'fakefour-bio-generator' }}`
   into the production environment. Set the repo **variable** if your function name differs.
+- **Does _not_ run `prisma db push`.** The deploy only builds/runs the app image (the
+  Docker build runs `prisma generate` for the client, not a schema push). See
+  [Database schema changes](#database-schema-changes-prisma-db-push) below.
+
+### Database schema changes (`prisma db push`)
+
+Schema changes are **not** applied automatically by the deploy — `prisma db push` is a
+deliberate, manual step. MongoDB is schemaless, so most edits need nothing in prod:
+
+- **Adding/removing optional scalar fields** (e.g. `Artist.bioStatus`): no push required.
+  Existing documents simply read the new field as `null` until it is written.
+- **Index changes** (`@@index`, `@unique`, `@@unique`) and new collections/relations
+  with indexes: **do** require a push, or the new indexes/constraints won't exist in prod.
+
+When a push is needed, run it once from a machine that can reach the **production** Mongo
+(the external `DATABASE_URL`), with that URL scoped to the command — never committed, never
+left in your shell:
+
+```bash
+# Replace with the production connection string (treat as a secret).
+DATABASE_URL='<prod-mongodb-uri>' pnpm exec prisma db push
+```
+
+> Review the printed plan before confirming. `prisma db push` can drop indexes to match the
+> schema (it prompts for `--accept-data-loss` on destructive changes) — never pass that flag
+> blindly against prod. This is intentionally manual so an index drop can't ride in on a
+> routine app deploy.
 
 **`.github/workflows/deploy-bio-generator.yml`** — deploys the Lambda (new).
 
