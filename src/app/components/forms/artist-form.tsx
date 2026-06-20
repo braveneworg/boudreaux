@@ -121,8 +121,8 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const createArtist = useCreateArtistMutation();
-  const updateArtist = useUpdateArtistMutation();
+  const { mutateAsync: createArtist } = useCreateArtistMutation();
+  const { mutateAsync: updateArtist } = useUpdateArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   // Re-hosted bio images (existing + freshly generated) offered in the
   // rich-text editor's insert-image picker, alongside uploaded images.
@@ -355,7 +355,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
           // If we already have an artistId, this is an update
           if (artistId) {
-            const newFormState = await updateArtist.mutateAsync({ artistId, formState, formData });
+            const newFormState = await updateArtist({ artistId, formState, formData });
             if (newFormState.success) {
               // Upload any pending images for existing artist
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -466,7 +466,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             }
           } else {
             // This is a create action
-            const newFormState = await createArtist.mutateAsync({ formState, formData });
+            const newFormState = await createArtist({ formState, formData });
             if (newFormState.success) {
               const createdArtistId = newFormState.data?.artistId as string | undefined;
 

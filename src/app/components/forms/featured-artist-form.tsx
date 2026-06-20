@@ -97,8 +97,8 @@ export const FeaturedArtistForm = ({
   const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
-  const createFeaturedArtist = useCreateFeaturedArtistMutation();
-  const updateFeaturedArtistCoverArt = useUpdateFeaturedArtistCoverArtMutation();
+  const { mutateAsync: createFeaturedArtist } = useCreateFeaturedArtistMutation();
+  const { mutateAsync: updateFeaturedArtistCoverArt } = useUpdateFeaturedArtistCoverArtMutation();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -371,7 +371,7 @@ export const FeaturedArtistForm = ({
         }
       } else {
         // In create mode, use the server action via the mutation hook
-        const result = await createFeaturedArtist.mutateAsync({ formState, formData });
+        const result = await createFeaturedArtist({ formState, formData });
         setFormState(result);
 
         if (result.success && result.data?.featuredArtistId) {
@@ -633,7 +633,7 @@ export const FeaturedArtistForm = ({
                         // variant generation + orphan sweep + CloudFront
                         // invalidation). For create mode there's no row to
                         // update yet — submit will save it then.
-                        const result = await updateFeaturedArtistCoverArt.mutateAsync({
+                        const result = await updateFeaturedArtistCoverArt({
                           featuredArtistId,
                           coverArt: cdnUrl,
                         });

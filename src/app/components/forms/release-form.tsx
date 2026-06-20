@@ -124,9 +124,9 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const createRelease = useCreateReleaseMutation();
-  const updateRelease = useUpdateReleaseMutation();
-  const updateReleaseCoverArt = useUpdateReleaseCoverArtMutation();
+  const { mutateAsync: createRelease } = useCreateReleaseMutation();
+  const { mutateAsync: updateRelease } = useUpdateReleaseMutation();
+  const { mutateAsync: updateReleaseCoverArt } = useUpdateReleaseCoverArtMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isLoadingRelease, setIsLoadingRelease] = useState(!!initialReleaseId);
@@ -411,7 +411,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
           if (releaseId) {
             // Update existing release
-            const newFormState = await updateRelease.mutateAsync({
+            const newFormState = await updateRelease({
               releaseId,
               formState,
               formData,
@@ -437,7 +437,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
             }
           } else {
             // Create new release
-            const newFormState = await createRelease.mutateAsync({ formState, formData });
+            const newFormState = await createRelease({ formState, formData });
             if (newFormState.success) {
               const createdReleaseId = newFormState.data?.releaseId as string | undefined;
 
@@ -787,7 +787,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
                           // navigates away before submitting the full form.
                           // For new releases there's no row to update yet —
                           // the create flow will save it on form submit.
-                          const result = await updateReleaseCoverArt.mutateAsync({
+                          const result = await updateReleaseCoverArt({
                             releaseId,
                             coverArt: cdnUrl,
                           });
