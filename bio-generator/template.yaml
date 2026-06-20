@@ -49,6 +49,7 @@ Resources:
                 - ssm:GetParameter
               Resource:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/tpm-limit'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/search/api-key'
             - Effect: Allow
               Action:
@@ -60,6 +61,9 @@ Resources:
           # Optional web-search fallback (Tavily). If the parameter does not
           # exist the function degrades gracefully to a facts-only bio.
           SSM_PATH_SEARCH_API_KEY: '/fakefour/search/api-key'
+          # Groq per-request token (TPM) ceiling. If the parameter is unset the
+          # function falls back to the free-tier default (12k) in code.
+          SSM_PATH_GROQ_TPM_LIMIT: '/fakefour/groq/tpm-limit'
           GROQ_MODEL: !Ref GroqModel
     Metadata:
       BuildMethod: esbuild

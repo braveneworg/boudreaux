@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { DEFAULT_GROQ_MODEL, groqProseSchema } from './types.js';
+import { DEFAULT_GROQ_MODEL, DEFAULT_GROQ_TOKEN_LIMIT, groqProseSchema } from './types.js';
 
 import type { ArtistFacts, GroqProse } from './types.js';
 
@@ -17,8 +17,22 @@ interface GroqChatResponse {
 /** Allowed inline HTML in the longBio — must stay within the web app's sanitizer allowlist. */
 const ALLOWED_TAGS = '<p>, <strong>, <em>, <ul>, <ol>, <li>, <a>, <img>, <h2>, <h3>, <h4>';
 
-/** Upper bound on completion length so an extensive, image-rich bio is not truncated. */
-const MAX_COMPLETION_TOKENS = 8000;
+/** Reserved completion budget — ample for a 1500-word, image-rich HTML article. */
+const MAX_COMPLETION_TOKENS = 5000;
+
+/** Headroom below the ceiling to absorb tokenizer variance in the chars≈tokens estimate. */
+const TOKEN_SAFETY_MARGIN = 1000;
+
+/** Conservative chars-per-token ratio (HTML/punctuation inflate the true token count). */
+const CHARS_PER_TOKEN = 3.5;
+
+/**
+ * Char budget for the assembled system + user prompt so prompt + reserved
+ * completion stay under Groq's per-request token ceiling. The ceiling is
+ * resolved per environment from SSM (free-tier default 12k) and passed in.
+ */
+const promptCharBudget = (tokenLimit: number): number =>
+  Math.floor((tokenLimit - MAX_COMPLETION_TOKENS - TOKEN_SAFETY_MARGIN) * CHARS_PER_TOKEN);
 
 /** Combines real and display names for the research persona line. */
 const artistFullName = (facts: ArtistFacts): string =>
@@ -106,6 +120,30 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
   return lines.filter(Boolean).join('\n');
 };
 
+/** Trims to `length`, backing up to the last paragraph break past the halfway mark so prose stays coherent. */
+const truncateAtBreak = (text: string, length: number): string => {
+  if (text.length <= length) return text;
+  const head = text.slice(0, length);
+  const lastBreak = head.lastIndexOf('\n');
+  return (lastBreak > length / 2 ? head.slice(0, lastBreak) : head).trim();
+};
+
+/**
+ * Shrinks `facts.sourceText` (the only unbounded input) just enough that the
+ * assembled system + user prompt fits {@link promptCharBudget}. Wikipedia and
+ * web-search content are each capped upstream, but their merged size can still
+ * blow Groq's per-request token ceiling — this is the single chokepoint that
+ * guarantees the request never 413s, regardless of how many sources combine.
+ */
+const fitToBudget = (facts: ArtistFacts, tokenLimit: number): ArtistFacts => {
+  if (!facts.sourceText) return facts;
+  const overage =
+    buildSystemPrompt(facts).length + buildUserPrompt(facts).length - promptCharBudget(tokenLimit);
+  if (overage <= 0) return facts;
+  const target = Math.max(0, facts.sourceText.length - overage);
+  return { ...facts, sourceText: truncateAtBreak(facts.sourceText, target) };
+};
+
 /**
  * Generates short + long bio prose with Groq's OpenAI-compatible chat API in
  * JSON mode. The model writes prose only; it is given the real facts gathered
@@ -116,14 +154,19 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
  * @param apiKey - Groq API key (resolved from SSM).
  * @param model - Groq model id; defaults to {@link DEFAULT_GROQ_MODEL}.
  * @param fetchFn - Injectable fetch (defaults to global) for testability.
+ * @param tokenLimit - Groq per-request token ceiling (resolved from SSM);
+ * defaults to {@link DEFAULT_GROQ_TOKEN_LIMIT}. Source material is trimmed to
+ * keep prompt + completion under it, preventing HTTP 413s.
  * @returns Validated prose plus the model's image ranking.
  */
 export const generateProse = async (
   facts: ArtistFacts,
   apiKey: string,
   model: string = DEFAULT_GROQ_MODEL,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  tokenLimit: number = DEFAULT_GROQ_TOKEN_LIMIT
 ): Promise<GroqProse> => {
+  const fitted = fitToBudget(facts, tokenLimit);
   const response = await fetchFn(GROQ_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -136,8 +179,8 @@ export const generateProse = async (
       max_tokens: MAX_COMPLETION_TOKENS,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: buildSystemPrompt(facts) },
-        { role: 'user', content: buildUserPrompt(facts) },
+        { role: 'system', content: buildSystemPrompt(fitted) },
+        { role: 'user', content: buildUserPrompt(fitted) },
       ],
     }),
   });

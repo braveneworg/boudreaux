@@ -4,6 +4,8 @@
 
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
+import { DEFAULT_GROQ_TOKEN_LIMIT } from '../types.js';
+
 const ssmClient = new SSMClient({});
 
 /** Cached once per cold start — the Groq key does not change between invokes. */
@@ -11,6 +13,9 @@ let cachedGroqApiKey: string | null = null;
 
 /** Cached once per cold start — the optional search (Tavily) key. */
 let cachedSearchApiKey: string | null = null;
+
+/** Cached once per cold start — the resolved Groq per-request token ceiling. */
+let cachedGroqTpmLimit: number | null = null;
 
 const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({ Name: path, WithDecryption: true });
@@ -72,8 +77,40 @@ export const getSearchApiKey = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Resolves Groq's per-request token ceiling (TPM) from SSM, caching it for the
+ * life of the Lambda container. Non-fatal like the search key: when
+ * `SSM_PATH_GROQ_TPM_LIMIT` is unset, the value is non-numeric, or the lookup
+ * fails, it falls back to {@link DEFAULT_GROQ_TOKEN_LIMIT} so bio generation
+ * still runs against the free-tier default.
+ *
+ * @returns The configured ceiling, or the default when unavailable.
+ */
+export const getGroqTpmLimit = async (): Promise<number> => {
+  if (cachedGroqTpmLimit !== null) {
+    return cachedGroqTpmLimit;
+  }
+
+  const path = process.env.SSM_PATH_GROQ_TPM_LIMIT;
+  if (!path) {
+    cachedGroqTpmLimit = DEFAULT_GROQ_TOKEN_LIMIT;
+    return cachedGroqTpmLimit;
+  }
+
+  try {
+    const parsed = Number.parseInt(await fetchSsmParameter(path), 10);
+    cachedGroqTpmLimit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_GROQ_TOKEN_LIMIT;
+    return cachedGroqTpmLimit;
+  } catch (err) {
+    console.warn('Groq TPM limit unavailable; using default ceiling:', err);
+    cachedGroqTpmLimit = DEFAULT_GROQ_TOKEN_LIMIT;
+    return cachedGroqTpmLimit;
+  }
+};
+
 /** Test-only reset of the cold-start cache. */
 export const __resetSecretsCacheForTests = (): void => {
   cachedGroqApiKey = null;
   cachedSearchApiKey = null;
+  cachedGroqTpmLimit = null;
 };

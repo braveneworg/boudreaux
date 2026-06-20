@@ -77,6 +77,39 @@ describe('generateProse', () => {
     expect(JSON.parse(fetchFn.mock.calls[0][1].body).max_tokens).toBeGreaterThan(2000);
   });
 
+  it('trims oversized source material to keep the request under the Groq token ceiling', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+    const huge: ArtistFacts = { ...facts, sourceText: 'word '.repeat(15_000) };
+
+    await generateProse(huge, 'k', undefined, fetchFn);
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    const promptChars = body.messages[0].content.length + body.messages[1].content.length;
+    // Requested tokens = prompt + reserved completion must stay under the 12k TPM ceiling.
+    expect(Math.ceil(promptChars / 4) + body.max_tokens).toBeLessThan(12_000);
+  });
+
+  it('trims source material more aggressively under a lower token ceiling', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+    const huge: ArtistFacts = { ...facts, sourceText: 'word '.repeat(15_000) };
+
+    await generateProse(huge, 'k', undefined, fetchFn, 6000);
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    const promptChars = body.messages[0].content.length + body.messages[1].content.length;
+    expect(Math.ceil(promptChars / 4) + body.max_tokens).toBeLessThan(6000);
+  });
+
+  it('does not truncate source material that already fits the budget', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+    const grounded: ArtistFacts = { ...facts, sourceText: 'Radiohead formed in Abingdon in 1985.' };
+
+    await generateProse(grounded, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).messages[1].content;
+    expect(userMessage).toContain('Radiohead formed in Abingdon in 1985.');
+  });
+
   it('uses the research persona naming the artist in the system prompt', async () => {
     const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
 

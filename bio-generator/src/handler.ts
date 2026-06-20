@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { generateProse } from './groq.js';
-import { getGroqApiKey, getSearchApiKey } from './lib/secrets.js';
+import { getGroqApiKey, getGroqTpmLimit, getSearchApiKey } from './lib/secrets.js';
 import { lookupArtist } from './musicbrainz.js';
 import { bioGenerationInputSchema, DEFAULT_GROQ_MODEL } from './types.js';
 import { searchArtistSources } from './websearch.js';
@@ -28,6 +28,7 @@ export interface BioGeneratorDeps {
   getCommonsImage: typeof getCommonsImage;
   generateProse: typeof generateProse;
   getGroqApiKey: () => Promise<string>;
+  getGroqTpmLimit: typeof getGroqTpmLimit;
   getSearchApiKey: typeof getSearchApiKey;
   searchArtistSources: typeof searchArtistSources;
 }
@@ -39,6 +40,7 @@ const defaultDeps: BioGeneratorDeps = {
   getCommonsImage,
   generateProse,
   getGroqApiKey,
+  getGroqTpmLimit,
   getSearchApiKey,
   searchArtistSources,
 };
@@ -202,7 +204,8 @@ export const runBioGeneration = async (
   const { images, links, facts } = await gatherMetadata(input, deps);
 
   const apiKey = await deps.getGroqApiKey();
-  const prose = await deps.generateProse(facts, apiKey, model);
+  const tokenLimit = await deps.getGroqTpmLimit();
+  const prose = await deps.generateProse(facts, apiKey, model, undefined, tokenLimit);
 
   // applyImageRanking already caps the COUNT of primaries to MAX_PRIMARY via the
   // selected indexes; the primaries can sit at any position, so we must NOT
