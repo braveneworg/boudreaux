@@ -134,7 +134,9 @@ aws cloudformation describe-stacks \
 
 ### 4.4 App IAM permissions
 
-The web app's AWS principal must be allowed to invoke the Lambda and write re-hosted bio images:
+The web app's AWS principal must be allowed to invoke the Lambda and write re-hosted bio images.
+That principal is whatever `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` the running app uses (the
+pair injected by `deploy.yml`'s `.env.deploy`) — static keys, so almost always an **IAM user**.
 
 ```json
 {
@@ -152,6 +154,58 @@ The web app's AWS principal must be allowed to invoke the Lambda and write re-ho
     }
   ]
 }
+```
+
+**Apply it via the CLI** (run the `iam:*` commands with **admin** creds — the app's own keys can't
+modify their own policies). First identify the principal and account, then render and attach the
+policy as a reusable customer-managed policy:
+
+```bash
+# 1. Identify the principal (run with the APP's creds) + grab the account id
+aws sts get-caller-identity   # Arn → .../user/<NAME> (IAM user) or .../assumed-role/<ROLE>/...
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+MEDIA_BUCKET=<your-media-bucket>            # same value as the app's AWS_S3_BUCKET_NAME / S3_BUCKET
+
+# 2. Render the policy from the JSON above (placeholders filled)
+cat > bio-app-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:us-east-1:${ACCOUNT_ID}:function:fakefour-bio-generator" },
+    { "Effect": "Allow", "Action": ["s3:PutObject"],
+      "Resource": "arn:aws:s3:::${MEDIA_BUCKET}/media/artists/*/bio/*" }
+  ]
+}
+EOF
+
+# 3. Create the managed policy, then attach to the principal from step 1 (pick ONE)
+POLICY_ARN=$(aws iam create-policy --policy-name fakefour-bio-app \
+  --policy-document file://bio-app-policy.json --query 'Policy.Arn' --output text)
+aws iam attach-user-policy --user-name <NAME> --policy-arn "$POLICY_ARN"   # IAM user
+aws iam attach-role-policy --role-name <ROLE> --policy-arn "$POLICY_ARN"   # IAM role
+
+rm bio-app-policy.json
+```
+
+To **update** the policy later, publish a new default version instead of recreating it
+(`create-policy` errors if the name already exists):
+
+```bash
+aws iam create-policy-version --policy-arn "$POLICY_ARN" \
+  --policy-document file://bio-app-policy.json --set-as-default
+```
+
+**Verify** the effective permissions against the real ARNs (both rows should read `allowed`):
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn "arn:aws:iam::${ACCOUNT_ID}:user/<NAME>" \
+  --action-names lambda:InvokeFunction s3:PutObject \
+  --resource-arns \
+    "arn:aws:lambda:us-east-1:${ACCOUNT_ID}:function:fakefour-bio-generator" \
+    "arn:aws:s3:::${MEDIA_BUCKET}/media/artists/000/bio/x.jpg" \
+  --query 'EvaluationResults[].{action:EvalActionName,decision:EvalDecision}' --output table
 ```
 
 ### 4.5 CloudFront / S3 image delivery
