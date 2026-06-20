@@ -13,8 +13,12 @@ interface MbSearchResponse {
   artists?: Array<{ id: string; name: string; score?: number }>;
 }
 
-/** Subset of the artist lookup (with url-rels) response. */
-interface MbRelationResponse {
+/** Subset of the artist lookup (with url-rels + tags) response. */
+interface MbLookupResponse {
+  type?: string;
+  area?: { name?: string };
+  'life-span'?: { begin?: string; end?: string };
+  tags?: Array<{ name?: string; count?: number }>;
   relations?: Array<{ type: string; url?: { resource: string } }>;
 }
 
@@ -23,7 +27,23 @@ export interface MusicBrainzMatch {
   name: string;
   wikidataId?: string;
   links: BioLink[];
+  /** Structured grounding facts, best-effort from the lookup response. */
+  artistType?: string;
+  area?: string;
+  beginDate?: string;
+  endDate?: string;
+  tags: string[];
 }
+
+/** Most-used tags first, capped — MusicBrainz tags are folksonomic and noisy. */
+const MAX_TAGS = 8;
+
+const topTags = (tags: MbLookupResponse['tags']): string[] =>
+  (tags ?? [])
+    .filter((tag): tag is { name: string; count?: number } => Boolean(tag.name))
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    .slice(0, MAX_TAGS)
+    .map((tag) => tag.name);
 
 type FetchFn = typeof fetch;
 
@@ -70,8 +90,8 @@ export const lookupArtist = async (
     return null;
   }
 
-  const relUrl = `${MB_BASE}/artist/${top.id}?inc=url-rels&fmt=json`;
-  const relData = await request<MbRelationResponse>(relUrl, fetchFn);
+  const relUrl = `${MB_BASE}/artist/${top.id}?inc=url-rels+tags&fmt=json`;
+  const relData = await request<MbLookupResponse>(relUrl, fetchFn);
 
   let wikidataId: string | undefined;
   const links: BioLink[] = [];
@@ -96,5 +116,15 @@ export const lookupArtist = async (
     kind: 'musicbrainz',
   });
 
-  return { mbid: top.id, name: top.name, wikidataId, links };
+  return {
+    mbid: top.id,
+    name: top.name,
+    wikidataId,
+    links,
+    artistType: relData.type,
+    area: relData.area?.name,
+    beginDate: relData['life-span']?.begin,
+    endDate: relData['life-span']?.end,
+    tags: topTags(relData.tags),
+  };
 };

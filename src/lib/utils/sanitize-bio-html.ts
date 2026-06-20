@@ -7,14 +7,17 @@ import sanitizeHtml from 'sanitize-html';
 
 /**
  * Rich-text allowlist for the long bio (Tiptap editor output + AI prose).
- * Links are force-rewritten to carry `rel="nofollow noopener noreferrer"` and
- * `target="_blank"` so an opened tab can never reach back through
- * `window.opener`. Inline `<img>` (re-hosted images) and `<span>` font-size
- * styling are permitted; the host of every `<img>`/`<a>` is additionally gated
- * by next/image `remotePatterns` and the `BioHtml` renderer at display time.
+ * Section headings (`<h2>`–`<h4>`) are permitted so extensive, encyclopedic
+ * bios can be structured; `<h1>` is intentionally excluded and reserved for the
+ * page title. Links are force-rewritten to carry `rel="nofollow noopener
+ * noreferrer"` and `target="_blank"` so an opened tab can never reach back
+ * through `window.opener`. Inline `<img>` (re-hosted images) and `<span>`
+ * font-size styling are permitted; the host of every `<img>`/`<a>` is
+ * additionally gated by next/image `remotePatterns` and the `BioHtml` renderer
+ * at display time.
  */
 const BIO_HTML_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'img', 'span'],
+  allowedTags: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'img', 'span', 'h2', 'h3', 'h4'],
   allowedAttributes: {
     a: ['href', 'rel', 'target'],
     img: ['src', 'alt', 'width', 'height'],
