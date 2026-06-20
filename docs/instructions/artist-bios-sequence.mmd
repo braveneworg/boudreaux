@@ -19,7 +19,7 @@ sequenceDiagram
     Svc->>Repo: findById(artistId)
     Repo->>DB: read artist (names, genres)
     Svc->>Lambda: invoke (InvokeCommand) /<br/>fakeBioGeneration if BIO_GENERATOR_FAKE
-    Note over Lambda: MusicBrainz → Wikidata →<br/>Wikimedia → Groq prose
+    Note over Lambda: MusicBrainz → Wikidata →<br/>Wikimedia → Gemini prose
     Lambda-->>Svc: { ok, data: {shortBio,longBio,genres,images,links,model} }
     Svc->>Svc: sanitizeBioHtml / sanitizeBioText
     loop each discovered image

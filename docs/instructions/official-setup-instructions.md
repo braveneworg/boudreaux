@@ -29,16 +29,16 @@ this guide is the developer-focused, day-to-day version.
 
 ## 1. What changed on this branch
 
-| Area             | What's new                                                                                                                | Why it matters for setup                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `bio-generator/` | A standalone AWS SAM Lambda (separate pnpm workspace) that writes bios with Groq from MusicBrainz/Wikidata/Wikimedia data | New AWS resources + a Groq key in SSM; deployed by its own workflow       |
-| Web app          | Invokes the Lambda via `@aws-sdk/client-lambda`, re-hosts images to S3, renders sanitized HTML                            | New env vars: `BIO_GENERATOR_LAMBDA_NAME`, `BIO_GENERATOR_FAKE`           |
-| Editing          | Tiptap rich-text editors for the three bio fields                                                                         | New deps: `@tiptap/*`, `html-react-parser`                                |
-| Tests            | A Vitest `forks` project for the `html-react-parser` spec                                                                 | `bio-html.spec.tsx` runs in a different pool; consumers mock `./bio-html` |
-| CI/CD            | `deploy-bio-generator.yml` (new), `BIO_GENERATOR_FAKE` in E2E, `BIO_GENERATOR_LAMBDA_NAME` in deploy                      | New GitHub secrets/variables                                              |
-| Security         | `.gitleaks.toml` (new) allowlists bio-generator test fixtures                                                             | The pre-commit secret scan reads it automatically                         |
+| Area             | What's new                                                                                                                  | Why it matters for setup                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `bio-generator/` | A standalone AWS SAM Lambda (separate pnpm workspace) that writes bios with Gemini from MusicBrainz/Wikidata/Wikimedia data | New AWS resources + a Gemini key in SSM; deployed by its own workflow     |
+| Web app          | Invokes the Lambda via `@aws-sdk/client-lambda`, re-hosts images to S3, renders sanitized HTML                              | New env vars: `BIO_GENERATOR_LAMBDA_NAME`, `BIO_GENERATOR_FAKE`           |
+| Editing          | Tiptap rich-text editors for the three bio fields                                                                           | New deps: `@tiptap/*`, `html-react-parser`                                |
+| Tests            | A Vitest `forks` project for the `html-react-parser` spec                                                                   | `bio-html.spec.tsx` runs in a different pool; consumers mock `./bio-html` |
+| CI/CD            | `deploy-bio-generator.yml` (new), `BIO_GENERATOR_FAKE` in E2E, `BIO_GENERATOR_LAMBDA_NAME` in deploy                        | New GitHub secrets/variables                                              |
+| Security         | `.gitleaks.toml` (new) allowlists bio-generator test fixtures                                                               | The pre-commit secret scan reads it automatically                         |
 
-**Good news:** the only external service that needs a real key is **Groq**.
+**Good news:** the only external service that needs a real key is **Gemini**.
 MusicBrainz, Wikidata, and Wikimedia need no key (just a descriptive `User-Agent`,
 already baked in). And you can do all local development with **no AWS at all** using
 fake mode.
@@ -58,20 +58,20 @@ fake mode.
 
 ## 3. Accounts & secrets you must create
 
-### 3.1 Groq API key — the only required third-party key
+### 3.1 Gemini API key — the only required third-party key
 
 This is only needed to run **real** generation (the Lambda). For local dev you can
 skip it entirely and use fake mode (§5).
 
-1. Sign up / sign in: <https://console.groq.com>
-2. Create a key: <https://console.groq.com/keys> (copied once).
+1. Sign up / sign in: <https://aistudio.google.com>
+2. Create a key: <https://aistudio.google.com/apikey> (copied once).
 3. Store it in **AWS SSM Parameter Store** as a `SecureString` at the exact path the
-   Lambda reads (`/fakefour/groq/api-key`):
+   Lambda reads (`/fakefour/gemini/api-key`):
    ```bash
    aws ssm put-parameter \
-     --name "/fakefour/groq/api-key" \
+     --name "/fakefour/gemini/api-key" \
      --type "SecureString" \
-     --value "gsk_REPLACE_WITH_YOUR_GROQ_KEY" \
+     --value "AIza_REPLACE_WITH_YOUR_GEMINI_KEY" \
      --region us-east-1 \
      --overwrite
    ```
@@ -101,10 +101,10 @@ are unchanged by this branch.
 This branch adds **two** web-app env vars (now in `.env.example` — copy them into
 your local `.env`):
 
-| Variable                    | When you need it             | Notes                                                                                                      |
-| --------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `BIO_GENERATOR_FAKE`        | Local dev / E2E              | `true` → skip AWS + Groq entirely and use the deterministic fixture. **Use this for everyday local work.** |
-| `BIO_GENERATOR_LAMBDA_NAME` | Only for real Lambda invokes | `fakefour-bio-generator`. **Required by `env-validation.ts`** when env validation runs.                    |
+| Variable                    | When you need it             | Notes                                                                                                        |
+| --------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `BIO_GENERATOR_FAKE`        | Local dev / E2E              | `true` → skip AWS + Gemini entirely and use the deterministic fixture. **Use this for everyday local work.** |
+| `BIO_GENERATOR_LAMBDA_NAME` | Only for real Lambda invokes | `fakefour-bio-generator`. **Required by `env-validation.ts`** when env validation runs.                      |
 
 > ⚠️ `BIO_GENERATOR_LAMBDA_NAME` is in the required list in
 > `src/lib/config/env-validation.ts`. If you don't want to set it locally, run with
@@ -119,7 +119,7 @@ Suggested local `.env` additions:
 
 ```bash
 # AI bio generation
-BIO_GENERATOR_FAKE="true"                       # local dev: no AWS/Groq
+BIO_GENERATOR_FAKE="true"                       # local dev: no AWS/Gemini
 BIO_GENERATOR_LAMBDA_NAME="fakefour-bio-generator"
 ```
 
@@ -139,7 +139,7 @@ pnpm install
 #    (Artist.bio/shortBio/altBio/bioGeneratedAt/bioModel + ArtistBioImage + ArtistBioLink)
 pnpm exec prisma db push
 
-# 4. Run the app in fake mode (no AWS, no Groq, no S3)
+# 4. Run the app in fake mode (no AWS, no Gemini, no S3)
 BIO_GENERATOR_FAKE=true pnpm run dev
 ```
 
@@ -225,7 +225,7 @@ Three workflows are relevant:
 - The E2E job sets `BIO_GENERATOR_FAKE: "true"` and `NEXT_PUBLIC_E2E_MODE: "true"`,
   and runs against the isolated Mongo at `mongodb://localhost:27018/boudreaux-e2e`
   (`SKIP_ENV_VALIDATION: "true"`). So CI exercises the admin bio flow **without** AWS
-  or Groq.
+  or Gemini.
 
 **`.github/workflows/deploy.yml`** — app image build/deploy (push to `main`).
 
@@ -312,9 +312,9 @@ aws cloudformation describe-stacks \
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | App: `Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)` | Real invoke without the env var                | Set `BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator`, or use `BIO_GENERATOR_FAKE=true` for local dev |
 | Startup: env validation fails on `BIO_GENERATOR_LAMBDA_NAME`             | It's a required var                            | Add it to `.env`, or run with `SKIP_ENV_VALIDATION=true`                                               |
-| Lambda: `SSM parameter /fakefour/groq/api-key returned no value`         | Groq key not stored / wrong region             | Re-run the `aws ssm put-parameter` in `us-east-1` (§3.1)                                               |
+| Lambda: `SSM parameter /fakefour/gemini/api-key returned no value`       | Gemini key not stored / wrong region           | Re-run the `aws ssm put-parameter` in `us-east-1` (§3.1)                                               |
 | `git push` fails on `tsc` with a Node version error                      | Hook ran under the wrong Node                  | `nvm use` (Node 24) before `git push` — never `--no-verify`                                            |
 | gitleaks blocks a commit on a `bio-generator` test                       | False positive on a placeholder key            | Already handled by `.gitleaks.toml`; add new fixture paths there if needed                             |
 | Spec crashes at import with a `domhandler` ESM error                     | A new `<BioHtml>` consumer spec on `vmThreads` | `vi.mock('./bio-html', …)` in that spec (see §6)                                                       |
-| E2E unexpectedly hits real AWS/Groq                                      | Fake mode not set                              | Ensure `BIO_GENERATOR_FAKE=true` (the Playwright web server sets it; CI sets it in `ci.yml`)           |
+| E2E unexpectedly hits real AWS/Gemini                                    | Fake mode not set                              | Ensure `BIO_GENERATOR_FAKE=true` (the Playwright web server sets it; CI sets it in `ci.yml`)           |
 | Bio image 403s on the CDN                                                | Requested width has no `_w{width}` variant     | Confirm `images.imageSizes`/`deviceSizes` in `next.config.ts` match `IMAGE_VARIANT_DEVICE_SIZES`       |

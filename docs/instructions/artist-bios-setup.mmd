@@ -1,13 +1,13 @@
 %% Setup, secrets & configuration flow for the AI artist-bio feature.
 flowchart TD
     subgraph MANUAL["Manual sign-up / one-time"]
-        GROQ["Groq account<br/>console.groq.com/keys<br/>create API key"]
+        GEMINI["Gemini account<br/>aistudio.google.com/apikey<br/>create API key"]
         OIDC["GitHub OIDC role<br/>secret: AWS_DEPLOY_ROLE_ARN<br/>+ ALERT_EMAIL"]
     end
 
     subgraph AWS["AWS account (us-east-1)"]
-        SSM["SSM Parameter Store<br/>SecureString<br/>/fakefour/groq/api-key"]
-        LAMBDA["Lambda: fakefour-bio-generator<br/>(SAM stack)<br/>reads SSM_PATH_GROQ_API_KEY"]
+        SSM["SSM Parameter Store<br/>SecureString<br/>/fakefour/gemini/api-key"]
+        LAMBDA["Lambda: fakefour-bio-generator<br/>(SAM stack)<br/>reads SSM_PATH_GEMINI_API_KEY"]
         S3["S3 media bucket<br/>media/artists/&#123;id&#125;/bio/...<br/>+ _w&#123;width&#125;.webp variants"]
         CF["CloudFront<br/>NEXT_PUBLIC_CDN_DOMAIN"]
     end
@@ -21,7 +21,7 @@ flowchart TD
         IAM["App IAM:<br/>lambda:InvokeFunction<br/>s3:PutObject media/artists/*/bio/*"]
     end
 
-    GROQ -->|aws ssm put-parameter| SSM
+    GEMINI -->|aws ssm put-parameter| SSM
     OIDC --> SAM
     SAM -->|creates / updates| LAMBDA
     SAM -.->|FunctionName output| ENV
@@ -37,6 +37,6 @@ flowchart TD
     classDef manual fill:#fde68a,stroke:#b45309,color:#000;
     classDef aws fill:#bfdbfe,stroke:#1d4ed8,color:#000;
     classDef app fill:#bbf7d0,stroke:#15803d,color:#000;
-    class GROQ,OIDC manual;
+    class GEMINI,OIDC manual;
     class SSM,LAMBDA,S3,CF aws;
     class ENV,IAM,APP,PUBLIC app;

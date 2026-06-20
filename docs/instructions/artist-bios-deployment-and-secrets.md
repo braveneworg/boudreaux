@@ -16,7 +16,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ## 1. Summary
 
 This feature adds a standalone **AWS Lambda** (`bio-generator/`, deployed with AWS SAM) that
-writes grounded artist bios with **Groq**, sourcing facts/images/links from **MusicBrainz**,
+writes grounded artist bios with **Gemini**, sourcing facts/images/links from **MusicBrainz**,
 **Wikidata**, and **Wikimedia Commons**. The Next.js web app invokes the Lambda directly over
 the AWS SDK (not HTTP), **re-hosts discovered images into S3** with the existing `sharp`
 width-variant pipeline, serves them from **CloudFront**, and renders the sanitized bio HTML with
@@ -24,14 +24,14 @@ Next.js `Link`/`Image`. Admins generate and edit bios from the artist form; the 
 on `/artists`, `/artists/[slug]`, and `/artists/[slug]/bio`.
 
 The Lambda grounds the model on real source material — the **full Wikipedia article body**, enriched
-MusicBrainz facts, and (when configured) **always-on Tavily web-search context** — so bios read as
+MusicBrainz facts, and (when configured) **always-on Jina web-search context** — so bios read as
 extensive, original, image-rich, section-structured articles. The web-search context is merged with
 the Wikipedia body for every artist (not just a fallback), and also covers artists absent from
 MusicBrainz/Wikipedia.
 
 This guide focuses on **what you must sign up for, which secrets/keys to create, and the exact
 commands to configure them** so the feature works against your deployed app. Only **one external
-paid/keyed service is required: Groq.** The **Tavily** web-search key is optional (web-search context
+paid/keyed service is required: Gemini.** The **Jina** web-search key is optional (web-search context
 is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (only a descriptive
 `User-Agent`, already set).
 
@@ -42,9 +42,9 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 | Area            | Path                                                                                               | Purpose                                                                                 |
 | --------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Lambda          | `bio-generator/src/handler.ts`                                                                     | Orchestrates lookup → prose → assemble; returns a result envelope                       |
-| Lambda          | `bio-generator/src/{musicbrainz,wikidata,wikimedia,wikipedia,groq}.ts`                             | External source clients (no keys except Groq); `wikipedia.ts` pulls the article body    |
-| Lambda          | `bio-generator/src/websearch.ts`                                                                   | Optional always-on Tavily web-search context (merged with the Wikipedia body)           |
-| Lambda          | `bio-generator/src/lib/secrets.ts`                                                                 | Reads Groq key + optional search key from SSM (`SSM_PATH_GROQ_API_KEY` / `_SEARCH_`)    |
+| Lambda          | `bio-generator/src/{musicbrainz,wikidata,wikimedia,wikipedia,gemini}.ts`                           | External source clients (no keys except Gemini); `wikipedia.ts` pulls the article body  |
+| Lambda          | `bio-generator/src/jina.ts`                                                                        | Optional always-on Jina web-search context (merged with the Wikipedia body)             |
+| Lambda          | `bio-generator/src/lib/secrets.ts`                                                                 | Reads Gemini key + optional search key from SSM (`SSM_PATH_GEMINI_API_KEY` / `_JINA_`)  |
 | Lambda          | `bio-generator/template.yaml`                                                                      | SAM stack: function, IAM (SSM/KMS), CloudWatch alarm, SNS                               |
 | CI/CD           | `.github/workflows/deploy-bio-generator.yml`                                                       | OIDC → `sam build`/`sam deploy` on `bio-generator/**` changes                           |
 | App service     | `src/lib/services/bio-generation-service.ts`                                                       | Invokes the Lambda; fake mode; persists via repository                                  |
@@ -60,33 +60,33 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 
 ## 3. Prerequisites
 
-| Requirement  | Version / Source                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Node.js      | **24** (`.nvmrc`; the web app's pre-push hook and the Lambda runtime both need 24 — `nvm use` before any `pnpm`/`git push`) |
-| pnpm         | **11.3.0** (`corepack prepare pnpm@11.3.0 --activate`)                                                                      |
-| AWS account  | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                       |
-| AWS SAM CLI  | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                       |
-| AWS CLI v2   | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                             |
-| Groq account | <https://console.groq.com> (free tier sufficient for testing)                                                               |
-| Docker       | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                             |
-| MongoDB      | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                   |
+| Requirement    | Version / Source                                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Node.js        | **24** (`.nvmrc`; the web app's pre-push hook and the Lambda runtime both need 24 — `nvm use` before any `pnpm`/`git push`) |
+| pnpm           | **11.3.0** (`corepack prepare pnpm@11.3.0 --activate`)                                                                      |
+| AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                       |
+| AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                       |
+| AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                             |
+| Gemini account | <https://aistudio.google.com> (free tier sufficient for testing)                                                            |
+| Docker         | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                             |
+| MongoDB        | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                   |
 
 ---
 
 ## 4. Secrets, keys & accounts
 
-### 4.1 Groq API key (the only required third-party key)
+### 4.1 Gemini API key (the only required third-party key)
 
-1. **Sign up / sign in:** <https://console.groq.com>
-2. **Create a key:** <https://console.groq.com/keys> → _Create API Key_ → copy it (shown once).
+1. **Sign up / sign in:** <https://aistudio.google.com>
+2. **Create a key:** <https://aistudio.google.com/apikey> → _Create API Key_ → copy it (shown once).
 3. **Store it in AWS SSM Parameter Store as a SecureString** at the exact path the Lambda reads
-   (`/fakefour/groq/api-key` — hard-coded in `template.yaml` as `SSM_PATH_GROQ_API_KEY`):
+   (`/fakefour/gemini/api-key` — hard-coded in `template.yaml` as `SSM_PATH_GEMINI_API_KEY`):
 
 ```bash
 aws ssm put-parameter \
-  --name "/fakefour/groq/api-key" \
+  --name "/fakefour/gemini/api-key" \
   --type "SecureString" \
-  --value "gsk_REPLACE_WITH_YOUR_GROQ_KEY" \
+  --value "AIza_REPLACE_WITH_YOUR_GEMINI_KEY" \
   --region us-east-1 \
   --overwrite
 ```
@@ -95,9 +95,9 @@ aws ssm put-parameter \
 > the web app — the Lambda fetches and caches it per cold start. The IAM policy in `template.yaml`
 > grants the function `ssm:GetParameter` on this one path plus `kms:Decrypt` on `alias/aws/ssm`.
 
-Model choice (optional): the Groq model id is the SAM parameter `GroqModel`
-(default `llama-3.3-70b-versatile`). Override at deploy with
-`--parameter-overrides GroqModel=<id>`.
+Model choice (optional): the Gemini model id is the SAM parameter `GeminiModel`
+(default `gemini-3-flash`). Override at deploy with
+`--parameter-overrides GeminiModel=<id>`.
 
 ### 4.2 GitHub Actions secrets (for automated Lambda deploys)
 
@@ -268,29 +268,29 @@ loader (`src/lib/image-loader.ts`). Ensure your CloudFront distribution fronts t
 (`cdn.fakefourrecords.com`, `picsum.photos`, `upload.wikimedia.org`, `commons.wikimedia.org`);
 add your CDN hostname there if it differs.
 
-### 4.6 Tavily web-search key (optional — always-on web context)
+### 4.6 Jina web-search key (optional — always-on web context)
 
 The Lambda grounds on the **full Wikipedia article body** and, when this key is configured, **always**
-merges in **Tavily** web-search content as additional context for every artist (not just a fallback)
+merges in **Jina** web-search content as additional context for every artist (not just a fallback)
 — this also covers artists with no MusicBrainz/Wikipedia match. It is **entirely optional**: when the
 SSM parameter below is absent, `getSearchApiKey()` returns `null` and the Lambda grounds on Wikipedia
 
 - facts alone rather than aborting.
 
-1. **Sign up / sign in:** <https://app.tavily.com> (free tier sufficient for testing).
+1. **Sign up / sign in:** <https://jina.ai> (free tier sufficient for testing).
 2. **Create a key** and store it as a SecureString at the path the Lambda reads
-   (`/fakefour/search/api-key` — hard-coded in `template.yaml` as `SSM_PATH_SEARCH_API_KEY`):
+   (`/fakefour/jina/api-key` — hard-coded in `template.yaml` as `SSM_PATH_JINA_API_KEY`):
 
 ```bash
 aws ssm put-parameter \
-  --name "/fakefour/search/api-key" \
+  --name "/fakefour/jina/api-key" \
   --type "SecureString" \
-  --value "tvly-REPLACE_WITH_YOUR_TAVILY_KEY" \
+  --value "jina_REPLACE_WITH_YOUR_JINA_KEY" \
   --region us-east-1 \
   --overwrite
 ```
 
-> Like the Groq key, this lives **only** in SSM. The IAM policy in `template.yaml` already grants the
+> Like the Gemini key, this lives **only** in SSM. The IAM policy in `template.yaml` already grants the
 > function `ssm:GetParameter` on this path. To disable web-search context later, delete the parameter
 > — no redeploy needed. The function `Timeout` is **600s (10 min)** to allow the always-on search
 > plus lengthy, image-rich generation; the web app's invoke client uses a matching request timeout.
@@ -309,9 +309,9 @@ pnpm install
 pnpm exec prisma generate
 pnpm exec prisma db push                  # MongoDB: pushes Artist bio fields + ArtistBioImage/Link
 
-# 2. Store the Groq key in SSM (section 4.1)
-aws ssm put-parameter --name "/fakefour/groq/api-key" --type SecureString \
-  --value "gsk_REPLACE_WITH_YOUR_GROQ_KEY" --region us-east-1 --overwrite
+# 2. Store the Gemini key in SSM (section 4.1)
+aws ssm put-parameter --name "/fakefour/gemini/api-key" --type SecureString \
+  --value "AIza_REPLACE_WITH_YOUR_GEMINI_KEY" --region us-east-1 --overwrite
 
 # 3. Deploy the Lambda — option A: CI (push to main touching bio-generator/**)
 #    option B: locally with SAM
@@ -334,7 +334,7 @@ cd ..
 
 **Local dev without AWS:** set `BIO_GENERATOR_FAKE=true` and run `pnpm run dev` — generation returns
 the deterministic fixture (`src/lib/services/bio-generation-fixture.ts`), images render from
-`picsum.photos`, and no Lambda/S3/Groq calls are made.
+`picsum.photos`, and no Lambda/S3/Gemini calls are made.
 
 ---
 
@@ -396,8 +396,8 @@ pnpm run e2e:docker:down
 # Remove the Lambda stack (deletes function, alarm, SNS topic)
 aws cloudformation delete-stack --stack-name fakefour-bio-generator --region us-east-1
 
-# Remove the Groq secret
-aws ssm delete-parameter --name "/fakefour/groq/api-key" --region us-east-1
+# Remove the Gemini secret
+aws ssm delete-parameter --name "/fakefour/gemini/api-key" --region us-east-1
 
 # Unset web-app env: BIO_GENERATOR_LAMBDA_NAME (+ BIO_GENERATOR_FAKE)
 # Optional: clear re-hosted images
@@ -416,7 +416,7 @@ To clear it, null those fields / delete the `ArtistBioImage`/`ArtistBioLink` row
 `BioGenerationService.generateForArtist`. The service reads the artist, then either returns the
 **fixture** (`BIO_GENERATOR_FAKE=true`) or **invokes the Lambda** (`BIO_GENERATOR_LAMBDA_NAME`) via
 `@aws-sdk/client-lambda`. The Lambda (`handler.ts`) gathers facts from MusicBrainz → Wikidata →
-Wikimedia Commons, asks Groq for grounded prose (key from **SSM**), ranks primary images, and
+Wikimedia Commons, asks Gemini for grounded prose (key from **SSM**), ranks primary images, and
 returns `{ok, data:{shortBio, longBio, genres, images, links, model}}`. The LLM never emits URLs.
 
 **Image re-hosting.** For each discovered image, `BioImageService.rehostWithVariants` fetches it,
@@ -442,7 +442,7 @@ editors; generation is routed through `useGenerateArtistBioMutation`.
 | Symptom                                                                      | Likely cause                                                  | Fix                                                                                                                                |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)`          | App runtime env missing the var                               | Set `BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator` (4.3)                                                                       |
-| Lambda error: `SSM parameter /fakefour/groq/api-key returned no value`       | Secret not created or wrong region                            | Re-run the `aws ssm put-parameter` (4.1) in `us-east-1`                                                                            |
+| Lambda error: `SSM parameter /fakefour/gemini/api-key returned no value`     | Secret not created or wrong region                            | Re-run the `aws ssm put-parameter` (4.1) in `us-east-1`                                                                            |
 | Lambda `AccessDenied` on `ssm:GetParameter`/`kms:Decrypt`                    | Stack out of date                                             | Re-deploy; IAM policy is in `template.yaml`                                                                                        |
 | SAM deploy rolls back; events show `SNS:GetTopicAttributes ... AccessDenied` | Deploy role lacks SNS/CloudWatch perms                        | Add the SNS + CloudWatch policy to the OIDC role (4.2), delete the rolled-back stack, then redeploy                                |
 | `sam deploy` fails: waiter matched `ROLLBACK_COMPLETE`                       | First-create failed; the stack can't be updated in this state | `aws cloudformation delete-stack --stack-name fakefour-bio-generator` + `wait stack-delete-complete`, fix the root cause, redeploy |
@@ -451,4 +451,4 @@ editors; generation is routed through `useGenerateArtistBioMutation`.
 | Bio images 403 on the CDN                                                    | Requested width has no `_w{width}` variant                    | Ensure `images.imageSizes`/`deviceSizes` match `IMAGE_VARIANT_DEVICE_SIZES`; variants are written by `image-variants.ts`           |
 | `git push` fails pre-push `tsc` under Node v22                               | Hook ran with system Node                                     | `nvm use` (Node 24) **before** `git push`                                                                                          |
 | MusicBrainz lookups return nothing / 503                                     | Missing `User-Agent` or 1 req/s rate limit                    | `User-Agent` is set in `types.ts`; the handler degrades to prose-only on failure                                                   |
-| E2E hits real S3/Groq                                                        | Fake mode not set                                             | Ensure `BIO_GENERATOR_FAKE=true` (Playwright web server sets it)                                                                   |
+| E2E hits real S3/Gemini                                                      | Fake mode not set                                             | Ensure `BIO_GENERATOR_FAKE=true` (Playwright web server sets it)                                                                   |
