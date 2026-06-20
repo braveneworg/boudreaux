@@ -43,6 +43,39 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('button', { name: 'New paragraph' })).toBeInTheDocument();
   });
 
+  it('renders the H2 and H3 heading buttons in the toolbar', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    expect(screen.getByRole('button', { name: 'Heading 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Heading 3' })).toBeInTheDocument();
+  });
+
+  it('wraps the current block in an h2 when the Heading 2 button is clicked', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p>Career</p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Heading 2' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<h2>Career</h2>'))
+    );
+  });
+
   it('disables the insert-image button when there are no images', async () => {
     render(<Harness images={[]} />);
     await waitForEditor();

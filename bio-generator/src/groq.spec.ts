@@ -44,6 +44,39 @@ describe('generateProse', () => {
     expect(JSON.parse(init.body).response_format).toEqual({ type: 'json_object' });
   });
 
+  it('embeds the source material and reference URLs in the user prompt', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+    const grounded: ArtistFacts = {
+      ...facts,
+      sourceText: 'Radiohead formed in Abingdon in 1985.',
+      sourceUrls: ['https://en.wikipedia.org/wiki/Radiohead'],
+    };
+
+    await generateProse(grounded, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).messages[1].content;
+    expect(userMessage).toContain('Radiohead formed in Abingdon in 1985.');
+    expect(userMessage).toContain('https://en.wikipedia.org/wiki/Radiohead');
+  });
+
+  it('instructs an extensive, sectioned article without a sources list', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).messages[1].content;
+    expect(userMessage).toContain('<h2>');
+    expect(userMessage).toContain('Do NOT add a "Sources"');
+  });
+
+  it('caps the completion length so an extensive bio is not truncated', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(groqResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body).max_tokens).toBeGreaterThan(2000);
+  });
+
   it('throws when Groq returns a non-OK status', async () => {
     const fetchFn = vi.fn().mockResolvedValue(new Response('quota', { status: 429 }));
 

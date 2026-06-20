@@ -92,4 +92,18 @@ export interface ArtistFacts {
   wikipediaUrl?: string;
   officialUrl?: string;
   imageTitles: string[];
+  /** MusicBrainz-derived structured facts (best-effort; omitted when unknown). */
+  artistType?: string;
+  area?: string;
+  beginDate?: string;
+  endDate?: string;
+  tags?: string[];
+  /**
+   * Long-form source material (Wikipedia article body and/or web-search
+   * content) the LLM rewrites into an original bio. The single biggest driver
+   * of bio quality — without it the model has only sparse facts to work from.
+   */
+  sourceText?: string;
+  /** Provenance of {@link sourceText}, for the model to weave in as inline links. */
+  sourceUrls?: string[];
 }

@@ -26,6 +26,18 @@ vi.mock('@/lib/services/bio-generation-service', () => ({
   },
 }));
 
+const loggerErrorMock = vi.fn();
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: {
+    media: {
+      error: (...args: unknown[]) => loggerErrorMock(...args),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    },
+  },
+}));
+
 const VALID_ID = 'a'.repeat(24);
 
 const content: GeneratedBioContent = {
@@ -99,5 +111,24 @@ describe('generateArtistBioAction', () => {
     expect(result).toEqual({ success: false, error: 'Artist not found.' });
     expect(logSecurityEventMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a typed error instead of a 500 when the service throws unexpectedly', async () => {
+    generateForArtistMock.mockRejectedValue(new Error('PrismaClientInitializationError: DB down'));
+
+    const result = await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Bio generation failed unexpectedly. Please try again.',
+    });
+  });
+
+  it('logs the unexpected error so it stays observable (not a silent 500)', async () => {
+    generateForArtistMock.mockRejectedValue(new Error('DB down'));
+
+    await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(loggerErrorMock).toHaveBeenCalledTimes(1);
   });
 });

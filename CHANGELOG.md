@@ -44,6 +44,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
+
+
+
+## [4.140.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n
+
+## [4.139.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n
+
+## [4.138.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n
+
+## [4.137.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n
+
+## [4.136.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n
+
+## [4.135.0] - 2026-06-20
+
+### Added
+
+- test: ✅ polyfill jsdom Range getClientRects (#511)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n
+
 ## [4.134.0] - 2026-06-19
 
 ### Added

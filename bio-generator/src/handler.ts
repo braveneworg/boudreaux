@@ -3,11 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { generateProse } from './groq.js';
-import { getGroqApiKey } from './lib/secrets.js';
+import { getGroqApiKey, getSearchApiKey } from './lib/secrets.js';
 import { lookupArtist } from './musicbrainz.js';
 import { bioGenerationInputSchema, DEFAULT_GROQ_MODEL } from './types.js';
+import { searchArtistSources } from './websearch.js';
 import { getWikidataData } from './wikidata.js';
 import { getCommonsImage } from './wikimedia.js';
+import { getWikipediaExtract } from './wikipedia.js';
 
 import type {
   ArtistFacts,
@@ -22,17 +24,23 @@ import type {
 export interface BioGeneratorDeps {
   lookupArtist: typeof lookupArtist;
   getWikidataData: typeof getWikidataData;
+  getWikipediaExtract: typeof getWikipediaExtract;
   getCommonsImage: typeof getCommonsImage;
   generateProse: typeof generateProse;
   getGroqApiKey: () => Promise<string>;
+  getSearchApiKey: typeof getSearchApiKey;
+  searchArtistSources: typeof searchArtistSources;
 }
 
 const defaultDeps: BioGeneratorDeps = {
   lookupArtist,
   getWikidataData,
+  getWikipediaExtract,
   getCommonsImage,
   generateProse,
   getGroqApiKey,
+  getSearchApiKey,
+  searchArtistSources,
 };
 
 const MAX_IMAGES = 6;
@@ -91,6 +99,11 @@ const gatherMetadata = async (
 
     if (match) {
       facts.musicBrainzId = match.mbid;
+      facts.artistType = match.artistType;
+      facts.area = match.area;
+      facts.beginDate = match.beginDate;
+      facts.endDate = match.endDate;
+      if (match.tags.length) facts.tags = match.tags;
       links.push(...match.links);
 
       if (match.wikidataId) {
@@ -101,6 +114,14 @@ const gatherMetadata = async (
           links.push({ label: 'Wikipedia', url: wd.wikipediaUrl, kind: 'wikipedia' });
         if (wd.officialUrl)
           links.push({ label: 'Official site', url: wd.officialUrl, kind: 'official' });
+
+        // Fetch the full Wikipedia article body as the primary grounding source
+        // so the LLM rewrites real depth rather than padding sparse facts. A
+        // failed/absent extract simply leaves sourceText unset (best-effort).
+        if (wd.wikipediaUrl) {
+          const article = await deps.getWikipediaExtract(wd.wikipediaUrl);
+          if (article) facts.sourceText = article.extract;
+        }
 
         // Resolve all candidate images, then prefer attribution-free (public
         // domain / CC0) ones since we re-host without attribution. Truncate
@@ -116,6 +137,25 @@ const gatherMetadata = async (
     }
   } catch (err) {
     console.warn('Bio metadata gathering degraded:', err);
+  }
+
+  // Fallback grounding: when the structured sources yielded no article body
+  // (no MusicBrainz/Wikipedia match), search the web so even artists absent
+  // from those catalogs still get a real bio. Optional — skipped when no search
+  // key is configured, and never throws (degrades to a facts-only bio).
+  if (!facts.sourceText) {
+    const searchKey = await deps.getSearchApiKey();
+    if (searchKey) {
+      const searchName = input.realName?.trim() || input.displayName;
+      const found = await deps.searchArtistSources(searchName, searchKey);
+      if (found) {
+        facts.sourceText = found.sourceText;
+        facts.sourceUrls = found.sourceUrls;
+        for (const url of found.sourceUrls) {
+          links.push({ label: 'Reference', url, kind: 'other' });
+        }
+      }
+    }
   }
 
   // Admin-supplied links are appended last so curated entries survive dedupe.

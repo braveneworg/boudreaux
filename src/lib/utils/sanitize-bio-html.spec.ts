@@ -37,6 +37,18 @@ describe('sanitizeBioHtml', () => {
     expect(result).not.toContain('javascript:');
   });
 
+  it('keeps section headings h2 through h4', () => {
+    const result = sanitizeBioHtml('<h2>Career</h2><h3>Early years</h3><h4>1985</h4>');
+
+    expect(result).toBe('<h2>Career</h2><h3>Early years</h3><h4>1985</h4>');
+  });
+
+  it('discards h1 but keeps its text (reserved for the page title)', () => {
+    const result = sanitizeBioHtml('<h1>Name</h1><p>bio</p>');
+
+    expect(result).toBe('Name<p>bio</p>');
+  });
+
   it('discards disallowed tags like iframe', () => {
     const result = sanitizeBioHtml('<p>text</p><iframe></iframe>');
 

@@ -12,7 +12,17 @@ import { Image as TiptapImage } from '@tiptap/extension-image';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
-import { Bold, ImageIcon, Italic, Link2, Link2Off, Pilcrow, Type } from 'lucide-react';
+import {
+  Bold,
+  Heading2,
+  Heading3,
+  ImageIcon,
+  Italic,
+  Link2,
+  Link2Off,
+  Pilcrow,
+  Type,
+} from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import {
@@ -116,6 +126,9 @@ export const RichTextEditor = ({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
+        // Restrict headings to h2–h4 to match the bio HTML sanitizer allowlist
+        // (h1 is reserved for the page title and would be stripped on save).
+        heading: { levels: [2, 3, 4] },
         link: { openOnClick: false, protocols: ['http', 'https'], autolink: false },
       }),
       TextStyle,
@@ -157,6 +170,8 @@ export const RichTextEditor = ({
       isBold: instance?.isActive('bold') ?? false,
       isItalic: instance?.isActive('italic') ?? false,
       isLink: instance?.isActive('link') ?? false,
+      isHeading2: instance?.isActive('heading', { level: 2 }) ?? false,
+      isHeading3: instance?.isActive('heading', { level: 3 }) ?? false,
     }),
   });
 
@@ -217,6 +232,27 @@ export const RichTextEditor = ({
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
           <Italic className="size-4" aria-hidden />
+        </Button>
+
+        <Button
+          type="button"
+          size="icon"
+          variant={toolbarState?.isHeading2 ? 'secondary' : 'ghost'}
+          aria-label="Heading 2"
+          aria-pressed={toolbarState?.isHeading2}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        >
+          <Heading2 className="size-4" aria-hidden />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant={toolbarState?.isHeading3 ? 'secondary' : 'ghost'}
+          aria-label="Heading 3"
+          aria-pressed={toolbarState?.isHeading3}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        >
+          <Heading3 className="size-4" aria-hidden />
         </Button>
 
         <DropdownMenu>
