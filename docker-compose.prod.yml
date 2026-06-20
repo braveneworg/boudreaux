@@ -67,6 +67,10 @@ services:
       # Upstash Redis (rate limiting)
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}
       UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+      # Artist bio generator (AWS Lambda invoked via @aws-sdk/client-lambda).
+      # Required by env-validation.ts in production; falls back to the deployed
+      # function name so the container always boots even if the var is unset.
+      BIO_GENERATOR_LAMBDA_NAME: ${BIO_GENERATOR_LAMBDA_NAME:-fakefour-bio-generator}
       # Structured logging (winston → stdout JSON → Alloy → Loki)
       LOG_LEVEL: ${LOG_LEVEL:-info}
     expose:
