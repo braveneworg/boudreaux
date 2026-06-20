@@ -15,7 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <PageContainer>
       <ContentContainer>
         <AdminNav />
-        <section className="py-6">{children}</section>
+        {/* Tighter top gap so the breadcrumb groups with the nav above it;
+            a little padding under the breadcrumb adds breathing room before the
+            first heading (padding, since space-y margins collapse). */}
+        <section className="pt-3 pb-6 **:data-[slot=breadcrumb-menu]:pb-2">{children}</section>
       </ContentContainer>
     </PageContainer>
   );

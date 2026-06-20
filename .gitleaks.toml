@@ -1,0 +1,13 @@
+# gitleaks configuration.
+#
+# Extends the built-in default ruleset (so all standard secret detectors stay
+# active) and allowlists the bio-generator Lambda's unit tests, which pass
+# placeholder credentials (e.g. a literal "test-key" as the Groq API key) to
+# exercise the code paths. These are fixtures, not real secrets — the real Groq
+# key lives only in AWS SSM and is never committed.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "bio-generator unit tests use placeholder credentials, not real secrets"
+paths = ['''bio-generator/src/.*\.spec\.ts$''']

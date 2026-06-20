@@ -28,6 +28,7 @@ describe('Environment Validation', () => {
       NEXT_PUBLIC_PUSHER_CLUSTER: 'us2',
       UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
       UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
+      BIO_GENERATOR_LAMBDA_NAME: 'fakefour-bio-generator',
     };
   });
 
@@ -320,6 +321,7 @@ describe('Environment Validation', () => {
         NEXT_PUBLIC_PUSHER_CLUSTER: 'us2',
         UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
         UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
+        BIO_GENERATOR_LAMBDA_NAME: 'fakefour-bio-generator',
       };
 
       // Dynamic import forces module-level code to run with NODE_ENV='production'

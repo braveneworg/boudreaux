@@ -3,6 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+// Bio fields are authored in the rich-text editor and stored as HTML, so their
+// length limits must count visible prose, not markup — otherwise `<p>`/`<a>`
+// overhead can reject a bio whose readable text is well within the limit.
+const visibleLength = (value: string): number => value.replace(/<[^>]*>/g, '').length;
+
 // TODO: extract out commonality with update-artist-schema.ts to an object that you can spread into both schemas
 // Base schema without refinements — use this for .partial() in update schemas
 export const artistBaseSchema = z.object({
@@ -50,17 +55,23 @@ export const artistBaseSchema = z.object({
     }),
   bio: z
     .string()
-    .max(5000, { message: 'Bio must be less than 5000 characters' })
+    .refine((value) => visibleLength(value) <= 5000, {
+      message: 'Bio must be less than 5000 characters',
+    })
     .optional()
     .or(z.literal('')),
   shortBio: z
     .string()
-    .max(500, { message: 'Short bio must be less than 500 characters' })
+    .refine((value) => visibleLength(value) <= 500, {
+      message: 'Short bio must be less than 500 characters',
+    })
     .optional()
     .or(z.literal('')),
   altBio: z
     .string()
-    .max(5000, { message: 'Alternative bio must be less than 5000 characters' })
+    .refine((value) => visibleLength(value) <= 5000, {
+      message: 'Alternative bio must be less than 5000 characters',
+    })
     .optional()
     .or(z.literal('')),
   genres: z

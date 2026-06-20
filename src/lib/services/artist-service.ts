@@ -8,9 +8,14 @@ import { Prisma } from '@prisma/client';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
-import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import type {
+  Artist,
+  ArtistListWithBio,
+  ArtistWithPublishedReleases,
+} from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getS3Client } from '@/lib/utils/s3-client';
+import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import type { ServiceResponse } from './service.types';
@@ -53,13 +58,33 @@ const generateS3Key = (artistId: string, fileName: string): string => {
   return `media/artists/${artistId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
 };
 
+/**
+ * Sanitizes the rich-text bio fields (`bio`, `shortBio`, `altBio`) before they
+ * are persisted. All three are authored in the Tiptap editor, so they are HTML;
+ * `sanitizeBioHtml` enforces the allowlist (and link hardening) on write so
+ * every read surface can trust the stored markup. Only string values are
+ * touched, leaving Prisma update operators (e.g. `{ set }`) and `null` intact.
+ */
+const sanitizeBioWriteFields = <T extends Prisma.ArtistCreateInput | Prisma.ArtistUpdateInput>(
+  data: T
+): T => {
+  const sanitized = { ...data };
+  if (typeof sanitized.bio === 'string') sanitized.bio = sanitizeBioHtml(sanitized.bio);
+  if (typeof sanitized.shortBio === 'string')
+    sanitized.shortBio = sanitizeBioHtml(sanitized.shortBio);
+  if (typeof sanitized.altBio === 'string') sanitized.altBio = sanitizeBioHtml(sanitized.altBio);
+  return sanitized;
+};
+
 export class ArtistService {
   /**
    * Create a new artist
    */
   static async createArtist(data: Prisma.ArtistCreateInput): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.create(data)) as unknown as Artist;
+      const artist = (await ArtistRepository.create(
+        sanitizeBioWriteFields(data)
+      )) as unknown as Artist;
       return { success: true, data: artist };
     } catch (error) {
       // Unique constraint violations
@@ -196,7 +221,10 @@ export class ArtistService {
     data: Prisma.ArtistUpdateInput
   ): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.update(id, data)) as unknown as Artist;
+      const artist = (await ArtistRepository.update(
+        id,
+        sanitizeBioWriteFields(data)
+      )) as unknown as Artist;
 
       return { success: true, data: artist };
     } catch (error) {
@@ -649,6 +677,28 @@ export class ArtistService {
    * Get an artist by slug with full release and digital format data.
    * Post-query filters to only published, non-deleted releases.
    */
+  /**
+   * List published artists for the public `/artists` index, with their primary
+   * bio images and short bios sanitized for redisplay.
+   */
+  static async listPublishedArtists(): Promise<ServiceResponse<ArtistListWithBio[]>> {
+    try {
+      const artists = await ArtistRepository.listPublishedWithBio({ skip: 0, take: 100 });
+      const sanitized = artists.map((artist) => ({
+        ...artist,
+        shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
+      }));
+      return { success: true, data: sanitized };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to retrieve artists' };
+    }
+  }
+
   static async getArtistBySlugWithReleases(
     slug: string
   ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
@@ -666,9 +716,16 @@ export class ArtistService {
       }
 
       // Filter to only published, non-deleted releases (Prisma MongoDB
-      // doesn't support nested where on junction table includes)
+      // doesn't support nested where on junction table includes). Bio prose is
+      // sanitized on read so redisplay is safe regardless of how it was
+      // authored (AI-generated bios are also sanitized at write time).
       const filteredArtist: ArtistWithPublishedReleases = {
         ...artist,
+        bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
+        // Short bio is rich-text too (Tiptap); kept as sanitized HTML for
+        // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
+        // descriptions, listing cards) strip it with sanitizeBioText instead.
+        shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
         releases: artist.releases.filter(
           (ar) => ar.release.publishedAt != null && ar.release.deletedOn == null
         ),

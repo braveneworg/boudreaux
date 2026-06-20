@@ -40,5 +40,5 @@
     ".next/dev/types/**/*.ts",
     ".next/dev/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "stripe-webhook"]
+  "exclude": ["node_modules", "stripe-webhook", "bio-generator"]
 }

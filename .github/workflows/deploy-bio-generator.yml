@@ -1,0 +1,84 @@
+name: Deploy Bio Generator
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "bio-generator/**"
+      - ".github/workflows/deploy-bio-generator.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@11.3.0 --activate
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Install dependencies
+        working-directory: bio-generator
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: bio-generator
+        run: pnpm run test:run
+
+      - name: Install esbuild globally
+        run: npm install -g esbuild
+
+      - name: SAM build
+        working-directory: bio-generator
+        run: sam build
+
+      - name: Ensure SAM artifact bucket exists
+        run: |
+          BUCKET="fakefour-sam-artifacts-us-east-1"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3 mb "s3://$BUCKET" --region us-east-1
+          fi
+
+      - name: SAM deploy
+        working-directory: bio-generator
+        run: |
+          sam deploy \
+            --s3-bucket fakefour-sam-artifacts-us-east-1 \
+            --s3-prefix fakefour-bio-generator \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --stack-name fakefour-bio-generator \
+            --region us-east-1 \
+            --parameter-overrides Environment=production "AlarmEmail=${{ secrets.ALERT_EMAIL }}"
+
+      - name: Print function name
+        run: |
+          echo "Set BIO_GENERATOR_LAMBDA_NAME in the web app environment to:"
+          aws cloudformation describe-stacks \
+            --stack-name fakefour-bio-generator \
+            --region us-east-1 \
+            --query 'Stacks[0].Outputs[?OutputKey==`FunctionName`].OutputValue' \
+            --output text

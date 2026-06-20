@@ -5,17 +5,11 @@
 
 import 'server-only';
 
-import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import mime from 'mime';
-import sharp from 'sharp';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 
-import {
-  IMAGE_VARIANT_DEVICE_SIZES,
-  IMAGE_VARIANT_SUFFIX_REGEX,
-  WEBP_QUALITY,
-  WEBP_TRANSCODE_EXTENSIONS,
-} from '@/lib/constants/image-variants';
+import { IMAGE_VARIANT_SUFFIX_REGEX } from '@/lib/constants/image-variants';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { generateVariantsFromBuffer, getExtension } from '@/lib/utils/image-variants';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { generateImageVariantsSchema } from '@/lib/validation/admin-asset-schemas';
 
@@ -75,19 +69,6 @@ const validateSourceKey = (
   }
 
   return { isValid: true, shouldSkip: false };
-};
-
-const getExtension = (key: string): string => {
-  const dot = key.lastIndexOf('.');
-  return dot === -1 ? '' : key.substring(dot).toLowerCase();
-};
-
-const buildVariantKey = (originalKey: string, width: number, overrideExt?: string): string => {
-  const dot = originalKey.lastIndexOf('.');
-  if (dot === -1) return `${originalKey}_w${width}${overrideExt ?? ''}`;
-  const base = originalKey.substring(0, dot);
-  const ext = overrideExt ?? originalKey.substring(dot);
-  return `${base}_w${width}${ext}`;
 };
 
 /**
@@ -172,61 +153,8 @@ export const generateImageVariantsAction = async (
     }
     const buffer = Buffer.concat(chunks);
 
-    // Get original dimensions
-    const metadata = await sharp(buffer).metadata();
-    const originalWidth = metadata.width ?? 0;
-
-    if (originalWidth === 0) {
-      return { success: false, variantsGenerated: 0, error: 'Could not determine image width' };
-    }
-
-    const contentType = mime.getType(s3Key) ?? 'application/octet-stream';
-    const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
-    let variantsGenerated = 0;
-
-    // Generate and upload every variant width, even ones >= the original.
-    // `withoutEnlargement: true` clamps sharp's output to the original's
-    // native dimensions, so a 500px source asked for at 1200px just emits
-    // a 500px image saved at the `_w1200` filename. This keeps every URL in
-    // the loader's srcset live (no 403s for small originals); browsers trust
-    // the width descriptor and pick the appropriate entry without ever
-    // fetch-failing.
-    for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
-      const pipeline = sharp(buffer).resize(targetWidth, undefined, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      });
-
-      const variantKey = buildVariantKey(s3Key, targetWidth);
-      const originalVariantBuffer = await pipeline.clone().toBuffer();
-
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: variantKey,
-          Body: originalVariantBuffer,
-          ContentType: contentType,
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
-      variantsGenerated++;
-
-      if (!shouldTranscodeToWebp) continue;
-
-      const webpVariantKey = buildVariantKey(s3Key, targetWidth, '.webp');
-      const webpBuffer = await pipeline.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
-
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: webpVariantKey,
-          Body: webpBuffer,
-          ContentType: 'image/webp',
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
-      variantsGenerated++;
-    }
+    // Resize + upload every `_w{width}` variant (and WebP siblings) to S3.
+    const { variantsGenerated } = await generateVariantsFromBuffer(buffer, s3Key);
 
     return { success: true, variantsGenerated };
   } catch (error) {

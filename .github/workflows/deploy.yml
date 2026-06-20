@@ -454,6 +454,7 @@ jobs:
           NEXT_PUBLIC_PUSHER_CLUSTER=${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
           UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          BIO_GENERATOR_LAMBDA_NAME=${{ vars.BIO_GENERATOR_LAMBDA_NAME || 'fakefour-bio-generator' }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ALERT_EMAIL=${{ secrets.GRAFANA_ALERT_EMAIL }}
           LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}

@@ -19,6 +19,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getQueryClient } from '@/lib/utils/get-query-client';
+import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 
 import type { Metadata } from 'next';
 
@@ -42,9 +43,12 @@ export async function generateMetadata({ params }: ArtistDetailPageProps): Promi
   const artist = result.data;
   const displayName = getArtistDisplayName(artist);
 
+  // shortBio is now rich HTML; strip tags for the plain-text meta description.
+  const shortBioText = artist.shortBio ? sanitizeBioText(artist.shortBio) : '';
+
   return {
     title: displayName,
-    description: artist.shortBio || `Listen to releases by ${displayName}.`,
+    description: shortBioText || `Listen to releases by ${displayName}.`,
   };
 }
 

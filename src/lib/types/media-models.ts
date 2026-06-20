@@ -430,6 +430,8 @@ export const artistWithPublishedReleasesInclude = {
   images: true,
   labels: true,
   urls: true,
+  bioImages: { orderBy: { sortOrder: 'asc' } },
+  bioLinks: { orderBy: { sortOrder: 'asc' } },
   members: { include: { member: true } },
   releases: {
     include: {
@@ -451,4 +453,21 @@ export const artistWithPublishedReleasesInclude = {
  */
 export type ArtistWithPublishedReleases = Prisma.ArtistGetPayload<{
   include: typeof artistWithPublishedReleasesInclude;
+}>;
+
+/**
+ * Prisma include for the public artists index at `/artists`. Pulls only the
+ * primary identifying images (2–3) shown beside each card's short bio.
+ */
+export const artistListWithBioInclude = {
+  bioImages: {
+    where: { isPrimary: true },
+    orderBy: { sortOrder: 'asc' },
+    take: 3,
+  },
+} as const satisfies Prisma.ArtistInclude;
+
+/** Published artist with its primary bio images, for the public listing. */
+export type ArtistListWithBio = Prisma.ArtistGetPayload<{
+  include: typeof artistListWithBioInclude;
 }>;

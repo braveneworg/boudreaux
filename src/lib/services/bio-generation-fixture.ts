@@ -1,0 +1,55 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+import type { BioGenerationResult } from '@/lib/validation/bio-generation-schema';
+
+export interface BioGenerationLambdaInput {
+  artistId: string;
+  displayName: string;
+  realName?: string;
+  akaNames?: string;
+  links?: string[];
+  description?: string;
+  existingGenres?: string;
+}
+
+/**
+ * Deterministic bio-generation result used when `BIO_GENERATOR_FAKE=true`
+ * (E2E and local dev without a deployed Lambda). Echoes the artist name so
+ * tests can assert the content rendered end-to-end. The long bio weaves a valid
+ * inline `<a>` (must render as a Next Link) and a `javascript:` link (must be
+ * stripped) so sanitization + Link mapping are exercised by the real flow. The
+ * image uses a `picsum.photos` URL (allowed in `next.config` remotePatterns) so
+ * it renders through next/image when re-hosting is skipped in fake mode.
+ */
+export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGenerationResult => ({
+  ok: true,
+  data: {
+    shortBio: `${input.displayName} is a boundary-pushing artist on the roster.`,
+    longBio:
+      `<p><strong>${input.displayName}</strong> builds immersive soundscapes that blur genre lines.</p>` +
+      `<p>Read more on <a href="https://en.wikipedia.org/wiki/Music">their Wikipedia page</a>.</p>` +
+      `<a href="javascript:alert(1)">unsafe</a>`,
+    genres: input.existingGenres?.trim() || 'experimental, electronic',
+    images: [
+      {
+        url: 'https://picsum.photos/seed/e2e-bio/1200/800',
+        thumbnailUrl: 'https://picsum.photos/seed/e2e-bio/400/300',
+        title: `${input.displayName} portrait`,
+        // Lambda returns attribution metadata; the app drops it on re-host.
+        attribution: 'Public domain',
+        license: 'Public domain',
+        sourceUrl: null,
+        width: 1200,
+        height: 800,
+        isPrimary: true,
+      },
+    ],
+    links: [
+      { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Music', kind: 'wikipedia' },
+      ...(input.links ?? []).map((url) => ({ label: 'Reference', url, kind: 'other' as const })),
+    ],
+    model: 'fake/deterministic',
+  },
+});

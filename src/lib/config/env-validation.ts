@@ -39,6 +39,8 @@ export const validateEnvironment = () => {
     'NEXT_PUBLIC_PUSHER_CLUSTER',
     'UPSTASH_REDIS_REST_URL',
     'UPSTASH_REDIS_REST_TOKEN',
+    // Name of the deployed bio-generator Lambda the app invokes for AI bios.
+    'BIO_GENERATOR_LAMBDA_NAME',
   ];
 
   const presentEnvKeys = new Set(

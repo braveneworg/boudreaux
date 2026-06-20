@@ -1,0 +1,71 @@
+flowchart TD
+    subgraph public["Public site (Server Components)"]
+        IDX["/artists<br/>page.tsx"]
+        DET["/artists/[slug]<br/>page.tsx"]
+        BIO["/artists/[slug]/bio<br/>page.tsx"]
+        CARD["ArtistListCard"]
+        DETC["ArtistDetailContent<br/>('use client')"]
+        BIOC["ArtistBioContent<br/>('use client')"]
+        BHTML["BioHtml<br/>(html-react-parser to<br/>next/Image + next/Link)"]
+        THUMB["ExpandableThumbnail"]
+    end
+
+    subgraph admin["Admin (artist edit form)"]
+        FORM["artist-form.tsx"]
+        GENSEC["ArtistBioGenerationSection<br/>('use client')"]
+        RTE["RichTextEditor<br/>(Tiptap, dynamic ssr:false)"]
+        MUT["useGenerateArtistBioMutation<br/>(TanStack Query)"]
+    end
+
+    subgraph server["Server (Next.js)"]
+        ACT["generateArtistBioAction<br/>(Server Action, admin-only)"]
+        SVC["BioGenerationService"]
+        IMGSVC["BioImageService<br/>(rehostWithVariants)"]
+        ASVC["ArtistService<br/>(sanitize on read/write)"]
+        REPO["ArtistRepository<br/>(replaceBioContent,<br/>listPublishedWithBio)"]
+        SAN["sanitizeBioHtml /<br/>sanitizeBioText"]
+        VAR["generateVariantsFromBuffer<br/>(image-variants util)"]
+    end
+
+    subgraph ext["External / AWS"]
+        LAMBDA["fakefour-bio-generator<br/>Lambda"]
+        FAKE["fakeBioGeneration<br/>(fixture, BIO_GENERATOR_FAKE=true)"]
+        S3["S3 + CDN"]
+        DB[("MongoDB<br/>Artist + ArtistBioImage<br/>+ ArtistBioLink")]
+        MB["MusicBrainz"]
+        WD["Wikidata"]
+        WM["Wikimedia Commons"]
+        GROQ["Groq LLM"]
+    end
+
+    IDX --> CARD
+    DET --> DETC
+    BIO --> BIOC
+    DETC --> BHTML
+    DETC --> THUMB
+    BIOC --> BHTML
+    BIOC --> THUMB
+    IDX -.->|listPublishedArtists| ASVC
+    DET -.->|getArtistBySlugWithReleases| ASVC
+    BIO -.->|getArtistBySlugWithReleases| ASVC
+
+    FORM --> GENSEC
+    FORM --> RTE
+    GENSEC --> MUT
+    MUT --> ACT
+    ACT --> SVC
+    SVC --> IMGSVC
+    SVC --> ASVC
+    SVC --> SAN
+    IMGSVC --> VAR
+    VAR --> S3
+    SVC -->|"BIO_GENERATOR_FAKE != true"| LAMBDA
+    SVC -->|"BIO_GENERATOR_FAKE = true"| FAKE
+    SVC --> REPO
+    ASVC --> REPO
+    REPO --> DB
+
+    LAMBDA --> MB
+    LAMBDA --> WD
+    LAMBDA --> WM
+    LAMBDA --> GROQ

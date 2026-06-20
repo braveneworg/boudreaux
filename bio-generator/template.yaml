@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Fake Four Records - AI artist bio generator
+
+Globals:
+  Function:
+    Timeout: 29
+    MemorySize: 512
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        NODE_ENV: !Ref Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging]
+  GroqModel:
+    Type: String
+    Default: llama-3.3-70b-versatile
+    Description: Groq model id used to write bio prose
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: Email for Lambda error alarm notifications (empty disables them)
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+
+Resources:
+  BioGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: fakefour-bio-generator
+      CodeUri: src/
+      Handler: handler.lambdaHandler
+      Description: Generates short/long artist bios from MusicBrainz + Wikidata + Groq
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/api-key'
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
+      Environment:
+        Variables:
+          SSM_PATH_GROQ_API_KEY: '/fakefour/groq/api-key'
+          GROQ_MODEL: !Ref GroqModel
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2024
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - handler.ts
+        External:
+          - '@aws-sdk/*'
+
+  # Bio generation is admin-triggered and non-critical, so this alarm fires on
+  # the first error in any 15 minutes purely for visibility.
+  BioGeneratorErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Artist bio generator Lambda is failing
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BioGeneratorFunction
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], []]
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      TopicName: fakefour-bio-generator-alarms
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+Outputs:
+  FunctionName:
+    Description: Set this as BIO_GENERATOR_LAMBDA_NAME in the web app environment
+    Value: !Ref BioGeneratorFunction
+  FunctionArn:
+    Value: !GetAtt BioGeneratorFunction.Arn

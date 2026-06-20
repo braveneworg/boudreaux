@@ -88,6 +88,8 @@ describe('ArtistService', () => {
     bio: null,
     shortBio: null,
     altBio: null,
+    bioGeneratedAt: null,
+    bioModel: null,
     slug: 'john-doe',
     genres: null,
     bornOn: null,
@@ -404,6 +406,27 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: updatedArtist });
       expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', updateData);
+    });
+
+    it('sanitizes the bio HTML before persisting', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', {
+        bio: '<p>Hi</p><script>alert(1)</script>',
+      });
+
+      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', { bio: '<p>Hi</p>' });
+    });
+
+    it('strips a disallowed image host from the bio on write', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', {
+        altBio: '<p>x<img src="javascript:alert(1)"></p>',
+      });
+
+      const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
+      expect(persisted?.altBio).not.toContain('javascript:');
     });
 
     it('should return error when artist not found', async () => {
@@ -1280,6 +1303,18 @@ describe('ArtistService', () => {
         isActive: true,
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       });
+    });
+
+    it('keeps the short bio as sanitized HTML for rich rendering', async () => {
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue({
+        ...mockArtistWithReleases,
+        shortBio: '<p><strong>Bold</strong></p><script>alert(1)</script>',
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      const data = (result as { success: true; data: { shortBio: string } }).data;
+      expect(data.shortBio).toBe('<p><strong>Bold</strong></p>');
     });
 
     it('should filter to only published, non-deleted releases', async () => {
