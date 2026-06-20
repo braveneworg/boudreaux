@@ -62,4 +62,15 @@ test.describe('Admin AI bio generation', () => {
     // A success toast confirms the save without navigating away from the form.
     await expect(adminPage.getByText(/saved successfully/i)).toBeVisible({ timeout: 15_000 });
   });
+
+  test('exposes bulleted and numbered list buttons in the bio editors', async ({ adminPage }) => {
+    await openFirstArtistEdit(adminPage);
+
+    // The rich-text bio editors expose list controls (first() — there are
+    // multiple bio editors on the form, each with its own toolbar).
+    await expect(adminPage.getByRole('button', { name: 'Bulleted list' }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(adminPage.getByRole('button', { name: 'Numbered list' }).first()).toBeVisible();
+  });
 });

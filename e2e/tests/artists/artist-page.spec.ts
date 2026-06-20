@@ -51,7 +51,7 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('link', { name: /read full bio/i })).toBeVisible();
     });
 
-    test('should open the full bio page with the long bio and a nofollow link', async ({
+    test('should open the full bio page with the long bio, inline link, and image', async ({
       page,
     }) => {
       await page.goto('/artists/e2e-artist');
@@ -61,15 +61,17 @@ test.describe('Artist Page', () => {
 
       await expect(page.getByText(/immersive soundscapes/i)).toBeVisible({ timeout: 15_000 });
 
-      const wikiLink = page.getByRole('link', { name: 'Wikipedia' });
-      await expect(wikiLink).toBeVisible();
-      await expect(wikiLink).toHaveAttribute('rel', 'nofollow noopener noreferrer');
-      await expect(wikiLink).toHaveAttribute('target', '_blank');
+      // Links are woven inline in the prose — there is no separate links list
+      // section at the bottom of the bio page anymore.
+      await expect(page.getByRole('heading', { name: 'Links' })).toHaveCount(0);
 
-      // BioHtml maps the inline <a> in the bio body to a hardened Next Link.
+      // BioHtml maps the inline <a> in the bio body to a hardened Next Link with
+      // a trailing open-in-new-tab icon (aria-hidden, so the name is unchanged).
       const inlineLink = page.getByRole('link', { name: 'inline link' });
       await expect(inlineLink).toBeVisible();
       await expect(inlineLink).toHaveAttribute('rel', 'nofollow noopener noreferrer');
+      await expect(inlineLink).toHaveAttribute('target', '_blank');
+      await expect(inlineLink.locator('svg')).toBeVisible();
 
       // BioHtml maps the inline CDN <img> to a Next Image whose srcset uses the
       // `_w{width}` variant convention (custom CDN loader, no `unoptimized`).
