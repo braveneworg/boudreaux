@@ -8,6 +8,7 @@ import { lookupArtist } from './musicbrainz.js';
 import { bioGenerationInputSchema, DEFAULT_GROQ_MODEL } from './types.js';
 import { getWikidataData } from './wikidata.js';
 import { getCommonsImage } from './wikimedia.js';
+import { getWikipediaExtract } from './wikipedia.js';
 
 import type {
   ArtistFacts,
@@ -22,6 +23,7 @@ import type {
 export interface BioGeneratorDeps {
   lookupArtist: typeof lookupArtist;
   getWikidataData: typeof getWikidataData;
+  getWikipediaExtract: typeof getWikipediaExtract;
   getCommonsImage: typeof getCommonsImage;
   generateProse: typeof generateProse;
   getGroqApiKey: () => Promise<string>;
@@ -30,6 +32,7 @@ export interface BioGeneratorDeps {
 const defaultDeps: BioGeneratorDeps = {
   lookupArtist,
   getWikidataData,
+  getWikipediaExtract,
   getCommonsImage,
   generateProse,
   getGroqApiKey,
@@ -91,6 +94,11 @@ const gatherMetadata = async (
 
     if (match) {
       facts.musicBrainzId = match.mbid;
+      facts.artistType = match.artistType;
+      facts.area = match.area;
+      facts.beginDate = match.beginDate;
+      facts.endDate = match.endDate;
+      if (match.tags.length) facts.tags = match.tags;
       links.push(...match.links);
 
       if (match.wikidataId) {
@@ -101,6 +109,14 @@ const gatherMetadata = async (
           links.push({ label: 'Wikipedia', url: wd.wikipediaUrl, kind: 'wikipedia' });
         if (wd.officialUrl)
           links.push({ label: 'Official site', url: wd.officialUrl, kind: 'official' });
+
+        // Fetch the full Wikipedia article body as the primary grounding source
+        // so the LLM rewrites real depth rather than padding sparse facts. A
+        // failed/absent extract simply leaves sourceText unset (best-effort).
+        if (wd.wikipediaUrl) {
+          const article = await deps.getWikipediaExtract(wd.wikipediaUrl);
+          if (article) facts.sourceText = article.extract;
+        }
 
         // Resolve all candidate images, then prefer attribution-free (public
         // domain / CC0) ones since we re-host without attribution. Truncate

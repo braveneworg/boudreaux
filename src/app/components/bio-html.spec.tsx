@@ -103,6 +103,13 @@ describe('BioHtml', () => {
     expect(screen.getByText('Bold')).toBeInTheDocument();
   });
 
+  it('renders section headings as native heading elements', () => {
+    render(<BioHtml html="<h2>Career</h2><h3>Early years</h3><p>bio</p>" />);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Career' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Early years' })).toBeInTheDocument();
+  });
+
   it('renders an anchor without an href as plain text', () => {
     render(<BioHtml html="<a>no href</a>" />);
 

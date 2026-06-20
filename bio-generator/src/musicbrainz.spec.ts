@@ -60,6 +60,55 @@ describe('lookupArtist', () => {
     ]);
   });
 
+  it('extracts type, area, life-span, and the top tags as grounding facts', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-4', name: 'Radiohead' }] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          type: 'Group',
+          area: { name: 'United Kingdom' },
+          'life-span': { begin: '1985', end: null },
+          tags: [
+            { name: 'alternative rock', count: 10 },
+            { name: 'experimental', count: 7 },
+          ],
+          relations: [],
+        })
+      );
+
+    const result = await lookupArtist('Radiohead', fetchFn);
+
+    expect(result?.artistType).toBe('Group');
+    expect(result?.area).toBe('United Kingdom');
+    expect(result?.beginDate).toBe('1985');
+    expect(result?.tags).toEqual(['alternative rock', 'experimental']);
+  });
+
+  it('orders tags by usage count and caps the list', async () => {
+    const manyTags = Array.from({ length: 12 }, (_, i) => ({ name: `tag-${i}`, count: i }));
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-5', name: 'Artist' }] }))
+      .mockResolvedValueOnce(jsonResponse({ tags: manyTags, relations: [] }));
+
+    const result = await lookupArtist('Artist', fetchFn);
+
+    expect(result?.tags).toHaveLength(8);
+    expect(result?.tags[0]).toBe('tag-11');
+  });
+
+  it('requests tags alongside url-rels in the lookup', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-6', name: 'Artist' }] }))
+      .mockResolvedValueOnce(jsonResponse({ relations: [] }));
+
+    await lookupArtist('Artist', fetchFn);
+
+    expect(fetchFn.mock.calls[1][0]).toContain('inc=url-rels+tags');
+  });
+
   it('sends the required descriptive User-Agent header', async () => {
     const fetchFn = vi
       .fn()

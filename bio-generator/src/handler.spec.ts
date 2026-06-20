@@ -25,6 +25,10 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     mbid: 'mbid-1',
     name: 'Radiohead',
     wikidataId: 'Q11649',
+    artistType: 'Group',
+    area: 'United Kingdom',
+    beginDate: '1985',
+    tags: ['alternative rock'],
     links: [
       { label: 'MusicBrainz', url: 'https://musicbrainz.org/artist/mbid-1', kind: 'musicbrainz' },
     ],
@@ -33,6 +37,11 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     imageFileNames: ['a.jpg', 'b.jpg'],
     officialUrl: 'https://radiohead.com',
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Radiohead',
+  }),
+  getWikipediaExtract: vi.fn().mockResolvedValue({
+    title: 'Radiohead',
+    extract: 'Radiohead are an English rock band formed in Abingdon in 1985.',
+    url: 'https://en.wikipedia.org/wiki/Radiohead',
   }),
   getCommonsImage: vi
     .fn()
@@ -58,6 +67,36 @@ describe('runBioGeneration', () => {
     expect(result.genres).toBe('alternative rock');
     expect(result.images).toHaveLength(2);
     expect(result.links.some((l) => l.kind === 'wikipedia')).toBe(true);
+  });
+
+  it('feeds the Wikipedia article extract to the model as source text', async () => {
+    const deps = makeDeps();
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(facts.sourceText).toContain('formed in Abingdon in 1985');
+  });
+
+  it('propagates MusicBrainz structured facts to the model', async () => {
+    const deps = makeDeps();
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(facts.area).toBe('United Kingdom');
+    expect(facts.beginDate).toBe('1985');
+    expect(facts.tags).toEqual(['alternative rock']);
+  });
+
+  it('degrades to no source text when the Wikipedia extract is unavailable', async () => {
+    const deps = makeDeps({ getWikipediaExtract: vi.fn().mockResolvedValue(null) });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(facts.sourceText).toBeUndefined();
+    expect(result.longBio).toBe('<p>Long bio.</p>');
   });
 
   it('marks the LLM-ranked image as primary', async () => {
