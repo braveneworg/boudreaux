@@ -60,8 +60,9 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   const [displayFrom, setDisplayFrom] = useState(slot.notification?.displayFrom ?? '');
   const [displayUntil, setDisplayUntil] = useState(slot.notification?.displayUntil ?? '');
   const [repostedFromId, setRepostedFromId] = useState(slot.notification?.repostedFromId ?? '');
-  const upsertBanner = useUpsertBannerNotificationMutation();
-  const deleteBanner = useDeleteBannerNotificationMutation();
+  const { mutateAsync: upsertBanner } = useUpsertBannerNotificationMutation();
+  const { mutateAsync: deleteBanner, isPending: isDeletingBanner } =
+    useDeleteBannerNotificationMutation();
 
   const boundAction = useCallback(
     async (_prevState: FormState, formData: FormData): Promise<FormState> => {
@@ -76,7 +77,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
       }
       // Routes through the mutation hook so the banner caches are invalidated on
       // success; the hook returns the action's FormState unchanged.
-      return upsertBanner.mutateAsync({ formState: _prevState, formData });
+      return upsertBanner({ formState: _prevState, formData });
     },
     [
       slot.slotNumber,
@@ -96,7 +97,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   );
 
   const handleDelete = async () => {
-    const result = await deleteBanner.mutateAsync({ slotNumber: slot.slotNumber });
+    const result = await deleteBanner({ slotNumber: slot.slotNumber });
     if (result.success) {
       setContent('');
       setTextColor('#ffffff');
@@ -251,10 +252,10 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={deleteBanner.isPending}
+              disabled={isDeletingBanner}
               onClick={handleDelete}
             >
-              {deleteBanner.isPending ? (
+              {isDeletingBanner ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="mr-2 h-4 w-4" />
