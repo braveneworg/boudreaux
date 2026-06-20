@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.136.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n
+
 ## [4.135.0] - 2026-06-20
 
 ### Added
