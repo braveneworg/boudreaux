@@ -55,6 +55,8 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     primaryImageIndexes: [0],
   }),
   getGroqApiKey: vi.fn().mockResolvedValue('test-key'),
+  getSearchApiKey: vi.fn().mockResolvedValue(null),
+  searchArtistSources: vi.fn().mockResolvedValue(null),
   ...overrides,
 });
 
@@ -97,6 +99,51 @@ describe('runBioGeneration', () => {
     const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(facts.sourceText).toBeUndefined();
     expect(result.longBio).toBe('<p>Long bio.</p>');
+  });
+
+  it('falls back to web search when no structured source text and a key is set', async () => {
+    const searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'Web-sourced bio text.',
+      sourceUrls: ['https://x.example'],
+    });
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSearchApiKey: vi.fn().mockResolvedValue('tvly-key'),
+      searchArtistSources,
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'tvly-key');
+    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(facts.sourceText).toBe('Web-sourced bio text.');
+    expect(facts.sourceUrls).toEqual(['https://x.example']);
+    expect(result.links.some((l) => l.url === 'https://x.example')).toBe(true);
+  });
+
+  it('skips web search when a Wikipedia extract was already found', async () => {
+    const searchArtistSources = vi.fn();
+    const deps = makeDeps({
+      getSearchApiKey: vi.fn().mockResolvedValue('tvly-key'),
+      searchArtistSources,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchArtistSources).not.toHaveBeenCalled();
+  });
+
+  it('skips web search when no search key is configured', async () => {
+    const searchArtistSources = vi.fn();
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSearchApiKey: vi.fn().mockResolvedValue(null),
+      searchArtistSources,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(searchArtistSources).not.toHaveBeenCalled();
   });
 
   it('marks the LLM-ranked image as primary', async () => {

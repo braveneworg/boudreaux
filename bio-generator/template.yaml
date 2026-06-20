@@ -4,7 +4,9 @@ Description: Fake Four Records - AI artist bio generator
 
 Globals:
   Function:
-    Timeout: 29
+    # Headroom for the metadata + web-search fallback + extensive generation.
+    # Invoked directly (not via API Gateway), so the 29s gateway limit does not apply.
+    Timeout: 60
     MemorySize: 512
     Runtime: nodejs24.x
     Architectures:
@@ -45,6 +47,7 @@ Resources:
                 - ssm:GetParameter
               Resource:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/groq/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/search/api-key'
             - Effect: Allow
               Action:
                 - kms:Decrypt
@@ -52,6 +55,9 @@ Resources:
       Environment:
         Variables:
           SSM_PATH_GROQ_API_KEY: '/fakefour/groq/api-key'
+          # Optional web-search fallback (Tavily). If the parameter does not
+          # exist the function degrades gracefully to a facts-only bio.
+          SSM_PATH_SEARCH_API_KEY: '/fakefour/search/api-key'
           GROQ_MODEL: !Ref GroqModel
     Metadata:
       BuildMethod: esbuild
