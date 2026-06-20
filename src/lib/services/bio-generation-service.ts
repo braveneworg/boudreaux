@@ -13,6 +13,8 @@ import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html'
 import {
   bioGenerationResultSchema,
   type BioGenerationResult,
+  type BioGenerationStatusResult,
+  type BioStatus,
   type GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
 
@@ -248,5 +250,65 @@ export class BioGenerationService {
     });
 
     return { success: true, data: content, slug: artist.slug };
+  }
+
+  /**
+   * Runs a full generation as a background job and records its lifecycle on the
+   * artist: flips to `processing`, runs {@link generateForArtist}, then sets
+   * `succeeded` (clearing any prior error) or `failed` (storing the message).
+   * Never throws — it is meant to be scheduled via Next.js `after()`, where an
+   * unhandled rejection would be lost. Returns the underlying result so the
+   * caller can revalidate caches / audit-log on success.
+   *
+   * @param artistId - The artist to generate for.
+   * @param opts - Optional admin-supplied reference links and description.
+   */
+  static async runGenerationJob(
+    artistId: string,
+    opts: { links?: string[]; description?: string } = {}
+  ): Promise<GenerateForArtistResult> {
+    await ArtistRepository.setBioStatus(artistId, 'processing');
+    try {
+      const result = await BioGenerationService.generateForArtist(artistId, opts);
+      await (result.success
+        ? ArtistRepository.setBioStatus(artistId, 'succeeded', { error: null })
+        : ArtistRepository.setBioStatus(artistId, 'failed', { error: result.error }));
+      return result;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Bio generation failed unexpectedly.';
+      await ArtistRepository.setBioStatus(artistId, 'failed', { error: message });
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Reads the current async generation status for an artist, including the
+   * persisted bio content when the job has succeeded (so the admin form can
+   * populate without a second request). Returns `null` when the artist is
+   * missing.
+   *
+   * @param artistId - The artist to read the status for.
+   */
+  static async getGenerationStatus(artistId: string): Promise<BioGenerationStatusResult | null> {
+    const state = await ArtistRepository.getBioGenerationState(artistId);
+    if (!state) {
+      return null;
+    }
+
+    const status = (state.bioStatus as BioStatus | null) ?? null;
+    const content: GeneratedBioContent | null =
+      status === 'succeeded'
+        ? {
+            shortBio: state.shortBio ?? '',
+            longBio: state.bio ?? '',
+            genres: state.genres ?? null,
+            images: state.bioImages,
+            links: state.bioLinks,
+            model: state.bioModel ?? '',
+          }
+        : null;
+
+    return { status, error: state.bioError ?? null, content };
   }
 }

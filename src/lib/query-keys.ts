@@ -50,6 +50,8 @@ export const queryKeys = {
         params.deleted,
       ] as const,
     bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
+    bioGeneration: (artistId: string) =>
+      [...queryKeys.artists.all, 'bioGeneration', artistId] as const,
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
     filteredList: (params: { search?: string; take?: number }) =>
       [

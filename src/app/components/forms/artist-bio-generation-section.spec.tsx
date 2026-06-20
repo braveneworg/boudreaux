@@ -4,7 +4,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
+import type {
+  BioGenerationStatusResult,
+  GeneratedBioContent,
+} from '@/lib/validation/bio-generation-schema';
 
 import { ArtistBioGenerationSection } from './artist-bio-generation-section';
 
@@ -13,9 +16,20 @@ vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
   useGenerateArtistBioMutation: () => ({ mutateAsync: generateMock, isPending: false }),
 }));
 
+// The polled status drives completion. A module-level value lets each test set
+// the status the (enabled) query reports back after generation is triggered.
+let statusReturn: BioGenerationStatusResult = { status: null, error: null, content: null };
+vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
+  useArtistBioGenerationStatusQuery: () => ({
+    data: statusReturn,
+    isPending: false,
+    error: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
 // Mock BioHtml so this spec stays on the fast vmThreads pool (the real BioHtml
-// pulls in html-react-parser, which requires the forks pool). BioHtml behavior
-// is covered in bio-html.spec; here the short-bio preview just needs to render.
+// pulls in html-react-parser, which requires the forks pool).
 vi.mock('@/app/components/bio-html', () => ({
   BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
 }));
@@ -47,6 +61,14 @@ const content: GeneratedBioContent = {
 
 const ARTIST_ID = 'a'.repeat(24);
 
+beforeEach(() => {
+  generateMock.mockReset();
+  toastError.mockClear();
+  toastSuccess.mockClear();
+  statusReturn = { status: null, error: null, content: null };
+  generateMock.mockResolvedValue({ success: true, status: 'pending' });
+});
+
 describe('ArtistBioGenerationSection', () => {
   it('shows the Generate button initially', () => {
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
@@ -54,8 +76,8 @@ describe('ArtistBioGenerationSection', () => {
     expect(screen.getByRole('button', { name: /generate bios/i })).toBeInTheDocument();
   });
 
-  it('calls onGenerated and shows a preview on success', async () => {
-    generateMock.mockResolvedValue({ success: true, data: content });
+  it('populates the form and shows a preview when the job succeeds', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
     const onGenerated = vi.fn();
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
@@ -67,8 +89,30 @@ describe('ArtistBioGenerationSection', () => {
     expect(screen.getByRole('button', { name: /regenerate bios/i })).toBeInTheDocument();
   });
 
-  it('forwards added reference links to the action', async () => {
-    generateMock.mockResolvedValue({ success: true, data: content });
+  it('shows an in-progress hint while the job is processing', async () => {
+    statusReturn = { status: 'processing', error: null, content: null };
+    const onGenerated = vi.fn();
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(screen.getByText(/can take a few minutes/i)).toBeInTheDocument());
+    expect(onGenerated).not.toHaveBeenCalled();
+  });
+
+  it('toasts and does not populate when the job fails', async () => {
+    statusReturn = { status: 'failed', error: 'Bio generation failed.', content: null };
+    const onGenerated = vi.fn();
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Bio generation failed.'));
+    expect(onGenerated).not.toHaveBeenCalled();
+  });
+
+  it('forwards added reference links to the trigger', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/reference links/i), 'https://artist.example');
@@ -91,14 +135,14 @@ describe('ArtistBioGenerationSection', () => {
     expect(toastError).toHaveBeenCalledWith('Links must start with http:// or https://');
   });
 
-  it('shows an error toast and no preview when generation fails', async () => {
-    generateMock.mockResolvedValue({ success: false, error: 'Bio generation failed' });
+  it('shows an error toast when the trigger itself fails', async () => {
+    generateMock.mockResolvedValue({ success: false, error: 'Bio generation failed to start.' });
     const onGenerated = vi.fn();
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
 
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Bio generation failed'));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Bio generation failed to start.'));
     expect(onGenerated).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,9 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 
+import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
@@ -19,13 +21,23 @@ import { logSecurityEvent } from '@/utils/audit-log';
 const logger = loggers.media;
 
 /**
- * Generates (or regenerates) an artist's short + long bio plus discovered
- * images and links. Admin-only. Delegates the read → generate → sanitize →
- * persist flow to {@link BioGenerationService.generateForArtist}; this action
- * only handles auth, input validation, audit logging, and cache revalidation.
+ * A job is considered stale (abandoned, e.g. the server restarted mid-run) once
+ * it has been `pending`/`processing` longer than this, after which a new trigger
+ * is allowed to supersede it. Kept above the Lambda's 10-minute timeout.
+ */
+const STALE_JOB_MS = 12 * 60 * 1000;
+
+/**
+ * Triggers (or re-triggers) async generation of an artist's bio. Admin-only.
+ *
+ * Generation can take minutes, so this no longer blocks: it marks the job
+ * `pending`, schedules the heavy read → generate → re-host → persist flow via
+ * Next.js `after()` (which runs after the response on our long-lived server),
+ * and returns immediately. The client polls the status endpoint for completion.
+ * A run already in flight (and not stale) is not duplicated.
  *
  * @param input - `{ artistId, links?, description? }`.
- * @returns The sanitized generated content for admin preview, or a typed error.
+ * @returns `{ success, status }` once the job is accepted, or a typed error.
  */
 export const generateArtistBioAction = async (
   input: unknown
@@ -37,49 +49,60 @@ export const generateArtistBioAction = async (
     return { success: false, error: 'Invalid bio generation request.' };
   }
 
-  // Wrap the read → generate → persist flow so an unexpected throw (e.g. a
-  // Prisma/Mongo error from the artist lookup, or any other failure the service
-  // doesn't convert to a typed result) surfaces as a graceful error toast
-  // instead of an unhandled Server Action rejection — which Next renders as an
-  // opaque 500 ("digest" error) in production. Auth (`requireRole`) stays
-  // outside: an unauthorized caller should still propagate, matching the other
-  // admin actions.
-  try {
-    const result = await BioGenerationService.generateForArtist(parsed.data.artistId, {
-      links: parsed.data.links,
-      description: parsed.data.description,
-    });
+  const { artistId, links, description } = parsed.data;
 
-    if (!result.success) {
-      return { success: false, error: result.error };
+  try {
+    const state = await ArtistRepository.getBioGenerationState(artistId);
+    if (!state) {
+      return { success: false, error: 'Artist not found.' };
     }
 
-    logSecurityEvent({
-      event: 'media.artist.updated',
-      userId: session.user.id,
-      metadata: {
-        artistId: parsed.data.artistId,
-        action: 'bio-generated',
-        model: result.data.model,
-        imageCount: result.data.images.length,
-        linkCount: result.data.links.length,
-      },
+    // Don't start a second run while one is genuinely in flight.
+    const inFlight = state.bioStatus === 'pending' || state.bioStatus === 'processing';
+    const startedAt = state.bioStartedAt?.getTime() ?? 0;
+    const isStale = Date.now() - startedAt > STALE_JOB_MS;
+    if (inFlight && !isStale) {
+      return { success: true, status: state.bioStatus === 'processing' ? 'processing' : 'pending' };
+    }
+
+    await ArtistRepository.setBioStatus(artistId, 'pending', {
+      error: null,
+      startedAt: new Date(),
     });
 
-    revalidatePath('/admin/artists');
-    revalidatePath('/artists');
-    revalidatePath(`/artists/${result.slug}`);
-    revalidatePath(`/artists/${result.slug}/bio`);
+    // Run the heavy work after the response is sent. `runGenerationJob` records
+    // its own succeeded/failed status and never throws, so the only thing left
+    // is to revalidate the public pages and audit-log on success.
+    after(async () => {
+      const result = await BioGenerationService.runGenerationJob(artistId, { links, description });
+      if (!result.success) {
+        return;
+      }
 
-    return { success: true, data: result.data };
+      logSecurityEvent({
+        event: 'media.artist.updated',
+        userId: session.user.id,
+        metadata: {
+          artistId,
+          action: 'bio-generated',
+          model: result.data.model,
+          imageCount: result.data.images.length,
+          linkCount: result.data.links.length,
+        },
+      });
+
+      revalidatePath('/admin/artists');
+      revalidatePath('/artists');
+      revalidatePath(`/artists/${result.slug}`);
+      revalidatePath(`/artists/${result.slug}/bio`);
+    });
+
+    return { success: true, status: 'pending' };
   } catch (error) {
-    // Once caught, Next no longer logs this server-side, so log it here to keep
-    // the failure observable (this opacity is exactly what made the original
-    // production 500 hard to diagnose).
-    logger.error('Unexpected error generating artist bio', {
-      artistId: parsed.data.artistId,
+    logger.error('Unexpected error triggering artist bio generation', {
+      artistId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { success: false, error: 'Bio generation failed unexpectedly. Please try again.' };
+    return { success: false, error: 'Bio generation failed to start. Please try again.' };
   }
 };

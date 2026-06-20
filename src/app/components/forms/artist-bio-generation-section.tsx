@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -18,6 +18,7 @@ import { Label } from '@/app/components/ui/label';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Textarea } from '@/app/components/ui/textarea';
 import { useGenerateArtistBioMutation } from '@/app/hooks/mutations/use-bio-mutations';
+import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { cn } from '@/lib/utils';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
@@ -45,8 +46,30 @@ export const ArtistBioGenerationSection = ({
   const [linkDraft, setLinkDraft] = useState('');
   const [description, setDescription] = useState('');
   const [result, setResult] = useState<GeneratedBioContent | null>(null);
+  // `active` is true from the moment we trigger generation until we handle its
+  // terminal status — it both gates status polling and keeps the UI in the
+  // working state across the (minutes-long) background job.
+  const [active, setActive] = useState(false);
   const generateBio = useGenerateArtistBioMutation();
-  const isPending = generateBio.isPending;
+  const status = useArtistBioGenerationStatusQuery(artistId, { enabled: active });
+
+  // Generation runs in the background; surface its terminal status once. On
+  // success we populate the form from the polled content; on failure we toast.
+  useEffect(() => {
+    if (!active || !status.data) return;
+    if (status.data.status === 'succeeded' && status.data.content) {
+      setResult(status.data.content);
+      onGenerated(status.data.content);
+      toast.success('Bios generated — review below, then Save to keep them.');
+      setActive(false);
+    } else if (status.data.status === 'failed') {
+      toast.error(status.data.error || 'Bio generation failed.');
+      setActive(false);
+    }
+  }, [active, status.data, onGenerated]);
+
+  // Disable inputs while triggering or while a background job is in flight.
+  const isPending = generateBio.isPending || active;
 
   const addLink = (): void => {
     const candidate = linkDraft.trim();
@@ -75,9 +98,8 @@ export const ArtistBioGenerationSection = ({
       return;
     }
 
-    setResult(response.data);
-    onGenerated(response.data);
-    toast.success('Bios generated — review below, then Save to keep them.');
+    // Generation now runs in the background — start polling for completion.
+    setActive(true);
   };
 
   return (
@@ -169,9 +191,15 @@ export const ArtistBioGenerationSection = ({
       </Button>
 
       {isPending && (
-        <div className="space-y-2" aria-hidden>
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-20 w-full" />
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-sm" role="status">
+            Researching the web and writing the bio — this can take a few minutes. You can keep
+            working; the results will appear here when ready.
+          </p>
+          <div className="space-y-2" aria-hidden>
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-20 w-full" />
+          </div>
         </div>
       )}
 
