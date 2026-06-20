@@ -9,11 +9,14 @@ import { revalidatePath } from 'next/cache';
 
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
+
+const logger = loggers.media;
 
 /**
  * Generates (or regenerates) an artist's short + long bio plus discovered
@@ -34,31 +37,49 @@ export const generateArtistBioAction = async (
     return { success: false, error: 'Invalid bio generation request.' };
   }
 
-  const result = await BioGenerationService.generateForArtist(parsed.data.artistId, {
-    links: parsed.data.links,
-    description: parsed.data.description,
-  });
+  // Wrap the read → generate → persist flow so an unexpected throw (e.g. a
+  // Prisma/Mongo error from the artist lookup, or any other failure the service
+  // doesn't convert to a typed result) surfaces as a graceful error toast
+  // instead of an unhandled Server Action rejection — which Next renders as an
+  // opaque 500 ("digest" error) in production. Auth (`requireRole`) stays
+  // outside: an unauthorized caller should still propagate, matching the other
+  // admin actions.
+  try {
+    const result = await BioGenerationService.generateForArtist(parsed.data.artistId, {
+      links: parsed.data.links,
+      description: parsed.data.description,
+    });
 
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
 
-  logSecurityEvent({
-    event: 'media.artist.updated',
-    userId: session.user.id,
-    metadata: {
+    logSecurityEvent({
+      event: 'media.artist.updated',
+      userId: session.user.id,
+      metadata: {
+        artistId: parsed.data.artistId,
+        action: 'bio-generated',
+        model: result.data.model,
+        imageCount: result.data.images.length,
+        linkCount: result.data.links.length,
+      },
+    });
+
+    revalidatePath('/admin/artists');
+    revalidatePath('/artists');
+    revalidatePath(`/artists/${result.slug}`);
+    revalidatePath(`/artists/${result.slug}/bio`);
+
+    return { success: true, data: result.data };
+  } catch (error) {
+    // Once caught, Next no longer logs this server-side, so log it here to keep
+    // the failure observable (this opacity is exactly what made the original
+    // production 500 hard to diagnose).
+    logger.error('Unexpected error generating artist bio', {
       artistId: parsed.data.artistId,
-      action: 'bio-generated',
-      model: result.data.model,
-      imageCount: result.data.images.length,
-      linkCount: result.data.links.length,
-    },
-  });
-
-  revalidatePath('/admin/artists');
-  revalidatePath('/artists');
-  revalidatePath(`/artists/${result.slug}`);
-  revalidatePath(`/artists/${result.slug}/bio`);
-
-  return { success: true, data: result.data };
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { success: false, error: 'Bio generation failed unexpectedly. Please try again.' };
+  }
 };
