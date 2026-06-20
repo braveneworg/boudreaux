@@ -11,6 +11,14 @@ vi.mock('server-only', () => ({}));
 const revalidatePathMock = vi.fn();
 vi.mock('next/cache', () => ({ revalidatePath: (path: string) => revalidatePathMock(path) }));
 
+// Capture the after() callback so tests can run the "background" work on demand.
+let afterCallback: (() => Promise<void>) | null = null;
+vi.mock('next/server', () => ({
+  after: (cb: () => Promise<void>) => {
+    afterCallback = cb;
+  },
+}));
+
 const logSecurityEventMock = vi.fn();
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: (e: unknown) => logSecurityEventMock(e) }));
 
@@ -19,10 +27,19 @@ vi.mock('@/lib/utils/auth/require-role', () => ({
   requireRole: (role: string) => requireRoleMock(role),
 }));
 
-const generateForArtistMock = vi.fn();
+const getBioGenerationStateMock = vi.fn();
+const setBioStatusMock = vi.fn();
+vi.mock('@/lib/repositories/artist-repository', () => ({
+  ArtistRepository: {
+    getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
+    setBioStatus: (id: string, status: string, opts: unknown) => setBioStatusMock(id, status, opts),
+  },
+}));
+
+const runGenerationJobMock = vi.fn();
 vi.mock('@/lib/services/bio-generation-service', () => ({
   BioGenerationService: {
-    generateForArtist: (id: string, opts: unknown) => generateForArtistMock(id, opts),
+    runGenerationJob: (id: string, opts: unknown) => runGenerationJobMock(id, opts),
   },
 }));
 
@@ -44,26 +61,18 @@ const content: GeneratedBioContent = {
   shortBio: 'Short teaser',
   longBio: '<p>Long</p>',
   genres: 'art rock',
-  images: [
-    {
-      url: 'https://upload.wikimedia.org/a.jpg',
-      thumbnailUrl: null,
-      title: 'Portrait',
-      attribution: 'Photographer',
-      license: 'CC BY-SA 4.0',
-      sourceUrl: null,
-      isPrimary: true,
-    },
-  ],
-  links: [
-    { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead', kind: 'wikipedia' },
-  ],
+  images: [],
+  links: [],
   model: 'llama-3.3-70b-versatile',
 };
 
 beforeEach(() => {
+  afterCallback = null;
   requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
-  generateForArtistMock.mockResolvedValue({ success: true, data: content, slug: 'radiohead' });
+  // Default: artist exists, never generated.
+  getBioGenerationStateMock.mockResolvedValue({ bioStatus: null, bioStartedAt: null });
+  setBioStatusMock.mockResolvedValue(undefined);
+  runGenerationJobMock.mockResolvedValue({ success: true, data: content, slug: 'radiohead' });
 });
 
 describe('generateArtistBioAction', () => {
@@ -73,62 +82,99 @@ describe('generateArtistBioAction', () => {
     await expect(generateArtistBioAction({ artistId: VALID_ID })).rejects.toThrow('Unauthorized');
   });
 
-  it('returns an error for invalid input without calling the service', async () => {
+  it('returns an error for invalid input without touching the service', async () => {
     const result = await generateArtistBioAction({ artistId: 'not-an-id' });
 
     expect(result).toEqual({ success: false, error: 'Invalid bio generation request.' });
-    expect(generateForArtistMock).not.toHaveBeenCalled();
+    expect(getBioGenerationStateMock).not.toHaveBeenCalled();
   });
 
-  it('delegates to the service with the validated input', async () => {
-    await generateArtistBioAction({
+  it('returns not-found when the artist does not exist', async () => {
+    getBioGenerationStateMock.mockResolvedValue(null);
+
+    const result = await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(result).toEqual({ success: false, error: 'Artist not found.' });
+    expect(setBioStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('marks the job pending and returns immediately', async () => {
+    const result = await generateArtistBioAction({
       artistId: VALID_ID,
       links: ['https://example.com'],
       description: 'x',
     });
 
-    expect(generateForArtistMock).toHaveBeenCalledWith(VALID_ID, {
-      links: ['https://example.com'],
-      description: 'x',
-    });
+    expect(result).toEqual({ success: true, status: 'pending' });
+    expect(setBioStatusMock).toHaveBeenCalledWith(
+      VALID_ID,
+      'pending',
+      expect.objectContaining({ error: null })
+    );
+    // Heavy work is deferred to after(), not run inline.
+    expect(runGenerationJobMock).not.toHaveBeenCalled();
+    expect(afterCallback).toBeTypeOf('function');
   });
 
-  it('audits and revalidates the artist pages on success', async () => {
+  it('does not start a second run while one is in flight', async () => {
+    getBioGenerationStateMock.mockResolvedValue({
+      bioStatus: 'processing',
+      bioStartedAt: new Date(),
+    });
+
     const result = await generateArtistBioAction({ artistId: VALID_ID });
 
-    expect(result).toEqual({ success: true, data: content });
+    expect(result).toEqual({ success: true, status: 'processing' });
+    expect(setBioStatusMock).not.toHaveBeenCalled();
+    expect(afterCallback).toBeNull();
+  });
+
+  it('re-triggers a stale in-flight job', async () => {
+    getBioGenerationStateMock.mockResolvedValue({
+      bioStatus: 'processing',
+      bioStartedAt: new Date(Date.now() - 20 * 60 * 1000),
+    });
+
+    const result = await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(result).toEqual({ success: true, status: 'pending' });
+    expect(setBioStatusMock).toHaveBeenCalledWith(VALID_ID, 'pending', expect.anything());
+    expect(afterCallback).toBeTypeOf('function');
+  });
+
+  it('audits and revalidates when the background job succeeds', async () => {
+    await generateArtistBioAction({ artistId: VALID_ID });
+    await afterCallback?.();
+
+    expect(runGenerationJobMock).toHaveBeenCalledWith(VALID_ID, {
+      links: undefined,
+      description: undefined,
+    });
     expect(logSecurityEventMock).toHaveBeenCalledTimes(1);
     const revalidated = revalidatePathMock.mock.calls.map(([path]) => path);
     expect(revalidated).toContain('/artists/radiohead');
     expect(revalidated).toContain('/artists/radiohead/bio');
   });
 
-  it('returns the service error without auditing or revalidating', async () => {
-    generateForArtistMock.mockResolvedValue({ success: false, error: 'Artist not found.' });
+  it('does not audit or revalidate when the background job fails', async () => {
+    runGenerationJobMock.mockResolvedValue({ success: false, error: 'boom' });
 
-    const result = await generateArtistBioAction({ artistId: VALID_ID });
+    await generateArtistBioAction({ artistId: VALID_ID });
+    await afterCallback?.();
 
-    expect(result).toEqual({ success: false, error: 'Artist not found.' });
     expect(logSecurityEventMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
-  it('returns a typed error instead of a 500 when the service throws unexpectedly', async () => {
-    generateForArtistMock.mockRejectedValue(new Error('PrismaClientInitializationError: DB down'));
+  it('returns a typed error and logs when triggering throws unexpectedly', async () => {
+    getBioGenerationStateMock.mockRejectedValue(new Error('DB down'));
 
     const result = await generateArtistBioAction({ artistId: VALID_ID });
 
     expect(result).toEqual({
       success: false,
-      error: 'Bio generation failed unexpectedly. Please try again.',
+      error: 'Bio generation failed to start. Please try again.',
     });
-  });
-
-  it('logs the unexpected error so it stays observable (not a silent 500)', async () => {
-    generateForArtistMock.mockRejectedValue(new Error('DB down'));
-
-    await generateArtistBioAction({ artistId: VALID_ID });
-
     expect(loggerErrorMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -260,4 +260,43 @@ describe('ArtistRepository', () => {
       });
     });
   });
+
+  describe('setBioStatus', () => {
+    it('updates only the status when no options are given', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioStatus('a1', 'processing');
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioStatus: 'processing' },
+      });
+    });
+
+    it('writes the error and startedAt when provided', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+      const startedAt = new Date('2026-06-20T00:00:00Z');
+
+      await ArtistRepository.setBioStatus('a1', 'pending', { error: null, startedAt });
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioStatus: 'pending', bioError: null, bioStartedAt: startedAt },
+      });
+    });
+  });
+
+  describe('getBioGenerationState', () => {
+    it('selects the status fields plus ordered images and links', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      const result = await ArtistRepository.getBioGenerationState('a1');
+
+      expect(result).toEqual({ bioStatus: 'succeeded' });
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg.where).toEqual({ id: 'a1' });
+      expect(arg.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+      expect(arg.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+    });
+  });
 });

@@ -30,12 +30,13 @@ test.describe('Admin AI bio generation', () => {
     await expect(generate).toBeVisible({ timeout: 15_000 });
     await generate.click();
 
-    // Generation succeeded once the button flips to "Regenerate" and the
-    // discovered link + populated short-bio editor appear. The Short Bio field
-    // is now a rich-text (contenteditable) editor, so assert its text content
-    // rather than a form value.
+    // Generation now runs in the background (server `after()`); the client polls
+    // for completion, so allow extra time. It succeeded once the button flips to
+    // "Regenerate" and the discovered link + populated short-bio editor appear.
+    // The Short Bio field is a rich-text (contenteditable) editor, so assert its
+    // text content rather than a form value.
     const regenerate = adminPage.getByRole('button', { name: /regenerate bios/i });
-    await expect(regenerate).toBeVisible({ timeout: 15_000 });
+    await expect(regenerate).toBeVisible({ timeout: 30_000 });
     // `exact` disambiguates the discovered-links "Wikipedia" entry from the
     // inline "their Wikipedia page" link Tiptap renders inside the bio editor.
     await expect(adminPage.getByRole('link', { name: 'Wikipedia', exact: true })).toBeVisible();
@@ -43,10 +44,10 @@ test.describe('Admin AI bio generation', () => {
       /boundary-pushing artist on the roster/
     );
 
-    // Regenerate replaces the preview.
+    // Regenerate replaces the preview (also async — poll again).
     await regenerate.click();
     await expect(adminPage.getByRole('link', { name: 'Wikipedia', exact: true })).toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
 
     // Editing a generated field dirties the form so Save (which persists the

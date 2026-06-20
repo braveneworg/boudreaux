@@ -84,6 +84,53 @@ export interface GeneratedBioContent {
   model: string;
 }
 
+/** Async bio-generation lifecycle states (null = never generated). */
+export const BIO_STATUSES = ['pending', 'processing', 'succeeded', 'failed'] as const;
+export type BioStatus = (typeof BIO_STATUSES)[number];
+
+/** Terminal states — polling stops once the job reaches one of these. */
+export const isTerminalBioStatus = (status: BioStatus | null | undefined): boolean =>
+  status === 'succeeded' || status === 'failed';
+
+/**
+ * Result of *triggering* async bio generation. Generation now runs in the
+ * background (Next.js `after()`); the action returns immediately with the job
+ * status, and the client polls {@link BioGenerationStatusResult} for completion.
+ */
 export type GenerateArtistBioActionResult =
-  | { success: true; data: GeneratedBioContent }
+  | { success: true; status: BioStatus }
   | { success: false; error: string };
+
+/** Polled status of an artist's async bio generation. */
+export interface BioGenerationStatusResult {
+  status: BioStatus | null;
+  error: string | null;
+  /** Persisted, sanitized content — present only when `status` is `'succeeded'`. */
+  content: GeneratedBioContent | null;
+}
+
+/** Wire schema for the bio-generation status route, validated on the client. */
+export const bioGenerationStatusResponseSchema = z.object({
+  status: z.enum(BIO_STATUSES).nullable(),
+  error: z.string().nullable(),
+  content: z
+    .object({
+      shortBio: z.string(),
+      longBio: z.string(),
+      genres: z.string().nullable(),
+      images: z.array(
+        z.object({
+          url: z.string(),
+          thumbnailUrl: z.string().nullable(),
+          title: z.string().nullable(),
+          attribution: z.string().nullable(),
+          license: z.string().nullable(),
+          sourceUrl: z.string().nullable(),
+          isPrimary: z.boolean(),
+        })
+      ),
+      links: z.array(z.object({ label: z.string(), url: z.string(), kind: z.string().nullable() })),
+      model: z.string(),
+    })
+    .nullable(),
+});

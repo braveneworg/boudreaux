@@ -12,6 +12,7 @@ import {
   type ArtistListWithBio,
   type ArtistWithPublishedReleases,
 } from '@/lib/types/media-models';
+import type { BioStatus } from '@/lib/validation/bio-generation-schema';
 
 import type { Artist as PrismaArtist, Prisma } from '@prisma/client';
 
@@ -286,6 +287,89 @@ export class ArtistRepository {
         },
       }),
     ]);
+  }
+
+  /**
+   * Update the async bio-generation lifecycle fields. `error`/`startedAt` are
+   * only written when explicitly provided so a status flip can leave them alone.
+   *
+   * @param artistId - The artist whose generation state to update.
+   * @param status - The new lifecycle state.
+   * @param opts - Optional `error` (failure message) and `startedAt` timestamp.
+   */
+  static async setBioStatus(
+    artistId: string,
+    status: BioStatus,
+    opts: { error?: string | null; startedAt?: Date | null } = {}
+  ): Promise<void> {
+    await prisma.artist.update({
+      where: { id: artistId },
+      data: {
+        bioStatus: status,
+        ...(opts.error !== undefined ? { bioError: opts.error } : {}),
+        ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
+      },
+    });
+  }
+
+  /**
+   * Reads the async bio-generation state plus the persisted bio content, so the
+   * status endpoint can report progress and hand back the finished bio for the
+   * admin form to populate. Returns `null` when the artist does not exist.
+   *
+   * @param artistId - The artist to read.
+   */
+  static async getBioGenerationState(artistId: string): Promise<{
+    bioStatus: string | null;
+    bioError: string | null;
+    bioStartedAt: Date | null;
+    bioGeneratedAt: Date | null;
+    slug: string;
+    shortBio: string | null;
+    bio: string | null;
+    genres: string | null;
+    bioModel: string | null;
+    bioImages: Array<{
+      url: string;
+      thumbnailUrl: string | null;
+      title: string | null;
+      attribution: string | null;
+      license: string | null;
+      sourceUrl: string | null;
+      isPrimary: boolean;
+    }>;
+    bioLinks: Array<{ label: string; url: string; kind: string | null }>;
+  } | null> {
+    return prisma.artist.findUnique({
+      where: { id: artistId },
+      select: {
+        bioStatus: true,
+        bioError: true,
+        bioStartedAt: true,
+        bioGeneratedAt: true,
+        slug: true,
+        shortBio: true,
+        bio: true,
+        genres: true,
+        bioModel: true,
+        bioImages: {
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            url: true,
+            thumbnailUrl: true,
+            title: true,
+            attribution: true,
+            license: true,
+            sourceUrl: true,
+            isPrimary: true,
+          },
+        },
+        bioLinks: {
+          orderBy: { sortOrder: 'asc' },
+          select: { label: true, url: true, kind: true },
+        },
+      },
+    });
   }
 
   /**

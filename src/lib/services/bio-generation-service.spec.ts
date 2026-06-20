@@ -20,10 +20,14 @@ vi.mock('@aws-sdk/client-lambda', () => ({
 
 const findByIdMock = vi.fn();
 const replaceBioContentMock = vi.fn();
+const setBioStatusMock = vi.fn();
+const getBioGenerationStateMock = vi.fn();
 vi.mock('@/lib/repositories/artist-repository', () => ({
   ArtistRepository: {
     findById: (id: string) => findByIdMock(id),
     replaceBioContent: (id: string, content: unknown) => replaceBioContentMock(id, content),
+    setBioStatus: (id: string, status: string, opts: unknown) => setBioStatusMock(id, status, opts),
+    getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
   },
 }));
 
@@ -301,5 +305,130 @@ describe('BioGenerationService.generateForArtist', () => {
 
     expect(result).toEqual({ success: false, error: 'Bio generation failed' });
     expect(replaceBioContentMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('BioGenerationService.runGenerationJob', () => {
+  let generateForArtistSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    setBioStatusMock.mockReset().mockResolvedValue(undefined);
+    generateForArtistSpy = vi.spyOn(BioGenerationService, 'generateForArtist');
+  });
+
+  afterEach(() => {
+    generateForArtistSpy.mockRestore();
+  });
+
+  const okContent = {
+    shortBio: 's',
+    longBio: '<p>l</p>',
+    genres: null,
+    images: [],
+    links: [],
+    model: 'llama',
+  };
+
+  it('flips to processing then succeeded (clearing the error) on success', async () => {
+    generateForArtistSpy.mockResolvedValue({ success: true, data: okContent, slug: 'x' });
+
+    const result = await BioGenerationService.runGenerationJob('a1', { links: ['u'] });
+
+    expect(result.success).toBe(true);
+    expect(generateForArtistSpy).toHaveBeenCalledWith('a1', { links: ['u'] });
+    expect(setBioStatusMock.mock.calls[0]).toEqual(['a1', 'processing', undefined]);
+    expect(setBioStatusMock.mock.calls[1]).toEqual(['a1', 'succeeded', { error: null }]);
+  });
+
+  it('flips to failed with the message when generation returns an error', async () => {
+    generateForArtistSpy.mockResolvedValue({ success: false, error: 'nope' });
+
+    await BioGenerationService.runGenerationJob('a1');
+
+    expect(setBioStatusMock.mock.calls[1]).toEqual(['a1', 'failed', { error: 'nope' }]);
+  });
+
+  it('flips to failed and never throws when generation throws', async () => {
+    generateForArtistSpy.mockRejectedValue(new Error('DB down'));
+
+    const result = await BioGenerationService.runGenerationJob('a1');
+
+    expect(result).toEqual({ success: false, error: 'DB down' });
+    expect(setBioStatusMock.mock.calls[1]).toEqual(['a1', 'failed', { error: 'DB down' }]);
+  });
+});
+
+describe('BioGenerationService.getGenerationStatus', () => {
+  beforeEach(() => {
+    getBioGenerationStateMock.mockReset();
+  });
+
+  const state = (overrides: Record<string, unknown>) => ({
+    bioStatus: null,
+    bioError: null,
+    bioStartedAt: null,
+    bioGeneratedAt: null,
+    slug: 'x',
+    shortBio: null,
+    bio: null,
+    genres: null,
+    bioModel: null,
+    bioImages: [],
+    bioLinks: [],
+    ...overrides,
+  });
+
+  it('returns null when the artist is missing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(null);
+
+    expect(await BioGenerationService.getGenerationStatus('a1')).toBeNull();
+  });
+
+  it('returns the persisted content when the job has succeeded', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'succeeded',
+        shortBio: 's',
+        bio: '<p>l</p>',
+        genres: 'rock',
+        bioModel: 'llama',
+        bioImages: [
+          {
+            url: 'u',
+            thumbnailUrl: null,
+            title: null,
+            attribution: null,
+            license: null,
+            sourceUrl: null,
+            isPrimary: true,
+          },
+        ],
+        bioLinks: [{ label: 'L', url: 'u2', kind: null }],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('succeeded');
+    expect(result?.content?.longBio).toBe('<p>l</p>');
+    expect(result?.content?.images).toHaveLength(1);
+    expect(result?.content?.links[0].label).toBe('L');
+  });
+
+  it('omits content while still processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(state({ bioStatus: 'processing' }));
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('processing');
+    expect(result?.content).toBeNull();
+  });
+
+  it('reports a failed job with its error and no content', async () => {
+    getBioGenerationStateMock.mockResolvedValue(state({ bioStatus: 'failed', bioError: 'boom' }));
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result).toEqual({ status: 'failed', error: 'boom', content: null });
   });
 });

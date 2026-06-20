@@ -263,6 +263,9 @@ model Artist {
   altBio                String? // Ditto md support; An alternative bio for special use cases
   bioGeneratedAt        DateTime? // When the short/long bio was last AI-generated; null = hand-authored only
   bioModel              String? // AI model id used to generate the bio, e.g. "groq/llama-3.3-70b-versatile"
+  bioStatus             String? // Async AI bio generation state: pending | processing | succeeded | failed (null = never generated)
+  bioError              String? // Error message from the last failed bio generation, if any
+  bioStartedAt          DateTime? // When the current/last bio generation job started (for stale-job detection)
   slug                  String                 @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
   genres                String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
   bornOn                DateTime? // Always feature artist on their birthday if known
