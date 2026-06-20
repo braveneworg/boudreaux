@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.143.0] - 2026-06-20
+
+### Added
+
+- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n
+
 ## [4.142.0] - 2026-06-20
 
 ### Added
