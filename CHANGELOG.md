@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.135.0] - 2026-06-20
+
+### Added
+
+- test: ✅ polyfill jsdom Range getClientRects (#511)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n
+
 ## [4.134.0] - 2026-06-19
 
 ### Added
