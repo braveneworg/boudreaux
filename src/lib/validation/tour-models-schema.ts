@@ -17,9 +17,25 @@ const nullableDate = z.coerce.date().nullable();
 const nullableString = z.string().nullable();
 
 /** `TourImage` scalars (`images: { orderBy }`). */
-const tourImageSchema = z.object({
+export const tourImageSchema = z.object({
   id: z.string(),
   tourId: z.string(),
+  s3Key: z.string(),
+  s3Url: z.string(),
+  s3Bucket: z.string(),
+  fileName: z.string(),
+  fileSize: z.number(),
+  mimeType: z.string(),
+  displayOrder: z.number(),
+  altText: nullableString,
+  createdAt: date,
+  uploadedBy: nullableString,
+});
+
+/** `TourDateImage` scalars returned by the tour-date images route. */
+export const tourDateImageSchema = z.object({
+  id: z.string(),
+  tourDateId: z.string(),
   s3Key: z.string(),
   s3Url: z.string(),
   s3Bucket: z.string(),

@@ -251,6 +251,15 @@ export const artistSchema = artistScalarSchema.extend({
   urls: z.array(urlSchema),
 }) satisfies z.ZodType<Artist>;
 
+/**
+ * `Artist` as returned by `GET /api/artists/[id]` — scalars plus the ordered
+ * `images` relation only (see `ArtistRepository.findById`). Narrower than
+ * `artistSchema`, which also pulls labels/urls/releases the by-id route omits.
+ */
+export const artistDetailSchema = artistScalarSchema.extend({
+  images: z.array(imageSchema),
+});
+
 /** `Release` with the relations selected by the `Release` domain type. */
 export const releaseSchema = releaseScalarSchema.extend({
   images: z.array(imageSchema),
