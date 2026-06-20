@@ -47,7 +47,7 @@ const okResult: BioGenerationResult = {
     genres: 'rock',
     images: [],
     links: [],
-    model: 'llama',
+    model: 'gemini-3-flash',
   },
 };
 
@@ -156,7 +156,7 @@ describe('BioGenerationService.generateForArtist', () => {
       links: [
         { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead', kind: 'wikipedia' },
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'gemini-3-flash',
     },
   };
 
@@ -193,7 +193,8 @@ describe('BioGenerationService.generateForArtist', () => {
     if (!result.success) return;
     expect(result.data.longBio).not.toContain('javascript:');
     expect(result.data.longBio).not.toContain('<script>');
-    expect(result.data.shortBio).toBe('Short teaser');
+    // <b> is now preserved by the bio allowlist (no emphasis is stripped).
+    expect(result.data.shortBio).toBe('<b>Short</b> teaser');
     expect(result.slug).toBe('radiohead');
   });
 
@@ -209,7 +210,7 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(content.images[0].attribution).toBeNull();
     expect(content.images[0].sortOrder).toBe(0);
     expect(content.images[0].isPrimary).toBe(true);
-    expect(content.bioModel).toBe('llama-3.3-70b-versatile');
+    expect(content.bioModel).toBe('gemini-3-flash');
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
@@ -244,6 +245,30 @@ describe('BioGenerationService.generateForArtist', () => {
     if (!result.success) return;
     // The unresolved placeholder is a non-http(s) src, so the sanitizer drops it.
     expect(result.data.longBio).not.toContain('image:0');
+  });
+
+  it('drops a discovered link to a listening service', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        links: [
+          { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead', kind: 'wikipedia' },
+          {
+            label: 'Spotify',
+            url: 'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb',
+            kind: 'other',
+          },
+          { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'other' },
+        ],
+      },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.links).toHaveLength(1);
+    expect(content.links[0].url).toBe('https://en.wikipedia.org/wiki/Radiohead');
   });
 
   it('drops a discovered link whose URL is not http(s)', async () => {
@@ -326,7 +351,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     genres: null,
     images: [],
     links: [],
-    model: 'llama',
+    model: 'gemini-3-flash',
   };
 
   it('flips to processing then succeeded (clearing the error) on success', async () => {
@@ -391,7 +416,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
         shortBio: 's',
         bio: '<p>l</p>',
         genres: 'rock',
-        bioModel: 'llama',
+        bioModel: 'gemini-3-flash',
         bioImages: [
           {
             url: 'u',

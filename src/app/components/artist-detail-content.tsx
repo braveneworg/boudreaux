@@ -10,10 +10,10 @@ import { ArrowRight, Loader2, Music2 } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { useArtistBySlugQuery } from '@/app/hooks/use-artist-by-slug-query';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import { toBioTeaser } from '@/lib/utils/bio-teaser';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import { ArtistPlayer } from './artist-player';
-import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
 
@@ -143,7 +143,9 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
               </ul>
             )}
             {artist.shortBio && (
-              <BioHtml html={artist.shortBio} className="text-muted-foreground text-sm" />
+              // Header shows a short plain-text teaser; the full rich short bio
+              // (with inline links) lives on the dedicated /bio page.
+              <p className="text-muted-foreground text-sm">{toBioTeaser(artist.shortBio)}</p>
             )}
             {hasFullBio && (
               <Link

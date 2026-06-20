@@ -8,6 +8,7 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
+import { isListeningServiceUrl } from '@/lib/utils/is-listening-service-url';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import {
@@ -75,7 +76,7 @@ export type GenerateForArtistResult =
  * is the Lambda/fixture seam used internally and in unit tests.
  *
  * In E2E and local dev (`BIO_GENERATOR_FAKE=true`) the Lambda call returns a
- * deterministic fixture so flows are testable without AWS or a Groq key.
+ * deterministic fixture so flows are testable without AWS or a Gemini key.
  */
 export class BioGenerationService {
   /**
@@ -211,12 +212,14 @@ export class BioGenerationService {
     // Drop any link whose URL is not http(s). Lambda link sources (MusicBrainz /
     // Wikidata relations) are community-editable untrusted input, so a
     // `javascript:`/`data:` URL must never reach the persisted, publicly-rendered
-    // anchor. `sanitizeUrl` returns '' for disallowed schemes.
+    // anchor. `sanitizeUrl` returns '' for disallowed schemes. Listening-service
+    // links (Spotify, Bandcamp, …) are also dropped — a bio links to informative
+    // sources only, never to another listening experience.
     const persistedLinks = result.data.links.reduce<
       Array<{ label: string; url: string; kind: string | null; sortOrder: number }>
     >((acc, link) => {
       const url = sanitizeUrl(link.url);
-      if (!url) return acc;
+      if (!url || isListeningServiceUrl(url)) return acc;
       acc.push({
         label: sanitizeBioText(link.label),
         url,
