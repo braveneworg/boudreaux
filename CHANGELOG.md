@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.141.0] - 2026-06-20
+
+### Added
+
+- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n
+
 ## [4.140.0] - 2026-06-20
 
 ### Added
