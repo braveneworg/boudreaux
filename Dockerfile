@@ -111,12 +111,20 @@ COPY --from=builder --chown=appuser:nodegroup /app/.next/static ./.next/static
 COPY --from=builder --chown=appuser:nodegroup /app/public ./public
 
 # The standalone bundle is traced on glibc (ubuntu CI runner), so it ships the
-# glibc sharp binary (@img/sharp-linux-x64). This image is Alpine (musl), so we
-# reinstall sharp's musl native binary over it; otherwise next/image optimization
-# fails at runtime with "Could not load the sharp module using the linuxmusl-x64 runtime".
+# glibc sharp binary (@img/sharp-linux-x64). This image is Alpine (musl), so the
+# matching @img/sharp-linuxmusl-x64 native package is missing and next/image
+# optimization fails at runtime with "Could not load the sharp module using the
+# linuxmusl-x64 runtime". Install sharp in an isolated temp dir (no package.json,
+# so npm skips full project tree resolution and its React peer conflicts), then
+# copy just the musl native packages into the standalone node_modules.
 RUN SHARP_VER="$(node -p "require('/app/node_modules/sharp/package.json').version")" \
+    && mkdir -p /tmp/sharp-musl \
+    && cd /tmp/sharp-musl \
     && npm install --no-save --os=linux --libc=musl --cpu=x64 "sharp@${SHARP_VER}" \
-    && chown -R appuser:nodegroup /app/node_modules
+    && mkdir -p /app/node_modules/@img \
+    && cp -R /tmp/sharp-musl/node_modules/@img/. /app/node_modules/@img/ \
+    && rm -rf /tmp/sharp-musl \
+    && chown -R appuser:nodegroup /app/node_modules/@img
 
 USER appuser
 
