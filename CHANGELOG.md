@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.144.0] - 2026-06-20
+
+### Added
+
+- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n
+
 ## [4.143.0] - 2026-06-20
 
 ### Added
