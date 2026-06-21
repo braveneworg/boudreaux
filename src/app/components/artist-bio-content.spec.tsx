@@ -94,4 +94,57 @@ describe('ArtistBioContent', () => {
 
     expect(screen.queryByRole('heading', { name: 'Links' })).not.toBeInTheDocument();
   });
+
+  it('shows the error message when the query failed', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: null,
+      error: new Error('boom'),
+    });
+
+    render(<ArtistBioContent slug="broken" />);
+
+    expect(screen.getByText('Failed to load bio')).toBeInTheDocument();
+    expect(screen.getByText('Please try again later.')).toBeInTheDocument();
+  });
+
+  it('omits the genres list when the artist has no genres', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, genres: null },
+    });
+
+    render(<ArtistBioContent slug="test-artist" />);
+
+    // splitList(null) returns [] so no genre badges render.
+    expect(screen.queryByText('jazz')).not.toBeInTheDocument();
+    expect(screen.queryByText('funk')).not.toBeInTheDocument();
+  });
+
+  it('falls back to a generated alt text for an untitled bio image', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [{ ...artist.bioImages[0], title: null }],
+      },
+    });
+
+    render(<ArtistBioContent slug="test-artist" />);
+
+    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Test Artist image');
+  });
+
+  it('shows the empty-bio fallback when the artist has no long bio', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, bio: null },
+    });
+
+    render(<ArtistBioContent slug="test-artist" />);
+
+    expect(
+      screen.getByText('No biography has been written for this artist yet.')
+    ).toBeInTheDocument();
+  });
 });

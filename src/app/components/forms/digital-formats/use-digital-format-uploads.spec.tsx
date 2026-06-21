@@ -1066,5 +1066,429 @@ describe('useDigitalFormatUploads', () => {
 
       expect(result.current.confirmReuploadFormat).toBeNull();
     });
+
+    it('deletes existing files when no file input ref exists', async () => {
+      vi.mocked(deleteFormatFilesAction).mockResolvedValue({
+        success: true,
+        data: { deletedCount: 1 },
+      });
+      const existingFormats: ExistingFormat[] = [
+        {
+          formatType: 'FLAC',
+          trackCount: 1,
+          totalFileSize: 100,
+          files: [
+            { trackNumber: 1, title: null, fileName: 'a.flac', fileSize: 100, duration: null },
+          ],
+        },
+      ];
+      const { result } = renderUploads({ existingFormats });
+
+      act(() => {
+        result.current.setConfirmReuploadFormat('FLAC');
+      });
+      // No fileInputRefs.current.FLAC set → the `if (input)` guard is false.
+      await act(async () => {
+        await result.current.handleConfirmReupload();
+      });
+
+      expect(result.current.isUploaded('FLAC')).toBe(false);
+    });
+  });
+
+  describe('initial state — existingFormat with no files', () => {
+    it('does not seed the uploaded file list for an empty-files format', () => {
+      const existingFormats: ExistingFormat[] = [
+        { formatType: 'FLAC', trackCount: 0, totalFileSize: 0, files: [] },
+      ];
+
+      const { result } = renderUploads({ existingFormats });
+
+      expect(result.current.uploadedFilesList.FLAC).toBeUndefined();
+    });
+  });
+
+  describe('isUploading query', () => {
+    it('reports a format as not uploading while idle', () => {
+      const { result } = renderUploads();
+
+      expect(result.current.isUploading('FLAC')).toBe(false);
+    });
+
+    it('reports a format as uploading while a batch is in flight', async () => {
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'fmt', fileCount: 2 },
+      });
+      // A fetch that never resolves keeps the state in `uploading`.
+      global.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const files = [
+        new File(['a'], '01.flac', { type: 'audio/flac' }),
+        new File(['b'], '02.flac', { type: 'audio/flac' }),
+      ];
+
+      act(() => {
+        void result.current.handleFileInputChange('FLAC', {
+          target: { files },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.isUploading('FLAC')).toBe(true);
+    });
+  });
+
+  describe('uploadSingleFile — mime + extension fallbacks', () => {
+    it('uploads a file with an empty mime type using the default mime', async () => {
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const fetchSpy = mockFetchSuccess();
+      global.fetch = fetchSpy;
+      const { result } = renderUploads();
+      // Empty mime type → `file.type || getDefaultMimeType(formatType)` falls back.
+      const file = new File(['x'], 'a.flac', { type: '' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/upload/FLAC'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': 'audio/flac' }),
+        })
+      );
+    });
+
+    it('falls back to "Upload failed" when the proxy fails without a message', async () => {
+      // ok:false, success:false, no message → single-file `result.error ?? 'Upload failed'`.
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ success: false }),
+      }) as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({
+        status: 'error',
+        message: 'Upload failed',
+      });
+    });
+
+    it('returns the thrown Error message when fetch rejects with an Error', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('socket hang up')) as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({
+        status: 'error',
+        message: 'socket hang up',
+      });
+    });
+
+    it('uses a generic message when fetch rejects with a non-Error', async () => {
+      global.fetch = vi.fn().mockRejectedValue('boom') as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({
+        status: 'error',
+        message: 'Upload failed. Please try again.',
+      });
+    });
+  });
+
+  describe('handleFileUpload — MP3 metadata extraction (single file)', () => {
+    it('forwards extracted metadata (with cover art) to onMetadataExtracted', async () => {
+      vi.mocked(extractAudioMetadata).mockResolvedValue({
+        album: 'My Album',
+        coverArt: 'data:image/png;base64,abc',
+      });
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'My Album',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const onMetadataExtracted = vi.fn();
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(onMetadataExtracted).toHaveBeenCalledWith(
+        expect.objectContaining({ album: 'My Album' })
+      );
+    });
+
+    it('forwards extracted metadata without cover art to onMetadataExtracted', async () => {
+      // Metadata has keys but no coverArt → exercises the `coverArt ? … : undefined`
+      // ternary's false branch in the single-file console.info.
+      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album', artist: 'Artist' });
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'My Album',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const onMetadataExtracted = vi.fn();
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(onMetadataExtracted).toHaveBeenCalledWith(
+        expect.objectContaining({ artist: 'Artist' })
+      );
+    });
+
+    it('does not call onMetadataExtracted when no metadata is extracted', async () => {
+      vi.mocked(extractAudioMetadata).mockResolvedValue({});
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Untitled Release',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const onMetadataExtracted = vi.fn();
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(onMetadataExtracted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleFileUpload — edit-mode confirm throws non-Error', () => {
+    it('uses the default message when the confirm action throws a non-Error', async () => {
+      vi.mocked(confirmDigitalFormatUploadAction).mockRejectedValue('explode');
+      const { result } = renderUploads();
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({
+        status: 'error',
+        message: 'Upload failed',
+      });
+    });
+  });
+
+  describe('handleBatchUpload — MP3 metadata branches', () => {
+    it('forwards metadata with cover art but no album to onMetadataExtracted', async () => {
+      // No album → the `if (extractedMetadata.album)` setAlbumTitle branch is skipped,
+      // while non-empty keys still trigger onMetadataExtracted and the coverArt ternary.
+      vi.mocked(extractAudioMetadata).mockResolvedValue({
+        artist: 'Some Artist',
+        coverArt: 'data:image/png;base64,abc',
+      });
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Untitled Release',
+        created: true,
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'fmt', fileCount: 2 },
+      });
+      const onMetadataExtracted = vi.fn();
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
+      const files = [
+        new File(['a'], '01.mp3', { type: 'audio/mpeg' }),
+        new File(['b'], '02.mp3', { type: 'audio/mpeg' }),
+      ];
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.albumTitle).toBeNull();
+    });
+
+    it('skips metadata forwarding when batch extraction yields nothing', async () => {
+      // Empty metadata → the `Object.keys(...).length > 0` guard is false in batch mode.
+      vi.mocked(extractAudioMetadata).mockResolvedValue({});
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Untitled Release',
+        created: true,
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'fmt', fileCount: 2 },
+      });
+      const onMetadataExtracted = vi.fn();
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
+      const files = [
+        new File(['a'], '01.mp3', { type: 'audio/mpeg' }),
+        new File(['b'], '02.mp3', { type: 'audio/mpeg' }),
+      ];
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(onMetadataExtracted).not.toHaveBeenCalled();
+    });
+
+    it('records the album title when batch metadata includes an album', async () => {
+      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'Batch Album' });
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Batch Album',
+        created: true,
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'fmt', fileCount: 2 },
+      });
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onReleaseAutoCreated });
+      const files = [
+        new File(['a'], '01.mp3', { type: 'audio/mpeg' }),
+        new File(['b'], '02.mp3', { type: 'audio/mpeg' }),
+      ];
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(result.current.albumTitle).toBe('Batch Album');
+    });
+  });
+
+  describe('handleFileInputChange — multi-file folder with no matches', () => {
+    it('shows an error when a multi-file selection has no matching files', async () => {
+      const { result } = renderUploads();
+      // Multiple files but none match the FLAC extension.
+      const files = [
+        new File(['a'], 'a.mp3', { type: 'audio/mpeg' }),
+        new File(['b'], 'b.mp3', { type: 'audio/mpeg' }),
+      ];
+
+      await act(async () => {
+        await result.current.handleFileInputChange('FLAC', {
+          target: { files },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(
+        'No matching FLAC files found in folder',
+        expect.objectContaining({ description: expect.stringContaining('.flac') })
+      );
+    });
+  });
+
+  describe('handleDrop — items present but not a directory', () => {
+    it('falls through to single-file handling when the dropped entry is a file', async () => {
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+      const fileEntry = { isFile: true, isDirectory: false, name: 'a.flac' };
+      const { result } = renderUploads();
+
+      await act(async () => {
+        await result.current.handleDrop('FLAC', {
+          preventDefault: () => {},
+          dataTransfer: {
+            items: [{ webkitGetAsEntry: () => fileEntry }],
+            files: [file],
+          },
+        } as unknown as React.DragEvent<HTMLDivElement>);
+      });
+
+      expect(toast.success).toHaveBeenCalledWith('FLAC uploaded successfully');
+    });
+
+    it('falls through to single-file handling when webkitGetAsEntry is absent', async () => {
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'fmt' },
+      });
+      const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
+      const { result } = renderUploads();
+
+      await act(async () => {
+        await result.current.handleDrop('FLAC', {
+          preventDefault: () => {},
+          dataTransfer: {
+            items: [{}],
+            files: [file],
+          },
+        } as unknown as React.DragEvent<HTMLDivElement>);
+      });
+
+      expect(toast.success).toHaveBeenCalledWith('FLAC uploaded successfully');
+    });
   });
 });

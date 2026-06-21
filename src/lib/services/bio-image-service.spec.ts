@@ -97,4 +97,104 @@ describe('BioImageService.rehostWithVariants', () => {
       BioImageService.rehostWithVariants('https://x/a.html', 'artist-1', 0)
     ).rejects.toThrow('Source is not an image');
   });
+
+  it('no-ops in E2E_MODE', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await BioImageService.rehostWithVariants('https://x/a.jpg', 'artist-1', 1);
+
+    expect(result).toEqual({ url: 'https://x/a.jpg', width: null, height: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('no-ops in NEXT_PUBLIC_E2E_MODE', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await BioImageService.rehostWithVariants('https://x/a.jpg', 'artist-1', 2);
+
+    expect(result).toEqual({ url: 'https://x/a.jpg', width: null, height: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('throws when the image exceeds the 50MB limit', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    const oversized = new Uint8Array(50 * 1024 * 1024 + 1);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(oversized, { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+        )
+    );
+
+    await expect(
+      BioImageService.rehostWithVariants('https://x/a.jpg', 'artist-1', 0)
+    ).rejects.toThrow('Source image exceeds the 50MB limit');
+  });
+
+  it('derives the extension from the URL when no content-type header is present', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    // No Content-Type header → resolveExtension falls back to the URL pathname.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+    );
+
+    const result = await BioImageService.rehostWithVariants(
+      'https://upload.example.org/photo.PNG',
+      'artist-9',
+      3
+    );
+
+    const [, key] = generateVariantsMock.mock.calls[0];
+    expect(key).toMatch(/^media\/artists\/artist-9\/bio\/3-[a-f0-9]{8}\.png$/);
+    expect(result.url).toBe(`https://cdn.example.com/${key}`);
+  });
+
+  it('defaults to .jpg when neither the content-type nor the URL yields an extension', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    // No content-type, and a URL path without an extension → final '.jpg' default.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+    );
+
+    const result = await BioImageService.rehostWithVariants(
+      'https://upload.example.org/no-extension-here',
+      'artist-7',
+      4
+    );
+
+    const [, key] = generateVariantsMock.mock.calls[0];
+    expect(key).toMatch(/^media\/artists\/artist-7\/bio\/4-[a-f0-9]{8}\.jpg$/);
+    expect(result.url).toBe(`https://cdn.example.com/${key}`);
+  });
+
+  it('uploads with an octet-stream content type when the header is absent', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+    );
+
+    await BioImageService.rehostWithVariants('https://x/no-extension', 'artist-1', 0);
+
+    const putInput = sendMock.mock.calls[0][0].input as { ContentType: string };
+    expect(putInput.ContentType).toBe('application/octet-stream');
+  });
 });

@@ -6,7 +6,11 @@ import { render } from '@testing-library/react';
 
 import { isDarkColor } from '@/lib/utils/color';
 
-import { BannerNotificationStrip, type BannerNotification } from './banner-notification-strip';
+import {
+  BannerNotificationStrip,
+  type BannerNotification,
+  type BannerNotificationSize,
+} from './banner-notification-strip';
 
 const mockIsDarkColor = vi.mocked(isDarkColor);
 
@@ -151,5 +155,56 @@ describe('BannerNotificationStrip', () => {
 
     expect(container.firstChild).toHaveStyle({ minHeight: '2.5rem' });
     expect(container.querySelector('.text-sm')).toBeInTheDocument();
+  });
+
+  it('falls back to the default size style for an unknown size', () => {
+    const { container } = render(
+      <BannerNotificationStrip
+        {...baseProps}
+        active={makeNotification()}
+        // An unrecognised size hits the `?? DEFAULT_SIZE_STYLE` fallback.
+        size={'xl' as unknown as BannerNotificationSize}
+      />
+    );
+
+    expect(container.firstChild).toHaveStyle({ minHeight: '2.5rem' });
+    expect(container.querySelector('.text-sm')).toBeInTheDocument();
+  });
+
+  it('renders the outgoing strip with the dark styling and color fallbacks', () => {
+    mockIsDarkColor.mockReturnValue(true);
+    const { container } = render(
+      <BannerNotificationStrip
+        {...baseProps}
+        active={makeNotification({ id: 'n1', content: 'Incoming' })}
+        outgoing={makeNotification({
+          id: 'n0',
+          content: 'Outgoing',
+          textColor: null,
+          backgroundColor: null,
+        })}
+        isTransitioning
+      />
+    );
+
+    // The outgoing strip uses the dark link styling and the transparent
+    // background fallback when its colors are null. (jsdom normalises
+    // `background-color: transparent` to empty, so we assert via the inline
+    // style attribute string instead.)
+    const outgoing = container.querySelector('[style*="banner-strip-exit-right"]');
+    expect(outgoing).toHaveClass('banner-strip-dark');
+    expect(outgoing?.getAttribute('style')).toContain('background-color: transparent');
+  });
+
+  it('uses the transparent background fallback for the active strip with null colors', () => {
+    const { container } = render(
+      <BannerNotificationStrip
+        {...baseProps}
+        active={makeNotification({ textColor: null, backgroundColor: null })}
+      />
+    );
+
+    const strip = container.querySelector('.banner-strip-slide');
+    expect(strip?.getAttribute('style')).toContain('background-color: transparent');
   });
 });

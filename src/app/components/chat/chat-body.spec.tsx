@@ -82,6 +82,7 @@ interface ListProps {
   renderReactionBar?: (m: OptimisticChatMessage) => ReactNode;
   renderPinIndicator?: (m: OptimisticChatMessage) => ReactNode;
   onLoadMore?: () => void;
+  scrollToMentionUsername?: string | null;
 }
 let lastListProps: ListProps | null = null;
 
@@ -139,6 +140,7 @@ interface ChatInputProps {
   onTyping: () => void;
   onSendResolved: (tempId: string, server: unknown) => void;
   onSendFailed: (tempId: string) => void;
+  currentUser: { id: string; username: string | null; gravatarHash: string };
 }
 let lastInputProps: ChatInputProps | null = null;
 vi.mock('./chat-input', () => ({
@@ -779,5 +781,45 @@ describe('ChatBody — list + input plumbing', () => {
     act(() => lastInputProps?.onTyping());
 
     expect(sendTyping).toHaveBeenCalledWith({ userId: 'admin-1', username: 'Admin' });
+  });
+});
+
+describe('ChatBody — session fallbacks', () => {
+  it('defaults currentUserId to an empty string when session.user is absent', () => {
+    // Covers `session.user?.id ?? ''` (line 97) — the whole `user` object is
+    // undefined, so the optional chain short-circuits and the `?? ''` fires.
+    render(<ChatBody session={{ user: undefined } as unknown as Session} enabled />);
+    expect(lastInputProps).not.toBeNull();
+    expect(lastInputProps?.currentUser.id).toBe('');
+  });
+
+  it('passes a null username to sendTyping when the session has no name', () => {
+    // Covers `session.user?.name ?? null` (line 122) inside handleSendTyping.
+    const sendTyping = vi.fn();
+    useChatChannelMock.mockImplementation((params: ChannelCallbacks) => {
+      capturedChannelCallbacks = params;
+      return { sendTyping };
+    });
+
+    render(
+      <ChatBody session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session} enabled />
+    );
+    act(() => lastInputProps?.onTyping());
+
+    expect(sendTyping).toHaveBeenCalledWith({ userId: 'anon-1', username: null });
+  });
+
+  it('passes a null scrollToMentionUsername when scrollToMention is true but the name is absent', () => {
+    // Covers the `session.user?.name ?? null` arm of the scrollToMention
+    // ternary (line 334).
+    render(
+      <ChatBody
+        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session}
+        enabled
+        scrollToMention
+      />
+    );
+    expect(lastListProps).not.toBeNull();
+    expect(lastListProps?.scrollToMentionUsername).toBeNull();
   });
 });

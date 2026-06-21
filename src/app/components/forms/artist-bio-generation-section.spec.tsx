@@ -153,4 +153,98 @@ describe('ArtistBioGenerationSection', () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Bio generation failed to start.'));
     expect(onGenerated).not.toHaveBeenCalled();
   });
+
+  it('adds a link when Enter is pressed in the input', async () => {
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    const input = screen.getByLabelText(/reference links/i);
+    await userEvent.type(input, 'https://artist.example{Enter}');
+
+    expect(screen.getByText('https://artist.example')).toBeInTheDocument();
+  });
+
+  it('does not add a duplicate link', async () => {
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    const input = screen.getByLabelText(/reference links/i);
+    await userEvent.type(input, 'https://artist.example{Enter}');
+    await userEvent.type(input, 'https://artist.example{Enter}');
+
+    expect(screen.getAllByText('https://artist.example')).toHaveLength(1);
+  });
+
+  it('ignores an empty link draft', async () => {
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    const input = screen.getByLabelText(/reference links/i);
+    await userEvent.type(input, '   {Enter}');
+
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
+  it('removes an added link via its remove button', async () => {
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    const input = screen.getByLabelText(/reference links/i);
+    await userEvent.type(input, 'https://artist.example{Enter}');
+    await userEvent.click(
+      screen.getByRole('button', { name: /remove https:\/\/artist\.example/i })
+    );
+
+    expect(screen.queryByText('https://artist.example')).not.toBeInTheDocument();
+  });
+
+  it('forwards the typed description to the trigger', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText(/additional description/i), 'Hometown hero');
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() =>
+      expect(generateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Hometown hero' })
+      )
+    );
+  });
+
+  it('renders discovered links with their kind badge in the preview', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Wikipedia' })).toBeInTheDocument()
+    );
+    expect(screen.getByRole('link', { name: 'Wikipedia' })).toHaveAttribute(
+      'href',
+      'https://en.wikipedia.org/wiki/x'
+    );
+    expect(screen.getByText('wikipedia')).toBeInTheDocument();
+  });
+
+  it('marks a primary discovered image with a star', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(screen.getByLabelText('Primary image')).toBeInTheDocument());
+  });
+
+  it('omits the images and links sections when none are discovered', async () => {
+    statusReturn = {
+      status: 'succeeded',
+      error: null,
+      content: { ...content, images: [], links: [] },
+    };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(screen.getByText('A boundary-pushing artist.')).toBeInTheDocument());
+    expect(screen.queryByText('Discovered images')).not.toBeInTheDocument();
+    expect(screen.queryByText('Discovered links')).not.toBeInTheDocument();
+  });
 });

@@ -2793,4 +2793,78 @@ describe('GET /api/releases/[id]/download/bundle — additional branch coverage'
 
     expect(mockArchiverPassThrough).toBeDefined();
   });
+
+  // ─── Drive-error catch finds cache streams already destroyed (1094, 1095) ──
+
+  it('skips re-destroying already-destroyed cache streams in the drive catch (false arms)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Emit an archiver error first so the archive `on('error')` listener destroys
+    // BOTH cachePass and teeToCache. The subsequent append (second entry) throws
+    // and the drive catch runs — but now both streams are already destroyed, so
+    // the `!cachePass.destroyed` / `!teeToCache.destroyed` guards take their false
+    // arms and skip the redundant destroy calls.
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/MP3_320KBPS/01.mp3', fileName: '01.mp3' },
+          { s3Key: 'releases/r1/MP3_320KBPS/02.mp3', fileName: '02.mp3' },
+        ],
+      },
+    ]);
+    mockAppend
+      .mockImplementationOnce(() => {
+        // First append: destroy the cache streams via an archiver error, then
+        // resolve the per-entry wait so the loop advances to the second entry.
+        mockArchiverPassThrough.emit('error', new Error('archive boom'));
+        queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('append exploded after streams destroyed');
+      });
+
+    const response = await GET(makeFreeStreamRequest('MP3_320KBPS'), makeParams());
+    await response.arrayBuffer().catch(() => undefined);
+    await flushMicrotasks();
+
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle stream drive error',
+      expect.any(Error),
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+    expect(mockArchiveAbort).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── SSE abort with a null PassThrough (line 632 false arm) ────────────────
+
+  it('aborts the SSE upload safely when the archive was never created (null PassThrough)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Make the in-stream cache check reject BEFORE the archiver/PassThrough are
+    // created. The outer try/catch runs abortSseUpload while combinedPassThrough
+    // is still null, exercising the `combinedPassThrough && !destroyed` false arm.
+    mockVerifyS3ObjectExists.mockReset();
+    mockVerifyS3ObjectExists
+      // First call: lock-acquire cache-warm probe (not reached — lock acquired).
+      // Stream start cache probe rejects.
+      .mockRejectedValueOnce(new Error('verify exploded in stream'))
+      .mockResolvedValue(false);
+
+    const response = await GET(makeFreeJsonRequest('MP3_320KBPS'), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(
+      events.some((e) => e.event === 'error' && e.data.message === 'An unexpected error occurred.')
+    ).toBe(true);
+    expect(downloadsLoggerMock.error).toHaveBeenCalledWith(
+      'Bundle SSE stream error',
+      expect.anything()
+    );
+
+    consoleSpy.mockRestore();
+  });
 });

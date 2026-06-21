@@ -736,6 +736,27 @@ describe('FormatBundleDownload', () => {
     expect(triggerDownload).not.toHaveBeenCalled();
   });
 
+  it('renders the iOS/Safari anchor fallback link after a completed download', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    const mockFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<FormatBundleDownload {...freeOnlyProps} mode="free" />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 2 formats/ }));
+
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
+
+    // The captured stream URL is surfaced as a tappable fallback anchor; with
+    // no fileName delivered the `download` attribute resolves to undefined.
+    const fallback = screen.getByRole('link', { name: /Tap here/i });
+    expect(fallback).toHaveAttribute('href', expect.stringContaining('respond=stream&mode=free'));
+    expect(fallback).not.toHaveAttribute('download');
+  });
+
   describe('mode="free"', () => {
     const freeProps = {
       releaseId: 'release-free',
