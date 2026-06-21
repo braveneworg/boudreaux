@@ -41,11 +41,13 @@ import {
   useUpdateTourDateMutation,
 } from '@/app/hooks/mutations/use-tour-date-mutations';
 import { useTourDateImagesQuery } from '@/app/hooks/use-tour-date-images-query';
-import type { FormState } from '@/lib/types/form-state';
+import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
 import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
+  type TourDateCreateInput,
+  type TourDateUpdateInput,
 } from '@/lib/validation/tours/tour-date-schema';
 
 /**
@@ -104,11 +106,6 @@ interface TourDateFormProps {
   onSuccess?: () => void;
 }
 
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
-
 export const TourDateForm = ({
   tourId,
   tourDate,
@@ -116,12 +113,11 @@ export const TourDateForm = ({
   onOpenChange,
   onSuccess,
 }: TourDateFormProps) => {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
-  const [isPending, setIsPending] = useState(false);
   const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
   const isEditMode = !!tourDate;
-  const { mutateAsync: createTourDate } = useCreateTourDateMutation();
-  const { mutateAsync: updateTourDate } = useUpdateTourDateMutation();
+  const { createTourDateAsync, isCreatingTourDate } = useCreateTourDateMutation();
+  const { updateTourDateAsync, isUpdatingTourDate } = useUpdateTourDateMutation();
+  const isSaving = isCreatingTourDate || isUpdatingTourDate;
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourDateUpdateSchema : tourDateCreateSchema),
@@ -253,24 +249,17 @@ export const TourDateForm = ({
   }, [refetchTourDateImages]);
 
   const onSubmit = async (data: Record<string, unknown>) => {
-    setIsPending(true);
     try {
-      const formData = new FormData();
-
-      // Add all form fields to FormData
+      // Normalize values, omitting empties (optional fields stay absent). zodResolver
+      // coerces z.coerce.date() fields into Date objects, so emit ISO strings the
+      // server can reparse; arrays are passed through for the hook to JSON-encode.
+      // A Map keeps dynamic string keys off a plain object (avoids object-injection sinks).
+      const values = new Map<string, unknown>();
       Object.entries(data).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          if (key === 'headlinerIds' && Array.isArray(value)) {
-            // Encode array as JSON string for FormData
-            formData.append(key, JSON.stringify(value));
-          } else if (value instanceof Date) {
-            // zodResolver coerces z.coerce.date() fields into Date objects.
-            // Use ISO string so the server receives a stable, parseable format.
-            formData.append(key, value.toISOString());
-          } else {
-            formData.append(key, String(value));
-          }
+        if (value === null || value === undefined || value === '') {
+          return;
         }
+        values.set(key, value instanceof Date ? value.toISOString() : value);
       });
 
       // If a timezone is set, override time entries with correctly-converted UTC values.
@@ -283,20 +272,16 @@ export const TourDateForm = ({
         for (const key of timeKeys) {
           const raw = rawValues[key as keyof typeof rawValues] as string | undefined;
           if (raw && typeof raw === 'string' && raw.includes('T')) {
-            const utcDate = localToUTC(raw.slice(0, 16), tz);
-            formData.set(key, utcDate.toISOString());
+            values.set(key, localToUTC(raw.slice(0, 16), tz).toISOString());
           }
         }
       }
 
-      let result: FormState;
-      if (isEditMode && tourDate?.id) {
-        result = await updateTourDate({ tourDateId: tourDate.id, formState, formData });
-      } else {
-        result = await createTourDate({ formState, formData });
-      }
-
-      setFormState(result);
+      const payload = Object.fromEntries(values);
+      const result =
+        isEditMode && tourDate?.id
+          ? await updateTourDateAsync({ id: tourDate.id, values: payload as TourDateUpdateInput })
+          : await createTourDateAsync(payload as TourDateCreateInput);
 
       if (result.success) {
         toast.success(
@@ -306,31 +291,14 @@ export const TourDateForm = ({
         if (onSuccess) {
           onSuccess();
         }
-      } else {
-        const errors = result.errors ?? {};
-        const fieldErrors: string[] = [];
-        for (const [field, messages] of Object.entries(errors)) {
-          const msg = Array.isArray(messages) ? messages[0] : String(messages);
-          if (!msg) continue;
-          if (field === 'general') {
-            // Not tied to a specific field — surface via toast
-            toast.error(msg);
-          } else {
-            setError(field as 'tourId', { message: msg });
-            fieldErrors.push(field);
-          }
-        }
-        if (fieldErrors.length > 0) {
-          toast.error('Please fix the form errors');
-        } else if (!Object.keys(errors).includes('general')) {
-          toast.error('An unexpected error occurred. Please try again.');
-        }
+        return;
       }
+
+      const { generalError } = setFormErrors(setError, result);
+      toast.error(generalError ?? 'Please fix the form errors');
     } catch (err) {
       console.error('Form submission error:', err);
       toast.error('An unexpected error occurred');
-    } finally {
-      setIsPending(false);
     }
   };
 
@@ -470,7 +438,7 @@ export const TourDateForm = ({
                         <TimezoneSelect
                           value={(field.value as string) || null}
                           onChange={field.onChange}
-                          disabled={isPending}
+                          disabled={isSaving}
                         />
                       </FormControl>
                       <FormMessage />
@@ -691,7 +659,7 @@ export const TourDateForm = ({
                     tourDateId={tourDate.id}
                     initialImages={tourDateImages}
                     onUploadComplete={handleImageUploadComplete}
-                    disabled={isPending}
+                    disabled={isSaving}
                   />
                 </section>
               </>
@@ -702,12 +670,12 @@ export const TourDateForm = ({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isPending}
+                disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : isEditMode ? 'Update' : 'Add Tour Date'}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? 'Saving...' : isEditMode ? 'Update' : 'Add Tour Date'}
               </Button>
             </DialogFooter>
           </form>

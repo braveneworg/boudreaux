@@ -9,7 +9,8 @@ import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
 
 import {
   useCreateFeaturedArtistMutation,
@@ -50,20 +51,47 @@ const failState: FormState = { fields: {}, success: false };
 
 beforeEach(() => {
   useMutationMock.mockReset();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
   invalidateQueriesMock.mockClear();
 });
 
 describe('useCreateFeaturedArtistMutation', () => {
-  it('calls createFeaturedArtistAction with the form state and data', async () => {
+  const createValues: FeaturedArtistFormData & { artistIds: string[] } = {
+    position: 0,
+    digitalFormatId: 'a'.repeat(24),
+    releaseId: 'b'.repeat(24),
+    artistIds: ['x', 'y'],
+  };
+
+  it('calls createFeaturedArtistAction with the empty form state', async () => {
     vi.mocked(createFeaturedArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(
+    const opts = getOptions<FeaturedArtistFormData & { artistIds: string[] }>(
       useCreateFeaturedArtistMutation
     );
-    const formData = new FormData();
 
-    await opts.mutationFn({ formState: failState, formData });
+    await opts.mutationFn(createValues);
 
-    expect(createFeaturedArtistAction).toHaveBeenCalledWith(failState, formData);
+    expect(vi.mocked(createFeaturedArtistAction).mock.calls[0]?.[0]).toBe(EMPTY_FORM_STATE);
+  });
+
+  it('appends artistIds individually to the form data', async () => {
+    vi.mocked(createFeaturedArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<FeaturedArtistFormData & { artistIds: string[] }>(
+      useCreateFeaturedArtistMutation
+    );
+
+    await opts.mutationFn(createValues);
+
+    const formData = vi.mocked(createFeaturedArtistAction).mock.calls[0]?.[1] as FormData;
+    expect(formData.getAll('artistIds')).toEqual(['x', 'y']);
   });
 
   it('invalidates the featured-artist cache on success', async () => {

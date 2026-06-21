@@ -18,10 +18,27 @@ import type {
  * {@link useArtistBioGenerationStatusQuery} for completion and the finished
  * content. No cache invalidation here — nothing has changed yet at trigger time;
  * the public pages are revalidated server-side once the job succeeds.
- *
- * @returns The TanStack mutation object for triggering bio generation.
  */
-export const useGenerateArtistBioMutation = () =>
-  useMutation<GenerateArtistBioActionResult, Error, GenerateArtistBioInput>({
+export const useGenerateArtistBioMutation = () => {
+  const {
+    mutate: generateArtistBio,
+    mutateAsync: generateArtistBioAsync,
+    isPending: isGeneratingArtistBio,
+    isError: isGenerateArtistBioError,
+    error: generateArtistBioError,
+    data: generatedArtistBio,
+    reset: resetGenerateArtistBio,
+  } = useMutation<GenerateArtistBioActionResult, Error, GenerateArtistBioInput>({
     mutationFn: (input) => generateArtistBioAction(input),
   });
+
+  return {
+    generateArtistBio,
+    generateArtistBioAsync,
+    isGeneratingArtistBio,
+    isGenerateArtistBioError,
+    generateArtistBioError,
+    generatedArtistBio,
+    resetGenerateArtistBio,
+  };
+};

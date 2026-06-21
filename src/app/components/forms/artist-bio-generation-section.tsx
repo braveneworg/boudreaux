@@ -50,7 +50,7 @@ export const ArtistBioGenerationSection = ({
   // terminal status — it both gates status polling and keeps the UI in the
   // working state across the (minutes-long) background job.
   const [active, setActive] = useState(false);
-  const { mutateAsync: generateBio, isPending: isGeneratingBio } = useGenerateArtistBioMutation();
+  const { generateArtistBioAsync, isGeneratingArtistBio } = useGenerateArtistBioMutation();
   const status = useArtistBioGenerationStatusQuery(artistId, { enabled: active });
 
   // Generation runs in the background; surface its terminal status once. On
@@ -69,7 +69,7 @@ export const ArtistBioGenerationSection = ({
   }, [active, status.data, onGenerated]);
 
   // Disable inputs while triggering or while a background job is in flight.
-  const isPending = isGeneratingBio || active;
+  const isPending = isGeneratingArtistBio || active;
 
   const addLink = (): void => {
     const candidate = linkDraft.trim();
@@ -87,7 +87,7 @@ export const ArtistBioGenerationSection = ({
   };
 
   const generate = async (): Promise<void> => {
-    const response = await generateBio({
+    const response = await generateArtistBioAsync({
       artistId,
       links: links.length ? links : undefined,
       description: description.trim() || undefined,

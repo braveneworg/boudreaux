@@ -41,8 +41,8 @@ import {
 } from '@/app/hooks/mutations/use-venue-mutations';
 import { useVenueDetailQuery } from '@/app/hooks/use-venue-detail-query';
 import { useVenueSearchQuery } from '@/app/hooks/use-venue-search-query';
-import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
+import type { VenueCreateInput, VenueUpdateInput } from '@/lib/validation/tours/venue-schema';
 
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
@@ -85,8 +85,8 @@ export const VenueSelect = <
 }: VenueSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const { mutateAsync: createVenue } = useCreateVenueMutation();
-  const { mutateAsync: updateVenue } = useUpdateVenueMutation();
+  const { createVenueAsync } = useCreateVenueMutation();
+  const { updateVenueAsync } = useUpdateVenueMutation();
 
   // Venue list fetching via TanStack Query
   const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, {
@@ -148,17 +148,16 @@ export const VenueSelect = <
     setIsCreating(true);
     setCreateError(null);
     try {
-      const formData = new FormData();
-      formData.append('name', newVenueName.trim());
-      if (newVenueAddress.trim()) formData.append('address', newVenueAddress.trim());
-      if (newVenueCity.trim()) formData.append('city', newVenueCity.trim());
-      if (newVenueState.trim()) formData.append('state', newVenueState.trim());
-      if (newVenuePostalCode.trim()) formData.append('postalCode', newVenuePostalCode.trim());
-      if (newVenueCountry.trim()) formData.append('country', newVenueCountry.trim());
-      if (newVenueTimeZone) formData.append('timeZone', newVenueTimeZone);
-
-      const initialFormState: FormState = { fields: {}, success: false };
-      const result = await createVenue({ formState: initialFormState, formData });
+      const values: VenueCreateInput = {
+        name: newVenueName.trim(),
+        address: newVenueAddress.trim(),
+        city: newVenueCity.trim(),
+        state: newVenueState.trim(),
+        postalCode: newVenuePostalCode.trim(),
+        country: newVenueCountry.trim(),
+        timeZone: newVenueTimeZone,
+      };
+      const result = await createVenueAsync(values);
 
       if (result.success && result.data?.venueId) {
         const newVenue: VenueOption = {
@@ -202,21 +201,16 @@ export const VenueSelect = <
     setIsUpdating(true);
     setUpdateError(null);
     try {
-      const formData = new FormData();
-      formData.append('name', editVenueName.trim());
-      if (editVenueAddress.trim()) formData.append('address', editVenueAddress.trim());
-      formData.append('city', editVenueCity.trim());
-      if (editVenueState.trim()) formData.append('state', editVenueState.trim());
-      if (editVenuePostalCode.trim()) formData.append('postalCode', editVenuePostalCode.trim());
-      if (editVenueCountry.trim()) formData.append('country', editVenueCountry.trim());
-      if (editVenueTimeZone) formData.append('timeZone', editVenueTimeZone);
-
-      const initialFormState: FormState = { fields: {}, success: false };
-      const result = await updateVenue({
-        venueId: editVenueId,
-        formState: initialFormState,
-        formData,
-      });
+      const values: VenueUpdateInput = {
+        name: editVenueName.trim(),
+        city: editVenueCity.trim(),
+        ...(editVenueAddress.trim() ? { address: editVenueAddress.trim() } : {}),
+        ...(editVenueState.trim() ? { state: editVenueState.trim() } : {}),
+        ...(editVenuePostalCode.trim() ? { postalCode: editVenuePostalCode.trim() } : {}),
+        ...(editVenueCountry.trim() ? { country: editVenueCountry.trim() } : {}),
+        ...(editVenueTimeZone ? { timeZone: editVenueTimeZone } : {}),
+      };
+      const result = await updateVenueAsync({ id: editVenueId, values });
 
       if (result.success) {
         const updatedVenue: VenueOption = {

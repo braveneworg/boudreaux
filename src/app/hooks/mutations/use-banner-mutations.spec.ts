@@ -11,7 +11,8 @@ import {
   updateRotationIntervalAction,
 } from '@/lib/actions/banner-notification-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { BannerNotificationFormData } from '@/lib/validation/banner-notification-schema';
 
 import {
   useDeleteBannerNotificationMutation,
@@ -49,19 +50,48 @@ const failState: FormState = { fields: {}, success: false };
 beforeEach(() => {
   useMutationMock.mockReset();
   invalidateQueriesMock.mockClear();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
 });
 
 describe('useUpsertBannerNotificationMutation', () => {
-  it('calls createOrUpdateBannerNotificationAction with the form state and data', async () => {
+  it('calls the action with EMPTY_FORM_STATE as the first argument', async () => {
     vi.mocked(createOrUpdateBannerNotificationAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(
-      useUpsertBannerNotificationMutation
+    const opts = getOptions<BannerNotificationFormData>(useUpsertBannerNotificationMutation);
+
+    await opts.mutationFn({ slotNumber: 1, content: 'Hi' });
+
+    expect(createOrUpdateBannerNotificationAction).toHaveBeenCalledWith(
+      EMPTY_FORM_STATE,
+      expect.any(FormData)
     );
-    const formData = new FormData();
+  });
 
-    await opts.mutationFn({ formState: failState, formData });
+  it('serializes the slot number onto the FormData', async () => {
+    vi.mocked(createOrUpdateBannerNotificationAction).mockResolvedValue(okState);
+    const opts = getOptions<BannerNotificationFormData>(useUpsertBannerNotificationMutation);
 
-    expect(createOrUpdateBannerNotificationAction).toHaveBeenCalledWith(failState, formData);
+    await opts.mutationFn({ slotNumber: 1, content: 'Hi' });
+
+    const formData = vi.mocked(createOrUpdateBannerNotificationAction).mock.calls.at(-1)?.[1];
+    expect(formData?.get('slotNumber')).toBe('1');
+  });
+
+  it('serializes the content onto the FormData', async () => {
+    vi.mocked(createOrUpdateBannerNotificationAction).mockResolvedValue(okState);
+    const opts = getOptions<BannerNotificationFormData>(useUpsertBannerNotificationMutation);
+
+    await opts.mutationFn({ slotNumber: 1, content: 'Hi' });
+
+    const formData = vi.mocked(createOrUpdateBannerNotificationAction).mock.calls.at(-1)?.[1];
+    expect(formData?.get('content')).toBe('Hi');
   });
 
   it('invalidates the banner cache on success', async () => {
@@ -87,9 +117,15 @@ describe('useDeleteBannerNotificationMutation', () => {
     const opts = getOptions<{ slotNumber: number }>(useDeleteBannerNotificationMutation);
 
     await opts.mutationFn({ slotNumber: 2 });
-    await opts.onSuccess({ success: true }, {});
 
     expect(deleteBannerNotificationAction).toHaveBeenCalledWith(2);
+  });
+
+  it('invalidates the banner cache on success', async () => {
+    const opts = getOptions<{ slotNumber: number }>(useDeleteBannerNotificationMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.banners.all });
   });
 });
@@ -100,9 +136,15 @@ describe('useUpdateRotationIntervalMutation', () => {
     const opts = getOptions<{ interval: number }>(useUpdateRotationIntervalMutation);
 
     await opts.mutationFn({ interval: 8 });
-    await opts.onSuccess({ success: true }, {});
 
     expect(updateRotationIntervalAction).toHaveBeenCalledWith(8);
+  });
+
+  it('invalidates the banner cache on success', async () => {
+    const opts = getOptions<{ interval: number }>(useUpdateRotationIntervalMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.banners.all });
   });
 });

@@ -9,7 +9,8 @@ import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
 import {
   useCreateReleaseMutation,
@@ -47,17 +48,70 @@ const failState: FormState = { fields: {}, success: false };
 beforeEach(() => {
   useMutationMock.mockReset();
   invalidateQueriesMock.mockClear();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
 });
 
 describe('useCreateReleaseMutation', () => {
-  it('calls createReleaseAction with the form state and data', async () => {
+  it('calls createReleaseAction with the empty form state', async () => {
     vi.mocked(createReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(useCreateReleaseMutation);
-    const formData = new FormData();
+    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
+      useCreateReleaseMutation
+    );
 
-    await opts.mutationFn({ formState: failState, formData });
+    await opts.mutationFn({
+      title: 'Album',
+      releasedOn: '2026-01-01',
+      coverArt: 'https://x/y.png',
+      formats: ['DIGITAL'],
+      artistIds: ['a'.repeat(24)],
+      preGeneratedId: 'p1',
+    });
 
-    expect(createReleaseAction).toHaveBeenCalledWith(failState, formData);
+    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[0]).toBe(EMPTY_FORM_STATE);
+  });
+
+  it('serializes the release title into the form data', async () => {
+    vi.mocked(createReleaseAction).mockResolvedValue(okState);
+    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
+      useCreateReleaseMutation
+    );
+
+    await opts.mutationFn({
+      title: 'Album',
+      releasedOn: '2026-01-01',
+      coverArt: 'https://x/y.png',
+      formats: ['DIGITAL'],
+      artistIds: ['a'.repeat(24)],
+      preGeneratedId: 'p1',
+    });
+
+    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[1].get('title')).toBe('Album');
+  });
+
+  it('json-encodes array fields in the form data', async () => {
+    vi.mocked(createReleaseAction).mockResolvedValue(okState);
+    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
+      useCreateReleaseMutation
+    );
+
+    await opts.mutationFn({
+      title: 'Album',
+      releasedOn: '2026-01-01',
+      coverArt: 'https://x/y.png',
+      formats: ['DIGITAL'],
+      artistIds: ['a'.repeat(24)],
+      preGeneratedId: 'p1',
+    });
+
+    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[1].get('formats')).toBe('["DIGITAL"]');
   });
 
   it('invalidates release and artist caches on success', async () => {
@@ -79,16 +133,13 @@ describe('useCreateReleaseMutation', () => {
 });
 
 describe('useUpdateReleaseMutation', () => {
-  it('calls updateReleaseAction with the release id, state, and data', async () => {
+  it('calls updateReleaseAction with the release id', async () => {
     vi.mocked(updateReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<{ releaseId: string; formState: FormState; formData: FormData }>(
-      useUpdateReleaseMutation
-    );
-    const formData = new FormData();
+    const opts = getOptions<{ id: string; values: ReleaseFormData }>(useUpdateReleaseMutation);
 
-    await opts.mutationFn({ releaseId: 'r-1', formState: failState, formData });
+    await opts.mutationFn({ id: 'r1', values: { title: 'Album' } as ReleaseFormData });
 
-    expect(updateReleaseAction).toHaveBeenCalledWith('r-1', failState, formData);
+    expect(vi.mocked(updateReleaseAction).mock.calls[0]?.[0]).toBe('r1');
   });
 
   it('invalidates release and artist caches on success', async () => {

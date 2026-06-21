@@ -7,7 +7,8 @@ import { renderHook } from '@testing-library/react';
 
 import { createVenueAction, updateVenueAction } from '@/lib/actions/venue-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { VenueCreateInput, VenueUpdateInput } from '@/lib/validation/tours/venue-schema';
 
 import { useCreateVenueMutation, useUpdateVenueMutation } from './use-venue-mutations';
 
@@ -39,18 +40,35 @@ const failState: FormState = { fields: {}, success: false };
 
 beforeEach(() => {
   useMutationMock.mockReset();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
   invalidateQueriesMock.mockClear();
 });
 
 describe('useCreateVenueMutation', () => {
-  it('calls createVenueAction with the form state and data', async () => {
+  it('calls createVenueAction with the empty form state', async () => {
     vi.mocked(createVenueAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(useCreateVenueMutation);
-    const formData = new FormData();
+    const opts = getOptions<VenueCreateInput>(useCreateVenueMutation);
 
-    await opts.mutationFn({ formState: failState, formData });
+    await opts.mutationFn({ name: 'The Venue', city: 'NOLA' } as VenueCreateInput);
 
-    expect(createVenueAction).toHaveBeenCalledWith(failState, formData);
+    expect(createVenueAction).toHaveBeenCalledWith(EMPTY_FORM_STATE, expect.any(FormData));
+  });
+
+  it('serializes the venue values to form data', async () => {
+    vi.mocked(createVenueAction).mockResolvedValue(okState);
+    const opts = getOptions<VenueCreateInput>(useCreateVenueMutation);
+
+    await opts.mutationFn({ name: 'The Venue', city: 'NOLA' } as VenueCreateInput);
+
+    expect(vi.mocked(createVenueAction).mock.calls[0]?.[1].get('name')).toBe('The Venue');
   });
 
   it('invalidates the venue and tour caches on success', async () => {
@@ -72,16 +90,13 @@ describe('useCreateVenueMutation', () => {
 });
 
 describe('useUpdateVenueMutation', () => {
-  it('calls updateVenueAction with the venue id, state, and data', async () => {
+  it('calls updateVenueAction with the venue id', async () => {
     vi.mocked(updateVenueAction).mockResolvedValue(okState);
-    const opts = getOptions<{ venueId: string; formState: FormState; formData: FormData }>(
-      useUpdateVenueMutation
-    );
-    const formData = new FormData();
+    const opts = getOptions<{ id: string; values: VenueUpdateInput }>(useUpdateVenueMutation);
 
-    await opts.mutationFn({ venueId: 'v-1', formState: failState, formData });
+    await opts.mutationFn({ id: 'v1', values: { name: 'New Name' } as VenueUpdateInput });
 
-    expect(updateVenueAction).toHaveBeenCalledWith('v-1', failState, formData);
+    expect(updateVenueAction).toHaveBeenCalledWith('v1', EMPTY_FORM_STATE, expect.any(FormData));
   });
 
   it('invalidates the venue and tour caches on success', async () => {

@@ -89,9 +89,9 @@ export const ArtistPillList = ({
 }: ArtistPillListProps) => {
   const [headliners, setHeadliners] = useState(initialHeadliners);
   const prevInitialRef = useRef(initialHeadliners);
-  const { mutateAsync: reorderHeadliners } = useReorderHeadlinersMutation();
-  const { mutateAsync: updateHeadlinerSetTime } = useUpdateHeadlinerSetTimeMutation();
-  const { mutateAsync: removeHeadliner } = useRemoveHeadlinerMutation();
+  const { reorderHeadlinersAsync } = useReorderHeadlinersMutation();
+  const { updateHeadlinerSetTimeAsync } = useUpdateHeadlinerSetTimeMutation();
+  const { removeHeadlinerAsync } = useRemoveHeadlinerMutation();
 
   // Keep local state in sync with parent prop updates
   // (e.g., after the parent refetches tour dates).
@@ -121,7 +121,7 @@ export const ArtistPillList = ({
       const reordered = arrayMove(headliners, oldIndex, newIndex);
       setHeadliners(reordered);
 
-      const result = await reorderHeadliners({
+      const result = await reorderHeadlinersAsync({
         tourDateId,
         headlinerIds: reordered.map((h) => h.id),
       });
@@ -134,12 +134,12 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to reorder artists');
       }
     },
-    [headliners, tourDateId, reorderHeadliners]
+    [headliners, tourDateId, reorderHeadlinersAsync]
   );
 
   const handleSetTimeUpdate = useCallback(
     async (headlinerId: string, artistId: string | null, setTime: string | null) => {
-      const result = await updateHeadlinerSetTime({
+      const result = await updateHeadlinerSetTimeAsync({
         headlinerId,
         setTime,
         tourDateId,
@@ -158,12 +158,12 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to update set time');
       }
     },
-    [tourDateId, updateHeadlinerSetTime]
+    [tourDateId, updateHeadlinerSetTimeAsync]
   );
 
   const handleRemove = useCallback(
     async (headlinerId: string, artistId: string | null) => {
-      const result = await removeHeadliner({
+      const result = await removeHeadlinerAsync({
         headlinerId,
         tourDateId,
         artistId: artistId ?? undefined,
@@ -176,7 +176,7 @@ export const ArtistPillList = ({
         toast.error(result.error || 'Failed to remove artist');
       }
     },
-    [onHeadlinersChange, tourDateId, removeHeadliner]
+    [onHeadlinersChange, tourDateId, removeHeadlinerAsync]
   );
 
   if (headliners.length === 0) {
