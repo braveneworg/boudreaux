@@ -5,6 +5,11 @@
 
 import { useMemo, useState } from 'react';
 
+import {
+  useArchiveArtistMutation,
+  usePublishArtistMutation,
+  useRestoreArtistMutation,
+} from '@/app/hooks/mutations/use-artist-mutations';
 import { useDebounce } from '@/app/hooks/use-debounce';
 import { useInfiniteArtistsQuery } from '@/app/hooks/use-infinite-artists-query';
 import { ENTITIES } from '@/lib/constants';
@@ -13,6 +18,9 @@ import type { Artist } from '@/lib/types/media-models';
 import { DataView } from './data-view';
 
 export const ArtistDataView = () => {
+  const { publishArtistAsync } = usePublishArtistMutation();
+  const { archiveArtistAsync } = useArchiveArtistMutation();
+  const { restoreArtistAsync } = useRestoreArtistMutation();
   const fieldsToShow = [
     'firstName',
     'middleName',
@@ -61,6 +69,9 @@ export const ArtistDataView = () => {
       fieldsToShow={fieldsToShow}
       imageField="images"
       canCreate={false}
+      onPublishEntity={(id) => publishArtistAsync({ artistId: id })}
+      onDeleteEntity={(id) => archiveArtistAsync({ artistId: id })}
+      onRestoreEntity={(id) => restoreArtistAsync({ artistId: id })}
       refetch={refetch}
       isPending={isPending}
       isFetching={isFetching}

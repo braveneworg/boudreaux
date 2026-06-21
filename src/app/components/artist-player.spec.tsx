@@ -181,6 +181,10 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
           {f.title ?? f.fileName}
         </button>
       ))}
+      {/* Drives handleFileSelect with an id no file matches (index < 0 guard). */}
+      <button data-testid="select-unknown-file" onClick={() => onFileSelect('no-such-file')}>
+        Unknown file
+      </button>
       {downloadTrigger}
     </div>
   );
@@ -249,11 +253,20 @@ vi.mock('./release-combobox', () => ({
           type="button"
           aria-label={`Play ${release.title}`}
           aria-pressed={release.id === selectedId}
+          data-cover-src={release.coverArtSrc ?? 'null'}
           onClick={() => onSelect(release.id)}
         >
           {release.title}
         </button>
       ))}
+      {/* Exercises the parent's `index >= 0` guard with an id no release matches. */}
+      <button
+        type="button"
+        data-testid="select-unknown-release"
+        onClick={() => onSelect('does-not-exist')}
+      >
+        Select unknown
+      </button>
     </div>
   ),
 }));
@@ -825,6 +838,35 @@ describe('ArtistPlayer', () => {
     });
   });
 
+  describe('combobox option mapping', () => {
+    it('maps a release with no cover art to a null coverArtSrc', () => {
+      const withCover = createRelease('release-1', 'Album One', [mockFile1]);
+      const noCover = { ...createRelease('release-2', 'Album Two', [mockFile2]), coverArt: '' };
+      const artist = createArtistWithReleases([withCover, noCover]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      // The null-cover branch (getReleaseCoverArt(...)?.src ?? null) maps the
+      // second option's coverArtSrc to null.
+      const second = screen.getByRole('button', { name: 'Play Album Two' });
+      expect(second).toHaveAttribute('data-cover-src', 'null');
+    });
+
+    it('ignores a combobox selection for an unknown release id', () => {
+      const release1 = createRelease('release-1', 'Album One', [mockFile1]);
+      const release2 = createRelease('release-2', 'Album Two', [mockFile2]);
+      const artist = createArtistWithReleases([release1, release2]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      // The onSelect handler's `index >= 0` guard no-ops on a bad id, so the
+      // first release stays selected.
+      fireEvent.click(screen.getByTestId('select-unknown-release'));
+
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
+    });
+  });
+
   describe('edge cases for uncovered branches', () => {
     it('should use fallback cover art alt text when cover art is null', () => {
       const noCoverRelease = {
@@ -859,8 +901,10 @@ describe('ArtistPlayer', () => {
 
       render(<ArtistPlayer artist={artist} />);
 
-      // The FormatFileListDrawer mock only renders buttons for actual files
-      // Verify current state is unchanged (file-1)
+      // The drawer's unknown-file button drives onFileSelect('no-such-file'),
+      // hitting handleFileSelect's `index >= 0` false branch (no state change).
+      fireEvent.click(screen.getByTestId('select-unknown-file'));
+
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
       expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
         'data-current-file-id',

@@ -6,9 +6,11 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
 import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
+import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -54,6 +56,9 @@ vi.mock('@/lib/actions/create-release-action', () => ({
 }));
 vi.mock('@/lib/actions/update-release-action', () => ({
   updateReleaseAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/delete-release-action', () => ({
+  deleteReleaseAction: vi.fn(),
 }));
 vi.mock('@/lib/actions/presigned-upload-actions', () => ({
   getPresignedUploadUrlsAction: vi.fn(),
@@ -256,6 +261,81 @@ describe('ReleaseForm — edit mode', () => {
     const input = await screen.findByLabelText('Suggested price in dollars');
     await waitFor(() => {
       expect(input).toHaveValue('7.99');
+    });
+  });
+});
+
+describe('ReleaseForm — delete (hard)', () => {
+  const releaseId = '507f1f77bcf86cd799439011';
+
+  // Opens the EntityDeleteButton's confirmation dialog and clicks its confirm.
+  const confirmDelete = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Delete Release' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+  };
+
+  beforeEach(() => {
+    vi.mocked(deleteReleaseAction).mockResolvedValue({ success: true });
+  });
+
+  it('renders a delete button in edit mode', () => {
+    render(<ReleaseForm releaseId={releaseId} />);
+
+    expect(screen.getByRole('button', { name: 'Delete Release' })).toBeInTheDocument();
+  });
+
+  it('does not render a delete button in create mode', () => {
+    render(<ReleaseForm />);
+
+    expect(screen.queryByRole('button', { name: 'Delete Release' })).not.toBeInTheDocument();
+  });
+
+  it('deletes the release and navigates to the admin list on success', async () => {
+    render(<ReleaseForm releaseId={releaseId} />);
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await confirmDelete(user);
+
+    await waitFor(() => {
+      expect(deleteReleaseAction).toHaveBeenCalledWith(releaseId);
+    });
+    expect(mockPush).toHaveBeenCalledWith('/admin/releases');
+  });
+
+  it('does not delete when the confirmation dialog is cancelled', async () => {
+    render(<ReleaseForm releaseId={releaseId} />);
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: 'Delete Release' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(deleteReleaseAction).not.toHaveBeenCalled();
+  });
+
+  it('shows an error toast when deletion fails', async () => {
+    vi.mocked(deleteReleaseAction).mockResolvedValue({
+      success: false,
+      error: 'Release not found',
+    });
+    render(<ReleaseForm releaseId={releaseId} />);
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await confirmDelete(user);
+
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Release not found');
+    });
+  });
+
+  it('shows a generic error toast when the delete action throws', async () => {
+    vi.mocked(deleteReleaseAction).mockRejectedValue(new Error('boom'));
+    render(<ReleaseForm releaseId={releaseId} />);
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await confirmDelete(user);
+
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('An unexpected error occurred');
     });
   });
 });

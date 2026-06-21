@@ -186,6 +186,64 @@ describe('EmailStep', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it('should focus the email input on mount', () => {
+    renderInDialog(<EmailStep {...defaultProps} />);
+
+    expect(screen.getByLabelText('Email')).toHaveFocus();
+  });
+
+  it('should show "Checking..." on the submit button while verification is pending', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    let resolveVerify: ((value: { success: boolean }) => void) | undefined;
+    mockVerifyTurnstile.mockReturnValue(
+      new Promise<{ success: boolean }>((resolve) => {
+        resolveVerify = resolve;
+      })
+    );
+
+    const onConfirm = vi.fn();
+    const { container } = renderInDialog(
+      <EmailStep onCancel={defaultProps.onCancel} onConfirm={onConfirm} />
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'pending@example.com' } });
+    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByTestId('verify-turnstile'));
+
+    const submitButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    // Submit while verifyTurnstile is still unresolved (deferred promise).
+    fireEvent.click(submitButton);
+
+    // While verifyTurnstile is unresolved, the submit button shows pending copy.
+    await waitFor(() => {
+      expect(submitButton).toHaveTextContent('Checking...');
+    });
+
+    resolveVerify?.({ success: true });
+
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledWith('pending@example.com');
+    });
+  });
+
+  it('should clear verification and reset the token when verification fails', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    const onConfirm = vi.fn();
+    mockVerifyTurnstile.mockResolvedValue({ success: false, error: 'Failed verification' });
+
+    renderInDialog(<EmailStep onCancel={defaultProps.onCancel} onConfirm={onConfirm} />);
+
+    await fillFormAndVerify(user, 'reset@example.com');
+    await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
+
+    // After a failed verification the button reverts to disabled (isVerified
+    // reset to false) and surfaces the error.
+    await waitFor(() => {
+      expect(screen.getByText('Failed verification')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Continue to Checkout' })).toBeDisabled();
+  });
+
   it('should show default error message when Turnstile verification fails without error string', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     mockVerifyTurnstile.mockResolvedValue({ success: false });

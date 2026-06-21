@@ -6,6 +6,8 @@
 import { renderHook } from '@testing-library/react';
 
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
+import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
+import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
@@ -14,6 +16,8 @@ import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-ar
 
 import {
   useCreateFeaturedArtistMutation,
+  useDeleteFeaturedArtistMutation,
+  usePublishFeaturedArtistMutation,
   usePublishFeaturedArtistsMutation,
   useUpdateFeaturedArtistCoverArtMutation,
 } from './use-featured-artist-mutations';
@@ -28,6 +32,12 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/actions/create-featured-artist-action', () => ({
   createFeaturedArtistAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/delete-featured-artist-action', () => ({
+  deleteFeaturedArtistAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/publish-featured-artist-action', () => ({
+  publishFeaturedArtistAction: vi.fn(),
 }));
 vi.mock('@/lib/actions/publish-featured-artists-action', () => ({
   publishFeaturedArtistsToSiteAction: vi.fn(),
@@ -129,6 +139,60 @@ describe('useUpdateFeaturedArtistCoverArtMutation', () => {
     await opts.onSuccess({ success: true }, {});
 
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.featuredArtists.all });
+  });
+});
+
+describe('useDeleteFeaturedArtistMutation', () => {
+  it('calls deleteFeaturedArtistAction with the featured artist id', async () => {
+    vi.mocked(deleteFeaturedArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ featuredArtistId: string }>(useDeleteFeaturedArtistMutation);
+
+    await opts.mutationFn({ featuredArtistId: 'fa-1' });
+
+    expect(deleteFeaturedArtistAction).toHaveBeenCalledWith('fa-1');
+  });
+
+  it('invalidates the featured-artist cache on success', async () => {
+    const opts = getOptions(useDeleteFeaturedArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.featuredArtists.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useDeleteFeaturedArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePublishFeaturedArtistMutation', () => {
+  it('calls publishFeaturedArtistAction with the featured artist id', async () => {
+    vi.mocked(publishFeaturedArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ featuredArtistId: string }>(usePublishFeaturedArtistMutation);
+
+    await opts.mutationFn({ featuredArtistId: 'fa-1' });
+
+    expect(publishFeaturedArtistAction).toHaveBeenCalledWith('fa-1');
+  });
+
+  it('invalidates the featured-artist cache on success', async () => {
+    const opts = getOptions(usePublishFeaturedArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.featuredArtists.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(usePublishFeaturedArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });
 

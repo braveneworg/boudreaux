@@ -9,6 +9,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
+import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
+import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 
 import { FeaturedArtistDataView } from './featured-artist-data-view';
@@ -42,6 +44,15 @@ vi.mock('sonner', () => ({
 // Mock publish action
 vi.mock('@/lib/actions/publish-featured-artists-action', () => ({
   publishFeaturedArtistsToSiteAction: vi.fn(),
+}));
+
+// Mock the per-row publish/delete actions so the injected DataView callbacks
+// resolve without executing server code.
+vi.mock('@/lib/actions/publish-featured-artist-action', () => ({
+  publishFeaturedArtistAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+vi.mock('@/lib/actions/delete-featured-artist-action', () => ({
+  deleteFeaturedArtistAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
 const createQueryClient = () =>
@@ -336,5 +347,29 @@ describe('FeaturedArtistDataView', () => {
     expect(useInfiniteFeaturedArtistsQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ published: true })
     );
+  });
+
+  it('publishes a row via the per-item publish action', async () => {
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(publishFeaturedArtistAction).toHaveBeenCalledWith('featured-123'));
+  });
+
+  it('hard-deletes a row via the delete action', async () => {
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(deleteFeaturedArtistAction).toHaveBeenCalledWith('featured-123'));
   });
 });

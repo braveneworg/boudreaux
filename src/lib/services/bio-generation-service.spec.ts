@@ -120,6 +120,18 @@ describe('BioGenerationService.generate', () => {
     expect(result).toEqual({ ok: false, error: 'Failed to reach the bio generator' });
     vi.unstubAllEnvs();
   });
+
+  it('treats a missing Payload as malformed JSON and fails gracefully', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
+    // No Payload at all → empty string → JSON.parse('') throws → caught.
+    sendMock.mockResolvedValue({});
+
+    const result = await BioGenerationService.generate({ artistId: 'a1', displayName: 'Nas' });
+
+    expect(result).toEqual({ ok: false, error: 'Failed to reach the bio generator' });
+    vi.unstubAllEnvs();
+  });
 });
 
 describe('BioGenerationService.generateForArtist', () => {
@@ -331,6 +343,168 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result).toEqual({ success: false, error: 'Bio generation failed' });
     expect(replaceBioContentMock).not.toHaveBeenCalled();
   });
+
+  it('grounds on the real name when displayName is blank', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, displayName: '   ' });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: 'Thom Yorke' })
+    );
+  });
+
+  it('falls back to the first aka name when no display or real name exists', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      displayName: null,
+      firstName: '',
+      surname: '',
+      akaNames: 'Tommy, Tom',
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ displayName: 'Tommy' }));
+  });
+
+  it('errors when the artist has no name at all', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      displayName: null,
+      firstName: '',
+      surname: '',
+      akaNames: null,
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Artist has no name to generate a bio from.',
+    });
+    expect(generateSpy).not.toHaveBeenCalled();
+  });
+
+  it('omits the real name when first and surname are blank but not pseudonymous', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      firstName: ' ',
+      surname: ' ',
+      displayName: 'Radiohead',
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ realName: undefined }));
+  });
+
+  it('forwards undefined akaNames and genres when the artist has none', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, akaNames: null, genres: null });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ akaNames: undefined, existingGenres: undefined })
+    );
+  });
+
+  it('persists null genres when generation returns no genres', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: { ...generateResult.data, genres: null },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.genres).toBeNull();
+  });
+
+  it('persists null genres when the value sanitizes down to an empty string', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      // Tag-only content collapses to '' after sanitizeBioText → `|| null`.
+      data: { ...generateResult.data, genres: '<script></script>' },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.genres).toBeNull();
+  });
+
+  it('falls back to the original image dimensions and null title when re-host omits them', async () => {
+    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: null,
+            attribution: 'Photographer',
+            license: null,
+            sourceUrl: null,
+            width: 640,
+            height: 480,
+            isPrimary: false,
+          },
+        ],
+      },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.images[0].title).toBeNull();
+    expect(content.images[0].width).toBe(640);
+    expect(content.images[0].height).toBe(480);
+  });
+
+  it('persists null dimensions when neither re-host nor source supply them', async () => {
+    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: 'Cover',
+            attribution: 'Photographer',
+            license: null,
+            sourceUrl: null,
+            isPrimary: false,
+          },
+        ],
+      },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.images[0].width).toBeNull();
+    expect(content.images[0].height).toBeNull();
+  });
+
+  it('persists a null kind for a link that has none', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        links: [{ label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead' }],
+      },
+    });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.links[0].kind).toBeNull();
+  });
 });
 
 describe('BioGenerationService.runGenerationJob', () => {
@@ -380,6 +554,19 @@ describe('BioGenerationService.runGenerationJob', () => {
 
     expect(result).toEqual({ success: false, error: 'DB down' });
     expect(setBioStatusMock.mock.calls[1]).toEqual(['a1', 'failed', { error: 'DB down' }]);
+  });
+
+  it('uses a default message when a non-Error value is thrown', async () => {
+    generateForArtistSpy.mockRejectedValue('boom');
+
+    const result = await BioGenerationService.runGenerationJob('a1');
+
+    expect(result).toEqual({ success: false, error: 'Bio generation failed unexpectedly.' });
+    expect(setBioStatusMock.mock.calls[1]).toEqual([
+      'a1',
+      'failed',
+      { error: 'Bio generation failed unexpectedly.' },
+    ]);
   });
 });
 
@@ -455,5 +642,28 @@ describe('BioGenerationService.getGenerationStatus', () => {
     const result = await BioGenerationService.getGenerationStatus('a1');
 
     expect(result).toEqual({ status: 'failed', error: 'boom', content: null });
+  });
+
+  it('defaults succeeded content fields when the persisted columns are null', async () => {
+    getBioGenerationStateMock.mockResolvedValue(state({ bioStatus: 'succeeded' }));
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.content).toEqual({
+      shortBio: '',
+      longBio: '',
+      genres: null,
+      images: [],
+      links: [],
+      model: '',
+    });
+  });
+
+  it('normalises a missing bioStatus to null', async () => {
+    getBioGenerationStateMock.mockResolvedValue(state({ bioStatus: undefined }));
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result).toEqual({ status: null, error: null, content: null });
   });
 });

@@ -185,4 +185,31 @@ export class FeaturedArtistsService {
       return { success: false, error: 'Failed to delete featured artist' };
     }
   }
+
+  /**
+   * Publish a single featured artist by stamping `publishedOn` with the current
+   * time. Distinct from {@link publishFeaturedArtistsToSiteAction}, which
+   * republishes the whole active set to the landing page.
+   */
+  static async publishFeaturedArtist(id: string): Promise<ServiceResponse<FeaturedArtist>> {
+    try {
+      const featuredArtist = await FeaturedArtistRepository.update(id, {
+        publishedOn: new Date(),
+      });
+
+      return { success: true, data: featuredArtist };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Featured artist not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to publish featured artist' };
+    }
+  }
 }

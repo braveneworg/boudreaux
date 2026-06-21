@@ -151,6 +151,22 @@ describe('useUpdateTourDateMutation', () => {
     const formData = vi.mocked(updateTourDateAction).mock.calls.at(-1)?.[2] as FormData;
     expect(formData.get('venueId')).toBe('v2');
   });
+
+  it('invalidates the tour cache on success', async () => {
+    const opts = getOptions(useUpdateTourDateMutation);
+
+    await opts.onSuccess(okState, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useUpdateTourDateMutation);
+
+    await opts.onSuccess(failState, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('useDeleteTourDateMutation', () => {
@@ -163,6 +179,14 @@ describe('useDeleteTourDateMutation', () => {
 
     expect(deleteTourDateAction).toHaveBeenCalledWith('td-1');
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useDeleteTourDateMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });
 
@@ -190,6 +214,22 @@ describe('useUpdateHeadlinerSetTimeMutation', () => {
       'a-1'
     );
   });
+
+  it('invalidates the tour cache on success', async () => {
+    const opts = getOptions(useUpdateHeadlinerSetTimeMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useUpdateHeadlinerSetTimeMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('useRemoveHeadlinerMutation', () => {
@@ -202,6 +242,22 @@ describe('useRemoveHeadlinerMutation', () => {
     await opts.mutationFn({ headlinerId: 'h-1', tourDateId: 'td-1', artistId: 'a-1' });
 
     expect(removeHeadlinerAction).toHaveBeenCalledWith('h-1', 'td-1', 'a-1');
+  });
+
+  it('invalidates the tour cache on success', async () => {
+    const opts = getOptions(useRemoveHeadlinerMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useRemoveHeadlinerMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });
 
@@ -217,5 +273,13 @@ describe('useReorderHeadlinersMutation', () => {
 
     expect(reorderHeadlinersAction).toHaveBeenCalledWith('td-1', ['h-2', 'h-1']);
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useReorderHeadlinersMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });

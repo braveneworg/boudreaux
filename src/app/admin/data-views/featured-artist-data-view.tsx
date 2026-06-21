@@ -10,7 +10,11 @@ import { toast } from 'sonner';
 
 import { Button } from '@/app/components/ui/button';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
-import { usePublishFeaturedArtistsMutation } from '@/app/hooks/mutations/use-featured-artist-mutations';
+import {
+  useDeleteFeaturedArtistMutation,
+  usePublishFeaturedArtistMutation,
+  usePublishFeaturedArtistsMutation,
+} from '@/app/hooks/mutations/use-featured-artist-mutations';
 import { useDebounce } from '@/app/hooks/use-debounce';
 import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
 import { ENTITIES } from '@/lib/constants';
@@ -22,6 +26,8 @@ import { DataView } from './data-view';
 export const FeaturedArtistDataView = () => {
   const { publishFeaturedArtistsAsync, isPublishingFeaturedArtists: isPublishing } =
     usePublishFeaturedArtistsMutation();
+  const { publishFeaturedArtistAsync } = usePublishFeaturedArtistMutation();
+  const { deleteFeaturedArtistAsync } = useDeleteFeaturedArtistMutation();
   const fieldsToShow = [
     'displayName',
     'featuredOn',
@@ -90,6 +96,8 @@ export const FeaturedArtistDataView = () => {
         entity={ENTITIES.featuredArtist}
         data={{ featuredArtists: rows }}
         fieldsToShow={fieldsToShow}
+        onPublishEntity={(id) => publishFeaturedArtistAsync({ featuredArtistId: id })}
+        onDeleteEntity={(id) => deleteFeaturedArtistAsync({ featuredArtistId: id })}
         refetch={refetch}
         isPending={isPending}
         isFetching={isFetching}

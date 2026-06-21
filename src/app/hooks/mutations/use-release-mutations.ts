@@ -6,6 +6,8 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { createReleaseAction } from '@/lib/actions/create-release-action';
+import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
+import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
@@ -116,5 +118,62 @@ export const useUpdateReleaseCoverArtMutation = () => {
     isUpdateReleaseCoverArtError,
     updateReleaseCoverArtError,
     resetUpdateReleaseCoverArt,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link deleteReleaseAction} (a hard delete — cascades to
+ * the release's related records and S3 objects). Invalidates the release/artist
+ * caches on a successful result so listings drop the removed release.
+ */
+export const useDeleteReleaseMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: deleteRelease,
+    mutateAsync: deleteReleaseAsync,
+    isPending: isDeletingRelease,
+    isError: isDeleteReleaseError,
+    error: deleteReleaseError,
+    reset: resetDeleteRelease,
+  } = useMutation<Awaited<ReturnType<typeof deleteReleaseAction>>, Error, { releaseId: string }>({
+    mutationFn: ({ releaseId }) => deleteReleaseAction(releaseId),
+    onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
+  });
+
+  return {
+    deleteRelease,
+    deleteReleaseAsync,
+    isDeletingRelease,
+    isDeleteReleaseError,
+    deleteReleaseError,
+    resetDeleteRelease,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link publishReleaseAction} (stamps `publishedAt`).
+ * Invalidates the release/artist caches on a successful result.
+ */
+export const usePublishReleaseMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: publishRelease,
+    mutateAsync: publishReleaseAsync,
+    isPending: isPublishingRelease,
+    isError: isPublishReleaseError,
+    error: publishReleaseError,
+    reset: resetPublishRelease,
+  } = useMutation<Awaited<ReturnType<typeof publishReleaseAction>>, Error, { releaseId: string }>({
+    mutationFn: ({ releaseId }) => publishReleaseAction(releaseId),
+    onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
+  });
+
+  return {
+    publishRelease,
+    publishReleaseAsync,
+    isPublishingRelease,
+    isPublishReleaseError,
+    publishReleaseError,
+    resetPublishRelease,
   };
 };

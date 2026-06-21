@@ -5,6 +5,10 @@
 
 import { useMemo, useState } from 'react';
 
+import {
+  useDeleteReleaseMutation,
+  usePublishReleaseMutation,
+} from '@/app/hooks/mutations/use-release-mutations';
 import { useDebounce } from '@/app/hooks/use-debounce';
 import { useInfiniteReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 import { ENTITIES } from '@/lib/constants';
@@ -28,6 +32,8 @@ const getAlbumArtist = (release: ReleaseListItem): string => {
 };
 
 export const ReleaseDataView = () => {
+  const { publishReleaseAsync } = usePublishReleaseMutation();
+  const { deleteReleaseAsync } = useDeleteReleaseMutation();
   const fieldsToShow = [
     'title',
     'albumArtist',
@@ -83,6 +89,8 @@ export const ReleaseDataView = () => {
       fieldsToShow={fieldsToShow}
       imageField="images"
       forceHardDelete
+      onPublishEntity={(id) => publishReleaseAsync({ releaseId: id })}
+      onDeleteEntity={(id) => deleteReleaseAsync({ releaseId: id })}
       refetch={refetch}
       isPending={isPending}
       isFetching={isFetching}

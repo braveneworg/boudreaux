@@ -724,6 +724,49 @@ describe('ReleaseService', () => {
     });
   });
 
+  describe('publishRelease', () => {
+    it('should publish a release by stamping publishedAt', async () => {
+      const publishedRelease = { ...mockRelease, publishedAt: new Date('2024-12-13') };
+      vi.mocked(ReleaseRepository.update).mockResolvedValue(publishedRelease as never);
+
+      const result = await ReleaseService.publishRelease('release-123');
+
+      expect(result).toMatchObject({ success: true, data: publishedRelease });
+      expect(ReleaseRepository.update).toHaveBeenCalledWith('release-123', {
+        publishedAt: expect.any(Date),
+      });
+    });
+
+    it('should return error when release not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(notFoundError);
+
+      const result = await ReleaseService.publishRelease('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(initError);
+
+      const result = await ReleaseService.publishRelease('release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(ReleaseRepository.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await ReleaseService.publishRelease('release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to publish release' });
+    });
+  });
+
   // ===========================================================================
   // Public release methods (for /releases pages)
   // ===========================================================================

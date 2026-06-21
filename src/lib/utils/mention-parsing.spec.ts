@@ -78,4 +78,46 @@ describe('tokenizeMentions', () => {
     const tokens = tokenizeMentions('reach me at foo@bar.com');
     expect(tokens.every((t) => t.kind === 'text')).toBe(true);
   });
+
+  it('does not emit a leading text token when a mention starts at cursor', () => {
+    // First mention is at index 0, so `mentionStart > cursor` is false and no
+    // empty leading text token is pushed.
+    const tokens = tokenizeMentions('@alice');
+    expect(tokens).toEqual([{ kind: 'mention', value: '@alice', username: 'alice' }]);
+  });
+
+  it('does not emit a trailing text token when the body ends on a mention', () => {
+    // cursor lands exactly at body.length after the trailing mention, so the
+    // `cursor < body.length` branch is false.
+    const tokens = tokenizeMentions('hi @bob');
+    expect(tokens).toEqual([
+      { kind: 'text', value: 'hi ' },
+      { kind: 'mention', value: '@bob', username: 'bob' },
+    ]);
+  });
+
+  it('emits a separator text token between punctuation-adjacent mentions', () => {
+    // The boundary char between mentions (',' here) is the regex group-1
+    // prefix; it is emitted as its own text token, exercising the
+    // `mentionStart > cursor` true branch on the second mention.
+    const tokens = tokenizeMentions('@a,@b');
+    expect(tokens).toEqual([
+      { kind: 'mention', value: '@a', username: 'a' },
+      { kind: 'text', value: ',' },
+      { kind: 'mention', value: '@b', username: 'b' },
+    ]);
+  });
+
+  it('returns a single text token for a lone @ with no username', () => {
+    expect(tokenizeMentions('@')).toEqual([{ kind: 'text', value: '@' }]);
+  });
+
+  it('caps the username at 32 chars and emits the overflow as trailing text', () => {
+    const long = 'b'.repeat(40);
+    const tokens = tokenizeMentions(`@${long}`);
+    expect(tokens).toEqual([
+      { kind: 'mention', value: `@${long.slice(0, 32)}`, username: long.slice(0, 32) },
+      { kind: 'text', value: long.slice(32) },
+    ]);
+  });
 });

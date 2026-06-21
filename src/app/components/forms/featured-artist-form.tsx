@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
 import { TextField } from '@/app/components/forms/fields';
 import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
 import { ReleaseSelect, type ReleaseOption } from '@/app/components/forms/fields/release-select';
@@ -39,6 +40,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
   useCreateFeaturedArtistMutation,
+  useDeleteFeaturedArtistMutation,
   useUpdateFeaturedArtistCoverArtMutation,
 } from '@/app/hooks/mutations/use-featured-artist-mutations';
 import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
@@ -100,6 +102,7 @@ export const FeaturedArtistForm = ({
   const router = useRouter();
   const { createFeaturedArtistAsync } = useCreateFeaturedArtistMutation();
   const { updateFeaturedArtistCoverArtAsync } = useUpdateFeaturedArtistCoverArtMutation();
+  const { deleteFeaturedArtistAsync } = useDeleteFeaturedArtistMutation();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -638,9 +641,23 @@ export const FeaturedArtistForm = ({
             </div>
           </div>
           <div className="flex justify-between pt-6">
-            <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
+                Cancel
+              </Button>
+              {isEditMode && featuredArtistId && (
+                <EntityDeleteButton
+                  label="Delete Featured Artist"
+                  title="Delete this featured artist?"
+                  description="This permanently removes the featured artist entry and cannot be undone."
+                  successMessage="Featured artist deleted successfully"
+                  failureMessage="Failed to delete featured artist"
+                  redirectTo="/admin/featured-artists"
+                  disabled={isPending}
+                  onDelete={() => deleteFeaturedArtistAsync({ featuredArtistId })}
+                />
+              )}
+            </div>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Featured Artist'}
             </Button>

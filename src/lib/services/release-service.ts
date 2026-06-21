@@ -329,6 +329,29 @@ export class ReleaseService {
     }
   }
 
+  /**
+   * Publish a release by stamping `publishedAt` with the current time.
+   */
+  static async publishRelease(id: string): Promise<ServiceResponse<Release>> {
+    try {
+      const release = await ReleaseRepository.update(id, { publishedAt: new Date() });
+
+      return { success: true, data: release };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Release not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to publish release' };
+    }
+  }
+
   // ===========================================================================
   // Public release methods (for /releases pages)
   // ===========================================================================
