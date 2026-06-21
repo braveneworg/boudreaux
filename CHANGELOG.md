@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.147.0] - 2026-06-21
+
+### Added
+
+- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n
+
 ## [4.146.0] - 2026-06-21
 
 ### Added
