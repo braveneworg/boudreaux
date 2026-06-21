@@ -1,15 +1,53 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, fireEvent } from '@testing-library/react';
+import type { ReactNode } from 'react';
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+
+import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
+import { publishArtistAction } from '@/lib/actions/publish-artist-action';
+import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 
 import { ArtistDataView } from './artist-data-view';
+
+/**
+ * Wraps renders in a fresh QueryClient so the mutation hooks the wrapper now
+ * uses (publish/archive/restore) have a provider in scope. Mirrors the
+ * `render` signature so existing call sites are unchanged.
+ */
+const render = (ui: ReactNode) => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  Wrapper.displayName = 'TestWrapper';
+  return rtlRender(ui, { wrapper: Wrapper });
+};
 
 const mockUseArtistsQuery = vi.fn();
 vi.mock('@/app/hooks/use-infinite-artists-query', () => ({
   useInfiniteArtistsQuery: (...args: unknown[]) => mockUseArtistsQuery(...args),
 }));
 
+// Mock the artist mutation actions so the real mutation hooks resolve without
+// executing server code; lets us assert the wrapper maps DataView's `id` to the
+// `{ artistId }` shape each action expects.
+vi.mock('@/lib/actions/publish-artist-action', () => ({
+  publishArtistAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+vi.mock('@/lib/actions/archive-artist-action', () => ({
+  archiveArtistAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+vi.mock('@/lib/actions/restore-artist-action', () => ({
+  restoreArtistAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+
+type EntityMutation = (id: string) => Promise<{ success: boolean; error?: string }>;
+
+// DataView is mocked to a stub exposing the injected mutation callbacks as
+// buttons, so the wrapper's `(id) => xAsync({ artistId: id })` arrows execute.
 vi.mock('./data-view', () => ({
   DataView: (props: Record<string, unknown>) => (
     <div
@@ -24,6 +62,27 @@ vi.mock('./data-view', () => ({
         onClick={() => (props.onShowUnpublishedChange as (value: boolean) => void)(false)}
       >
         toggle unpublished
+      </button>
+      <button
+        type="button"
+        data-testid="invoke-publish"
+        onClick={() => void (props.onPublishEntity as EntityMutation)('artist-1')}
+      >
+        publish
+      </button>
+      <button
+        type="button"
+        data-testid="invoke-delete"
+        onClick={() => void (props.onDeleteEntity as EntityMutation)('artist-1')}
+      >
+        delete
+      </button>
+      <button
+        type="button"
+        data-testid="invoke-restore"
+        onClick={() => void (props.onRestoreEntity as EntityMutation)('artist-1')}
+      >
+        restore
       </button>
     </div>
   ),
@@ -97,5 +156,20 @@ describe('ArtistDataView', () => {
     expect(mockUseArtistsQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ published: true })
     );
+  });
+
+  it('maps DataView ids to the artist mutation actions', async () => {
+    mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+
+    render(<ArtistDataView />);
+    fireEvent.click(screen.getByTestId('invoke-publish'));
+    fireEvent.click(screen.getByTestId('invoke-delete'));
+    fireEvent.click(screen.getByTestId('invoke-restore'));
+
+    await waitFor(() => {
+      expect(publishArtistAction).toHaveBeenCalledWith('artist-1');
+      expect(archiveArtistAction).toHaveBeenCalledWith('artist-1');
+      expect(restoreArtistAction).toHaveBeenCalledWith('artist-1');
+    });
   });
 });

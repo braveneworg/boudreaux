@@ -58,6 +58,19 @@ const cleanImageUrl = (url: string): string => {
 const readField = (record: Record<string, unknown>, key: string): unknown =>
   new Map(Object.entries(record)).get(key);
 
+/** Plain result returned by the injected entity mutation callbacks. */
+export interface EntityMutationResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * An entity mutation injected by a `*-data-view` wrapper. Each wraps a TanStack
+ * mutation hook (which owns cache invalidation) and resolves to a plain result
+ * the DataView maps to a toast — keeping the generic DataView free of raw fetch.
+ */
+export type EntityMutation = (id: string) => Promise<EntityMutationResult>;
+
 /**
  * A generic data view component for displaying and managing admin entities.
  *
@@ -85,6 +98,9 @@ export const DataView = <T extends Record<string, unknown>>({
   imageField,
   coverArtField,
   forceHardDelete = false,
+  onPublishEntity,
+  onDeleteEntity,
+  onRestoreEntity,
   refetch,
   isPending,
   isFetching = false,
@@ -110,8 +126,14 @@ export const DataView = <T extends Record<string, unknown>>({
   imageField?: string;
   /** Field name containing a direct cover art URL string */
   coverArtField?: string;
-  /** Force hard delete (DELETE request) even if the entity has a deletedOn field */
+  /** Force hard delete (no Restore/“Show deleted” UI) even if the entity has a deletedOn field */
   forceHardDelete?: boolean;
+  /** Publishes the entity (stamps its publish timestamp). Injected by the wrapper. */
+  onPublishEntity: EntityMutation;
+  /** Deletes the entity — soft (archive) or hard, per the wrapper's wiring. */
+  onDeleteEntity: EntityMutation;
+  /** Restores a soft-deleted entity. Omitted for hard-delete-only entities. */
+  onRestoreEntity?: EntityMutation;
   refetch: () => void;
   isPending: boolean;
   /** Whether the query is fetching (e.g. after `refetch()`); drives the refresh skeleton. */
@@ -169,36 +191,6 @@ export const DataView = <T extends Record<string, unknown>>({
   // Get the display-friendly label for the entity (e.g., "featuredArtist" -> "featured artist")
   const entityDisplayLabel = toDisplayLabel(entity);
 
-  const updateEntity = useCallback(
-    async (id: string, body: Record<string, unknown>) => {
-      return await fetch(`/api/${entityUrlPath}/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-        .then((res) => res.json())
-        .catch((error) => {
-          console.error(`Failed to update ${entityDisplayLabel}:`, error);
-          return { error: 'Failed to update entity' };
-        });
-    },
-    [entityDisplayLabel, entityUrlPath]
-  );
-
-  const deleteEntity = useCallback(
-    async (id: string) => {
-      return await fetch(`/api/${entityUrlPath}/${id}`, {
-        method: 'DELETE',
-      })
-        .then((res) => res.json())
-        .catch((error) => {
-          console.error(`Failed to delete ${entityDisplayLabel}:`, error);
-          return { error: 'Failed to delete entity' };
-        });
-    },
-    [entityDisplayLabel, entityUrlPath]
-  );
-
   // Check if entity supports soft delete by checking if first item has deletedOn property
   const supportsSoftDelete = useMemo(() => {
     if (forceHardDelete) return false;
@@ -212,100 +204,44 @@ export const DataView = <T extends Record<string, unknown>>({
     router?.push(`/admin/${entityUrlPath}/new`);
   };
 
-  const handleClickPublishButton = useCallback(
-    async (event: React.MouseEvent<HTMLButtonElement>) => {
-      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
-
-      if (id) {
-        // Releases use 'publishedAt', other entities use 'publishedOn'
-        const publishField = entity === 'release' ? 'publishedAt' : 'publishedOn';
-        const response = await updateEntity(id, {
-          [publishField]: new Date().toISOString(),
-        });
-
-        if (response.id) {
-          const displayName = resolveDisplayName(response as T);
-          toast.success(`Successfully published ${entityDisplayLabel} - ${displayName}`);
+  // Runs an injected entity mutation and maps its result to a toast + refetch.
+  // Catches a rejected mutation (e.g. a Server Action transport failure) so the
+  // UI always surfaces an error rather than an unhandled rejection.
+  const runEntityMutation = useCallback(
+    async (verb: 'publish' | 'delete' | 'restore', item: T, mutation: EntityMutation) => {
+      const past = verb === 'publish' ? 'published' : verb === 'delete' ? 'deleted' : 'restored';
+      try {
+        const response = await mutation(item.id as string);
+        if (response.success) {
+          toast.success(`Successfully ${past} ${entityDisplayLabel} - ${resolveDisplayName(item)}`);
           refetch();
         } else {
           toast.error(
-            `Failed to publish ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+            `Failed to ${verb} ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
           );
         }
-      } else {
-        toast.error(`Failed to publish: Missing ${entityDisplayLabel} ID`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        toast.error(`Failed to ${verb} ${entityDisplayLabel}: ${message}`);
       }
     },
-    [entity, entityDisplayLabel, updateEntity, refetch, resolveDisplayName]
+    [entityDisplayLabel, refetch, resolveDisplayName]
+  );
+
+  const handleClickPublishButton = useCallback(
+    (item: T) => runEntityMutation('publish', item, onPublishEntity),
+    [runEntityMutation, onPublishEntity]
   );
 
   const handleClickDeleteButton = useCallback(
-    async (event: React.MouseEvent<HTMLButtonElement>) => {
-      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
-      if (id) {
-        // Use hard delete for entities that don't support soft delete (like Release)
-        if (!supportsSoftDelete) {
-          const response = await deleteEntity(id);
-
-          if (response.message || !response.error) {
-            toast.success(`Successfully deleted ${entityDisplayLabel}`);
-            refetch();
-          } else {
-            toast.error(
-              `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
-            );
-          }
-        } else {
-          // Use soft delete for entities that support it
-          const response = await updateEntity(id, {
-            deletedOn: new Date().toISOString(),
-          });
-
-          if (response.id) {
-            toast.success(
-              `Successfully deleted ${entityDisplayLabel} - ${resolveDisplayName(response as T)}`
-            );
-            refetch();
-          } else {
-            toast.error(
-              `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
-            );
-          }
-        }
-      } else {
-        toast.error(`Failed to delete: Missing ${entityDisplayLabel} ID`);
-      }
-    },
-    [
-      entityDisplayLabel,
-      updateEntity,
-      deleteEntity,
-      refetch,
-      supportsSoftDelete,
-      resolveDisplayName,
-    ]
+    (item: T) => runEntityMutation('delete', item, onDeleteEntity),
+    [runEntityMutation, onDeleteEntity]
   );
 
   const handleClickRestoreButton = useCallback(
-    async (event: React.MouseEvent<HTMLButtonElement>) => {
-      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
-      if (id) {
-        const response = await updateEntity(id, { deletedOn: null });
-        if (response.id) {
-          toast.success(
-            `Successfully restored ${entityDisplayLabel} - ${resolveDisplayName(response as T)}`
-          );
-          refetch();
-        } else {
-          toast.error(
-            `Failed to restore ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
-          );
-        }
-      } else {
-        toast.error(`Failed to restore: Missing ${entityDisplayLabel} ID`);
-      }
-    },
-    [entityDisplayLabel, updateEntity, refetch, resolveDisplayName]
+    (item: T) =>
+      onRestoreEntity ? runEntityMutation('restore', item, onRestoreEntity) : undefined,
+    [runEntityMutation, onRestoreEntity]
   );
 
   // Show the full-area skeleton on a refetch (e.g. after publish/delete/restore),
@@ -362,6 +298,10 @@ export const DataView = <T extends Record<string, unknown>>({
             <ul>
               {(data[`${String(entity)}s`] as T[]).map((item) => {
                 const id = item.id as string;
+                // Offer Restore only when the entity is soft-deletable, this row
+                // is currently deleted, AND a restore handler is wired — otherwise
+                // fall back to Delete so the action can never silently no-op.
+                const showRestore = supportsSoftDelete && !!item.deletedOn && !!onRestoreEntity;
 
                 return (
                   <li key={id}>
@@ -558,8 +498,7 @@ export const DataView = <T extends Record<string, unknown>>({
                                     <DialogClose asChild>
                                       <Button
                                         variant="destructive"
-                                        onClick={handleClickPublishButton}
-                                        datasetId={id}
+                                        onClick={() => handleClickPublishButton(item)}
                                       >
                                         Confirm
                                       </Button>
@@ -572,24 +511,20 @@ export const DataView = <T extends Record<string, unknown>>({
                         })()}
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button
-                              variant={
-                                supportsSoftDelete && item.deletedOn ? 'secondary' : 'destructive'
-                              }
-                            >
-                              {supportsSoftDelete && item.deletedOn ? (
+                            <Button variant={showRestore ? 'secondary' : 'destructive'}>
+                              {showRestore ? (
                                 <ArchiveRestoreIcon className="mr-0 size-4" />
                               ) : (
                                 <Trash2Icon className="mr-0 size-4" />
                               )}
-                              {supportsSoftDelete && item.deletedOn ? 'Restore' : 'Delete'}
+                              {showRestore ? 'Restore' : 'Delete'}
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <section>
                               <DialogHeader>
                                 <DialogTitle asChild>
-                                  {supportsSoftDelete && item.deletedOn ? (
+                                  {showRestore ? (
                                     <h1 className="text-3xl!">Confirm Restore</h1>
                                   ) : (
                                     <h1 className="text-3xl!">Confirm Delete</h1>
@@ -597,8 +532,7 @@ export const DataView = <T extends Record<string, unknown>>({
                                 </DialogTitle>
                               </DialogHeader>
                               <p className="mt-1 mb-4">
-                                Are you sure you want to{' '}
-                                {supportsSoftDelete && item.deletedOn ? 'restore' : 'delete'}{' '}
+                                Are you sure you want to {showRestore ? 'restore' : 'delete'}{' '}
                                 <b>{resolveDisplayName(item)}</b>?
                               </p>
                               <DialogFooter>
@@ -607,17 +541,12 @@ export const DataView = <T extends Record<string, unknown>>({
                                 </DialogClose>
                                 <DialogClose asChild>
                                   <Button
-                                    variant={
-                                      supportsSoftDelete && item.deletedOn
-                                        ? 'default'
-                                        : 'destructive'
+                                    variant={showRestore ? 'default' : 'destructive'}
+                                    onClick={() =>
+                                      showRestore
+                                        ? handleClickRestoreButton(item)
+                                        : handleClickDeleteButton(item)
                                     }
-                                    onClick={
-                                      supportsSoftDelete && item.deletedOn
-                                        ? handleClickRestoreButton
-                                        : handleClickDeleteButton
-                                    }
-                                    datasetId={id}
                                   >
                                     Confirm
                                   </Button>

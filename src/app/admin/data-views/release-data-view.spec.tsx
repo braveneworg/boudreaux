@@ -9,10 +9,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useInfiniteReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
+import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
+import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 
 import { ReleaseDataView } from './release-data-view';
 
 // Mock the useInfiniteReleasesQuery hook
+vi.mock('@/lib/actions/publish-release-action', () => ({
+  publishReleaseAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+vi.mock('@/lib/actions/delete-release-action', () => ({
+  deleteReleaseAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
+
 vi.mock('@/app/hooks/use-infinite-releases-query', () => ({
   useInfiniteReleasesQuery: vi.fn(),
 }));
@@ -319,5 +328,29 @@ describe('ReleaseDataView', () => {
     expect(useInfiniteReleasesQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ published: true })
     );
+  });
+
+  it('publishes a row via the release publish action', async () => {
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(publishReleaseAction).toHaveBeenCalledWith('release-123'));
+  });
+
+  it('hard-deletes a row via the release delete action', async () => {
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(deleteReleaseAction).toHaveBeenCalledWith('release-123'));
   });
 });
