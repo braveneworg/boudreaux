@@ -5,7 +5,7 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { useReleaseDetailQuery } from './use-release-detail-query';
+import { useReleaseDetailQuery, useReleaseQuery } from './use-release-query';
 
 const mockUseQuery = vi.hoisted(() => vi.fn());
 
@@ -13,6 +13,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: unknown) => mockUseQuery(options),
 }));
 
+/** Full admin `releaseSchema` fixture for the no-`withTracks` parse path. */
 const releaseResponse = {
   id: 'release-1',
   title: 'Test Release',
@@ -51,37 +52,77 @@ const releaseResponse = {
   releaseUrls: [],
 };
 
-describe('useReleaseDetailQuery', () => {
-  beforeEach(() => {
-    mockUseQuery.mockReturnValue({
-      isPending: false,
-      error: undefined,
-      data: null,
-      refetch: vi.fn(),
+type CapturedOptions = {
+  enabled: boolean;
+  queryKey: unknown[];
+  queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
+};
+
+const lastOptions = (): CapturedOptions => mockUseQuery.mock.calls[0]?.[0] as CapturedOptions;
+
+beforeEach(() => {
+  mockUseQuery.mockReturnValue({
+    isPending: false,
+    isError: false,
+    error: undefined,
+    data: null,
+    refetch: vi.fn(),
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('useReleaseQuery (public, withTracks)', () => {
+  it('disables the query when no release id is provided', () => {
+    renderHook(() => useReleaseQuery(''));
+
+    expect(lastOptions().enabled).toBe(false);
+  });
+
+  it('uses the public release detail query key', () => {
+    renderHook(() => useReleaseQuery('release-1'));
+
+    expect(lastOptions().queryKey).toEqual(['releases', 'detail', 'release-1']);
+  });
+
+  it('requests the `?withTracks=true` URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    renderHook(() => useReleaseQuery('release-1'));
+
+    const { signal } = new AbortController();
+    await expect(lastOptions().queryFn({ signal })).resolves.toBeNull();
+    expect(global.fetch).toHaveBeenCalledWith('/api/releases/release-1?withTracks=true', {
+      signal,
     });
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  it('throws when the response fails for a non-404 reason', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
+    renderHook(() => useReleaseQuery('release-1'));
+
+    const { signal } = new AbortController();
+    await expect(lastOptions().queryFn({ signal })).rejects.toThrow('Failed to fetch release');
+  });
+});
+
+describe('useReleaseDetailQuery (admin, no withTracks)', () => {
   it('disables the query when no release id is provided', () => {
     renderHook(() => useReleaseDetailQuery(''));
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { enabled: boolean };
-
-    expect(options.enabled).toBe(false);
+    expect(lastOptions().enabled).toBe(false);
   });
 
   it('uses the admin release detail query key', () => {
     renderHook(() => useReleaseDetailQuery('release-1'));
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { queryKey: unknown[] };
-
-    expect(options.queryKey).toEqual(['releases', 'adminDetail', 'release-1']);
+    expect(lastOptions().queryKey).toEqual(['releases', 'adminDetail', 'release-1']);
   });
 
-  it('fetches and parses the release on a 200 response', async () => {
+  it('fetches the no-`withTracks` URL and parses the release on a 200 response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => releaseResponse })
@@ -89,12 +130,8 @@ describe('useReleaseDetailQuery', () => {
 
     renderHook(() => useReleaseDetailQuery('release-1'));
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
-    };
-
     const { signal } = new AbortController();
-    const result = (await options.queryFn({ signal })) as { id: string };
+    const result = (await lastOptions().queryFn({ signal })) as { id: string };
 
     expect(result.id).toBe('release-1');
     expect(global.fetch).toHaveBeenCalledWith('/api/releases/release-1', { signal });
@@ -105,13 +142,8 @@ describe('useReleaseDetailQuery', () => {
 
     renderHook(() => useReleaseDetailQuery('missing'));
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
-    };
-
     const { signal } = new AbortController();
-
-    await expect(options.queryFn({ signal })).resolves.toBeNull();
+    await expect(lastOptions().queryFn({ signal })).resolves.toBeNull();
   });
 
   it('throws when the response fails for a non-404 reason', async () => {
@@ -119,12 +151,7 @@ describe('useReleaseDetailQuery', () => {
 
     renderHook(() => useReleaseDetailQuery('release-1'));
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
-    };
-
     const { signal } = new AbortController();
-
-    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to fetch release');
+    await expect(lastOptions().queryFn({ signal })).rejects.toThrow('Failed to fetch release');
   });
 });

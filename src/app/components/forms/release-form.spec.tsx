@@ -8,7 +8,7 @@ import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
-import { useReleaseDetailQuery } from '@/app/hooks/use-release-detail-query';
+import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -75,10 +75,11 @@ vi.mock('@/lib/utils/console-logger', () => ({
 // Mock the release-detail query hook so edit-mode loading is driven by the
 // hook's return value instead of a raw `fetch`. Defaults to "create mode"
 // (null data, not pending); edit-mode tests override it per-case.
-vi.mock('@/app/hooks/use-release-detail-query', () => ({
+vi.mock('@/app/hooks/use-release-query', () => ({
   useReleaseDetailQuery: vi.fn(() => ({
     data: null,
     isPending: false,
+    isError: false,
     error: null,
     refetch: vi.fn(),
   })),

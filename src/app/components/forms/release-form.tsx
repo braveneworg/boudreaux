@@ -45,7 +45,7 @@ import {
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
-import { useReleaseDetailQuery } from '@/app/hooks/use-release-detail-query';
+import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
