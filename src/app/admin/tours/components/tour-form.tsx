@@ -97,9 +97,12 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
     enabled: !!tourId,
   });
 
-  // In edit mode the form is "loading" until the tour query resolves; the
-  // `initialTour` fast-path (and create mode) have nothing to wait for.
-  const isLoadingTour = !!tourId && !initialTour && isTourPending;
+  // In edit mode the form renders only after its data has been applied
+  // client-side (create mode is ready immediately). Starting `true` for any
+  // edit keeps the form out of the SSR markup, so the reset-on-data effect
+  // can't trigger a hydration mismatch — which would otherwise mount a second,
+  // empty copy of the form.
+  const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
@@ -124,6 +127,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
         description: initialTour.description || '',
         notes: initialTour.notes || '',
       });
+      setIsLoadingTour(false);
     }
   }, [tourId, initialTour, reset]);
 
@@ -137,8 +141,19 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
         description: tourData.description || '',
         notes: tourData.notes || '',
       });
+      setIsLoadingTour(false);
     }
   }, [tourId, initialTour, tourData, reset]);
+
+  // Non-`initialTour` edit mode: once the tour query settles, stop showing the
+  // loading state even when the tour was not found (404 → null data), so the
+  // empty form (and its "Edit Tour" heading) renders instead of a perpetual
+  // skeleton.
+  useEffect(() => {
+    if (tourId && !initialTour && !isTourPending) {
+      setIsLoadingTour(false);
+    }
+  }, [tourId, initialTour, isTourPending]);
 
   // Project the tour-images query result into local state for the uploader.
   useEffect(() => {
