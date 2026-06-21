@@ -190,6 +190,30 @@ describe('ContactPage', () => {
     });
   });
 
+  describe('email contact links', () => {
+    const emailLinks = [
+      { name: /email label manager/i, href: 'mailto:dylanowenmusic@gmail.com' },
+      { name: /email distribution/i, href: 'mailto:jeephalo@gmail.com' },
+      { name: /email media and fan support/i, href: 'mailto:nikianarchy@gmail.com' },
+      { name: /email customer service/i, href: 'mailto:djmoniklz@gmail.com' },
+    ];
+
+    it.each(emailLinks)(
+      'should render an accessible mailto link to $href',
+      async ({ name, href }) => {
+        await importAndRender();
+        const link = screen.getByRole('link', { name });
+        expect(link).toHaveAttribute('href', href);
+      }
+    );
+
+    it('should render a mail icon inside each email link', async () => {
+      await importAndRender();
+      const link = screen.getByRole('link', { name: /email label manager/i });
+      expect(link.querySelector('svg')).toBeInTheDocument();
+    });
+  });
+
   describe('session auto-population', () => {
     it('should have fields enabled when user is not logged in', async () => {
       await importAndRender();

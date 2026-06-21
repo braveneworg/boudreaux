@@ -3,9 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { Fragment, useState, useCallback, useEffect } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Mail } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -18,6 +19,20 @@ import { ImageHeading } from '@/components/ui/image-heading';
 import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
 import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
+
+interface ContactEntry {
+  role: string;
+  name: string;
+  email?: string;
+}
+
+const CONTACTS: readonly ContactEntry[] = [
+  { role: 'Co-founders/owners', name: 'Ceschi Ramos and David Ramos' },
+  { role: 'Label Manager', name: 'Dylan', email: 'dylanowenmusic@gmail.com' },
+  { role: 'Distribution', name: 'Jeep Ward at Redeye Worldwide', email: 'jeephalo@gmail.com' },
+  { role: 'Media and Fan Support', name: 'Niki', email: 'nikianarchy@gmail.com' },
+  { role: 'Customer Service', name: 'Mo Niklz', email: 'djmoniklz@gmail.com' },
+];
 
 const ContactPage = () => {
   const { data: session } = useSession();
@@ -131,33 +146,25 @@ const ContactPage = () => {
         <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
         <ImageHeading src="/media/headings/CONTACT.webp" alt="contact" imageHeight={480} priority />
         <div className="mb-4 flex flex-col space-y-2">
-          <p>
-            <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos
-          </p>
-          <p>
-            <strong>Label Manager:</strong> Dylan
-          </p>
-          <p>
-            <a href="mailto:dylanowenmusic@gmail.com">dylanowenmusic@gmail.com</a>
-          </p>
-          <p>
-            <strong>Distribution:</strong> Jeep Ward at Redeye Worldwide
-          </p>
-          <p>
-            <a href="mailto:jeephalo@gmail.com">jeephalo@gmail.com</a>
-          </p>
-          <p>
-            <strong>Media and Fan Support:</strong> Niki
-          </p>
-          <p>
-            <a href="mailto:nikianarchy@gmail.com">nikianarchy@gmail.com</a>
-          </p>
-          <p>
-            <strong>Customer Service:</strong> Mo Niklz
-          </p>
-          <p>
-            <a href="mailto:djmoniklz@gmail.com">djmoniklz@gmail.com</a>
-          </p>
+          {CONTACTS.map(({ role, name, email }) => (
+            <Fragment key={role}>
+              <p>
+                <strong>{role}:</strong> {name}
+              </p>
+              {email && (
+                <p>
+                  <a
+                    href={`mailto:${email}`}
+                    aria-label={`Email ${role}, ${email}`}
+                    className="inline-flex items-center gap-1.5 underline"
+                  >
+                    <Mail aria-hidden className="size-4 shrink-0" />
+                    {email}
+                  </a>
+                </p>
+              )}
+            </Fragment>
+          ))}
         </div>
         <p className="text-zinc-950-foreground mb-6">
           Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
