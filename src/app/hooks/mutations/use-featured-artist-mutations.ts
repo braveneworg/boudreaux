@@ -6,6 +6,8 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
+import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
+import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
@@ -87,6 +89,75 @@ export const useUpdateFeaturedArtistCoverArtMutation = () => {
     isUpdateFeaturedArtistCoverArtError,
     updateFeaturedArtistCoverArtError,
     resetUpdateFeaturedArtistCoverArt,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link deleteFeaturedArtistAction} (a hard delete — the
+ * model has no `deletedOn` field). Invalidates the featured-artist caches on a
+ * successful result so the admin listing and home-page carousel drop the entry.
+ */
+export const useDeleteFeaturedArtistMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: deleteFeaturedArtist,
+    mutateAsync: deleteFeaturedArtistAsync,
+    isPending: isDeletingFeaturedArtist,
+    isError: isDeleteFeaturedArtistError,
+    error: deleteFeaturedArtistError,
+    reset: resetDeleteFeaturedArtist,
+  } = useMutation<
+    Awaited<ReturnType<typeof deleteFeaturedArtistAction>>,
+    Error,
+    { featuredArtistId: string }
+  >({
+    mutationFn: ({ featuredArtistId }) => deleteFeaturedArtistAction(featuredArtistId),
+    onSuccess: (result) =>
+      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
+  });
+
+  return {
+    deleteFeaturedArtist,
+    deleteFeaturedArtistAsync,
+    isDeletingFeaturedArtist,
+    isDeleteFeaturedArtistError,
+    deleteFeaturedArtistError,
+    resetDeleteFeaturedArtist,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link publishFeaturedArtistAction} — publishes a single
+ * featured artist by stamping its `publishedOn`. Distinct from
+ * {@link usePublishFeaturedArtistsMutation}, which republishes the whole active
+ * set to the landing page. Invalidates the featured-artist caches on success.
+ */
+export const usePublishFeaturedArtistMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: publishFeaturedArtist,
+    mutateAsync: publishFeaturedArtistAsync,
+    isPending: isPublishingFeaturedArtist,
+    isError: isPublishFeaturedArtistError,
+    error: publishFeaturedArtistError,
+    reset: resetPublishFeaturedArtist,
+  } = useMutation<
+    Awaited<ReturnType<typeof publishFeaturedArtistAction>>,
+    Error,
+    { featuredArtistId: string }
+  >({
+    mutationFn: ({ featuredArtistId }) => publishFeaturedArtistAction(featuredArtistId),
+    onSuccess: (result) =>
+      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
+  });
+
+  return {
+    publishFeaturedArtist,
+    publishFeaturedArtistAsync,
+    isPublishingFeaturedArtist,
+    isPublishFeaturedArtistError,
+    publishFeaturedArtistError,
+    resetPublishFeaturedArtist,
   };
 };
 

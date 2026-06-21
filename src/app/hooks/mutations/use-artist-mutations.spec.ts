@@ -5,13 +5,22 @@
 
 import { renderHook } from '@testing-library/react';
 
+import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { publishArtistAction } from '@/lib/actions/publish-artist-action';
+import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
-import { useCreateArtistMutation, useUpdateArtistMutation } from './use-artist-mutations';
+import {
+  useArchiveArtistMutation,
+  useCreateArtistMutation,
+  usePublishArtistMutation,
+  useRestoreArtistMutation,
+  useUpdateArtistMutation,
+} from './use-artist-mutations';
 
 const useMutationMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -23,6 +32,9 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/actions/create-artist-action', () => ({ createArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/update-artist-action', () => ({ updateArtistAction: vi.fn() }));
+vi.mock('@/lib/actions/archive-artist-action', () => ({ archiveArtistAction: vi.fn() }));
+vi.mock('@/lib/actions/publish-artist-action', () => ({ publishArtistAction: vi.fn() }));
+vi.mock('@/lib/actions/restore-artist-action', () => ({ restoreArtistAction: vi.fn() }));
 
 interface MutationOptions<TVariables> {
   mutationFn: (variables: TVariables) => Promise<unknown>;
@@ -120,6 +132,90 @@ describe('useUpdateArtistMutation', () => {
     const opts = getOptions(useUpdateArtistMutation);
 
     await opts.onSuccess(failState, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useArchiveArtistMutation', () => {
+  it('calls archiveArtistAction with the artist id', async () => {
+    vi.mocked(archiveArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ artistId: string }>(useArchiveArtistMutation);
+
+    await opts.mutationFn({ artistId: 'a1' });
+
+    expect(archiveArtistAction).toHaveBeenCalledWith('a1');
+  });
+
+  it('invalidates artist and release caches on success', async () => {
+    const opts = getOptions(useArchiveArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+  });
+
+  it('does not invalidate when the action reports failure', async () => {
+    const opts = getOptions(useArchiveArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePublishArtistMutation', () => {
+  it('calls publishArtistAction with the artist id', async () => {
+    vi.mocked(publishArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ artistId: string }>(usePublishArtistMutation);
+
+    await opts.mutationFn({ artistId: 'a1' });
+
+    expect(publishArtistAction).toHaveBeenCalledWith('a1');
+  });
+
+  it('invalidates artist and release caches on success', async () => {
+    const opts = getOptions(usePublishArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+  });
+
+  it('does not invalidate when the action reports failure', async () => {
+    const opts = getOptions(usePublishArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRestoreArtistMutation', () => {
+  it('calls restoreArtistAction with the artist id', async () => {
+    vi.mocked(restoreArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ artistId: string }>(useRestoreArtistMutation);
+
+    await opts.mutationFn({ artistId: 'a1' });
+
+    expect(restoreArtistAction).toHaveBeenCalledWith('a1');
+  });
+
+  it('invalidates artist and release caches on success', async () => {
+    const opts = getOptions(useRestoreArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+  });
+
+  it('does not invalidate when the action reports failure', async () => {
+    const opts = getOptions(useRestoreArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
 
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });

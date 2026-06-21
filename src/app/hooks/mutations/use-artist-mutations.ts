@@ -5,7 +5,10 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { publishArtistAction } from '@/lib/actions/publish-artist-action';
+import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -84,5 +87,91 @@ export const useUpdateArtistMutation = () => {
     updateArtistError,
     updatedArtist,
     resetUpdateArtist,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link archiveArtistAction} (a soft delete — the model
+ * has a `deletedOn` field, so the artist is archived rather than removed).
+ * Invalidates the artist/release caches on a successful result.
+ */
+export const useArchiveArtistMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: archiveArtist,
+    mutateAsync: archiveArtistAsync,
+    isPending: isArchivingArtist,
+    isError: isArchiveArtistError,
+    error: archiveArtistError,
+    reset: resetArchiveArtist,
+  } = useMutation<Awaited<ReturnType<typeof archiveArtistAction>>, Error, { artistId: string }>({
+    mutationFn: ({ artistId }) => archiveArtistAction(artistId),
+    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
+  });
+
+  return {
+    archiveArtist,
+    archiveArtistAsync,
+    isArchivingArtist,
+    isArchiveArtistError,
+    archiveArtistError,
+    resetArchiveArtist,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link publishArtistAction} (stamps `publishedOn`).
+ * Invalidates the artist/release caches on a successful result.
+ */
+export const usePublishArtistMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: publishArtist,
+    mutateAsync: publishArtistAsync,
+    isPending: isPublishingArtist,
+    isError: isPublishArtistError,
+    error: publishArtistError,
+    reset: resetPublishArtist,
+  } = useMutation<Awaited<ReturnType<typeof publishArtistAction>>, Error, { artistId: string }>({
+    mutationFn: ({ artistId }) => publishArtistAction(artistId),
+    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
+  });
+
+  return {
+    publishArtist,
+    publishArtistAsync,
+    isPublishingArtist,
+    isPublishArtistError,
+    publishArtistError,
+    resetPublishArtist,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link restoreArtistAction} (clears `deletedOn` to
+ * un-archive a soft-deleted artist). Invalidates the artist/release caches on a
+ * successful result.
+ */
+export const useRestoreArtistMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    mutate: restoreArtist,
+    mutateAsync: restoreArtistAsync,
+    isPending: isRestoringArtist,
+    isError: isRestoreArtistError,
+    error: restoreArtistError,
+    reset: resetRestoreArtist,
+  } = useMutation<Awaited<ReturnType<typeof restoreArtistAction>>, Error, { artistId: string }>({
+    mutationFn: ({ artistId }) => restoreArtistAction(artistId),
+    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
+  });
+
+  return {
+    restoreArtist,
+    restoreArtistAsync,
+    isRestoringArtist,
+    isRestoreArtistError,
+    restoreArtistError,
+    resetRestoreArtist,
   };
 };

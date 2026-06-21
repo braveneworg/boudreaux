@@ -6,6 +6,8 @@
 import { renderHook } from '@testing-library/react';
 
 import { createReleaseAction } from '@/lib/actions/create-release-action';
+import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
+import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
@@ -14,6 +16,8 @@ import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
 import {
   useCreateReleaseMutation,
+  useDeleteReleaseMutation,
+  usePublishReleaseMutation,
   useUpdateReleaseMutation,
   useUpdateReleaseCoverArtMutation,
 } from './use-release-mutations';
@@ -31,6 +35,8 @@ vi.mock('@/lib/actions/update-release-action', () => ({ updateReleaseAction: vi.
 vi.mock('@/lib/actions/update-release-cover-art-action', () => ({
   updateReleaseCoverArtAction: vi.fn(),
 }));
+vi.mock('@/lib/actions/delete-release-action', () => ({ deleteReleaseAction: vi.fn() }));
+vi.mock('@/lib/actions/publish-release-action', () => ({ publishReleaseAction: vi.fn() }));
 
 interface MutationOptions<TVariables> {
   mutationFn: (variables: TVariables) => Promise<unknown>;
@@ -182,6 +188,62 @@ describe('useUpdateReleaseCoverArtMutation', () => {
 
   it('does not invalidate on failure', async () => {
     const opts = getOptions(useUpdateReleaseCoverArtMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDeleteReleaseMutation', () => {
+  it('calls deleteReleaseAction with the release id', async () => {
+    vi.mocked(deleteReleaseAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ releaseId: string }>(useDeleteReleaseMutation);
+
+    await opts.mutationFn({ releaseId: 'r-1' });
+
+    expect(deleteReleaseAction).toHaveBeenCalledWith('r-1');
+  });
+
+  it('invalidates release and artist caches on success', async () => {
+    const opts = getOptions(useDeleteReleaseMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useDeleteReleaseMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePublishReleaseMutation', () => {
+  it('calls publishReleaseAction with the release id', async () => {
+    vi.mocked(publishReleaseAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ releaseId: string }>(usePublishReleaseMutation);
+
+    await opts.mutationFn({ releaseId: 'r-1' });
+
+    expect(publishReleaseAction).toHaveBeenCalledWith('r-1');
+  });
+
+  it('invalidates release and artist caches on success', async () => {
+    const opts = getOptions(usePublishReleaseMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(usePublishReleaseMutation);
 
     await opts.onSuccess({ success: false }, {});
 
