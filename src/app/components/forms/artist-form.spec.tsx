@@ -4,7 +4,11 @@
 import React from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
+
+import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 
 import { ArtistForm } from './artist-form';
 
@@ -70,6 +74,7 @@ vi.mock('@/ui/datepicker', () => ({
 // network/DB work runs on render.
 vi.mock('@/lib/actions/create-artist-action', () => ({ createArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/update-artist-action', () => ({ updateArtistAction: vi.fn() }));
+vi.mock('@/lib/actions/archive-artist-action', () => ({ archiveArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/artist-image-actions', () => ({
   deleteArtistImageAction: vi.fn(),
   reorderArtistImagesAction: vi.fn(),
@@ -137,6 +142,81 @@ describe('ArtistForm', () => {
       render(<ArtistForm />);
 
       expect(screen.getByRole('button', { name: /create & publish/i })).toBeInTheDocument();
+    });
+
+    it('does not render a delete button in create mode', () => {
+      render(<ArtistForm />);
+
+      expect(screen.queryByRole('button', { name: 'Delete Artist' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('delete (soft / archive)', () => {
+    const artistId = '507f1f77bcf86cd799439011';
+
+    // Opens the EntityDeleteButton's confirmation dialog and clicks its confirm.
+    const confirmDelete = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: 'Delete Artist' }));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+    };
+
+    beforeEach(() => {
+      vi.mocked(archiveArtistAction).mockResolvedValue({ success: true });
+    });
+
+    it('renders a delete button in edit mode', () => {
+      render(<ArtistForm artistId={artistId} />);
+
+      expect(screen.getByRole('button', { name: 'Delete Artist' })).toBeInTheDocument();
+    });
+
+    it('archives the artist and navigates to the admin list on success', async () => {
+      render(<ArtistForm artistId={artistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(archiveArtistAction).toHaveBeenCalledWith(artistId);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/admin/artists');
+    });
+
+    it('does not archive when the confirmation dialog is cancelled', async () => {
+      render(<ArtistForm artistId={artistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getByRole('button', { name: 'Delete Artist' }));
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(archiveArtistAction).not.toHaveBeenCalled();
+    });
+
+    it('shows an error toast when archiving fails', async () => {
+      vi.mocked(archiveArtistAction).mockResolvedValue({
+        success: false,
+        error: 'Artist not found',
+      });
+      render(<ArtistForm artistId={artistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Artist not found');
+      });
+    });
+
+    it('shows a generic error toast when the archive action throws', async () => {
+      vi.mocked(archiveArtistAction).mockRejectedValue(new Error('boom'));
+      render(<ArtistForm artistId={artistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('An unexpected error occurred');
+      });
     });
   });
 });

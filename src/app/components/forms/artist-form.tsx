@@ -15,6 +15,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { ArtistBioGenerationSection } from '@/app/components/forms/artist-bio-generation-section';
+import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -30,6 +31,7 @@ import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import {
+  useArchiveArtistMutation,
   useCreateArtistMutation,
   useUpdateArtistMutation,
 } from '@/app/hooks/mutations/use-artist-mutations';
@@ -105,6 +107,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   const [isTransitionPending, startTransition] = useTransition();
   const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
+  const { archiveArtistAsync } = useArchiveArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   // Re-hosted bio images (existing + freshly generated) offered in the
   // rich-text editor's insert-image picker, alongside uploaded images.
@@ -925,6 +928,18 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
               {isEditMode ? (
                 // Edit mode buttons
                 <>
+                  {artistId && (
+                    <EntityDeleteButton
+                      label="Delete Artist"
+                      title="Delete this artist?"
+                      description="The artist is archived and hidden from listings. You can restore it later from the artists list."
+                      successMessage="Artist deleted successfully"
+                      failureMessage="Failed to delete artist"
+                      redirectTo="/admin/artists"
+                      disabled={isSubmitting}
+                      onDelete={() => archiveArtistAsync({ artistId })}
+                    />
+                  )}
                   <Button
                     type="button"
                     variant="outline"

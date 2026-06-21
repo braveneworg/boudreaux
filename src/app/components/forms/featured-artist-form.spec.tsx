@@ -13,6 +13,7 @@ import {
   useReleaseDigitalFormatQuery,
   type ReleaseDigitalFormat,
 } from '@/app/hooks/use-release-digital-format-query';
+import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 
 import { FeaturedArtistForm } from './featured-artist-form';
 
@@ -41,6 +42,7 @@ let capturedReleaseSelectSetValue:
 const mockSetValue = vi.fn();
 
 const mockPush = vi.fn();
+const mockRefresh = vi.fn();
 
 vi.mock('react-hook-form', async () => {
   const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
@@ -73,7 +75,7 @@ vi.mock('react-hook-form', async () => {
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
 
 vi.mock('next-auth/react', () => ({
@@ -86,6 +88,10 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/lib/actions/create-featured-artist-action', () => ({
   createFeaturedArtistAction: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/delete-featured-artist-action', () => ({
+  deleteFeaturedArtistAction: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/console-logger', () => ({
@@ -593,6 +599,101 @@ describe('FeaturedArtistForm', () => {
 
       await waitFor(() => {
         expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to load featured artist data');
+      });
+    });
+  });
+
+  describe('delete', () => {
+    const useFeaturedArtistQueryMock = vi.mocked(useFeaturedArtistQuery);
+    const featuredArtistId = '507f1f77bcf86cd799439011';
+
+    // Opens the EntityDeleteButton's confirmation dialog and clicks its confirm.
+    const confirmDelete = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: 'Delete Featured Artist' }));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+    };
+
+    beforeEach(() => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      vi.mocked(deleteFeaturedArtistAction).mockResolvedValue({ success: true });
+    });
+
+    afterEach(() => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+    });
+
+    it('renders a delete button in edit mode', () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      expect(screen.getByRole('button', { name: 'Delete Featured Artist' })).toBeInTheDocument();
+    });
+
+    it('does not render a delete button in create mode', () => {
+      render(<FeaturedArtistForm />);
+
+      expect(
+        screen.queryByRole('button', { name: 'Delete Featured Artist' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('deletes the featured artist and navigates to the admin list on success', async () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(deleteFeaturedArtistAction).toHaveBeenCalledWith(featuredArtistId);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/admin/featured-artists');
+    });
+
+    it('does not delete when the confirmation dialog is cancelled', async () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getByRole('button', { name: 'Delete Featured Artist' }));
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(deleteFeaturedArtistAction).not.toHaveBeenCalled();
+    });
+
+    it('shows an error toast when deletion fails', async () => {
+      vi.mocked(deleteFeaturedArtistAction).mockResolvedValue({
+        success: false,
+        error: 'Featured artist not found',
+      });
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Featured artist not found');
+      });
+    });
+
+    it('shows a generic error toast when the delete action throws', async () => {
+      vi.mocked(deleteFeaturedArtistAction).mockRejectedValue(new Error('boom'));
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await confirmDelete(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('An unexpected error occurred');
       });
     });
   });

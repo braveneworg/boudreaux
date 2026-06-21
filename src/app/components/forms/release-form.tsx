@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 import { DownloadAnalyticsDashboard } from '@/app/components/download-analytics-dashboard';
 import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-accordion';
+import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
 import { TextField } from '@/app/components/forms/fields';
 import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
 import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
@@ -42,6 +43,7 @@ import { Switch } from '@/app/components/ui/switch';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
   useCreateReleaseMutation,
+  useDeleteReleaseMutation,
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
@@ -117,6 +119,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   const { createReleaseAsync, isCreatingRelease } = useCreateReleaseMutation();
   const { updateReleaseAsync, isUpdatingRelease } = useUpdateReleaseMutation();
   const { updateReleaseCoverArtAsync } = useUpdateReleaseCoverArtMutation();
+  const { deleteReleaseAsync } = useDeleteReleaseMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
@@ -965,6 +968,18 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
             <CardFooter className="flex justify-end gap-4">
               {isEditMode ? (
                 <>
+                  {releaseId && (
+                    <EntityDeleteButton
+                      label="Delete Release"
+                      title="Delete this release?"
+                      description="This permanently removes the release and its files (digital formats and images) and cannot be undone."
+                      successMessage="Release deleted successfully"
+                      failureMessage="Failed to delete release"
+                      redirectTo="/admin/releases"
+                      disabled={isSubmitting}
+                      onDelete={() => deleteReleaseAsync({ releaseId })}
+                    />
+                  )}
                   <Button
                     type="button"
                     variant="outline"
