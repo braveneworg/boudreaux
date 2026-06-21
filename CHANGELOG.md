@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.150.0] - 2026-06-21
+
+### Added
+
+- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n
+
 ## [4.149.0] - 2026-06-21
 
 ### Added
