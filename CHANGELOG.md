@@ -60,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.151.0] - 2026-06-21
+
+### Added
+
+- fix: 🐛 restore artists index image heading (#528)\n- fix: 🐛 restore artists index image heading (#528)\n- fix: 🐛 restore artists index image heading (#528)\n
+
 ## [4.150.0] - 2026-06-21
 
 ### Added
