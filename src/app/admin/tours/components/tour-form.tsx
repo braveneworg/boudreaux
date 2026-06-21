@@ -34,6 +34,8 @@ import {
   useDeleteTourMutation,
   useUpdateTourMutation,
 } from '@/app/hooks/mutations/use-tour-mutations';
+import { useTourImagesQuery } from '@/app/hooks/use-tour-images-query';
+import { useTourQuery } from '@/app/hooks/use-tour-query';
 import type { FormState } from '@/lib/types/form-state';
 import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
 
@@ -75,7 +77,6 @@ const initialFormState: FormState = {
 export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
-  const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [tourImages, setTourImages] = useState<TourImageFields[]>([]);
   const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
@@ -85,6 +86,20 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const { mutateAsync: createTour } = useCreateTourMutation();
   const { mutateAsync: updateTour } = useUpdateTourMutation();
   const { mutateAsync: deleteTour } = useDeleteTourMutation();
+
+  // Edit-mode data loading. `useTourQuery` is skipped when an `initialTour`
+  // prop is supplied (the fast-path resets straight from the prop). Tour images
+  // are always fetched in edit mode; `refetch` re-pulls them after an upload.
+  const { data: tourData, isPending: isTourPending } = useTourQuery(tourId ?? '', {
+    enabled: !!tourId && !initialTour,
+  });
+  const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(tourId ?? '', {
+    enabled: !!tourId,
+  });
+
+  // In edit mode the form is "loading" until the tour query resolves; the
+  // `initialTour` fast-path (and create mode) have nothing to wait for.
+  const isLoadingTour = !!tourId && !initialTour && isTourPending;
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
@@ -99,66 +114,38 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
 
   const { control, handleSubmit, reset, setError } = form;
 
-  // Fetch tour data in edit mode
+  // Reset the form from the `initialTour` fast-path prop when provided.
   useEffect(() => {
-    if (tourId) {
-      if (initialTour) {
-        reset({
-          title: initialTour.title || '',
-          subtitle: initialTour.subtitle || '',
-          subtitle2: initialTour.subtitle2 || '',
-          description: initialTour.description || '',
-          notes: initialTour.notes || '',
-        });
-        setIsLoadingTour(false);
-
-        const fetchImages = async () => {
-          try {
-            const imagesRes = await fetch(`/api/tours/${tourId}/images`);
-            if (imagesRes.ok) {
-              const { images } = await imagesRes.json();
-              setTourImages(images || []);
-            }
-          } catch (err) {
-            console.error('Failed to fetch tour images:', err);
-          }
-        };
-
-        fetchImages();
-        return;
-      }
-
-      const fetchTour = async () => {
-        setIsLoadingTour(true);
-        try {
-          const res = await fetch(`/api/tours/${tourId}`);
-          if (res.ok) {
-            const { tour } = await res.json();
-            reset({
-              title: tour.title || '',
-              subtitle: tour.subtitle || '',
-              subtitle2: tour.subtitle2 || '',
-              description: tour.description || '',
-              notes: tour.notes || '',
-            });
-
-            // Fetch tour images separately
-            const imagesRes = await fetch(`/api/tours/${tourId}/images`);
-            if (imagesRes.ok) {
-              const { images } = await imagesRes.json();
-              setTourImages(images || []);
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch tour:', err);
-          toast.error('Failed to load tour data');
-        } finally {
-          setIsLoadingTour(false);
-        }
-      };
-      fetchTour();
+    if (tourId && initialTour) {
+      reset({
+        title: initialTour.title || '',
+        subtitle: initialTour.subtitle || '',
+        subtitle2: initialTour.subtitle2 || '',
+        description: initialTour.description || '',
+        notes: initialTour.notes || '',
+      });
     }
   }, [tourId, initialTour, reset]);
+
+  // Reset the form from the fetched tour (non-`initialTour` edit mode).
+  useEffect(() => {
+    if (tourId && !initialTour && tourData) {
+      reset({
+        title: tourData.title || '',
+        subtitle: tourData.subtitle || '',
+        subtitle2: tourData.subtitle2 || '',
+        description: tourData.description || '',
+        notes: tourData.notes || '',
+      });
+    }
+  }, [tourId, initialTour, tourData, reset]);
+
+  // Project the tour-images query result into local state for the uploader.
+  useEffect(() => {
+    if (tourImagesData) {
+      setTourImages(tourImagesData.images);
+    }
+  }, [tourImagesData]);
 
   const onSubmit = async (data: Record<string, unknown>) => {
     setIsPending(true);
@@ -248,17 +235,10 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   };
 
   const handleImageUploadComplete = async () => {
-    // Refresh images after upload
+    // Refresh images after upload via the query's refetch; the projection
+    // effect above syncs the result into local state.
     if (tourId) {
-      try {
-        const imagesRes = await fetch(`/api/tours/${tourId}/images`);
-        if (imagesRes.ok) {
-          const { images } = await imagesRes.json();
-          setTourImages(images || []);
-        }
-      } catch (err) {
-        console.error('Failed to refresh images:', err);
-      }
+      await refetchTourImages();
     }
   };
 
