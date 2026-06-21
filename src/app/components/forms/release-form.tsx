@@ -197,6 +197,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   const {
     data: releaseData,
     isPending: isReleasePending,
+    isError: isReleaseError,
     error: releaseError,
   } = useReleaseDetailQuery(initialReleaseId ?? '', { enabled: !!initialReleaseId });
 
@@ -285,10 +286,11 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
   // Surface a load failure (edit mode only) without unmounting the form.
   useEffect(() => {
-    if (initialReleaseId && releaseError) {
+    if (initialReleaseId && isReleaseError) {
+      error('Failed to fetch release:', releaseError);
       toast.error('Failed to load release data');
     }
-  }, [initialReleaseId, releaseError]);
+  }, [initialReleaseId, isReleaseError, releaseError]);
 
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);

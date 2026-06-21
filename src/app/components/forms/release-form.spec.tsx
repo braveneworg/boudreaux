@@ -185,6 +185,7 @@ describe('ReleaseForm — edit mode', () => {
     useReleaseDetailQueryMock.mockReturnValue({
       data: null,
       isPending: false,
+      isError: false,
       error: null,
       refetch: vi.fn(),
     });
@@ -194,6 +195,7 @@ describe('ReleaseForm — edit mode', () => {
     useReleaseDetailQueryMock.mockReturnValue({
       data: null,
       isPending: true,
+      isError: false,
       error: null,
       refetch: vi.fn(),
     });
@@ -243,6 +245,7 @@ describe('ReleaseForm — edit mode', () => {
         releaseUrls: [],
       },
       isPending: false,
+      isError: false,
       error: null,
       refetch: vi.fn(),
     });

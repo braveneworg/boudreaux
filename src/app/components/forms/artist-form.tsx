@@ -193,6 +193,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   const {
     data: artistData,
     isPending: isArtistPending,
+    isError: isArtistError,
     error: artistError,
   } = useArtistQuery(initialArtistId ?? '', { enabled: !!initialArtistId });
 
@@ -256,12 +257,15 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     }
   }, [initialArtistId, artistData, artistForm, user?.id]);
 
-  // Surface a load failure (edit mode only) without unmounting the form.
+  // Surface a load failure (edit mode only) without unmounting the form. Gate
+  // on `isError` — `artistError` is defaulted to a non-null Error, so it is
+  // truthy even on a successful load.
   useEffect(() => {
-    if (initialArtistId && artistError) {
+    if (initialArtistId && isArtistError) {
+      error('Failed to fetch artist:', artistError);
       toast.error('Failed to load artist data');
     }
-  }, [initialArtistId, artistError]);
+  }, [initialArtistId, isArtistError, artistError]);
 
   // After artist creation, navigate away — outside of startTransition so the router
   // navigation doesn't keep isTransitionPending true for the form submission. When a

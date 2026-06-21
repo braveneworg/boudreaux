@@ -50,8 +50,8 @@ const fetchFeaturedArtist = async (
  * @param featuredArtistId - The featured-artist identifier to fetch.
  * @param options - Caller overrides spread into the `useQuery` call (e.g.
  * `enabled`); the non-empty-id gate is always applied on top.
- * @returns The query state: `isPending`, `error` (defaulted when unknown),
- * `data`, and `refetch`.
+ * @returns The query state: `isPending`, `isError`, `error` (defaulted when
+ * unknown), `data`, and `refetch`.
  */
 export const useFeaturedArtistQuery = (
   featuredArtistId: string,
@@ -59,6 +59,7 @@ export const useFeaturedArtistQuery = (
 ) => {
   const {
     isPending,
+    isError,
     error = Error('Unknown error'),
     data,
     refetch,
@@ -69,5 +70,5 @@ export const useFeaturedArtistQuery = (
     enabled: (options.enabled ?? true) && !!featuredArtistId,
   });
 
-  return { isPending, error, data, refetch };
+  return { isPending, isError, error, data, refetch };
 };

@@ -37,8 +37,8 @@ export const useArtistsQuery = (
     queries: artistIds.map((id) => ({
       queryKey: queryKeys.artists.detail(id),
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchArtistById(id, signal),
-      enabled: !!id,
       ...options,
+      enabled: (options.enabled ?? true) && !!id,
     })),
   });
 

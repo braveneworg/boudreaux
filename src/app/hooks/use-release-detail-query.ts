@@ -56,8 +56,8 @@ const fetchReleaseDetail = async (
  * @param releaseId - The release identifier to fetch.
  * @param options - Caller overrides spread into the `useQuery` call (e.g.
  * `enabled`); the non-empty-releaseId gate is always applied on top.
- * @returns The query state: `isPending`, `error` (defaulted when unknown),
- * `data`, and `refetch`.
+ * @returns The query state: `isPending`, `isError`, `error` (defaulted when
+ * unknown), `data`, and `refetch`.
  */
 export const useReleaseDetailQuery = (
   releaseId: string,
@@ -65,6 +65,7 @@ export const useReleaseDetailQuery = (
 ) => {
   const {
     isPending,
+    isError,
     error = Error('Unknown error'),
     data,
     refetch,
@@ -75,5 +76,5 @@ export const useReleaseDetailQuery = (
     enabled: (options.enabled ?? true) && !!releaseId,
   });
 
-  return { isPending, error, data, refetch };
+  return { isPending, isError, error, data, refetch };
 };

@@ -6,6 +6,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 
 import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
 import {
@@ -524,6 +525,7 @@ describe('FeaturedArtistForm', () => {
       useFeaturedArtistQueryMock.mockReturnValue({
         data: null,
         isPending: false,
+        isError: false,
         error: null,
         refetch: vi.fn(),
       });
@@ -533,6 +535,7 @@ describe('FeaturedArtistForm', () => {
       useFeaturedArtistQueryMock.mockReturnValue({
         data: null,
         isPending: true,
+        isError: false,
         error: null,
         refetch: vi.fn(),
       });
@@ -546,6 +549,7 @@ describe('FeaturedArtistForm', () => {
       useFeaturedArtistQueryMock.mockReturnValue({
         data: null,
         isPending: true,
+        isError: false,
         error: null,
         refetch: vi.fn(),
       });
@@ -553,6 +557,43 @@ describe('FeaturedArtistForm', () => {
       render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
 
       expect(screen.queryByTestId('release-select-releaseId')).not.toBeInTheDocument();
+    });
+
+    it('does not show a load-error toast on a successful load', async () => {
+      // The hook defaults `error` to a non-null Error even on success, so the
+      // toast must gate on `isError` — not on the truthy `error` value.
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: new Error('Unknown error'),
+        refetch: vi.fn(),
+      });
+
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading featured artist...')).not.toBeInTheDocument();
+      });
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(
+        'Failed to load featured artist data'
+      );
+    });
+
+    it('shows a load-error toast when the query errors', async () => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: new Error('boom'),
+        refetch: vi.fn(),
+      });
+
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to load featured artist data');
+      });
     });
   });
 });

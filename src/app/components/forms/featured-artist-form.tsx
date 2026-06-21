@@ -132,6 +132,7 @@ export const FeaturedArtistForm = ({
   const {
     data: featuredArtistData,
     isPending: isFeaturedArtistPending,
+    isError: isFeaturedArtistError,
     error: featuredArtistError,
   } = useFeaturedArtistQuery(initialFeaturedArtistId ?? '', {
     enabled: !!initialFeaturedArtistId,
@@ -187,11 +188,11 @@ export const FeaturedArtistForm = ({
 
   // Surface a load failure (edit mode only) without unmounting the form.
   useEffect(() => {
-    if (initialFeaturedArtistId && featuredArtistError) {
+    if (initialFeaturedArtistId && isFeaturedArtistError) {
       error('Failed to fetch featured artist:', featuredArtistError);
       toast.error('Failed to load featured artist data');
     }
-  }, [initialFeaturedArtistId, featuredArtistError]);
+  }, [initialFeaturedArtistId, isFeaturedArtistError, featuredArtistError]);
 
   // Sync server-side field errors with React Hook Form for inline display
   useEffect(() => {
