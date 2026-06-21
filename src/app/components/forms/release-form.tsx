@@ -3,7 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -133,20 +141,6 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
   const [imagesReordered, setImagesReordered] = useState(false);
-  const [existingFormats, setExistingFormats] = useState<
-    Array<{
-      formatType: DigitalFormatType;
-      trackCount: number;
-      totalFileSize: number;
-      files: Array<{
-        trackNumber: number;
-        title: string | null;
-        fileName: string;
-        fileSize: number;
-        duration: number | null;
-      }>;
-    }>
-  >([]);
   const isEditMode = releaseId !== null;
 
   // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
@@ -192,8 +186,8 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
   // Fetch release data when initialReleaseId is provided. The gated hook owns
   // the request lifecycle; the effects below project its data/error into form
-  // state, preserving the original side effects (reset, publish flag, images,
-  // existing digital formats).
+  // state, preserving the original side effects (reset, publish flag, images).
+  // Existing digital formats are derived synchronously instead (see below).
   const {
     data: releaseData,
     isPending: isReleasePending,
@@ -204,6 +198,32 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   // In edit mode the form is "loading" until the gated query resolves; in
   // create mode there's nothing to load.
   const isLoadingRelease = !!initialReleaseId && isReleasePending;
+
+  // Existing digital formats are DERIVED from the loaded release, not projected
+  // into state via an effect. `DigitalFormatsAccordion` snapshots `existingFormats`
+  // into its own state at mount (one-time `useState` initializers), so it must
+  // receive the final list on the same render it first mounts — i.e. the render
+  // the loading gate opens. Setting it in an effect would populate it one render
+  // late, after the accordion has already mounted empty, and the "uploaded"
+  // checkmarks would never appear.
+  const existingFormats = useMemo(
+    () =>
+      (releaseData?.digitalFormats ?? [])
+        .filter((df) => df.deletedAt == null)
+        .map((df) => ({
+          formatType: df.formatType as DigitalFormatType,
+          trackCount: df.trackCount ?? df.files.length,
+          totalFileSize: Number(df.totalFileSize ?? 0),
+          files: df.files.map((f) => ({
+            trackNumber: f.trackNumber,
+            title: f.title ?? null,
+            fileName: f.fileName,
+            fileSize: Number(f.fileSize),
+            duration: f.duration ?? null,
+          })),
+        })),
+    [releaseData]
+  );
 
   useEffect(() => {
     if (!initialReleaseId || !releaseData) return;
@@ -261,26 +281,6 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
         sortOrder: img.sortOrder ?? 0,
       }));
       setImages(existingImages);
-    }
-
-    // Load existing digital formats with track files
-    if (release.digitalFormats.length > 0) {
-      setExistingFormats(
-        release.digitalFormats
-          .filter((df) => df.deletedAt == null)
-          .map((df) => ({
-            formatType: df.formatType as DigitalFormatType,
-            trackCount: df.trackCount ?? df.files.length,
-            totalFileSize: Number(df.totalFileSize ?? 0),
-            files: df.files.map((f) => ({
-              trackNumber: f.trackNumber,
-              title: f.title ?? null,
-              fileName: f.fileName,
-              fileSize: Number(f.fileSize),
-              duration: f.duration ?? null,
-            })),
-          }))
-      );
     }
   }, [initialReleaseId, releaseData, releaseForm, user?.id]);
 
