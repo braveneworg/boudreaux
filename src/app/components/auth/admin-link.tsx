@@ -8,11 +8,11 @@ import { ShieldUser as ShieldUserIcon } from 'lucide-react';
 export const AdminLink = ({ onClick }: { onClick?: () => void }) => {
   return (
     <Link
-      className="-mt-2.5 ml-1 flex items-center gap-1.5 text-sm text-zinc-50 underline"
+      className="flex items-center gap-1.5 text-sm text-zinc-50 underline"
       href="/admin"
       onClick={onClick}
     >
-      <ShieldUserIcon size={16} className="mt-1" />
+      <ShieldUserIcon size={16} />
       Admin
     </Link>
   );
