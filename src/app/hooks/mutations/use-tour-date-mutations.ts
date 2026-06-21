@@ -60,8 +60,8 @@ export const useCreateTourDateMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link updateTourDateAction}. Empty strings are preserved
- * so optional fields can be cleared.
+ * Mutation hook wrapping {@link updateTourDateAction}. Empty fields are omitted —
+ * the tour-date form normalizes blanks out before submitting.
  */
 export const useUpdateTourDateMutation = () => {
   const queryClient = useQueryClient();
@@ -75,11 +75,7 @@ export const useUpdateTourDateMutation = () => {
     reset: resetUpdateTourDate,
   } = useMutation<FormState, Error, { id: string; values: TourDateUpdateInput }>({
     mutationFn: ({ id, values }) =>
-      updateTourDateAction(
-        id,
-        EMPTY_FORM_STATE,
-        objectToFormData(values, { keepEmptyStrings: true })
-      ),
+      updateTourDateAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
 

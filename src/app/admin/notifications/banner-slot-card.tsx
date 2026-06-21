@@ -18,7 +18,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { BANNER_CDN_PATH } from '@/lib/constants/banner-slots';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 import { isDarkColor } from '@/lib/utils/color';
 import {
@@ -46,11 +46,6 @@ export interface BannerSlotFormData {
 interface BannerSlotCardProps {
   slot: BannerSlotFormData;
 }
-
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
 
 export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   const [content, setContent] = useState(slot.notification?.content ?? '');
@@ -93,7 +88,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
 
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     boundAction,
-    initialFormState
+    EMPTY_FORM_STATE
   );
 
   const handleDelete = async () => {
