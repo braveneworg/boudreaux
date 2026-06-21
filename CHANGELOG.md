@@ -57,6 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.148.0] - 2026-06-21
+
+### Added
+
+- style(auth): align mobile nav account links beside avatar (#525)\n- style(auth): align mobile nav account links beside avatar (#525)\n- feat(contact): ✨ accessible email links (#524)\n- style(auth): align mobile nav account links beside avatar (#525)\n- feat(contact): ✨ accessible email links (#524)\n- style(auth): align mobile nav account links beside avatar (#525)\n
+
 ## [4.147.0] - 2026-06-21
 
 ### Added
