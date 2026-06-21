@@ -4,18 +4,13 @@
 
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
-import { DEFAULT_GROQ_TOKEN_LIMIT } from '../types.js';
-
 const ssmClient = new SSMClient({});
 
-/** Cached once per cold start — the Groq key does not change between invokes. */
-let cachedGroqApiKey: string | null = null;
+/** Cached once per cold start — the Gemini key does not change between invokes. */
+let cachedGeminiApiKey: string | null = null;
 
-/** Cached once per cold start — the optional search (Tavily) key. */
-let cachedSearchApiKey: string | null = null;
-
-/** Cached once per cold start — the resolved Groq per-request token ceiling. */
-let cachedGroqTpmLimit: number | null = null;
+/** Cached once per cold start — the optional Jina (web scrape) key. */
+let cachedScrapeApiKey: string | null = null;
 
 const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({ Name: path, WithDecryption: true });
@@ -30,87 +25,55 @@ const fetchSsmParameter = async (path: string): Promise<string> => {
 };
 
 /**
- * Resolves the Groq API key from SSM Parameter Store, caching it for the life
+ * Resolves the Gemini API key from SSM Parameter Store, caching it for the life
  * of the Lambda container. The SSM path is passed as a non-secret environment
  * variable so template.yaml stays the single source of truth for the name.
  *
- * @returns The decrypted Groq API key.
+ * @returns The decrypted Gemini API key.
  */
-export const getGroqApiKey = async (): Promise<string> => {
-  if (cachedGroqApiKey) {
-    return cachedGroqApiKey;
+export const getGeminiApiKey = async (): Promise<string> => {
+  if (cachedGeminiApiKey) {
+    return cachedGeminiApiKey;
   }
 
-  const path = process.env.SSM_PATH_GROQ_API_KEY;
+  const path = process.env.SSM_PATH_GEMINI_API_KEY;
   if (!path) {
-    throw new Error('Missing environment variable: SSM_PATH_GROQ_API_KEY');
+    throw new Error('Missing environment variable: SSM_PATH_GEMINI_API_KEY');
   }
 
-  cachedGroqApiKey = await fetchSsmParameter(path);
-  return cachedGroqApiKey;
+  cachedGeminiApiKey = await fetchSsmParameter(path);
+  return cachedGeminiApiKey;
 };
 
 /**
- * Resolves the optional web-search (Tavily) API key from SSM. Unlike the Groq
- * key this is non-fatal: when `SSM_PATH_SEARCH_API_KEY` is unset (or the lookup
- * fails) it returns `null` so bio generation simply skips the web-search
- * fallback rather than aborting.
+ * Resolves the optional web-scrape (Jina) API key from SSM. Unlike the Gemini
+ * key this is non-fatal: Jina works keyless at a lower rate limit, so when
+ * `SSM_PATH_JINA_API_KEY` is unset (or the lookup fails) it returns `null` and
+ * scraping proceeds without authentication.
  *
- * @returns The decrypted key, or `null` when search is not configured.
+ * @returns The decrypted key, or `null` when no key is configured.
  */
-export const getSearchApiKey = async (): Promise<string | null> => {
-  if (cachedSearchApiKey) {
-    return cachedSearchApiKey;
+export const getScrapeApiKey = async (): Promise<string | null> => {
+  if (cachedScrapeApiKey) {
+    return cachedScrapeApiKey;
   }
 
-  const path = process.env.SSM_PATH_SEARCH_API_KEY;
+  const path = process.env.SSM_PATH_JINA_API_KEY;
   if (!path) {
     return null;
   }
 
   try {
-    cachedSearchApiKey = await fetchSsmParameter(path);
-    return cachedSearchApiKey;
+    cachedScrapeApiKey = await fetchSsmParameter(path);
+    return cachedScrapeApiKey;
   } catch (err) {
-    console.warn('Search API key unavailable; web-search fallback disabled:', err);
+    console.warn('Jina API key unavailable; scraping unauthenticated:', err);
     return null;
-  }
-};
-
-/**
- * Resolves Groq's per-request token ceiling (TPM) from SSM, caching it for the
- * life of the Lambda container. Non-fatal like the search key: when
- * `SSM_PATH_GROQ_TPM_LIMIT` is unset, the value is non-numeric, or the lookup
- * fails, it falls back to {@link DEFAULT_GROQ_TOKEN_LIMIT} so bio generation
- * still runs against the free-tier default.
- *
- * @returns The configured ceiling, or the default when unavailable.
- */
-export const getGroqTpmLimit = async (): Promise<number> => {
-  if (cachedGroqTpmLimit !== null) {
-    return cachedGroqTpmLimit;
-  }
-
-  const path = process.env.SSM_PATH_GROQ_TPM_LIMIT;
-  if (!path) {
-    cachedGroqTpmLimit = DEFAULT_GROQ_TOKEN_LIMIT;
-    return cachedGroqTpmLimit;
-  }
-
-  try {
-    const parsed = Number.parseInt(await fetchSsmParameter(path), 10);
-    cachedGroqTpmLimit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_GROQ_TOKEN_LIMIT;
-    return cachedGroqTpmLimit;
-  } catch (err) {
-    console.warn('Groq TPM limit unavailable; using default ceiling:', err);
-    cachedGroqTpmLimit = DEFAULT_GROQ_TOKEN_LIMIT;
-    return cachedGroqTpmLimit;
   }
 };
 
 /** Test-only reset of the cold-start cache. */
 export const __resetSecretsCacheForTests = (): void => {
-  cachedGroqApiKey = null;
-  cachedSearchApiKey = null;
-  cachedGroqTpmLimit = null;
+  cachedGeminiApiKey = null;
+  cachedScrapeApiKey = null;
 };

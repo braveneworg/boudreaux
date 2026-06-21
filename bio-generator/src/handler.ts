@@ -2,11 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { generateProse } from './groq.js';
-import { getGroqApiKey, getGroqTpmLimit, getSearchApiKey } from './lib/secrets.js';
+import { generateProse } from './gemini.js';
+import { readUrl, searchArtistSources } from './jina.js';
+import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
+import { isListeningServiceUrl } from './listening-services.js';
 import { lookupArtist } from './musicbrainz.js';
-import { bioGenerationInputSchema, DEFAULT_GROQ_MODEL } from './types.js';
-import { searchArtistSources } from './websearch.js';
+import { bioGenerationInputSchema, DEFAULT_GEMINI_MODEL } from './types.js';
 import { getWikidataData } from './wikidata.js';
 import { getCommonsImage } from './wikimedia.js';
 import { getWikipediaExtract } from './wikipedia.js';
@@ -27,10 +28,10 @@ export interface BioGeneratorDeps {
   getWikipediaExtract: typeof getWikipediaExtract;
   getCommonsImage: typeof getCommonsImage;
   generateProse: typeof generateProse;
-  getGroqApiKey: () => Promise<string>;
-  getGroqTpmLimit: typeof getGroqTpmLimit;
-  getSearchApiKey: typeof getSearchApiKey;
+  getGeminiApiKey: () => Promise<string>;
+  getScrapeApiKey: typeof getScrapeApiKey;
   searchArtistSources: typeof searchArtistSources;
+  readUrl: typeof readUrl;
 }
 
 const defaultDeps: BioGeneratorDeps = {
@@ -39,10 +40,10 @@ const defaultDeps: BioGeneratorDeps = {
   getWikipediaExtract,
   getCommonsImage,
   generateProse,
-  getGroqApiKey,
-  getGroqTpmLimit,
-  getSearchApiKey,
+  getGeminiApiKey,
+  getScrapeApiKey,
   searchArtistSources,
+  readUrl,
 };
 
 const MAX_IMAGES = 6;
@@ -73,6 +74,10 @@ const dedupeLinks = (links: BioLink[]): BioLink[] => {
   });
 };
 
+/** Merges additional grounding text onto existing source material, if any. */
+const appendSourceText = (existing: string | undefined, addition: string): string =>
+  existing ? `${existing}\n\n${addition}` : addition;
+
 /**
  * Best-effort metadata gathering. Any failure (rate limit, missing entity)
  * degrades to fewer images/links rather than aborting — the artist still gets
@@ -92,6 +97,10 @@ const gatherMetadata = async (
     existingGenres: input.existingGenres,
     imageTitles: [],
   };
+
+  // Jina works keyless (lower rate limit); the key just raises the limit, so we
+  // resolve it once and always attempt scraping regardless of whether it is set.
+  const scrapeKey = await deps.getScrapeApiKey();
 
   try {
     const searchName = input.realName?.trim() || input.displayName;
@@ -125,6 +134,13 @@ const gatherMetadata = async (
           if (article) facts.sourceText = article.extract;
         }
 
+        // Read the official site into clean markdown via Jina Reader — high-signal
+        // primary-source grounding that web search often ranks poorly.
+        if (wd.officialUrl) {
+          const official = await deps.readUrl(wd.officialUrl, scrapeKey);
+          if (official) facts.sourceText = appendSourceText(facts.sourceText, official);
+        }
+
         // Resolve all candidate images, then prefer attribution-free (public
         // domain / CC0) ones since we re-host without attribution. Truncate
         // after ranking so PD/CC0 images survive over attribution-required ones.
@@ -141,31 +157,26 @@ const gatherMetadata = async (
     console.warn('Bio metadata gathering degraded:', err);
   }
 
-  // Web search as additional grounding *context*, not just a fallback: always
-  // gather it when a key is configured and MERGE it with any Wikipedia article
-  // body, so both the extensive long bio and the informed short bio draw on the
-  // fullest possible material. Optional + best-effort (never throws).
-  const searchKey = await deps.getSearchApiKey();
-  if (searchKey) {
-    const searchName = input.realName?.trim() || input.displayName;
-    const found = await deps.searchArtistSources(searchName, searchKey);
-    if (found) {
-      facts.sourceText = facts.sourceText
-        ? `${facts.sourceText}\n\n${found.sourceText}`
-        : found.sourceText;
-      facts.sourceUrls = [
-        ...new Set(
-          [
-            facts.wikipediaUrl,
-            facts.officialUrl,
-            ...(facts.sourceUrls ?? []),
-            ...found.sourceUrls,
-          ].filter((url): url is string => Boolean(url))
-        ),
-      ];
-      for (const url of found.sourceUrls) {
-        links.push({ label: 'Reference', url, kind: 'other' });
-      }
+  // Web search (Jina) as additional grounding *context*, not just a fallback:
+  // always gather it and MERGE with any Wikipedia/official-site material so both
+  // the extensive long bio and the informed short bio draw on the fullest
+  // possible material. Optional + best-effort (never throws).
+  const searchName = input.realName?.trim() || input.displayName;
+  const found = await deps.searchArtistSources(searchName, scrapeKey);
+  if (found) {
+    facts.sourceText = appendSourceText(facts.sourceText, found.sourceText);
+    facts.sourceUrls = [
+      ...new Set(
+        [
+          facts.wikipediaUrl,
+          facts.officialUrl,
+          ...(facts.sourceUrls ?? []),
+          ...found.sourceUrls,
+        ].filter((url): url is string => Boolean(url))
+      ),
+    ];
+    for (const url of found.sourceUrls) {
+      links.push({ label: 'Reference', url, kind: 'other' });
     }
   }
 
@@ -174,7 +185,13 @@ const gatherMetadata = async (
     links.push({ label: 'Reference', url, kind: 'other' });
   }
 
-  links = dedupeLinks(links);
+  // A bio links to informative sources only — drop every streaming/listening
+  // service from both the discovered-links list and the reference URLs the model
+  // may inline, so no listening link can ever reach the output.
+  links = dedupeLinks(links).filter((link) => !isListeningServiceUrl(link.url));
+  if (facts.sourceUrls) {
+    facts.sourceUrls = facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
+  }
   facts.imageTitles = images.map((image) => image.title ?? '');
 
   return { images, links, facts };
@@ -189,7 +206,7 @@ const applyImageRanking = (images: BioImage[], indexes: number[] | undefined): B
 };
 
 /**
- * Orchestrates a full bio generation: gather grounding metadata, ask Groq for
+ * Orchestrates a full bio generation: gather grounding metadata, ask Gemini for
  * grounded prose, then assemble the final payload.
  *
  * @param input - Validated generation input.
@@ -200,12 +217,11 @@ export const runBioGeneration = async (
   input: BioGenerationInput,
   deps: BioGeneratorDeps = defaultDeps
 ): Promise<BioGenerationData> => {
-  const model = process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
+  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const { images, links, facts } = await gatherMetadata(input, deps);
 
-  const apiKey = await deps.getGroqApiKey();
-  const tokenLimit = await deps.getGroqTpmLimit();
-  const prose = await deps.generateProse(facts, apiKey, model, undefined, tokenLimit);
+  const apiKey = await deps.getGeminiApiKey();
+  const prose = await deps.generateProse(facts, apiKey, model);
 
   // applyImageRanking already caps the COUNT of primaries to MAX_PRIMARY via the
   // selected indexes; the primaries can sit at any position, so we must NOT

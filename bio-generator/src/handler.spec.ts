@@ -54,12 +54,15 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     genres: 'alternative rock',
     primaryImageIndexes: [0],
   }),
-  getGroqApiKey: vi.fn().mockResolvedValue('test-key'),
-  getGroqTpmLimit: vi.fn().mockResolvedValue(12_000),
-  getSearchApiKey: vi.fn().mockResolvedValue(null),
+  getGeminiApiKey: vi.fn().mockResolvedValue('test-key'),
+  getScrapeApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
+  readUrl: vi.fn().mockResolvedValue(null),
   ...overrides,
 });
+
+const factsArg = (deps: BioGeneratorDeps) =>
+  (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
 
 describe('runBioGeneration', () => {
   it('assembles prose, images, links, and genres', async () => {
@@ -72,12 +75,13 @@ describe('runBioGeneration', () => {
     expect(result.links.some((l) => l.kind === 'wikipedia')).toBe(true);
   });
 
-  it('passes the SSM-resolved Groq token ceiling to prose generation', async () => {
-    const deps = makeDeps({ getGroqTpmLimit: vi.fn().mockResolvedValue(6000) });
+  it('generates with the Gemini model and resolved key', async () => {
+    const deps = makeDeps();
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    expect((deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][4]).toBe(6000);
+    const [, apiKey] = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(apiKey).toBe('test-key');
   });
 
   it('feeds the Wikipedia article extract to the model as source text', async () => {
@@ -85,8 +89,19 @@ describe('runBioGeneration', () => {
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(facts.sourceText).toContain('formed in Abingdon in 1985');
+    expect(factsArg(deps).sourceText).toContain('formed in Abingdon in 1985');
+  });
+
+  it('reads the official site via Jina Reader and merges it into source text', async () => {
+    const deps = makeDeps({
+      getWikipediaExtract: vi.fn().mockResolvedValue(null),
+      readUrl: vi.fn().mockResolvedValue('Official site copy about the band.'),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(deps.readUrl).toHaveBeenCalledWith('https://radiohead.com', null);
+    expect(factsArg(deps).sourceText).toContain('Official site copy about the band.');
   });
 
   it('propagates MusicBrainz structured facts to the model', async () => {
@@ -94,37 +109,49 @@ describe('runBioGeneration', () => {
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const facts = factsArg(deps);
     expect(facts.area).toBe('United Kingdom');
     expect(facts.beginDate).toBe('1985');
     expect(facts.tags).toEqual(['alternative rock']);
   });
 
-  it('degrades to no source text when the Wikipedia extract is unavailable', async () => {
+  it('degrades to no source text when no source is available', async () => {
     const deps = makeDeps({ getWikipediaExtract: vi.fn().mockResolvedValue(null) });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(facts.sourceText).toBeUndefined();
+    expect(factsArg(deps).sourceText).toBeUndefined();
     expect(result.longBio).toBe('<p>Long bio.</p>');
   });
 
-  it('falls back to web search when no structured source text and a key is set', async () => {
+  it('always attempts web search even without a Jina key', async () => {
+    const searchArtistSources = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getScrapeApiKey: vi.fn().mockResolvedValue(null),
+      searchArtistSources,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null);
+  });
+
+  it('uses web search content as grounding when found', async () => {
     const searchArtistSources = vi.fn().mockResolvedValue({
       sourceText: 'Web-sourced bio text.',
       sourceUrls: ['https://x.example'],
     });
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
-      getSearchApiKey: vi.fn().mockResolvedValue('tvly-key'),
+      getScrapeApiKey: vi.fn().mockResolvedValue('jina-key'),
       searchArtistSources,
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'tvly-key');
-    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'jina-key');
+    const facts = factsArg(deps);
     expect(facts.sourceText).toBe('Web-sourced bio text.');
     expect(facts.sourceUrls).toEqual(['https://x.example']);
     expect(result.links.some((l) => l.url === 'https://x.example')).toBe(true);
@@ -134,32 +161,48 @@ describe('runBioGeneration', () => {
     const searchArtistSources = vi
       .fn()
       .mockResolvedValue({ sourceText: 'Extra web context.', sourceUrls: ['https://x.example'] });
-    const deps = makeDeps({
-      getSearchApiKey: vi.fn().mockResolvedValue('tvly-key'),
-      searchArtistSources,
-    });
+    const deps = makeDeps({ searchArtistSources });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalled();
-    const facts = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const facts = factsArg(deps);
     expect(facts.sourceText).toContain('formed in Abingdon in 1985');
     expect(facts.sourceText).toContain('Extra web context.');
     expect(facts.sourceUrls).toContain('https://en.wikipedia.org/wiki/Radiohead');
     expect(facts.sourceUrls).toContain('https://x.example');
   });
 
-  it('skips web search when no search key is configured', async () => {
-    const searchArtistSources = vi.fn();
-    const deps = makeDeps({
-      lookupArtist: vi.fn().mockResolvedValue(null),
-      getSearchApiKey: vi.fn().mockResolvedValue(null),
-      searchArtistSources,
+  it('drops listening-service URLs from the reference URLs given to the model', async () => {
+    const searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'Web context.',
+      sourceUrls: ['https://genius.com/radiohead', 'https://open.spotify.com/artist/x'],
     });
+    const deps = makeDeps({ searchArtistSources });
 
-    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    expect(searchArtistSources).not.toHaveBeenCalled();
+    const facts = factsArg(deps);
+    expect(facts.sourceUrls).toContain('https://genius.com/radiohead');
+    expect(facts.sourceUrls?.some((u: string) => u.includes('spotify.com'))).toBe(false);
+  });
+
+  it('drops listening-service links from the discovered links', async () => {
+    const result = await runBioGeneration(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        links: [
+          'https://radiohead.com',
+          'https://radiohead.bandcamp.com',
+          'https://open.spotify.com/artist/x',
+        ],
+      },
+      makeDeps()
+    );
+
+    expect(result.links.some((l) => l.url === 'https://radiohead.com')).toBe(true);
+    expect(result.links.some((l) => l.url.includes('bandcamp.com'))).toBe(false);
+    expect(result.links.some((l) => l.url.includes('spotify.com'))).toBe(false);
   });
 
   it('marks the LLM-ranked image as primary', async () => {
@@ -187,7 +230,7 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
     expect(result.images[4].isPrimary).toBe(true);
-    expect(result.images.filter((image) => image.isPrimary)).toHaveLength(1);
+    expect(result.images.filter((img) => img.isPrimary)).toHaveLength(1);
   });
 
   it('appends optional admin-supplied links and dedupes by url', async () => {
@@ -195,14 +238,13 @@ describe('runBioGeneration', () => {
       {
         artistId: 'a1',
         displayName: 'Radiohead',
-        links: ['https://radiohead.com', 'https://bandcamp.com/radiohead'],
+        links: ['https://radiohead.com', 'https://radiohead.com'],
       },
       makeDeps()
     );
 
     const radioheadLinks = result.links.filter((l) => l.url === 'https://radiohead.com');
     expect(radioheadLinks).toHaveLength(1);
-    expect(result.links.some((l) => l.url === 'https://bandcamp.com/radiohead')).toBe(true);
   });
 
   it('degrades to prose-only when MusicBrainz finds no match', async () => {
@@ -251,7 +293,7 @@ describe('lambdaHandler', () => {
 
   it('returns ok:false with the error message when generation throws', async () => {
     // Stub fetch so metadata gathering fails fast (no live network); with no SSM
-    // env configured, getGroqApiKey then throws inside runBioGeneration → ok:false.
+    // env configured, getGeminiApiKey then throws inside runBioGeneration → ok:false.
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network disabled in test')));
 
     const result = await lambdaHandler({ artistId: 'a1', displayName: 'Radiohead' });

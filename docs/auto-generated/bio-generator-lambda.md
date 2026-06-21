@@ -20,7 +20,7 @@ Given an artist's name(s) plus optional reference links and an editor descriptio
    website, and English Wikipedia sitelink.
 3. **Wikimedia Commons** (`src/wikimedia.ts`) — resolves each image file name to a real,
    hotlinkable image URL with the **attribution + license** required to display it.
-4. **Groq** (`src/groq.ts`) — writes the short + long bio prose in JSON mode, grounded on the facts
+4. **Gemini** (`src/gemini.ts`) — writes the short + long bio prose in JSON mode, grounded on the facts
    gathered above so it does not invent discography/dates. The model also ranks which 2–3 images
    best identify the artist. **The LLM never produces image or link URLs** — those come only from
    the real sources above, which is why nothing 404s.
@@ -33,7 +33,7 @@ MusicBrainz match is found or a metadata call fails, and returns a discriminated
 { "ok": true, "data": { "shortBio": "...", "longBio": "<p>...</p>", "genres": "...",
                         "images": [{ "url": "...", "attribution": "...", "isPrimary": true }],
                         "links": [{ "label": "Wikipedia", "url": "...", "kind": "wikipedia" }],
-                        "model": "llama-3.3-70b-versatile" } }
+                        "model": "gemini-3-flash" } }
 // failure
 { "ok": false, "error": "..." }
 ```
@@ -45,17 +45,17 @@ re-declares the same shapes in `src/lib/validation/bio-generation-schema.ts`.
 
 - **MusicBrainz** and **Wikimedia** require only a descriptive `User-Agent` (no API key). The UA is
   the `USER_AGENT` constant in `src/types.ts`.
-- **Groq** needs an API key, stored in SSM (below). Free tier, OpenAI-compatible.
+- **Gemini** needs an API key, stored in SSM (below). Free tier.
 
 ## Secrets / configuration
 
 | Where                                  | Name                                    | Purpose                                            |
 | -------------------------------------- | --------------------------------------- | -------------------------------------------------- |
-| AWS SSM Parameter Store (SecureString) | `/fakefour/groq/api-key`                | Groq API key — Lambda only                         |
+| AWS SSM Parameter Store (SecureString) | `/fakefour/gemini/api-key`              | Gemini API key — Lambda only                       |
 | Web app env                            | `BIO_GENERATOR_LAMBDA_NAME`             | Function name to invoke (`fakefour-bio-generator`) |
 | Web app IAM identity                   | `lambda:InvokeFunction` on the function | Lets the app invoke it                             |
 
-The Groq key is **never** in the web app or CI — only the Lambda reads it from SSM at runtime.
+The Gemini key is **never** in the web app or CI — only the Lambda reads it from SSM at runtime.
 
 ## How it was created
 
@@ -66,13 +66,13 @@ The Groq key is **never** in the web app or CI — only the Lambda reads it from
 # 2. Install + test (from bio-generator/)
 cd bio-generator
 pnpm install
-pnpm run test:run        # unit tests (fetch + Groq + SSM all mocked)
+pnpm run test:run        # unit tests (fetch + Gemini + SSM all mocked)
 
-# 3. Store the Groq key once (SecureString, KMS-encrypted)
+# 3. Store the Gemini key once (SecureString, KMS-encrypted)
 aws ssm put-parameter \
-  --name /fakefour/groq/api-key \
+  --name /fakefour/gemini/api-key \
   --type SecureString \
-  --value "<YOUR_GROQ_API_KEY>" \
+  --value "<YOUR_GEMINI_API_KEY>" \
   --overwrite
 
 # 4. Build + deploy with SAM (esbuild bundles handler.ts, externalising @aws-sdk/*)
@@ -87,7 +87,7 @@ sam deploy
 ### Local invocation
 
 ```bash
-# Requires a Groq key reachable via SSM (or stub getGroqApiKey). Build first.
+# Requires a Gemini key reachable via SSM (or stub getGeminiApiKey). Build first.
 sam build
 sam local invoke BioGeneratorFunction -e events/sample.json
 ```
@@ -96,12 +96,12 @@ sam local invoke BioGeneratorFunction -e events/sample.json
 
 Deployed by [`.github/workflows/deploy-bio-generator.yml`](../../.github/workflows/deploy-bio-generator.yml),
 which mirrors the Stripe webhook workflow: it assumes the `AWS_DEPLOY_ROLE_ARN` OIDC role, runs
-`sam build` + `sam deploy`, and triggers only on changes under `bio-generator/`. The Groq key is
+`sam build` + `sam deploy`, and triggers only on changes under `bio-generator/`. The Gemini key is
 read from SSM at deploy/runtime — it is not a GitHub secret.
 
 ## Tests
 
 `pnpm run test:run` in `bio-generator/`. Every external call (`fetch`, SSM) is mocked, so the suite
 is deterministic and offline. Covers: MusicBrainz relation parsing, Wikidata claim extraction,
-Commons attribution building, Groq JSON-mode parsing/validation, and the full handler orchestration
+Commons attribution building, Gemini JSON-mode parsing/validation, and the full handler orchestration
 including graceful degradation paths.
