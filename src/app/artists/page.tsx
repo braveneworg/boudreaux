@@ -17,7 +17,7 @@ import { ArtistListCard } from '@/app/components/artist-list-card';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import { Heading } from '@/app/components/ui/heading';
+import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ArtistService } from '@/lib/services/artist-service';
 
@@ -44,7 +44,12 @@ export default async function ArtistsIndexPage() {
           <BreadcrumbMenu items={breadcrumbItems} />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Heading level={1}>Artists</Heading>
+            <ImageHeading
+              src="/media/headings/ARTISTS.webp"
+              alt="artists"
+              imageHeight={480}
+              priority
+            />
             <Button asChild variant="outline" size="sm">
               <Link href="/artists/search">
                 <Search className="size-4" aria-hidden />
