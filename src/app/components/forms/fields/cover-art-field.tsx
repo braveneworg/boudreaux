@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -21,6 +21,7 @@ import {
 } from '@/app/components/ui/command';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { useArtistsQuery } from '@/app/hooks/use-artists-query';
 import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
 import { finalizeCoverArtUploadAction } from '@/lib/actions/finalize-cover-art-upload-action';
 import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
@@ -89,18 +90,63 @@ export const CoverArtField = <
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [artistImages, setArtistImages] = useState<ArtistImageOption[]>([]);
+  // Raw image options fetched from the server action; their `artistName` is
+  // resolved reactively below from the artist-name query so resolving a name
+  // later never re-triggers the image fetch.
+  const [rawArtistImages, setRawArtistImages] = useState<ArtistImageOption[]>([]);
   const [isLoadingArtistImages, setIsLoadingArtistImages] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
-  // Fetch artist images when selected artists change
+  // Stable serialization of the selected artist IDs. Used both as a memo key
+  // for the query input and as the sole dependency of the images effect, so a
+  // new-but-equal `artistIds` array prop doesn't retrigger fetches.
   const artistIdsKey = JSON.stringify([...artistIds].sort());
+
+  // A stable, sorted ID array derived from the key — `useArtistsQuery` spins up
+  // one query per ID, so feeding it a referentially stable array avoids
+  // re-subscribing on every render.
+  const sortedArtistIds = useMemo<string[]>(() => JSON.parse(artistIdsKey), [artistIdsKey]);
+
+  // Artist NAMES come from the shared by-id query cache (same cache entry as
+  // `useArtistQuery`); IMAGES still come from the `getArtistImagesAction`
+  // server action below.
+  const { artistsById } = useArtistsQuery(sortedArtistIds);
+
+  // Map each ID to its display name, memoized on the artist data. Iterating the
+  // record's entries (rather than indexing by a dynamic key) and storing into a
+  // `Map` keeps the lookup off plain-object sinks (object-injection safety).
+  const nameByArtistId = useMemo<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const [id, artist] of Object.entries(artistsById)) {
+      map.set(
+        id,
+        artist
+          ? artist.displayName ||
+              [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
+              '(no name)'
+          : '(no name)'
+      );
+    }
+    return map;
+  }, [artistsById]);
+
+  // Final options shown in the combobox: raw images stamped with the live name
+  // for each owning artist. Names update reactively as the query resolves
+  // without re-fetching images.
+  const artistImages = useMemo<ArtistImageOption[]>(
+    () =>
+      rawArtistImages.map((img) => ({
+        ...img,
+        artistName: nameByArtistId.get(img.artistId) ?? '(no name)',
+      })),
+    [rawArtistImages, nameByArtistId]
+  );
 
   useEffect(() => {
     const parsedIds: string[] = JSON.parse(artistIdsKey);
 
     if (parsedIds.length === 0) {
-      setArtistImages([]);
+      setRawArtistImages([]);
       return;
     }
 
@@ -111,26 +157,15 @@ export const CoverArtField = <
       try {
         const imageResults = await Promise.all(
           parsedIds.map(async (artistId) => {
-            const [artistResponse, imagesResult] = await Promise.all([
-              fetch(`/api/artists/${artistId}`),
-              getArtistImagesAction(artistId),
-            ]);
-
-            let artistName = '(no name)';
-            if (artistResponse.ok) {
-              const artist = await artistResponse.json();
-              artistName =
-                artist.displayName ||
-                [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
-                '(no name)';
-            }
+            const imagesResult = await getArtistImagesAction(artistId);
 
             if (imagesResult.success && imagesResult.data) {
               return imagesResult.data.map<ArtistImageOption>((img) => ({
                 id: img.id,
                 src: img.src,
                 artistId,
-                artistName,
+                // Resolved reactively in the `artistImages` memo above.
+                artistName: '(no name)',
                 caption: img.caption,
                 altText: img.altText,
               }));
@@ -142,7 +177,7 @@ export const CoverArtField = <
 
         const allImages: ArtistImageOption[] = imageResults.flat();
         if (!cancelled) {
-          setArtistImages(allImages);
+          setRawArtistImages(allImages);
         }
       } catch (err) {
         console.error('Failed to fetch artist images:', err);

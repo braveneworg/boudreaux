@@ -24,10 +24,13 @@ export const queryKeys = {
         params.deleted,
       ] as const,
     detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
+    adminDetail: (id: string) => [...queryKeys.releases.all, 'adminDetail', id] as const,
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
     related: (id: string, artistId?: string | null) =>
       [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
+    digitalFormat: (id: string, formatType: string) =>
+      [...queryKeys.releases.all, 'digitalFormat', id, formatType] as const,
     freeDownloadStatus: (id: string) =>
       [...queryKeys.releases.all, 'freeDownloadStatus', id] as const,
     filteredList: (params: { search?: string; artistIds?: string[]; take?: number }) =>
@@ -50,6 +53,7 @@ export const queryKeys = {
         params.deleted,
       ] as const,
     bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
+    detail: (id: string) => [...queryKeys.artists.all, 'detail', id] as const,
     bioGeneration: (artistId: string) =>
       [...queryKeys.artists.all, 'bioGeneration', artistId] as const,
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
@@ -73,6 +77,7 @@ export const queryKeys = {
         params.deleted,
       ] as const,
     active: () => [...queryKeys.featuredArtists.all, 'active'] as const,
+    detail: (id: string) => [...queryKeys.featuredArtists.all, 'detail', id] as const,
   },
   collection: {
     all: ['collection'] as const,
@@ -84,6 +89,9 @@ export const queryKeys = {
       [...queryKeys.tours.all, 'infinite', search.trim().toLowerCase()] as const,
     detail: (id: string) => [...queryKeys.tours.all, 'detail', id] as const,
     dates: (tourId: string) => [...queryKeys.tours.all, 'dates', tourId] as const,
+    images: (tourId: string) => [...queryKeys.tours.all, 'images', tourId] as const,
+    dateImages: (tourId: string, tourDateId: string) =>
+      [...queryKeys.tours.all, 'dateImages', tourId, tourDateId] as const,
   },
   purchaseStatus: {
     bySession: (releaseId: string, sessionId: string) =>

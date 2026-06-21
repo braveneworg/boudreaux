@@ -89,9 +89,9 @@ export const ArtistPillList = ({
 }: ArtistPillListProps) => {
   const [headliners, setHeadliners] = useState(initialHeadliners);
   const prevInitialRef = useRef(initialHeadliners);
-  const reorderHeadliners = useReorderHeadlinersMutation();
-  const updateHeadlinerSetTime = useUpdateHeadlinerSetTimeMutation();
-  const removeHeadliner = useRemoveHeadlinerMutation();
+  const { mutateAsync: reorderHeadliners } = useReorderHeadlinersMutation();
+  const { mutateAsync: updateHeadlinerSetTime } = useUpdateHeadlinerSetTimeMutation();
+  const { mutateAsync: removeHeadliner } = useRemoveHeadlinerMutation();
 
   // Keep local state in sync with parent prop updates
   // (e.g., after the parent refetches tour dates).
@@ -121,7 +121,7 @@ export const ArtistPillList = ({
       const reordered = arrayMove(headliners, oldIndex, newIndex);
       setHeadliners(reordered);
 
-      const result = await reorderHeadliners.mutateAsync({
+      const result = await reorderHeadliners({
         tourDateId,
         headlinerIds: reordered.map((h) => h.id),
       });
@@ -139,7 +139,7 @@ export const ArtistPillList = ({
 
   const handleSetTimeUpdate = useCallback(
     async (headlinerId: string, artistId: string | null, setTime: string | null) => {
-      const result = await updateHeadlinerSetTime.mutateAsync({
+      const result = await updateHeadlinerSetTime({
         headlinerId,
         setTime,
         tourDateId,
@@ -163,7 +163,7 @@ export const ArtistPillList = ({
 
   const handleRemove = useCallback(
     async (headlinerId: string, artistId: string | null) => {
-      const result = await removeHeadliner.mutateAsync({
+      const result = await removeHeadliner({
         headlinerId,
         tourDateId,
         artistId: artistId ?? undefined,

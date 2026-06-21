@@ -41,6 +41,7 @@ import {
   useCreateArtistMutation,
   useUpdateArtistMutation,
 } from '@/app/hooks/mutations/use-artist-mutations';
+import { useArtistQuery } from '@/app/hooks/use-artist-query';
 import {
   deleteArtistImageAction,
   reorderArtistImagesAction,
@@ -121,14 +122,13 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const createArtist = useCreateArtistMutation();
-  const updateArtist = useUpdateArtistMutation();
+  const { mutateAsync: createArtist } = useCreateArtistMutation();
+  const { mutateAsync: updateArtist } = useUpdateArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   // Re-hosted bio images (existing + freshly generated) offered in the
   // rich-text editor's insert-image picker, alongside uploaded images.
   const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [isLoadingArtist, setIsLoadingArtist] = useState(!!initialArtistId);
   // artistId will be set after artist creation or from URL param for persisting image reordering
   const [artistId, setArtistId] = useState<string | null>(initialArtistId || null);
   // Track if artist is published (publishedOn date exists)
@@ -188,103 +188,84 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   });
   const { control, setValue } = artistForm;
 
-  // Fetch artist data when initialArtistId is provided
+  // Fetch artist data when initialArtistId is provided. The gated hook owns the
+  // request lifecycle; the effects below project its data/error into form state.
+  const {
+    data: artistData,
+    isPending: isArtistPending,
+    isError: isArtistError,
+    error: artistError,
+  } = useArtistQuery(initialArtistId ?? '', { enabled: !!initialArtistId });
+
+  // In edit mode the form is "loading" until the gated query resolves; in
+  // create mode there's nothing to load.
+  const isLoadingArtist = !!initialArtistId && isArtistPending;
+
   useEffect(() => {
-    if (!initialArtistId) return;
+    if (!initialArtistId || !artistData) return;
 
-    const fetchArtist = async () => {
-      try {
-        setIsLoadingArtist(true);
-        const response = await fetch(`/api/artists/${initialArtistId}`);
+    const artist = artistData;
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          toast.error(errorData.error || 'Failed to load artist');
-          return;
-        }
-
-        const artist = await response.json();
-
-        // Format dates for the form (YYYY-MM-DD format)
-        const formatDate = (dateValue: string | Date | null | undefined): string => {
-          if (!dateValue) return '';
-          const date = new Date(dateValue);
-          return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-        };
-
-        // Reset form with fetched data
-        artistForm.reset({
-          firstName: artist.firstName || '',
-          middleName: artist.middleName || '',
-          surname: artist.surname || '',
-          akaNames: artist.akaNames || '',
-          displayName: artist.displayName || '',
-          title: artist.title || '',
-          suffix: artist.suffix || '',
-          slug: artist.slug || '',
-          // Convert legacy plain-text bios to HTML so the rich-text editor
-          // preserves their line breaks instead of collapsing them.
-          bio: plainTextToBioHtml(artist.bio),
-          shortBio: plainTextToBioHtml(artist.shortBio),
-          altBio: plainTextToBioHtml(artist.altBio),
-          genres: artist.genres || '',
-          tags: artist.tags || '',
-          bornOn: formatDate(artist.bornOn),
-          diedOn: formatDate(artist.diedOn),
-          formedOn: formatDate(artist.formedOn),
-          publishedOn: formatDate(artist.publishedOn),
-          createdBy: artist.createdBy || user?.id,
-        });
-
-        // Set published state
-        if (artist.publishedOn) {
-          setIsPublished(true);
-        }
-
-        // Load existing images if any
-        if (artist.images && artist.images.length > 0) {
-          const existingImages: ImageItem[] = artist.images.map(
-            (img: {
-              id: string;
-              src: string;
-              caption?: string;
-              altText?: string;
-              sortOrder?: number;
-            }) => ({
-              id: img.id,
-              preview: img.src,
-              uploadedUrl: img.src,
-              caption: img.caption || '',
-              altText: img.altText || '',
-              sortOrder: img.sortOrder ?? 0,
-            })
-          );
-          setImages(existingImages);
-        }
-
-        // Load existing re-hosted bio images for the editor's image picker.
-        if (artist.bioImages && artist.bioImages.length > 0) {
-          setBioPickerImages(
-            artist.bioImages.map(
-              (img: {
-                url: string;
-                title?: string | null;
-                width?: number | null;
-                height?: number | null;
-              }) => ({ url: img.url, alt: img.title ?? '', width: img.width, height: img.height })
-            )
-          );
-        }
-      } catch (err) {
-        error('Failed to fetch artist:', err);
-        toast.error('Failed to load artist data');
-      } finally {
-        setIsLoadingArtist(false);
-      }
+    // Format dates for the form (YYYY-MM-DD format)
+    const formatDate = (dateValue: Date | null): string => {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
     };
 
-    fetchArtist();
-  }, [initialArtistId, artistForm, user?.id]);
+    // Reset form with fetched data
+    artistForm.reset({
+      firstName: artist.firstName || '',
+      middleName: artist.middleName || '',
+      surname: artist.surname || '',
+      akaNames: artist.akaNames || '',
+      displayName: artist.displayName || '',
+      title: artist.title || '',
+      suffix: artist.suffix || '',
+      slug: artist.slug || '',
+      // Convert legacy plain-text bios to HTML so the rich-text editor
+      // preserves their line breaks instead of collapsing them.
+      bio: plainTextToBioHtml(artist.bio),
+      shortBio: plainTextToBioHtml(artist.shortBio),
+      altBio: plainTextToBioHtml(artist.altBio),
+      genres: artist.genres || '',
+      tags: artist.tags || '',
+      bornOn: formatDate(artist.bornOn),
+      diedOn: formatDate(artist.diedOn),
+      formedOn: formatDate(artist.formedOn),
+      publishedOn: formatDate(artist.publishedOn),
+      createdBy: artist.createdBy || user?.id,
+    });
+
+    // Set published state
+    if (artist.publishedOn) {
+      setIsPublished(true);
+    }
+
+    // Load existing images if any. The by-id route returns scalars + `images`
+    // only (no `bioImages` relation), so there's no bio-picker hydration here.
+    if (artist.images.length > 0) {
+      const existingImages: ImageItem[] = artist.images.map((img) => ({
+        id: img.id,
+        preview: img.src ?? '',
+        uploadedUrl: img.src ?? '',
+        caption: img.caption || '',
+        altText: img.altText || '',
+        sortOrder: img.sortOrder ?? 0,
+      }));
+      setImages(existingImages);
+    }
+  }, [initialArtistId, artistData, artistForm, user?.id]);
+
+  // Surface a load failure (edit mode only) without unmounting the form. Gate
+  // on `isError` — `artistError` is defaulted to a non-null Error, so it is
+  // truthy even on a successful load.
+  useEffect(() => {
+    if (initialArtistId && isArtistError) {
+      error('Failed to fetch artist:', artistError);
+      toast.error('Failed to load artist data');
+    }
+  }, [initialArtistId, isArtistError, artistError]);
 
   // After artist creation, navigate away — outside of startTransition so the router
   // navigation doesn't keep isTransitionPending true for the form submission. When a
@@ -355,7 +336,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
           // If we already have an artistId, this is an update
           if (artistId) {
-            const newFormState = await updateArtist.mutateAsync({ artistId, formState, formData });
+            const newFormState = await updateArtist({ artistId, formState, formData });
             if (newFormState.success) {
               // Upload any pending images for existing artist
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -466,7 +447,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             }
           } else {
             // This is a create action
-            const newFormState = await createArtist.mutateAsync({ formState, formData });
+            const newFormState = await createArtist({ formState, formData });
             if (newFormState.success) {
               const createdArtistId = newFormState.data?.artistId as string | undefined;
 

@@ -11,15 +11,14 @@ import {
   useCheckout,
 } from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
-import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, Loader2Icon } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
+import { usePurchaseStatusQuery } from '@/app/hooks/use-purchase-status-query';
 import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purchase-checkout-session-action';
 import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
 import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
-import { queryKeys } from '@/lib/query-keys';
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 const getStripe = () => {
@@ -135,10 +134,6 @@ const PurchaseCheckoutForm = ({
   );
 };
 
-interface PurchaseStatusResponse {
-  confirmed: boolean;
-}
-
 /**
  * Checkout step for the PWYW release purchase flow.
  *
@@ -204,14 +199,8 @@ export const PurchaseCheckoutStep = ({
   // counter mutated inside `queryFn` — a `queryFn` side effect the query
   // exhaustive-deps rule rightly flags. Reaching the cap latches
   // `pollLimitReached` so the render can show the timeout UI.
-  const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
-    queryKey: queryKeys.purchaseStatus.bySession(releaseId, sessionId ?? ''),
-    queryFn: async () => {
-      const res = await fetch(`/api/releases/${releaseId}/purchase-status?sessionId=${sessionId}`);
-      if (!res.ok) throw new Error('Failed to fetch purchase status');
-      return res.json() as Promise<PurchaseStatusResponse>;
-    },
-    enabled: paymentComplete && sessionId !== null,
+  const { data: purchaseStatus } = usePurchaseStatusQuery(releaseId, sessionId, {
+    enabled: paymentComplete,
     refetchInterval: (query) => {
       if (query.state.data?.confirmed) return false;
       if (query.state.dataUpdateCount >= MAX_POLL_COUNT) {

@@ -81,6 +81,18 @@ vi.mock('@/lib/actions/register-image-actions', () => ({ registerArtistImagesAct
 vi.mock('@/lib/utils/direct-upload', () => ({ uploadFilesToS3: vi.fn() }));
 vi.mock('@/lib/utils/console-logger', () => ({ error: vi.fn(), warn: vi.fn(), log: vi.fn() }));
 
+// Mock the artist-detail query hook so edit-mode loading is driven by the
+// hook's return value instead of a raw `fetch`. Create-mode tests below leave
+// it at the default (null data, not pending).
+vi.mock('@/app/hooks/use-artist-query', () => ({
+  useArtistQuery: vi.fn(() => ({
+    data: null,
+    isPending: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
 describe('ArtistForm', () => {
   beforeEach(() => {
     mockPush.mockClear();

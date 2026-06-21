@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -41,6 +41,8 @@ import {
   useCreateFeaturedArtistMutation,
   useUpdateFeaturedArtistCoverArtMutation,
 } from '@/app/hooks/mutations/use-featured-artist-mutations';
+import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
+import { useReleaseDigitalFormatQuery } from '@/app/hooks/use-release-digital-format-query';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
@@ -87,7 +89,6 @@ export const FeaturedArtistForm = ({
 }: FeaturedArtistFormProps) => {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
-  const [isLoadingFeaturedArtist, setIsLoadingFeaturedArtist] = useState(!!initialFeaturedArtistId);
   const [featuredArtistId, setFeaturedArtistId] = useState<string | null>(
     initialFeaturedArtistId || null
   );
@@ -97,8 +98,8 @@ export const FeaturedArtistForm = ({
   const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
-  const createFeaturedArtist = useCreateFeaturedArtistMutation();
-  const updateFeaturedArtistCoverArt = useUpdateFeaturedArtistCoverArtMutation();
+  const { mutateAsync: createFeaturedArtist } = useCreateFeaturedArtistMutation();
+  const { mutateAsync: updateFeaturedArtistCoverArt } = useUpdateFeaturedArtistCoverArtMutation();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -125,72 +126,73 @@ export const FeaturedArtistForm = ({
   const [formatFileCount, setFormatFileCount] = useState(0);
   const [formatTracks, setFormatTracks] = useState<TrackOption[]>([]);
 
-  // Fetch featured artist data when initialFeaturedArtistId is provided
+  // Fetch featured artist data when initialFeaturedArtistId is provided. The
+  // gated hook owns the request lifecycle; the effects below project its
+  // data/error into form state, preserving the original side effects.
+  const {
+    data: featuredArtistData,
+    isPending: isFeaturedArtistPending,
+    isError: isFeaturedArtistError,
+    error: featuredArtistError,
+  } = useFeaturedArtistQuery(initialFeaturedArtistId ?? '', {
+    enabled: !!initialFeaturedArtistId,
+  });
+
+  // In edit mode the form is "loading" until the gated query resolves; in
+  // create mode there's nothing to load. This flag also gates the
+  // release-change effect below so it doesn't clobber the initial reset.
+  const isLoadingFeaturedArtist = !!initialFeaturedArtistId && isFeaturedArtistPending;
+
   useEffect(() => {
-    if (!initialFeaturedArtistId) return;
+    if (!initialFeaturedArtistId || !featuredArtistData) return;
 
-    const fetchFeaturedArtist = async () => {
-      try {
-        setIsLoadingFeaturedArtist(true);
-        const response = await fetch(`/api/featured-artists/${initialFeaturedArtistId}`);
+    const featuredArtist = featuredArtistData;
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          toast.error(errorData.error || 'Failed to load featured artist');
-          return;
-        }
-
-        const featuredArtist = await response.json();
-
-        // Format dates for the form (YYYY-MM-DD format)
-        const formatDate = (dateValue: string | Date | null | undefined): string => {
-          if (!dateValue) return '';
-          const date = new Date(dateValue);
-          return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-        };
-
-        // Reset form with fetched data
-        form.reset({
-          displayName: featuredArtist.displayName || '',
-          description: featuredArtist.description || '',
-          coverArt: featuredArtist.coverArt || '',
-          position: featuredArtist.position ?? 0,
-          featuredOn: formatDate(featuredArtist.featuredOn),
-          featuredUntil: formatDate(featuredArtist.featuredUntil),
-          digitalFormatId: featuredArtist.digitalFormatId || '',
-          releaseId: featuredArtist.releaseId || '',
-          featuredTrackNumber: featuredArtist.featuredTrackNumber ?? undefined,
-        });
-
-        // Set format status if editing an existing entry
-        if (featuredArtist.digitalFormatId) {
-          setFormatStatus('found');
-        }
-
-        // Populate derived artist data for display and CoverArtField
-        const ids = featuredArtist.artists?.map((a: { id: string }) => a.id) || [];
-        setDerivedArtistIds(ids);
-        const names =
-          featuredArtist.artists
-            ?.map((a: { displayName?: string; firstName?: string; surname?: string }) => {
-              if (a.displayName) return a.displayName;
-              const first = a.firstName ?? '';
-              const last = a.surname ?? '';
-              const full = `${first} ${last}`.trim();
-              return full || null;
-            })
-            .filter((n: string | null): n is string => !!n) ?? [];
-        setDerivedArtistNames(names);
-      } catch (err) {
-        error('Failed to fetch featured artist:', err);
-        toast.error('Failed to load featured artist data');
-      } finally {
-        setIsLoadingFeaturedArtist(false);
-      }
+    // Format dates for the form (YYYY-MM-DD format)
+    const formatDate = (dateValue: Date | null): string => {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
     };
 
-    fetchFeaturedArtist();
-  }, [initialFeaturedArtistId, form]);
+    // Reset form with fetched data
+    form.reset({
+      displayName: featuredArtist.displayName || '',
+      description: featuredArtist.description || '',
+      coverArt: featuredArtist.coverArt || '',
+      position: featuredArtist.position ?? 0,
+      featuredOn: formatDate(featuredArtist.featuredOn),
+      featuredUntil: formatDate(featuredArtist.featuredUntil),
+      digitalFormatId: featuredArtist.digitalFormatId || '',
+      releaseId: featuredArtist.releaseId || '',
+      featuredTrackNumber: featuredArtist.featuredTrackNumber ?? undefined,
+    });
+
+    // Set format status if editing an existing entry
+    if (featuredArtist.digitalFormatId) {
+      setFormatStatus('found');
+    }
+
+    // Populate derived artist data for display and CoverArtField
+    const ids = featuredArtist.artists.map((a) => a.id);
+    setDerivedArtistIds(ids);
+    const names = featuredArtist.artists
+      .map((a) => {
+        if (a.displayName) return a.displayName;
+        const full = `${a.firstName} ${a.surname}`.trim();
+        return full || null;
+      })
+      .filter((n): n is string => !!n);
+    setDerivedArtistNames(names);
+  }, [initialFeaturedArtistId, featuredArtistData, form]);
+
+  // Surface a load failure (edit mode only) without unmounting the form.
+  useEffect(() => {
+    if (initialFeaturedArtistId && isFeaturedArtistError) {
+      error('Failed to fetch featured artist:', featuredArtistError);
+      toast.error('Failed to load featured artist data');
+    }
+  }, [initialFeaturedArtistId, isFeaturedArtistError, featuredArtistError]);
 
   // Sync server-side field errors with React Hook Form for inline display
   useEffect(() => {
@@ -206,76 +208,77 @@ export const FeaturedArtistForm = ({
     }
   }, [formState.errors, form]);
 
-  // Fetch the MP3_320KBPS digital format for a given release and auto-set digitalFormatId
-  const fetchDigitalFormat = useCallback(
-    async (releaseId: string) => {
-      setFormatStatus('loading');
-      setFormatFileCount(0);
-      setFormatTracks([]);
-      setValue('digitalFormatId', '');
-      setValue('featuredTrackNumber', undefined);
+  // The featured-track selector needs the release's MP3 320kbps format: its id
+  // gates submission and its files populate the selector. Fetched reactively for
+  // the selected release once the featured-artist edit load has settled.
+  const {
+    data: digitalFormat,
+    isPending: isDigitalFormatPending,
+    isError: isDigitalFormatError,
+  } = useReleaseDigitalFormatQuery(watchedReleaseId ?? '', 'MP3_320KBPS', {
+    enabled: !!watchedReleaseId && !isLoadingFeaturedArtist,
+  });
 
-      try {
-        const response = await fetch(
-          `/api/releases/${releaseId}/digital-formats?formatType=MP3_320KBPS`
-        );
-
-        if (!response.ok) {
-          setFormatStatus('missing');
-          form.setError('digitalFormatId', {
-            type: 'manual',
-            message:
-              'Selected release has no MP3 320kbps format. Please upload format files first.',
-          });
-          return;
-        }
-
-        const { digitalFormat } = await response.json();
-        setValue('digitalFormatId', digitalFormat.id, {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-        setFormatStatus('found');
-        const files = digitalFormat.files ?? [];
-        setFormatFileCount(files.length);
-        setFormatTracks(
-          [...files]
-            .sort(
-              (a: { trackNumber: number }, b: { trackNumber: number }) =>
-                a.trackNumber - b.trackNumber
-            )
-            .map((f: { trackNumber: number; title: string | null; fileName: string }) => ({
-              trackNumber: f.trackNumber,
-              title: f.title,
-              fileName: f.fileName,
-            }))
-        );
-        form.clearErrors('digitalFormatId');
-      } catch {
-        setFormatStatus('missing');
-        form.setError('digitalFormatId', {
-          type: 'manual',
-          message: 'Failed to check digital format availability.',
-        });
-      }
-    },
-    [setValue, form]
-  );
-
-  // When releaseId changes (and not during initial load), fetch the digital format
+  // Mirror the digital-format query state into the form: clear while loading or
+  // when no release is selected, surface a field error when the release has no
+  // MP3 320kbps format, and populate `digitalFormatId` + tracks when found.
   useEffect(() => {
     if (isLoadingFeaturedArtist) return;
 
-    if (watchedReleaseId) {
-      fetchDigitalFormat(watchedReleaseId);
-    } else {
+    if (!watchedReleaseId) {
       setFormatStatus('idle');
       setFormatFileCount(0);
       setFormatTracks([]);
       setValue('digitalFormatId', '');
       setValue('featuredTrackNumber', undefined);
+      return;
     }
-  }, [watchedReleaseId, fetchDigitalFormat, setValue, isLoadingFeaturedArtist]);
+
+    if (isDigitalFormatPending) {
+      setFormatStatus('loading');
+      setFormatFileCount(0);
+      setFormatTracks([]);
+      setValue('digitalFormatId', '');
+      setValue('featuredTrackNumber', undefined);
+      return;
+    }
+
+    if (!digitalFormat) {
+      setFormatStatus('missing');
+      form.setError('digitalFormatId', {
+        type: 'manual',
+        message: isDigitalFormatError
+          ? 'Failed to check digital format availability.'
+          : 'Selected release has no MP3 320kbps format. Please upload format files first.',
+      });
+      return;
+    }
+
+    setValue('digitalFormatId', digitalFormat.id, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setFormatStatus('found');
+    setFormatFileCount(digitalFormat.files.length);
+    setFormatTracks(
+      [...digitalFormat.files]
+        .sort((a, b) => a.trackNumber - b.trackNumber)
+        .map((f) => ({
+          trackNumber: f.trackNumber,
+          title: f.title,
+          fileName: f.fileName,
+        }))
+    );
+    form.clearErrors('digitalFormatId');
+  }, [
+    isLoadingFeaturedArtist,
+    watchedReleaseId,
+    isDigitalFormatPending,
+    isDigitalFormatError,
+    digitalFormat,
+    setValue,
+    form,
+  ]);
 
   const handleDateSelect = (dateString: string, fieldName: string) => {
     const dateOnly = dateString ? dateString.split('T')[0] : '';
@@ -371,7 +374,7 @@ export const FeaturedArtistForm = ({
         }
       } else {
         // In create mode, use the server action via the mutation hook
-        const result = await createFeaturedArtist.mutateAsync({ formState, formData });
+        const result = await createFeaturedArtist({ formState, formData });
         setFormState(result);
 
         if (result.success && result.data?.featuredArtistId) {
@@ -633,7 +636,7 @@ export const FeaturedArtistForm = ({
                         // variant generation + orphan sweep + CloudFront
                         // invalidation). For create mode there's no row to
                         // update yet — submit will save it then.
-                        const result = await updateFeaturedArtistCoverArt.mutateAsync({
+                        const result = await updateFeaturedArtistCoverArt({
                           featuredArtistId,
                           coverArt: cdnUrl,
                         });

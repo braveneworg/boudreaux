@@ -40,6 +40,7 @@ import {
   useCreateTourDateMutation,
   useUpdateTourDateMutation,
 } from '@/app/hooks/mutations/use-tour-date-mutations';
+import { useTourDateImagesQuery } from '@/app/hooks/use-tour-date-images-query';
 import type { FormState } from '@/lib/types/form-state';
 import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
 import {
@@ -119,8 +120,8 @@ export const TourDateForm = ({
   const [isPending, setIsPending] = useState(false);
   const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
   const isEditMode = !!tourDate;
-  const createTourDate = useCreateTourDateMutation();
-  const updateTourDate = useUpdateTourDateMutation();
+  const { mutateAsync: createTourDate } = useCreateTourDateMutation();
+  const { mutateAsync: updateTourDate } = useUpdateTourDateMutation();
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourDateUpdateSchema : tourDateCreateSchema),
@@ -214,25 +215,21 @@ export const TourDateForm = ({
     }
   }, [tourDate, tourId, reset]);
 
-  // Fetch tour date images in edit mode
-  const fetchTourDateImages = useCallback(async () => {
-    if (!tourDate?.id) return;
-    try {
-      const response = await fetch(`/api/tours/${tourId}/dates/${tourDate.id}/images`);
-      if (response.ok) {
-        const data = await response.json();
-        setTourDateImages(data.images ?? []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch tour date images:', error);
-    }
-  }, [tourId, tourDate?.id]);
+  // Fetch tour date images in edit mode. The gated query owns the request
+  // (only while the dialog is open for an existing tour date); the effect
+  // below projects its result into local state, and `refetch` re-pulls after
+  // an upload completes.
+  const { data: tourDateImagesData, refetch: refetchTourDateImages } = useTourDateImagesQuery(
+    tourId,
+    tourDate?.id ?? '',
+    { enabled: isEditMode && open && !!tourDate?.id }
+  );
 
   useEffect(() => {
-    if (isEditMode && open) {
-      fetchTourDateImages();
+    if (tourDateImagesData) {
+      setTourDateImages(tourDateImagesData.images);
     }
-  }, [isEditMode, open, fetchTourDateImages]);
+  }, [tourDateImagesData]);
 
   // Auto-compute utcOffset when timeZone or startDate changes
   useEffect(() => {
@@ -252,8 +249,8 @@ export const TourDateForm = ({
   );
 
   const handleImageUploadComplete = useCallback(() => {
-    fetchTourDateImages();
-  }, [fetchTourDateImages]);
+    refetchTourDateImages();
+  }, [refetchTourDateImages]);
 
   const onSubmit = async (data: Record<string, unknown>) => {
     setIsPending(true);
@@ -294,9 +291,9 @@ export const TourDateForm = ({
 
       let result: FormState;
       if (isEditMode && tourDate?.id) {
-        result = await updateTourDate.mutateAsync({ tourDateId: tourDate.id, formState, formData });
+        result = await updateTourDate({ tourDateId: tourDate.id, formState, formData });
       } else {
-        result = await createTourDate.mutateAsync({ formState, formData });
+        result = await createTourDate({ formState, formData });
       }
 
       setFormState(result);
