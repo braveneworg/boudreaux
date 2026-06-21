@@ -29,6 +29,8 @@ export const queryKeys = {
     related: (id: string, artistId?: string | null) =>
       [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
+    digitalFormat: (id: string, formatType: string) =>
+      [...queryKeys.releases.all, 'digitalFormat', id, formatType] as const,
     freeDownloadStatus: (id: string) =>
       [...queryKeys.releases.all, 'freeDownloadStatus', id] as const,
     filteredList: (params: { search?: string; artistIds?: string[]; take?: number }) =>

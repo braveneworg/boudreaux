@@ -132,7 +132,7 @@ const digitalFormatFileSchema = z.object({
 });
 
 /** `ReleaseDigitalFormat` with its child files (`digitalFormats: { include: { files } }`). */
-const digitalFormatWithFilesSchema = z.object({
+export const digitalFormatWithFilesSchema = z.object({
   id: z.string(),
   releaseId: z.string(),
   formatType: z.string(),
