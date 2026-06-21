@@ -58,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.149.0] - 2026-06-21
+
+### Added
+
+- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n
+
 ## [4.148.0] - 2026-06-21
 
 ### Added
