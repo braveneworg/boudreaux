@@ -9,7 +9,9 @@ import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
 /**
  * Invalidate every cached surface a release mutation can affect: the release
@@ -23,18 +25,35 @@ const invalidateReleaseQueries = (queryClient: QueryClient): Promise<unknown> =>
   ]);
 
 /**
- * Mutation hook wrapping {@link createReleaseAction}.
- *
- * `mutateAsync` returns the action's {@link FormState} unchanged so callers keep
- * rendering field-level errors; on a successful result the release and artist
- * caches are invalidated so the admin sees the new release immediately.
+ * Mutation hook wrapping {@link createReleaseAction}. Accepts the validated
+ * release values (plus the optional pre-generated id) and serializes them to
+ * `FormData` internally; the release and artist caches are invalidated on a
+ * successful result.
  */
 export const useCreateReleaseMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createReleaseAction(formState, formData),
+  const {
+    mutate: createRelease,
+    mutateAsync: createReleaseAsync,
+    isPending: isCreatingRelease,
+    isError: isCreateReleaseError,
+    error: createReleaseError,
+    data: createdRelease,
+    reset: resetCreateRelease,
+  } = useMutation<FormState, Error, ReleaseFormData & { preGeneratedId?: string }>({
+    mutationFn: (values) => createReleaseAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });
+
+  return {
+    createRelease,
+    createReleaseAsync,
+    isCreatingRelease,
+    isCreateReleaseError,
+    createReleaseError,
+    createdRelease,
+    resetCreateRelease,
+  };
 };
 
 /**
@@ -43,15 +62,29 @@ export const useCreateReleaseMutation = () => {
  */
 export const useUpdateReleaseMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    FormState,
-    Error,
-    { releaseId: string; formState: FormState; formData: FormData }
-  >({
-    mutationFn: ({ releaseId, formState, formData }) =>
-      updateReleaseAction(releaseId, formState, formData),
+  const {
+    mutate: updateRelease,
+    mutateAsync: updateReleaseAsync,
+    isPending: isUpdatingRelease,
+    isError: isUpdateReleaseError,
+    error: updateReleaseError,
+    data: updatedRelease,
+    reset: resetUpdateRelease,
+  } = useMutation<FormState, Error, { id: string; values: ReleaseFormData }>({
+    mutationFn: ({ id, values }) =>
+      updateReleaseAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });
+
+  return {
+    updateRelease,
+    updateReleaseAsync,
+    isUpdatingRelease,
+    isUpdateReleaseError,
+    updateReleaseError,
+    updatedRelease,
+    resetUpdateRelease,
+  };
 };
 
 /**
@@ -60,7 +93,14 @@ export const useUpdateReleaseMutation = () => {
  */
 export const useUpdateReleaseCoverArtMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: updateReleaseCoverArt,
+    mutateAsync: updateReleaseCoverArtAsync,
+    isPending: isUpdatingReleaseCoverArt,
+    isError: isUpdateReleaseCoverArtError,
+    error: updateReleaseCoverArtError,
+    reset: resetUpdateReleaseCoverArt,
+  } = useMutation<
     Awaited<ReturnType<typeof updateReleaseCoverArtAction>>,
     Error,
     { releaseId: string; coverArt: string }
@@ -68,4 +108,13 @@ export const useUpdateReleaseCoverArtMutation = () => {
     mutationFn: ({ releaseId, coverArt }) => updateReleaseCoverArtAction(releaseId, coverArt),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });
+
+  return {
+    updateReleaseCoverArt,
+    updateReleaseCoverArtAsync,
+    isUpdatingReleaseCoverArt,
+    isUpdateReleaseCoverArtError,
+    updateReleaseCoverArtError,
+    resetUpdateReleaseCoverArt,
+  };
 };

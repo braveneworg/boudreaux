@@ -3,15 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import {
-  useActionState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -45,10 +37,8 @@ import {
   deleteArtistImageAction,
   reorderArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
-import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
-import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateSlug } from '@/lib/utils/generate-slug';
@@ -69,11 +59,6 @@ interface ArtistFormProps {
    */
   returnTo?: string;
 }
-
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
 
 // Admin-only rich-text editor for the bio fields. Lazy + `ssr: false` so the
 // Tiptap/ProseMirror bundle never ships to (or runs on) public pages.
@@ -116,13 +101,9 @@ const PublishedToastContent = ({ fullName }: { fullName: string }) => (
 );
 
 export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormProps) => {
-  const [formState, formAction, isPending] = useActionState<FormState, FormData>(
-    createArtistAction,
-    initialFormState
-  );
   const [isTransitionPending, startTransition] = useTransition();
-  const createArtist = useCreateArtistMutation();
-  const updateArtist = useUpdateArtistMutation();
+  const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
+  const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   // Re-hosted bio images (existing + freshly generated) offered in the
   // rich-text editor's insert-image picker, alongside uploaded images.
@@ -343,19 +324,13 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
   const onSubmitArtistForm = useCallback(
     async (data: ArtistFormData) => {
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          formData.append(key, String(value));
-        }
-      });
       startTransition(async () => {
         if (formRef.current) {
           const fullName = data.displayName || `${data.firstName} ${data.surname}`.trim();
 
           // If we already have an artistId, this is an update
           if (artistId) {
-            const newFormState = await updateArtist.mutateAsync({ artistId, formState, formData });
+            const newFormState = await updateArtistAsync({ id: artistId, values: data });
             if (newFormState.success) {
               // Upload any pending images for existing artist
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -466,7 +441,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
             }
           } else {
             // This is a create action
-            const newFormState = await createArtist.mutateAsync({ formState, formData });
+            const newFormState = await createArtistAsync(data);
             if (newFormState.success) {
               const createdArtistId = newFormState.data?.artistId as string | undefined;
 
@@ -606,10 +581,11 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
         }
       });
     },
-    [formState, images, artistId, isPublished, artistForm, createArtist, updateArtist]
+    [images, artistId, isPublished, artistForm, createArtistAsync, updateArtistAsync]
   );
 
-  const isSubmitting = isPending || isTransitionPending || isUploadingImages;
+  const isSubmitting =
+    isCreatingArtist || isUpdatingArtist || isTransitionPending || isUploadingImages;
 
   // Watch name fields for auto-generating slug (using useWatch for React Compiler compatibility)
   const displayName = useWatch({ control, name: 'displayName' });
@@ -719,7 +695,6 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
         </div>
         <Form {...artistForm}>
           <form
-            action={formAction}
             ref={formRef}
             onSubmit={artistForm.handleSubmit(onSubmitArtistForm, (errors) => {
               console.error('Form validation errors:', errors);

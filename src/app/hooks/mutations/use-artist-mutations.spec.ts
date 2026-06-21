@@ -8,7 +8,8 @@ import { renderHook } from '@testing-library/react';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
 import { useCreateArtistMutation, useUpdateArtistMutation } from './use-artist-mutations';
 
@@ -39,17 +40,34 @@ const failState: FormState = { fields: {}, success: false };
 beforeEach(() => {
   useMutationMock.mockReset();
   invalidateQueriesMock.mockClear();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
 });
 
 describe('useCreateArtistMutation', () => {
-  it('calls createArtistAction with the form state and data', async () => {
+  it('calls createArtistAction with the empty form state', async () => {
     vi.mocked(createArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(useCreateArtistMutation);
-    const formData = new FormData();
+    const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
 
-    await opts.mutationFn({ formState: failState, formData });
+    await opts.mutationFn({ slug: 'john-doe', displayName: 'John' });
 
-    expect(createArtistAction).toHaveBeenCalledWith(failState, formData);
+    expect(createArtistAction).toHaveBeenCalledWith(EMPTY_FORM_STATE, expect.any(FormData));
+  });
+
+  it('serializes the artist values to FormData', async () => {
+    vi.mocked(createArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
+
+    await opts.mutationFn({ slug: 'john-doe', displayName: 'John' });
+
+    expect(vi.mocked(createArtistAction).mock.calls[0][1].get('slug')).toBe('john-doe');
   });
 
   it('invalidates artist and release caches on success', async () => {
@@ -71,16 +89,22 @@ describe('useCreateArtistMutation', () => {
 });
 
 describe('useUpdateArtistMutation', () => {
-  it('calls updateArtistAction with the artist id, state, and data', async () => {
+  it('calls updateArtistAction with the artist id', async () => {
     vi.mocked(updateArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<{ artistId: string; formState: FormState; formData: FormData }>(
-      useUpdateArtistMutation
-    );
-    const formData = new FormData();
+    const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
 
-    await opts.mutationFn({ artistId: 'a-1', formState: failState, formData });
+    await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe' } });
 
-    expect(updateArtistAction).toHaveBeenCalledWith('a-1', failState, formData);
+    expect(updateArtistAction).toHaveBeenCalledWith('a1', EMPTY_FORM_STATE, expect.any(FormData));
+  });
+
+  it('serializes the artist values to FormData', async () => {
+    vi.mocked(updateArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
+
+    await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe' } });
+
+    expect(vi.mocked(updateArtistAction).mock.calls[0][2].get('slug')).toBe('john-doe');
   });
 
   it('invalidates artist and release caches on success', async () => {

@@ -8,7 +8,9 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
 /**
  * Invalidate every cached surface an artist mutation can affect: the artist
@@ -22,33 +24,65 @@ const invalidateArtistQueries = (queryClient: QueryClient): Promise<unknown> =>
   ]);
 
 /**
- * Mutation hook wrapping {@link createArtistAction}.
- *
- * `mutateAsync` returns the action's {@link FormState} unchanged so callers keep
- * rendering field-level errors; on a successful result the artist and release
- * caches are invalidated so the admin sees the change immediately.
+ * Mutation hook wrapping {@link createArtistAction}. Accepts the validated artist
+ * values and serializes them to `FormData` internally; the returned helpers
+ * resolve to the action's {@link FormState} and the artist/release caches are
+ * invalidated on a successful result.
  */
 export const useCreateArtistMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createArtistAction(formState, formData),
+  const {
+    mutate: createArtist,
+    mutateAsync: createArtistAsync,
+    isPending: isCreatingArtist,
+    isError: isCreateArtistError,
+    error: createArtistError,
+    data: createdArtist,
+    reset: resetCreateArtist,
+  } = useMutation<FormState, Error, ArtistFormData>({
+    mutationFn: (values) => createArtistAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
   });
+
+  return {
+    createArtist,
+    createArtistAsync,
+    isCreatingArtist,
+    isCreateArtistError,
+    createArtistError,
+    createdArtist,
+    resetCreateArtist,
+  };
 };
 
 /**
- * Mutation hook wrapping {@link updateArtistAction}. See
+ * Mutation hook wrapping {@link updateArtistAction}. Empty fields are omitted (the
+ * artist form does not clear values by submitting blanks). See
  * {@link useCreateArtistMutation} for the result/invalidation contract.
  */
 export const useUpdateArtistMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    FormState,
-    Error,
-    { artistId: string; formState: FormState; formData: FormData }
-  >({
-    mutationFn: ({ artistId, formState, formData }) =>
-      updateArtistAction(artistId, formState, formData),
+  const {
+    mutate: updateArtist,
+    mutateAsync: updateArtistAsync,
+    isPending: isUpdatingArtist,
+    isError: isUpdateArtistError,
+    error: updateArtistError,
+    data: updatedArtist,
+    reset: resetUpdateArtist,
+  } = useMutation<FormState, Error, { id: string; values: ArtistFormData }>({
+    mutationFn: ({ id, values }) =>
+      updateArtistAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
   });
+
+  return {
+    updateArtist,
+    updateArtistAsync,
+    isUpdatingArtist,
+    isUpdateArtistError,
+    updateArtistError,
+    updatedArtist,
+    resetUpdateArtist,
+  };
 };

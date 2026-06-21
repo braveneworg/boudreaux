@@ -9,7 +9,9 @@ import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
 
 /**
  * Invalidate the featured-artist caches (admin listing, active list) so the
@@ -19,17 +21,40 @@ const invalidateFeaturedArtistQueries = (queryClient: QueryClient): Promise<unkn
   queryClient.invalidateQueries({ queryKey: queryKeys.featuredArtists.all });
 
 /**
- * Mutation hook wrapping {@link createFeaturedArtistAction}. `mutateAsync`
- * returns the action's {@link FormState} unchanged; the featured-artist caches
- * are invalidated on a successful result.
+ * Mutation hook wrapping {@link createFeaturedArtistAction}. Accepts the featured
+ * artist values plus the derived `artistIds`, which the action reads via
+ * `FormData.getAll`, so they are appended individually rather than JSON-encoded.
+ * The featured-artist caches are invalidated on a successful result.
  */
 export const useCreateFeaturedArtistMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createFeaturedArtistAction(formState, formData),
+  const {
+    mutate: createFeaturedArtist,
+    mutateAsync: createFeaturedArtistAsync,
+    isPending: isCreatingFeaturedArtist,
+    isError: isCreateFeaturedArtistError,
+    error: createFeaturedArtistError,
+    data: createdFeaturedArtist,
+    reset: resetCreateFeaturedArtist,
+  } = useMutation<FormState, Error, FeaturedArtistFormData & { artistIds: string[] }>({
+    mutationFn: (values) =>
+      createFeaturedArtistAction(
+        EMPTY_FORM_STATE,
+        objectToFormData(values, { repeatKeys: ['artistIds'] })
+      ),
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
   });
+
+  return {
+    createFeaturedArtist,
+    createFeaturedArtistAsync,
+    isCreatingFeaturedArtist,
+    isCreateFeaturedArtistError,
+    createFeaturedArtistError,
+    createdFeaturedArtist,
+    resetCreateFeaturedArtist,
+  };
 };
 
 /**
@@ -37,7 +62,14 @@ export const useCreateFeaturedArtistMutation = () => {
  */
 export const useUpdateFeaturedArtistCoverArtMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: updateFeaturedArtistCoverArt,
+    mutateAsync: updateFeaturedArtistCoverArtAsync,
+    isPending: isUpdatingFeaturedArtistCoverArt,
+    isError: isUpdateFeaturedArtistCoverArtError,
+    error: updateFeaturedArtistCoverArtError,
+    reset: resetUpdateFeaturedArtistCoverArt,
+  } = useMutation<
     Awaited<ReturnType<typeof updateFeaturedArtistCoverArtAction>>,
     Error,
     { featuredArtistId: string; coverArt: string }
@@ -47,6 +79,15 @@ export const useUpdateFeaturedArtistCoverArtMutation = () => {
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
   });
+
+  return {
+    updateFeaturedArtistCoverArt,
+    updateFeaturedArtistCoverArtAsync,
+    isUpdatingFeaturedArtistCoverArt,
+    isUpdateFeaturedArtistCoverArtError,
+    updateFeaturedArtistCoverArtError,
+    resetUpdateFeaturedArtistCoverArt,
+  };
 };
 
 /**
@@ -56,9 +97,25 @@ export const useUpdateFeaturedArtistCoverArtMutation = () => {
  */
 export const usePublishFeaturedArtistsMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<Awaited<ReturnType<typeof publishFeaturedArtistsToSiteAction>>, Error, void>({
+  const {
+    mutate: publishFeaturedArtists,
+    mutateAsync: publishFeaturedArtistsAsync,
+    isPending: isPublishingFeaturedArtists,
+    isError: isPublishFeaturedArtistsError,
+    error: publishFeaturedArtistsError,
+    reset: resetPublishFeaturedArtists,
+  } = useMutation<Awaited<ReturnType<typeof publishFeaturedArtistsToSiteAction>>, Error, void>({
     mutationFn: () => publishFeaturedArtistsToSiteAction(),
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
   });
+
+  return {
+    publishFeaturedArtists,
+    publishFeaturedArtistsAsync,
+    isPublishingFeaturedArtists,
+    isPublishFeaturedArtistsError,
+    publishFeaturedArtistsError,
+    resetPublishFeaturedArtists,
+  };
 };

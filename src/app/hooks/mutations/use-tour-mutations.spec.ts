@@ -7,7 +7,8 @@ import { renderHook } from '@testing-library/react';
 
 import { createTourAction, deleteTourAction, updateTourAction } from '@/lib/actions/tour-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { TourCreateInput, TourUpdateInput } from '@/lib/validation/tours/tour-schema';
 
 import {
   useCreateTourMutation,
@@ -44,18 +45,35 @@ const failState: FormState = { fields: {}, success: false };
 
 beforeEach(() => {
   useMutationMock.mockReset();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
   invalidateQueriesMock.mockClear();
 });
 
 describe('useCreateTourMutation', () => {
-  it('calls createTourAction with the form state and data', async () => {
+  it('calls createTourAction with the shared empty form state', async () => {
     vi.mocked(createTourAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(useCreateTourMutation);
-    const formData = new FormData();
+    const opts = getOptions<TourCreateInput>(useCreateTourMutation);
 
-    await opts.mutationFn({ formState: failState, formData });
+    await opts.mutationFn({ title: 'My Tour' });
 
-    expect(createTourAction).toHaveBeenCalledWith(failState, formData);
+    expect(vi.mocked(createTourAction).mock.calls.at(-1)?.[0]).toBe(EMPTY_FORM_STATE);
+  });
+
+  it('serializes the tour values into the submitted form data', async () => {
+    vi.mocked(createTourAction).mockResolvedValue(okState);
+    const opts = getOptions<TourCreateInput>(useCreateTourMutation);
+
+    await opts.mutationFn({ title: 'My Tour' });
+
+    expect(vi.mocked(createTourAction).mock.calls.at(-1)?.[1].get('title')).toBe('My Tour');
   });
 
   it('invalidates the tour cache on success', async () => {
@@ -76,16 +94,22 @@ describe('useCreateTourMutation', () => {
 });
 
 describe('useUpdateTourMutation', () => {
-  it('calls updateTourAction with the tour id, state, and data', async () => {
+  it('calls updateTourAction with the tour id and shared empty form state', async () => {
     vi.mocked(updateTourAction).mockResolvedValue(okState);
-    const opts = getOptions<{ tourId: string; formState: FormState; formData: FormData }>(
-      useUpdateTourMutation
-    );
-    const formData = new FormData();
+    const opts = getOptions<{ id: string; values: TourUpdateInput }>(useUpdateTourMutation);
 
-    await opts.mutationFn({ tourId: 't-1', formState: failState, formData });
+    await opts.mutationFn({ id: 't-1', values: { title: 'Edited' } });
 
-    expect(updateTourAction).toHaveBeenCalledWith('t-1', failState, formData);
+    expect(vi.mocked(updateTourAction).mock.calls.at(-1)?.[0]).toBe('t-1');
+  });
+
+  it('preserves empty strings so optional fields can be cleared', async () => {
+    vi.mocked(updateTourAction).mockResolvedValue(okState);
+    const opts = getOptions<{ id: string; values: TourUpdateInput }>(useUpdateTourMutation);
+
+    await opts.mutationFn({ id: 't-1', values: { title: 'Edited', subtitle: '' } });
+
+    expect(vi.mocked(updateTourAction).mock.calls.at(-1)?.[2].get('subtitle')).toBe('');
   });
 
   it('invalidates the tour cache on success', async () => {

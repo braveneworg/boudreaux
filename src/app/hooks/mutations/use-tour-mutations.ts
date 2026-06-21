@@ -7,7 +7,9 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 
 import { createTourAction, deleteTourAction, updateTourAction } from '@/lib/actions/tour-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { TourCreateInput, TourUpdateInput } from '@/lib/validation/tours/tour-schema';
 
 /**
  * Invalidate the tour caches (infinite listing, detail, and dates) so an edited
@@ -17,32 +19,67 @@ const invalidateTourQueries = (queryClient: QueryClient): Promise<unknown> =>
   queryClient.invalidateQueries({ queryKey: queryKeys.tours.all });
 
 /**
- * Mutation hook wrapping {@link createTourAction}. `mutateAsync` returns the
- * action's {@link FormState} unchanged; the tour caches are invalidated on a
- * successful result.
+ * Mutation hook wrapping {@link createTourAction}. Accepts the validated tour
+ * values and serializes them to `FormData` internally; the returned `createTour`
+ * /`createTourAsync` resolve to the action's {@link FormState} so callers can map
+ * field errors, and the tour caches are invalidated on a successful result.
  */
 export const useCreateTourMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createTourAction(formState, formData),
+  const {
+    mutate: createTour,
+    mutateAsync: createTourAsync,
+    isPending: isCreatingTour,
+    isError: isCreateTourError,
+    error: createTourError,
+    data: createdTour,
+    reset: resetCreateTour,
+  } = useMutation<FormState, Error, TourCreateInput>({
+    mutationFn: (values) => createTourAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    createTour,
+    createTourAsync,
+    isCreatingTour,
+    isCreateTourError,
+    createTourError,
+    createdTour,
+    resetCreateTour,
+  };
 };
 
 /**
- * Mutation hook wrapping {@link updateTourAction}. See
- * {@link useCreateTourMutation} for the result/invalidation contract.
+ * Mutation hook wrapping {@link updateTourAction}. Empty strings are preserved so
+ * optional fields can be cleared. See {@link useCreateTourMutation} for the
+ * result/invalidation contract.
  */
 export const useUpdateTourMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    FormState,
-    Error,
-    { tourId: string; formState: FormState; formData: FormData }
-  >({
-    mutationFn: ({ tourId, formState, formData }) => updateTourAction(tourId, formState, formData),
+  const {
+    mutate: updateTour,
+    mutateAsync: updateTourAsync,
+    isPending: isUpdatingTour,
+    isError: isUpdateTourError,
+    error: updateTourError,
+    data: updatedTour,
+    reset: resetUpdateTour,
+  } = useMutation<FormState, Error, { id: string; values: TourUpdateInput }>({
+    mutationFn: ({ id, values }) =>
+      updateTourAction(id, EMPTY_FORM_STATE, objectToFormData(values, { keepEmptyStrings: true })),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    updateTour,
+    updateTourAsync,
+    isUpdatingTour,
+    isUpdateTourError,
+    updateTourError,
+    updatedTour,
+    resetUpdateTour,
+  };
 };
 
 /**
@@ -51,8 +88,24 @@ export const useUpdateTourMutation = () => {
  */
 export const useDeleteTourMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<Awaited<ReturnType<typeof deleteTourAction>>, Error, { tourId: string }>({
+  const {
+    mutate: deleteTour,
+    mutateAsync: deleteTourAsync,
+    isPending: isDeletingTour,
+    isError: isDeleteTourError,
+    error: deleteTourError,
+    reset: resetDeleteTour,
+  } = useMutation<Awaited<ReturnType<typeof deleteTourAction>>, Error, { tourId: string }>({
     mutationFn: ({ tourId }) => deleteTourAction(tourId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    deleteTour,
+    deleteTourAsync,
+    isDeletingTour,
+    isDeleteTourError,
+    deleteTourError,
+    resetDeleteTour,
+  };
 };

@@ -13,7 +13,15 @@ import { ArtistBioGenerationSection } from './artist-bio-generation-section';
 
 const generateMock = vi.fn();
 vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
-  useGenerateArtistBioMutation: () => ({ mutateAsync: generateMock, isPending: false }),
+  useGenerateArtistBioMutation: () => ({
+    generateArtistBio: vi.fn(),
+    generateArtistBioAsync: generateMock,
+    isGeneratingArtistBio: false,
+    isGenerateArtistBioError: false,
+    generateArtistBioError: null,
+    generatedArtistBio: undefined,
+    resetGenerateArtistBio: vi.fn(),
+  }),
 }));
 
 // The polled status drives completion. A module-level value lets each test set

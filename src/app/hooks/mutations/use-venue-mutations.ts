@@ -7,7 +7,9 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 
 import { createVenueAction, updateVenueAction } from '@/lib/actions/venue-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { VenueCreateInput, VenueUpdateInput } from '@/lib/validation/tours/venue-schema';
 
 /**
  * Invalidate the venue caches plus the tour caches — tour dates embed venue
@@ -20,31 +22,64 @@ const invalidateVenueQueries = (queryClient: QueryClient): Promise<unknown> =>
   ]);
 
 /**
- * Mutation hook wrapping {@link createVenueAction}. `mutateAsync` returns the
- * action's {@link FormState} unchanged; venue and tour caches are invalidated on
- * a successful result.
+ * Mutation hook wrapping {@link createVenueAction}. Accepts the validated venue
+ * values and serializes them to `FormData` internally; venue and tour caches are
+ * invalidated on a successful result.
  */
 export const useCreateVenueMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createVenueAction(formState, formData),
+  const {
+    mutate: createVenue,
+    mutateAsync: createVenueAsync,
+    isPending: isCreatingVenue,
+    isError: isCreateVenueError,
+    error: createVenueError,
+    data: createdVenue,
+    reset: resetCreateVenue,
+  } = useMutation<FormState, Error, VenueCreateInput>({
+    mutationFn: (values) => createVenueAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateVenueQueries(queryClient) : undefined),
   });
+
+  return {
+    createVenue,
+    createVenueAsync,
+    isCreatingVenue,
+    isCreateVenueError,
+    createVenueError,
+    createdVenue,
+    resetCreateVenue,
+  };
 };
 
 /**
- * Mutation hook wrapping {@link updateVenueAction}. See
- * {@link useCreateVenueMutation} for the result/invalidation contract.
+ * Mutation hook wrapping {@link updateVenueAction}. Empty strings are preserved so
+ * optional fields can be cleared. See {@link useCreateVenueMutation} for the
+ * result/invalidation contract.
  */
 export const useUpdateVenueMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    FormState,
-    Error,
-    { venueId: string; formState: FormState; formData: FormData }
-  >({
-    mutationFn: ({ venueId, formState, formData }) =>
-      updateVenueAction(venueId, formState, formData),
+  const {
+    mutate: updateVenue,
+    mutateAsync: updateVenueAsync,
+    isPending: isUpdatingVenue,
+    isError: isUpdateVenueError,
+    error: updateVenueError,
+    data: updatedVenue,
+    reset: resetUpdateVenue,
+  } = useMutation<FormState, Error, { id: string; values: VenueUpdateInput }>({
+    mutationFn: ({ id, values }) =>
+      updateVenueAction(id, EMPTY_FORM_STATE, objectToFormData(values, { keepEmptyStrings: true })),
     onSuccess: (result) => (result.success ? invalidateVenueQueries(queryClient) : undefined),
   });
+
+  return {
+    updateVenue,
+    updateVenueAsync,
+    isUpdatingVenue,
+    isUpdateVenueError,
+    updateVenueError,
+    updatedVenue,
+    resetUpdateVenue,
+  };
 };

@@ -28,6 +28,15 @@ const getOptions = (): MutationOptions => {
 
 beforeEach(() => {
   useMutationMock.mockReset();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
 });
 
 describe('useGenerateArtistBioMutation', () => {

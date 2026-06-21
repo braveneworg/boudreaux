@@ -20,13 +20,13 @@ interface RotationIntervalFormProps {
 export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormProps) => {
   const [interval, setInterval] = useState(currentInterval);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const updateRotation = useUpdateRotationIntervalMutation();
-  const isPending = updateRotation.isPending;
+  const { updateRotationIntervalAsync, isUpdatingRotationInterval } =
+    useUpdateRotationIntervalMutation();
 
   const handleSave = async () => {
     setMessage(null);
     try {
-      const result = await updateRotation.mutateAsync({ interval });
+      const result = await updateRotationIntervalAsync({ interval });
       if (result.success) {
         setMessage({ type: 'success', text: 'Rotation interval updated.' });
       } else {
@@ -56,8 +56,8 @@ export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormPr
             className="w-24"
           />
         </div>
-        <Button type="button" size="sm" disabled={isPending} onClick={handleSave}>
-          {isPending ? (
+        <Button type="button" size="sm" disabled={isUpdatingRotationInterval} onClick={handleSave}>
+          {isUpdatingRotationInterval ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Save className="mr-2 h-4 w-4" />

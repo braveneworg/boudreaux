@@ -34,8 +34,13 @@ import {
   useDeleteTourMutation,
   useUpdateTourMutation,
 } from '@/app/hooks/mutations/use-tour-mutations';
-import type { FormState } from '@/lib/types/form-state';
-import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
+import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
+import {
+  tourCreateSchema,
+  tourUpdateSchema,
+  type TourCreateInput,
+  type TourUpdateInput,
+} from '@/lib/validation/tours/tour-schema';
 
 /**
  * Local interface matching Prisma TourImage model.
@@ -67,24 +72,17 @@ interface TourFormProps {
   } | null;
 }
 
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
-
 export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
-  const [isPending, setIsPending] = useState(false);
   const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [tourImages, setTourImages] = useState<TourImageFields[]>([]);
   const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
   const isEditMode = !!tourId;
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const createTour = useCreateTourMutation();
-  const updateTour = useUpdateTourMutation();
-  const deleteTour = useDeleteTourMutation();
+  const { createTourAsync, isCreatingTour } = useCreateTourMutation();
+  const { updateTourAsync, isUpdatingTour } = useUpdateTourMutation();
+  const { deleteTourAsync, isDeletingTour } = useDeleteTourMutation();
+  const isSubmitting = isCreatingTour || isUpdatingTour;
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
@@ -160,66 +158,25 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
     }
   }, [tourId, initialTour, reset]);
 
-  const onSubmit = async (data: Record<string, unknown>) => {
-    setIsPending(true);
+  const onSubmit = async (values: TourCreateInput | TourUpdateInput) => {
     try {
-      const formData = new FormData();
-
-      // Add all form fields to FormData
-      Object.entries(data).forEach(([key, value]) => {
-        if (value === null || value === undefined) {
-          return;
-        }
-
-        if (key === 'headlinerIds' && Array.isArray(value)) {
-          // Encode array as JSON string for FormData
-          formData.append(key, JSON.stringify(value));
-          return;
-        }
-
-        // In edit mode, preserve empty string values so optional fields can be cleared.
-        if (isEditMode || value !== '') {
-          formData.append(key, String(value));
-        }
-      });
-
-      let result: FormState;
-      if (isEditMode && tourId) {
-        result = await updateTour.mutateAsync({ tourId, formState, formData });
-      } else {
-        result = await createTour.mutateAsync({ formState, formData });
-      }
-
-      setFormState(result);
+      const result =
+        isEditMode && tourId
+          ? await updateTourAsync({ id: tourId, values: values as TourUpdateInput })
+          : await createTourAsync(values as TourCreateInput);
 
       if (result.success) {
         toast.success(isEditMode ? 'Tour updated successfully' : 'Tour created successfully');
         router.push('/admin/tours');
         router.refresh();
-      } else {
-        const errors = result.errors ?? {};
-        const fieldErrors: string[] = [];
-        for (const [field, messages] of Object.entries(errors)) {
-          const msg = Array.isArray(messages) ? messages[0] : String(messages);
-          if (!msg) continue;
-          if (field === 'general') {
-            toast.error(msg);
-          } else {
-            setError(field as 'title', { message: msg });
-            fieldErrors.push(field);
-          }
-        }
-        if (fieldErrors.length > 0) {
-          toast.error('Please fix the form errors');
-        } else if (!Object.keys(errors).includes('general')) {
-          toast.error('An unexpected error occurred. Please try again.');
-        }
+        return;
       }
+
+      const { generalError } = setFormErrors(setError, result);
+      toast.error(generalError ?? 'Please fix the form errors');
     } catch (err) {
       console.error('Form submission error:', err);
       toast.error('An unexpected error occurred');
-    } finally {
-      setIsPending(false);
     }
   };
 
@@ -229,9 +186,8 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
       return;
     }
 
-    setIsDeleting(true);
     try {
-      const result = await deleteTour.mutateAsync({ tourId });
+      const result = await deleteTourAsync({ tourId });
       if (result.success) {
         toast.success('Tour deleted successfully');
         router.push('/admin/tours');
@@ -242,8 +198,6 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
     } catch (err) {
       console.error('Delete error:', err);
       toast.error('An unexpected error occurred');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -386,7 +340,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
                     tourId={tourId}
                     initialImages={tourImages}
                     onUploadComplete={handleImageUploadComplete}
-                    disabled={isPending || isDeleting}
+                    disabled={isSubmitting || isDeletingTour}
                   />
                 </section>
               </>
@@ -399,7 +353,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
                 type="button"
                 variant="outline"
                 onClick={() => router.back()}
-                disabled={isPending || isDeleting}
+                disabled={isSubmitting || isDeletingTour}
               >
                 Cancel
               </Button>
@@ -408,14 +362,14 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
                   type="button"
                   variant="destructive"
                   onClick={handleDelete}
-                  disabled={isPending || isDeleting}
+                  disabled={isSubmitting || isDeletingTour}
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete Tour'}
+                  {isDeletingTour ? 'Deleting...' : 'Delete Tour'}
                 </Button>
               )}
             </div>
-            <Button type="submit" disabled={isPending || isDeleting || isTourDateDialogOpen}>
-              {isPending
+            <Button type="submit" disabled={isSubmitting || isDeletingTour || isTourDateDialogOpen}>
+              {isSubmitting
                 ? isEditMode
                   ? 'Updating...'
                   : 'Creating...'

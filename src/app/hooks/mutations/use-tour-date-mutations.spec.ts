@@ -14,7 +14,11 @@ import {
   updateTourDateAction,
 } from '@/lib/actions/tour-date-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type {
+  TourDateCreateInput,
+  TourDateUpdateInput,
+} from '@/lib/validation/tours/tour-date-schema';
 
 import {
   useCreateTourDateMutation,
@@ -58,25 +62,65 @@ const failState: FormState = { fields: {}, success: false };
 beforeEach(() => {
   useMutationMock.mockReset();
   invalidateQueriesMock.mockClear();
+  useMutationMock.mockReturnValue({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+    reset: vi.fn(),
+  });
 });
 
-describe('useCreateTourDateMutation', () => {
-  it('calls createTourDateAction and invalidates the tour cache on success', async () => {
-    vi.mocked(createTourDateAction).mockResolvedValue(okState);
-    const opts = getOptions<{ formState: FormState; formData: FormData }>(
-      useCreateTourDateMutation
-    );
-    const formData = new FormData();
+const createInput: TourDateCreateInput = {
+  tourId: 't1',
+  startDate: new Date('2026-01-01'),
+  showStartTime: new Date('2026-01-01T20:00'),
+  venueId: 'v1',
+  headlinerIds: ['a1'],
+};
 
-    await opts.mutationFn({ formState: failState, formData });
+describe('useCreateTourDateMutation', () => {
+  it('passes EMPTY_FORM_STATE as the first argument to createTourDateAction', async () => {
+    vi.mocked(createTourDateAction).mockResolvedValue(okState);
+    const opts = getOptions<TourDateCreateInput>(useCreateTourDateMutation);
+
+    await opts.mutationFn(createInput);
+
+    expect(createTourDateAction).toHaveBeenCalledWith(EMPTY_FORM_STATE, expect.any(FormData));
+  });
+
+  it('serializes venueId into the FormData', async () => {
+    vi.mocked(createTourDateAction).mockResolvedValue(okState);
+    const opts = getOptions<TourDateCreateInput>(useCreateTourDateMutation);
+
+    await opts.mutationFn(createInput);
+
+    const formData = vi.mocked(createTourDateAction).mock.calls.at(-1)?.[1] as FormData;
+    expect(formData.get('venueId')).toBe('v1');
+  });
+
+  it('serializes headlinerIds as a JSON string in the FormData', async () => {
+    vi.mocked(createTourDateAction).mockResolvedValue(okState);
+    const opts = getOptions<TourDateCreateInput>(useCreateTourDateMutation);
+
+    await opts.mutationFn(createInput);
+
+    const formData = vi.mocked(createTourDateAction).mock.calls.at(-1)?.[1] as FormData;
+    expect(formData.get('headlinerIds')).toBe('["a1"]');
+  });
+
+  it('invalidates the tour cache on success', async () => {
+    const opts = getOptions<TourDateCreateInput>(useCreateTourDateMutation);
+
     await opts.onSuccess(okState, {});
 
-    expect(createTourDateAction).toHaveBeenCalledWith(failState, formData);
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.tours.all });
   });
 
   it('does not invalidate on failure', async () => {
-    const opts = getOptions(useCreateTourDateMutation);
+    const opts = getOptions<TourDateCreateInput>(useCreateTourDateMutation);
 
     await opts.onSuccess(failState, {});
 
@@ -85,16 +129,27 @@ describe('useCreateTourDateMutation', () => {
 });
 
 describe('useUpdateTourDateMutation', () => {
-  it('calls updateTourDateAction with the tour date id', async () => {
+  it('calls updateTourDateAction with the tour date id as the first argument', async () => {
     vi.mocked(updateTourDateAction).mockResolvedValue(okState);
-    const opts = getOptions<{ tourDateId: string; formState: FormState; formData: FormData }>(
-      useUpdateTourDateMutation
+    const opts = getOptions<{ id: string; values: TourDateUpdateInput }>(useUpdateTourDateMutation);
+
+    await opts.mutationFn({ id: 'td1', values: { venueId: 'v2' } });
+
+    expect(updateTourDateAction).toHaveBeenCalledWith(
+      'td1',
+      EMPTY_FORM_STATE,
+      expect.any(FormData)
     );
-    const formData = new FormData();
+  });
 
-    await opts.mutationFn({ tourDateId: 'td-1', formState: failState, formData });
+  it('serializes the updated values into the FormData', async () => {
+    vi.mocked(updateTourDateAction).mockResolvedValue(okState);
+    const opts = getOptions<{ id: string; values: TourDateUpdateInput }>(useUpdateTourDateMutation);
 
-    expect(updateTourDateAction).toHaveBeenCalledWith('td-1', failState, formData);
+    await opts.mutationFn({ id: 'td1', values: { venueId: 'v2' } });
+
+    const formData = vi.mocked(updateTourDateAction).mock.calls.at(-1)?.[2] as FormData;
+    expect(formData.get('venueId')).toBe('v2');
   });
 });
 

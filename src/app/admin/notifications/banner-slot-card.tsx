@@ -24,6 +24,7 @@ import { isDarkColor } from '@/lib/utils/color';
 import {
   addLinkAttributes,
   sanitizeNotificationHtml,
+  type BannerNotificationFormData,
 } from '@/lib/validation/banner-notification-schema';
 
 import { NotificationSearch } from './notification-search';
@@ -60,35 +61,35 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   const [displayFrom, setDisplayFrom] = useState(slot.notification?.displayFrom ?? '');
   const [displayUntil, setDisplayUntil] = useState(slot.notification?.displayUntil ?? '');
   const [repostedFromId, setRepostedFromId] = useState(slot.notification?.repostedFromId ?? '');
-  const upsertBanner = useUpsertBannerNotificationMutation();
-  const deleteBanner = useDeleteBannerNotificationMutation();
+  const { upsertBannerAsync } = useUpsertBannerNotificationMutation();
+  const { deleteBannerAsync, isDeletingBanner } = useDeleteBannerNotificationMutation();
 
-  const boundAction = useCallback(
-    async (_prevState: FormState, formData: FormData): Promise<FormState> => {
-      formData.set('slotNumber', String(slot.slotNumber));
-      formData.set('content', content);
-      formData.set('textColor', textColor);
-      formData.set('backgroundColor', backgroundColor);
-      formData.set('displayFrom', displayFrom);
-      formData.set('displayUntil', displayUntil);
-      if (repostedFromId) {
-        formData.set('repostedFromId', repostedFromId);
-      }
-      // Routes through the mutation hook so the banner caches are invalidated on
-      // success; the hook returns the action's FormState unchanged.
-      return upsertBanner.mutateAsync({ formState: _prevState, formData });
-    },
-    [
-      slot.slotNumber,
+  const boundAction = useCallback((): Promise<FormState> => {
+    // Banner inputs are controlled local state (not native form fields), so build
+    // the typed values here. The hook serializes them and the banner caches are
+    // invalidated on success; the action's FormState is returned unchanged.
+    const values: Record<string, unknown> = {
+      slotNumber: slot.slotNumber,
       content,
       textColor,
       backgroundColor,
       displayFrom,
       displayUntil,
-      repostedFromId,
-      upsertBanner,
-    ]
-  );
+    };
+    if (repostedFromId) {
+      values.repostedFromId = repostedFromId;
+    }
+    return upsertBannerAsync(values as BannerNotificationFormData);
+  }, [
+    slot.slotNumber,
+    content,
+    textColor,
+    backgroundColor,
+    displayFrom,
+    displayUntil,
+    repostedFromId,
+    upsertBannerAsync,
+  ]);
 
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     boundAction,
@@ -96,7 +97,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   );
 
   const handleDelete = async () => {
-    const result = await deleteBanner.mutateAsync({ slotNumber: slot.slotNumber });
+    const result = await deleteBannerAsync({ slotNumber: slot.slotNumber });
     if (result.success) {
       setContent('');
       setTextColor('#ffffff');
@@ -251,10 +252,10 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={deleteBanner.isPending}
+              disabled={isDeletingBanner}
               onClick={handleDelete}
             >
-              {deleteBanner.isPending ? (
+              {isDeletingBanner ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="mr-2 h-4 w-4" />

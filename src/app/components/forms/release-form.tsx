@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -45,7 +45,6 @@ import {
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
-import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
 import {
@@ -54,7 +53,6 @@ import {
 } from '@/lib/actions/release-image-actions';
 import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
-import type { FormState } from '@/lib/types/form-state';
 import { FORMATS, type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
@@ -69,11 +67,6 @@ type FormFieldName = keyof ReleaseFormData;
 export interface ReleaseFormProps {
   releaseId?: string;
 }
-
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
 
 // Common formats grouped for easier selection (digital formats managed via accordion)
 const FORMAT_GROUPS = {
@@ -119,14 +112,10 @@ const PublishedToastContent = ({ title }: { title: string }) => (
 );
 
 export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) => {
-  const [formState, formAction, isPending] = useActionState<FormState, FormData>(
-    createReleaseAction,
-    initialFormState
-  );
   const [isTransitionPending, startTransition] = useTransition();
-  const createRelease = useCreateReleaseMutation();
-  const updateRelease = useUpdateReleaseMutation();
-  const updateReleaseCoverArt = useUpdateReleaseCoverArtMutation();
+  const { createReleaseAsync, isCreatingRelease } = useCreateReleaseMutation();
+  const { updateReleaseAsync, isUpdatingRelease } = useUpdateReleaseMutation();
+  const { updateReleaseCoverArtAsync } = useUpdateReleaseCoverArtMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isLoadingRelease, setIsLoadingRelease] = useState(!!initialReleaseId);
@@ -391,31 +380,13 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData) => {
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          if (Array.isArray(value)) {
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      });
-
-      // Always include the pre-generated ID so the server can use it as the MongoDB _id
-      formData.append('preGeneratedId', preGeneratedId);
-
       startTransition(async () => {
         if (formRef.current) {
           const title = data.title;
 
           if (releaseId) {
             // Update existing release
-            const newFormState = await updateRelease.mutateAsync({
-              releaseId,
-              formState,
-              formData,
-            });
+            const newFormState = await updateReleaseAsync({ id: releaseId, values: data });
             if (newFormState.success) {
               // Upload any pending images
               const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
@@ -437,7 +408,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
             }
           } else {
             // Create new release
-            const newFormState = await createRelease.mutateAsync({ formState, formData });
+            const newFormState = await createReleaseAsync({ ...data, preGeneratedId });
             if (newFormState.success) {
               const createdReleaseId = newFormState.data?.releaseId as string | undefined;
 
@@ -474,15 +445,14 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
       });
     },
     [
-      formState,
       images,
       releaseId,
       isPublished,
       releaseForm,
       router,
       preGeneratedId,
-      createRelease,
-      updateRelease,
+      createReleaseAsync,
+      updateReleaseAsync,
     ]
   );
 
@@ -579,7 +549,8 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     }
   };
 
-  const isSubmitting = isPending || isTransitionPending || isUploadingImages;
+  const isSubmitting =
+    isCreatingRelease || isUpdatingRelease || isTransitionPending || isUploadingImages;
 
   const _title = useWatch({ control, name: 'title' });
   const formats = useWatch({ control, name: 'formats' });
@@ -673,7 +644,6 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
         </CardHeader>
         <Form {...releaseForm}>
           <form
-            action={formAction}
             ref={formRef}
             onSubmit={releaseForm.handleSubmit(onSubmitReleaseForm, (errors) => {
               console.error('Form validation errors:', errors);
@@ -787,7 +757,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
                           // navigates away before submitting the full form.
                           // For new releases there's no row to update yet —
                           // the create flow will save it on form submit.
-                          const result = await updateReleaseCoverArt.mutateAsync({
+                          const result = await updateReleaseCoverArtAsync({
                             releaseId,
                             coverArt: cdnUrl,
                           });

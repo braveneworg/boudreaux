@@ -11,7 +11,9 @@ import {
   updateRotationIntervalAction,
 } from '@/lib/actions/banner-notification-action';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { BannerNotificationFormData } from '@/lib/validation/banner-notification-schema';
 
 /**
  * Invalidate the banner caches so the home-page banner carousel/strip reflects
@@ -21,17 +23,35 @@ const invalidateBannerQueries = (queryClient: QueryClient): Promise<unknown> =>
   queryClient.invalidateQueries({ queryKey: queryKeys.banners.all });
 
 /**
- * Mutation hook wrapping {@link createOrUpdateBannerNotificationAction}.
- * `mutateAsync` returns the action's {@link FormState} unchanged; the banner
- * caches are invalidated on a successful result.
+ * Mutation hook wrapping {@link createOrUpdateBannerNotificationAction}. Accepts
+ * the validated banner values and serializes them to `FormData` internally; the
+ * banner caches are invalidated on a successful result.
  */
 export const useUpsertBannerNotificationMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) =>
-      createOrUpdateBannerNotificationAction(formState, formData),
+  const {
+    mutate: upsertBanner,
+    mutateAsync: upsertBannerAsync,
+    isPending: isUpsertingBanner,
+    isError: isUpsertBannerError,
+    error: upsertBannerError,
+    data: savedBanner,
+    reset: resetUpsertBanner,
+  } = useMutation<FormState, Error, BannerNotificationFormData>({
+    mutationFn: (values) =>
+      createOrUpdateBannerNotificationAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
   });
+
+  return {
+    upsertBanner,
+    upsertBannerAsync,
+    isUpsertingBanner,
+    isUpsertBannerError,
+    upsertBannerError,
+    savedBanner,
+    resetUpsertBanner,
+  };
 };
 
 /**
@@ -39,7 +59,14 @@ export const useUpsertBannerNotificationMutation = () => {
  */
 export const useDeleteBannerNotificationMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: deleteBanner,
+    mutateAsync: deleteBannerAsync,
+    isPending: isDeletingBanner,
+    isError: isDeleteBannerError,
+    error: deleteBannerError,
+    reset: resetDeleteBanner,
+  } = useMutation<
     Awaited<ReturnType<typeof deleteBannerNotificationAction>>,
     Error,
     { slotNumber: number }
@@ -47,6 +74,15 @@ export const useDeleteBannerNotificationMutation = () => {
     mutationFn: ({ slotNumber }) => deleteBannerNotificationAction(slotNumber),
     onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
   });
+
+  return {
+    deleteBanner,
+    deleteBannerAsync,
+    isDeletingBanner,
+    isDeleteBannerError,
+    deleteBannerError,
+    resetDeleteBanner,
+  };
 };
 
 /**
@@ -54,7 +90,14 @@ export const useDeleteBannerNotificationMutation = () => {
  */
 export const useUpdateRotationIntervalMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: updateRotationInterval,
+    mutateAsync: updateRotationIntervalAsync,
+    isPending: isUpdatingRotationInterval,
+    isError: isUpdateRotationIntervalError,
+    error: updateRotationIntervalError,
+    reset: resetUpdateRotationInterval,
+  } = useMutation<
     Awaited<ReturnType<typeof updateRotationIntervalAction>>,
     Error,
     { interval: number }
@@ -62,4 +105,13 @@ export const useUpdateRotationIntervalMutation = () => {
     mutationFn: ({ interval }) => updateRotationIntervalAction(interval),
     onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
   });
+
+  return {
+    updateRotationInterval,
+    updateRotationIntervalAsync,
+    isUpdatingRotationInterval,
+    isUpdateRotationIntervalError,
+    updateRotationIntervalError,
+    resetUpdateRotationInterval,
+  };
 };

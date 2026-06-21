@@ -97,8 +97,8 @@ export const FeaturedArtistForm = ({
   const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
-  const createFeaturedArtist = useCreateFeaturedArtistMutation();
-  const updateFeaturedArtistCoverArt = useUpdateFeaturedArtistCoverArtMutation();
+  const { createFeaturedArtistAsync } = useCreateFeaturedArtistMutation();
+  const { updateFeaturedArtistCoverArtAsync } = useUpdateFeaturedArtistCoverArtMutation();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -314,23 +314,10 @@ export const FeaturedArtistForm = ({
       return;
     }
 
-    // Build FormData from React Hook Form state instead of the DOM.
-    // Custom select components (ReleaseSelect) and DatePicker
-    // don't render <input> elements with name attributes,
-    // so new FormData(formRef) would miss their values.
+    // Read values from React Hook Form state instead of the DOM. Custom select
+    // components (ReleaseSelect) and DatePicker don't render <input> elements with
+    // name attributes, so new FormData(formRef) would miss their values.
     const values = form.getValues();
-    const formData = new FormData();
-
-    for (const [key, value] of Object.entries(values)) {
-      if (value !== undefined && value !== null && value !== '') {
-        formData.append(key, String(value));
-      }
-    }
-
-    // Append derived artistIds individually (server action uses getAll('artistIds'))
-    derivedArtistIds.forEach((id) => {
-      formData.append('artistIds', id);
-    });
 
     setIsPending(true);
     try {
@@ -370,8 +357,9 @@ export const FeaturedArtistForm = ({
           toast.error(errorData.error || 'Failed to update featured artist');
         }
       } else {
-        // In create mode, use the server action via the mutation hook
-        const result = await createFeaturedArtist.mutateAsync({ formState, formData });
+        // In create mode, use the server action via the mutation hook. The hook
+        // serializes the values and appends each derived artistId individually.
+        const result = await createFeaturedArtistAsync({ ...values, artistIds: derivedArtistIds });
         setFormState(result);
 
         if (result.success && result.data?.featuredArtistId) {
@@ -633,7 +621,7 @@ export const FeaturedArtistForm = ({
                         // variant generation + orphan sweep + CloudFront
                         // invalidation). For create mode there's no row to
                         // update yet — submit will save it then.
-                        const result = await updateFeaturedArtistCoverArt.mutateAsync({
+                        const result = await updateFeaturedArtistCoverArtAsync({
                           featuredArtistId,
                           coverArt: cdnUrl,
                         });

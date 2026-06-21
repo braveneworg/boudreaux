@@ -14,7 +14,12 @@ import {
   updateTourDateAction,
 } from '@/lib/actions/tour-date-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type { FormState } from '@/lib/types/form-state';
+import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type {
+  TourDateCreateInput,
+  TourDateUpdateInput,
+} from '@/lib/validation/tours/tour-date-schema';
 
 /**
  * Invalidate the tour caches. Tour dates and headliners render inside the tour
@@ -24,32 +29,69 @@ const invalidateTourQueries = (queryClient: QueryClient): Promise<unknown> =>
   queryClient.invalidateQueries({ queryKey: queryKeys.tours.all });
 
 /**
- * Mutation hook wrapping {@link createTourDateAction}. `mutateAsync` returns the
- * action's {@link FormState} unchanged; the tour caches are invalidated on a
- * successful result.
+ * Mutation hook wrapping {@link createTourDateAction}. Accepts the validated tour
+ * date values and serializes them to `FormData` internally; the tour caches are
+ * invalidated on a successful result.
  */
 export const useCreateTourDateMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<FormState, Error, { formState: FormState; formData: FormData }>({
-    mutationFn: ({ formState, formData }) => createTourDateAction(formState, formData),
+  const {
+    mutate: createTourDate,
+    mutateAsync: createTourDateAsync,
+    isPending: isCreatingTourDate,
+    isError: isCreateTourDateError,
+    error: createTourDateError,
+    data: createdTourDate,
+    reset: resetCreateTourDate,
+  } = useMutation<FormState, Error, TourDateCreateInput>({
+    mutationFn: (values) => createTourDateAction(EMPTY_FORM_STATE, objectToFormData(values)),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    createTourDate,
+    createTourDateAsync,
+    isCreatingTourDate,
+    isCreateTourDateError,
+    createTourDateError,
+    createdTourDate,
+    resetCreateTourDate,
+  };
 };
 
 /**
- * Mutation hook wrapping {@link updateTourDateAction}.
+ * Mutation hook wrapping {@link updateTourDateAction}. Empty strings are preserved
+ * so optional fields can be cleared.
  */
 export const useUpdateTourDateMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    FormState,
-    Error,
-    { tourDateId: string; formState: FormState; formData: FormData }
-  >({
-    mutationFn: ({ tourDateId, formState, formData }) =>
-      updateTourDateAction(tourDateId, formState, formData),
+  const {
+    mutate: updateTourDate,
+    mutateAsync: updateTourDateAsync,
+    isPending: isUpdatingTourDate,
+    isError: isUpdateTourDateError,
+    error: updateTourDateError,
+    data: updatedTourDate,
+    reset: resetUpdateTourDate,
+  } = useMutation<FormState, Error, { id: string; values: TourDateUpdateInput }>({
+    mutationFn: ({ id, values }) =>
+      updateTourDateAction(
+        id,
+        EMPTY_FORM_STATE,
+        objectToFormData(values, { keepEmptyStrings: true })
+      ),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    updateTourDate,
+    updateTourDateAsync,
+    isUpdatingTourDate,
+    isUpdateTourDateError,
+    updateTourDateError,
+    updatedTourDate,
+    resetUpdateTourDate,
+  };
 };
 
 /**
@@ -57,14 +99,26 @@ export const useUpdateTourDateMutation = () => {
  */
 export const useDeleteTourDateMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    Awaited<ReturnType<typeof deleteTourDateAction>>,
-    Error,
-    { tourDateId: string }
-  >({
+  const {
+    mutate: deleteTourDate,
+    mutateAsync: deleteTourDateAsync,
+    isPending: isDeletingTourDate,
+    isError: isDeleteTourDateError,
+    error: deleteTourDateError,
+    reset: resetDeleteTourDate,
+  } = useMutation<Awaited<ReturnType<typeof deleteTourDateAction>>, Error, { tourDateId: string }>({
     mutationFn: ({ tourDateId }) => deleteTourDateAction(tourDateId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    deleteTourDate,
+    deleteTourDateAsync,
+    isDeletingTourDate,
+    isDeleteTourDateError,
+    deleteTourDateError,
+    resetDeleteTourDate,
+  };
 };
 
 /**
@@ -72,7 +126,14 @@ export const useDeleteTourDateMutation = () => {
  */
 export const useUpdateHeadlinerSetTimeMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: updateHeadlinerSetTime,
+    mutateAsync: updateHeadlinerSetTimeAsync,
+    isPending: isUpdatingHeadlinerSetTime,
+    isError: isUpdateHeadlinerSetTimeError,
+    error: updateHeadlinerSetTimeError,
+    reset: resetUpdateHeadlinerSetTime,
+  } = useMutation<
     Awaited<ReturnType<typeof updateHeadlinerSetTimeAction>>,
     Error,
     { headlinerId: string; setTime: string | null; tourDateId?: string; artistId?: string }
@@ -81,6 +142,15 @@ export const useUpdateHeadlinerSetTimeMutation = () => {
       updateHeadlinerSetTimeAction(headlinerId, setTime, tourDateId, artistId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    updateHeadlinerSetTime,
+    updateHeadlinerSetTimeAsync,
+    isUpdatingHeadlinerSetTime,
+    isUpdateHeadlinerSetTimeError,
+    updateHeadlinerSetTimeError,
+    resetUpdateHeadlinerSetTime,
+  };
 };
 
 /**
@@ -88,7 +158,14 @@ export const useUpdateHeadlinerSetTimeMutation = () => {
  */
 export const useRemoveHeadlinerMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: removeHeadliner,
+    mutateAsync: removeHeadlinerAsync,
+    isPending: isRemovingHeadliner,
+    isError: isRemoveHeadlinerError,
+    error: removeHeadlinerError,
+    reset: resetRemoveHeadliner,
+  } = useMutation<
     Awaited<ReturnType<typeof removeHeadlinerAction>>,
     Error,
     { headlinerId: string; tourDateId?: string; artistId?: string }
@@ -97,6 +174,15 @@ export const useRemoveHeadlinerMutation = () => {
       removeHeadlinerAction(headlinerId, tourDateId, artistId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    removeHeadliner,
+    removeHeadlinerAsync,
+    isRemovingHeadliner,
+    isRemoveHeadlinerError,
+    removeHeadlinerError,
+    resetRemoveHeadliner,
+  };
 };
 
 /**
@@ -104,7 +190,14 @@ export const useRemoveHeadlinerMutation = () => {
  */
 export const useReorderHeadlinersMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
+  const {
+    mutate: reorderHeadliners,
+    mutateAsync: reorderHeadlinersAsync,
+    isPending: isReorderingHeadliners,
+    isError: isReorderHeadlinersError,
+    error: reorderHeadlinersError,
+    reset: resetReorderHeadliners,
+  } = useMutation<
     Awaited<ReturnType<typeof reorderHeadlinersAction>>,
     Error,
     { tourDateId: string; headlinerIds: string[] }
@@ -112,4 +205,13 @@ export const useReorderHeadlinersMutation = () => {
     mutationFn: ({ tourDateId, headlinerIds }) => reorderHeadlinersAction(tourDateId, headlinerIds),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
+
+  return {
+    reorderHeadliners,
+    reorderHeadlinersAsync,
+    isReorderingHeadliners,
+    isReorderHeadlinersError,
+    reorderHeadlinersError,
+    resetReorderHeadliners,
+  };
 };
