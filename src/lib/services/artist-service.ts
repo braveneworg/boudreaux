@@ -296,6 +296,56 @@ export class ArtistService {
   }
 
   /**
+   * Publish an artist by stamping `publishedOn` with the current time.
+   */
+  static async publishArtist(id: string): Promise<ServiceResponse<Artist>> {
+    try {
+      const artist = (await ArtistRepository.update(id, {
+        publishedOn: new Date(),
+      })) as unknown as Artist;
+
+      return { success: true, data: artist };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Artist not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to publish artist' };
+    }
+  }
+
+  /**
+   * Restore a soft-deleted (archived) artist by clearing `deletedOn`.
+   */
+  static async restoreArtist(id: string): Promise<ServiceResponse<Artist>> {
+    try {
+      const artist = (await ArtistRepository.update(id, {
+        deletedOn: null,
+      })) as unknown as Artist;
+
+      return { success: true, data: artist };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Artist not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to restore artist' };
+    }
+  }
+
+  /**
    * Upload a single image to S3 and create the Image record in the database
    */
   static async uploadArtistImage(

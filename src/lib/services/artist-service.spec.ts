@@ -45,6 +45,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findFirstByName: vi.fn(),
     findMany: vi.fn(),
     searchPublished: vi.fn(),
+    listPublishedWithBio: vi.fn(),
     findBySlugWithReleases: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -558,6 +559,96 @@ describe('ArtistService', () => {
       const result = await ArtistService.archiveArtist('artist-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to archive artist' });
+    });
+  });
+
+  describe('publishArtist', () => {
+    it('should publish an artist by stamping publishedOn', async () => {
+      const publishedArtist = { ...mockArtist, publishedOn: new Date('2024-12-13') };
+      vi.mocked(ArtistRepository.update).mockResolvedValue(publishedArtist);
+
+      const result = await ArtistService.publishArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true, data: publishedArtist });
+      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', {
+        publishedOn: expect.any(Date),
+      });
+    });
+
+    it('should return error when artist not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);
+
+      const result = await ArtistService.publishArtist('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
+
+      const result = await ArtistService.publishArtist('artist-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await ArtistService.publishArtist('artist-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to publish artist' });
+    });
+  });
+
+  describe('restoreArtist', () => {
+    it('should restore an artist by clearing deletedOn', async () => {
+      const restoredArtist = { ...mockArtist, deletedOn: null };
+      vi.mocked(ArtistRepository.update).mockResolvedValue(restoredArtist);
+
+      const result = await ArtistService.restoreArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true, data: restoredArtist });
+      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', { deletedOn: null });
+    });
+
+    it('should return error when artist not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);
+
+      const result = await ArtistService.restoreArtist('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
+
+      const result = await ArtistService.restoreArtist('artist-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await ArtistService.restoreArtist('artist-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to restore artist' });
     });
   });
 
@@ -1868,6 +1959,137 @@ describe('ArtistService', () => {
       const result = await ArtistService.existsById('missing-id');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('updateArtist shortBio sanitization', () => {
+    it('sanitizes a string shortBio before persisting', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', {
+        shortBio: '<p>Hi</p><script>alert(1)</script>',
+      });
+
+      const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
+      expect(persisted?.shortBio).toBe('<p>Hi</p>');
+    });
+  });
+
+  describe('listPublishedArtists', () => {
+    it('returns published artists with their short bios sanitized to plain text', async () => {
+      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
+        { ...mockArtist, shortBio: '<p>Hello <b>world</b></p>' },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists();
+
+      expect(ArtistRepository.listPublishedWithBio).toHaveBeenCalledWith({ skip: 0, take: 100 });
+      expect(result.success).toBe(true);
+    });
+
+    it('strips markup from the short bio (plain-text sanitization)', async () => {
+      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
+        { ...mockArtist, shortBio: '<p>Hello <b>world</b></p>' },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists();
+
+      const shortBio = result.success ? result.data[0]?.shortBio : undefined;
+      expect(shortBio).not.toContain('<');
+    });
+
+    it('leaves a null short bio untouched', async () => {
+      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
+        { ...mockArtist, shortBio: null },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists();
+
+      const shortBio = result.success ? result.data[0]?.shortBio : 'unexpected';
+      expect(shortBio).toBeNull();
+    });
+
+    it('returns Database unavailable on a connection failure', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('boom', '5.0.0');
+      vi.mocked(ArtistRepository.listPublishedWithBio).mockRejectedValue(initError);
+
+      const result = await ArtistService.listPublishedArtists();
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('returns a generic error on an unexpected failure', async () => {
+      vi.mocked(ArtistRepository.listPublishedWithBio).mockRejectedValue(new Error('nope'));
+
+      const result = await ArtistService.listPublishedArtists();
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artists' });
+    });
+  });
+
+  describe('getArtistBySlugWithReleases bio sanitization', () => {
+    it('leaves null bio/shortBio untouched (no sanitization)', async () => {
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue({
+        ...mockArtist,
+        bio: null,
+        shortBio: null,
+        releases: [],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      const bio = result.success ? result.data.bio : 'unexpected';
+      expect(bio).toBeNull();
+    });
+
+    it('sanitizes a non-null bio before returning it', async () => {
+      vi.mocked(ArtistRepository.findBySlugWithReleases).mockResolvedValue({
+        ...mockArtist,
+        bio: '<p>Hi</p><script>alert(1)</script>',
+        shortBio: '<p>Short</p><script>alert(2)</script>',
+        releases: [],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      const bio = result.success ? result.data.bio : 'unexpected';
+      expect(bio).toBe('<p>Hi</p>');
+    });
+  });
+
+  describe('findOrCreateByName branch coverage', () => {
+    it('creates a new artist when no slug, displayName, or name match exists', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+        id: 'new-1',
+        displayName: 'Brand New',
+        firstName: 'Brand',
+        surname: 'New',
+      } as never);
+
+      const result = await ArtistService.findOrCreateByName('Brand New');
+
+      expect(result).toMatchObject({ success: true, data: { id: 'new-1' } });
+    });
+
+    it('falls back to a name-derived slug when the name yields no slug', async () => {
+      // Punctuation-only name trims non-empty but slugifies to '' → the slug
+      // lookup is skipped and createWithSelect uses the firstName-derived slug.
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+        id: 'new-2',
+        displayName: '!!!',
+        firstName: '!!!',
+        surname: '',
+      } as never);
+
+      const result = await ArtistService.findOrCreateByName('!!!');
+
+      expect(result).toMatchObject({ success: true, data: { id: 'new-2' } });
+      expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
     });
   });
 });

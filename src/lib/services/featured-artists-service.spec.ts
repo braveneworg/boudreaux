@@ -376,6 +376,47 @@ describe('FeaturedArtistsService', () => {
     });
   });
 
+  describe('publishFeaturedArtist', () => {
+    it('should publish by stamping publishedOn and return the featured artist', async () => {
+      const published = { ...mockFeaturedArtist, publishedOn: new Date('2024-12-13') };
+      mockUpdate.mockResolvedValue(published as never);
+
+      const result = await FeaturedArtistsService.publishFeaturedArtist('fa-1');
+
+      expect(result).toMatchObject({ success: true, data: published });
+      expect(mockUpdate).toHaveBeenCalledWith('fa-1', { publishedOn: expect.any(Date) });
+    });
+
+    it('should return not found error on P2025', async () => {
+      mockUpdate.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Record not found', {
+          code: 'P2025',
+          clientVersion: '0.0.0',
+        })
+      );
+
+      const result = await FeaturedArtistsService.publishFeaturedArtist('missing');
+
+      expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
+    });
+
+    it('should return error on PrismaClientInitializationError', async () => {
+      mockUpdate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+
+      const result = await FeaturedArtistsService.publishFeaturedArtist('fa-1');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should return error on generic exception', async () => {
+      mockUpdate.mockRejectedValue(new Error('Publish failed'));
+
+      const result = await FeaturedArtistsService.publishFeaturedArtist('fa-1');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to publish featured artist' });
+    });
+  });
+
   describe('cache TTL', () => {
     it('should use zero TTL when E2E_MODE is true', async () => {
       vi.stubEnv('E2E_MODE', 'true');
