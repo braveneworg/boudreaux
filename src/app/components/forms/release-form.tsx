@@ -45,6 +45,7 @@ import {
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
+import { useReleaseDetailQuery } from '@/app/hooks/use-release-detail-query';
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
@@ -129,7 +130,6 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   const { mutateAsync: updateReleaseCoverArt } = useUpdateReleaseCoverArtMutation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [isLoadingRelease, setIsLoadingRelease] = useState(!!initialReleaseId);
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
   const [imagesReordered, setImagesReordered] = useState(false);
@@ -190,130 +190,105 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   });
   const { control } = releaseForm;
 
-  // Fetch release data when initialReleaseId is provided
+  // Fetch release data when initialReleaseId is provided. The gated hook owns
+  // the request lifecycle; the effects below project its data/error into form
+  // state, preserving the original side effects (reset, publish flag, images,
+  // existing digital formats).
+  const {
+    data: releaseData,
+    isPending: isReleasePending,
+    error: releaseError,
+  } = useReleaseDetailQuery(initialReleaseId ?? '', { enabled: !!initialReleaseId });
+
+  // In edit mode the form is "loading" until the gated query resolves; in
+  // create mode there's nothing to load.
+  const isLoadingRelease = !!initialReleaseId && isReleasePending;
+
   useEffect(() => {
-    if (!initialReleaseId) return;
+    if (!initialReleaseId || !releaseData) return;
 
-    const fetchRelease = async () => {
-      try {
-        setIsLoadingRelease(true);
-        const response = await fetch(`/api/releases/${initialReleaseId}`);
+    const release = releaseData;
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          toast.error(errorData.error || 'Failed to load release');
-          return;
-        }
-
-        const release = await response.json();
-
-        // Format dates for the form (YYYY-MM-DD format)
-        const formatDate = (dateValue: string | Date | null | undefined): string => {
-          if (!dateValue) return '';
-          const date = new Date(dateValue);
-          return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-        };
-
-        // Reset form with fetched data
-        releaseForm.reset({
-          title: release.title || '',
-          releasedOn: formatDate(release.releasedOn),
-          coverArt: release.coverArt || '',
-          formats: release.formats || ['DIGITAL'],
-          artistIds: release.artistReleases?.map((ar: { artistId: string }) => ar.artistId) || [],
-          labels: Array.isArray(release.labels) ? release.labels.join(', ') : '',
-          catalogNumber: release.catalogNumber || '',
-          description: release.description || '',
-          notes: Array.isArray(release.notes) ? release.notes.join(', ') : '',
-          executiveProducedBy: Array.isArray(release.executiveProducedBy)
-            ? release.executiveProducedBy.join(', ')
-            : '',
-          coProducedBy: Array.isArray(release.coProducedBy) ? release.coProducedBy.join(', ') : '',
-          masteredBy: Array.isArray(release.masteredBy) ? release.masteredBy.join(', ') : '',
-          mixedBy: Array.isArray(release.mixedBy) ? release.mixedBy.join(', ') : '',
-          recordedBy: Array.isArray(release.recordedBy) ? release.recordedBy.join(', ') : '',
-          artBy: Array.isArray(release.artBy) ? release.artBy.join(', ') : '',
-          designBy: Array.isArray(release.designBy) ? release.designBy.join(', ') : '',
-          photographyBy: Array.isArray(release.photographyBy)
-            ? release.photographyBy.join(', ')
-            : '',
-          linerNotesBy: Array.isArray(release.linerNotesBy) ? release.linerNotesBy.join(', ') : '',
-          publishedAt: formatDate(release.publishedAt),
-          featuredOn: formatDate(release.featuredOn),
-          featuredUntil: formatDate(release.featuredUntil),
-          featuredDescription: release.featuredDescription || '',
-          suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
-          createdBy: release.createdBy || user?.id,
-        });
-
-        // Set published state
-        if (release.publishedAt) {
-          setIsPublished(true);
-        }
-
-        // Load existing images if any
-        if (release.images && release.images.length > 0) {
-          const existingImages: ImageItem[] = release.images.map(
-            (img: {
-              id: string;
-              src: string;
-              caption?: string;
-              altText?: string;
-              sortOrder?: number;
-            }) => ({
-              id: img.id,
-              preview: img.src,
-              uploadedUrl: img.src,
-              caption: img.caption || '',
-              altText: img.altText || '',
-              sortOrder: img.sortOrder ?? 0,
-            })
-          );
-          setImages(existingImages);
-        }
-
-        // Load existing digital formats with track files
-        if (release.digitalFormats && release.digitalFormats.length > 0) {
-          setExistingFormats(
-            release.digitalFormats
-              .filter((df: { deletedAt?: string | null }) => df.deletedAt == null)
-              .map(
-                (df: {
-                  formatType: string;
-                  trackCount?: number;
-                  totalFileSize?: number | string;
-                  files?: Array<{
-                    trackNumber: number;
-                    title?: string | null;
-                    fileName: string;
-                    fileSize: number | string;
-                    duration?: number | null;
-                  }>;
-                }) => ({
-                  formatType: df.formatType as DigitalFormatType,
-                  trackCount: df.trackCount ?? df.files?.length ?? 0,
-                  totalFileSize: Number(df.totalFileSize ?? 0),
-                  files: (df.files ?? []).map((f) => ({
-                    trackNumber: f.trackNumber,
-                    title: f.title ?? null,
-                    fileName: f.fileName,
-                    fileSize: Number(f.fileSize),
-                    duration: f.duration ?? null,
-                  })),
-                })
-              )
-          );
-        }
-      } catch (err) {
-        error('Failed to fetch release:', err);
-        toast.error('Failed to load release data');
-      } finally {
-        setIsLoadingRelease(false);
-      }
+    // Format dates for the form (YYYY-MM-DD format)
+    const formatDate = (dateValue: string | Date | null | undefined): string => {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
     };
 
-    fetchRelease();
-  }, [initialReleaseId, releaseForm, user?.id]);
+    // Reset form with fetched data
+    releaseForm.reset({
+      title: release.title || '',
+      releasedOn: formatDate(release.releasedOn),
+      coverArt: release.coverArt || '',
+      formats: release.formats.length > 0 ? release.formats : ['DIGITAL'],
+      artistIds: release.artistReleases.map((ar) => ar.artistId),
+      labels: release.labels.join(', '),
+      catalogNumber: release.catalogNumber || '',
+      description: release.description || '',
+      notes: release.notes.join(', '),
+      executiveProducedBy: release.executiveProducedBy.join(', '),
+      coProducedBy: release.coProducedBy.join(', '),
+      masteredBy: release.masteredBy.join(', '),
+      mixedBy: release.mixedBy.join(', '),
+      recordedBy: release.recordedBy.join(', '),
+      artBy: release.artBy.join(', '),
+      designBy: release.designBy.join(', '),
+      photographyBy: release.photographyBy.join(', '),
+      linerNotesBy: release.linerNotesBy.join(', '),
+      publishedAt: formatDate(release.publishedAt),
+      featuredOn: formatDate(release.featuredOn),
+      featuredUntil: formatDate(release.featuredUntil),
+      featuredDescription: release.featuredDescription || '',
+      suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
+      createdBy: user?.id,
+    });
+
+    // Set published state
+    if (release.publishedAt) {
+      setIsPublished(true);
+    }
+
+    // Load existing images if any
+    if (release.images.length > 0) {
+      const existingImages: ImageItem[] = release.images.map((img) => ({
+        id: img.id,
+        preview: img.src ?? '',
+        uploadedUrl: img.src ?? '',
+        caption: img.caption || '',
+        altText: img.altText || '',
+        sortOrder: img.sortOrder ?? 0,
+      }));
+      setImages(existingImages);
+    }
+
+    // Load existing digital formats with track files
+    if (release.digitalFormats.length > 0) {
+      setExistingFormats(
+        release.digitalFormats
+          .filter((df) => df.deletedAt == null)
+          .map((df) => ({
+            formatType: df.formatType as DigitalFormatType,
+            trackCount: df.trackCount ?? df.files.length,
+            totalFileSize: Number(df.totalFileSize ?? 0),
+            files: df.files.map((f) => ({
+              trackNumber: f.trackNumber,
+              title: f.title ?? null,
+              fileName: f.fileName,
+              fileSize: Number(f.fileSize),
+              duration: f.duration ?? null,
+            })),
+          }))
+      );
+    }
+  }, [initialReleaseId, releaseData, releaseForm, user?.id]);
+
+  // Surface a load failure (edit mode only) without unmounting the form.
+  useEffect(() => {
+    if (initialReleaseId && releaseError) {
+      toast.error('Failed to load release data');
+    }
+  }, [initialReleaseId, releaseError]);
 
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);
