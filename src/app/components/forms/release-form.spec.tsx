@@ -8,6 +8,7 @@ import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
+import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -69,6 +70,19 @@ vi.mock('@/lib/utils/direct-upload', () => ({
 }));
 vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
+}));
+
+// Mock the release-detail query hook so edit-mode loading is driven by the
+// hook's return value instead of a raw `fetch`. Defaults to "create mode"
+// (null data, not pending); edit-mode tests override it per-case.
+vi.mock('@/app/hooks/use-release-query', () => ({
+  useReleaseDetailQuery: vi.fn(() => ({
+    data: null,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }));
 
 // Mock complex sub-components to keep tests focused
@@ -161,5 +175,87 @@ describe('ReleaseForm — suggestedPrice field', () => {
 
     const input = await screen.findByLabelText('Suggested price in dollars');
     expect(input).toHaveValue('');
+  });
+});
+
+describe('ReleaseForm — edit mode', () => {
+  const useReleaseDetailQueryMock = vi.mocked(useReleaseDetailQuery);
+
+  afterEach(() => {
+    // Restore the default create-mode behavior for other suites.
+    useReleaseDetailQueryMock.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('shows the loading skeleton while the release query is pending', () => {
+    useReleaseDetailQueryMock.mockReturnValue({
+      data: null,
+      isPending: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<ReleaseForm releaseId="rel-1" />);
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  });
+
+  it('populates the suggested price from the loaded release (cents → dollars)', async () => {
+    useReleaseDetailQueryMock.mockReturnValue({
+      data: {
+        id: 'rel-1',
+        title: 'My Release',
+        labels: ['Label A'],
+        releasedOn: new Date('2024-01-01T00:00:00.000Z'),
+        catalogNumber: 'CAT-1',
+        coverArt: 'https://cdn.example.com/cover.jpg',
+        description: null,
+        downloadUrls: [],
+        formats: ['DIGITAL'],
+        extendedData: [],
+        notes: [],
+        executiveProducedBy: [],
+        coProducedBy: [],
+        masteredBy: [],
+        mixedBy: [],
+        recordedBy: [],
+        artBy: [],
+        designBy: [],
+        photographyBy: [],
+        linerNotesBy: [],
+        imageTypes: [],
+        variants: [],
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        deletedOn: null,
+        publishedAt: null,
+        featuredOn: null,
+        featuredUntil: null,
+        featuredDescription: null,
+        tagId: null,
+        suggestedPrice: 799,
+        images: [],
+        artistReleases: [],
+        digitalFormats: [],
+        releaseUrls: [],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<ReleaseForm releaseId="rel-1" />);
+
+    const input = await screen.findByLabelText('Suggested price in dollars');
+    await waitFor(() => {
+      expect(input).toHaveValue('7.99');
+    });
   });
 });

@@ -132,7 +132,7 @@ const digitalFormatFileSchema = z.object({
 });
 
 /** `ReleaseDigitalFormat` with its child files (`digitalFormats: { include: { files } }`). */
-const digitalFormatWithFilesSchema = z.object({
+export const digitalFormatWithFilesSchema = z.object({
   id: z.string(),
   releaseId: z.string(),
   formatType: z.string(),
@@ -250,6 +250,15 @@ export const artistSchema = artistScalarSchema.extend({
   ),
   urls: z.array(urlSchema),
 }) satisfies z.ZodType<Artist>;
+
+/**
+ * `Artist` as returned by `GET /api/artists/[id]` — scalars plus the ordered
+ * `images` relation only (see `ArtistRepository.findById`). Narrower than
+ * `artistSchema`, which also pulls labels/urls/releases the by-id route omits.
+ */
+export const artistDetailSchema = artistScalarSchema.extend({
+  images: z.array(imageSchema),
+});
 
 /** `Release` with the relations selected by the `Release` domain type. */
 export const releaseSchema = releaseScalarSchema.extend({

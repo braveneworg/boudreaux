@@ -6,6 +6,13 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
+
+import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
+import {
+  useReleaseDigitalFormatQuery,
+  type ReleaseDigitalFormat,
+} from '@/app/hooks/use-release-digital-format-query';
 
 import { FeaturedArtistForm } from './featured-artist-form';
 
@@ -85,6 +92,32 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
+// Mock the featured-artist query hook so edit-mode loading is driven by the
+// hook's return value instead of a raw `fetch`. Defaults to "create mode"
+// (null data, not pending); edit-mode tests override it per-case.
+vi.mock('@/app/hooks/use-featured-artist-query', () => ({
+  useFeaturedArtistQuery: vi.fn(() => ({
+    data: null,
+    isPending: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
+// Mock the release-digital-format query hook so the featured-track auto-fetch
+// path is driven by the hook's return value instead of a raw `fetch`. Defaults
+// to "no format found" (null data, not pending); each digital-format test
+// overrides it per-case.
+vi.mock('@/app/hooks/use-release-digital-format-query', () => ({
+  useReleaseDigitalFormatQuery: vi.fn(() => ({
+    data: null,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
@@ -152,19 +185,58 @@ vi.mock('@/app/components/ui/select', () => ({
   ),
 }));
 
-describe('FeaturedArtistForm', () => {
-  const mockFetch = vi.fn();
+/**
+ * Builds a fully-typed digital-format fixture matching the hook's `data` shape.
+ * The component only reads `id` and `files[].{ trackNumber, title, fileName }`,
+ * but every schema field is supplied so the literal satisfies
+ * `ReleaseDigitalFormat` without a cast.
+ */
+const TEST_DATE = new Date('2024-01-01T00:00:00.000Z');
 
+const makeFormat = (id: string, fileCount: number): ReleaseDigitalFormat => ({
+  id,
+  releaseId: 'release-1',
+  formatType: 'MP3_320KBPS',
+  s3Key: null,
+  fileName: null,
+  fileSize: null,
+  mimeType: null,
+  trackCount: fileCount,
+  totalFileSize: null,
+  checksum: null,
+  deletedAt: null,
+  uploadedAt: TEST_DATE,
+  createdAt: TEST_DATE,
+  updatedAt: TEST_DATE,
+  files: Array.from({ length: fileCount }, (_, i) => ({
+    id: `file-${i}`,
+    formatId: id,
+    trackNumber: i + 1,
+    title: null,
+    duration: null,
+    s3Key: 'k',
+    fileName: `track-${i + 1}.mp3`,
+    fileSize: 1n,
+    mimeType: 'audio/mpeg',
+    checksum: null,
+    uploadedAt: TEST_DATE,
+    createdAt: TEST_DATE,
+    updatedAt: TEST_DATE,
+  })),
+});
+
+describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     mockSetValue.mockClear();
-    mockFetch.mockReset();
     capturedReleaseSelectSetValue = undefined;
     _capturedSelectOnValueChange = undefined;
-    vi.stubGlobal('fetch', mockFetch);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   describe('rendering', () => {
@@ -208,20 +280,13 @@ describe('FeaturedArtistForm', () => {
     const TEST_FORMAT_ID = 'def456abc123def456abc123';
 
     it('auto-sets digitalFormatId when release has MP3_320KBPS format', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            digitalFormat: {
-              id: TEST_FORMAT_ID,
-              files: [
-                { id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' },
-                { id: 'file-2', trackNumber: 2, title: null, fileName: 'track-2.mp3' },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(TEST_FORMAT_ID, 2),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -233,8 +298,10 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
-          `/api/releases/${TEST_RELEASE_ID}/digital-formats?formatType=MP3_320KBPS`
+        expect(useReleaseDigitalFormatQuery).toHaveBeenCalledWith(
+          TEST_RELEASE_ID,
+          'MP3_320KBPS',
+          expect.objectContaining({ enabled: true })
         );
       });
 
@@ -247,21 +314,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('shows format found status with file count when MP3 format exists', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            digitalFormat: {
-              id: TEST_FORMAT_ID,
-              files: [
-                { id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' },
-                { id: 'file-2', trackNumber: 2, title: null, fileName: 'track-2.mp3' },
-                { id: 'file-3', trackNumber: 3, title: null, fileName: 'track-3.mp3' },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(TEST_FORMAT_ID, 3),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -279,12 +338,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('shows missing format status when release has no MP3_320KBPS format', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(JSON.stringify({ error: 'Not found' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -301,12 +361,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('shows loading status while checking format availability', async () => {
-      let resolveFetch: (value: Response) => void;
-      const fetchPromise = new Promise<Response>((resolve) => {
-        resolveFetch = resolve;
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: undefined,
+        isPending: true,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
       });
-
-      mockFetch.mockReturnValue(fetchPromise);
 
       render(<FeaturedArtistForm />);
 
@@ -320,20 +381,16 @@ describe('FeaturedArtistForm', () => {
       await waitFor(() => {
         expect(screen.getByText(/Checking for MP3 320kbps format/)).toBeInTheDocument();
       });
-
-      // Clean up pending fetch to avoid act warnings
-      await act(async () => {
-        resolveFetch(
-          new Response(JSON.stringify({ digitalFormat: { id: TEST_FORMAT_ID, files: [] } }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        );
-      });
     });
 
     it('shows missing status when fetch throws a network error', async () => {
-      mockFetch.mockRejectedValue(new Error('Network failure'));
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: new Error('Network failure'),
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -350,17 +407,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('displays singular file text for a single file format', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            digitalFormat: {
-              id: TEST_FORMAT_ID,
-              files: [{ id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' }],
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(TEST_FORMAT_ID, 1),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -393,20 +446,13 @@ describe('FeaturedArtistForm', () => {
     const TEST_FORMAT_ID = 'def456abc123def456abc123';
 
     it('renders featured track dropdown when format files are loaded', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            digitalFormat: {
-              id: TEST_FORMAT_ID,
-              files: [
-                { id: 'file-1', trackNumber: 1, title: 'Track One', fileName: 'track-1.mp3' },
-                { id: 'file-2', trackNumber: 2, title: 'Track Two', fileName: 'track-2.mp3' },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(TEST_FORMAT_ID, 2),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -425,12 +471,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('does not render featured track dropdown when no format files', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(JSON.stringify({ error: 'Not found' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -447,19 +494,13 @@ describe('FeaturedArtistForm', () => {
     });
 
     it('displays the default placeholder text', async () => {
-      mockFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            digitalFormat: {
-              id: TEST_FORMAT_ID,
-              files: [
-                { id: 'file-1', trackNumber: 1, title: 'Track One', fileName: 'track-1.mp3' },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(TEST_FORMAT_ID, 1),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
       render(<FeaturedArtistForm />);
 
@@ -477,16 +518,82 @@ describe('FeaturedArtistForm', () => {
   });
 
   describe('edit mode', () => {
-    it('shows loading state when featuredArtistId is provided', () => {
+    const useFeaturedArtistQueryMock = vi.mocked(useFeaturedArtistQuery);
+
+    afterEach(() => {
+      // Restore the default create-mode behavior for other suites.
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+    });
+
+    it('shows loading state while the featured-artist query is pending', () => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: true,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
       render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
 
       expect(screen.getByText('Loading featured artist...')).toBeInTheDocument();
     });
 
     it('does not render form fields while loading', () => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: true,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
       render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
 
       expect(screen.queryByTestId('release-select-releaseId')).not.toBeInTheDocument();
+    });
+
+    it('does not show a load-error toast on a successful load', async () => {
+      // The hook defaults `error` to a non-null Error even on success, so the
+      // toast must gate on `isError` — not on the truthy `error` value.
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: new Error('Unknown error'),
+        refetch: vi.fn(),
+      });
+
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading featured artist...')).not.toBeInTheDocument();
+      });
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(
+        'Failed to load featured artist data'
+      );
+    });
+
+    it('shows a load-error toast when the query errors', async () => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: new Error('boom'),
+        refetch: vi.fn(),
+      });
+
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to load featured artist data');
+      });
     });
   });
 });
