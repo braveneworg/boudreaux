@@ -113,7 +113,7 @@ describe('SignedInAs', () => {
       const wrapper = container.firstChild as HTMLElement;
       expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('items-center');
-      expect(wrapper).toHaveClass('gap-2');
+      expect(wrapper).toHaveClass('gap-1.5');
     });
 
     it('applies text-zinc-50 class to wrapper', () => {

@@ -28,13 +28,13 @@ export const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
 
   return (
     <>
-      <div className={cn('flex items-center gap-2 text-zinc-50')}>
+      <div className={cn('flex items-center gap-1.5 text-zinc-50')}>
         {!isMobile && (
           <div className="flex flex-row gap-2">
             <span className="text-xl">Signed in as: </span>
           </div>
         )}
-        <EditIcon size={16} className="mt-1 ml-2.5" />
+        <EditIcon size={16} />
         <Link className="text-zinc-50 underline" href="/profile" onClick={onClick}>
           {username ? `@${username}` : displayName}
         </Link>

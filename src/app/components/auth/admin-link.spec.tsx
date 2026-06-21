@@ -80,11 +80,11 @@ describe('AdminLink', () => {
       expect(linkText).toBeInTheDocument();
     });
 
-    it('should render icon with correct className', () => {
+    it('centers the icon via the parent flex row, without a margin nudge', () => {
       const { container } = render(<AdminLink />);
 
       const icon = container.querySelector('svg');
-      expect(icon).toHaveClass('mt-1');
+      expect(icon).not.toHaveClass('mt-1');
     });
   });
 

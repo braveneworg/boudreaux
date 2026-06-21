@@ -28,16 +28,15 @@ export const SignedInToolbar = ({
 
   return (
     <div className={cn('mt-3', className)}>
-      <div className="align-center mb-3 flex gap-0">
+      <div className="mb-3 flex items-center gap-3">
         <GravatarAvatar
-          className="mt-1"
           email={session?.user?.email || ''}
           firstName={session?.user?.name?.split(' ')[0]}
           surname={session?.user?.name?.split(' ')[1]}
         />
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           <SignedInAs onClick={onNavigate} />
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-4">
             <SignOutButton onNavigate={onNavigate} />
             {!isMobile && <VerticalSeparator className="mx-2 h-4! w-0.5! self-stretch" />}
             <EditProfileButton />
