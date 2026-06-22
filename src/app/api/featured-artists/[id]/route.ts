@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
@@ -46,7 +47,7 @@ export const GET = withRateLimit<{ id: string }>(
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {
-    console.error('FeaturedArtist GET by ID error:', error);
+    loggers.media.error('FeaturedArtist GET by ID error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
@@ -97,7 +98,7 @@ export const PATCH = withAdmin(
 
       return NextResponse.json(serializeForResponse(result.data));
     } catch (error) {
-      console.error('FeaturedArtist PATCH error:', error);
+      loggers.media.error('FeaturedArtist PATCH error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }
@@ -126,7 +127,7 @@ export const DELETE = withAdmin(
 
       return NextResponse.json({ message: 'Featured artist deleted successfully' });
     } catch (error) {
-      console.error('FeaturedArtist DELETE error:', error);
+      loggers.media.error('FeaturedArtist DELETE error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }

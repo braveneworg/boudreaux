@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { CloudFrontClient, ListInvalidationsCommand } from '@aws-sdk/client-cloudfront';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +78,7 @@ export const GET = withAdmin(async () => {
       message: 'CDN is ready',
     });
   } catch (error) {
-    console.error('Error checking CDN status:', error);
+    loggers.s3.error('Error checking CDN status', error);
     return NextResponse.json(
       {
         status: 'error',

@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { UserService } from '@/lib/services/user-service';
+import { loggers } from '@/lib/utils/logger';
 import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
 
 // Rate-limited per IP: username changes are rare, and the duplicate check
@@ -64,10 +65,10 @@ export const POST = withRateLimit(
     } catch (error) {
       // Log safely - don't expose error details in production
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error updating username:', error);
+        loggers.auth.error('Error updating username', error);
       } else {
-        console.error(
-          'Error updating username:',
+        loggers.auth.error(
+          'Error updating username',
           error instanceof Error ? error.message : 'Unknown error'
         );
       }

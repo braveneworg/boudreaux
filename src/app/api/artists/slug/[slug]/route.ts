@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 export const dynamic = 'force-dynamic';
@@ -65,7 +66,7 @@ export const GET = withRateLimit<{ slug: string }>(
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {
-    console.error('Artist slug GET error:', error);
+    loggers.media.error('Artist slug GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

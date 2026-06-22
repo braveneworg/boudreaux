@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export const GET = withAdmin(
 
       return NextResponse.json(status);
     } catch (error) {
-      console.error('Bio generation status error:', error);
+      loggers.media.error('Bio generation status error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }

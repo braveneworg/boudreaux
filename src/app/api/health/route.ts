@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { HEALTH_LIMIT, healthLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { checkDatabaseHealth } from '@/lib/utils/database-utils';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,7 @@ export const GET = withRateLimit(
       }
     );
   } catch (error) {
-    console.error('Health check error:', error);
+    loggers.database.error('Health check error', error);
     return NextResponse.json(
       {
         status: 'unhealthy',

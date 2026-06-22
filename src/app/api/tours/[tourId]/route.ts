@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { loggers } from '@/lib/utils/logger';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 export const GET = withRateLimit<{ tourId: string }>(
@@ -31,7 +32,7 @@ export const GET = withRateLimit<{ tourId: string }>(
       }
     );
   } catch (error) {
-    console.error('Failed to fetch tour:', error);
+    loggers.media.error('Failed to fetch tour', error);
     return NextResponse.json({ error: 'Failed to fetch tour' }, { status: 500 });
   }
 });

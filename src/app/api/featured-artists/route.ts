@@ -11,6 +11,7 @@ import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
@@ -116,7 +117,7 @@ export const GET = withRateLimit(
       }
     );
   } catch (error) {
-    console.error('FeaturedArtist GET error:', error);
+    loggers.media.error('FeaturedArtist GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
@@ -146,7 +147,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
 
     return NextResponse.json(serializeForResponse(result.data), { status: 201 });
   } catch (error) {
-    console.error('FeaturedArtist POST error:', error);
+    loggers.media.error('FeaturedArtist POST error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

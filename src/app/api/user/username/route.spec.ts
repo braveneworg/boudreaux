@@ -6,7 +6,11 @@ import { NextRequest } from 'next/server';
 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
+import { loggers } from '@/lib/utils/logger';
+
 import { POST } from './route';
+
+vi.mock('server-only', () => ({}));
 
 const mockSession = {
   user: { id: 'user-123', email: 'test@test.com', name: 'Test User', role: 'user' },
@@ -143,7 +147,7 @@ describe('POST /api/user/username', () => {
   it('should return 500 when an unexpected error occurs during update', async () => {
     mockPrismaUpdate.mockRejectedValue(new Error('Database connection lost'));
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
     const request = createRequest({ username: 'validuser', confirmUsername: 'validuser' });
     const response = await POST(request, { params: Promise.resolve({}) });
@@ -152,37 +156,37 @@ describe('POST /api/user/username', () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe('An error occurred while updating the username');
 
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   it('should log full error in development mode', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     mockPrismaUpdate.mockRejectedValue(new Error('Dev debug error'));
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
     const request = createRequest({ username: 'validuser', confirmUsername: 'validuser' });
     const response = await POST(request, { params: Promise.resolve({}) });
 
     expect(response.status).toBe(500);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating username:', expect.any(Error));
+    expect(loggerErrorSpy).toHaveBeenCalledWith('Error updating username', expect.any(Error));
 
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
     vi.unstubAllEnvs();
   });
 
   it('should log "Unknown error" when thrown value is not an Error instance', async () => {
     mockPrismaUpdate.mockRejectedValue('a plain string error');
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
     const request = createRequest({ username: 'validuser', confirmUsername: 'validuser' });
     const response = await POST(request, { params: Promise.resolve({}) });
 
     expect(response.status).toBe(500);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating username:', 'Unknown error');
+    expect(loggerErrorSpy).toHaveBeenCalledWith('Error updating username', 'Unknown error');
 
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   it('should accept a valid username with underscores and dashes', async () => {

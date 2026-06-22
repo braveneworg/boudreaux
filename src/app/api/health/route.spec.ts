@@ -4,10 +4,13 @@
 import { NextRequest } from 'next/server';
 
 import { checkDatabaseHealth } from '@/lib/utils/database-utils';
+import { loggers } from '@/lib/utils/logger';
 
 import { GET } from './route';
 
 // Import after mocking
+
+vi.mock('server-only', () => ({}));
 
 // Mock rate limiting to pass through
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
@@ -100,7 +103,7 @@ describe('Health Check API', () => {
     it('should handle unexpected errors gracefully', async () => {
       vi.mocked(checkDatabaseHealth).mockRejectedValue(Error('Unexpected error'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
@@ -108,15 +111,15 @@ describe('Health Check API', () => {
       expect(response.status).toBe(500);
       expect(data.status).toBe('unhealthy');
       expect(data.database).toBe('health check failed');
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(loggerErrorSpy).toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should handle non-Error exceptions', async () => {
       vi.mocked(checkDatabaseHealth).mockRejectedValue('String error');
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
@@ -124,14 +127,14 @@ describe('Health Check API', () => {
       expect(response.status).toBe(500);
       expect(data.status).toBe('unhealthy');
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should include error message in development mode when catch block triggered with Error', async () => {
       vi.stubEnv('NODE_ENV', 'development');
       vi.mocked(checkDatabaseHealth).mockRejectedValue(new Error('Database connection failed'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
@@ -139,7 +142,7 @@ describe('Health Check API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database connection failed');
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 
@@ -147,7 +150,7 @@ describe('Health Check API', () => {
       vi.stubEnv('NODE_ENV', 'development');
       vi.mocked(checkDatabaseHealth).mockRejectedValue('String thrown error');
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
@@ -155,7 +158,7 @@ describe('Health Check API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Unspecified error occurred');
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 
@@ -163,7 +166,7 @@ describe('Health Check API', () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.mocked(checkDatabaseHealth).mockRejectedValue(new Error('Sensitive error details'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
@@ -171,7 +174,7 @@ describe('Health Check API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBeUndefined();
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 

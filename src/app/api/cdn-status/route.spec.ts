@@ -3,7 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
+import { loggers } from '@/lib/utils/logger';
+
 import { GET } from './route';
+
+vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: <H>(handler: H): H => handler,
@@ -216,7 +220,7 @@ describe('CDN Status API', () => {
     it('should return error status when CloudFront API throws', async () => {
       mockSend.mockRejectedValue(new Error('Access denied'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
       const response = await callGet();
       const data = await response.json();
@@ -224,9 +228,9 @@ describe('CDN Status API', () => {
       expect(response.status).toBe(500);
       expect(data.status).toBe('error');
       expect(data.message).toBe('Unable to check CDN status');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error checking CDN status:', expect.any(Error));
+      expect(loggerErrorSpy).toHaveBeenCalledWith('Error checking CDN status', expect.any(Error));
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should use empty strings for missing AWS credentials', async () => {
