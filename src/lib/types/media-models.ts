@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { Platform } from '@/lib/types/domain/shared';
+
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -8,75 +10,10 @@ import type { Prisma } from '@prisma/client';
  * These types are shared across the application for audio/media-related features
  */
 
-// =============================================================================
-// Enums (matching Prisma schema enums)
-// =============================================================================
-
-/**
- * Platform enum - matches Prisma Platform enum
- */
-export type Platform =
-  | 'SPOTIFY'
-  | 'APPLE_MUSIC'
-  | 'BANDCAMP'
-  | 'YOUTUBE'
-  | 'SOUNDCLOUD'
-  | 'AMAZON_MUSIC'
-  | 'FACEBOOK'
-  | 'TWITTER'
-  | 'INSTAGRAM'
-  | 'BLUESKY'
-  | 'TIKTOK'
-  | 'WEBSITE'
-  | 'PATREON'
-  | 'DISCOGS';
-
-export const FORMATS = {
-  // Use AI to expand this list as needed
-  DIGITAL: 'DIGITAL',
-  MP3_320KBPS: 'MP3_320KBPS',
-  MP3_256KBPS: 'MP3_256KBPS',
-  MP3_192KBPS: 'MP3_192KBPS',
-  MP3_128KBPS: 'MP3_128KBPS',
-  FLAC: 'FLAC',
-  ALAC: 'ALAC',
-  WAV: 'WAV',
-  AIFF: 'AIFF',
-  AAC: 'AAC',
-  OGG_VORBIS: 'OGG_VORBIS',
-  WMA: 'WMA',
-  CD: 'CD',
-  VINYL: 'VINYL',
-  VINYL_7_INCH: 'VINYL_7_INCH',
-  VINYL_10_INCH: 'VINYL_10_INCH',
-  VINYL_12_INCH: 'VINYL_12_INCH',
-  VINYL_180G: 'VINYL_180G',
-  VINYL_COLORED: 'VINYL_COLORED',
-  VINYL_PICTURE_DISC: 'VINYL_PICTURE_DISC',
-  VINYL_GATEFOLD: 'VINYL_GATEFOLD',
-  VINYL_SPLATTERED: 'VINYL_SPLATTERED',
-  VINYL_ETCHED: 'VINYL_ETCHED',
-  VINYL_45RPM: 'VINYL_45RPM',
-  VINYL_33RPM: 'VINYL_33RPM',
-  VINYL_TRANSPARENT: 'VINYL_TRANSPARENT',
-  VINYL_DOUBLE_LP: 'VINYL_DOUBLE_LP',
-  VINYL_TRIPLE_LP: 'VINYL_TRIPLE_LP',
-  VINYL_QUAD_LP: 'VINYL_QUAD_LP',
-  CASSETTE: 'CASSETTE',
-  VIDEO: 'VIDEO',
-  OTHER: 'OTHER',
-} as const;
-
-export type Format = (typeof FORMATS)[keyof typeof FORMATS];
-
-// =============================================================================
-// Base Types
-// =============================================================================
-
-/**
- * Json type for extended data fields
- */
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+// Vendor-neutral primitives now live in the Prisma-free domain layer. Re-exported
+// here so existing importers keep working until they migrate to `@/lib/types/domain`.
+export { FORMATS } from '@/lib/types/domain/shared';
+export type { Format, Json, Platform } from '@/lib/types/domain/shared';
 
 // =============================================================================
 // Model Interfaces (matching Prisma schema models)
