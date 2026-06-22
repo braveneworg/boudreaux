@@ -10,6 +10,7 @@ import {
   deleteBannerNotificationAction,
   updateRotationIntervalAction,
 } from '@/lib/actions/banner-notification-action';
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
@@ -66,11 +67,7 @@ export const useDeleteBannerNotificationMutation = () => {
     isError: isDeleteBannerError,
     error: deleteBannerError,
     reset: resetDeleteBanner,
-  } = useMutation<
-    Awaited<ReturnType<typeof deleteBannerNotificationAction>>,
-    Error,
-    { slotNumber: number }
-  >({
+  } = useMutation<AdminActionResult, Error, { slotNumber: number }>({
     mutationFn: ({ slotNumber }) => deleteBannerNotificationAction(slotNumber),
     onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
   });
@@ -97,11 +94,7 @@ export const useUpdateRotationIntervalMutation = () => {
     isError: isUpdateRotationIntervalError,
     error: updateRotationIntervalError,
     reset: resetUpdateRotationInterval,
-  } = useMutation<
-    Awaited<ReturnType<typeof updateRotationIntervalAction>>,
-    Error,
-    { interval: number }
-  >({
+  } = useMutation<AdminActionResult, Error, { interval: number }>({
     mutationFn: ({ interval }) => updateRotationIntervalAction(interval),
     onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
   });

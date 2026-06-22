@@ -15,6 +15,8 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { logSecurityEvent } from '@/utils/audit-log';
 
+import type { AdminActionResult } from './run-admin-entity-action';
+
 /**
  * Result type for image upload actions
  */
@@ -33,9 +35,7 @@ export interface ImageUploadActionResult {
 /**
  * Server action to delete a release image
  */
-export const deleteReleaseImageAction = async (
-  imageId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const deleteReleaseImageAction = async (imageId: string): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {
@@ -163,7 +163,7 @@ export const getReleaseImagesAction = async (
 export const updateReleaseImageAction = async (
   imageId: string,
   data: { caption?: string; altText?: string }
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {

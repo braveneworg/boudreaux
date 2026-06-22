@@ -17,6 +17,7 @@ import {
   rotationIntervalSchema,
 } from '@/lib/validation/banner-notification-schema';
 
+import type { AdminActionResult } from './run-admin-entity-action';
 import type { Session } from 'next-auth';
 
 const logger = loggers.notifications;
@@ -122,7 +123,7 @@ export const createOrUpdateBannerNotificationAction = async (
  */
 export const deleteBannerNotificationAction = async (
   slotNumber: number
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   try {
     await requireRole('admin');
   } catch {
@@ -152,7 +153,7 @@ export const deleteBannerNotificationAction = async (
  */
 export const updateRotationIntervalAction = async (
   interval: number
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   try {
     await requireRole('admin');
   } catch {
