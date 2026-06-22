@@ -10,3 +10,4 @@
 export * from './shared';
 export * from './errors';
 export * from './release';
+export * from './featured-artist';

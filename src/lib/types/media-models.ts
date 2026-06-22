@@ -6,6 +6,7 @@ import type {
   ArtistListWithBio,
   ArtistWithPublishedReleases,
 } from '@/lib/types/domain/artist';
+import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/domain/featured-artist';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
@@ -41,6 +42,11 @@ export type {
   ReleaseCarouselItem,
   ReleaseListItem,
 };
+
+// FeaturedArtist types are now hand-written, Prisma-free domain types
+// (drift-checked in featured-artist-repository). Imported above for local use,
+// re-exported for back-compat with existing importers of this module.
+export type { FeaturedArtist, FeaturedArtistFormatFile };
 
 // =============================================================================
 // Model Interfaces (matching Prisma schema models)
@@ -158,43 +164,10 @@ export interface Instrument {
   updatedAt: Date;
 }
 
-export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
-  include: {
-    artists: {
-      select: {
-        id: true;
-        displayName: true;
-        firstName: true;
-        surname: true;
-        slug: true;
-        images: { select: { src: true } };
-      };
-    };
-    digitalFormat: {
-      include: {
-        files: true;
-      };
-    };
-    release: {
-      select: {
-        id: true;
-        title: true;
-        coverArt: true;
-        images: { select: { src: true } };
-      };
-    };
-  };
-}>;
-
-/**
- * A single file within a digital format, used for playback in the
- * featured artists player.
- */
-export type FeaturedArtistFormatFile = NonNullable<
-  FeaturedArtist['digitalFormat']
->['files'][number];
-
 // `Artist` is re-exported from the domain layer at the top of this file.
+// `FeaturedArtist` and `FeaturedArtistFormatFile` are re-exported from the
+// domain layer above; their query include lives in featured-artist-repository
+// (drift-checked against the domain types).
 
 export type User = Prisma.UserGetPayload<{
   include: {
