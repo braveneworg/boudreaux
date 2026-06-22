@@ -8,6 +8,7 @@ import path from 'path';
 import nodemailer from 'nodemailer';
 
 import { prisma } from '@/lib/prisma';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 
 import { buildLoginVerificationEmailHtml } from './login-verification-email-html';
@@ -82,7 +83,7 @@ export const sendVerificationRequest = async (
   } catch (error) {
     // If the DB lookup fails, fall back to treating the user as returning so
     // the email still sends without blocking sign-in.
-    console.error('[sendVerificationRequest] Failed to look up user:', error);
+    loggers.auth.error('[sendVerificationRequest] Failed to look up user', error);
   }
 
   const emailData = { url, email, isNewUser };
@@ -111,5 +112,5 @@ export const sendVerificationRequest = async (
     ],
   });
 
-  console.info(`[sendVerificationRequest] Verification email sent to ${email}`);
+  loggers.auth.info(`[sendVerificationRequest] Verification email sent to ${email}`);
 };

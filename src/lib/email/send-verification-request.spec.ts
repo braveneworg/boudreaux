@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { loggers } from '@/lib/utils/logger';
+
 import { buildLoginVerificationEmailHtml } from './login-verification-email-html';
 import { buildLoginVerificationEmailText } from './login-verification-email-text';
 import { sendVerificationRequest } from './send-verification-request';
@@ -154,7 +156,7 @@ describe('sendVerificationRequest', () => {
     });
 
     it('should default to returning-user (isNewUser=false) when the DB lookup throws', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
       mockFindUnique.mockRejectedValue(new Error('DB unavailable'));
 
       await sendVerificationRequest(validParams);
@@ -162,7 +164,7 @@ describe('sendVerificationRequest', () => {
       expect(vi.mocked(buildLoginVerificationEmailHtml)).toHaveBeenCalledWith(
         expect.objectContaining({ isNewUser: false })
       );
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
   });
 
