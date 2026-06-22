@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { artistWithPublishedReleasesInclude } from '@/lib/types/media-models';
+import { Prisma } from '@prisma/client';
+
+import { DataError } from '@/lib/types/domain/errors';
 
 import { ArtistRepository } from './artist-repository';
 
@@ -15,6 +17,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
@@ -26,18 +29,54 @@ vi.mock('@/lib/prisma', () => ({
 
 const { prisma } = await import('@/lib/prisma');
 
+const adminInclude = {
+  images: { orderBy: { sortOrder: 'asc' }, take: 3 },
+  labels: true,
+  urls: true,
+  releases: { include: { release: true } },
+};
+
+const nameSelect = { id: true, displayName: true, firstName: true, surname: true };
+
 describe('ArtistRepository', () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe('create', () => {
-    it('passes data through to prisma.artist.create', async () => {
+    it('translates scalar data and includes the admin payload', async () => {
       vi.mocked(prisma.artist.create).mockResolvedValue({ id: 'a' } as never);
 
       const data = { firstName: 'John', surname: 'Doe', displayName: 'John Doe', slug: 'john-doe' };
       const result = await ArtistRepository.create(data);
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.create).toHaveBeenCalledWith({ data });
+      expect(prisma.artist.create).toHaveBeenCalledWith({ data, include: adminInclude });
+    });
+
+    it('builds connectOrCreate for nested images and urls', async () => {
+      vi.mocked(prisma.artist.create).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.create({
+        firstName: 'John',
+        surname: 'Doe',
+        slug: 'john-doe',
+        images: [{ id: 'i1', src: 's1' }],
+        urls: [{ id: 'u1', platform: 'SPOTIFY', url: 'https://x' }],
+      });
+
+      const arg = vi.mocked(prisma.artist.create).mock.calls[0][0];
+      expect(arg?.data?.images).toEqual({
+        connectOrCreate: [
+          {
+            where: { id: 'i1' },
+            create: { id: 'i1', src: 's1', altText: undefined, caption: undefined },
+          },
+        ],
+      });
+      expect(arg?.data?.urls).toEqual({
+        connectOrCreate: [
+          { where: { id: 'u1' }, create: { id: 'u1', platform: 'SPOTIFY', url: 'https://x' } },
+        ],
+      });
     });
   });
 
@@ -53,6 +92,24 @@ describe('ArtistRepository', () => {
         include: { images: { orderBy: { sortOrder: 'asc' } } },
       });
     });
+
+    it('wraps a Prisma error as a DataError', async () => {
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('missing', { code: 'P2025', clientVersion: '6' })
+      );
+
+      await expect(ArtistRepository.findById('a')).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(ArtistRepository.findById('a')).rejects.toBeInstanceOf(DataError);
+    });
   });
 
   describe('findBySlug', () => {
@@ -67,30 +124,101 @@ describe('ArtistRepository', () => {
   });
 
   describe('findMany', () => {
-    it('forwards where/skip/take and uses the full admin include', async () => {
+    it('uses the full admin include and default pagination', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
 
-      const where = { AND: [{ OR: [{ deletedOn: null }] }] };
-      const result = await ArtistRepository.findMany({ where, skip: 5, take: 10 });
+      const result = await ArtistRepository.findMany({});
 
       expect(result).toEqual([{ id: 'a' }]);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
-        where,
-        skip: 5,
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 3 },
-          labels: true,
-          urls: true,
-          releases: { include: { release: true } },
-        },
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.skip).toBe(0);
+      expect(arg?.take).toBe(50);
+      expect(arg?.orderBy).toEqual({ createdAt: 'desc' });
+      expect(arg?.include).toEqual(adminInclude);
+    });
+
+    it('excludes soft-deleted artists by default (Mongo null-safe)', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({});
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+      });
+    });
+
+    it('includes soft-deleted artists when deleted=true', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({});
+    });
+
+    it('filters to published artists when published=true', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true, published: true });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({ AND: [{ publishedOn: { not: null } }] });
+    });
+
+    it('filters to unpublished artists when published=false', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true, published: false });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
+      });
+    });
+
+    it('adds a case-insensitive search OR across name fields', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true, search: 'foo' });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        AND: [
+          {
+            OR: [
+              { firstName: { contains: 'foo', mode: 'insensitive' } },
+              { surname: { contains: 'foo', mode: 'insensitive' } },
+              { displayName: { contains: 'foo', mode: 'insensitive' } },
+              { slug: { contains: 'foo', mode: 'insensitive' } },
+            ],
+          },
+        ],
       });
     });
   });
 
+  describe('count', () => {
+    it('counts all artists with no filter', async () => {
+      vi.mocked(prisma.artist.count).mockResolvedValue(7 as never);
+
+      const result = await ArtistRepository.count();
+
+      expect(result).toBe(7);
+      expect(prisma.artist.count).toHaveBeenCalledWith({ where: {} });
+    });
+
+    it('counts only published artists when published=true', async () => {
+      vi.mocked(prisma.artist.count).mockResolvedValue(3 as never);
+
+      await ArtistRepository.count({ published: true });
+
+      expect(prisma.artist.count).toHaveBeenCalledWith({ where: { publishedOn: { not: null } } });
+    });
+  });
+
   describe('update', () => {
-    it('updates an artist by id', async () => {
+    it('updates an artist by id and includes the admin payload', async () => {
       vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.update('a', { displayName: 'New' });
@@ -99,6 +227,7 @@ describe('ArtistRepository', () => {
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'a' },
         data: { displayName: 'New' },
+        include: adminInclude,
       });
     });
   });
@@ -142,78 +271,90 @@ describe('ArtistRepository', () => {
   });
 
   describe('searchPublished', () => {
-    it('forwards where/skip/take with the public search include', async () => {
+    it('builds the public-search where with the lightweight include', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
 
-      const where = { isActive: true };
-      const result = await ArtistRepository.searchPublished({ where, skip: 0, take: 50 });
+      const result = await ArtistRepository.searchPublished({ skip: 0, take: 50 });
 
       expect(result).toEqual([{ id: 'a' }]);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
-        where,
-        skip: 0,
-        take: 50,
-        orderBy: { displayName: 'asc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-          releases: {
-            include: {
-              release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        isActive: true,
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        releases: {
+          some: {
+            release: {
+              publishedAt: { not: null },
+              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
             },
           },
         },
       });
+      expect(arg?.orderBy).toEqual({ displayName: 'asc' });
+      expect(arg?.include?.images).toEqual({ orderBy: { sortOrder: 'asc' }, take: 1 });
+    });
+
+    it('adds a title/name search AND clause when a search term is given', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.searchPublished({ search: 'foo' });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where?.AND).toBeDefined();
     });
   });
 
-  describe('findBySlugWithReleases', () => {
-    it('finds the published-artist record by where using the shared include', async () => {
+  describe('findPublishedBySlugWithReleases', () => {
+    it('finds a published, non-deleted artist by slug with the detail include', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
-      const where = { slug: 'john-doe', isActive: true };
-      const result = await ArtistRepository.findBySlugWithReleases(where);
+      const result = await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where,
-        include: artistWithPublishedReleasesInclude,
+      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        slug: 'john-doe',
+        isActive: true,
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       });
+      expect(arg?.include?.releases).toBeDefined();
+      expect(arg?.include?.bioImages).toBeDefined();
     });
   });
 
   describe('findUniqueBySlug', () => {
-    it('finds an artist by slug with a select projection', async () => {
+    it('finds an artist by slug with the name projection', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
 
-      const select = { id: true, displayName: true, firstName: true, surname: true } as const;
-      const result = await ArtistRepository.findUniqueBySlug('ceschi', select);
+      const result = await ArtistRepository.findUniqueBySlug('ceschi');
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({ where: { slug: 'ceschi' }, select });
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
+        where: { slug: 'ceschi' },
+        select: nameSelect,
+      });
     });
   });
 
   describe('findFirstByDisplayName', () => {
-    it('does a case-insensitive displayName lookup with a select projection', async () => {
+    it('does a case-insensitive displayName lookup with the name projection', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
-      const select = { id: true, displayName: true, firstName: true, surname: true } as const;
-      const result = await ArtistRepository.findFirstByDisplayName('Ceschi', select);
+      const result = await ArtistRepository.findFirstByDisplayName('Ceschi');
 
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.findFirst).toHaveBeenCalledWith({
         where: { displayName: { equals: 'Ceschi', mode: 'insensitive' } },
-        select,
+        select: nameSelect,
       });
     });
   });
 
   describe('findFirstByName', () => {
-    it('does a case-insensitive firstName+surname lookup with a select projection', async () => {
+    it('does a case-insensitive firstName+surname lookup with the name projection', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
-      const select = { id: true, displayName: true, firstName: true, surname: true } as const;
-      const result = await ArtistRepository.findFirstByName('Ceschi', 'Ramos', select);
+      const result = await ArtistRepository.findFirstByName('Ceschi', 'Ramos');
 
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.findFirst).toHaveBeenCalledWith({
@@ -223,13 +364,13 @@ describe('ArtistRepository', () => {
             { surname: { equals: 'Ramos', mode: 'insensitive' } },
           ],
         },
-        select,
+        select: nameSelect,
       });
     });
   });
 
   describe('createWithSelect', () => {
-    it('creates an artist returning only the selected fields', async () => {
+    it('creates an artist returning only the name projection', async () => {
       vi.mocked(prisma.artist.create).mockResolvedValue({ id: 'a' } as never);
 
       const data = {
@@ -239,11 +380,10 @@ describe('ArtistRepository', () => {
         slug: 'jane',
         isActive: true,
       };
-      const select = { id: true, displayName: true, firstName: true, surname: true } as const;
-      const result = await ArtistRepository.createWithSelect(data, select);
+      const result = await ArtistRepository.createWithSelect(data);
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.create).toHaveBeenCalledWith({ data, select });
+      expect(prisma.artist.create).toHaveBeenCalledWith({ data, select: nameSelect });
     });
   });
 
@@ -294,9 +434,9 @@ describe('ArtistRepository', () => {
 
       expect(result).toEqual({ bioStatus: 'succeeded' });
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
-      expect(arg.where).toEqual({ id: 'a1' });
-      expect(arg.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
-      expect(arg.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+      expect(arg?.where).toEqual({ id: 'a1' });
+      expect(arg?.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+      expect(arg?.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
     });
   });
 });

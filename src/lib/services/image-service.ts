@@ -63,7 +63,7 @@ const registerImages = async ({
   images: RegisterImageInput[];
 }): Promise<RegisteredImage[]> => {
   const ownerData = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
-  const existing = await ImageRepository.findManyByOwner(ownerData, { id: true });
+  const existing = await ImageRepository.findManyByOwner(ownerData);
   const baseSortOrder = existing.length;
 
   // Inserts are independent — sortOrder is derived deterministically from the

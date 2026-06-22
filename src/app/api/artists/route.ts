@@ -7,12 +7,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import type { CreateArtistData } from '@/lib/types/domain/artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
-
-import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,7 +93,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
       return validation.response;
     }
 
-    const result = await ArtistService.createArtist(validation.data as Prisma.ArtistCreateInput);
+    const result = await ArtistService.createArtist(validation.data as unknown as CreateArtistData);
 
     if (!result.success) {
       const status =

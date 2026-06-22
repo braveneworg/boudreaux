@@ -45,7 +45,7 @@ export class AdminStatsService {
       ReleaseRepository.count({ publishedAt: { not: null } }),
       FeaturedArtistRepository.count(),
       ArtistRepository.count(),
-      ArtistRepository.count({ publishedOn: { not: null } }),
+      ArtistRepository.count({ published: true }),
       BannerNotificationRepository.countActive(),
       ChatUserRepository.countFlagged(),
       ChatUserRepository.countDisabled(),

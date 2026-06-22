@@ -65,5 +65,13 @@ export const FORMATS = {
 
 export type Format = (typeof FORMATS)[keyof typeof FORMATS];
 
-/** JSON value type for extended-data fields — mirrors `Prisma.JsonValue`. */
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+/**
+ * JSON value type for extended-data fields. Structurally mirrors
+ * `Prisma.JsonValue` (objects carry optional/`undefined` values, arrays are a
+ * `Json[]`) so it is mutually assignable in the repository drift checks.
+ */
+export type Json = string | number | boolean | JsonObject | JsonArray | null;
+export type JsonArray = Array<Json>;
+export interface JsonObject {
+  [key: string]: Json | undefined;
+}

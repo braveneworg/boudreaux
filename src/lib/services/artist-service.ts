@@ -4,20 +4,25 @@
 import 'server-only';
 
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { Prisma } from '@prisma/client';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
+  ArtistListFilters,
   ArtistListWithBio,
   ArtistWithPublishedReleases,
-} from '@/lib/types/media-models';
+  CreateArtistData,
+  UpdateArtistData,
+} from '@/lib/types/domain/artist';
+import { DataError } from '@/lib/types/domain/errors';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { loggers } from '@/lib/utils/logger';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
+
+import { failFromError } from './_internal/map-data-error';
 
 import type { ServiceResponse } from './service.types';
 
@@ -66,11 +71,9 @@ const generateS3Key = (artistId: string, fileName: string): string => {
  * are persisted. All three are authored in the Tiptap editor, so they are HTML;
  * `sanitizeBioHtml` enforces the allowlist (and link hardening) on write so
  * every read surface can trust the stored markup. Only string values are
- * touched, leaving Prisma update operators (e.g. `{ set }`) and `null` intact.
+ * touched, leaving `null`/`undefined` intact.
  */
-const sanitizeBioWriteFields = <T extends Prisma.ArtistCreateInput | Prisma.ArtistUpdateInput>(
-  data: T
-): T => {
+const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(data: T): T => {
   const sanitized = { ...data };
   if (typeof sanitized.bio === 'string') sanitized.bio = sanitizeBioHtml(sanitized.bio);
   if (typeof sanitized.shortBio === 'string')
@@ -83,27 +86,15 @@ export class ArtistService {
   /**
    * Create a new artist
    */
-  static async createArtist(data: Prisma.ArtistCreateInput): Promise<ServiceResponse<Artist>> {
+  static async createArtist(data: CreateArtistData): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.create(
-        sanitizeBioWriteFields(data)
-      )) as unknown as Artist;
+      const artist = await ArtistRepository.create(sanitizeBioWriteFields(data));
       return { success: true, data: artist };
     } catch (error) {
-      // Unique constraint violations
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return { success: false, error: 'Artist with this slug already exists' };
-      }
-
-      // Connection/network issues
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      // Unknown errors
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to create artist' };
+      return failFromError(error, {
+        DUPLICATE: 'Artist with this slug already exists',
+        UNKNOWN: 'Failed to create artist',
+      });
     }
   }
 
@@ -120,13 +111,7 @@ export class ArtistService {
 
       return { success: true, data: artist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve artist' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }
   }
 
@@ -135,21 +120,15 @@ export class ArtistService {
    */
   static async getArtistBySlug(slug: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.findBySlug(slug)) as unknown as Artist | null;
+      const artist = await ArtistRepository.findBySlug(slug);
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };
       }
 
-      return { success: true, data: artist };
+      return { success: true, data: artist as unknown as Artist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve artist' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }
   }
 
@@ -157,97 +136,36 @@ export class ArtistService {
    * Get all artists with optional filters.
    *
    * Supports server-side `search` plus `published`/`deleted` filtering for the
-   * admin listing. The search OR and the deletedOn OR are combined under `AND`
-   * so the two `OR` keys never collide (Prisma 6 + MongoDB null-safe pattern).
+   * admin listing. The repository owns the Mongo-safe `where` construction and
+   * the include shape (`artistSchema`-compatible).
    *
    * - `published === true` → only artists with a `publishedOn` date.
    * - `published === false` → only artists without a `publishedOn` date.
    * - `published == null` → no publish filter.
    * - `deleted` falsy → exclude soft-deleted artists; `deleted === true` → include them.
    */
-  static async getArtists(params?: {
-    skip?: number;
-    take?: number;
-    search?: string;
-    published?: boolean;
-    deleted?: boolean;
-  }): Promise<ServiceResponse<Artist[]>> {
+  static async getArtists(params?: ArtistListFilters): Promise<ServiceResponse<Artist[]>> {
     try {
-      const { skip = 0, take = 50, search, published, deleted } = params || {};
-
-      const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
-      const and: Prisma.ArtistWhereInput[] = [];
-
-      if (!deleted) {
-        and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
-      }
-      if (published === true) {
-        and.push({ publishedOn: { not: null } });
-      } else if (published === false) {
-        and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
-      }
-      if (search) {
-        and.push({
-          OR: [
-            { firstName: contains(search) },
-            { surname: contains(search) },
-            { displayName: contains(search) },
-            { slug: contains(search) },
-          ],
-        });
-      }
-
-      const where: Prisma.ArtistWhereInput = and.length > 0 ? { AND: and } : {};
-
-      // The repository owns the include shape (images take 3, labels, urls,
-      // releases → release) required by `artistSchema`, which the admin artists
-      // query validates against.
-      const artists = await ArtistRepository.findMany({ where, skip, take });
-
+      const artists = await ArtistRepository.findMany(params ?? {});
       return { success: true, data: artists };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve artists' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artists' });
     }
   }
 
   /**
    * Update an artist by ID
    */
-  static async updateArtist(
-    id: string,
-    data: Prisma.ArtistUpdateInput
-  ): Promise<ServiceResponse<Artist>> {
+  static async updateArtist(id: string, data: UpdateArtistData): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.update(
-        id,
-        sanitizeBioWriteFields(data)
-      )) as unknown as Artist;
-
+      const artist = await ArtistRepository.update(id, sanitizeBioWriteFields(data));
       return { success: true, data: artist };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Artist not found' };
-      }
-
-      // Unique constraint violations
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return { success: false, error: 'Artist with this slug already exists' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to update artist' };
+      return failFromError(error, {
+        NOT_FOUND: 'Artist not found',
+        DUPLICATE: 'Artist with this slug already exists',
+        UNKNOWN: 'Failed to update artist',
+      });
     }
   }
 
@@ -256,22 +174,13 @@ export class ArtistService {
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.delete(id)) as unknown as Artist;
-
-      return { success: true, data: artist };
+      const artist = await ArtistRepository.delete(id);
+      return { success: true, data: artist as unknown as Artist };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to delete artist' };
+      return failFromError(error, {
+        NOT_FOUND: 'Artist not found',
+        UNKNOWN: 'Failed to delete artist',
+      });
     }
   }
 
@@ -280,21 +189,13 @@ export class ArtistService {
    */
   static async archiveArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.archive(id)) as unknown as Artist;
-
-      return { success: true, data: artist };
+      const artist = await ArtistRepository.archive(id);
+      return { success: true, data: artist as unknown as Artist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to archive artist' };
+      return failFromError(error, {
+        NOT_FOUND: 'Artist not found',
+        UNKNOWN: 'Failed to archive artist',
+      });
     }
   }
 
@@ -303,23 +204,13 @@ export class ArtistService {
    */
   static async publishArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.update(id, {
-        publishedOn: new Date(),
-      })) as unknown as Artist;
-
+      const artist = await ArtistRepository.update(id, { publishedOn: new Date() });
       return { success: true, data: artist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to publish artist' };
+      return failFromError(error, {
+        NOT_FOUND: 'Artist not found',
+        UNKNOWN: 'Failed to publish artist',
+      });
     }
   }
 
@@ -328,23 +219,13 @@ export class ArtistService {
    */
   static async restoreArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = (await ArtistRepository.update(id, {
-        deletedOn: null,
-      })) as unknown as Artist;
-
+      const artist = await ArtistRepository.update(id, { deletedOn: null });
       return { success: true, data: artist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Artist not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to restore artist' };
+      return failFromError(error, {
+        NOT_FOUND: 'Artist not found',
+        UNKNOWN: 'Failed to restore artist',
+      });
     }
   }
 
@@ -402,7 +283,7 @@ export class ArtistService {
       const imageUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
 
       // Get the next sort order for this artist
-      const existingImages = await ImageRepository.findManyByOwner({ artistId }, { id: true });
+      const existingImages = await ImageRepository.findManyByOwner({ artistId });
       const nextSortOrder = existingImages.length;
 
       // Create Image record in database with sortOrder
@@ -421,17 +302,11 @@ export class ArtistService {
           src: image.src || imageUrl,
           caption: image.caption || undefined,
           altText: image.altText || undefined,
-          sortOrder: (image as { sortOrder?: number }).sortOrder ?? nextSortOrder,
+          sortOrder: image.sortOrder ?? nextSortOrder,
         },
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Image upload error', error);
-      return { success: false, error: 'Failed to upload image' };
+      return failFromError(error, { UNKNOWN: 'Failed to upload image' });
     }
   }
 
@@ -469,8 +344,7 @@ export class ArtistService {
 
       return { success: true, data: results };
     } catch (error) {
-      logger.error('Multiple image upload error', error);
-      return { success: false, error: 'Failed to upload images' };
+      return failFromError(error, { UNKNOWN: 'Failed to upload images' });
     }
   }
 
@@ -480,11 +354,7 @@ export class ArtistService {
   static async deleteArtistImage(imageId: string): Promise<ServiceResponse<{ id: string }>> {
     try {
       // Get the image record to get the S3 key
-      const image = await ImageRepository.findUniqueById(imageId, {
-        id: true,
-        src: true,
-        artistId: true,
-      });
+      const image = await ImageRepository.findUniqueById(imageId);
 
       if (!image) {
         return { success: false, error: 'Image not found' };
@@ -532,17 +402,10 @@ export class ArtistService {
 
       return { success: true, data: { id: imageId } };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Image not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Image deletion error', error);
-      return { success: false, error: 'Failed to delete image' };
+      return failFromError(error, {
+        NOT_FOUND: 'Image not found',
+        UNKNOWN: 'Failed to delete image',
+      });
     }
   }
 
@@ -560,17 +423,11 @@ export class ArtistService {
           src: img.src || '',
           caption: img.caption || undefined,
           altText: img.altText || undefined,
-          sortOrder: (img as { sortOrder?: number }).sortOrder ?? 0,
+          sortOrder: img.sortOrder ?? 0,
         })),
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Get artist images error', error);
-      return { success: false, error: 'Failed to retrieve artist images' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist images' });
     }
   }
 
@@ -594,21 +451,14 @@ export class ArtistService {
           src: image.src || '',
           caption: image.caption || undefined,
           altText: image.altText || undefined,
-          sortOrder: (image as { sortOrder?: number }).sortOrder ?? 0,
+          sortOrder: image.sortOrder ?? 0,
         },
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Image not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Update image error', error);
-      return { success: false, error: 'Failed to update image' };
+      return failFromError(error, {
+        NOT_FOUND: 'Image not found',
+        UNKNOWN: 'Failed to update image',
+      });
     }
   }
 
@@ -645,91 +495,30 @@ export class ArtistService {
           src: img.src || '',
           caption: img.caption || undefined,
           altText: img.altText || undefined,
-          sortOrder: (img as { sortOrder?: number }).sortOrder ?? 0,
+          sortOrder: img.sortOrder ?? 0,
         })),
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Reorder images error', error);
-      return { success: false, error: 'Failed to reorder images' };
+      return failFromError(error, { UNKNOWN: 'Failed to reorder images' });
     }
   }
 
   /**
    * Search published (active, non-deleted) artists.
-   * Used by the public artist search feature.
+   * Used by the public artist search feature. The repository owns the Mongo-safe
+   * `where` (published + non-deleted + has-published-release) construction.
    */
-  static async searchPublishedArtists(params?: {
-    skip?: number;
-    take?: number;
-    search?: string;
-  }): Promise<ServiceResponse<Artist[]>> {
+  static async searchPublishedArtists(
+    params?: ArtistListFilters
+  ): Promise<ServiceResponse<Artist[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
-
-      const where: Prisma.ArtistWhereInput = {
-        isActive: true,
-        // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-        // set to null, not missing fields. Use OR to handle both cases.
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        // Only return artists that have at least one published, non-deleted release
-        releases: {
-          some: {
-            release: {
-              publishedAt: { not: null },
-              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-            },
-          },
-        },
-        ...(search && {
-          AND: [
-            {
-              OR: [
-                { firstName: { contains: search, mode: 'insensitive' as const } },
-                { surname: { contains: search, mode: 'insensitive' as const } },
-                { displayName: { contains: search, mode: 'insensitive' as const } },
-                { slug: { contains: search, mode: 'insensitive' as const } },
-                {
-                  releases: {
-                    some: {
-                      release: {
-                        title: { contains: search, mode: 'insensitive' as const },
-                        publishedAt: { isSet: true },
-                        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-                      },
-                    },
-                  },
-                },
-              ],
-            },
-          ],
-        }),
-      };
-
-      // The repository owns the orderBy + lightweight images/releases include
-      // the public search UI consumes.
-      const artists = await ArtistRepository.searchPublished({ where, skip, take });
-
+      const artists = await ArtistRepository.searchPublished(params ?? {});
       return { success: true, data: artists };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to search artists' };
+      return failFromError(error, { UNKNOWN: 'Failed to search artists' });
     }
   }
 
-  /**
-   * Get an artist by slug with full release and digital format data.
-   * Post-query filters to only published, non-deleted releases.
-   */
   /**
    * List published artists for the public `/artists` index, with their primary
    * bio images and short bios sanitized for redisplay.
@@ -743,26 +532,19 @@ export class ArtistService {
       }));
       return { success: true, data: sanitized };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve artists' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artists' });
     }
   }
 
+  /**
+   * Get an artist by slug with full release and digital format data.
+   * Post-query filters to only published, non-deleted releases.
+   */
   static async getArtistBySlugWithReleases(
     slug: string
   ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
     try {
-      const artist = await ArtistRepository.findBySlugWithReleases({
-        slug,
-        isActive: true,
-        // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-        // set to null, not missing fields. Use OR to handle both cases.
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-      });
+      const artist = await ArtistRepository.findPublishedBySlugWithReleases(slug);
 
       if (!artist) {
         return { success: false, error: 'Artist not found' };
@@ -786,13 +568,7 @@ export class ArtistService {
 
       return { success: true, data: filteredArtist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve artist' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }
   }
 
@@ -821,76 +597,55 @@ export class ArtistService {
     try {
       const slug = generateSlug(trimmed);
       const { firstName, lastName } = splitFullName(trimmed);
-      const selectFields = {
-        id: true,
-        displayName: true,
-        firstName: true,
-        surname: true,
-      } as const;
 
       // 1. Try slug match (unique index, most reliable)
       if (slug) {
-        const bySlug = await ArtistRepository.findUniqueBySlug(slug, selectFields);
+        const bySlug = await ArtistRepository.findUniqueBySlug(slug);
         if (bySlug) {
           return { success: true, data: bySlug };
         }
       }
 
       // 2. Try case-insensitive displayName match
-      const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed, selectFields);
+      const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed);
       if (byDisplayName) {
         return { success: true, data: byDisplayName };
       }
 
       // 3. Try case-insensitive firstName + surname match
       if (firstName) {
-        const byName = await ArtistRepository.findFirstByName(firstName, lastName, selectFields);
+        const byName = await ArtistRepository.findFirstByName(firstName, lastName);
         if (byName) {
           return { success: true, data: byName };
         }
       }
 
       // 4. Create new artist
-      const newArtist = await ArtistRepository.createWithSelect(
-        {
-          firstName,
-          surname: lastName,
-          displayName: trimmed,
-          slug: slug || generateSlug(firstName || 'artist'),
-          isActive: true,
-        },
-        selectFields
-      );
+      const newArtist = await ArtistRepository.createWithSelect({
+        firstName,
+        surname: lastName,
+        displayName: trimmed,
+        slug: slug || generateSlug(firstName || 'artist'),
+        isActive: true,
+      });
       return { success: true, data: newArtist };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (error instanceof DataError && error.code === 'DUPLICATE') {
         // Slug collision — try to find the existing artist instead
         const slug = generateSlug(trimmed);
-        const existing = await ArtistRepository.findUniqueBySlug(slug, {
-          id: true,
-          displayName: true,
-          firstName: true,
-          surname: true,
-        });
+        const existing = await ArtistRepository.findUniqueBySlug(slug);
         if (existing) {
           return { success: true, data: existing };
         }
         return { success: false, error: 'Artist with this slug already exists' };
       }
 
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error in findOrCreateByName', error);
-      return { success: false, error: 'Failed to find or create artist' };
+      return failFromError(error, { UNKNOWN: 'Failed to find or create artist' });
     }
   }
 
   /**
    * Idempotently connect an artist to a release via the ArtistRelease join table.
-   * Uses upsert to avoid duplicate constraint violations.
    *
    * @param artistId - The Artist ID
    * @param releaseId - The Release ID

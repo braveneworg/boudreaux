@@ -48,20 +48,18 @@ describe('createArtistAction', () => {
     expect(createArtistMock).toHaveBeenCalledTimes(1);
   });
 
-  it('builds connectOrCreate inputs for images and urls', async () => {
+  it('forwards image and url inputs to the service (repo builds connectOrCreate)', async () => {
     requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
     createArtistMock.mockResolvedValue({ success: true, data: { id: 'a1' } });
     await createArtistAction({
       ...baseArtist,
-      images: [{ id: 'img1', src: 'x' }],
+      images: [{ id: 'img1', src: 'x', altText: null, caption: null }],
       urls: [{ id: 'url1', platform: 'SPOTIFY', url: 'https://example.com' }],
     } as never);
 
     const arg = createArtistMock.mock.calls[0][0];
-    expect(arg.images).toEqual({
-      connectOrCreate: [{ where: { id: 'img1' }, create: { id: 'img1', src: 'x' } }],
-    });
-    expect(arg.urls.connectOrCreate[0].where).toEqual({ id: 'url1' });
+    expect(arg.images).toEqual([{ id: 'img1', src: 'x', altText: null, caption: null }]);
+    expect(arg.urls).toEqual([{ id: 'url1', platform: 'SPOTIFY', url: 'https://example.com' }]);
   });
 
   it('returns failure when the service throws', async () => {
