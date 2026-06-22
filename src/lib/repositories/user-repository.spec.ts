@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { DataError } from '@/lib/types/domain/errors';
+
 export {};
 
 vi.mock('server-only', () => ({}));
@@ -23,6 +25,9 @@ vi.mock('@/lib/prisma', () => ({
 
 const { UserRepository } = await import('./user-repository');
 
+/** The full include shape the repository attaches to whole-user reads/writes. */
+const fullInclude = { accounts: true, sessions: true };
+
 describe('UserRepository', () => {
   beforeEach(() => {
     findUniqueMock.mockReset();
@@ -32,12 +37,15 @@ describe('UserRepository', () => {
   });
 
   describe('findByEmail', () => {
-    it('looks up a user by email', async () => {
+    it('looks up a user by email with accounts and sessions', async () => {
       const user = { id: 'u1', email: 'a@b.co' };
       findUniqueMock.mockResolvedValue(user);
 
       await expect(UserRepository.findByEmail('a@b.co')).resolves.toBe(user);
-      expect(findUniqueMock).toHaveBeenCalledWith({ where: { email: 'a@b.co' } });
+      expect(findUniqueMock).toHaveBeenCalledWith({
+        where: { email: 'a@b.co' },
+        include: fullInclude,
+      });
     });
   });
 
@@ -79,13 +87,13 @@ describe('UserRepository', () => {
   });
 
   describe('create', () => {
-    it('creates a user with the supplied data', async () => {
+    it('creates a user with the supplied data and full include', async () => {
       const created = { id: 'u1' };
       createMock.mockResolvedValue(created);
       const data = { email: 'a@b.co', name: 'Admin', role: 'admin', emailVerified: new Date() };
 
       await expect(UserRepository.create(data)).resolves.toBe(created);
-      expect(createMock).toHaveBeenCalledWith({ data });
+      expect(createMock).toHaveBeenCalledWith({ data, include: fullInclude });
     });
   });
 
@@ -101,13 +109,27 @@ describe('UserRepository', () => {
   });
 
   describe('updateUsername', () => {
-    it('updates the username for the given id', async () => {
+    it('updates the username for the given id with full include', async () => {
       updateMock.mockResolvedValue({ id: 'u1' });
 
       await UserRepository.updateUsername('u1', 'alice');
       expect(updateMock).toHaveBeenCalledWith({
         where: { id: 'u1' },
         data: { username: 'alice' },
+        include: fullInclude,
+      });
+    });
+  });
+
+  describe('updateEmail', () => {
+    it('updates the email and previousEmail for the given id with full include', async () => {
+      updateMock.mockResolvedValue({ id: 'u1' });
+
+      await UserRepository.updateEmail('u1', 'new@x.io', 'old@x.io');
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { email: 'new@x.io', previousEmail: 'old@x.io' },
+        include: fullInclude,
       });
     });
   });
@@ -170,6 +192,23 @@ describe('UserRepository', () => {
           allowSmsNotifications: true,
         },
       });
+    });
+  });
+
+  describe('error translation', () => {
+    it('wraps a Prisma duplicate-key failure as a DUPLICATE DataError', async () => {
+      const { Prisma } = await import('@prisma/client');
+      updateMock.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        })
+      );
+
+      await expect(UserRepository.updateUsername('u1', 'taken')).rejects.toMatchObject({
+        code: 'DUPLICATE',
+      });
+      await expect(UserRepository.updateUsername('u1', 'taken')).rejects.toBeInstanceOf(DataError);
     });
   });
 });

@@ -15,6 +15,7 @@ import type {
   ReleaseListItem,
 } from '@/lib/types/domain/release';
 import type { Platform } from '@/lib/types/domain/shared';
+import type { User } from '@/lib/types/domain/user';
 
 import type { Prisma } from '@prisma/client';
 
@@ -169,12 +170,10 @@ export interface Instrument {
 // domain layer above; their query include lives in featured-artist-repository
 // (drift-checked against the domain types).
 
-export type User = Prisma.UserGetPayload<{
-  include: {
-    accounts: true;
-    sessions: true;
-  };
-}>;
+// `User` is now a hand-written, Prisma-free domain type (drift-checked in
+// user-repository). Imported above for local use, re-exported for back-compat
+// with existing importers of `@/lib/types/media-models`.
+export type { User };
 
 export type Url = Prisma.UrlGetPayload<{
   include: {

@@ -6,18 +6,14 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { auth, signOut } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { UserRepository } from '@/lib/repositories/user-repository';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
-
-import type { AdapterUser } from 'next-auth/adapters';
 
 export const changeEmailAction = async (
   _initialState: FormState,
@@ -43,15 +39,9 @@ export const changeEmailAction = async (
       // Use the current email from session as previousEmail if not provided
       const previousEmail = parsed.data.previousEmail || session.user.email || '';
 
-      const adapter = CustomPrismaAdapter(prisma);
-
       formState.hasTimeout = false;
 
-      await adapter.updateUser({
-        id: session.user.id,
-        email: parsed.data.email,
-        previousEmail,
-      } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
+      await UserRepository.updateEmail(session.user.id, parsed.data.email, previousEmail);
 
       // Log email change for security audit
       await logSecurityEvent({
@@ -66,30 +56,28 @@ export const changeEmailAction = async (
       formState.success = true;
     } catch (error: unknown) {
       formState.success = false;
-      // Check for MongoDB timeout errors
+      // Check for MongoDB timeout errors. The repository normalizes ETIMEOUT to
+      // a `TIMEOUT` DataError; other timeout-shaped failures surface as an
+      // `UNKNOWN` DataError that still carries the original message.
       if (
-        error instanceof Error &&
-        (error.message.includes('ETIMEOUT') ||
+        error instanceof DataError &&
+        (error.code === 'TIMEOUT' ||
+          error.message.includes('ETIMEOUT') ||
           error.message.includes('timeout') ||
-          error.message.includes('timed out') ||
-          ('code' in error && error.code === 'ETIMEOUT'))
+          error.message.includes('timed out'))
       ) {
         formState.hasTimeout = true;
         if (!formState.errors) {
           formState.errors = {};
         }
         formState.errors.general = ['Connection timed out. Please try again.'];
-      } else if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
-        const duplicateKeyError = error as PrismaClientKnownRequestError;
-
-        if (duplicateKeyError?.meta?.target === 'User_email_key') {
-          if (!formState.errors) {
-            formState.errors = {};
-          }
-          formState.errors.email = ['Email address is already in use'];
-        } else {
-          setUnknownError(formState);
+      } else if (error instanceof DataError && error.code === 'DUPLICATE') {
+        // The only unique field this action writes is the email, so a
+        // duplicate-key violation can only be an email collision.
+        if (!formState.errors) {
+          formState.errors = {};
         }
+        formState.errors.email = ['Email address is already in use'];
       } else {
         setUnknownError(formState);
       }

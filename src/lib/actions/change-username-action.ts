@@ -6,18 +6,14 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { UserRepository } from '@/lib/repositories/user-repository';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { loggers } from '@/lib/utils/logger';
 import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
-
-import type { AdapterUser } from 'next-auth/adapters';
 
 const logger = loggers.auth;
 
@@ -55,18 +51,13 @@ export const changeUsernameAction = async (
         throw Error('You must be logged in to change your username');
       }
 
-      const adapter = CustomPrismaAdapter(prisma);
-
       formState.hasTimeout = false;
 
       const { id } = session.user;
       const { username } = parsed.data;
       const previousUsername = session.user.username;
 
-      await adapter.updateUser({
-        id,
-        username,
-      } as Pick<AdapterUser, 'username' | 'id'>);
+      await UserRepository.updateUsername(id, username);
 
       // Log username change for security audit
       await logSecurityEvent({
@@ -89,7 +80,7 @@ export const changeUsernameAction = async (
       const errorDetails = {
         errorType: error instanceof Error ? error.constructor.name : typeof error,
         errorMessage: error instanceof Error ? error.message : String(error),
-        errorCode: error instanceof PrismaClientKnownRequestError ? error.code : undefined,
+        errorCode: error instanceof DataError ? error.code : undefined,
         errorStack:
           process.env.NODE_ENV !== 'production' && error instanceof Error ? error.stack : undefined,
       };
@@ -100,59 +91,42 @@ export const changeUsernameAction = async (
         formState.errors = {};
       }
 
-      // Check for MongoDB timeout errors
+      // Check for MongoDB timeout errors. The repository normalizes ETIMEOUT to
+      // a `TIMEOUT` DataError; other timeout-shaped failures surface as an
+      // `UNKNOWN` DataError that still carries the original message.
       if (
-        error instanceof Error &&
-        (error.message.includes('ETIMEOUT') ||
+        error instanceof DataError &&
+        (error.code === 'TIMEOUT' ||
+          error.message.includes('ETIMEOUT') ||
           error.message.includes('timeout') ||
-          error.message.includes('timed out') ||
-          ('code' in error && error.code === 'ETIMEOUT'))
+          error.message.includes('timed out'))
       ) {
         formState.hasTimeout = true;
         formState.errors.general = ['Connection timed out. Please try again.'];
-      } else if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
-        // Handle duplicate key error
-        const duplicateKeyError = error as PrismaClientKnownRequestError;
-
-        if (duplicateKeyError?.meta?.target === 'User_username_key') {
-          formState.errors.username = ['Username is already taken.'];
-        } else {
-          // Other unique constraint violations
-          const targetField = Array.isArray(duplicateKeyError?.meta?.target)
-            ? duplicateKeyError.meta.target.join(', ')
-            : String(duplicateKeyError?.meta?.target);
-          formState.errors.general = [
-            `This ${targetField} is already in use. Please choose a different one.`,
-          ];
-        }
+      } else if (error instanceof DataError && error.code === 'DUPLICATE') {
+        // The only unique field this action writes is the username, so a
+        // duplicate-key violation can only be a username collision.
+        formState.errors.username = ['Username is already taken.'];
       } else if (
         error instanceof Error &&
         error.message === 'You must be logged in to change your username'
       ) {
         // Specific error message for authentication issues
         formState.errors.general = [error.message];
-      } else if (error instanceof PrismaClientKnownRequestError) {
-        // Handle other known Prisma errors with more context
-        const prismaError = error as PrismaClientKnownRequestError;
-        logger.error('[changeUsernameAction] Prisma error code', undefined, {
-          code: prismaError.code,
+      } else if (error instanceof DataError && error.code === 'NOT_FOUND') {
+        formState.errors.general = ['User not found. Please refresh and try again.'];
+      } else if (error instanceof DataError && error.code === 'VALIDATION') {
+        formState.errors.general = [
+          'There was a data validation issue. Please refresh and try again.',
+        ];
+      } else if (error instanceof DataError) {
+        // Any other data-access failure (e.g. UNAVAILABLE/UNKNOWN).
+        logger.error('[changeUsernameAction] Data error code', undefined, {
+          code: error.code,
         });
-
-        // Provide more specific error messages for different Prisma error codes
-        switch (prismaError.code) {
-          case 'P2025':
-            formState.errors.general = ['User not found. Please refresh and try again.'];
-            break;
-          case 'P2023':
-            formState.errors.general = [
-              'There was a data validation issue. Please refresh and try again.',
-            ];
-            break;
-          default:
-            formState.errors.general = [
-              'A database error occurred. Please try again or contact support.',
-            ];
-        }
+        formState.errors.general = [
+          'A database error occurred. Please try again or contact support.',
+        ];
       } else if (error instanceof Error) {
         // Handle general JavaScript errors
         logger.error('[changeUsernameAction] JavaScript error', error);

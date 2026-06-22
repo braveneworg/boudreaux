@@ -2,9 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Get the mocked functions using hoisted
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { changeEmailAction } from '@/lib/actions/change-email-action';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
 const mockAuth = vi.hoisted(() => vi.fn());
@@ -12,7 +11,7 @@ const mockSignOut = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
-const mockUpdateUser = vi.hoisted(() => vi.fn());
+const mockUpdateEmail = vi.hoisted(() => vi.fn());
 const mockLogSecurityEvent = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
@@ -25,14 +24,10 @@ vi.mock('@/auth', () => ({
   signOut: mockSignOut,
 }));
 
-vi.mock('@/lib/prisma-adapter', () => ({
-  CustomPrismaAdapter: vi.fn(() => ({
-    updateUser: mockUpdateUser,
-  })),
-}));
-
-vi.mock('../prisma', () => ({
-  prisma: {},
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    updateEmail: mockUpdateEmail,
+  },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -104,7 +99,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -120,11 +115,11 @@ describe('changeEmailAction', () => {
         'NEXT_REDIRECT'
       );
 
-      expect(mockUpdateUser).toHaveBeenCalledWith({
-        id: 'user-123',
-        email: 'newemail@example.com',
-        previousEmail: 'oldemail@example.com',
-      });
+      expect(mockUpdateEmail).toHaveBeenCalledWith(
+        'user-123',
+        'newemail@example.com',
+        'oldemail@example.com'
+      );
 
       expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
       expect(mockRedirect).toHaveBeenCalledWith(
@@ -160,7 +155,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'session@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -174,11 +169,11 @@ describe('changeEmailAction', () => {
         'NEXT_REDIRECT'
       );
 
-      expect(mockUpdateUser).toHaveBeenCalledWith({
-        id: 'user-123',
-        email: 'newemail@example.com',
-        previousEmail: 'session@example.com',
-      });
+      expect(mockUpdateEmail).toHaveBeenCalledWith(
+        'user-123',
+        'newemail@example.com',
+        'session@example.com'
+      );
     });
 
     it('should use empty string for previousEmail when session has no email', async () => {
@@ -209,7 +204,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -223,11 +218,7 @@ describe('changeEmailAction', () => {
         'NEXT_REDIRECT'
       );
 
-      expect(mockUpdateUser).toHaveBeenCalledWith({
-        id: 'user-123',
-        email: 'newemail@example.com',
-        previousEmail: '',
-      });
+      expect(mockUpdateEmail).toHaveBeenCalledWith('user-123', 'newemail@example.com', '');
     });
 
     it('should set hasTimeout to false on successful update', async () => {
@@ -260,7 +251,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -310,7 +301,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -364,7 +355,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'session@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -418,7 +409,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -474,7 +465,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -486,7 +477,7 @@ describe('changeEmailAction', () => {
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockUpdateUser).toHaveBeenCalled();
+      expect(mockUpdateEmail).toHaveBeenCalled();
       expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
       expect(mockSignOut).not.toHaveBeenCalled();
       expect(mockRedirect).not.toHaveBeenCalled();
@@ -522,13 +513,9 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
+      const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
+      vi.mocked(mockUpdateEmail).mockRejectedValue(duplicateEmailError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -592,7 +579,7 @@ describe('changeEmailAction', () => {
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
       expect(result).toEqual(mockFormState);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
 
@@ -618,7 +605,7 @@ describe('changeEmailAction', () => {
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
       expect(result.errors?.confirmEmail).toEqual(['Email addresses do not match']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -647,7 +634,7 @@ describe('changeEmailAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to change your email']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
 
@@ -677,7 +664,7 @@ describe('changeEmailAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to change your email']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
 
@@ -705,7 +692,7 @@ describe('changeEmailAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
       expect(result.errors?.general).toEqual(['You must be logged in to change your email']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
   });
@@ -743,13 +730,9 @@ describe('changeEmailAction', () => {
     });
 
     it('should handle duplicate email errors', async () => {
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
+      const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
+      vi.mocked(mockUpdateEmail).mockRejectedValue(duplicateEmailError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -759,9 +742,9 @@ describe('changeEmailAction', () => {
       expect(mockRedirect).not.toHaveBeenCalled();
     });
 
-    it('should handle timeout errors with ETIMEOUT in message', async () => {
-      const timeoutError = Error('Connection ETIMEOUT');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors signalled by a TIMEOUT DataError code', async () => {
+      const timeoutError = new DataError('TIMEOUT', 'Database timed out');
+      vi.mocked(mockUpdateEmail).mockRejectedValue(timeoutError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -771,9 +754,9 @@ describe('changeEmailAction', () => {
       expect(mockSignOut).not.toHaveBeenCalled();
     });
 
-    it('should handle timeout errors with "timeout" in message', async () => {
-      const timeoutError = Error('Connection timeout exceeded');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "timeout" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Connection timeout exceeded');
+      vi.mocked(mockUpdateEmail).mockRejectedValue(timeoutError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -782,9 +765,9 @@ describe('changeEmailAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle timeout errors with "timed out" in message', async () => {
-      const timeoutError = Error('Operation timed out');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "timed out" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Operation timed out');
+      vi.mocked(mockUpdateEmail).mockRejectedValue(timeoutError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -793,9 +776,9 @@ describe('changeEmailAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle timeout errors with ETIMEOUT error code', async () => {
-      const timeoutError = Object.assign(Error('Network timeout'), { code: 'ETIMEOUT' });
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "ETIMEOUT" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Network ETIMEOUT');
+      vi.mocked(mockUpdateEmail).mockRejectedValue(timeoutError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -804,29 +787,10 @@ describe('changeEmailAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle unknown Prisma errors with P2002 but different target', async () => {
-      const unknownError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_username_key' },
-      });
+    it('should call setUnknownError for other data-access errors', async () => {
+      const unknownError = new DataError('UNKNOWN', 'Database error');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(unknownError);
-
-      const result = await changeEmailAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
-      expect(mockSignOut).not.toHaveBeenCalled();
-    });
-
-    it('should handle other Prisma errors', async () => {
-      const unknownError = new PrismaClientKnownRequestError('Database error', {
-        code: 'P1000',
-        clientVersion: '4.0.0',
-      });
-
-      vi.mocked(mockUpdateUser).mockRejectedValue(unknownError);
+      vi.mocked(mockUpdateEmail).mockRejectedValue(unknownError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -836,7 +800,7 @@ describe('changeEmailAction', () => {
 
     it('should handle general errors', async () => {
       const generalError = Error('Something went wrong');
-      vi.mocked(mockUpdateUser).mockRejectedValue(generalError);
+      vi.mocked(mockUpdateEmail).mockRejectedValue(generalError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -845,7 +809,7 @@ describe('changeEmailAction', () => {
     });
 
     it('should handle non-Error thrown values', async () => {
-      vi.mocked(mockUpdateUser).mockRejectedValue('string error');
+      vi.mocked(mockUpdateEmail).mockRejectedValue('string error');
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -880,13 +844,9 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
+      const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
+      vi.mocked(mockUpdateEmail).mockRejectedValue(duplicateEmailError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -920,8 +880,8 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      const timeoutError = Error('Connection ETIMEOUT');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+      const timeoutError = new DataError('TIMEOUT', 'Database timed out');
+      vi.mocked(mockUpdateEmail).mockRejectedValue(timeoutError);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -964,7 +924,7 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateEmail).mockResolvedValue({
         id: 'user-123',
         email: 'newemail@example.com',
       });
@@ -978,7 +938,7 @@ describe('changeEmailAction', () => {
       );
 
       // Even if signOut fails, updateUser and logSecurityEvent should have been called
-      expect(mockUpdateUser).toHaveBeenCalled();
+      expect(mockUpdateEmail).toHaveBeenCalled();
       expect(mockLogSecurityEvent).toHaveBeenCalled();
     });
   });
@@ -1030,7 +990,7 @@ describe('changeEmailAction', () => {
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateEmail).not.toHaveBeenCalled();
     });
 
     it('should not redirect when email update fails', async () => {
