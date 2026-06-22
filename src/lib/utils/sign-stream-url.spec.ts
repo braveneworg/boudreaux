@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { loggers } from '@/lib/utils/logger';
+
 import { signStreamUrl } from './sign-stream-url';
 
 vi.mock('@aws-sdk/cloudfront-signer', () => ({
@@ -77,7 +79,7 @@ describe('signStreamUrl', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
     vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem').toString('base64'));
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
     expect(signStreamUrl('a/b.mp3')).toBeNull();
     expect(errSpy).toHaveBeenCalled();

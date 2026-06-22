@@ -7,6 +7,9 @@ import 'server-only';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.s3;
 
 interface CloudFrontSignedUrlInput {
   /** S3 object key (no leading slash), e.g. `releases/abc/digital-formats/.../track.mp3`. */
@@ -92,7 +95,7 @@ export const generateCloudFrontSignedUrl = (input: CloudFrontSignedUrlInput): st
       dateLessThan,
     });
   } catch (err) {
-    console.error('CloudFront signing failed; falling back to S3 presigned URL:', err);
+    logger.error('CloudFront signing failed; falling back to S3 presigned URL', err);
     return null;
   }
 };

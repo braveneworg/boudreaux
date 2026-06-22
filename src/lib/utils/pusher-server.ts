@@ -5,6 +5,10 @@ import 'server-only';
 
 import Pusher from 'pusher';
 
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.chat;
+
 /** Single presence channel used for the global Fake Four Inc. chat. */
 export const CHAT_CHANNEL = 'presence-fake-four-chat';
 
@@ -74,7 +78,7 @@ export const triggerChatEvent = async (event: string, payload: unknown): Promise
       ),
     ]);
   } catch (error) {
-    console.error('Pusher trigger failed', { event, error });
+    logger.error('Pusher trigger failed', error, { event });
   }
 };
 

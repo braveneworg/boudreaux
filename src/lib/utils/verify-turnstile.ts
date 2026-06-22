@@ -6,6 +6,9 @@
 import 'server-only';
 
 import { CONSTANTS } from '@/lib/constants';
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.auth;
 
 interface TurnstileVerifyResponse {
   success: boolean;
@@ -27,7 +30,7 @@ export const verifyTurnstile = async (
   const secret = process.env.CLOUDFLARE_SECRET;
 
   if (!secret) {
-    console.error('CLOUDFLARE_SECRET environment variable is not set');
+    logger.error('CLOUDFLARE_SECRET environment variable is not set');
     return { success: false, error: 'Server configuration error' };
   }
 
@@ -62,7 +65,9 @@ export const verifyTurnstile = async (
     });
 
     if (!response.ok) {
-      console.error('Turnstile verification request failed:', response.status);
+      logger.error('Turnstile verification request failed', undefined, {
+        status: response.status,
+      });
       return { success: false, error: 'Verification service unavailable' };
     }
 
@@ -70,7 +75,7 @@ export const verifyTurnstile = async (
 
     if (!result.success) {
       const errorCodes = result['error-codes'] || [];
-      console.error('Turnstile verification failed:', errorCodes);
+      logger.error('Turnstile verification failed', undefined, { errorCodes });
       return {
         success: false,
         error: errorCodes.includes('invalid-input-response')
@@ -81,7 +86,7 @@ export const verifyTurnstile = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Turnstile verification error:', error);
+    logger.error('Turnstile verification error', error);
     return { success: false, error: 'Verification service error' };
   }
 };

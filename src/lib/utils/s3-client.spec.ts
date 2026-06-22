@@ -5,6 +5,7 @@
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
+import { loggers } from '@/lib/utils/logger';
 
 import {
   getS3Client,
@@ -251,15 +252,15 @@ describe('s3-client', () => {
     });
 
     it('should return false on deletion failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
       mockSend.mockRejectedValue(new Error('AccessDenied'));
 
       const result = await deleteS3Object('releases/123/file.mp3');
 
       expect(result).toBe(false);
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to delete S3 object:', expect.any(Error));
+      expect(loggerSpy).toHaveBeenCalledWith('Failed to delete S3 object', expect.any(Error));
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
   });
 });
