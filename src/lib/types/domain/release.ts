@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { ArtistScalars } from './artist';
 import type { ImageRecord } from './image';
-import type { Format, Json } from './shared';
+import type { Format, Json, Platform } from './shared';
 import type { UrlRecord } from './url';
 
 /**
@@ -11,8 +11,13 @@ import type { UrlRecord } from './url';
  * against its `Prisma.*GetPayload` counterpart in the release/artist repos.
  */
 
-/** Scalar fields of the Prisma `Release` model (no relations loaded). */
-export interface ReleaseScalars {
+/**
+ * Scalar fields of the Prisma `Release` model (no relations loaded). Declared as
+ * a `type` (not `interface`) so release payloads built on it remain assignable
+ * to `Record<string, unknown>` — the constraint the generic admin `DataView`
+ * uses.
+ */
+export type ReleaseScalars = {
   id: string;
   title: string;
   labels: string[];
@@ -44,7 +49,7 @@ export interface ReleaseScalars {
   featuredDescription: string | null;
   tagId: string | null;
   suggestedPrice: number | null;
-}
+};
 
 /** Scalar fields of the Prisma `ReleaseDigitalFormatFile` model. */
 export interface ReleaseDigitalFormatFileRecord {
@@ -106,9 +111,171 @@ export interface ReleaseUrlRecord {
  * artist scalars), digital formats (with files), and release URLs (with url).
  * Matches the Prisma `Release` payload used across the media surfaces.
  */
-export interface Release extends ReleaseScalars {
+export type Release = ReleaseScalars & {
   images: ImageRecord[];
   artistReleases: Array<ArtistReleaseScalars & { artist: ArtistScalars }>;
   digitalFormats: ReleaseDigitalFormatRecord[];
   releaseUrls: ReleaseUrlRecord[];
+};
+
+// =============================================================================
+// Listing / projection output types
+//
+// Each mirrors a Prisma include/select shape that lives in release-repository
+// (drift-checked there). Declared as `type` aliases — not interfaces — so any
+// release type used as `DataView<T>` stays assignable to `Record<string,
+// unknown>`.
+// =============================================================================
+
+/**
+ * Lightweight release row for the admin releases listing — release scalars plus
+ * capped cover-art images and the artist join rows (full artist scalars) used to
+ * derive the album-artist display name. The heavy digital-format files and
+ * release URLs are deliberately omitted. Mirrors `releaseListItemInclude`.
+ */
+export type ReleaseListItem = ReleaseScalars & {
+  images: ImageRecord[];
+  artistReleases: Array<ArtistReleaseScalars & { artist: ArtistScalars }>;
+};
+
+/** Narrow artist name projection consumed by the public releases listing card. */
+export type PublishedReleaseListingArtist = {
+  id: string;
+  firstName: string;
+  surname: string;
+  displayName: string | null;
+};
+
+/** A single image projected for the public listing (`src`/`altText` only). */
+export type PublishedReleaseListingImage = {
+  src: string | null;
+  altText: string | null;
+};
+
+/** A release→url join projected to the platform URL the listing renders. */
+export type PublishedReleaseListingUrl = {
+  url: { platform: Platform; url: string };
+};
+
+/**
+ * Published release listing for the public releases grid page. Only the fields
+ * the listing UI consumes (release cards + search combobox) are projected,
+ * keeping both the Mongo read and the API payload small. Mirrors
+ * `publishedReleaseListingSelect`.
+ */
+export type PublishedReleaseListing = {
+  id: string;
+  title: string;
+  coverArt: string;
+  releasedOn: Date;
+  images: PublishedReleaseListingImage[];
+  artistReleases: Array<{ artist: PublishedReleaseListingArtist }>;
+  releaseUrls: PublishedReleaseListingUrl[];
+};
+
+/** Narrow artist name-part projection for the media-player detail page. */
+export type PublishedReleaseDetailArtist = {
+  id: string;
+  firstName: string;
+  middleName: string | null;
+  surname: string;
+  displayName: string | null;
+  title: string | null;
+  suffix: string | null;
+};
+
+/**
+ * Published release detail for the media player page at `/releases/[releaseId]`.
+ * Includes digital format files for audio playback, unbounded images, narrowed
+ * artist info, and release URLs. Mirrors `publishedReleaseDetailInclude`.
+ */
+export type PublishedReleaseDetail = ReleaseScalars & {
+  images: ImageRecord[];
+  artistReleases: Array<{ artist: PublishedReleaseDetailArtist }>;
+  digitalFormats: ReleaseDigitalFormatRecord[];
+  releaseUrls: ReleaseUrlRecord[];
+};
+
+/**
+ * Lightweight release for the "other releases by this artist" carousel — release
+ * scalars plus images for cover-art display. Mirrors the carousel include.
+ */
+export type ReleaseCarouselItem = ReleaseScalars & {
+  images: ImageRecord[];
+};
+
+/**
+ * S3-cleanup view of a release loaded before a hard delete — just the
+ * digital-format files and images needed to enumerate S3 keys. Mirrors the
+ * `findForDeletion` include in release-repository.
+ */
+export type ReleaseForDeletion = ReleaseScalars & {
+  images: ImageRecord[];
+  digitalFormats: ReleaseDigitalFormatRecord[];
+};
+
+// =============================================================================
+// Input types
+// =============================================================================
+
+/** Writable release scalar fields shared by create/update. */
+export interface ReleaseWritableData {
+  title?: string;
+  labels?: string[];
+  releasedOn?: Date;
+  catalogNumber?: string;
+  coverArt?: string;
+  description?: string;
+  downloadUrls?: string[];
+  formats?: Format[];
+  notes?: string[];
+  executiveProducedBy?: string[];
+  coProducedBy?: string[];
+  masteredBy?: string[];
+  mixedBy?: string[];
+  recordedBy?: string[];
+  artBy?: string[];
+  designBy?: string[];
+  photographyBy?: string[];
+  linerNotesBy?: string[];
+  publishedAt?: Date | null;
+  featuredOn?: Date | null;
+  featuredUntil?: Date | null;
+  featuredDescription?: string;
+  suggestedPrice?: number | null;
+  deletedOn?: Date | null;
+}
+
+/** Data accepted by the repository to create a release. */
+export interface CreateReleaseData extends ReleaseWritableData {
+  id?: string;
+  title: string;
+  releasedOn: Date;
+  coverArt: string;
+  formats: Format[];
+}
+
+/** Data accepted by the repository to update a release (all fields optional). */
+export type UpdateReleaseData = ReleaseWritableData;
+
+/** Pagination + filters for the admin releases listing. */
+export interface ReleaseListFilters {
+  skip?: number;
+  take?: number;
+  search?: string;
+  artistIds?: string[];
+  published?: boolean;
+  deleted?: boolean;
+}
+
+/** Pagination + optional search for the public published-releases listing. */
+export interface PublishedReleaseFilters {
+  skip?: number;
+  take?: number;
+  search?: string;
+}
+
+/** Count filters for the admin dashboard (Prisma-free at the boundary). */
+export interface ReleaseCountFilters {
+  published?: boolean;
 }

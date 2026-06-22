@@ -1,10 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Prisma } from '@prisma/client';
-
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { DataError } from '@/lib/types/domain/errors';
+import type { CreateReleaseData, UpdateReleaseData } from '@/lib/types/domain/release';
 import type { Format } from '@/lib/types/media-models';
 import { cache } from '@/lib/utils/simple-cache';
 
@@ -114,7 +114,7 @@ describe('ReleaseService', () => {
   };
 
   describe('createRelease', () => {
-    const createInput: Prisma.ReleaseCreateInput = {
+    const createInput: CreateReleaseData = {
       title: 'Test Album',
       labels: ['Test Label'],
       releasedOn: new Date('2024-01-15'),
@@ -132,10 +132,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when title already exists', async () => {
-      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '5.0.0',
-      });
+      const prismaError = new DataError('DUPLICATE', 'Unique constraint failed');
       vi.mocked(ReleaseRepository.create).mockRejectedValue(prismaError);
 
       const result = await ReleaseService.createRelease(createInput);
@@ -147,7 +144,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.create).mockRejectedValue(initError);
 
       const result = await ReleaseService.createRelease(createInput);
@@ -183,7 +180,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findById).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleaseById('release-123');
@@ -211,115 +208,60 @@ describe('ReleaseService', () => {
       },
     ];
 
-    const deletedOnClause = { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] };
-
-    it('should retrieve all releases with default parameters (excludes deleted)', async () => {
+    it('should retrieve all releases, forwarding default (empty) filters', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue(mockReleases as never);
 
       const result = await ReleaseService.getReleases();
 
       expect(result).toMatchObject({ success: true, data: mockReleases });
-      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
-        where: { AND: [deletedOnClause] },
-        skip: 0,
-        take: 50,
-      });
+      // The repository owns the where/pagination defaults — the service forwards
+      // an empty filter object when no params are supplied.
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({});
     });
 
-    it('should retrieve releases with custom pagination', async () => {
+    it('forwards pagination filters to the repository', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({ skip: 10, take: 5 });
 
       expect(result.success).toBe(true);
-      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
-        where: { AND: [deletedOnClause] },
-        skip: 10,
-        take: 5,
-      });
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({ skip: 10, take: 5 });
     });
 
-    it('should search across multiple fields', async () => {
+    it('forwards the search filter to the repository', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       const result = await ReleaseService.getReleases({ search: 'test' });
 
       expect(result.success).toBe(true);
-      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            deletedOnClause,
-            {
-              OR: [
-                { title: { contains: 'test', mode: 'insensitive' } },
-                { catalogNumber: { contains: 'test', mode: 'insensitive' } },
-                { description: { contains: 'test', mode: 'insensitive' } },
-              ],
-            },
-          ],
-        },
-        skip: 0,
-        take: 50,
-      });
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({ search: 'test' });
     });
 
-    it('should combine pagination and search', async () => {
-      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
-
-      const result = await ReleaseService.getReleases({
-        skip: 5,
-        take: 10,
-        search: 'album',
-      });
-
-      expect(result.success).toBe(true);
-      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            deletedOnClause,
-            {
-              OR: [
-                { title: { contains: 'album', mode: 'insensitive' } },
-                { catalogNumber: { contains: 'album', mode: 'insensitive' } },
-                { description: { contains: 'album', mode: 'insensitive' } },
-              ],
-            },
-          ],
-        },
-        skip: 5,
-        take: 10,
-      });
-    });
-
-    it('should add publishedAt filter when published=true', async () => {
+    it('forwards the published filter to the repository', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ published: true });
 
-      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where;
-      expect(passedWhere).toEqual({
-        AND: [deletedOnClause, { publishedAt: { not: null } }],
-      });
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({ published: true });
     });
 
-    it('should add unpublished filter when published=false', async () => {
-      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
-
-      await ReleaseService.getReleases({ published: false });
-
-      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where;
-      expect(passedWhere).toEqual({
-        AND: [deletedOnClause, { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }],
-      });
-    });
-
-    it('should omit the deletedOn constraint when deleted=true', async () => {
+    it('forwards the deleted filter to the repository', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
 
       await ReleaseService.getReleases({ deleted: true });
 
-      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
-      expect(passedWhere).not.toHaveProperty('AND');
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({ deleted: true });
+    });
+
+    it('forwards artistIds to the repository', async () => {
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
+
+      const result = await ReleaseService.getReleases({ artistIds: ['artist-1', 'artist-2'] });
+
+      expect(result.success).toBe(true);
+      expect(ReleaseRepository.findMany).toHaveBeenCalledWith({
+        artistIds: ['artist-1', 'artist-2'],
+      });
     });
 
     it('should return empty array when no releases found', async () => {
@@ -331,7 +273,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findMany).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleases();
@@ -346,36 +288,10 @@ describe('ReleaseService', () => {
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve releases' });
     });
-
-    it('should filter by artistIds when provided', async () => {
-      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
-
-      const result = await ReleaseService.getReleases({ artistIds: ['artist-1', 'artist-2'] });
-
-      expect(result.success).toBe(true);
-      expect(ReleaseRepository.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            artistReleases: {
-              some: { artistId: { in: ['artist-1', 'artist-2'] } },
-            },
-          }),
-        })
-      );
-    });
-
-    it('should NOT filter by artistIds when an empty array is provided', async () => {
-      vi.mocked(ReleaseRepository.findMany).mockResolvedValue([mockRelease] as never);
-
-      await ReleaseService.getReleases({ artistIds: [] });
-
-      const passedWhere = vi.mocked(ReleaseRepository.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
-      expect(passedWhere).not.toHaveProperty('artistReleases');
-    });
   });
 
   describe('updateRelease', () => {
-    const updateData: Prisma.ReleaseUpdateInput = {
+    const updateData: UpdateReleaseData = {
       title: 'Updated Album Title',
     };
 
@@ -390,10 +306,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when release not found', async () => {
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ReleaseRepository.update).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.updateRelease('non-existent', updateData);
@@ -402,10 +315,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when title already exists', async () => {
-      const uniqueError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '5.0.0',
-      });
+      const uniqueError = new DataError('DUPLICATE', 'Unique constraint failed');
       vi.mocked(ReleaseRepository.update).mockRejectedValue(uniqueError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
@@ -417,7 +327,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.update).mockRejectedValue(initError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
@@ -478,10 +388,7 @@ describe('ReleaseService', () => {
 
     it('should return error when release not found during delete step', async () => {
       vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ReleaseRepository.delete).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.deleteRelease('release-123');
@@ -490,7 +397,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findForDeletion).mockRejectedValue(initError);
 
       const result = await ReleaseService.deleteRelease('release-123');
@@ -651,10 +558,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when release not found', async () => {
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.softDeleteRelease('non-existent');
@@ -663,7 +567,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(initError);
 
       const result = await ReleaseService.softDeleteRelease('release-123');
@@ -695,10 +599,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when release not found', async () => {
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ReleaseRepository.restore).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.restoreRelease('non-existent');
@@ -707,7 +608,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.restore).mockRejectedValue(initError);
 
       const result = await ReleaseService.restoreRelease('release-123');
@@ -738,10 +639,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when release not found', async () => {
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ReleaseRepository.update).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.publishRelease('non-existent');
@@ -750,7 +648,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.update).mockRejectedValue(initError);
 
       const result = await ReleaseService.publishRelease('release-123');
@@ -811,21 +709,16 @@ describe('ReleaseService', () => {
       expect(data[0].id).toBe('release-123');
     });
 
-    it('should filter by publishedAt not null and deletedOn null or unset', async () => {
+    it('forwards default skip/take to the repository (where-building is owned by the repo)', async () => {
       vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       await ReleaseService.getPublishedReleases();
 
-      expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            publishedAt: { not: null },
-            AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-          },
-          skip: 0,
-          take: 24,
-        })
-      );
+      expect(ReleaseRepository.findPublished).toHaveBeenCalledWith({
+        skip: 0,
+        take: 24,
+        search: undefined,
+      });
     });
 
     it('applies skip/take pagination', async () => {
@@ -838,41 +731,13 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('adds a server-side search filter across title, catalog, description, and artist', async () => {
+    it('forwards the search term to the repository', async () => {
       vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 
       await ReleaseService.getPublishedReleases({ search: 'Doe' });
 
-      const contains = { contains: 'Doe', mode: 'insensitive' };
       expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            publishedAt: { not: null },
-            AND: [
-              { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
-              {
-                OR: [
-                  { title: contains },
-                  { catalogNumber: contains },
-                  { description: contains },
-                  {
-                    artistReleases: {
-                      some: {
-                        artist: {
-                          OR: [
-                            { firstName: contains },
-                            { surname: contains },
-                            { displayName: contains },
-                          ],
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        })
+        expect.objectContaining({ search: 'Doe' })
       );
     });
 
@@ -885,7 +750,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findPublished).mockRejectedValue(initError);
 
       const result = await ReleaseService.getPublishedReleases();
@@ -963,7 +828,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findPublishedWithTracks).mockRejectedValue(initError);
 
       const result = await ReleaseService.getReleaseWithTracks('release-123');
@@ -1020,7 +885,7 @@ describe('ReleaseService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockRejectedValue(initError);
 
       const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');

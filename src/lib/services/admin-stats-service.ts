@@ -42,7 +42,7 @@ export class AdminStatsService {
       upcomingDates,
     ] = await Promise.all([
       ReleaseRepository.count(),
-      ReleaseRepository.count({ publishedAt: { not: null } }),
+      ReleaseRepository.count({ published: true }),
       FeaturedArtistRepository.count(),
       ArtistRepository.count(),
       ArtistRepository.count({ published: true }),

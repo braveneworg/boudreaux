@@ -5,11 +5,11 @@
 import { auth } from '@/auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { ReleaseScalars } from '@/lib/types/domain/release';
 import { requireRole } from '@/utils/auth/require-role';
 
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
 
-import type { Release } from '@prisma/client';
 import type { Session } from 'next-auth';
 
 vi.mock('server-only', () => ({}));
@@ -29,7 +29,9 @@ const mockRequireRole = vi.mocked(requireRole);
 const mockReleaseFindByTitle = vi.mocked(
   ReleaseService.findByTitleInsensitive
 ) as unknown as ReturnType<
-  typeof vi.fn<() => Promise<Pick<Release, 'id' | 'title' | 'publishedAt' | 'deletedOn'> | null>>
+  typeof vi.fn<
+    () => Promise<Pick<ReleaseScalars, 'id' | 'title' | 'publishedAt' | 'deletedOn'> | null>
+  >
 >;
 const mockReleaseApplyFoundUpdate = vi.mocked(ReleaseService.applyFoundReleaseUpdate);
 const mockReleaseServiceCreate = vi.mocked(ReleaseService.createRelease);

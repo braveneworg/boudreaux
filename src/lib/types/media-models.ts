@@ -6,6 +6,13 @@ import type {
   ArtistListWithBio,
   ArtistWithPublishedReleases,
 } from '@/lib/types/domain/artist';
+import type {
+  PublishedReleaseDetail,
+  PublishedReleaseListing,
+  Release,
+  ReleaseCarouselItem,
+  ReleaseListItem,
+} from '@/lib/types/domain/release';
 import type { Platform } from '@/lib/types/domain/shared';
 
 import type { Prisma } from '@prisma/client';
@@ -23,6 +30,17 @@ export type { Format, Json, Platform } from '@/lib/types/domain/shared';
 // Artist types are now hand-written, Prisma-free domain types (drift-checked in
 // artist-repository). Imported above for local use, re-exported for back-compat.
 export type { Artist, ArtistListWithBio, ArtistWithPublishedReleases };
+
+// Release output types are now hand-written, Prisma-free domain types
+// (drift-checked in release-repository). Imported above for local use,
+// re-exported for back-compat with existing importers of `@/lib/types/media-models`.
+export type {
+  PublishedReleaseDetail,
+  PublishedReleaseListing,
+  Release,
+  ReleaseCarouselItem,
+  ReleaseListItem,
+};
 
 // =============================================================================
 // Model Interfaces (matching Prisma schema models)
@@ -185,56 +203,6 @@ export type User = Prisma.UserGetPayload<{
   };
 }>;
 
-export type Release = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-    artistReleases: {
-      include: {
-        artist: true;
-      };
-    };
-    digitalFormats: {
-      include: {
-        files: true;
-      };
-    };
-    releaseUrls: {
-      include: {
-        url: true;
-      };
-    };
-  };
-}>;
-
-/**
- * Prisma include for the admin releases listing. The admin grid only renders
- * release scalars, cover-art images, and the album-artist display name, so the
- * heavy `digitalFormats.files` and `releaseUrls` relations (loaded by the full
- * detail include) are deliberately omitted. Single source of truth for
- * `ReleaseListItem` — the repository query and the derived type reference this
- * same const so they can't drift.
- */
-export const releaseListItemInclude = {
-  images: {
-    orderBy: { sortOrder: 'asc' },
-    take: 3,
-  },
-  artistReleases: {
-    include: {
-      artist: true,
-    },
-  },
-} as const satisfies Prisma.ReleaseInclude;
-
-/**
- * Lightweight release row for the admin releases listing — release scalars
- * plus capped cover-art images and the artist join rows used to derive the
- * album-artist display name.
- */
-export type ReleaseListItem = Prisma.ReleaseGetPayload<{
-  include: typeof releaseListItemInclude;
-}>;
-
 export type Url = Prisma.UrlGetPayload<{
   include: {
     artist: true;
@@ -249,108 +217,9 @@ export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
   };
 }>;
 
-// =============================================================================
-// Public Release Types (for /releases pages)
-// =============================================================================
-
-/**
- * Prisma projection for the public releases grid page. Only the fields the
- * listing UI consumes (release cards + search combobox) are selected, keeping
- * both the Mongo read and the API payload small — this is the single source
- * of truth for `PublishedReleaseListing`.
- */
-export const publishedReleaseListingSelect = {
-  id: true,
-  title: true,
-  coverArt: true,
-  releasedOn: true,
-  images: {
-    orderBy: { sortOrder: 'asc' },
-    take: 1,
-    select: { src: true, altText: true },
-  },
-  artistReleases: {
-    select: {
-      artist: {
-        select: { id: true, firstName: true, surname: true, displayName: true },
-      },
-    },
-  },
-  releaseUrls: {
-    select: {
-      url: { select: { platform: true, url: true } },
-    },
-  },
-} as const satisfies Prisma.ReleaseSelect;
-
-/**
- * Published release listing for the public releases grid page.
- * Includes artist display-name fields, first image (for cover art fallback),
- * and URLs (for Bandcamp link).
- */
-export type PublishedReleaseListing = Prisma.ReleaseGetPayload<{
-  select: typeof publishedReleaseListingSelect;
-}>;
-
-/**
- * Prisma projection for the media player page at /releases/[releaseId].
- * Artist rows are narrowed to display-name fields — the player never renders
- * artist images/labels/urls or the artist's other releases, and the full
- * nested include shipped every artist document (plus all of its releases)
- * in the page payload. Single source of truth for `PublishedReleaseDetail`.
- */
-export const publishedReleaseDetailInclude = {
-  images: {
-    orderBy: { sortOrder: 'asc' },
-  },
-  artistReleases: {
-    select: {
-      artist: {
-        // The full name-part set consumed by `getArtistDisplayName`.
-        select: {
-          id: true,
-          firstName: true,
-          middleName: true,
-          surname: true,
-          displayName: true,
-          title: true,
-          suffix: true,
-        },
-      },
-    },
-  },
-  digitalFormats: {
-    include: {
-      files: {
-        orderBy: { trackNumber: 'asc' },
-      },
-    },
-  },
-  releaseUrls: {
-    include: {
-      url: true,
-    },
-  },
-} as const satisfies Prisma.ReleaseInclude;
-
-/**
- * Published release detail for the media player page at /releases/[releaseId].
- * Includes MP3_320KBPS digital format files for audio playback, images, artist info, and URLs.
- */
-export type PublishedReleaseDetail = Prisma.ReleaseGetPayload<{
-  include: typeof publishedReleaseDetailInclude;
-}>;
-
-/**
- * Lightweight release type for the "other releases by this artist" carousel.
- * Only includes images for cover art display.
- */
-export type ReleaseCarouselItem = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-  };
-}>;
-
 // `ArtistListWithBio` and `ArtistWithPublishedReleases` are re-exported from the
 // domain layer at the top of this file; their query includes live in
-// artist-repository (drift-checked against the domain types).
+// artist-repository (drift-checked against the domain types). The public release
+// listing/detail/carousel types are re-exported from the domain layer near the
+// top of this file; their query includes/selects live in release-repository
+// (drift-checked against the domain types).

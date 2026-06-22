@@ -3,27 +3,28 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { Prisma } from '@prisma/client';
-
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type {
+  CreateReleaseData,
   PublishedReleaseDetail,
+  PublishedReleaseFilters,
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
+  ReleaseListFilters,
   ReleaseListItem,
-} from '@/lib/types/media-models';
-import { loggers } from '@/lib/utils/logger';
+  UpdateReleaseData,
+} from '@/lib/types/domain/release';
 import { deleteS3Object } from '@/utils/s3-client';
 import { cache, withCache } from '@/utils/simple-cache';
 
-import type { ServiceResponse } from './service.types';
+import { failFromError } from './_internal/map-data-error';
 
-const logger = loggers.media;
+import type { ServiceResponse } from './service.types';
 
 /**
  * Default page size for the public published-releases listing. Mirrors the
@@ -48,25 +49,15 @@ export class ReleaseService {
   /**
    * Create a new release
    */
-  static async createRelease(data: Prisma.ReleaseCreateInput): Promise<ServiceResponse<Release>> {
+  static async createRelease(data: CreateReleaseData): Promise<ServiceResponse<Release>> {
     try {
       const release = await ReleaseRepository.create(data);
       return { success: true, data: release };
     } catch (error) {
-      // Unique constraint violations
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return { success: false, error: 'Release with this title already exists' };
-      }
-
-      // Connection/network issues
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      // Unknown errors
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to create release' };
+      return failFromError(error, {
+        DUPLICATE: 'Release with this title already exists',
+        UNKNOWN: 'Failed to create release',
+      });
     }
   }
 
@@ -83,13 +74,7 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve release' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve release' });
     }
   }
 
@@ -97,69 +82,23 @@ export class ReleaseService {
    * Get all releases with optional filters.
    *
    * Supports server-side `search` plus `published`/`deleted` filtering for the
-   * admin listing. The search OR and the deletedOn OR are combined under `AND`
-   * so the two `OR` keys never collide (Prisma 6 + MongoDB null-safe pattern).
+   * admin listing. The repository owns the Mongo-safe `where` construction
+   * (the search OR and the deletedOn OR are combined under `AND` so the two
+   * `OR` keys never collide).
    *
    * - `published === true` → only releases with a `publishedAt` date.
    * - `published === false` → only releases without a `publishedAt` date.
    * - `published == null` → no publish filter.
    * - `deleted` falsy → exclude soft-deleted releases; `deleted === true` → include them.
    */
-  static async getReleases(params?: {
-    skip?: number;
-    take?: number;
-    search?: string;
-    artistIds?: string[];
-    published?: boolean;
-    deleted?: boolean;
-  }): Promise<ServiceResponse<ReleaseListItem[]>> {
+  static async getReleases(
+    params?: ReleaseListFilters
+  ): Promise<ServiceResponse<ReleaseListItem[]>> {
     try {
-      const { skip = 0, take = 50, search, artistIds, published, deleted } = params || {};
-
-      const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
-      const and: Prisma.ReleaseWhereInput[] = [];
-
-      if (!deleted) {
-        and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
-      }
-      if (published === true) {
-        and.push({ publishedAt: { not: null } });
-      } else if (published === false) {
-        and.push({ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] });
-      }
-      if (search) {
-        and.push({
-          OR: [
-            { title: contains(search) },
-            { catalogNumber: contains(search) },
-            { description: contains(search) },
-          ],
-        });
-      }
-
-      const where: Prisma.ReleaseWhereInput = {
-        ...(and.length > 0 && { AND: and }),
-        ...(artistIds &&
-          artistIds.length > 0 && {
-            artistReleases: {
-              some: {
-                artistId: { in: artistIds },
-              },
-            },
-          }),
-      };
-
-      const releases = await ReleaseRepository.findMany({ where, skip, take });
-
+      const releases = await ReleaseRepository.findMany(params ?? {});
       return { success: true, data: releases };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve releases' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve releases' });
     }
   }
 
@@ -168,30 +107,18 @@ export class ReleaseService {
    */
   static async updateRelease(
     id: string,
-    data: Prisma.ReleaseUpdateInput
+    data: UpdateReleaseData
   ): Promise<ServiceResponse<Release>> {
     try {
       const release = await ReleaseRepository.update(id, data);
 
       return { success: true, data: release };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Release not found' };
-      }
-
-      // Unique constraint violations
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return { success: false, error: 'Release with this title already exists' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to update release' };
+      return failFromError(error, {
+        NOT_FOUND: 'Release not found',
+        DUPLICATE: 'Release with this title already exists',
+        UNKNOWN: 'Failed to update release',
+      });
     }
   }
 
@@ -269,18 +196,10 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Release not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to delete release' };
+      return failFromError(error, {
+        NOT_FOUND: 'Release not found',
+        UNKNOWN: 'Failed to delete release',
+      });
     }
   }
 
@@ -293,18 +212,10 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Release not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to soft delete release' };
+      return failFromError(error, {
+        NOT_FOUND: 'Release not found',
+        UNKNOWN: 'Failed to soft delete release',
+      });
     }
   }
 
@@ -317,18 +228,10 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      // Record not found
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Release not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to restore release' };
+      return failFromError(error, {
+        NOT_FOUND: 'Release not found',
+        UNKNOWN: 'Failed to restore release',
+      });
     }
   }
 
@@ -341,17 +244,10 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return { success: false, error: 'Release not found' };
-      }
-
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to publish release' };
+      return failFromError(error, {
+        NOT_FOUND: 'Release not found',
+        UNKNOWN: 'Failed to publish release',
+      });
     }
   }
 
@@ -369,65 +265,21 @@ export class ReleaseService {
    * unsearched first page is cached (10 min in production) — searched/offset
    * pages vary too much to share a cache entry.
    */
-  static async getPublishedReleases(params?: {
-    skip?: number;
-    take?: number;
-    search?: string;
-  }): Promise<ServiceResponse<PublishedReleaseListing[]>> {
+  static async getPublishedReleases(
+    params?: PublishedReleaseFilters
+  ): Promise<ServiceResponse<PublishedReleaseListing[]>> {
     const { skip = 0, take = PUBLISHED_RELEASES_PAGE_SIZE, search } = params ?? {};
 
     const fetchReleases = async (): Promise<ServiceResponse<PublishedReleaseListing[]>> => {
       try {
-        const contains = { contains: search ?? '', mode: 'insensitive' as const };
-        const where: Prisma.ReleaseWhereInput = {
-          publishedAt: { not: null },
-          // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
-          // set to null, not missing fields. Use OR to handle both cases. The
-          // deletedOn OR and the search OR are combined under AND so they don't
-          // collide on the same `OR` key.
-          AND: [
-            { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
-            ...(search
-              ? [
-                  {
-                    OR: [
-                      { title: contains },
-                      { catalogNumber: contains },
-                      { description: contains },
-                      {
-                        artistReleases: {
-                          some: {
-                            artist: {
-                              OR: [
-                                { firstName: contains },
-                                { surname: contains },
-                                { displayName: contains },
-                              ],
-                            },
-                          },
-                        },
-                      },
-                    ],
-                  },
-                ]
-              : []),
-          ],
-        };
-
-        const releases = await ReleaseRepository.findPublished({ where, skip, take });
+        const releases = await ReleaseRepository.findPublished({ skip, take, search });
 
         return {
           success: true,
           data: releases,
         };
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientInitializationError) {
-          logger.error('Database connection failed', error);
-          return { success: false, error: 'Database unavailable' };
-        }
-
-        logger.error('Unexpected error', error);
-        return { success: false, error: 'Failed to fetch published releases' };
+        return failFromError(error, { UNKNOWN: 'Failed to fetch published releases' });
       }
     };
 
@@ -466,13 +318,7 @@ export class ReleaseService {
 
       return { success: true, data: release };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to retrieve release' };
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve release' });
     }
   }
 
@@ -492,13 +338,7 @@ export class ReleaseService {
 
       return { success: true, data: releases };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        logger.error('Database connection failed', error);
-        return { success: false, error: 'Database unavailable' };
-      }
-
-      logger.error('Unexpected error', error);
-      return { success: false, error: 'Failed to fetch artist releases' };
+      return failFromError(error, { UNKNOWN: 'Failed to fetch artist releases' });
     }
   }
 
