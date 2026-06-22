@@ -11,10 +11,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/ca
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
-
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface TourDetailProps {
   tour: Tour & {

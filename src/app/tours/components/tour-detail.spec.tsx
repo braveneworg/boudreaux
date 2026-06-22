@@ -3,9 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import { TourDetail } from './tour-detail';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
+import { TourDetail } from './tour-detail';
 
 type TourWithRelations = Tour & {
   tourDates: Array<

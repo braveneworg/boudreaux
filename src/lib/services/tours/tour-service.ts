@@ -5,14 +5,13 @@
 import 'server-only';
 
 import { TourRepository, type TourWithRelations } from '@/lib/repositories/tours/tour-repository';
+import type { TourScalars } from '@/lib/types/tours';
 import {
   tourCreateSchema,
   tourUpdateSchema,
   type TourCreateInput,
   type TourUpdateInput,
 } from '@/lib/validation/tours/tour-schema';
-
-import type { Tour } from '@prisma/client';
 
 /**
  * Explicit base fields matching the Prisma Tour model.
@@ -126,7 +125,7 @@ export class TourService {
    * Delete a tour
    * Cascades to related records (headliners, images)
    */
-  static async delete(id: string): Promise<Tour> {
+  static async delete(id: string): Promise<TourScalars> {
     return TourRepository.delete(id);
   }
 
@@ -135,7 +134,9 @@ export class TourService {
    * Aggregates unique headliners from all tour dates
    * @private
    */
-  private static enrichTourWithDisplayNames(tour: TourWithRelations | Tour): TourWithDisplayNames {
+  private static enrichTourWithDisplayNames(
+    tour: TourWithRelations | TourScalars
+  ): TourWithDisplayNames {
     let displayHeadliners: string[] = [];
 
     // Extract headliners from tour dates if available

@@ -5,9 +5,13 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type { TourDateScalars, TourDateWithTourAndRelations } from '@/lib/types/tours';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
-import type { Prisma, TourDate } from '@prisma/client';
+import { runQuery } from '../_internal/map-prisma-error';
+
+import type { AssertExact } from '../_internal/drift';
+import type { Prisma } from '@prisma/client';
 
 export interface HeadlinerInput {
   artistId: string;
@@ -47,9 +51,11 @@ export interface TourDateUpdateData {
   utcOffset?: number | null;
 }
 
-/**
- * Prisma include configuration for tour date queries with all relations
- */
+// =============================================================================
+// Query shapes (single source of truth for both the query and the drift check)
+// =============================================================================
+
+/** Tour-date include — venue, parent tour, and ordered headliners. */
 const tourDateInclude = {
   venue: true,
   tour: true,
@@ -61,205 +67,224 @@ const tourDateInclude = {
   },
 } satisfies Prisma.TourDateInclude;
 
+// Compile-time drift guard: fail `pnpm run typecheck` if the hand-written
+// payload type diverges from the Prisma payload this include returns.
+type _TourDateDrift = AssertExact<
+  TourDateWithTourAndRelations,
+  Prisma.TourDateGetPayload<{ include: typeof tourDateInclude }>
+>;
+const _tourDateDrift: _TourDateDrift = true;
+
 /**
- * Repository for TourDate data access operations.
- * Provides CRUD operations for individual tour date entries.
+ * Build the Prisma update payload from domain update data. Converts null values
+ * to `undefined` (leave-unchanged) for the date/string fields, and translates a
+ * `venueId` into a `connect`. Headliner replacement is handled separately.
+ */
+const toPrismaUpdate = (
+  data: Omit<TourDateUpdateData, 'headlinerIds'>
+): Prisma.TourDateUpdateInput => {
+  const { venueId, ...fields } = data;
+  return {
+    ...(fields.startDate !== undefined && { startDate: fields.startDate || undefined }),
+    ...(fields.endDate !== undefined && { endDate: fields.endDate || undefined }),
+    ...(fields.showStartTime !== undefined && {
+      showStartTime: fields.showStartTime || undefined,
+    }),
+    ...(fields.showEndTime !== undefined && { showEndTime: fields.showEndTime || undefined }),
+    ...(fields.doorsOpenAt !== undefined && { doorsOpenAt: fields.doorsOpenAt || undefined }),
+    ...(fields.ticketsUrl !== undefined && { ticketsUrl: fields.ticketsUrl || undefined }),
+    ...(fields.ticketPrices !== undefined && { ticketPrices: fields.ticketPrices || undefined }),
+    ...(fields.notes !== undefined && { notes: fields.notes || undefined }),
+    ...(fields.timeZone !== undefined && { timeZone: fields.timeZone }),
+    ...(fields.utcOffset !== undefined && { utcOffset: fields.utcOffset }),
+    ...(venueId && {
+      venue: {
+        connect: { id: venueId },
+      },
+    }),
+  };
+};
+
+/**
+ * Repository for TourDate data access operations. The only layer that touches
+ * Prisma for tour dates: it owns the include/update DSL, wraps every call in
+ * `runQuery`, and returns hand-written, Prisma-free domain types.
  */
 export class TourDateRepository {
   /**
-   * Find all tour dates for a specific tour
+   * Find all tour dates for a specific tour.
    */
-  static async findByTourId(tourId: string): Promise<TourDate[]> {
+  static async findByTourId(tourId: string): Promise<TourDateWithTourAndRelations[]> {
     if (!OBJECT_ID_REGEX.test(tourId)) {
       return [];
     }
 
-    return prisma.tourDate.findMany({
-      where: { tourId },
-      orderBy: { startDate: 'asc' },
-      include: tourDateInclude,
-    });
+    return runQuery(() =>
+      prisma.tourDate.findMany({
+        where: { tourId },
+        orderBy: { startDate: 'asc' },
+        include: tourDateInclude,
+      })
+    );
   }
 
   /**
-   * Find a single tour date by ID with all relations
+   * Find a single tour date by ID with all relations.
    */
-  static async findById(id: string): Promise<TourDate | null> {
+  static async findById(id: string): Promise<TourDateWithTourAndRelations | null> {
     if (!OBJECT_ID_REGEX.test(id)) {
       return null;
     }
 
-    return prisma.tourDate.findUnique({
-      where: { id },
-      include: tourDateInclude,
-    });
+    return runQuery(() =>
+      prisma.tourDate.findUnique({
+        where: { id },
+        include: tourDateInclude,
+      })
+    );
   }
 
   /**
-   * Create a new tour date with headliners
-   * Headliners are linked via TourDateHeadliner junction table
+   * Create a new tour date with headliners. Headliners are linked via the
+   * TourDateHeadliner junction table. Returns the created tour date scalars;
+   * callers should refetch if full relations are needed.
    */
-  static async create(data: TourDateCreateData): Promise<TourDate> {
+  static async create(data: TourDateCreateData): Promise<TourDateScalars> {
     const { headlinerIds, venueId, tourId, ...tourDateData } = data;
 
-    // Create the tour date with proper Prisma types
-    const tourDate = await prisma.tourDate.create({
-      data: {
-        ...tourDateData,
-        tour: {
-          connect: { id: tourId },
+    const tourDate = await runQuery(() =>
+      prisma.tourDate.create({
+        data: {
+          ...tourDateData,
+          tour: {
+            connect: { id: tourId },
+          },
+          venue: {
+            connect: { id: venueId },
+          },
         },
-        venue: {
-          connect: { id: venueId },
-        },
-      },
-    });
+      })
+    );
 
     // Create TourDateHeadliner records with sortOrder
     if (headlinerIds && headlinerIds.length > 0) {
-      await prisma.tourDateHeadliner.createMany({
-        data: headlinerIds.map((artistId, index) => ({
-          tourDateId: tourDate.id,
-          artistId,
-          sortOrder: index,
-        })),
-      });
+      await runQuery(() =>
+        prisma.tourDateHeadliner.createMany({
+          data: headlinerIds.map((artistId, index) => ({
+            tourDateId: tourDate.id,
+            artistId,
+            sortOrder: index,
+          })),
+        })
+      );
     }
 
-    // Return the created tour date
-    // Caller should refetch if full relations are needed
     return tourDate;
   }
 
   /**
-   * Update an existing tour date
-   * If headlinerIds are provided, replaces all existing headliner associations
+   * Update an existing tour date. If headlinerIds are provided, replaces all
+   * existing headliner associations.
    */
-  static async update(id: string, data: TourDateUpdateData): Promise<TourDate> {
-    const { headlinerIds, venueId, ...tourDateData } = data;
-
-    // Build the Prisma update data object with proper types
-    // Convert null values to undefined for Prisma compatibility
-    const updateData: Prisma.TourDateUpdateInput = {
-      ...(tourDateData.startDate !== undefined && {
-        startDate: tourDateData.startDate || undefined,
-      }),
-      ...(tourDateData.endDate !== undefined && { endDate: tourDateData.endDate || undefined }),
-      ...(tourDateData.showStartTime !== undefined && {
-        showStartTime: tourDateData.showStartTime || undefined,
-      }),
-      ...(tourDateData.showEndTime !== undefined && {
-        showEndTime: tourDateData.showEndTime || undefined,
-      }),
-      ...(tourDateData.doorsOpenAt !== undefined && {
-        doorsOpenAt: tourDateData.doorsOpenAt || undefined,
-      }),
-      ...(tourDateData.ticketsUrl !== undefined && {
-        ticketsUrl: tourDateData.ticketsUrl || undefined,
-      }),
-      ...(tourDateData.ticketPrices !== undefined && {
-        ticketPrices: tourDateData.ticketPrices || undefined,
-      }),
-      ...(tourDateData.notes !== undefined && { notes: tourDateData.notes || undefined }),
-      ...(tourDateData.timeZone !== undefined && { timeZone: tourDateData.timeZone }),
-      ...(tourDateData.utcOffset !== undefined && { utcOffset: tourDateData.utcOffset }),
-      ...(venueId && {
-        venue: {
-          connect: { id: venueId },
-        },
-      }),
-    };
+  static async update(id: string, data: TourDateUpdateData): Promise<TourDateWithTourAndRelations> {
+    const { headlinerIds, ...rest } = data;
+    const updateData = toPrismaUpdate(rest);
 
     // If headlinerIds are provided, replace all existing headliner associations
     if (headlinerIds !== undefined) {
-      // Delete existing headliners
-      await prisma.tourDateHeadliner.deleteMany({
-        where: { tourDateId: id },
-      });
+      await runQuery(() =>
+        prisma.tourDateHeadliner.deleteMany({
+          where: { tourDateId: id },
+        })
+      );
 
-      // Create new headliner records with sortOrder
       if (headlinerIds.length > 0) {
-        await prisma.tourDateHeadliner.createMany({
-          data: headlinerIds.map((artistId, index) => ({
-            tourDateId: id,
-            artistId,
-            sortOrder: index,
-          })),
-        });
+        await runQuery(() =>
+          prisma.tourDateHeadliner.createMany({
+            data: headlinerIds.map((artistId, index) => ({
+              tourDateId: id,
+              artistId,
+              sortOrder: index,
+            })),
+          })
+        );
       }
+    }
 
-      // Update tour date fields
-      return prisma.tourDate.update({
+    return runQuery(() =>
+      prisma.tourDate.update({
         where: { id },
         data: updateData,
         include: tourDateInclude,
-      });
-    }
-
-    // Simple update without headliner changes
-    return prisma.tourDate.update({
-      where: { id },
-      data: updateData,
-      include: tourDateInclude,
-    });
+      })
+    );
   }
 
   /**
-   * Delete a tour date
-   * Cascades to related records (headliners) based on schema
+   * Delete a tour date. Cascades to related records (headliners) per schema.
    */
-  static async delete(id: string): Promise<TourDate> {
-    return prisma.tourDate.delete({
-      where: { id },
-    });
+  static async delete(id: string): Promise<TourDateScalars> {
+    return runQuery(() =>
+      prisma.tourDate.delete({
+        where: { id },
+      })
+    );
   }
 
   /**
-   * Count total tour dates for a specific tour
+   * Count total tour dates for a specific tour.
    */
   static async countByTourId(tourId: string): Promise<number> {
     if (!OBJECT_ID_REGEX.test(tourId)) {
       return 0;
     }
 
-    return prisma.tourDate.count({
-      where: { tourId },
-    });
+    return runQuery(() =>
+      prisma.tourDate.count({
+        where: { tourId },
+      })
+    );
   }
 
   /**
-   * Find all upcoming tour dates across all tours
-   * Useful for public display of upcoming shows
+   * Find all upcoming tour dates across all tours. Useful for public display of
+   * upcoming shows.
    */
-  static async findUpcoming(limit?: number): Promise<TourDate[]> {
+  static async findUpcoming(limit?: number): Promise<TourDateWithTourAndRelations[]> {
     const now = new Date();
-    return prisma.tourDate.findMany({
-      where: {
-        startDate: {
-          gte: now,
+    return runQuery(() =>
+      prisma.tourDate.findMany({
+        where: {
+          startDate: {
+            gte: now,
+          },
         },
-      },
-      orderBy: { startDate: 'asc' },
-      take: limit,
-      include: tourDateInclude,
-    });
+        orderBy: { startDate: 'asc' },
+        take: limit,
+        include: tourDateInclude,
+      })
+    );
   }
 
   /** Count tour dates scheduled on or after now (used by the admin dashboard). */
   static async countUpcoming(): Promise<number> {
-    return prisma.tourDate.count({
-      where: { startDate: { gte: new Date() } },
-    });
+    return runQuery(() =>
+      prisma.tourDate.count({
+        where: { startDate: { gte: new Date() } },
+      })
+    );
   }
 
   /**
-   * Update the setTime for a specific headliner on a tour date
+   * Update the setTime for a specific headliner on a tour date.
    */
   static async updateHeadlinerSetTime(headlinerId: string, setTime: Date | null): Promise<void> {
-    await prisma.tourDateHeadliner.update({
-      where: { id: headlinerId },
-      data: { setTime },
-    });
+    await runQuery(() =>
+      prisma.tourDateHeadliner.update({
+        where: { id: headlinerId },
+        data: { setTime },
+      })
+    );
   }
 
   /**
@@ -271,22 +296,26 @@ export class TourDateRepository {
     artistId: string,
     setTime: Date | null
   ): Promise<boolean> {
-    const result = await prisma.tourDateHeadliner.updateMany({
-      where: { tourDateId, artistId },
-      data: { setTime },
-    });
+    const result = await runQuery(() =>
+      prisma.tourDateHeadliner.updateMany({
+        where: { tourDateId, artistId },
+        data: { setTime },
+      })
+    );
 
     return result.count > 0;
   }
 
   /**
-   * Remove a specific headliner from a tour date
-   * Only deletes the TourDateHeadliner junction record — does NOT delete the artist
+   * Remove a specific headliner from a tour date. Only deletes the
+   * TourDateHeadliner junction record — does NOT delete the artist.
    */
   static async removeHeadliner(headlinerId: string): Promise<void> {
-    await prisma.tourDateHeadliner.delete({
-      where: { id: headlinerId },
-    });
+    await runQuery(() =>
+      prisma.tourDateHeadliner.delete({
+        where: { id: headlinerId },
+      })
+    );
   }
 
   /**
@@ -297,23 +326,27 @@ export class TourDateRepository {
     tourDateId: string,
     artistId: string
   ): Promise<boolean> {
-    const result = await prisma.tourDateHeadliner.deleteMany({
-      where: { tourDateId, artistId },
-    });
+    const result = await runQuery(() =>
+      prisma.tourDateHeadliner.deleteMany({
+        where: { tourDateId, artistId },
+      })
+    );
 
     return result.count > 0;
   }
 
   /**
-   * Reorder headliners for a tour date by updating sortOrder in batch
+   * Reorder headliners for a tour date by updating sortOrder in batch.
    */
   static async reorderHeadliners(_tourDateId: string, headlinerIds: string[]): Promise<void> {
-    await prisma.$transaction(
-      headlinerIds.map((id, index) =>
-        prisma.tourDateHeadliner.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
+    await runQuery(() =>
+      prisma.$transaction(
+        headlinerIds.map((id, index) =>
+          prisma.tourDateHeadliner.update({
+            where: { id },
+            data: { sortOrder: index },
+          })
+        )
       )
     );
   }

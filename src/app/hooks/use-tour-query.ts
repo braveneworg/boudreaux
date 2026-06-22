@@ -4,12 +4,19 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
 
 import { parseResponse } from './fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export type TourWithRelations = Tour & {
   tourDates: Array<

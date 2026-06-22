@@ -26,7 +26,7 @@ import { getDisplayName } from '@/lib/utils/get-display-name';
 
 /**
  * Local interfaces matching Prisma model shapes.
- * Client components should not import directly from @prisma/client.
+ * Client components do not import the generated Prisma client types directly.
  */
 interface TourDateHeadlinerFields {
   id: string;

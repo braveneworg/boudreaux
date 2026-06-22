@@ -8,11 +8,17 @@ import { useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 
 import { TourList } from './tour-list';
 import { TourSearch } from './tour-search';
-
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface ToursPageClientProps {
   tours: (Tour & {

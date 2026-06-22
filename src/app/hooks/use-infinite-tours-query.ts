@@ -5,13 +5,20 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
 
 import { fetchAndParse } from './fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
   tourDates: Array<
