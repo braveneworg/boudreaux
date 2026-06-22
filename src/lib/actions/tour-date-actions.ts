@@ -19,6 +19,8 @@ import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
+import type { AdminActionResult } from './run-admin-entity-action';
+
 /**
  * Server action to create a new tour date entry
  */
@@ -173,9 +175,7 @@ export const updateTourDateAction = async (
 /**
  * Server action to delete a tour date
  */
-export const deleteTourDateAction = async (
-  tourDateId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const deleteTourDateAction = async (tourDateId: string): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');
@@ -216,7 +216,7 @@ export const updateHeadlinerSetTimeAction = async (
   setTime: string | null,
   tourDateId?: string,
   artistId?: string
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');
@@ -300,7 +300,7 @@ export const removeHeadlinerAction = async (
   headlinerId: string,
   tourDateId?: string,
   artistId?: string
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');
@@ -375,7 +375,7 @@ export const removeHeadlinerAction = async (
 export const reorderHeadlinersAction = async (
   tourDateId: string,
   headlinerIds: string[]
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');

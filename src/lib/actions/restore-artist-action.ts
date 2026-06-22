@@ -7,16 +7,14 @@ import 'server-only';
 
 import { ArtistService } from '@/lib/services/artist-service';
 
-import { runAdminEntityAction } from './run-admin-entity-action';
+import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
  * Server action to restore a soft-deleted (archived) artist by clearing
  * `deletedOn`. Returns a plain result the {@link useRestoreArtistMutation} hook
  * maps to a toast.
  */
-export const restoreArtistAction = async (
-  artistId: string
-): Promise<{ success: boolean; error?: string }> =>
+export const restoreArtistAction = async (artistId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({
     id: artistId,
     entityLabel: 'artist',

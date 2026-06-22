@@ -8,8 +8,12 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { publishReleaseAction } from '@/lib/actions/publish-release-action';
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
-import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
+import {
+  updateReleaseCoverArtAction,
+  type UpdateReleaseCoverArtResult,
+} from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
@@ -102,11 +106,7 @@ export const useUpdateReleaseCoverArtMutation = () => {
     isError: isUpdateReleaseCoverArtError,
     error: updateReleaseCoverArtError,
     reset: resetUpdateReleaseCoverArt,
-  } = useMutation<
-    Awaited<ReturnType<typeof updateReleaseCoverArtAction>>,
-    Error,
-    { releaseId: string; coverArt: string }
-  >({
+  } = useMutation<UpdateReleaseCoverArtResult, Error, { releaseId: string; coverArt: string }>({
     mutationFn: ({ releaseId, coverArt }) => updateReleaseCoverArtAction(releaseId, coverArt),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });
@@ -135,7 +135,7 @@ export const useDeleteReleaseMutation = () => {
     isError: isDeleteReleaseError,
     error: deleteReleaseError,
     reset: resetDeleteRelease,
-  } = useMutation<Awaited<ReturnType<typeof deleteReleaseAction>>, Error, { releaseId: string }>({
+  } = useMutation<AdminActionResult, Error, { releaseId: string }>({
     mutationFn: ({ releaseId }) => deleteReleaseAction(releaseId),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });
@@ -163,7 +163,7 @@ export const usePublishReleaseMutation = () => {
     isError: isPublishReleaseError,
     error: publishReleaseError,
     reset: resetPublishRelease,
-  } = useMutation<Awaited<ReturnType<typeof publishReleaseAction>>, Error, { releaseId: string }>({
+  } = useMutation<AdminActionResult, Error, { releaseId: string }>({
     mutationFn: ({ releaseId }) => publishReleaseAction(releaseId),
     onSuccess: (result) => (result.success ? invalidateReleaseQueries(queryClient) : undefined),
   });

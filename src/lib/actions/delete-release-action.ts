@@ -7,7 +7,7 @@ import 'server-only';
 
 import { ReleaseService } from '@/lib/services/release-service';
 
-import { runAdminEntityAction } from './run-admin-entity-action';
+import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
  * Server action to hard-delete a release. `ReleaseService.deleteRelease` cascades
@@ -15,9 +15,7 @@ import { runAdminEntityAction } from './run-admin-entity-action';
  * images) but preserves Artist records. Returns a plain result the
  * {@link useDeleteReleaseMutation} hook maps to a toast.
  */
-export const deleteReleaseAction = async (
-  releaseId: string
-): Promise<{ success: boolean; error?: string }> =>
+export const deleteReleaseAction = async (releaseId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({
     id: releaseId,
     entityLabel: 'release',
