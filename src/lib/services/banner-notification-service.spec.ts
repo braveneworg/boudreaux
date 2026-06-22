@@ -1,15 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Prisma } from '@prisma/client';
-
 import { BannerNotificationRepository } from '@/lib/repositories/banner-notification-repository';
 import { SiteSettingsRepository } from '@/lib/repositories/site-settings-repository';
+import { DataError } from '@/lib/types/domain/errors';
 import { cache, withCache } from '@/lib/utils/simple-cache';
 
 import { BannerNotificationService } from './banner-notification-service';
-
-import type * as PrismaClientModule from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/repositories/banner-notification-repository', () => ({
@@ -26,31 +23,6 @@ vi.mock('@/lib/repositories/site-settings-repository', () => ({
     upsertByKey: vi.fn(),
   },
 }));
-vi.mock('@prisma/client', async () => {
-  const actual = await vi.importActual<typeof PrismaClientModule>('@prisma/client');
-  return {
-    ...actual,
-    Prisma: {
-      ...actual.Prisma,
-      PrismaClientInitializationError: class PrismaClientInitializationError extends Error {
-        clientVersion = '0.0.0';
-        constructor(message: string) {
-          super(message);
-          this.name = 'PrismaClientInitializationError';
-        }
-      },
-      PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
-        code: string;
-        clientVersion = '0.0.0';
-        constructor(message: string, opts: { code: string; clientVersion: string }) {
-          super(message);
-          this.name = 'PrismaClientKnownRequestError';
-          this.code = opts.code;
-        }
-      },
-    },
-  };
-});
 vi.mock('@/lib/utils/simple-cache', () => ({
   cache: { delete: vi.fn() },
   withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
@@ -247,10 +219,8 @@ describe('BannerNotificationService', () => {
       );
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockWithCache.mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
-      );
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockWithCache.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await BannerNotificationService.getActiveBanners();
 
@@ -326,10 +296,8 @@ describe('BannerNotificationService', () => {
       expect(mockFindMany).toHaveBeenCalledWith();
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockFindMany.mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
-      );
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockFindMany.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await BannerNotificationService.getAllNotifications();
 
@@ -403,13 +371,8 @@ describe('BannerNotificationService', () => {
       expect(mockCacheDelete).toHaveBeenCalled();
     });
 
-    it('should return not found error on P2025', async () => {
-      mockDelete.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
+    it('should return not found error on NOT_FOUND DataError', async () => {
+      mockDelete.mockRejectedValue(new DataError('NOT_FOUND', 'Record not found'));
 
       const result = await BannerNotificationService.deleteNotification(99);
 

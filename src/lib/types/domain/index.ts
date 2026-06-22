@@ -12,3 +12,4 @@ export * from './errors';
 export * from './release';
 export * from './featured-artist';
 export * from './user';
+export * from './banner-notification';

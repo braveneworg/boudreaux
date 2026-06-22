@@ -1,11 +1,13 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
+import type { BannerNotificationRecord } from '@/lib/types/domain/banner-notification';
+import { DataError } from '@/lib/types/domain/errors';
 
 import { BannerNotificationRepository } from './banner-notification-repository';
-
-import type { BannerNotification } from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/prisma', () => ({
@@ -22,7 +24,7 @@ const mockFindMany = vi.mocked(prisma.bannerNotification.findMany);
 const mockUpsert = vi.mocked(prisma.bannerNotification.upsert);
 const mockDelete = vi.mocked(prisma.bannerNotification.delete);
 
-const mockNotification: BannerNotification = {
+const mockNotification: BannerNotificationRecord = {
   id: 'notif-1',
   slotNumber: 1,
   content: 'Test banner content',
@@ -150,6 +152,26 @@ describe('BannerNotificationRepository', () => {
 
       expect(result).toEqual(mockNotification);
       expect(mockDelete).toHaveBeenCalledWith({ where: { slotNumber: 1 } });
+    });
+
+    it('wraps a Prisma P2025 error as a NOT_FOUND DataError', async () => {
+      mockDelete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Record not found', {
+          code: 'P2025',
+          clientVersion: '0.0.0',
+        })
+      );
+
+      await expect(BannerNotificationRepository.deleteBySlot(99)).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      mockDelete.mockRejectedValue(new Error('boom'));
+
+      await expect(BannerNotificationRepository.deleteBySlot(1)).rejects.toBeInstanceOf(DataError);
     });
   });
 });
