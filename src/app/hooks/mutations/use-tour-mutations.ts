@@ -5,6 +5,7 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { createTourAction, deleteTourAction, updateTourAction } from '@/lib/actions/tour-actions';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -95,7 +96,7 @@ export const useDeleteTourMutation = () => {
     isError: isDeleteTourError,
     error: deleteTourError,
     reset: resetDeleteTour,
-  } = useMutation<Awaited<ReturnType<typeof deleteTourAction>>, Error, { tourId: string }>({
+  } = useMutation<AdminActionResult, Error, { tourId: string }>({
     mutationFn: ({ tourId }) => deleteTourAction(tourId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });

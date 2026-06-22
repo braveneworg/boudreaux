@@ -7,7 +7,7 @@ import 'server-only';
 
 import { ArtistService } from '@/lib/services/artist-service';
 
-import { runAdminEntityAction } from './run-admin-entity-action';
+import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
  * Server action to soft-delete (archive) an artist. The `Artist` model has a
@@ -15,9 +15,7 @@ import { runAdminEntityAction } from './run-admin-entity-action';
  * listings rather than removed. Returns a plain result the
  * {@link useArchiveArtistMutation} hook maps to a toast.
  */
-export const archiveArtistAction = async (
-  artistId: string
-): Promise<{ success: boolean; error?: string }> =>
+export const archiveArtistAction = async (artistId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({
     id: artistId,
     entityLabel: 'artist',

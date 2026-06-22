@@ -10,8 +10,18 @@ import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
+/**
+ * The plain success/error result shared by admin-gated Server Actions (delete,
+ * publish, publish-to-site, …) and consumed by their mutation hooks, which map
+ * it to a toast. Distinct from form Server Actions, which return `FormState`.
+ */
+export interface AdminActionResult {
+  success: boolean;
+  error?: string;
+}
+
 /** A service call that resolves to a success/error result (ServiceResponse-shaped). */
-type EntityServiceCall = (id: string) => Promise<{ success: boolean; error?: string }>;
+type EntityServiceCall = (id: string) => Promise<AdminActionResult>;
 
 interface RunAdminEntityActionConfig {
   /** The target entity id (validated as a Mongo ObjectId). */
@@ -45,7 +55,7 @@ export const runAdminEntityAction = async ({
   metadataKey,
   revalidate,
   failureError,
-}: RunAdminEntityActionConfig): Promise<{ success: boolean; error?: string }> => {
+}: RunAdminEntityActionConfig): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');

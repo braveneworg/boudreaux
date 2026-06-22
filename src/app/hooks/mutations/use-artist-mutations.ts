@@ -9,6 +9,7 @@ import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -104,7 +105,7 @@ export const useArchiveArtistMutation = () => {
     isError: isArchiveArtistError,
     error: archiveArtistError,
     reset: resetArchiveArtist,
-  } = useMutation<Awaited<ReturnType<typeof archiveArtistAction>>, Error, { artistId: string }>({
+  } = useMutation<AdminActionResult, Error, { artistId: string }>({
     mutationFn: ({ artistId }) => archiveArtistAction(artistId),
     onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
   });
@@ -132,7 +133,7 @@ export const usePublishArtistMutation = () => {
     isError: isPublishArtistError,
     error: publishArtistError,
     reset: resetPublishArtist,
-  } = useMutation<Awaited<ReturnType<typeof publishArtistAction>>, Error, { artistId: string }>({
+  } = useMutation<AdminActionResult, Error, { artistId: string }>({
     mutationFn: ({ artistId }) => publishArtistAction(artistId),
     onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
   });
@@ -161,7 +162,7 @@ export const useRestoreArtistMutation = () => {
     isError: isRestoreArtistError,
     error: restoreArtistError,
     reset: resetRestoreArtist,
-  } = useMutation<Awaited<ReturnType<typeof restoreArtistAction>>, Error, { artistId: string }>({
+  } = useMutation<AdminActionResult, Error, { artistId: string }>({
     mutationFn: ({ artistId }) => restoreArtistAction(artistId),
     onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
   });

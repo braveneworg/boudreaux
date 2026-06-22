@@ -9,7 +9,11 @@ import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
-import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
+import {
+  updateFeaturedArtistCoverArtAction,
+  type UpdateFeaturedArtistCoverArtResult,
+} from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
@@ -72,7 +76,7 @@ export const useUpdateFeaturedArtistCoverArtMutation = () => {
     error: updateFeaturedArtistCoverArtError,
     reset: resetUpdateFeaturedArtistCoverArt,
   } = useMutation<
-    Awaited<ReturnType<typeof updateFeaturedArtistCoverArtAction>>,
+    UpdateFeaturedArtistCoverArtResult,
     Error,
     { featuredArtistId: string; coverArt: string }
   >({
@@ -106,11 +110,7 @@ export const useDeleteFeaturedArtistMutation = () => {
     isError: isDeleteFeaturedArtistError,
     error: deleteFeaturedArtistError,
     reset: resetDeleteFeaturedArtist,
-  } = useMutation<
-    Awaited<ReturnType<typeof deleteFeaturedArtistAction>>,
-    Error,
-    { featuredArtistId: string }
-  >({
+  } = useMutation<AdminActionResult, Error, { featuredArtistId: string }>({
     mutationFn: ({ featuredArtistId }) => deleteFeaturedArtistAction(featuredArtistId),
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
@@ -141,11 +141,7 @@ export const usePublishFeaturedArtistMutation = () => {
     isError: isPublishFeaturedArtistError,
     error: publishFeaturedArtistError,
     reset: resetPublishFeaturedArtist,
-  } = useMutation<
-    Awaited<ReturnType<typeof publishFeaturedArtistAction>>,
-    Error,
-    { featuredArtistId: string }
-  >({
+  } = useMutation<AdminActionResult, Error, { featuredArtistId: string }>({
     mutationFn: ({ featuredArtistId }) => publishFeaturedArtistAction(featuredArtistId),
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
@@ -175,7 +171,7 @@ export const usePublishFeaturedArtistsMutation = () => {
     isError: isPublishFeaturedArtistsError,
     error: publishFeaturedArtistsError,
     reset: resetPublishFeaturedArtists,
-  } = useMutation<Awaited<ReturnType<typeof publishFeaturedArtistsToSiteAction>>, Error, void>({
+  } = useMutation<AdminActionResult, Error, void>({
     mutationFn: () => publishFeaturedArtistsToSiteAction(),
     onSuccess: (result) =>
       result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,

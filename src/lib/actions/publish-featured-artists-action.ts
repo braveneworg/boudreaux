@@ -10,14 +10,13 @@ import { revalidatePath } from 'next/cache';
 import { cache } from '@/lib/utils/simple-cache';
 import { requireRole } from '@/utils/auth/require-role';
 
+import type { AdminActionResult } from './run-admin-entity-action';
+
 /**
  * Invalidates the in-memory featured artists cache and the landing page route cache.
  * Called from the admin UI to ensure the public landing page shows fresh content.
  */
-export const publishFeaturedArtistsToSiteAction = async (): Promise<{
-  success: boolean;
-  error?: string;
-}> => {
+export const publishFeaturedArtistsToSiteAction = async (): Promise<AdminActionResult> => {
   try {
     await requireRole('admin');
   } catch {

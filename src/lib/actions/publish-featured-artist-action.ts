@@ -7,7 +7,7 @@ import 'server-only';
 
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 
-import { runAdminEntityAction } from './run-admin-entity-action';
+import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
  * Server action to publish a single featured artist (stamps `publishedOn`).
@@ -17,7 +17,7 @@ import { runAdminEntityAction } from './run-admin-entity-action';
  */
 export const publishFeaturedArtistAction = async (
   featuredArtistId: string
-): Promise<{ success: boolean; error?: string }> =>
+): Promise<AdminActionResult> =>
   runAdminEntityAction({
     id: featuredArtistId,
     entityLabel: 'featured artist',

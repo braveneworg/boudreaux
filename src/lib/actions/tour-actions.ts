@@ -16,6 +16,8 @@ import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
+import type { AdminActionResult } from './run-admin-entity-action';
+
 /**
  * Server action to create a new tour
  */
@@ -142,9 +144,7 @@ export const updateTourAction = async (
 /**
  * Server action to delete a tour
  */
-export const deleteTourAction = async (
-  tourId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const deleteTourAction = async (tourId: string): Promise<AdminActionResult> => {
   let session;
   try {
     session = await requireRole('admin');
