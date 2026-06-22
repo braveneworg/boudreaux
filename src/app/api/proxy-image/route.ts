@@ -11,6 +11,7 @@ import { Agent } from 'undici';
 import { POLLING_LIMIT, pollingLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
+import { loggers } from '@/lib/utils/logger';
 
 import type { LookupAddress, LookupOptions } from 'node:dns';
 
@@ -116,7 +117,7 @@ export const GET = withRateLimit(
       (domain) => hostname === domain || hostname.endsWith('.' + domain)
     );
     if (!isAllowedHost) {
-      console.warn('[proxy-image] Blocked request to non-allowed domain:', hostname);
+      loggers.s3.warn('[proxy-image] Blocked request to non-allowed domain', { hostname });
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
 
@@ -130,13 +131,13 @@ export const GET = withRateLimit(
     try {
       const { address, family } = await lookup(parsedUrl.hostname);
       if (isDisallowedAddress(address)) {
-        console.warn('[proxy-image] Blocked request resolving to disallowed IP:', address);
+        loggers.s3.warn('[proxy-image] Blocked request resolving to disallowed IP', { address });
         return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
       }
       vettedAddress = address;
       vettedFamily = family;
     } catch (error) {
-      console.error('[proxy-image] DNS lookup failed:', error);
+      loggers.s3.error('[proxy-image] DNS lookup failed', error);
       return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
     }
 
@@ -227,7 +228,7 @@ export const GET = withRateLimit(
         },
       });
     } catch (error) {
-      console.error('[proxy-image] Error proxying image:', error);
+      loggers.s3.error('[proxy-image] Error proxying image', error);
       return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
     } finally {
       // Each request builds a fresh pinned dispatcher; close its connection

@@ -14,11 +14,14 @@ import type {
   ArtistWithPublishedReleases,
 } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { loggers } from '@/lib/utils/logger';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import type { ServiceResponse } from './service.types';
+
+const logger = loggers.media;
 
 /**
  * Input data for uploading an image
@@ -94,12 +97,12 @@ export class ArtistService {
 
       // Connection/network issues
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
       // Unknown errors
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to create artist' };
     }
   }
@@ -118,11 +121,11 @@ export class ArtistService {
       return { success: true, data: artist };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve artist' };
     }
   }
@@ -141,11 +144,11 @@ export class ArtistService {
       return { success: true, data: artist };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve artist' };
     }
   }
@@ -204,11 +207,11 @@ export class ArtistService {
       return { success: true, data: artists };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve artists' };
     }
   }
@@ -239,11 +242,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to update artist' };
     }
   }
@@ -263,11 +266,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to delete artist' };
     }
   }
@@ -286,11 +289,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to archive artist' };
     }
   }
@@ -311,11 +314,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to publish artist' };
     }
   }
@@ -336,11 +339,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to restore artist' };
     }
   }
@@ -423,11 +426,11 @@ export class ArtistService {
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Image upload error:', error);
+      logger.error('Image upload error', error);
       return { success: false, error: 'Failed to upload image' };
     }
   }
@@ -466,7 +469,7 @@ export class ArtistService {
 
       return { success: true, data: results };
     } catch (error) {
-      console.error('Multiple image upload error:', error);
+      logger.error('Multiple image upload error', error);
       return { success: false, error: 'Failed to upload images' };
     }
   }
@@ -518,7 +521,7 @@ export class ArtistService {
             });
             await s3Client.send(deleteCommand);
           } catch (s3Error) {
-            console.error('S3 delete error (continuing with DB delete):', s3Error);
+            logger.error('S3 delete error (continuing with DB delete)', s3Error);
             // Continue with database deletion even if S3 fails
           }
         }
@@ -534,11 +537,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Image deletion error:', error);
+      logger.error('Image deletion error', error);
       return { success: false, error: 'Failed to delete image' };
     }
   }
@@ -562,11 +565,11 @@ export class ArtistService {
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Get artist images error:', error);
+      logger.error('Get artist images error', error);
       return { success: false, error: 'Failed to retrieve artist images' };
     }
   }
@@ -600,11 +603,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Update image error:', error);
+      logger.error('Update image error', error);
       return { success: false, error: 'Failed to update image' };
     }
   }
@@ -647,11 +650,11 @@ export class ArtistService {
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Reorder images error:', error);
+      logger.error('Reorder images error', error);
       return { success: false, error: 'Failed to reorder images' };
     }
   }
@@ -714,11 +717,11 @@ export class ArtistService {
       return { success: true, data: artists };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to search artists' };
     }
   }
@@ -741,10 +744,10 @@ export class ArtistService {
       return { success: true, data: sanitized };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve artists' };
     }
   }
@@ -784,11 +787,11 @@ export class ArtistService {
       return { success: true, data: filteredArtist };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve artist' };
     }
   }
@@ -876,11 +879,11 @@ export class ArtistService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error in findOrCreateByName:', error);
+      logger.error('Unexpected error in findOrCreateByName', error);
       return { success: false, error: 'Failed to find or create artist' };
     }
   }

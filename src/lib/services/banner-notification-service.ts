@@ -12,10 +12,13 @@ import {
 } from '@/lib/constants/banner-slots';
 import { BannerNotificationRepository } from '@/lib/repositories/banner-notification-repository';
 import { SiteSettingsRepository } from '@/lib/repositories/site-settings-repository';
+import { loggers } from '@/lib/utils/logger';
 import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import { cache, withCache } from '@/lib/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
+
+const logger = loggers.notifications;
 
 export interface BannerNotificationData {
   id: string;
@@ -125,10 +128,10 @@ export class BannerNotificationService {
       return { success: true, data };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database connection failed' };
       }
-      console.error('Failed to fetch active banners:', error);
+      logger.error('Failed to fetch active banners', error);
       return { success: false, error: 'Failed to fetch active banners' };
     }
   }
@@ -142,10 +145,10 @@ export class BannerNotificationService {
       return { success: true, data: notifications };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database connection failed' };
       }
-      console.error('Failed to fetch all notifications:', error);
+      logger.error('Failed to fetch all notifications', error);
       return { success: false, error: 'Failed to fetch notifications' };
     }
   }
@@ -171,7 +174,7 @@ export class BannerNotificationService {
       BannerNotificationService.invalidateCache();
       return { success: true, data: notification };
     } catch (error) {
-      console.error('Failed to upsert notification:', error);
+      logger.error('Failed to upsert notification', error);
       return { success: false, error: 'Failed to save notification' };
     }
   }
@@ -188,7 +191,7 @@ export class BannerNotificationService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return { success: false, error: 'Notification not found' };
       }
-      console.error('Failed to delete notification:', error);
+      logger.error('Failed to delete notification', error);
       return { success: false, error: 'Failed to delete notification' };
     }
   }
@@ -205,7 +208,7 @@ export class BannerNotificationService {
 
       return { success: true, data: notifications };
     } catch (error) {
-      console.error('Failed to search notifications:', error);
+      logger.error('Failed to search notifications', error);
       return { success: false, error: 'Failed to search notifications' };
     }
   }
@@ -239,7 +242,7 @@ export class BannerNotificationService {
       BannerNotificationService.invalidateCache();
       return { success: true, data: { interval } };
     } catch (error) {
-      console.error('Failed to update rotation interval:', error);
+      logger.error('Failed to update rotation interval', error);
       return { success: false, error: 'Failed to update rotation interval' };
     }
   }

@@ -11,6 +11,7 @@ import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repositor
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
@@ -20,6 +21,8 @@ import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
 import type { AdminActionResult } from './run-admin-entity-action';
+
+const logger = loggers.media;
 
 /**
  * Server action to create a new tour date entry
@@ -283,11 +286,11 @@ export const updateHeadlinerSetTimeAction = async (
           return { success: true };
         }
       } catch (fallbackError) {
-        console.error('[updateHeadlinerSetTimeAction:fallback]', fallbackError);
+        logger.error('[updateHeadlinerSetTimeAction:fallback]', fallbackError);
       }
     }
 
-    console.error('[updateHeadlinerSetTimeAction]', error);
+    logger.error('[updateHeadlinerSetTimeAction]', error);
     return { success: false, error: 'Failed to update set time' };
   }
 };
@@ -360,11 +363,11 @@ export const removeHeadlinerAction = async (
           return { success: true };
         }
       } catch (fallbackError) {
-        console.error('[removeHeadlinerAction:fallback]', fallbackError);
+        logger.error('[removeHeadlinerAction:fallback]', fallbackError);
       }
     }
 
-    console.error('[removeHeadlinerAction]', error);
+    logger.error('[removeHeadlinerAction]', error);
     return { success: false, error: 'Failed to remove headliner' };
   }
 };
@@ -408,7 +411,7 @@ export const reorderHeadlinersAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('[reorderHeadlinersAction]', error);
+    logger.error('[reorderHeadlinersAction]', error);
     return { success: false, error: 'Failed to reorder headliners' };
   }
 };

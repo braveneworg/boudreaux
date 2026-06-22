@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { UploadService } from '@/lib/services/upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import type { ActionResult, PresignedUploadResponse } from '@/types/digital-format';
 
 /**
@@ -95,7 +96,7 @@ const uploadDigitalFormatActionHandler = async (
       },
     };
   } catch (error) {
-    console.error('Upload action error:', error);
+    loggers.s3.error('Upload action error', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to generate upload URL',

@@ -8,6 +8,7 @@ import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('Artist GET error:', error);
+    loggers.media.error('Artist GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -107,7 +108,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
 
     return NextResponse.json(result.data, { status: 201 });
   } catch (error) {
-    console.error('Artist POST error:', error);
+    loggers.media.error('Artist POST error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

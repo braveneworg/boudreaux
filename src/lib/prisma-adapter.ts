@@ -7,9 +7,12 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { generateUsername } from 'unique-username-generator';
 
 import type { prisma } from '@/lib/prisma';
+import { loggers } from '@/lib/utils/logger';
 
 import type { PrismaClient } from '@prisma/client';
 import type { Adapter } from 'next-auth/adapters';
+
+const logger = loggers.database;
 
 /** The app singleton is an $extends-ed client (slow-query logging) */
 type AdapterPrismaClient = PrismaClient | typeof prisma;
@@ -36,7 +39,7 @@ export const CustomPrismaAdapter = (p: AdapterPrismaClient): CustomAdapter => {
       try {
         // Call the base adapter's useVerificationToken to consume the token
         if (!baseAdapter.useVerificationToken) {
-          console.error('[CustomPrismaAdapter] useVerificationToken not found on base adapter');
+          logger.error('[CustomPrismaAdapter] useVerificationToken not found on base adapter');
           return null;
         }
 
@@ -57,14 +60,14 @@ export const CustomPrismaAdapter = (p: AdapterPrismaClient): CustomAdapter => {
             }
           } catch (error) {
             // Log error but don't fail the verification
-            console.error('[CustomPrismaAdapter] Error updating emailVerified:', error);
+            logger.error('[CustomPrismaAdapter] Error updating emailVerified', error);
           }
         }
 
         return verificationToken;
       } catch (error) {
         // Log and rethrow to maintain original behavior
-        console.error('[CustomPrismaAdapter] Error in useVerificationToken:', error);
+        logger.error('[CustomPrismaAdapter] Error in useVerificationToken', error);
         throw error;
       }
     },

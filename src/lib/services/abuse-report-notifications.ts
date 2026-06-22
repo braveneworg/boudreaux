@@ -6,6 +6,7 @@ import 'server-only';
 import { sendAbuseReportNotificationEmail } from '@/lib/email/send-abuse-report-notification';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { getSmsService } from '@/lib/services/get-sms-service';
+import { loggers } from '@/lib/utils/logger';
 
 interface DispatchInput {
   reportedUsername: string;
@@ -26,7 +27,7 @@ export const dispatchAbuseReportNotifications = async (input: DispatchInput): Pr
   const admins = await UserRepository.findAdmins();
 
   if (admins.length === 0) {
-    console.warn(
+    loggers.chat.warn(
       '[dispatchAbuseReportNotifications] no admins found; skipping notification fan-out'
     );
     return;
@@ -49,7 +50,10 @@ export const dispatchAbuseReportNotifications = async (input: DispatchInput): Pr
         recipientUsername,
         reportedUsername: input.reportedUsername,
       }).catch((error) => {
-        console.error(`[dispatchAbuseReportNotifications] email failed for ${admin.email}:`, error);
+        loggers.chat.error(
+          `[dispatchAbuseReportNotifications] email failed for ${admin.email}`,
+          error
+        );
       });
 
       // Truthy-guard narrows `admin.phone` to a non-null string for `send`.
@@ -59,14 +63,14 @@ export const dispatchAbuseReportNotifications = async (input: DispatchInput): Pr
               .send(admin.phone, smsBody, { transactional: true })
               .then((result) => {
                 if (!result.ok) {
-                  console.error(
+                  loggers.chat.error(
                     `[dispatchAbuseReportNotifications] SMS failed for admin ${admin.id}: ${result.error}`
                   );
                 }
               })
               .catch((error) => {
-                console.error(
-                  `[dispatchAbuseReportNotifications] SMS threw for admin ${admin.id}:`,
+                loggers.chat.error(
+                  `[dispatchAbuseReportNotifications] SMS threw for admin ${admin.id}`,
                   error
                 );
               })

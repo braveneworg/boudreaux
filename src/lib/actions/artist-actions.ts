@@ -9,6 +9,7 @@ import { ArtistService } from '@/lib/services/artist-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import type { Artist } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 
 import type { Prisma } from '@prisma/client';
 
@@ -41,7 +42,7 @@ export const createArtistAction = async (artist: Artist): Promise<ServiceRespons
 
     return result;
   } catch (error) {
-    console.error('Error creating artist:', error);
+    loggers.media.error('Error creating artist', error);
     return { success: false, error: 'Failed to create artist' };
   }
 };

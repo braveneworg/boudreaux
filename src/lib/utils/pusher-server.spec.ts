@@ -4,6 +4,8 @@
 
 import Pusher from 'pusher';
 
+import { loggers } from '@/lib/utils/logger';
+
 import {
   CHAT_CHANNEL,
   CHAT_EVENTS,
@@ -80,7 +82,7 @@ describe('pusher-server', () => {
     });
 
     it('swallows trigger errors so persistence is not blocked by a Pusher outage', async () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
       triggerMock.mockRejectedValue(Error('upstream down'));
 
       await expect(triggerChatEvent('new-message', { id: 'msg-1' })).resolves.toBeUndefined();
@@ -99,7 +101,7 @@ describe('pusher-server', () => {
 
     it('logs and resolves when the trigger times out', async () => {
       vi.useFakeTimers();
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
       // Never-resolving trigger forces the timeout path.
       triggerMock.mockImplementation(() => new Promise(() => undefined));
 
@@ -109,10 +111,8 @@ describe('pusher-server', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Pusher trigger failed',
-        expect.objectContaining({
-          event: 'new-message',
-          error: expect.objectContaining({ message: expect.stringContaining('timed out') }),
-        })
+        expect.objectContaining({ message: expect.stringContaining('timed out') }),
+        { event: 'new-message' }
       );
       errorSpy.mockRestore();
       vi.useRealTimers();

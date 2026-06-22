@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
+import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /**
@@ -38,7 +39,7 @@ export const GET = withRateLimit<{ venueId: string }>(
       }
     );
   } catch (error) {
-    console.error('Failed to fetch venue:', error);
+    loggers.media.error('Failed to fetch venue', error);
     return NextResponse.json({ error: 'Failed to fetch venue' }, { status: 500 });
   }
 });

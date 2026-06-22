@@ -7,6 +7,9 @@ import 'server-only';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 
 import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.s3;
 
 interface StreamSigningConfig {
   keyPairId: string;
@@ -77,7 +80,7 @@ export const signStreamUrl = (
       dateLessThan,
     });
   } catch (err) {
-    console.error('CloudFront stream signing failed; falling back to unsigned URL:', err);
+    logger.error('CloudFront stream signing failed; falling back to unsigned URL', err);
     return null;
   }
 };

@@ -17,10 +17,13 @@ import type {
   ReleaseCarouselItem,
   ReleaseListItem,
 } from '@/lib/types/media-models';
+import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object } from '@/utils/s3-client';
 import { cache, withCache } from '@/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
+
+const logger = loggers.media;
 
 /**
  * Default page size for the public published-releases listing. Mirrors the
@@ -57,12 +60,12 @@ export class ReleaseService {
 
       // Connection/network issues
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
       // Unknown errors
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to create release' };
     }
   }
@@ -81,11 +84,11 @@ export class ReleaseService {
       return { success: true, data: release };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve release' };
     }
   }
@@ -151,11 +154,11 @@ export class ReleaseService {
       return { success: true, data: releases };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve releases' };
     }
   }
@@ -183,11 +186,11 @@ export class ReleaseService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to update release' };
     }
   }
@@ -272,11 +275,11 @@ export class ReleaseService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to delete release' };
     }
   }
@@ -296,11 +299,11 @@ export class ReleaseService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to soft delete release' };
     }
   }
@@ -320,11 +323,11 @@ export class ReleaseService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to restore release' };
     }
   }
@@ -343,11 +346,11 @@ export class ReleaseService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to publish release' };
     }
   }
@@ -419,11 +422,11 @@ export class ReleaseService {
         };
       } catch (error) {
         if (error instanceof Prisma.PrismaClientInitializationError) {
-          console.error('Database connection failed:', error);
+          logger.error('Database connection failed', error);
           return { success: false, error: 'Database unavailable' };
         }
 
-        console.error('Unexpected error:', error);
+        logger.error('Unexpected error', error);
         return { success: false, error: 'Failed to fetch published releases' };
       }
     };
@@ -464,11 +467,11 @@ export class ReleaseService {
       return { success: true, data: release };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve release' };
     }
   }
@@ -490,11 +493,11 @@ export class ReleaseService {
       return { success: true, data: releases };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to fetch artist releases' };
     }
   }

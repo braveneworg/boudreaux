@@ -10,6 +10,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { IMAGE_VARIANT_SUFFIX_REGEX } from '@/lib/constants/image-variants';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { generateVariantsFromBuffer, getExtension } from '@/lib/utils/image-variants';
+import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { generateImageVariantsSchema } from '@/lib/validation/admin-asset-schemas';
 
@@ -159,7 +160,7 @@ export const generateImageVariantsAction = async (
     return { success: true, variantsGenerated };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[generateImageVariants] Error:', errorMessage);
+    loggers.s3.error('[generateImageVariants] Error', error);
     return { success: false, variantsGenerated: 0, error: errorMessage };
   }
 };

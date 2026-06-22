@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { type DigitalFormatType, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
@@ -77,7 +78,7 @@ export const GET = withRateLimit<{ id: string }>(
       }
     );
   } catch (error) {
-    console.error('Digital formats GET error:', error);
+    loggers.media.error('Digital formats GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

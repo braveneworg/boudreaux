@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { loggers } from '@/lib/utils/logger';
+
 import { sendChatMentionEmail } from './send-chat-mention';
 
 vi.mock('server-only', () => ({}));
@@ -78,7 +80,7 @@ describe('sendChatMentionEmail', () => {
 
   it('returns false and logs when EMAIL_FROM is not configured', async () => {
     vi.stubEnv('EMAIL_FROM', '');
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
 
     const result = await sendChatMentionEmail(validInput);
 
@@ -89,7 +91,7 @@ describe('sendChatMentionEmail', () => {
   });
 
   it('sends raw email via SES and returns true on success', async () => {
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(loggers.chat, 'info').mockImplementation(() => {});
 
     const result = await sendChatMentionEmail(validInput);
 
@@ -160,7 +162,7 @@ describe('sendChatMentionEmail', () => {
 
   it('throws when SES dispatch fails', async () => {
     mockSesClientSend.mockRejectedValueOnce(new Error('SES down'));
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
 
     await expect(sendChatMentionEmail(validInput)).rejects.toThrow('SES down');
     expect(errorSpy).toHaveBeenCalledWith(

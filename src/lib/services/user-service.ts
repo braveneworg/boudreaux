@@ -7,6 +7,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { loggers } from '@/lib/utils/logger';
 
 /** Result of {@link UserService.updateUsername}. */
 export interface UpdateUsernameResult {
@@ -41,7 +42,7 @@ export const UserService = {
     const adminUser = await UserRepository.findByEmail(email);
 
     if (!adminUser) {
-      console.info('🌱 Creating admin user...');
+      loggers.auth.info('🌱 Creating admin user...');
       await UserRepository.create({
         firstName,
         lastName,
@@ -51,9 +52,9 @@ export const UserService = {
         role,
         emailVerified: new Date(),
       });
-      console.info(`✅ Admin user, ${email}, created.`);
+      loggers.auth.info(`✅ Admin user, ${email}, created.`);
     } else {
-      console.info(`ℹ️ Admin user, ${email}, already exists.`);
+      loggers.auth.info(`ℹ️ Admin user, ${email}, already exists.`);
     }
   },
 

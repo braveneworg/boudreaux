@@ -5,6 +5,7 @@
 import { PrismaAdapter } from '@auth/prisma-adapter';
 
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { loggers } from '@/lib/utils/logger';
 
 import type { AdapterUser, Adapter } from 'next-auth/adapters';
 
@@ -999,7 +1000,7 @@ describe('CustomPrismaAdapter', () => {
         token: 'abc123',
         expires: new Date(),
       };
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
       // The @auth/prisma-adapter internally calls verificationToken.delete
@@ -1013,16 +1014,16 @@ describe('CustomPrismaAdapter', () => {
 
       // Should return the token even if updating emailVerified fails
       expect(result).toEqual(mockToken);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[CustomPrismaAdapter] Error updating emailVerified:',
+      expect(loggerSpy).toHaveBeenCalledWith(
+        '[CustomPrismaAdapter] Error updating emailVerified',
         expect.any(Error)
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should rethrow error if base adapter useVerificationToken fails', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
       // The @auth/prisma-adapter internally calls verificationToken.delete which then throws
       mockPrisma.verificationToken.delete.mockRejectedValue(new Error('Token error'));
       mockUseVerificationToken.mockRejectedValue(new Error('Token error'));
@@ -1034,7 +1035,7 @@ describe('CustomPrismaAdapter', () => {
         })
       ).rejects.toThrow('Token error');
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should not update emailVerified when user is not found by email', async () => {
@@ -1063,7 +1064,7 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null when base adapter lacks useVerificationToken', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(loggers.database, 'error').mockImplementation(() => {});
 
       // Re-mock PrismaAdapter to return an adapter object WITHOUT useVerificationToken (once)
       vi.mocked(PrismaAdapter).mockReturnValueOnce({
@@ -1088,11 +1089,11 @@ describe('CustomPrismaAdapter', () => {
       });
 
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         '[CustomPrismaAdapter] useVerificationToken not found on base adapter'
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
   });
 });

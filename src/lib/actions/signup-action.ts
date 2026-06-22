@@ -19,6 +19,7 @@ import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { validateEmailSecurity } from '@/lib/utils/email-security';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { signupSchema } from '@/lib/validation/signup-schema';
@@ -147,7 +148,7 @@ export const signupAction = async (
             });
           } catch (sendError) {
             // Log but do not surface — we must not reveal duplicate-email state.
-            console.error('Failed to send sign-in magic link on duplicate email', sendError);
+            loggers.auth.error('Failed to send sign-in magic link on duplicate email', sendError);
           }
 
           await logSecurityEvent({

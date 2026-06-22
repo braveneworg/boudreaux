@@ -10,6 +10,7 @@ import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-d
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { UploadService } from '@/lib/services/upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import {
   digitalFormatConfirmationSchema,
@@ -102,7 +103,7 @@ const confirmDigitalFormatUploadActionHandler = async (
       },
     };
   } catch (error) {
-    console.error('Confirmation action error:', error);
+    loggers.s3.error('Confirmation action error', error);
 
     // Handle unique constraint violation (format already exists)
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
@@ -191,7 +192,7 @@ const confirmMultiTrackUploadActionHandler = async (
       data: { formatId: parent.id, fileCount },
     };
   } catch (error) {
-    console.error('Multi-track confirmation action error:', error);
+    loggers.s3.error('Multi-track confirmation action error', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to confirm multi-track upload',

@@ -19,6 +19,7 @@ import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { UploadService } from '@/lib/services/upload-service';
+import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
@@ -48,11 +49,11 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
 
   try {
     const { id: releaseId, formatType } = await context.params;
-    console.info(`[upload-proxy] START ${formatType} for release=${releaseId}`);
+    loggers.s3.info(`[upload-proxy] START ${formatType} for release=${releaseId}`);
 
     // Step 2: Validate format type
     if (!VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {
-      console.warn(`[upload-proxy] Invalid format type: ${formatType}`);
+      loggers.s3.warn(`[upload-proxy] Invalid format type: ${formatType}`);
       return NextResponse.json(
         { success: false, error: 'INVALID_FORMAT', message: 'Invalid digital format type.' },
         { status: 400 }
@@ -66,7 +67,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
     const trackNumberHeader = request.headers.get('x-track-number');
 
     if (!rawFileName || !fileSizeHeader) {
-      console.warn(`[upload-proxy] Missing metadata headers for ${formatType}`);
+      loggers.s3.warn(`[upload-proxy] Missing metadata headers for ${formatType}`);
       return NextResponse.json(
         {
           success: false,
@@ -92,7 +93,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
       );
     }
 
-    console.info(
+    loggers.s3.info(
       `[upload-proxy] ${formatType}: file="${fileName}" size=${(fileSize / 1024 / 1024).toFixed(1)}MB mime=${mimeType || '(empty)'}`
     );
 
@@ -106,7 +107,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
     });
 
     if (!validation.valid) {
-      console.warn(`[upload-proxy] Validation failed for ${formatType}: ${validation.error}`);
+      loggers.s3.warn(`[upload-proxy] Validation failed for ${formatType}: ${validation.error}`);
       return NextResponse.json(
         { success: false, error: 'VALIDATION_FAILED', message: validation.error },
         { status: 400 }
@@ -123,7 +124,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
 
     // Step 6: Validate request body exists
     if (!request.body) {
-      console.warn(`[upload-proxy] Empty request body for ${formatType}`);
+      loggers.s3.warn(`[upload-proxy] Empty request body for ${formatType}`);
       return NextResponse.json(
         { success: false, error: 'NO_BODY', message: 'Request body is empty.' },
         { status: 400 }
@@ -133,7 +134,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
     const baseUrl =
       process.env.NEXT_PUBLIC_HOST_NAME?.trim() || process.env.NEXT_PUBLIC_BASE_URL?.trim();
     if (!baseUrl) {
-      console.error(
+      loggers.s3.error(
         '[upload-proxy] Missing NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
@@ -151,7 +152,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
     try {
       validatedBaseUrl = new URL(baseUrl).toString();
     } catch {
-      console.error(
+      loggers.s3.error(
         '[upload-proxy] Invalid NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
@@ -185,7 +186,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
       const s3Client = getS3Client();
       const bucketName = getS3BucketName();
 
-      console.info(`[upload-proxy] ${formatType}: starting S3 multipart upload to key=${s3Key}`);
+      loggers.s3.info(`[upload-proxy] ${formatType}: starting S3 multipart upload to key=${s3Key}`);
 
       const fileStream = createReadStream(tempFilePath);
       const upload = new Upload({
@@ -207,7 +208,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
       upload.on('httpUploadProgress', (progress) => {
         const loaded = progress.loaded ?? 0;
         const pct = actualFileSize > 0 ? ((loaded / actualFileSize) * 100).toFixed(1) : '?';
-        console.info(
+        loggers.s3.info(
           `[upload-proxy] ${formatType}: progress ${pct}% (${(loaded / 1024 / 1024).toFixed(1)}MB / ${(actualFileSize / 1024 / 1024).toFixed(1)}MB)`
         );
       });
@@ -215,7 +216,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
       await upload.done();
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.info(`[upload-proxy] ${formatType}: COMPLETE in ${elapsed}s — s3Key=${s3Key}`);
+      loggers.s3.info(`[upload-proxy] ${formatType}: COMPLETE in ${elapsed}s — s3Key=${s3Key}`);
 
       return NextResponse.json({ success: true, s3Key, contentType, trackNumber }, { status: 200 });
     } finally {
@@ -223,7 +224,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
       try {
         await unlink(tempFilePath);
       } catch (error) {
-        console.warn('[upload-proxy] Failed to clean up temp file', {
+        loggers.s3.warn('[upload-proxy] Failed to clean up temp file', {
           tempFilePath,
           error:
             error instanceof Error
@@ -234,12 +235,7 @@ export const PUT = withAdmin<{ id: string; formatType: string }>(async (request,
     }
   } catch (error) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.error(
-      `[upload-proxy] FAILED after ${elapsed}s:`,
-      error instanceof Error
-        ? { message: error.message, name: error.name, stack: error.stack }
-        : error
-    );
+    loggers.s3.error(`[upload-proxy] FAILED after ${elapsed}s`, error);
     return NextResponse.json(
       {
         success: false,

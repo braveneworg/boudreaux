@@ -10,6 +10,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
+import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateArtistSchema } from '@/lib/validation/update-schemas';
@@ -49,7 +50,7 @@ export const GET = withRateLimit<{ id: string }>(
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {
-    console.error('Artist GET by ID error:', error);
+    loggers.media.error('Artist GET by ID error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
@@ -88,7 +89,7 @@ export const PUT = withAdmin(
 
       return NextResponse.json(result.data);
     } catch (error) {
-      console.error('Artist PUT error:', error);
+      loggers.media.error('Artist PUT error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }
@@ -128,7 +129,7 @@ export const PATCH = withAdmin(
 
       return NextResponse.json(result.data);
     } catch (error) {
-      console.error('Artist PATCH error:', error);
+      loggers.media.error('Artist PATCH error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }
@@ -157,7 +158,7 @@ export const DELETE = withAdmin(
 
       return NextResponse.json({ message: 'Artist deleted successfully', data: result.data });
     } catch (error) {
-      console.error('Artist DELETE error:', error);
+      loggers.media.error('Artist DELETE error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }

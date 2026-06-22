@@ -12,12 +12,31 @@ log_file="${TMPDIR:-/tmp}/husky-pre-push.log"
 # before the full log is read. Updated as the hook progresses.
 stage="startup"
 
-# Drain pre-push stdin (git sends "<local ref> <local sha> <remote ref>
-# <remote sha>" lines) so child processes don't inherit it.
+# Capture pre-push stdin (git sends "<local ref> <local sha> <remote ref>
+# <remote sha>" lines) so we can both (a) keep child processes from inheriting
+# it and (b) detect a deliberate non-fast-forward (force / --force-with-lease)
+# push. git does NOT pass the --force* flag to this hook, so a rewrite can only
+# be inferred from these ref lines: a non-zero remote sha that is not an
+# ancestor of the local sha means history is being rewritten.
+push_refs=""
 if [ ! -t 0 ]; then
-  cat > /dev/null 2>&1 || true
+  push_refs=$(cat 2>/dev/null || true)
 fi
 exec </dev/null
+
+force_push=0
+if [ -n "$push_refs" ]; then
+  # Heredoc (not a pipe) so the loop runs in THIS shell and force_push sticks.
+  while read -r _local_ref local_sha _remote_ref remote_sha; do
+    case "$local_sha" in *[!0]*) : ;; *) continue ;; esac   # skip deletions
+    case "$remote_sha" in *[!0]*) : ;; *) continue ;; esac  # skip new branches
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      force_push=1
+    fi
+  done <<EOF
+$push_refs
+EOF
+fi
 
 # When invoked by `git push`, git exports GIT_* env vars that can confuse
 # child git commands (fetch, rev-parse, diff). Unset them so internal git
@@ -176,16 +195,21 @@ fi
 # origin/main; for tracked branches it means rebasing onto the upstream.
 stage="up-to-date check against $sync_ref"
 if ! git merge-base --is-ancestor "$sync_ref" HEAD; then
-  if [ "$has_upstream" = "1" ]; then
+  if [ "$force_push" = "1" ]; then
+    echo "⚠️  '$sync_ref' is not an ancestor of HEAD, but this is a force push"
+    echo "    (e.g. --force-with-lease after a rebase) — skipping the up-to-date"
+    echo "    check. Type-check, lint, format, and tests still run below."
+  elif [ "$has_upstream" = "1" ]; then
     echo "🚫 Your local branch is behind '$sync_ref'."
     echo "   Run: git pull --rebase $sync_remote $sync_branch"
+    exit 1
   else
     echo "🚫 Your branch '$branch_name' is missing commits from '$sync_ref'."
     echo "   Merge the latest main in before pushing:"
     echo "   git merge $sync_ref"
     echo "   (or: git pull --rebase $sync_remote $sync_branch)"
+    exit 1
   fi
-  exit 1
 fi
 
 # Diff base for change detection is the same ref we just synced against.
@@ -194,8 +218,13 @@ diff_base="$sync_ref"
 # Check if any .ts or .tsx files changed compared to the diff base
 TS_CHANGED=$(git diff --name-only "$diff_base"..HEAD -- '*.ts' '*.tsx' 2>/dev/null | head -1)
 
-if [ -z "$TS_CHANGED" ]; then
-  echo "📦 No .ts or .tsx files changed — skipping type-check, lint, and tests."
+# A force push rewrites history, so always run the full gate (type-check, lint,
+# format, tests) regardless of which files appear changed vs the stale upstream.
+# Only the fast-forward path keeps the "no .ts/.tsx changed" skip optimization.
+if [ "$force_push" = "1" ]; then
+  echo "🛡️  Force push detected — running the full gate (type-check, lint, format, tests)."
+elif [ -z "$TS_CHANGED" ]; then
+  echo "📦 No .ts or .tsx files changed — skipping type-check, lint, format, and tests."
   echo "🚀 Pushing changes..."
   exit 0
 fi
@@ -229,6 +258,21 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ ESLint passed"
+
+echo ""
+echo "🎨 Running Prettier format check before push..."
+stage="Prettier format check (pnpm run format:check)"
+
+pnpm run format:check
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Prettier found unformatted files. Please run 'pnpm run format' before pushing."
+  echo "   Run 'pnpm run format:check' to see all issues."
+  exit 1
+fi
+
+echo "✅ Prettier format check passed"
 
 echo ""
 echo "🧪 Running tests before push..."

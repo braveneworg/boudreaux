@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { loggers } from '@/lib/utils/logger';
+
 import {
   generateCloudFrontSignedUrl,
   isCloudFrontSigningConfigured,
@@ -139,7 +141,7 @@ describe('generateCloudFrontSignedUrl', () => {
     );
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
     const url = generateCloudFrontSignedUrl({
       s3Key: 'releases/abc/track.mp3',
@@ -148,11 +150,11 @@ describe('generateCloudFrontSignedUrl', () => {
     });
 
     expect(url).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(loggerSpy).toHaveBeenCalledWith(
       expect.stringContaining('CloudFront signing failed'),
       expect.anything()
     );
 
-    consoleSpy.mockRestore();
+    loggerSpy.mockRestore();
   });
 });

@@ -8,6 +8,7 @@ import path from 'path';
 import { SendRawEmailCommand } from '@aws-sdk/client-ses';
 import nodemailer from 'nodemailer';
 
+import { loggers } from '@/lib/utils/logger';
 import { sesClient } from '@/lib/utils/ses-client';
 
 import { buildAbuseReportEmailHtml } from './abuse-report-email-html';
@@ -32,7 +33,7 @@ export const sendAbuseReportNotificationEmail = async (
 ): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
-    console.error('[sendAbuseReportNotificationEmail] EMAIL_FROM is not configured');
+    loggers.chat.error('[sendAbuseReportNotificationEmail] EMAIL_FROM is not configured');
     return false;
   }
 
@@ -82,12 +83,12 @@ export const sendAbuseReportNotificationEmail = async (
     });
 
     await sesClient.send(command);
-    console.info(
+    loggers.chat.info(
       `[sendAbuseReportNotificationEmail] Email sent to ${input.toEmail} (report against @${input.reportedUsername})`
     );
     return true;
   } catch (error) {
-    console.error(`Failed to send abuse-report notification email to ${input.toEmail}:`, error);
+    loggers.chat.error(`Failed to send abuse-report notification email to ${input.toEmail}`, error);
     throw error;
   }
 };

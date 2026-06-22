@@ -10,9 +10,12 @@ import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { ArtistService, type ImageUploadInput } from '@/lib/services/artist-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 import type { AdminActionResult } from './run-admin-entity-action';
+
+const logger = loggers.s3;
 
 /**
  * Result type for image upload actions
@@ -114,7 +117,7 @@ export const uploadArtistImagesAction = async (
 
     return { success: false, error: response.error };
   } catch (error) {
-    console.error('Upload artist images action error:', error);
+    logger.error('Upload artist images action error', error);
     return { success: false, error: 'Failed to upload images' };
   }
 };
@@ -153,7 +156,7 @@ export const deleteArtistImageAction = async (imageId: string): Promise<AdminAct
 
     return { success: false, error: response.error };
   } catch (error) {
-    console.error('Delete artist image action error:', error);
+    logger.error('Delete artist image action error', error);
     return { success: false, error: 'Failed to delete image' };
   }
 };
@@ -171,7 +174,7 @@ export const getArtistImagesAction = async (artistId: string): Promise<ImageUplo
 
     return { success: false, error: response.error };
   } catch (error) {
-    console.error('Get artist images action error:', error);
+    logger.error('Get artist images action error', error);
     return { success: false, error: 'Failed to retrieve images' };
   }
 };
@@ -214,7 +217,7 @@ export const updateArtistImageAction = async (
 
     return { success: false, error: response.error };
   } catch (error) {
-    console.error('Update artist image action error:', error);
+    logger.error('Update artist image action error', error);
     return { success: false, error: 'Failed to update image' };
   }
 };
@@ -263,7 +266,7 @@ export const reorderArtistImagesAction = async (
 
     return { success: false, error: response.error };
   } catch (error) {
-    console.error('Reorder artist images action error:', error);
+    logger.error('Reorder artist images action error', error);
     return { success: false, error: 'Failed to reorder images' };
   }
 };

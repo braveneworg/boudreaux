@@ -9,6 +9,7 @@ import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,7 +118,7 @@ export const GET = withRateLimit(
       }
     );
   } catch (error) {
-    console.error('Artist search error:', error);
+    loggers.media.error('Artist search error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

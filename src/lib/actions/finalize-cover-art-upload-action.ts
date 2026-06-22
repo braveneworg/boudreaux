@@ -9,6 +9,7 @@ import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-clo
 import { DeleteObjectsCommand, ListObjectsV2Command, type _Object } from '@aws-sdk/client-s3';
 
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
@@ -164,7 +165,7 @@ export const finalizeCoverArtUploadAction = async (
       invalidationId = result.Invalidation?.Id;
     } catch (err) {
       // Best-effort: cleanup already succeeded; cache will refresh on TTL.
-      console.warn('[finalizeCoverArtUpload] CloudFront invalidation failed:', err);
+      loggers.s3.warn('[finalizeCoverArtUpload] CloudFront invalidation failed', { error: err });
     }
   }
 

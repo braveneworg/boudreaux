@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { loggers } from '@/lib/utils/logger';
 
 /**
  * Fetch all purchases for the currently authenticated user.
@@ -25,7 +26,7 @@ export const getCollectionAction = async () => {
     const purchases = await PurchaseRepository.findAllByUser(session.user.id);
     return { success: true, data: purchases };
   } catch (error) {
-    console.error('[getCollectionAction] Failed to fetch collection:', error);
+    loggers.media.error('[getCollectionAction] Failed to fetch collection', error);
     return { success: false, error: 'Failed to load collection', data: [] };
   }
 };
@@ -49,7 +50,7 @@ export const deletePurchaseAction = async (purchaseId: string) => {
     revalidatePath('/collection');
     return { success: true };
   } catch (error) {
-    console.error('[deletePurchaseAction] Failed to delete purchase:', error);
+    loggers.media.error('[deletePurchaseAction] Failed to delete purchase', error);
     return { success: false, error: 'Failed to delete purchase' };
   }
 };

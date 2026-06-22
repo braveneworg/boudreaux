@@ -8,6 +8,7 @@ import { POLLING_LIMIT, pollingLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { stripe } from '@/lib/stripe';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +72,7 @@ export const GET = withRateLimit<{ id: string }>(
             : session.payment_intent?.id;
 
         if (metadataReleaseId !== releaseId) {
-          console.warn(
+          loggers.payments.warn(
             '[purchase-status] Dev fallback: session releaseId mismatch, skipping auto-create',
             {
               sessionId,
@@ -99,10 +100,13 @@ export const GET = withRateLimit<{ id: string }>(
             });
           }
 
-          console.info('[purchase-status] Dev fallback: created purchase from Stripe session', {
-            sessionId,
-            releaseId,
-          });
+          loggers.payments.info(
+            '[purchase-status] Dev fallback: created purchase from Stripe session',
+            {
+              sessionId,
+              releaseId,
+            }
+          );
 
           return NextResponse.json(
             { confirmed: true },
@@ -111,10 +115,9 @@ export const GET = withRateLimit<{ id: string }>(
         }
       }
     } catch (error) {
-      console.warn(
-        '[purchase-status] Dev fallback failed:',
-        error instanceof Error ? error.message : error
-      );
+      loggers.payments.warn('[purchase-status] Dev fallback failed', {
+        error: error instanceof Error ? error.message : error,
+      });
     }
   }
 

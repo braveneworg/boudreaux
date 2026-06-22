@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 
 import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ export const GET = withAuth(async (_request, _context, session) => {
       isAdmin: session.user.role === 'admin',
     });
   } catch (error) {
-    console.error('User collection GET error:', error);
+    loggers.media.error('User collection GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
