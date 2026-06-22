@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.153.0] - 2026-06-22
+
+### Added
+
+- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n
+
 ## [4.152.0] - 2026-06-22
 
 ### Added
