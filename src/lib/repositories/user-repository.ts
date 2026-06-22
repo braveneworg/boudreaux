@@ -6,6 +6,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   CreateUserData,
+  UpdateUserProfileData,
   User,
   UserAdminRecord,
   UserContactRecord,
@@ -106,6 +107,15 @@ export class UserRepository {
         data: { email, previousEmail },
         include: userFullInclude,
       })
+    ) as Promise<User>;
+  }
+
+  /**
+   * Update a user's editable profile fields, returning the full user payload.
+   */
+  static async updateProfile(id: string, data: UpdateUserProfileData): Promise<User> {
+    return runQuery(() =>
+      prisma.user.update({ where: { id }, data, include: userFullInclude })
     ) as Promise<User>;
   }
 

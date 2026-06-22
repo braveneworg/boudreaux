@@ -3,15 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { Prisma } from '@prisma/client';
+import type { Json } from '@/lib/types/domain/shared';
 
 /**
- * Recursive schema for an arbitrary JSON value, matching Prisma's
- * `Prisma.JsonValue` (the deserialized shape of a `Json` field such as
- * `Release.extendedData`): `string | number | boolean | null | JsonValue[] |
- * { [key: string]: JsonValue }`.
+ * Recursive schema for an arbitrary JSON value, matching the vendor-neutral
+ * domain `Json` type (the deserialized shape of a `Json` field such as
+ * `Release.extendedData`): `string | number | boolean | null | Json[] |
+ * { [key: string]: Json }`.
  */
-export const jsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
+export const jsonValueSchema: z.ZodType<Json> = z.lazy(() =>
   z.union([
     z.string(),
     z.number(),

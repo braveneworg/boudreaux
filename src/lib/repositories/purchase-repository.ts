@@ -5,6 +5,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import { runQuery } from './_internal/map-prisma-error';
+
 interface CreatePurchaseData {
   userId: string;
   releaseId: string;
@@ -19,15 +21,21 @@ interface CreatePurchaseData {
  * All database logic for the PWYW purchase feature lives here.
  */
 export class PurchaseRepository {
-  /** Create a new purchase record after webhook confirms payment. */
+  /**
+   * Create a new purchase record after webhook confirms payment. Wrapped in
+   * `runQuery` so a unique-constraint race surfaces as a vendor-neutral
+   * `DataError` (code `DUPLICATE`) for the webhook's idempotency recovery.
+   */
   static async create(data: CreatePurchaseData) {
-    return prisma.releasePurchase.create({
-      data: {
-        ...data,
-        confirmationEmailSentAt: null,
-        refundedAt: null,
-      },
-    });
+    return runQuery(() =>
+      prisma.releasePurchase.create({
+        data: {
+          ...data,
+          confirmationEmailSentAt: null,
+          refundedAt: null,
+        },
+      })
+    );
   }
 
   /** Find a purchase by its Stripe PaymentIntent ID (idempotency key). */

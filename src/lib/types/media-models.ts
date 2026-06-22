@@ -4,6 +4,7 @@
 import type {
   Artist,
   ArtistListWithBio,
+  ArtistScalars,
   ArtistWithPublishedReleases,
 } from '@/lib/types/domain/artist';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/domain/featured-artist';
@@ -13,11 +14,11 @@ import type {
   Release,
   ReleaseCarouselItem,
   ReleaseListItem,
+  ReleaseScalars,
 } from '@/lib/types/domain/release';
 import type { Platform } from '@/lib/types/domain/shared';
+import type { UrlRecord } from '@/lib/types/domain/url';
 import type { User } from '@/lib/types/domain/user';
-
-import type { Prisma } from '@prisma/client';
 
 /**
  * Media model types that match the models in prisma/schema.prisma
@@ -175,19 +176,34 @@ export interface Instrument {
 // with existing importers of `@/lib/types/media-models`.
 export type { User };
 
-export type Url = Prisma.UrlGetPayload<{
-  include: {
-    artist: true;
-    release: true;
-  };
-}>;
+/**
+ * Hand-written, Prisma-free mirror of the Prisma `Url` model with its optional
+ * `artist` and `release` relations loaded. Mirrors `model Url` in
+ * prisma/schema.prisma; both relations are optional in the schema, so each is
+ * `| null` when included.
+ */
+export interface Url {
+  id: string;
+  artistId: string | null;
+  releaseId: string | null;
+  platform: Platform;
+  url: string;
+  artist: ArtistScalars | null;
+  release: ReleaseScalars | null;
+}
 
-export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
-  include: {
-    release: true;
-    url: true;
-  };
-}>;
+/**
+ * Hand-written, Prisma-free mirror of the Prisma `ReleaseUrl` join model with
+ * its required `release` and `url` relations loaded. Mirrors `model ReleaseUrl`
+ * in prisma/schema.prisma.
+ */
+export interface ReleaseUrl {
+  id: string;
+  releaseId: string;
+  urlId: string;
+  release: ReleaseScalars;
+  url: UrlRecord;
+}
 
 // `ArtistListWithBio` and `ArtistWithPublishedReleases` are re-exported from the
 // domain layer at the top of this file; their query includes live in

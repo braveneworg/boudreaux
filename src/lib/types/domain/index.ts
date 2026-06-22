@@ -13,3 +13,5 @@ export * from './release';
 export * from './featured-artist';
 export * from './user';
 export * from './banner-notification';
+export * from './purchase';
+export * from './visitor-identity';

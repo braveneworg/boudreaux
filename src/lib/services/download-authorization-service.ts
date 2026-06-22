@@ -8,9 +8,8 @@ import { SOFT_DELETE_GRACE_PERIOD_DAYS } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import type { ReleaseDigitalFormatScalars } from '@/lib/types/domain/release';
 import { generatePresignedDownloadUrl } from '@/lib/utils/s3-client';
-
-import type { ReleaseDigitalFormat } from '@prisma/client';
 
 /**
  * Service for authorizing digital format downloads with purchase verification
@@ -41,7 +40,7 @@ export class DownloadAuthorizationService {
   async checkFormatExists(
     releaseId: string,
     formatType: DigitalFormatType
-  ): Promise<ReleaseDigitalFormat | null> {
+  ): Promise<ReleaseDigitalFormatScalars | null> {
     return this.digitalFormatRepository.findActiveByReleaseAndFormat(releaseId, formatType);
   }
 
@@ -51,7 +50,7 @@ export class DownloadAuthorizationService {
    * @param format - Digital format record
    * @returns True if within grace period or not deleted, false if beyond grace period
    */
-  async checkSoftDeleteGracePeriod(format: ReleaseDigitalFormat): Promise<boolean> {
+  async checkSoftDeleteGracePeriod(format: ReleaseDigitalFormatScalars): Promise<boolean> {
     // If not deleted, always allow
     if (!format.deletedAt) {
       return true;
@@ -93,7 +92,7 @@ export class DownloadAuthorizationService {
     | {
         authorized: true;
         downloadUrl: string;
-        format: ReleaseDigitalFormat;
+        format: ReleaseDigitalFormatScalars;
       }
     | {
         authorized: false;

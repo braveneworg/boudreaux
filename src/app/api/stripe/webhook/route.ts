@@ -4,7 +4,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
@@ -12,6 +11,7 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseService } from '@/lib/services/release-service';
 import { UserService } from '@/lib/services/user-service';
 import { stripe } from '@/lib/stripe';
+import { DataError } from '@/lib/types/domain/errors';
 import { loggers } from '@/lib/utils/logger';
 
 import type Stripe from 'stripe';
@@ -207,14 +207,11 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
       // Race condition: a concurrent webhook delivery may have created the
       // record between our pre-check and the insert. Re-fetch by
       // paymentIntentId (the most specific unique key).
-      // Turbopack bundles Prisma into separate module contexts, breaking
-      // instanceof checks — use duck-type detection for the error code.
-      const isPrismaP2002 =
-        (createError instanceof PrismaClientKnownRequestError ||
-          (createError instanceof Error && 'code' in createError)) &&
-        (createError as { code?: string }).code === 'P2002';
+      // The repository translates a unique-constraint violation (Prisma P2002)
+      // into a vendor-neutral DataError with code 'DUPLICATE'.
+      const isDuplicate = createError instanceof DataError && createError.code === 'DUPLICATE';
 
-      if (isPrismaP2002) {
+      if (isDuplicate) {
         purchase =
           (await PurchaseRepository.findByPaymentIntentId(paymentIntentId)) ??
           (await PurchaseRepository.findByUserAndRelease(userId, releaseId));

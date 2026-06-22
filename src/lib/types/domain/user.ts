@@ -132,3 +132,22 @@ export interface CreateUserData {
   lastName?: string | null;
   phone?: string | null;
 }
+
+/**
+ * Writable user profile fields accepted by the repository's `updateProfile`
+ * method. Mirrors the subset of Prisma's `UserUpdateInput` the profile form
+ * writes.
+ */
+export interface UpdateUserProfileData {
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  allowSmsNotifications?: boolean;
+}

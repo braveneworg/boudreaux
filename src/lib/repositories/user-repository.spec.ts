@@ -134,6 +134,33 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('updateProfile', () => {
+    it('updates the profile fields for the given id with full include', async () => {
+      updateMock.mockResolvedValue({ id: 'u1' });
+
+      const data = {
+        name: 'Jane Doe',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        phone: '555-1234',
+        addressLine1: '1 Main St',
+        addressLine2: 'Apt 2',
+        city: 'Townsville',
+        state: 'NY',
+        zipCode: '10001',
+        country: 'US',
+        allowSmsNotifications: true,
+      };
+
+      await UserRepository.updateProfile('u1', data);
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data,
+        include: fullInclude,
+      });
+    });
+  });
+
   describe('searchByUsernamePrefix', () => {
     it('queries by case-insensitive prefix, excludes the caller and caps results', async () => {
       const rows = [{ id: 'u1', username: 'alice' }];

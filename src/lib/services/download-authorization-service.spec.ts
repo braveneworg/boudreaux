@@ -5,11 +5,11 @@
 import { SOFT_DELETE_GRACE_PERIOD_DAYS } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import type { PurchaseRecord } from '@/lib/types/domain/purchase';
+import type { ReleaseDigitalFormatScalars } from '@/lib/types/domain/release';
 import { generatePresignedDownloadUrl } from '@/lib/utils/s3-client';
 
 import { DownloadAuthorizationService } from './download-authorization-service';
-
-import type { ReleaseDigitalFormat, ReleasePurchase } from '@prisma/client';
 
 // Mock repositories — the service no longer touches Prisma directly.
 vi.mock('@/lib/repositories/purchase-repository', () => ({
@@ -39,7 +39,9 @@ describe('DownloadAuthorizationService', () => {
   const mockS3Key = 'releases/123/digital-formats/MP3_320KBPS/album.mp3';
   const mockFileName = 'album.mp3';
 
-  const createMockFormat = (overrides?: Partial<ReleaseDigitalFormat>): ReleaseDigitalFormat => ({
+  const createMockFormat = (
+    overrides?: Partial<ReleaseDigitalFormatScalars>
+  ): ReleaseDigitalFormatScalars => ({
     id: 'format123',
     releaseId: mockReleaseId,
     formatType: mockFormatType,
@@ -67,7 +69,7 @@ describe('DownloadAuthorizationService', () => {
 
   describe('checkPurchaseStatus', () => {
     it('should return true when user has a successful purchase', async () => {
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -76,7 +78,7 @@ describe('DownloadAuthorizationService', () => {
       };
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
 
       const result = await service.checkPurchaseStatus(mockUserId, mockReleaseId);
@@ -193,7 +195,7 @@ describe('DownloadAuthorizationService', () => {
     const mockFormat = createMockFormat();
 
     it('should authorize download when all checks pass', async () => {
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -202,7 +204,7 @@ describe('DownloadAuthorizationService', () => {
       const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
       findActiveByReleaseAndFormat.mockResolvedValue(mockFormat);
       vi.mocked(generatePresignedDownloadUrl).mockResolvedValue(mockPresignedUrl);
@@ -233,7 +235,7 @@ describe('DownloadAuthorizationService', () => {
     });
 
     it('should deny download when format does not exist', async () => {
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -241,7 +243,7 @@ describe('DownloadAuthorizationService', () => {
       };
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
       findActiveByReleaseAndFormat.mockResolvedValue(null);
 
@@ -264,7 +266,7 @@ describe('DownloadAuthorizationService', () => {
 
       const deletedFormat = createMockFormat({ deletedAt: deletedDate });
 
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -272,7 +274,7 @@ describe('DownloadAuthorizationService', () => {
       };
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
       findActiveByReleaseAndFormat.mockResolvedValue(deletedFormat);
 
@@ -291,7 +293,7 @@ describe('DownloadAuthorizationService', () => {
     it('should deny download when format has no s3Key', async () => {
       const incompleteFormat = createMockFormat({ s3Key: null });
 
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -299,7 +301,7 @@ describe('DownloadAuthorizationService', () => {
       };
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
       findActiveByReleaseAndFormat.mockResolvedValue(incompleteFormat);
 
@@ -320,7 +322,7 @@ describe('DownloadAuthorizationService', () => {
 
       const deletedFormat = createMockFormat({ deletedAt: deletedDate });
 
-      const mockPurchase: Partial<ReleasePurchase> = {
+      const mockPurchase: Partial<PurchaseRecord> = {
         id: 'purchase123',
         userId: mockUserId,
         releaseId: mockReleaseId,
@@ -329,7 +331,7 @@ describe('DownloadAuthorizationService', () => {
       const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
 
       vi.mocked(PurchaseRepository.findByUserReleaseKey).mockResolvedValue(
-        mockPurchase as ReleasePurchase
+        mockPurchase as PurchaseRecord
       );
       findActiveByReleaseAndFormat.mockResolvedValue(deletedFormat);
       vi.mocked(generatePresignedDownloadUrl).mockResolvedValue(mockPresignedUrl);
