@@ -343,6 +343,34 @@ const eslintConfig = [
       'security/detect-non-literal-fs-filename': 'off',
     },
   },
+  // Server-only modules must log through the project logger (`@/lib/utils/logger`),
+  // never `console.*`. The logger is `server-only`, so enforcement is scoped to
+  // directories that never reach the client bundle; client components and shared
+  // client-safe utils keep the lenient global rule. Specs are excluded — they
+  // legitimately spy on or silence `console`.
+  {
+    files: [
+      'src/lib/actions/**/*.{ts,tsx}',
+      'src/lib/services/**/*.{ts,tsx}',
+      'src/lib/email/**/*.{ts,tsx}',
+      'src/lib/repositories/**/*.{ts,tsx}',
+      'src/app/api/**/*.{ts,tsx}',
+    ],
+    ignores: ['**/*.spec.{ts,tsx}'],
+    rules: {
+      // Forbid every `console.*` call here (the global `no-console` allows
+      // warn/error/info, and its `allow` list can't be emptied — the schema
+      // requires ≥1 entry — so `no-restricted-syntax` enforces the stricter rule).
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='console']",
+          message:
+            'Use the project logger (`loggers` from @/lib/utils/logger), not console, in server-only modules.',
+        },
+      ],
+    },
+  },
   eslintPluginPrettierRecommended,
 ];
 
