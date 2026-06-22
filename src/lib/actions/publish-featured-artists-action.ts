@@ -7,6 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { loggers } from '@/lib/utils/logger';
 import { cache } from '@/lib/utils/simple-cache';
 import { requireRole } from '@/utils/auth/require-role';
 
@@ -28,7 +29,7 @@ export const publishFeaturedArtistsToSiteAction = async (): Promise<AdminActionR
     revalidatePath('/');
     return { success: true };
   } catch (error) {
-    console.error('Failed to publish featured artists to site:', error);
+    loggers.media.error('Failed to publish featured artists to site', error);
     return { success: false, error: 'Failed to publish featured artists to landing page' };
   }
 };

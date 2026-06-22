@@ -7,6 +7,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { signupAction } from '@/lib/actions/signup-action';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import type { FormState } from '@/lib/types/form-state';
+import { loggers } from '@/lib/utils/logger';
 
 import type { Mock } from 'vitest';
 
@@ -442,7 +443,7 @@ describe('signupAction', () => {
 
     it('still redirects on duplicate email when the silent sign-in magic link fails to send', async () => {
       // Account-enumeration defense: even if the magic-link signIn throws, the
-      // error is logged (console.error) and swallowed, and the flow still
+      // error is logged (loggers.auth.error) and swallowed, and the flow still
       // redirects to the same success page as a brand-new signup.
       const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
@@ -452,20 +453,20 @@ describe('signupAction', () => {
 
       mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
       vi.mocked(mockSignIn).mockRejectedValue(new Error('SES send failed'));
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
       });
 
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         'Failed to send sign-in magic link on duplicate email',
         expect.any(Error)
       );
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('should handle P2002 error with different target (not email)', async () => {

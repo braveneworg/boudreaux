@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
 import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import type { PresignedUrlResponse } from '@/lib/validation/tours/image-schema';
 import {
   MAX_IMAGES_PER_TOUR_DATE,
@@ -24,6 +25,8 @@ import {
   type TourDateImageUploadRequest,
   type TourDateUpdateImageAltText,
 } from '@/lib/validation/tours/tour-date-image-schema';
+
+const logger = loggers.s3;
 
 export interface TourDateImageActionResponse<T = unknown> {
   success: boolean;
@@ -60,7 +63,7 @@ export const generateTourDateUploadUrlAction = async (
 
     return { success: true, data: result.data };
   } catch (error) {
-    console.error('Error generating tour date upload URL:', error);
+    logger.error('Error generating tour date upload URL', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -125,7 +128,7 @@ export const confirmTourDateUploadAction = async (
       },
     };
   } catch (error) {
-    console.error('Error confirming tour date upload:', error);
+    logger.error('Error confirming tour date upload', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -162,7 +165,7 @@ export const deleteTourDateImageAction = async (
     // Delete from S3
     const s3Result = await ImageUploadService.deleteFromS3(image.s3Key);
     if (!s3Result.success) {
-      console.error('Failed to delete from S3:', s3Result.error);
+      logger.error('Failed to delete from S3', s3Result.error);
       // Continue with database deletion even if S3 delete fails
     }
 
@@ -175,7 +178,7 @@ export const deleteTourDateImageAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting tour date image:', error);
+    logger.error('Error deleting tour date image', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -219,7 +222,7 @@ export const reorderTourDateImagesAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error reordering tour date images:', error);
+    logger.error('Error reordering tour date images', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -257,7 +260,7 @@ export const updateTourDateImageAltTextAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error updating tour date image alt text:', error);
+    logger.error('Error updating tour date image alt text', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };

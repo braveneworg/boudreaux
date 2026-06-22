@@ -9,6 +9,7 @@ import 'server-only';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { deleteFormatFilesSchema } from '@/lib/validation/admin-asset-schemas';
 import type { ActionResult, DigitalFormatType } from '@/types/digital-format';
@@ -57,7 +58,7 @@ const deleteFormatFilesActionHandler = async (
 
     return { success: true, data: { deletedCount } };
   } catch (error) {
-    console.error('Delete format files action error:', error);
+    loggers.s3.error('Delete format files action error', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete format files',

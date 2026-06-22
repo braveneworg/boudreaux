@@ -14,9 +14,12 @@ import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { loggers } from '@/lib/utils/logger';
 import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
 
 import type { AdapterUser } from 'next-auth/adapters';
+
+const logger = loggers.auth;
 
 export const changeUsernameAction = async (
   _initialState: FormState,
@@ -90,7 +93,7 @@ export const changeUsernameAction = async (
         errorStack:
           process.env.NODE_ENV !== 'production' && error instanceof Error ? error.stack : undefined,
       };
-      console.error('[changeUsernameAction] Error updating username:', errorDetails);
+      logger.error('[changeUsernameAction] Error updating username', undefined, errorDetails);
 
       // Initialize errors object if it doesn't exist
       if (!formState.errors) {
@@ -131,7 +134,9 @@ export const changeUsernameAction = async (
       } else if (error instanceof PrismaClientKnownRequestError) {
         // Handle other known Prisma errors with more context
         const prismaError = error as PrismaClientKnownRequestError;
-        console.error('[changeUsernameAction] Prisma error code:', prismaError.code);
+        logger.error('[changeUsernameAction] Prisma error code', undefined, {
+          code: prismaError.code,
+        });
 
         // Provide more specific error messages for different Prisma error codes
         switch (prismaError.code) {
@@ -150,13 +155,13 @@ export const changeUsernameAction = async (
         }
       } else if (error instanceof Error) {
         // Handle general JavaScript errors
-        console.error('[changeUsernameAction] JavaScript error:', error.message);
+        logger.error('[changeUsernameAction] JavaScript error', error);
         formState.errors.general = [
           'Failed to update username. Please try again or contact support.',
         ];
       } else {
         // Unknown error type
-        console.error('[changeUsernameAction] Unknown error type:', error);
+        logger.error('[changeUsernameAction] Unknown error type', error);
         formState.errors.general = [
           'An unexpected error occurred. Please try again or contact support.',
         ];

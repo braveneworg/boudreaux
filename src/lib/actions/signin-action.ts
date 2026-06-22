@@ -11,6 +11,7 @@ import { signIn } from '@/auth';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { signinSchema } from '@/lib/validation/signin-schema';
@@ -77,9 +78,12 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
       formState.success = false;
       // Log the error for debugging (only in development to avoid exposing details)
       if (process.env.NODE_ENV === 'development') {
-        console.error('Sign-in error:', error);
+        loggers.auth.error('Sign-in error', error);
       } else {
-        console.error('Sign-in error:', error instanceof Error ? error.message : 'Unknown error');
+        loggers.auth.error(
+          'Sign-in error',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
       }
       // Set a generic error message for the user
       setUnknownError(formState);

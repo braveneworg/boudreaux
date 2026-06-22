@@ -5,6 +5,7 @@
 
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { loggers } from '@/lib/utils/logger';
 
 /**
  * Server action to fetch featured artists for the landing page
@@ -15,7 +16,7 @@ export const getFeaturedArtistsAction = async (limit = 7): Promise<FeaturedArtis
   const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), limit);
 
   if (!result.success) {
-    console.error('Failed to fetch featured artists:', result.error);
+    loggers.media.error('Failed to fetch featured artists', result.error);
     return [];
   }
 
