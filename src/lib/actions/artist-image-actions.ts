@@ -12,6 +12,8 @@ import { ArtistService, type ImageUploadInput } from '@/lib/services/artist-serv
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { logSecurityEvent } from '@/utils/audit-log';
 
+import type { AdminActionResult } from './run-admin-entity-action';
+
 /**
  * Result type for image upload actions
  */
@@ -120,9 +122,7 @@ export const uploadArtistImagesAction = async (
 /**
  * Server action to delete an artist image
  */
-export const deleteArtistImageAction = async (
-  imageId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const deleteArtistImageAction = async (imageId: string): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {
@@ -182,7 +182,7 @@ export const getArtistImagesAction = async (artistId: string): Promise<ImageUplo
 export const updateArtistImageAction = async (
   imageId: string,
   data: { caption?: string; altText?: string }
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {
