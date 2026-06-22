@@ -8,6 +8,7 @@ import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
+import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import {
   MAX_FILE_SIZE,
@@ -154,7 +155,7 @@ export class ImageUploadService {
         },
       };
     } catch (error) {
-      console.error('Error generating presigned URL:', error);
+      loggers.media.error('Error generating presigned URL', error);
       return { success: false, error: 'Failed to generate upload URL' };
     }
   }
@@ -206,7 +207,7 @@ export class ImageUploadService {
         },
       };
     } catch (error) {
-      console.error('Error generating tour date presigned URL:', error);
+      loggers.media.error('Error generating tour date presigned URL', error);
       return { success: false, error: 'Failed to generate upload URL' };
     }
   }
@@ -228,7 +229,7 @@ export class ImageUploadService {
 
       return { success: true, data: undefined };
     } catch (error) {
-      console.error('Error deleting from S3:', error);
+      loggers.media.error('Error deleting from S3', error);
       return { success: false, error: 'Failed to delete file from S3' };
     }
   }

@@ -9,6 +9,7 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { isListeningServiceUrl } from '@/lib/utils/is-listening-service-url';
+import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import {
@@ -107,20 +108,24 @@ export class BioGenerationService {
       const response = await getLambdaClient().send(command);
 
       if (response.FunctionError) {
-        console.error('Bio generator Lambda returned a function error:', response.FunctionError);
+        loggers.media.error('Bio generator Lambda returned a function error', undefined, {
+          functionError: response.FunctionError,
+        });
         return { ok: false, error: 'Bio generation failed' };
       }
 
       const payloadText = response.Payload ? Buffer.from(response.Payload).toString('utf-8') : '';
       const parsed = bioGenerationResultSchema.safeParse(JSON.parse(payloadText));
       if (!parsed.success) {
-        console.error('Malformed bio generator response:', parsed.error.issues);
+        loggers.media.error('Malformed bio generator response', undefined, {
+          issues: parsed.error.issues,
+        });
         return { ok: false, error: 'Bio generation returned an unexpected response' };
       }
 
       return parsed.data;
     } catch (error) {
-      console.error('Bio generation invoke failed:', error);
+      loggers.media.error('Bio generation invoke failed', error);
       return { ok: false, error: 'Failed to reach the bio generator' };
     }
   }
@@ -188,7 +193,7 @@ export class BioGenerationService {
             isPrimary: image.isPrimary,
           };
         } catch (error) {
-          console.warn('Bio image re-host failed; dropping image:', error);
+          loggers.media.warn('Bio image re-host failed; dropping image', { error });
           return null;
         }
       })
