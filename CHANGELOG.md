@@ -61,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.152.0] - 2026-06-22
+
+### Added
+
+- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n
+
 ## [4.151.0] - 2026-06-21
 
 ### Added
