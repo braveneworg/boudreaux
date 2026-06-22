@@ -48,6 +48,44 @@ describe('failFromError', () => {
     expect(result.success === false && result.error).toBe('Failed to create artist');
   });
 
+  it('falls back to the UNKNOWN override for a TIMEOUT failure', () => {
+    const result = failFromError(new DataError('TIMEOUT', 'x'), {
+      UNKNOWN: 'Failed to retrieve artist',
+    });
+
+    expect(result.success === false && result.error).toBe('Failed to retrieve artist');
+  });
+
+  it('falls back to the UNKNOWN override for a VALIDATION failure', () => {
+    const result = failFromError(new DataError('VALIDATION', 'x'), {
+      UNKNOWN: 'Failed to update artist',
+    });
+
+    expect(result.success === false && result.error).toBe('Failed to update artist');
+  });
+
+  it('prefers an explicit TIMEOUT override over the UNKNOWN override', () => {
+    const result = failFromError(new DataError('TIMEOUT', 'x'), {
+      TIMEOUT: 'Took too long',
+      UNKNOWN: 'generic',
+    });
+
+    expect(result.success === false && result.error).toBe('Took too long');
+  });
+
+  it('uses the TIMEOUT default when neither TIMEOUT nor UNKNOWN is overridden', () => {
+    expect(failFromError(new DataError('TIMEOUT', 'x'))).toEqual({
+      success: false,
+      error: 'Request timed out',
+    });
+  });
+
+  it('keeps the UNAVAILABLE default and does not fall back to the UNKNOWN override', () => {
+    const result = failFromError(new DataError('UNAVAILABLE', 'x'), { UNKNOWN: 'generic' });
+
+    expect(result.success === false && result.error).toBe('Database unavailable');
+  });
+
   it('logs UNAVAILABLE failures', () => {
     failFromError(new DataError('UNAVAILABLE', 'db down'));
 

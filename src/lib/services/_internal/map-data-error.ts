@@ -17,6 +17,14 @@ const DEFAULT_MESSAGE = new Map<DataErrorCode, string>([
 const LOGGED_CODES: ReadonlySet<DataErrorCode> = new Set(['UNAVAILABLE', 'UNKNOWN']);
 
 /**
+ * "Non-specific" codes that, when not given their own override, fall back to the
+ * caller's `UNKNOWN` override. Services historically funneled timeout/validation/
+ * unexpected failures into one generic per-method message; this preserves that
+ * while still letting `DUPLICATE`/`NOT_FOUND`/`UNAVAILABLE` keep their own copy.
+ */
+const GENERIC_CODES: ReadonlySet<DataErrorCode> = new Set(['TIMEOUT', 'VALIDATION', 'UNKNOWN']);
+
+/**
  * Translate a thrown error into a `ServiceResponse` failure. Repositories throw
  * a {@link DataError} with a vendor-neutral code; this maps that code to a
  * user-facing message, letting callers override individual codes for
@@ -37,8 +45,10 @@ export const failFromError = (
   }
 
   const overrideMap = new Map<string, string>(Object.entries(overrides ?? {}));
+  const genericFallback = GENERIC_CODES.has(code) ? overrideMap.get('UNKNOWN') : undefined;
   return {
     success: false,
-    error: overrideMap.get(code) ?? DEFAULT_MESSAGE.get(code) ?? 'Unexpected error',
+    error:
+      overrideMap.get(code) ?? genericFallback ?? DEFAULT_MESSAGE.get(code) ?? 'Unexpected error',
   };
 };

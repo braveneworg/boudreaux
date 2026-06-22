@@ -44,6 +44,27 @@ describe('toDataError', () => {
     expect(toDataError(error).code).toBe('UNKNOWN');
   });
 
+  // Turbopack bundles Prisma into separate module contexts, so `instanceof
+  // Prisma.PrismaClientKnownRequestError` can be false for a real Prisma error.
+  // The duck-typed fallback keeps known-request codes mapped regardless.
+  it('maps a duck-typed P2002 error (not a Prisma instance) to DUPLICATE', () => {
+    const error = Object.assign(new Error('dup'), { code: 'P2002' });
+
+    expect(toDataError(error).code).toBe('DUPLICATE');
+  });
+
+  it('maps a duck-typed P2025 error (not a Prisma instance) to NOT_FOUND', () => {
+    const error = Object.assign(new Error('missing'), { code: 'P2025' });
+
+    expect(toDataError(error).code).toBe('NOT_FOUND');
+  });
+
+  it('does not treat a non-Prisma string code as a known-request error', () => {
+    const error = Object.assign(new Error('nope'), { code: 'SOME_OTHER' });
+
+    expect(toDataError(error).code).toBe('UNKNOWN');
+  });
+
   it('maps PrismaClientInitializationError to UNAVAILABLE', () => {
     const error = new Prisma.PrismaClientInitializationError('no db', '6.0.0');
 

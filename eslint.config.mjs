@@ -398,6 +398,18 @@ const eslintConfig = [
                 'Prisma may only be imported in src/lib/repositories/**. Catch DataError from @/lib/types/domain/errors instead.',
             },
           ],
+          // Defense-in-depth: also catch any current/future Prisma submodule
+          // (e.g. @prisma/client/edge, @prisma/client/extension). `paths` above
+          // give the precise messages; this glob closes the gap. allowTypeImports
+          // stays false so `import type` is blocked too.
+          patterns: [
+            {
+              group: ['@prisma/client', '@prisma/client/*'],
+              allowTypeImports: false,
+              message:
+                'Prisma may only be imported in src/lib/repositories/**. Use @/lib/types/domain types and DataError instead.',
+            },
+          ],
         },
       ],
     },
