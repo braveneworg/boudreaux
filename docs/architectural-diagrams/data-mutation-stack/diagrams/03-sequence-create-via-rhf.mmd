@@ -1,0 +1,37 @@
+%% Sequence — create featured artist via React Hook Form (mutation path)
+sequenceDiagram
+    autonumber
+    actor U as Admin
+    participant F as RHF Form (client)
+    participant H as useCreate Mutation
+    participant A as Server Action
+    participant G as requireRole admin
+    participant V as Zod getActionState
+    participant S as FeaturedArtistsService
+    participant R as FeaturedArtistRepository
+    participant DB as Prisma / MongoDB
+    participant Q as TanStack Query cache
+
+    U->>F: Fill fields + submit
+    F->>F: form.trigger() client Zod via zodResolver
+    alt invalid
+        F-->>U: toast.error(validation)
+    else valid
+        F->>H: createFeaturedArtistAsync(values)
+        H->>A: mutationFn(FormData)
+        A->>G: admin gate
+        G-->>A: session
+        A->>V: parse + coerce (server Zod)
+        V-->>A: parsed data
+        A->>S: createFeaturedArtist(data)
+        S->>R: create(data)
+        R->>DB: prisma.featuredArtist.create
+        DB-->>R: row
+        R-->>S: entity
+        S-->>A: ServiceResponse(success, data)
+        A->>A: logSecurityEvent + revalidatePath + cache clear
+        A-->>H: FormState(success, data)
+        H-->>F: result
+        F->>Q: invalidateQueries(featuredArtists.all)
+        F-->>U: toast.success + redirect
+    end
