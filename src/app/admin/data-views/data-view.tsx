@@ -1,95 +1,47 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useCallback, useMemo, useRef, useState } from 'react';
+'use client';
+
+import { useCallback, useMemo } from 'react';
 import type { ReactElement } from 'react';
 
-import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { Separator } from '@radix-ui/react-separator';
-import {
-  ArchiveRestoreIcon,
-  BookCheck,
-  Eye,
-  InfoIcon,
-  Pencil,
-  Send,
-  Trash2Icon,
-  X,
-} from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { AdminEntity } from '@/app/admin/types';
 import { Button } from '@/app/components/ui/button';
-import { Card } from '@/app/components/ui/card';
-import {
-  Dialog,
-  DialogTitle,
-  DialogTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogClose,
-} from '@/app/components/ui/dialog';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
-import { Switch } from '@/app/components/ui/switch';
-import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { getDisplayName } from '@/lib/utils/get-display-name';
-import { toDisplayLabel, toEntityUrlPath, toPascalCase } from '@/lib/utils/string-utils';
+import { toDisplayLabel, toEntityUrlPath } from '@/lib/utils/string-utils';
+
+import { DataViewCard } from './components/data-view-card';
+import { DataViewFiltersToolbar } from './components/data-view-filters';
+import { LoadMoreTrigger } from './components/load-more-trigger';
+import { ImagePreviewProvider } from './image-preview-context';
+
+import type { DataViewProps, EntityMutation, MutationVerb } from './data-view-types';
+
+export type {
+  EntityMutation,
+  EntityMutationResult,
+  EntityMutations,
+  DataViewFilters,
+  DataViewPagination,
+  DataViewProps,
+} from './data-view-types';
+
+/** Maps a mutation verb to its past tense for success-toast copy. */
+const toPastTense = (verb: MutationVerb): string =>
+  verb === 'publish' ? 'published' : verb === 'delete' ? 'deleted' : 'restored';
 
 /**
- * Cleans up malformed URLs that may have duplicate protocols (e.g., https://https://)
- */
-const cleanImageUrl = (url: string): string => {
-  if (!url) return url;
-  // Fix double https:// protocol
-  return url.replace(/^https?:\/\/https?:\/\//, 'https://');
-};
-
-/**
- * Safely reads a dynamic field from a record without exposing the codebase to
- * prototype-pollution-style object injection. Returns `undefined` when the key
- * is absent.
- */
-const readField = (record: Record<string, unknown>, key: string): unknown =>
-  new Map(Object.entries(record)).get(key);
-
-/** Plain result returned by the injected entity mutation callbacks. */
-export interface EntityMutationResult {
-  success: boolean;
-  error?: string;
-}
-
-/**
- * An entity mutation injected by a `*-data-view` wrapper. Each wraps a TanStack
- * mutation hook (which owns cache invalidation) and resolves to a plain result
- * the DataView maps to a toast — keeping the generic DataView free of raw fetch.
- */
-export type EntityMutation = (id: string) => Promise<EntityMutationResult>;
-
-/**
- * A generic data view component for displaying and managing admin entities.
+ * A generic data view for displaying and managing admin entities: a searchable,
+ * filterable, infinitely-scrolling list of cards with create, edit, view, publish,
+ * and delete/restore actions. Entity-specific wrappers inject data, mutations, and
+ * controlled filter state.
  *
- * @template T - The entity type extending a record with string keys and unknown values
- *
- * @param props - Component properties
- * @param props.entity - The type of admin entity being displayed
- * @param props.data - The data to display. Uses an intersection type `(T[] & Record<string, T[]>)`
- *   to satisfy two different access patterns:
- *   - Direct array access for type safety when iterating
- *   - Dynamic key access (e.g., `data['artists']` or `data['releases']`) for accessing
- *     entity-specific collections where the key is derived from the entity name at runtime.
- *   This dual typing allows the component to work generically across different entity types
- *   while maintaining type safety for both access patterns. Can be null if no data is available.
- * @param props.fieldsToShow - Array of field names from the entity to display in each card
- * @param props.router - Optional router object for navigation with a push method
- *
- * @returns A React component that renders a searchable list view with create, edit, view,
- *   publish, and delete actions for admin entities
+ * @template T - The entity type extending a record with string keys and unknown values.
  */
 export const DataView = <T extends Record<string, unknown>>({
   entity,
@@ -98,122 +50,49 @@ export const DataView = <T extends Record<string, unknown>>({
   imageField,
   coverArtField,
   forceHardDelete = false,
-  onPublishEntity,
-  onDeleteEntity,
-  onRestoreEntity,
+  canCreate = true,
+  getItemDisplayName,
+  mutations,
+  filters,
+  pagination,
   refetch,
   isPending,
   isFetching = false,
   error,
-  hasNextPage,
-  fetchNextPage,
-  isFetchingNextPage,
-  getItemDisplayName,
-  searchValue,
-  onSearchChange,
-  showPublished,
-  onShowPublishedChange,
-  showUnpublished,
-  onShowUnpublishedChange,
-  showDeleted,
-  onShowDeletedChange,
-  canCreate = true,
-}: {
-  entity: AdminEntity;
-  data: Record<string, T[]> | null;
-  fieldsToShow: string[];
-  /** Field name containing an array of images with src property */
-  imageField?: string;
-  /** Field name containing a direct cover art URL string */
-  coverArtField?: string;
-  /** Force hard delete (no Restore/“Show deleted” UI) even if the entity has a deletedOn field */
-  forceHardDelete?: boolean;
-  /** Publishes the entity (stamps its publish timestamp). Injected by the wrapper. */
-  onPublishEntity: EntityMutation;
-  /** Deletes the entity — soft (archive) or hard, per the wrapper's wiring. */
-  onDeleteEntity: EntityMutation;
-  /** Restores a soft-deleted entity. Omitted for hard-delete-only entities. */
-  onRestoreEntity?: EntityMutation;
-  refetch: () => void;
-  isPending: boolean;
-  /** Whether the query is fetching (e.g. after `refetch()`); drives the refresh skeleton. */
-  isFetching?: boolean;
-  error?: string | null;
-  /** For infinite scroll - whether there are more pages to load */
-  hasNextPage?: boolean;
-  /** For infinite scroll - function to fetch next page */
-  fetchNextPage?: () => void;
-  /** For infinite scroll - whether currently fetching next page */
-  isFetchingNextPage?: boolean;
-  /** Custom display name resolver for entity-specific name formatting */
-  getItemDisplayName?: (item: T) => string;
-  /** Controlled, server-side search term. */
-  searchValue: string;
-  /** Called when the search input changes. */
-  onSearchChange: (value: string) => void;
-  /** Controlled "show published" toggle. */
-  showPublished: boolean;
-  /** Called when the "show published" toggle changes. */
-  onShowPublishedChange: (value: boolean) => void;
-  /** Controlled "show unpublished" toggle. */
-  showUnpublished: boolean;
-  /** Called when the "show unpublished" toggle changes. */
-  onShowUnpublishedChange: (value: boolean) => void;
-  /** Controlled "show deleted" toggle. */
-  showDeleted: boolean;
-  /** Called when the "show deleted" toggle changes. */
-  onShowDeletedChange: (value: boolean) => void;
-  /**
-   * Whether the "Create {entity}" button is shown. Defaults to true. Artists set
-   * this to false because new artists are created only from a release.
-   */
-  canCreate?: boolean;
-}) => {
-  const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
+}: DataViewProps<T>): ReactElement => {
   const router = useRouter();
-  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const resolveDisplayName = useCallback(
     (item: T) => (getItemDisplayName ? getItemDisplayName(item) : getDisplayName(item)),
     [getItemDisplayName]
   );
 
-  useInfiniteScroll(loadMoreRef, {
-    hasNextPage,
-    isFetchingNextPage: isFetchingNextPage ?? false,
-    fetchNextPage: fetchNextPage ?? (() => {}),
-    enabled: !!fetchNextPage,
-  });
-
   // Get the URL-friendly path for the entity (e.g., "featuredArtist" -> "featured-artists")
   const entityUrlPath = toEntityUrlPath(entity);
-
   // Get the display-friendly label for the entity (e.g., "featuredArtist" -> "featured artist")
   const entityDisplayLabel = toDisplayLabel(entity);
 
-  // Check if entity supports soft delete by checking if first item has deletedOn property
+  const items = useMemo(() => data?.[`${String(entity)}s`] ?? [], [data, entity]);
+
+  // Check if entity supports soft delete by checking if the first item has a deletedOn property.
   const supportsSoftDelete = useMemo(() => {
     if (forceHardDelete) return false;
-    const baseData = data?.[`${String(entity)}s`] as T[];
-    if (!baseData || baseData.length === 0) return true; // Default to soft delete for empty data
+    if (items.length === 0) return true; // Default to soft delete for empty data
     // Check if 'deletedOn' exists in the first item (including if it's null)
-    return 'deletedOn' in baseData[0];
-  }, [data, entity, forceHardDelete]);
-
-  const handleCreateEntityButtonClick = () => {
-    router?.push(`/admin/${entityUrlPath}/new`);
-  };
+    return 'deletedOn' in items[0];
+  }, [items, forceHardDelete]);
 
   // Runs an injected entity mutation and maps its result to a toast + refetch.
   // Catches a rejected mutation (e.g. a Server Action transport failure) so the
   // UI always surfaces an error rather than an unhandled rejection.
   const runEntityMutation = useCallback(
-    async (verb: 'publish' | 'delete' | 'restore', item: T, mutation: EntityMutation) => {
-      const past = verb === 'publish' ? 'published' : verb === 'delete' ? 'deleted' : 'restored';
+    async (verb: MutationVerb, item: T, mutation: EntityMutation) => {
       try {
         const response = await mutation(item.id as string);
         if (response.success) {
-          toast.success(`Successfully ${past} ${entityDisplayLabel} - ${resolveDisplayName(item)}`);
+          toast.success(
+            `Successfully ${toPastTense(verb)} ${entityDisplayLabel} - ${resolveDisplayName(item)}`
+          );
           refetch();
         } else {
           toast.error(
@@ -228,411 +107,83 @@ export const DataView = <T extends Record<string, unknown>>({
     [entityDisplayLabel, refetch, resolveDisplayName]
   );
 
-  const handleClickPublishButton = useCallback(
-    (item: T) => runEntityMutation('publish', item, onPublishEntity),
-    [runEntityMutation, onPublishEntity]
+  const handlePublish = useCallback(
+    (item: T) => runEntityMutation('publish', item, mutations.publish),
+    [runEntityMutation, mutations.publish]
   );
-
-  const handleClickDeleteButton = useCallback(
-    (item: T) => runEntityMutation('delete', item, onDeleteEntity),
-    [runEntityMutation, onDeleteEntity]
+  const handleDelete = useCallback(
+    (item: T) => runEntityMutation('delete', item, mutations.delete),
+    [runEntityMutation, mutations.delete]
   );
-
-  const handleClickRestoreButton = useCallback(
+  const handleRestore = useCallback(
     (item: T) =>
-      onRestoreEntity ? runEntityMutation('restore', item, onRestoreEntity) : undefined,
-    [runEntityMutation, onRestoreEntity]
+      mutations.restore ? runEntityMutation('restore', item, mutations.restore) : undefined,
+    [runEntityMutation, mutations.restore]
   );
 
   // Show the full-area skeleton on a refetch (e.g. after publish/delete/restore),
   // but not while paging in more items — that keeps its own "Loading more..." spinner.
-  const showRefreshSkeleton = isFetching && !isFetchingNextPage;
+  const showRefreshSkeleton = isFetching && !pagination?.isFetchingNextPage;
 
   return (
-    <div className="mx-1">
-      {canCreate && (
-        <Button
-          className="w-full"
-          onClick={handleCreateEntityButtonClick}
-        >{`Create ${entityDisplayLabel}`}</Button>
-      )}
-      {error && <div className="mb-2 text-red-600">{error}</div>}
-      <Input
-        className="my-4 w-full"
-        type="search"
-        value={searchValue}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder={`Search ${entityDisplayLabel}s...`}
-      />
-      {supportsSoftDelete && (
-        <div className="mb-2 flex items-center gap-2">
-          <Switch id="show-deleted" checked={showDeleted} onCheckedChange={onShowDeletedChange} />
-          <Label htmlFor="show-deleted" className="cursor-pointer">
-            Show deleted
-          </Label>
-        </div>
-      )}
-      <div className="mb-2 flex items-center gap-2">
-        <Switch
-          id="show-published"
-          checked={showPublished}
-          onCheckedChange={onShowPublishedChange}
+    <ImagePreviewProvider>
+      <div className="mx-1">
+        {canCreate && (
+          <Button
+            className="w-full"
+            onClick={() => router?.push(`/admin/${entityUrlPath}/new`)}
+          >{`Create ${entityDisplayLabel}`}</Button>
+        )}
+        {error && <div className="mb-2 text-red-600">{error}</div>}
+        <DataViewFiltersToolbar
+          filters={filters}
+          entityDisplayLabel={entityDisplayLabel}
+          supportsSoftDelete={supportsSoftDelete}
         />
-        <Label htmlFor="show-published" className="cursor-pointer">
-          Show published
-        </Label>
-      </div>
-      <div className="mb-4 flex items-center gap-2">
-        <Switch
-          id="show-unpublished"
-          checked={showUnpublished}
-          onCheckedChange={onShowUnpublishedChange}
-        />
-        <Label htmlFor="show-unpublished" className="cursor-pointer">
-          Show unpublished
-        </Label>
-      </div>
-      <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
-        {data && (data[`${entity}s`] as T[]).length > 0 ? (
-          <>
-            <ul>
-              {(data[`${String(entity)}s`] as T[]).map((item) => {
-                const id = item.id as string;
-                // Offer Restore only when the entity is soft-deletable, this row
-                // is currently deleted, AND a restore handler is wired — otherwise
-                // fall back to Delete so the action can never silently no-op.
-                const showRestore = supportsSoftDelete && !!item.deletedOn && !!onRestoreEntity;
-
-                return (
-                  <li key={id}>
-                    <Card>
-                      {/* Image thumbnails */}
-                      {(() => {
-                        // First check for direct coverArt URL field
-                        let coverArtUrl = coverArtField
-                          ? (readField(item, coverArtField) as string | undefined)
-                          : undefined;
-
-                        // Fallback: check releaseTracks for coverArt (for tracks)
-                        if (!coverArtUrl && item.releaseTracks) {
-                          const releaseTracks = item.releaseTracks as Array<{
-                            coverArt?: string;
-                          }>;
-                          coverArtUrl = releaseTracks[0]?.coverArt;
-                        }
-
-                        // Then check for images array
-                        const images = imageField
-                          ? (readField(item, imageField) as
-                              | Array<{ src?: string; altText?: string }>
-                              | undefined)
-                          : undefined;
-
-                        // If we have a direct cover art URL, show it
-                        if (coverArtUrl) {
-                          const resolvedCoverArtUrl: string = coverArtUrl;
-                          const isBase64 = resolvedCoverArtUrl.startsWith('data:');
-                          return (
-                            <div className="mb-3 flex justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPreviewImage({
-                                    src: resolvedCoverArtUrl,
-                                    altText: 'Cover art',
-                                  })
-                                }
-                                className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                              >
-                                {isBase64 ? (
-                                  // Base64 data URLs are passed through unoptimized
-                                  <Image
-                                    src={resolvedCoverArtUrl}
-                                    alt="Cover art"
-                                    fill
-                                    unoptimized
-                                    className="object-cover"
-                                    sizes="64px"
-                                  />
-                                ) : (
-                                  <Image
-                                    src={cleanImageUrl(resolvedCoverArtUrl)}
-                                    alt="Cover art"
-                                    fill
-                                    className="object-cover"
-                                    sizes="64px"
-                                  />
-                                )}
-                                <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
-                                  <Eye className="h-3 w-3" />
-                                </span>
-                              </button>
-                            </div>
-                          );
-                        }
-
-                        // If we have images array, show those
-                        if (images && images.length > 0) {
-                          return (
-                            <div className="mb-3 flex justify-center gap-2">
-                              {images.slice(0, 3).map((image) =>
-                                image.src ? (
-                                  <button
-                                    key={image.src}
-                                    type="button"
-                                    onClick={() =>
-                                      setPreviewImage(image as { src: string; altText?: string })
-                                    }
-                                    className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                                  >
-                                    <Image
-                                      src={cleanImageUrl(image.src)}
-                                      alt={image.altText || `${entity} image`}
-                                      fill
-                                      className="object-cover"
-                                      sizes="64px"
-                                    />
-                                    <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
-                                      <Eye className="h-3 w-3" />
-                                    </span>
-                                  </button>
-                                ) : null
-                              )}
-                            </div>
-                          );
-                        }
-
-                        return null;
-                      })()}
-                      <div className="mb-2 flex flex-row items-center justify-center gap-2">
-                        <InfoIcon className="h-4 w-4" />
-                        <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
-                      </div>
-                      <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
-                      {fieldsToShow.map((field: string, index: number) => {
-                        const fieldValue = readField(item, field);
-                        if (field.endsWith('At') || field.endsWith('On')) {
-                          const dateValue = fieldValue ? new Date(fieldValue as string) : null;
-                          /**
-                           * The formatted date string in locale-specific format (M/D/YYYY).
-                           * Uses the default locale with numeric representation for year, month, and day.
-                           * Returns '-' if dateValue is null/undefined.
-                           *
-                           * Note: 'default' is a valid locale argument that uses the runtime's default locale,
-                           * though it's often clearer to use `undefined` or explicitly specify a locale like 'en-US'.
-                           */
-                          const formattedDate = dateValue
-                            ? dateValue.toLocaleDateString('default', {
-                                year: 'numeric',
-                                month: 'numeric',
-                                day: 'numeric',
-                              })
-                            : '-';
-                          return (
-                            <span className="ml-2 leading-7" key={`${field}-${index + 1}`}>
-                              <b>
-                                {toPascalCase(field)
-                                  .split(/(?=[A-Z])/)
-                                  .join(' ')}
-                              </b>
-                              : <span>{formattedDate}</span>
-                            </span>
-                          );
-                        }
-
-                        return (
-                          <span className="ml-2 leading-7" key={`${field}-${index + 1}`}>
-                            <b>
-                              {toPascalCase(field)
-                                .split(/(?=[A-Z])/)
-                                .join(' ')}
-                            </b>
-                            :{' '}
-                            <span>
-                              {field === 'displayName' && !fieldValue
-                                ? resolveDisplayName(item)
-                                : String(fieldValue ?? '-')}
-                            </span>
-                          </span>
-                        );
-                      })}
-                      <Separator className="mt-2 mb-4 border-[0.5px] border-zinc-400" />
-                      <div className="flex items-center justify-center gap-2">
-                        <Button asChild variant="outline">
-                          <Link href={`/admin/${entityUrlPath}/${id}`}>
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </Link>
-                        </Button>
-                        {((): ReactElement => {
-                          // Check if item is published (releases use publishedAt, others use publishedOn)
-                          const isPublished = !!(item.publishedAt || item.publishedOn);
-                          return (
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button disabled={isPublished}>
-                                  {isPublished ? (
-                                    <BookCheck className="mr-0 size-4" />
-                                  ) : (
-                                    <Send className="mr-0 size-4" />
-                                  )}
-                                  {isPublished ? 'Published' : 'Publish'}
-                                  {isPending && <Spinner className="mr-2 size-4" />}
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <section>
-                                  <DialogHeader>
-                                    <DialogTitle asChild>
-                                      <h1 className="text-3xl!">Confirm Publish</h1>
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <p className="mt-1 mb-4">
-                                    Are you sure you want to publish{' '}
-                                    <b>{resolveDisplayName(item)}</b>?
-                                  </p>
-                                  <DialogFooter>
-                                    <DialogClose asChild>
-                                      <Button variant="secondary">Cancel</Button>
-                                    </DialogClose>
-                                    <DialogClose asChild>
-                                      <Button
-                                        variant="destructive"
-                                        onClick={() => handleClickPublishButton(item)}
-                                      >
-                                        Confirm
-                                      </Button>
-                                    </DialogClose>
-                                  </DialogFooter>
-                                </section>
-                              </DialogContent>
-                            </Dialog>
-                          );
-                        })()}
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant={showRestore ? 'secondary' : 'destructive'}>
-                              {showRestore ? (
-                                <ArchiveRestoreIcon className="mr-0 size-4" />
-                              ) : (
-                                <Trash2Icon className="mr-0 size-4" />
-                              )}
-                              {showRestore ? 'Restore' : 'Delete'}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <section>
-                              <DialogHeader>
-                                <DialogTitle asChild>
-                                  {showRestore ? (
-                                    <h1 className="text-3xl!">Confirm Restore</h1>
-                                  ) : (
-                                    <h1 className="text-3xl!">Confirm Delete</h1>
-                                  )}
-                                </DialogTitle>
-                              </DialogHeader>
-                              <p className="mt-1 mb-4">
-                                Are you sure you want to {showRestore ? 'restore' : 'delete'}{' '}
-                                <b>{resolveDisplayName(item)}</b>?
-                              </p>
-                              <DialogFooter>
-                                <DialogClose asChild>
-                                  <Button variant="secondary">Cancel</Button>
-                                </DialogClose>
-                                <DialogClose asChild>
-                                  <Button
-                                    variant={showRestore ? 'default' : 'destructive'}
-                                    onClick={() =>
-                                      showRestore
-                                        ? handleClickRestoreButton(item)
-                                        : handleClickDeleteButton(item)
-                                    }
-                                  >
-                                    Confirm
-                                  </Button>
-                                </DialogClose>
-                              </DialogFooter>
-                            </section>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </Card>
+        <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
+          {items.length > 0 ? (
+            <>
+              <ul>
+                {items.map((item) => (
+                  <li key={item.id as string}>
+                    <DataViewCard
+                      item={item}
+                      entity={entity}
+                      entityUrlPath={entityUrlPath}
+                      fieldsToShow={fieldsToShow}
+                      imageField={imageField}
+                      coverArtField={coverArtField}
+                      isPending={isPending}
+                      supportsSoftDelete={supportsSoftDelete}
+                      canRestore={!!mutations.restore}
+                      resolveDisplayName={resolveDisplayName}
+                      onPublish={handlePublish}
+                      onDelete={handleDelete}
+                      onRestore={handleRestore}
+                    />
                   </li>
-                );
-              })}
-            </ul>
-            {/* Infinite scroll load more trigger */}
-            {fetchNextPage && (
-              <div
-                ref={loadMoreRef}
-                className="flex min-h-15 flex-col items-center justify-center gap-2 py-6"
-              >
-                {isFetchingNextPage ? (
-                  <div className="flex items-center gap-2">
-                    <Spinner className="size-4" />
-                    <span className="text-zinc-950-foreground text-sm">Loading more...</span>
-                  </div>
-                ) : hasNextPage ? (
-                  <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
-                    Load More
-                  </Button>
-                ) : (
-                  <span className="text-zinc-950-foreground text-sm">All items loaded</span>
-                )}
+                ))}
+              </ul>
+              {pagination?.fetchNextPage && <LoadMoreTrigger {...pagination} />}
+            </>
+          ) : (
+            <p>No data available</p>
+          )}
+          {showRefreshSkeleton && (
+            <div
+              data-testid="data-view-overlay"
+              role="status"
+              aria-label={`Loading ${entityDisplayLabel}s`}
+              className="bg-background/60 absolute inset-0 z-10 flex cursor-wait items-start justify-center pt-24 backdrop-blur-sm"
+            >
+              <div className="text-muted-foreground flex items-center gap-2">
+                <Spinner className="size-5" />
+                <span className="text-sm">{`Loading ${entityDisplayLabel}s...`}</span>
               </div>
-            )}
-          </>
-        ) : (
-          <p>No data available</p>
-        )}
-        {showRefreshSkeleton && (
-          <div
-            data-testid="data-view-overlay"
-            role="status"
-            aria-label={`Loading ${entityDisplayLabel}s`}
-            className="bg-background/60 absolute inset-0 z-10 flex cursor-wait items-start justify-center pt-24 backdrop-blur-sm"
-          >
-            <div className="text-muted-foreground flex items-center gap-2">
-              <Spinner className="size-5" />
-              <span className="text-sm">{`Loading ${entityDisplayLabel}s...`}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Image Preview Dialog */}
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-        <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
-          <DialogTitle className="sr-only">{previewImage?.altText || 'Image preview'}</DialogTitle>
-          {previewImage && (
-            <div className="relative aspect-auto max-h-[85vh] w-full">
-              {previewImage.src.startsWith('data:') ? (
-                // Base64 data URLs are passed through unoptimized
-                <Image
-                  src={previewImage.src}
-                  alt={previewImage.altText || 'Image preview'}
-                  width={1200}
-                  height={800}
-                  unoptimized
-                  className="h-auto max-h-[85vh] w-full object-contain"
-                />
-              ) : (
-                <Image
-                  src={cleanImageUrl(previewImage.src)}
-                  alt={previewImage.altText || 'Image preview'}
-                  width={1200}
-                  height={800}
-                  className="h-auto max-h-[85vh] w-full object-contain"
-                />
-              )}
             </div>
           )}
-          <DialogClose className="bg-background/90 text-foreground hover:bg-background absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+      </div>
+    </ImagePreviewProvider>
   );
 };

@@ -26,19 +26,19 @@ const renderDataView = (overrides: Partial<DataViewProps> = {}) =>
       entity={ENTITIES.artist}
       data={{ artists: [] }}
       fieldsToShow={['firstName']}
-      onPublishEntity={okMutation}
-      onDeleteEntity={okMutation}
-      onRestoreEntity={okMutation}
+      mutations={{ publish: okMutation, delete: okMutation, restore: okMutation }}
       refetch={vi.fn()}
       isPending={false}
-      searchValue=""
-      onSearchChange={vi.fn()}
-      showPublished
-      onShowPublishedChange={vi.fn()}
-      showUnpublished
-      onShowUnpublishedChange={vi.fn()}
-      showDeleted={false}
-      onShowDeletedChange={vi.fn()}
+      filters={{
+        search: '',
+        onSearchChange: vi.fn(),
+        showPublished: true,
+        onShowPublishedChange: vi.fn(),
+        showUnpublished: true,
+        onShowUnpublishedChange: vi.fn(),
+        showDeleted: false,
+        onShowDeletedChange: vi.fn(),
+      }}
       {...overrides}
     />
   );
@@ -60,7 +60,10 @@ describe('DataView refresh overlay', () => {
   });
 
   it('keeps the overlay hidden while paging in more items', () => {
-    renderDataView({ isFetching: true, isFetchingNextPage: true, fetchNextPage: vi.fn() });
+    renderDataView({
+      isFetching: true,
+      pagination: { isFetchingNextPage: true, fetchNextPage: vi.fn() },
+    });
     expect(screen.queryByTestId('data-view-overlay')).not.toBeInTheDocument();
   });
 
@@ -99,7 +102,10 @@ describe('DataView entity mutations', () => {
 
   it('publishes an entity via the injected callback and toasts success', async () => {
     const onPublishEntity = vi.fn(() => Promise.resolve({ success: true }));
-    renderDataView({ data: { artists: [activeArtist] }, onPublishEntity });
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: { publish: onPublishEntity, delete: okMutation, restore: okMutation },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Publish' }));
@@ -113,7 +119,10 @@ describe('DataView entity mutations', () => {
 
   it('deletes an entity via the injected callback and toasts success', async () => {
     const onDeleteEntity = vi.fn(() => Promise.resolve({ success: true }));
-    renderDataView({ data: { artists: [activeArtist] }, onDeleteEntity });
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: { publish: okMutation, delete: onDeleteEntity, restore: okMutation },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -125,7 +134,10 @@ describe('DataView entity mutations', () => {
 
   it('toasts the error when a delete callback reports failure', async () => {
     const onDeleteEntity = vi.fn(() => Promise.resolve({ success: false, error: 'Boom' }));
-    renderDataView({ data: { artists: [activeArtist] }, onDeleteEntity });
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: { publish: okMutation, delete: onDeleteEntity, restore: okMutation },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -138,7 +150,10 @@ describe('DataView entity mutations', () => {
 
   it('toasts the underlying error message when a delete callback rejects', async () => {
     const onDeleteEntity = vi.fn(() => Promise.reject(new Error('network')));
-    renderDataView({ data: { artists: [activeArtist] }, onDeleteEntity });
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: { publish: okMutation, delete: onDeleteEntity, restore: okMutation },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -151,7 +166,10 @@ describe('DataView entity mutations', () => {
 
   it('toasts a generic error when a delete callback rejects with a non-Error', async () => {
     const onDeleteEntity = vi.fn(() => Promise.reject('boom'));
-    renderDataView({ data: { artists: [activeArtist] }, onDeleteEntity });
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: { publish: okMutation, delete: onDeleteEntity, restore: okMutation },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -164,7 +182,10 @@ describe('DataView entity mutations', () => {
 
   it('restores a soft-deleted entity via the injected callback', async () => {
     const onRestoreEntity = vi.fn(() => Promise.resolve({ success: true }));
-    renderDataView({ data: { artists: [deletedArtist] }, onRestoreEntity });
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: { publish: okMutation, delete: okMutation, restore: onRestoreEntity },
+    });
 
     const user = setup();
     await user.click(screen.getByRole('button', { name: 'Restore' }));
@@ -172,5 +193,75 @@ describe('DataView entity mutations', () => {
 
     await waitFor(() => expect(onRestoreEntity).toHaveBeenCalledWith('a-2'));
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Successfully restored artist - Joe Doe');
+  });
+});
+
+describe('DataView card rendering', () => {
+  const setup = () => userEvent.setup();
+
+  it('disables the publish action for an already-published entity', () => {
+    const published = {
+      id: 'a-3',
+      firstName: 'Max',
+      displayName: 'Max Doe',
+      publishedOn: '2024-01-01',
+    };
+    renderDataView({ data: { artists: [published] } });
+
+    expect(screen.getByRole('button', { name: 'Published' })).toBeDisabled();
+  });
+
+  it('renders thumbnails from an image array and opens the preview on click', async () => {
+    const item = {
+      id: 'a-4',
+      firstName: 'Pic',
+      displayName: 'Pic Doe',
+      images: [{ src: 'https://cdn.example.com/a.jpg', altText: 'Portrait' }],
+    };
+    renderDataView({ data: { artists: [item] }, imageField: 'images' });
+
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Portrait' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('renders a direct cover-art thumbnail and previews a base64 image', async () => {
+    const item = {
+      id: 'a-5',
+      firstName: 'Art',
+      displayName: 'Art Doe',
+      coverArt: 'data:image/png;base64,iVBORw0KGgo=',
+    };
+    renderDataView({ data: { artists: [item] }, coverArtField: 'coverArt' });
+
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Cover art' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('DataView pagination', () => {
+  const item = { id: 'a-6', firstName: 'Page', displayName: 'Page Doe', deletedOn: null };
+
+  it('loads the next page when the Load More button is clicked', async () => {
+    const fetchNextPage = vi.fn();
+    renderDataView({
+      data: { artists: [item] },
+      pagination: { hasNextPage: true, fetchNextPage },
+    });
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Load More' }));
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('shows a terminal message when there are no more pages', () => {
+    renderDataView({
+      data: { artists: [item] },
+      pagination: { hasNextPage: false, fetchNextPage: vi.fn() },
+    });
+
+    expect(screen.getByText('All items loaded')).toBeInTheDocument();
   });
 });

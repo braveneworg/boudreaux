@@ -69,24 +69,26 @@ export const ArtistDataView = () => {
       fieldsToShow={fieldsToShow}
       imageField="images"
       canCreate={false}
-      onPublishEntity={(id) => publishArtistAsync({ artistId: id })}
-      onDeleteEntity={(id) => archiveArtistAsync({ artistId: id })}
-      onRestoreEntity={(id) => restoreArtistAsync({ artistId: id })}
+      mutations={{
+        publish: (id) => publishArtistAsync({ artistId: id }),
+        delete: (id) => archiveArtistAsync({ artistId: id }),
+        restore: (id) => restoreArtistAsync({ artistId: id }),
+      }}
       refetch={refetch}
       isPending={isPending}
       isFetching={isFetching}
       error={null}
-      hasNextPage={hasNextPage}
-      fetchNextPage={fetchNextPage}
-      isFetchingNextPage={isFetchingNextPage}
-      searchValue={search}
-      onSearchChange={setSearch}
-      showPublished={showPublished}
-      onShowPublishedChange={setShowPublished}
-      showUnpublished={showUnpublished}
-      onShowUnpublishedChange={setShowUnpublished}
-      showDeleted={showDeleted}
-      onShowDeletedChange={setShowDeleted}
+      pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
+      filters={{
+        search,
+        onSearchChange: setSearch,
+        showPublished,
+        onShowPublishedChange: setShowPublished,
+        showUnpublished,
+        onShowUnpublishedChange: setShowUnpublished,
+        showDeleted,
+        onShowDeletedChange: setShowDeleted,
+      }}
     />
   );
 };

@@ -89,23 +89,25 @@ export const ReleaseDataView = () => {
       fieldsToShow={fieldsToShow}
       imageField="images"
       forceHardDelete
-      onPublishEntity={(id) => publishReleaseAsync({ releaseId: id })}
-      onDeleteEntity={(id) => deleteReleaseAsync({ releaseId: id })}
+      mutations={{
+        publish: (id) => publishReleaseAsync({ releaseId: id }),
+        delete: (id) => deleteReleaseAsync({ releaseId: id }),
+      }}
       refetch={refetch}
       isPending={isPending}
       isFetching={isFetching}
       error={null}
-      hasNextPage={hasNextPage}
-      fetchNextPage={fetchNextPage}
-      isFetchingNextPage={isFetchingNextPage}
-      searchValue={search}
-      onSearchChange={setSearch}
-      showPublished={showPublished}
-      onShowPublishedChange={setShowPublished}
-      showUnpublished={showUnpublished}
-      onShowUnpublishedChange={setShowUnpublished}
-      showDeleted={showDeleted}
-      onShowDeletedChange={setShowDeleted}
+      pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
+      filters={{
+        search,
+        onSearchChange: setSearch,
+        showPublished,
+        onShowPublishedChange: setShowPublished,
+        showUnpublished,
+        onShowUnpublishedChange: setShowUnpublished,
+        showDeleted,
+        onShowDeletedChange: setShowDeleted,
+      }}
     />
   );
 };
