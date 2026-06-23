@@ -10,14 +10,13 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
-
-import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,7 +84,7 @@ export const PATCH = withAdmin(
 
       const result = await ReleaseService.updateRelease(
         id,
-        validation.data as unknown as Prisma.ReleaseUpdateInput
+        validation.data as unknown as UpdateReleaseData
       );
 
       if (!result.success) {

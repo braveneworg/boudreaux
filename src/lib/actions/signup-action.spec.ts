@@ -2,15 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Get the mocked functions using hoisted
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { signupAction } from '@/lib/actions/signup-action';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 import { loggers } from '@/lib/utils/logger';
 
 import type { Mock } from 'vitest';
 
+const mockCreateUser = vi.hoisted(() => vi.fn());
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
@@ -62,12 +61,10 @@ vi.mock('@/auth', () => ({
   signIn: mockSignIn,
 }));
 
-vi.mock('@/lib/prisma-adapter', () => ({
-  CustomPrismaAdapter: vi.fn(),
-}));
-
-vi.mock('../prisma', () => ({
-  prisma: {},
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    create: mockCreateUser,
+  },
 }));
 
 vi.mock('unique-username-generator', () => ({
@@ -100,18 +97,11 @@ describe('signupAction', () => {
     success: false,
   };
 
-  const mockAdapter = {
-    createUser: vi.fn(),
-  };
-
   beforeEach(() => {
     mockFormData.set('email', 'test@example.com');
     mockFormData.set('termsAndConditions', 'true');
     mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
 
-    vi.mocked(CustomPrismaAdapter).mockReturnValue(
-      mockAdapter as unknown as ReturnType<typeof CustomPrismaAdapter>
-    );
     vi.mocked(mockGenerateUsername).mockReturnValue('test-user-1234');
     // Default to passing Turnstile verification
     mockVerifyTurnstile.mockResolvedValue({ success: true });
@@ -139,7 +129,7 @@ describe('signupAction', () => {
       });
 
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
-      mockAdapter.createUser.mockResolvedValue({
+      mockCreateUser.mockResolvedValue({
         id: '1',
         email: 'test@example.com',
       });
@@ -151,8 +141,7 @@ describe('signupAction', () => {
 
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockAdapter.createUser).toHaveBeenCalledWith({
-        id: '',
+      expect(mockCreateUser).toHaveBeenCalledWith({
         email: 'test@example.com',
         emailVerified: null,
         name: null,
@@ -187,7 +176,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      mockAdapter.createUser.mockResolvedValue({ id: '1' });
+      mockCreateUser.mockResolvedValue({ id: '1' });
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
@@ -198,7 +187,7 @@ describe('signupAction', () => {
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockGenerateUsername).toHaveBeenCalledWith('', 4);
-      expect(mockAdapter.createUser).toHaveBeenCalledWith(
+      expect(mockCreateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           username: 'test-user-1234',
         })
@@ -218,7 +207,7 @@ describe('signupAction', () => {
       expect(result.errors?.general).toContain(
         'CAPTCHA verification required. Please complete the verification.'
       );
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
 
     it('should return error when Turnstile verification fails', async () => {
@@ -231,7 +220,7 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('Invalid token');
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
 
     it('should use default error message when Turnstile returns no error string', async () => {
@@ -244,7 +233,7 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
 
     it('should use default CAPTCHA error message when Turnstile error is empty string', async () => {
@@ -257,7 +246,7 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
 
     it('should proceed when Turnstile verification succeeds', async () => {
@@ -280,7 +269,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      mockAdapter.createUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
+      mockCreateUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw Error('NEXT_REDIRECT');
@@ -288,7 +277,7 @@ describe('signupAction', () => {
 
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
       expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', '127.0.0.1');
-      expect(mockAdapter.createUser).toHaveBeenCalled();
+      expect(mockCreateUser).toHaveBeenCalled();
     });
   });
 
@@ -301,7 +290,7 @@ describe('signupAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('Too many signup attempts. Please try again later.');
       expect(mockVerifyTurnstile).not.toHaveBeenCalled();
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
   });
 
@@ -328,7 +317,7 @@ describe('signupAction', () => {
       const result = await signupAction(mockInitialState, mockFormData);
 
       expect(result).toEqual(mockFormState);
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
       expect(mockSignIn).not.toHaveBeenCalled();
     });
 
@@ -361,7 +350,7 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.email).toEqual(['Disposable email addresses are not allowed']);
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
 
     it('should return generic error when email security validation fails without error message', async () => {
@@ -392,7 +381,7 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.email).toEqual(['Invalid email address']);
-      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
   });
 
@@ -417,13 +406,9 @@ describe('signupAction', () => {
     });
 
     it('should silently send magic-link and redirect on duplicate email (no enumeration)', async () => {
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
+      const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
+      mockCreateUser.mockRejectedValue(duplicateEmailError);
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
@@ -445,13 +430,9 @@ describe('signupAction', () => {
       // Account-enumeration defense: even if the magic-link signIn throws, the
       // error is logged (loggers.auth.error) and swallowed, and the flow still
       // redirects to the same success page as a brand-new signup.
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
+      const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
+      mockCreateUser.mockRejectedValue(duplicateEmailError);
       vi.mocked(mockSignIn).mockRejectedValue(new Error('SES send failed'));
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
       mockRedirect.mockImplementation(() => {
@@ -469,24 +450,9 @@ describe('signupAction', () => {
       errorSpy.mockRestore();
     });
 
-    it('should handle P2002 error with different target (not email)', async () => {
-      const duplicateUsernameError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_username_key' },
-      });
-
-      mockAdapter.createUser.mockRejectedValue(duplicateUsernameError);
-
-      const result = await signupAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
-    });
-
     it('should handle timeout errors', async () => {
-      const timeoutError = Error('Connection ETIMEOUT');
-      mockAdapter.createUser.mockRejectedValue(timeoutError);
+      const timeoutError = new DataError('TIMEOUT', 'Database timed out');
+      mockCreateUser.mockRejectedValue(timeoutError);
 
       const result = await signupAction(mockInitialState, mockFormData);
 
@@ -496,7 +462,7 @@ describe('signupAction', () => {
     });
 
     it('should handle timeout errors when formState.errors is undefined', async () => {
-      const timeoutError = Error('timeout exceeded');
+      const timeoutError = new DataError('UNKNOWN', 'timeout exceeded');
 
       const mockFormState: FormState = {
         fields: { email: 'test@example.com', termsAndConditions: true },
@@ -515,7 +481,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      mockAdapter.createUser.mockRejectedValue(timeoutError);
+      mockCreateUser.mockRejectedValue(timeoutError);
 
       const result = await signupAction(mockInitialState, mockFormData);
 
@@ -527,9 +493,9 @@ describe('signupAction', () => {
 
     it('should handle various timeout error formats', async () => {
       const timeoutErrors = [
-        Error('timeout exceeded'),
-        Error('operation timed out'),
-        Object.assign(Error('Network timeout'), { code: 'ETIMEOUT' }),
+        new DataError('UNKNOWN', 'timeout exceeded'),
+        new DataError('UNKNOWN', 'operation timed out'),
+        new DataError('TIMEOUT', 'Database timed out'),
       ];
 
       for (const error of timeoutErrors) {
@@ -548,7 +514,7 @@ describe('signupAction', () => {
           },
         });
 
-        mockAdapter.createUser.mockRejectedValue(error);
+        mockCreateUser.mockRejectedValue(error);
 
         const result = await signupAction(mockInitialState, mockFormData);
 
@@ -557,13 +523,10 @@ describe('signupAction', () => {
       }
     });
 
-    it('should handle unknown Prisma errors', async () => {
-      const unknownError = new PrismaClientKnownRequestError('Unknown error', {
-        code: 'P1000',
-        clientVersion: '4.0.0',
-      });
+    it('should handle other data-access errors', async () => {
+      const unknownError = new DataError('UNKNOWN', 'Unknown error');
 
-      mockAdapter.createUser.mockRejectedValue(unknownError);
+      mockCreateUser.mockRejectedValue(unknownError);
 
       const result = await signupAction(mockInitialState, mockFormData);
 
@@ -573,7 +536,7 @@ describe('signupAction', () => {
 
     it('should handle general errors', async () => {
       const generalError = Error('Something went wrong');
-      mockAdapter.createUser.mockRejectedValue(generalError);
+      mockCreateUser.mockRejectedValue(generalError);
 
       const result = await signupAction(mockInitialState, mockFormData);
 
@@ -601,7 +564,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      mockAdapter.createUser.mockResolvedValue({ id: '1' });
+      mockCreateUser.mockResolvedValue({ id: '1' });
       vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test

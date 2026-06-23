@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { Artist } from '@prisma/client';
+import type { ArtistScalars } from '@/lib/types/domain/artist';
 
 /**
  * Get the display name for an artist in tour context with fallback logic.
@@ -12,7 +12,7 @@ import type { Artist } from '@prisma/client';
  * 2. Fall back to firstName + " " + surname
  * 3. Fall back to null
  *
- * @param artist - Artist from Prisma
+ * @param artist - Artist scalars (vendor-neutral mirror of the Prisma model)
  * @returns The computed display name string
  *
  * @example
@@ -21,7 +21,7 @@ import type { Artist } from '@prisma/client';
  * // Returns: "Artist Name" or "John Doe" or null
  * ```
  */
-export const getArtistDisplayNameForTour = (artist: Artist | null): string | null => {
+export const getArtistDisplayNameForTour = (artist: ArtistScalars | null): string | null => {
   if (!artist) {
     return null;
   }

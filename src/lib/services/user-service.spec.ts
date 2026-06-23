@@ -1,9 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { DataError, type DataErrorCode } from '@/lib/types/domain/errors';
 
 import { UserService } from './user-service';
 
@@ -24,8 +23,7 @@ vi.mock('unique-username-generator', () => ({
   generateUsername: vi.fn(() => 'generated-name'),
 }));
 
-const knownError = (code: string): PrismaClientKnownRequestError =>
-  new PrismaClientKnownRequestError('forced', { code, clientVersion: 'test' });
+const dataError = (code: DataErrorCode): DataError => new DataError(code, 'forced');
 
 describe('UserService', () => {
   describe('ensureAdminUser', () => {
@@ -105,19 +103,17 @@ describe('UserService', () => {
       expect(UserRepository.updateUsername).toHaveBeenCalledWith('u1', 'alice');
     });
 
-    it('returns duplicate when prisma raises P2002', async () => {
-      vi.mocked(UserRepository.updateUsername).mockRejectedValue(knownError('P2002'));
+    it('returns duplicate when the repository raises a DUPLICATE DataError', async () => {
+      vi.mocked(UserRepository.updateUsername).mockRejectedValue(dataError('DUPLICATE'));
       await expect(UserService.updateUsername('u1', 'taken')).resolves.toEqual({
         success: false,
         duplicate: true,
       });
     });
 
-    it('rethrows any other Prisma error', async () => {
-      vi.mocked(UserRepository.updateUsername).mockRejectedValue(knownError('P2025'));
-      await expect(UserService.updateUsername('u1', 'x')).rejects.toBeInstanceOf(
-        PrismaClientKnownRequestError
-      );
+    it('rethrows any other DataError', async () => {
+      vi.mocked(UserRepository.updateUsername).mockRejectedValue(dataError('NOT_FOUND'));
+      await expect(UserService.updateUsername('u1', 'x')).rejects.toBeInstanceOf(DataError);
     });
 
     it('rethrows generic errors', async () => {
@@ -135,8 +131,8 @@ describe('UserService', () => {
       });
     });
 
-    it('recovers the existing user when create races on P2002', async () => {
-      vi.mocked(UserRepository.createGuest).mockRejectedValue(knownError('P2002'));
+    it('recovers the existing user when create races on a DUPLICATE DataError', async () => {
+      vi.mocked(UserRepository.createGuest).mockRejectedValue(dataError('DUPLICATE'));
       vi.mocked(UserRepository.findIdByEmail).mockResolvedValue({ id: 'raced-id' });
 
       await expect(UserService.createGuestPurchaser('g@x.io')).resolves.toEqual({
@@ -145,20 +141,16 @@ describe('UserService', () => {
       });
     });
 
-    it('rethrows P2002 when the raced user cannot be recovered', async () => {
-      vi.mocked(UserRepository.createGuest).mockRejectedValue(knownError('P2002'));
+    it('rethrows DUPLICATE when the raced user cannot be recovered', async () => {
+      vi.mocked(UserRepository.createGuest).mockRejectedValue(dataError('DUPLICATE'));
       vi.mocked(UserRepository.findIdByEmail).mockResolvedValue(null);
 
-      await expect(UserService.createGuestPurchaser('g@x.io')).rejects.toBeInstanceOf(
-        PrismaClientKnownRequestError
-      );
+      await expect(UserService.createGuestPurchaser('g@x.io')).rejects.toBeInstanceOf(DataError);
     });
 
-    it('rethrows non-P2002 Prisma errors', async () => {
-      vi.mocked(UserRepository.createGuest).mockRejectedValue(knownError('P2025'));
-      await expect(UserService.createGuestPurchaser('g@x.io')).rejects.toBeInstanceOf(
-        PrismaClientKnownRequestError
-      );
+    it('rethrows non-DUPLICATE DataErrors', async () => {
+      vi.mocked(UserRepository.createGuest).mockRejectedValue(dataError('NOT_FOUND'));
+      await expect(UserService.createGuestPurchaser('g@x.io')).rejects.toBeInstanceOf(DataError);
     });
 
     it('rethrows generic errors', async () => {

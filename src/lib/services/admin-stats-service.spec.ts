@@ -85,9 +85,9 @@ describe('AdminStatsService.getStats', () => {
     expect(stats.tours).toEqual({ total: 5, upcomingDates: 8 });
   });
 
-  it('queries published releases with a non-null publishedAt filter', async () => {
+  it('queries published releases with the published domain filter', async () => {
     await AdminStatsService.getStats();
 
-    expect(ReleaseRepository.count).toHaveBeenNthCalledWith(2, { publishedAt: { not: null } });
+    expect(ReleaseRepository.count).toHaveBeenNthCalledWith(2, { published: true });
   });
 });

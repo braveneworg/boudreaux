@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { cache } from '@/lib/utils/simple-cache';
 import { updateFeaturedArtistCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
@@ -36,10 +36,10 @@ export const updateFeaturedArtistCoverArtAction = async (
   }
 
   try {
-    await prisma.featuredArtist.update({
-      where: { id: parsed.data.featuredArtistId },
-      data: { coverArt: parsed.data.coverArt },
-    });
+    await FeaturedArtistRepository.updateCoverArt(
+      parsed.data.featuredArtistId,
+      parsed.data.coverArt
+    );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update cover art';
     return { success: false, error: errorMessage };

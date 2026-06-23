@@ -17,7 +17,7 @@ import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validation/tours/tour-date-image
 
 /**
  * Local interface matching Prisma TourDateImage model.
- * Client components should not import directly from @prisma/client.
+ * Client components do not import the generated Prisma client types directly.
  */
 interface TourDateImageFields {
   id: string;

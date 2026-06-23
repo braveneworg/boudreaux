@@ -5,69 +5,222 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
-import {
-  artistListWithBioInclude,
-  artistWithPublishedReleasesInclude,
-  type Artist,
-  type ArtistListWithBio,
-  type ArtistWithPublishedReleases,
-} from '@/lib/types/media-models';
+import type {
+  Artist,
+  ArtistListFilters,
+  ArtistListWithBio,
+  ArtistNameRecord,
+  ArtistScalars,
+  ArtistWithPublishedReleases,
+  CreateArtistData,
+  UpdateArtistData,
+} from '@/lib/types/domain/artist';
 import type { BioStatus } from '@/lib/validation/bio-generation-schema';
 
-import type { Artist as PrismaArtist, Prisma } from '@prisma/client';
+import { runQuery } from './_internal/map-prisma-error';
 
-/** Pagination + filter args shared by the admin and public artist listings. */
-export interface ArtistFindManyParams {
-  where: Prisma.ArtistWhereInput;
-  skip: number;
-  take: number;
-}
+import type { AssertExact } from './_internal/drift';
+import type { Prisma } from '@prisma/client';
 
 /** The narrowed projection used by the find-or-create-by-name flow. */
-export type ArtistNameSelect = {
+type ArtistNameSelect = {
   id: true;
   displayName: true;
   firstName: true;
   surname: true;
 };
 
-/** Result of a name-projection lookup. */
-export type ArtistNameRecord = {
-  id: string;
-  displayName: string | null;
-  firstName: string;
-  surname: string;
+/** Count filters for the admin dashboard (Prisma-free at the boundary). */
+export interface ArtistCountFilters {
+  published?: boolean;
+}
+
+// =============================================================================
+// Query shapes (single source of truth for both the query and the drift check)
+// =============================================================================
+
+/** Admin listing include — release scalars, capped images, labels, urls. */
+const artistAdminInclude = {
+  images: { orderBy: { sortOrder: 'asc' }, take: 3 },
+  labels: true,
+  urls: true,
+  releases: { include: { release: true } },
+} as const satisfies Prisma.ArtistInclude;
+
+/** Public artists-index include — primary bio images beside the short bio. */
+const artistListWithBioInclude = {
+  bioImages: { where: { isPrimary: true }, orderBy: { sortOrder: 'asc' }, take: 3 },
+} as const satisfies Prisma.ArtistInclude;
+
+/** Public artist-detail include — full nested release + bio graph. */
+const artistWithPublishedReleasesInclude = {
+  images: true,
+  labels: true,
+  urls: true,
+  bioImages: { orderBy: { sortOrder: 'asc' } },
+  bioLinks: { orderBy: { sortOrder: 'asc' } },
+  members: { include: { member: true } },
+  releases: {
+    include: {
+      release: {
+        include: {
+          images: true,
+          artistReleases: { include: { artist: true } },
+          digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+          releaseUrls: { include: { url: true } },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.ArtistInclude;
+
+// Compile-time drift guards: fail `pnpm run typecheck` if a hand-written domain
+// type diverges from the Prisma payload its query actually returns.
+type _ArtistDrift = AssertExact<
+  Artist,
+  Prisma.ArtistGetPayload<{ include: typeof artistAdminInclude }>
+>;
+type _ArtistListWithBioDrift = AssertExact<
+  ArtistListWithBio,
+  Prisma.ArtistGetPayload<{ include: typeof artistListWithBioInclude }>
+>;
+type _ArtistWithPublishedReleasesDrift = AssertExact<
+  ArtistWithPublishedReleases,
+  Prisma.ArtistGetPayload<{ include: typeof artistWithPublishedReleasesInclude }>
+>;
+const _artistDrift: _ArtistDrift = true;
+const _artistListWithBioDrift: _ArtistListWithBioDrift = true;
+const _artistWithPublishedReleasesDrift: _ArtistWithPublishedReleasesDrift = true;
+
+// =============================================================================
+// Translators (domain input -> Prisma input; the return type is the drift guard)
+// =============================================================================
+
+/** Build a Prisma create payload from domain create data. */
+const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
+  const { images, urls, ...scalars } = data;
+  return {
+    ...scalars,
+    ...(images && {
+      images: {
+        connectOrCreate: images.map((image) => ({
+          where: { id: image.id },
+          create: { id: image.id, src: image.src, altText: image.altText, caption: image.caption },
+        })),
+      },
+    }),
+    ...(urls && {
+      urls: {
+        connectOrCreate: urls.map((url) => ({
+          where: { id: url.id },
+          create: {
+            id: url.id,
+            platform: url.platform as Prisma.UrlCreateInput['platform'],
+            url: url.url,
+          },
+        })),
+      },
+    }),
+  };
 };
 
+/** Build a Prisma update payload from domain update data. */
+const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => ({ ...data });
+
+/** Build the admin-listing `where` from domain filters (Mongo null-safe). */
+const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => {
+  const { search, published, deleted } = filters;
+  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+  const and: Prisma.ArtistWhereInput[] = [];
+
+  if (!deleted) {
+    and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
+  }
+  if (published === true) {
+    and.push({ publishedOn: { not: null } });
+  } else if (published === false) {
+    and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
+  }
+  if (search) {
+    and.push({
+      OR: [
+        { firstName: contains(search) },
+        { surname: contains(search) },
+        { displayName: contains(search) },
+        { slug: contains(search) },
+      ],
+    });
+  }
+
+  return and.length > 0 ? { AND: and } : {};
+};
+
+/** Build the public-search `where` from a search term (Mongo null-safe). */
+const buildSearchWhere = (search?: string): Prisma.ArtistWhereInput => ({
+  isActive: true,
+  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+  releases: {
+    some: {
+      release: {
+        publishedAt: { not: null },
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+    },
+  },
+  ...(search && {
+    AND: [
+      {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' as const } },
+          { surname: { contains: search, mode: 'insensitive' as const } },
+          { displayName: { contains: search, mode: 'insensitive' as const } },
+          { slug: { contains: search, mode: 'insensitive' as const } },
+          {
+            releases: {
+              some: {
+                release: {
+                  title: { contains: search, mode: 'insensitive' as const },
+                  publishedAt: { isSet: true },
+                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+  }),
+});
+
 /**
- * Data-access layer for the Artist and ArtistRelease models.
- *
- * Encapsulates every Prisma call for artists so the ArtistService keeps only
- * Zod validation, business logic, and ServiceResponse wrapping. Where/include
- * shapes are preserved exactly as the service previously issued them so the
- * response payloads continue to satisfy the admin/public Zod schemas.
+ * Data-access layer for the Artist and ArtistRelease models. The only layer that
+ * touches Prisma for artists: it owns the query shapes (includes/where DSL),
+ * translates domain input to Prisma input, and wraps every call in `runQuery`
+ * so callers see vendor-neutral `DataError`s and hand-written domain types.
  */
 export class ArtistRepository {
-  /** Create a new artist. */
-  static async create(data: Prisma.ArtistCreateInput): Promise<PrismaArtist> {
-    return prisma.artist.create({ data });
+  /** Create a new artist, returning the full admin payload. */
+  static async create(data: CreateArtistData): Promise<Artist> {
+    return runQuery(() =>
+      prisma.artist.create({ data: toPrismaCreate(data), include: artistAdminInclude })
+    ) as Promise<Artist>;
   }
 
   /** Find an artist by id, including images ordered by sortOrder. */
   static async findById(id: string): Promise<Artist | null> {
-    return prisma.artist.findUnique({
-      where: { id },
-      include: {
-        images: {
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    }) as Promise<Artist | null>;
+    return runQuery(() =>
+      prisma.artist.findUnique({
+        where: { id },
+        include: { images: { orderBy: { sortOrder: 'asc' } } },
+      })
+    ) as Promise<Artist | null>;
   }
 
   /** Find an artist by slug (no relations). */
-  static async findBySlug(slug: string): Promise<PrismaArtist | null> {
-    return prisma.artist.findUnique({ where: { slug } });
+  static async findBySlug(slug: string): Promise<ArtistScalars | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({ where: { slug } })
+    ) as Promise<ArtistScalars | null>;
   }
 
   /**
@@ -81,163 +234,166 @@ export class ArtistRepository {
     skip: number;
     take: number;
   }): Promise<ArtistListWithBio[]> {
-    return prisma.artist.findMany({
-      where: {
-        isActive: true,
-        publishedOn: { not: null },
-        // Mongo: `deletedOn: null` misses absent fields — OR with isSet:false.
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-      },
-      orderBy: { displayName: 'asc' },
-      skip,
-      take,
-      include: artistListWithBioInclude,
-    });
+    return runQuery(() =>
+      prisma.artist.findMany({
+        where: {
+          isActive: true,
+          publishedOn: { not: null },
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        orderBy: { displayName: 'asc' },
+        skip,
+        take,
+        include: artistListWithBioInclude,
+      })
+    );
   }
 
   /**
    * List artists for the admin listing with the full include shape required by
-   * `artistSchema` (images take 3, labels, urls, releases → release).
+   * `artistSchema`. Builds the filter `where` from domain filters.
    */
-  static async findMany({ where, skip, take }: ArtistFindManyParams): Promise<Artist[]> {
-    return prisma.artist.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        images: {
-          orderBy: { sortOrder: 'asc' },
-          take: 3,
-        },
-        labels: true,
-        urls: true,
-        releases: {
-          include: { release: true },
-        },
-      },
-    }) as Promise<Artist[]>;
+  static async findMany(filters: ArtistListFilters): Promise<Artist[]> {
+    const { skip = 0, take = 50 } = filters;
+    return runQuery(() =>
+      prisma.artist.findMany({
+        where: buildListWhere(filters),
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: artistAdminInclude,
+      })
+    ) as Promise<Artist[]>;
   }
 
-  /** Count artists matching an optional filter (used by the admin dashboard). */
-  static async count(where: Prisma.ArtistWhereInput = {}): Promise<number> {
-    return prisma.artist.count({ where });
+  /** Count artists matching an optional published filter (admin dashboard). */
+  static async count(filters: ArtistCountFilters = {}): Promise<number> {
+    const where: Prisma.ArtistWhereInput =
+      filters.published === true
+        ? { publishedOn: { not: null } }
+        : filters.published === false
+          ? { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }
+          : {};
+    return runQuery(() => prisma.artist.count({ where }));
   }
 
-  /** Update an artist by id. */
-  static async update(id: string, data: Prisma.ArtistUpdateInput): Promise<PrismaArtist> {
-    return prisma.artist.update({ where: { id }, data });
+  /** Update an artist by id, returning the full admin payload. */
+  static async update(id: string, data: UpdateArtistData): Promise<Artist> {
+    return runQuery(() =>
+      prisma.artist.update({
+        where: { id },
+        data: toPrismaUpdate(data),
+        include: artistAdminInclude,
+      })
+    ) as Promise<Artist>;
   }
 
   /** Hard-delete an artist by id. */
-  static async delete(id: string): Promise<PrismaArtist> {
-    return prisma.artist.delete({ where: { id } });
+  static async delete(id: string): Promise<ArtistScalars> {
+    return runQuery(() => prisma.artist.delete({ where: { id } })) as Promise<ArtistScalars>;
   }
 
   /** Soft-delete (archive) an artist by setting deletedOn to now. */
-  static async archive(id: string): Promise<PrismaArtist> {
-    return prisma.artist.update({
-      where: { id },
-      data: { deletedOn: new Date() },
-    });
+  static async archive(id: string): Promise<ArtistScalars> {
+    return runQuery(() =>
+      prisma.artist.update({ where: { id }, data: { deletedOn: new Date() } })
+    ) as Promise<ArtistScalars>;
   }
 
   /** Lightweight existence check returning only the id (or null). */
-  static async existsById(artistId: string): Promise<Pick<PrismaArtist, 'id'> | null> {
-    return prisma.artist.findUnique({
-      where: { id: artistId },
-      select: { id: true },
-    });
+  static async existsById(artistId: string): Promise<{ id: string } | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } })
+    );
   }
 
   /**
    * List active, published artists for the public search feature, with the
    * lightweight images/releases include the search UI consumes.
    */
-  static async searchPublished({ where, skip, take }: ArtistFindManyParams): Promise<Artist[]> {
-    return prisma.artist.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { displayName: 'asc' },
-      include: {
-        images: {
-          orderBy: { sortOrder: 'asc' },
-          take: 1,
-        },
-        releases: {
-          include: {
-            release: {
-              select: { id: true, title: true, publishedAt: true, deletedOn: true },
+  static async searchPublished({
+    search,
+    skip = 0,
+    take = 50,
+  }: ArtistListFilters): Promise<Artist[]> {
+    return runQuery(() =>
+      prisma.artist.findMany({
+        where: buildSearchWhere(search),
+        skip,
+        take,
+        orderBy: { displayName: 'asc' },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          releases: {
+            include: {
+              release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
             },
           },
         },
-      },
-    }) as Promise<Artist[]>;
+      })
+    ) as unknown as Promise<Artist[]>;
   }
 
   /**
-   * Find a single active, published artist (by the caller's where clause) with
-   * the full nested release + digital-format include used on the public detail
-   * page. The service still post-filters releases to published, non-deleted.
+   * Find a single active, published, non-deleted artist by slug with the full
+   * nested release + bio include used on the public detail page. The service
+   * post-filters releases to published, non-deleted.
    */
-  static async findBySlugWithReleases(
-    where: Prisma.ArtistWhereInput
+  static async findPublishedBySlugWithReleases(
+    slug: string
   ): Promise<ArtistWithPublishedReleases | null> {
-    return prisma.artist.findFirst({
-      where,
-      include: artistWithPublishedReleasesInclude,
-    });
+    return runQuery(() =>
+      prisma.artist.findFirst({
+        where: {
+          slug,
+          isActive: true,
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        include: artistWithPublishedReleasesInclude,
+      })
+    );
   }
 
   /** Find an artist by slug returning the name projection (find-or-create flow). */
-  static async findUniqueBySlug(
-    slug: string,
-    select: ArtistNameSelect
-  ): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findUnique({
-      where: { slug },
-      select,
-    }) as Promise<ArtistNameRecord | null>;
+  static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({ where: { slug }, select: nameSelect })
+    ) as Promise<ArtistNameRecord | null>;
   }
 
   /** Case-insensitive displayName lookup returning the name projection. */
-  static async findFirstByDisplayName(
-    displayName: string,
-    select: ArtistNameSelect
-  ): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findFirst({
-      where: { displayName: { equals: displayName, mode: 'insensitive' } },
-      select,
-    }) as Promise<ArtistNameRecord | null>;
+  static async findFirstByDisplayName(displayName: string): Promise<ArtistNameRecord | null> {
+    return runQuery(() =>
+      prisma.artist.findFirst({
+        where: { displayName: { equals: displayName, mode: 'insensitive' } },
+        select: nameSelect,
+      })
+    ) as Promise<ArtistNameRecord | null>;
   }
 
   /** Case-insensitive firstName + surname lookup returning the name projection. */
   static async findFirstByName(
     firstName: string,
-    surname: string,
-    select: ArtistNameSelect
+    surname: string
   ): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findFirst({
-      where: {
-        AND: [
-          { firstName: { equals: firstName, mode: 'insensitive' } },
-          { surname: { equals: surname, mode: 'insensitive' } },
-        ],
-      },
-      select,
-    }) as Promise<ArtistNameRecord | null>;
+    return runQuery(() =>
+      prisma.artist.findFirst({
+        where: {
+          AND: [
+            { firstName: { equals: firstName, mode: 'insensitive' } },
+            { surname: { equals: surname, mode: 'insensitive' } },
+          ],
+        },
+        select: nameSelect,
+      })
+    ) as Promise<ArtistNameRecord | null>;
   }
 
   /** Create an artist returning only the name projection (find-or-create flow). */
-  static async createWithSelect(
-    data: Prisma.ArtistCreateInput,
-    select: ArtistNameSelect
-  ): Promise<ArtistNameRecord> {
-    return prisma.artist.create({
-      data,
-      select,
-    }) as Promise<ArtistNameRecord>;
+  static async createWithSelect(data: CreateArtistData): Promise<ArtistNameRecord> {
+    return runQuery(() =>
+      prisma.artist.create({ data: toPrismaCreate(data), select: nameSelect })
+    ) as Promise<ArtistNameRecord>;
   }
 
   /**
@@ -245,9 +401,6 @@ export class ArtistRepository {
    * overwrite the short/long bio, genres, and provenance fields, then delete
    * and recreate the discovered images/links. Deleting first means a
    * regeneration never leaves stale rows behind.
-   *
-   * @param artistId - The artist to update.
-   * @param content - Sanitized bio content to persist.
    */
   static async replaceBioContent(
     artistId: string,
@@ -271,53 +424,51 @@ export class ArtistRepository {
       links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;
     }
   ): Promise<void> {
-    await prisma.$transaction([
-      prisma.artistBioImage.deleteMany({ where: { artistId } }),
-      prisma.artistBioLink.deleteMany({ where: { artistId } }),
-      prisma.artist.update({
-        where: { id: artistId },
-        data: {
-          shortBio: content.shortBio,
-          bio: content.bio,
-          genres: content.genres,
-          bioModel: content.bioModel,
-          bioGeneratedAt: new Date(),
-          bioImages: { create: content.images },
-          bioLinks: { create: content.links },
-        },
-      }),
-    ]);
+    await runQuery(() =>
+      prisma.$transaction([
+        prisma.artistBioImage.deleteMany({ where: { artistId } }),
+        prisma.artistBioLink.deleteMany({ where: { artistId } }),
+        prisma.artist.update({
+          where: { id: artistId },
+          data: {
+            shortBio: content.shortBio,
+            bio: content.bio,
+            genres: content.genres,
+            bioModel: content.bioModel,
+            bioGeneratedAt: new Date(),
+            bioImages: { create: content.images },
+            bioLinks: { create: content.links },
+          },
+        }),
+      ])
+    );
   }
 
   /**
    * Update the async bio-generation lifecycle fields. `error`/`startedAt` are
    * only written when explicitly provided so a status flip can leave them alone.
-   *
-   * @param artistId - The artist whose generation state to update.
-   * @param status - The new lifecycle state.
-   * @param opts - Optional `error` (failure message) and `startedAt` timestamp.
    */
   static async setBioStatus(
     artistId: string,
     status: BioStatus,
     opts: { error?: string | null; startedAt?: Date | null } = {}
   ): Promise<void> {
-    await prisma.artist.update({
-      where: { id: artistId },
-      data: {
-        bioStatus: status,
-        ...(opts.error !== undefined ? { bioError: opts.error } : {}),
-        ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
-      },
-    });
+    await runQuery(() =>
+      prisma.artist.update({
+        where: { id: artistId },
+        data: {
+          bioStatus: status,
+          ...(opts.error !== undefined ? { bioError: opts.error } : {}),
+          ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
+        },
+      })
+    );
   }
 
   /**
    * Reads the async bio-generation state plus the persisted bio content, so the
    * status endpoint can report progress and hand back the finished bio for the
    * admin form to populate. Returns `null` when the artist does not exist.
-   *
-   * @param artistId - The artist to read.
    */
   static async getBioGenerationState(artistId: string): Promise<{
     bioStatus: string | null;
@@ -340,36 +491,38 @@ export class ArtistRepository {
     }>;
     bioLinks: Array<{ label: string; url: string; kind: string | null }>;
   } | null> {
-    return prisma.artist.findUnique({
-      where: { id: artistId },
-      select: {
-        bioStatus: true,
-        bioError: true,
-        bioStartedAt: true,
-        bioGeneratedAt: true,
-        slug: true,
-        shortBio: true,
-        bio: true,
-        genres: true,
-        bioModel: true,
-        bioImages: {
-          orderBy: { sortOrder: 'asc' },
-          select: {
-            url: true,
-            thumbnailUrl: true,
-            title: true,
-            attribution: true,
-            license: true,
-            sourceUrl: true,
-            isPrimary: true,
+    return runQuery(() =>
+      prisma.artist.findUnique({
+        where: { id: artistId },
+        select: {
+          bioStatus: true,
+          bioError: true,
+          bioStartedAt: true,
+          bioGeneratedAt: true,
+          slug: true,
+          shortBio: true,
+          bio: true,
+          genres: true,
+          bioModel: true,
+          bioImages: {
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              url: true,
+              thumbnailUrl: true,
+              title: true,
+              attribution: true,
+              license: true,
+              sourceUrl: true,
+              isPrimary: true,
+            },
+          },
+          bioLinks: {
+            orderBy: { sortOrder: 'asc' },
+            select: { label: true, url: true, kind: true },
           },
         },
-        bioLinks: {
-          orderBy: { sortOrder: 'asc' },
-          select: { label: true, url: true, kind: true },
-        },
-      },
-    });
+      })
+    );
   }
 
   /**
@@ -377,12 +530,20 @@ export class ArtistRepository {
    * table. Uses upsert to avoid duplicate constraint violations.
    */
   static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
-    await prisma.artistRelease.upsert({
-      where: {
-        artistId_releaseId: { artistId, releaseId },
-      },
-      update: {},
-      create: { artistId, releaseId },
-    });
+    await runQuery(() =>
+      prisma.artistRelease.upsert({
+        where: { artistId_releaseId: { artistId, releaseId } },
+        update: {},
+        create: { artistId, releaseId },
+      })
+    );
   }
 }
+
+/** The narrow name projection select reused by the find-or-create flow. */
+const nameSelect: ArtistNameSelect = {
+  id: true,
+  displayName: true,
+  firstName: true,
+  surname: true,
+};

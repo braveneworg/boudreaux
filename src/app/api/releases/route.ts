@@ -7,12 +7,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { CreateReleaseData } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
-
-import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,7 +127,9 @@ export const POST = withAdmin(async (request: NextRequest) => {
       return validation.response;
     }
 
-    const result = await ReleaseService.createRelease(validation.data as Prisma.ReleaseCreateInput);
+    const result = await ReleaseService.createRelease(
+      validation.data as unknown as CreateReleaseData
+    );
 
     if (!result.success) {
       return NextResponse.json(

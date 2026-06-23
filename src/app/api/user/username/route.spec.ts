@@ -4,8 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
+import { UserService } from '@/lib/services/user-service';
 import { loggers } from '@/lib/utils/logger';
 
 import { POST } from './route';
@@ -28,29 +27,17 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   PUBLIC_LIMIT: 30,
 }));
 
-const mockPrismaUpdate = vi.fn();
-
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: {
-      update: (...args: unknown[]) => mockPrismaUpdate(...args),
-    },
+// The route delegates the write to the service, which owns the data-access
+// (duplicate detection, error translation). Mock at the service boundary so the
+// route spec exercises only route-level behavior (status codes, enumeration
+// defense, logging) without reaching Prisma.
+vi.mock('@/lib/services/user-service', () => ({
+  UserService: {
+    updateUsername: vi.fn(),
   },
 }));
 
-vi.mock('@prisma/client/runtime/library', () => {
-  class MockPrismaClientKnownRequestError extends Error {
-    code: string;
-    clientVersion: string;
-    constructor(message: string, opts: { code: string; clientVersion: string }) {
-      super(message);
-      this.code = opts.code;
-      this.clientVersion = opts.clientVersion;
-      this.name = 'PrismaClientKnownRequestError';
-    }
-  }
-  return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
-});
+const updateUsernameMock = vi.mocked(UserService.updateUsername);
 
 const createRequest = (body: Record<string, unknown>): NextRequest =>
   new NextRequest('http://localhost:3000/api/user/username', {
@@ -71,11 +58,11 @@ describe('POST /api/user/username', () => {
     const response = await POST(request, { params: Promise.resolve({}) });
 
     expect(response.status).toBe(429);
-    expect(mockPrismaUpdate).not.toHaveBeenCalled();
+    expect(updateUsernameMock).not.toHaveBeenCalled();
   });
 
   it('should update username successfully and return 200 with available:true', async () => {
-    mockPrismaUpdate.mockResolvedValue({ id: 'user-123', username: 'newuser' });
+    updateUsernameMock.mockResolvedValue({ success: true, duplicate: false });
 
     const request = createRequest({ username: 'newuser', confirmUsername: 'newuser' });
     const response = await POST(request, { params: Promise.resolve({}) });
@@ -86,10 +73,7 @@ describe('POST /api/user/username', () => {
     expect(data.success).toBe(true);
     expect(data.message).toBe('Username updated successfully');
     expect(data.username).toBe('newuser');
-    expect(mockPrismaUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-123' },
-      data: { username: 'newuser' },
-    });
+    expect(updateUsernameMock).toHaveBeenCalledWith('user-123', 'newuser');
   });
 
   it('should return 400 for a username that is too short', async () => {
@@ -100,7 +84,7 @@ describe('POST /api/user/username', () => {
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid username format');
     expect(data.details).toBeDefined();
-    expect(mockPrismaUpdate).not.toHaveBeenCalled();
+    expect(updateUsernameMock).not.toHaveBeenCalled();
   });
 
   it('should return 400 for a username with invalid characters', async () => {
@@ -111,7 +95,7 @@ describe('POST /api/user/username', () => {
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid username format');
     expect(data.details).toBeDefined();
-    expect(mockPrismaUpdate).not.toHaveBeenCalled();
+    expect(updateUsernameMock).not.toHaveBeenCalled();
   });
 
   it('should return 400 when username and confirmUsername do not match', async () => {
@@ -124,16 +108,11 @@ describe('POST /api/user/username', () => {
     expect(data.details).toEqual(
       expect.arrayContaining([expect.objectContaining({ message: 'Usernames do not match' })])
     );
-    expect(mockPrismaUpdate).not.toHaveBeenCalled();
+    expect(updateUsernameMock).not.toHaveBeenCalled();
   });
 
-  it('should return 200 with available:false when username is taken (P2002)', async () => {
-    mockPrismaUpdate.mockRejectedValue(
-      new PrismaClientKnownRequestError('Unique constraint', {
-        code: 'P2002',
-        clientVersion: '5.0.0',
-      })
-    );
+  it('should return 200 with available:false when username is taken', async () => {
+    updateUsernameMock.mockResolvedValue({ success: false, duplicate: true });
 
     const request = createRequest({ username: 'takenuser', confirmUsername: 'takenuser' });
     const response = await POST(request, { params: Promise.resolve({}) });
@@ -145,7 +124,7 @@ describe('POST /api/user/username', () => {
   });
 
   it('should return 500 when an unexpected error occurs during update', async () => {
-    mockPrismaUpdate.mockRejectedValue(new Error('Database connection lost'));
+    updateUsernameMock.mockRejectedValue(new Error('Database connection lost'));
 
     const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -161,7 +140,7 @@ describe('POST /api/user/username', () => {
 
   it('should log full error in development mode', async () => {
     vi.stubEnv('NODE_ENV', 'development');
-    mockPrismaUpdate.mockRejectedValue(new Error('Dev debug error'));
+    updateUsernameMock.mockRejectedValue(new Error('Dev debug error'));
 
     const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -176,7 +155,7 @@ describe('POST /api/user/username', () => {
   });
 
   it('should log "Unknown error" when thrown value is not an Error instance', async () => {
-    mockPrismaUpdate.mockRejectedValue('a plain string error');
+    updateUsernameMock.mockRejectedValue('a plain string error');
 
     const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -190,10 +169,7 @@ describe('POST /api/user/username', () => {
   });
 
   it('should accept a valid username with underscores and dashes', async () => {
-    mockPrismaUpdate.mockResolvedValue({
-      id: 'user-123',
-      username: 'my_user-name99',
-    });
+    updateUsernameMock.mockResolvedValue({ success: true, duplicate: false });
 
     const request = createRequest({
       username: 'my_user-name99',

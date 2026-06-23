@@ -5,8 +5,12 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type { TourImageScalars } from '@/lib/types/tours';
 
-import type { TourImage } from '@prisma/client';
+import { runQuery } from '../_internal/map-prisma-error';
+
+import type { AssertExact } from '../_internal/drift';
+import type { Prisma } from '@prisma/client';
 
 export interface CreateImageInput {
   tourId: string;
@@ -26,98 +30,125 @@ export interface ImageOrderUpdate {
   displayOrder: number;
 }
 
+// Compile-time drift guard: fail `pnpm run typecheck` if the hand-written
+// `TourImageScalars` diverges from the Prisma tour-image model scalars.
+type _TourImageDrift = AssertExact<
+  TourImageScalars,
+  Prisma.TourImageGetPayload<Record<never, never>>
+>;
+const _tourImageDrift: _TourImageDrift = true;
+
 /**
- * Repository for tour image database operations
+ * Repository for tour image database operations. The only layer that touches
+ * Prisma for tour images: it wraps every call in `runQuery` and returns
+ * hand-written, Prisma-free domain types.
  */
 export class ImageRepository {
   /**
-   * Find all images for a tour, sorted by display order
+   * Find all images for a tour, sorted by display order.
    */
-  static async findByTourId(tourId: string): Promise<TourImage[]> {
-    return prisma.tourImage.findMany({
-      where: { tourId },
-      orderBy: { displayOrder: 'asc' },
-    });
+  static async findByTourId(tourId: string): Promise<TourImageScalars[]> {
+    return runQuery(() =>
+      prisma.tourImage.findMany({
+        where: { tourId },
+        orderBy: { displayOrder: 'asc' },
+      })
+    );
   }
 
   /**
-   * Find a single image by ID
+   * Find a single image by ID.
    */
-  static async findById(id: string): Promise<TourImage | null> {
-    return prisma.tourImage.findUnique({
-      where: { id },
-    });
+  static async findById(id: string): Promise<TourImageScalars | null> {
+    return runQuery(() =>
+      prisma.tourImage.findUnique({
+        where: { id },
+      })
+    );
   }
 
   /**
-   * Create a new tour image record
+   * Create a new tour image record.
    */
-  static async create(data: CreateImageInput): Promise<TourImage> {
-    return prisma.tourImage.create({
-      data,
-    });
+  static async create(data: CreateImageInput): Promise<TourImageScalars> {
+    return runQuery(() =>
+      prisma.tourImage.create({
+        data,
+      })
+    );
   }
 
   /**
-   * Delete an image by ID
+   * Delete an image by ID.
    */
-  static async delete(id: string): Promise<TourImage> {
-    return prisma.tourImage.delete({
-      where: { id },
-    });
+  static async delete(id: string): Promise<TourImageScalars> {
+    return runQuery(() =>
+      prisma.tourImage.delete({
+        where: { id },
+      })
+    );
   }
 
   /**
-   * Delete all images for a tour
-   * Returns the count of deleted images
+   * Delete all images for a tour. Returns the count of deleted images.
    */
   static async deleteByTourId(tourId: string): Promise<number> {
-    const result = await prisma.tourImage.deleteMany({
-      where: { tourId },
-    });
+    const result = await runQuery(() =>
+      prisma.tourImage.deleteMany({
+        where: { tourId },
+      })
+    );
     return result.count;
   }
 
   /**
-   * Update the display order of a single image
+   * Update the display order of a single image.
    */
-  static async updateDisplayOrder(id: string, displayOrder: number): Promise<TourImage> {
-    return prisma.tourImage.update({
-      where: { id },
-      data: { displayOrder },
-    });
+  static async updateDisplayOrder(id: string, displayOrder: number): Promise<TourImageScalars> {
+    return runQuery(() =>
+      prisma.tourImage.update({
+        where: { id },
+        data: { displayOrder },
+      })
+    );
   }
 
   /**
-   * Reorder multiple images at once (atomic transaction)
+   * Reorder multiple images at once (atomic transaction).
    */
-  static async reorderImages(imageOrders: ImageOrderUpdate[]): Promise<TourImage[]> {
-    return prisma.$transaction(
-      imageOrders.map((order) =>
-        prisma.tourImage.update({
-          where: { id: order.id },
-          data: { displayOrder: order.displayOrder },
-        })
+  static async reorderImages(imageOrders: ImageOrderUpdate[]): Promise<TourImageScalars[]> {
+    return runQuery(() =>
+      prisma.$transaction(
+        imageOrders.map((order) =>
+          prisma.tourImage.update({
+            where: { id: order.id },
+            data: { displayOrder: order.displayOrder },
+          })
+        )
       )
     );
   }
 
   /**
-   * Count images for a tour
+   * Count images for a tour.
    */
   static async count(tourId: string): Promise<number> {
-    return prisma.tourImage.count({
-      where: { tourId },
-    });
+    return runQuery(() =>
+      prisma.tourImage.count({
+        where: { tourId },
+      })
+    );
   }
 
   /**
-   * Update alt text for an image
+   * Update alt text for an image.
    */
-  static async updateAltText(id: string, altText: string | null): Promise<TourImage> {
-    return prisma.tourImage.update({
-      where: { id },
-      data: { altText },
-    });
+  static async updateAltText(id: string, altText: string | null): Promise<TourImageScalars> {
+    return runQuery(() =>
+      prisma.tourImage.update({
+        where: { id },
+        data: { altText },
+      })
+    );
   }
 }

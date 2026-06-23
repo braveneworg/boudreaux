@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
+import { DataError } from '@/lib/types/domain/errors';
+
 import { POST } from './route';
 
 vi.mock('server-only', () => ({}));
@@ -13,29 +15,6 @@ const { stripeLoggerMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/utils/logger', () => ({
   loggers: { stripe: stripeLoggerMock },
-}));
-
-const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
-  class MockPrismaClientKnownRequestError extends Error {
-    code: string;
-    clientVersion: string;
-    meta?: Record<string, unknown>;
-    constructor(
-      message: string,
-      opts: { code: string; clientVersion: string; meta?: Record<string, unknown> }
-    ) {
-      super(message);
-      this.code = opts.code;
-      this.clientVersion = opts.clientVersion;
-      this.meta = opts.meta;
-      this.name = 'PrismaClientKnownRequestError';
-    }
-  }
-  return { MockPrismaClientKnownRequestError };
-});
-
-vi.mock('@prisma/client/runtime/library', () => ({
-  PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
 }));
 
 vi.mock('unique-username-generator', () => ({
@@ -814,18 +793,14 @@ describe('POST /api/stripe/webhook', () => {
       vi.mocked(console.error).mockRestore();
     });
 
-    it('recovers from P2002 race on purchase creation when target is stripePaymentIntentId', async () => {
+    it('recovers from a DUPLICATE DataError race on purchase creation by re-fetching by paymentIntentId', async () => {
       mockFindByPaymentIntentId
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 'p-pi-raced' });
       mockPurchaseCreate.mockRejectedValue(
-        new MockPrismaClientKnownRequestError(
-          'Unique constraint failed on the fields: (`stripePaymentIntentId`)',
-          {
-            code: 'P2002',
-            clientVersion: '5.0.0',
-            meta: { target: ['stripePaymentIntentId'] },
-          }
+        new DataError(
+          'DUPLICATE',
+          'Unique constraint failed on the fields: (`stripePaymentIntentId`)'
         )
       );
 
@@ -837,15 +812,9 @@ describe('POST /api/stripe/webhook', () => {
       );
     });
 
-    it('returns 500 when P2002 on stripePaymentIntentId but re-fetch finds no purchase', async () => {
+    it('returns 500 when a DUPLICATE DataError fires but re-fetch finds no purchase', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockPurchaseCreate.mockRejectedValue(
-        new MockPrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-          meta: { target: ['stripePaymentIntentId'] },
-        })
-      );
+      mockPurchaseCreate.mockRejectedValue(new DataError('DUPLICATE', 'Unique constraint failed'));
 
       const response = await POST(createRequest('{}'));
 
@@ -971,17 +940,15 @@ describe('POST /api/stripe/webhook', () => {
       vi.mocked(console.error).mockRestore();
     });
 
-    it('recovers from a duck-typed (non-Prisma) P2002 error using findByUserAndRelease', async () => {
-      // createError is a plain Error carrying a P2002 code (not a
-      // PrismaClientKnownRequestError instance) → the `instanceof Error && 'code'`
-      // duck-type branch detects it. findByPaymentIntentId re-fetch returns null so
-      // the recovery falls through to findByUserAndRelease.
-      const duckError = Object.assign(new Error('dup'), { code: 'P2002' });
+    it('recovers from a DUPLICATE DataError using findByUserAndRelease', async () => {
+      // The repository surfaces a unique-constraint race as a DataError with
+      // code 'DUPLICATE'. findByPaymentIntentId re-fetch returns null so the
+      // recovery falls through to findByUserAndRelease.
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockFindByUserAndRelease
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 'purchase-duck' });
-      mockPurchaseCreate.mockRejectedValue(duckError);
+      mockPurchaseCreate.mockRejectedValue(new DataError('DUPLICATE', 'dup'));
 
       const response = await POST(createRequest('{}'));
 
@@ -992,19 +959,13 @@ describe('POST /api/stripe/webhook', () => {
       );
     });
 
-    it('rethrows 500 when a P2002 race occurs and neither re-fetch finds a purchase', async () => {
+    it('rethrows 500 when a DUPLICATE race occurs and neither re-fetch finds a purchase', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
-      // P2002 is detected, but both recovery look-ups return null, so the
+      // DUPLICATE is detected, but both recovery look-ups return null, so the
       // `if (purchase)` guard is skipped and createError is re-thrown → 500.
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockFindByUserAndRelease.mockResolvedValue(null);
-      mockPurchaseCreate.mockRejectedValue(
-        new MockPrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-          meta: { target: ['stripePaymentIntentId'] },
-        })
-      );
+      mockPurchaseCreate.mockRejectedValue(new DataError('DUPLICATE', 'Unique constraint failed'));
 
       const response = await POST(createRequest('{}'));
 
@@ -1013,11 +974,11 @@ describe('POST /api/stripe/webhook', () => {
       vi.mocked(console.error).mockRestore();
     });
 
-    it('rethrows and returns 500 when the create error is not a P2002 conflict', async () => {
+    it('rethrows and returns 500 when the create error is not a DUPLICATE conflict', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
-      // A non-P2002 Prisma error skips the recovery branch entirely and is
+      // A non-DUPLICATE error skips the recovery branch entirely and is
       // rethrown, so the outer handler returns 500.
-      const otherError = Object.assign(new Error('boom'), { code: 'P2010' });
+      const otherError = new DataError('UNKNOWN', 'boom');
       mockPurchaseCreate.mockRejectedValue(otherError);
 
       const response = await POST(createRequest('{}'));

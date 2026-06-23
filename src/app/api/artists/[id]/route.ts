@@ -10,12 +10,11 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
+import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateArtistSchema } from '@/lib/validation/update-schemas';
-
-import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +71,7 @@ export const PUT = withAdmin(
 
       const result = await ArtistService.updateArtist(
         id,
-        validation.data as unknown as Prisma.ArtistUpdateInput
+        validation.data as unknown as UpdateArtistData
       );
 
       if (!result.success) {
@@ -112,7 +111,7 @@ export const PATCH = withAdmin(
 
       const result = await ArtistService.updateArtist(
         id,
-        validation.data as unknown as Prisma.ArtistUpdateInput
+        validation.data as unknown as UpdateArtistData
       );
 
       if (!result.success) {

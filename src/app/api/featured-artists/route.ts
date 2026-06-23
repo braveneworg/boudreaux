@@ -9,14 +9,13 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import type { CreateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
-
-import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,7 +136,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
     }
 
     const result = await FeaturedArtistsService.createFeaturedArtist(
-      validation.data as Prisma.FeaturedArtistCreateInput
+      validation.data as unknown as CreateFeaturedArtistData
     );
 
     if (!result.success) {

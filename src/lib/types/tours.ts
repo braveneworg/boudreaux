@@ -7,35 +7,168 @@
  * Adapted from contracts/tour-types.ts
  */
 
-import type {
-  Tour as PrismaTour,
-  Venue as PrismaVenue,
-  TourDateHeadliner as PrismaTourHeadliner,
-  TourImage as PrismaTourImage,
-  Artist,
-} from '@prisma/client';
+import type { ArtistScalars } from '@/lib/types/domain/artist';
+
+export type { ArtistScalars };
 
 // ============================================================================
-// Core Domain Models (extending Prisma types)
+// Scalar mirrors of the Prisma tour models (Prisma-free)
+//
+// Hand-written mirrors of the Prisma `Tour`/`Venue`/`TourDate`/
+// `TourDateHeadliner`/`TourImage`/`TourDateImage` model scalars. These are
+// drift-checked against their `Prisma.*GetPayload` counterparts inside the tour
+// repositories, so a schema change that isn't reflected here fails
+// `pnpm run typecheck`. Declared as `type` (not `interface`) so payloads remain
+// assignable to `Record<string, unknown>` — the constraint the admin `DataView`
+// uses.
 // ============================================================================
 
-export type Tour = PrismaTour & {
+/** Scalar fields of the Prisma `Tour` model (no relations loaded). */
+export type TourScalars = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  subtitle2: string | null;
+  description: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+/** Scalar fields of the Prisma `Venue` model (no relations loaded). */
+export type VenueScalars = {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  capacity: number | null;
+  notes: string | null;
+  timeZone: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+/** Scalar fields of the Prisma `TourDate` model (no relations loaded). */
+export type TourDateScalars = {
+  id: string;
+  tourId: string;
+  startDate: Date;
+  endDate: Date | null;
+  showStartTime: Date;
+  showEndTime: Date | null;
+  doorsOpenAt: Date | null;
+  venueId: string;
+  timeZone: string | null;
+  utcOffset: number | null;
+  ticketsUrl: string | null;
+  ticketIconUrl: string | null;
+  ticketPrices: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Scalar fields of the Prisma `TourDateHeadliner` join model. */
+export type TourDateHeadlinerScalars = {
+  id: string;
+  tourDateId: string;
+  artistId: string | null;
+  sortOrder: number;
+  setTime: Date | null;
+  createdAt: Date;
+};
+
+/** Scalar fields of the Prisma `TourImage` model. */
+export type TourImageScalars = {
+  id: string;
+  tourId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+};
+
+/** Scalar fields of the Prisma `TourDateImage` model. */
+export type TourDateImageScalars = {
+  id: string;
+  tourDateId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+};
+
+// ============================================================================
+// Core Domain Models (composing the scalar mirrors)
+// ============================================================================
+
+export type Tour = TourScalars & {
   venue: Venue;
   headliners: TourHeadliner[];
   images: TourImage[];
 };
 
-export type Venue = PrismaVenue & {
+export type Venue = VenueScalars & {
   tours?: Tour[];
 };
 
-export type TourHeadliner = PrismaTourHeadliner & {
+export type TourHeadliner = TourDateHeadlinerScalars & {
   tour?: Tour;
-  artist: Artist;
+  artist: ArtistScalars;
 };
 
-export type TourImage = PrismaTourImage & {
+export type TourImage = TourImageScalars & {
   tour?: Tour;
+};
+
+/**
+ * A tour-date row with its venue and ordered headliners (each carrying its
+ * bare artist scalars, nullable for unlinked guests).
+ */
+export type TourDateWithRelations = TourDateScalars & {
+  venue: VenueScalars;
+  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistScalars | null }>;
+};
+
+/**
+ * The full tour payload used by the public tours pages, the detail/card
+ * components, and the tour query hooks: a tour with its ordered images and its
+ * tour dates (each with venue + headliners). Drift-checked against
+ * `Prisma.TourGetPayload` inside `tour-repository`.
+ */
+export type TourWithRelations = TourScalars & {
+  images: TourImageScalars[];
+  tourDates: TourDateWithRelations[];
+};
+
+/**
+ * The full tour-date payload returned by `tour-date-repository`: a tour date
+ * with its venue, parent tour, and ordered headliners. Drift-checked against
+ * `Prisma.TourDateGetPayload` inside `tour-date-repository`.
+ */
+export type TourDateWithTourAndRelations = TourDateScalars & {
+  venue: VenueScalars;
+  tour: TourScalars;
+  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistScalars | null }>;
 };
 
 // ============================================================================
@@ -269,7 +402,7 @@ export interface ActionResult<T = void> {
  * 2. Fall back to firstName + " " + surname
  * 3. Fall back to null
  */
-export type GetArtistDisplayName = (artist: Artist) => string | null;
+export type GetArtistDisplayName = (artist: ArtistScalars) => string | null;
 
 // ============================================================================
 // Service Response Type (matching existing pattern)

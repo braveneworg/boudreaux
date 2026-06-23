@@ -20,7 +20,7 @@ import {
 
 /**
  * Local interface matching Prisma TourImage model.
- * Client components should not import directly from @prisma/client.
+ * Client components do not import the generated Prisma client types directly.
  */
 interface TourImageFields {
   id: string;

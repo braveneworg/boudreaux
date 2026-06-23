@@ -4,9 +4,16 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ToursPageClient } from './tours-page-client';
+import type {
+  ArtistScalars as Artist,
+  TourDateHeadlinerScalars as TourDateHeadliner,
+  TourDateScalars as TourDate,
+  TourImageScalars as TourImage,
+  TourScalars as Tour,
+  VenueScalars as Venue,
+} from '@/lib/types/tours';
 
-import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
+import { ToursPageClient } from './tours-page-client';
 
 type TourWithRelations = Tour & {
   tourDates: Array<

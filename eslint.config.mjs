@@ -372,6 +372,64 @@ const eslintConfig = [
     },
   },
   eslintPluginPrettierRecommended,
+  // Confine Prisma to the data-access layer of the app source. Only files under
+  // `src/lib/repositories/**` (and the DB-client infra files, allowlisted in the
+  // override block below) may import `@prisma/client`. Every other layer depends
+  // on the hand-written, Prisma-free domain types in `@/lib/types/domain` and
+  // catches `DataError` (`@/lib/types/domain/errors`) instead of Prisma error
+  // classes. Scoped to `src/**` so e2e tests, seed/maintenance scripts, and the
+  // standalone `stripe-webhook` project keep their direct Prisma access.
+  // `allowTypeImports` is left at its default (false) so even `import type` is blocked.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@prisma/client',
+              message:
+                'Prisma may only be imported in src/lib/repositories/**. Use hand-written domain types from @/lib/types/domain instead.',
+            },
+            {
+              name: '@prisma/client/runtime/library',
+              message:
+                'Prisma may only be imported in src/lib/repositories/**. Catch DataError from @/lib/types/domain/errors instead.',
+            },
+          ],
+          // Defense-in-depth: also catch any current/future Prisma submodule
+          // (e.g. @prisma/client/edge, @prisma/client/extension). `paths` above
+          // give the precise messages; this glob closes the gap. allowTypeImports
+          // stays false so `import type` is blocked too.
+          patterns: [
+            {
+              group: ['@prisma/client', '@prisma/client/*'],
+              allowTypeImports: false,
+              message:
+                'Prisma may only be imported in src/lib/repositories/**. Use @/lib/types/domain types and DataError instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Allowlist: the data-access layer and the DB-client infra files (the only
+  // places Prisma is permitted) are exempt from the no-prisma-import ban above.
+  {
+    files: [
+      'src/lib/repositories/**',
+      'src/lib/prisma.ts',
+      'src/lib/prisma.spec.ts',
+      'src/lib/prisma-adapter.ts',
+      'src/lib/prisma-adapter.spec.ts',
+      'src/lib/utils/slow-query-extension.ts',
+      'src/lib/utils/slow-query-extension.spec.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': 'off',
+    },
+  },
 ];
 
 export default eslintConfig;

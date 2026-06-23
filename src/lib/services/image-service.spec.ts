@@ -44,10 +44,7 @@ describe('ImageService.registerForArtist', () => {
       { cdnUrl: 'https://cdn.example.com/2' },
     ]);
 
-    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith(
-      { artistId: 'artist-1' },
-      { id: true }
-    );
+    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith({ artistId: 'artist-1' });
     expect(ImageRepository.create).toHaveBeenNthCalledWith(1, {
       src: 'https://cdn.example.com/1',
       caption: 'cap',
@@ -130,10 +127,7 @@ describe('ImageService.registerForRelease', () => {
 
     await ImageService.registerForRelease('release-1', [{ cdnUrl: 'https://cdn.example.com/1' }]);
 
-    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith(
-      { releaseId: 'release-1' },
-      { id: true }
-    );
+    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith({ releaseId: 'release-1' });
     expect(ImageRepository.create).toHaveBeenCalledWith({
       src: 'https://cdn.example.com/1',
       caption: undefined,

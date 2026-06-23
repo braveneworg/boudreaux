@@ -5,14 +5,13 @@
 import 'server-only';
 
 import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
+import type { VenueScalars } from '@/lib/types/tours';
 import {
   venueCreateSchema,
   venueUpdateSchema,
   type VenueCreateInput,
   type VenueUpdateInput,
 } from '@/lib/validation/tours/venue-schema';
-
-import type { Venue } from '@prisma/client';
 
 export interface VenueQueryParams {
   search?: string;
@@ -22,7 +21,7 @@ export interface VenueQueryParams {
 }
 
 export interface PaginatedVenuesResponse {
-  data: Venue[];
+  data: VenueScalars[];
   total: number;
   page: number;
   limit: number;
@@ -56,21 +55,21 @@ export class VenueService {
   /**
    * Find a venue by ID
    */
-  static async findById(id: string): Promise<Venue | null> {
+  static async findById(id: string): Promise<VenueScalars | null> {
     return VenueRepository.findById(id);
   }
 
   /**
    * Find venues by name (case-insensitive)
    */
-  static async findByName(name: string): Promise<Venue[]> {
+  static async findByName(name: string): Promise<VenueScalars[]> {
     return VenueRepository.findByName(name);
   }
 
   /**
    * Create a new venue with validation
    */
-  static async create(input: VenueCreateInput): Promise<Venue> {
+  static async create(input: VenueCreateInput): Promise<VenueScalars> {
     // Validate input
     const validated = venueCreateSchema.parse(input);
 
@@ -81,7 +80,7 @@ export class VenueService {
   /**
    * Update an existing venue with validation
    */
-  static async update(id: string, input: VenueUpdateInput, userId: string): Promise<Venue> {
+  static async update(id: string, input: VenueUpdateInput, userId: string): Promise<VenueScalars> {
     // Validate input
     const validated = venueUpdateSchema.parse(input);
 
@@ -93,7 +92,7 @@ export class VenueService {
    * Delete a venue
    * Will fail if venue has associated tours (foreign key constraint)
    */
-  static async delete(id: string): Promise<Venue> {
+  static async delete(id: string): Promise<VenueScalars> {
     return VenueRepository.delete(id);
   }
 

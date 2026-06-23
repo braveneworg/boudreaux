@@ -2,15 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Get the mocked functions using hoisted
-import { Prisma } from '@prisma/client';
-
 import { updateProfileAction } from '@/lib/actions/update-profile-action';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
-const mockPrismaUserUpdate = vi.hoisted(() => vi.fn());
+const mockUpdateProfile = vi.hoisted(() => vi.fn());
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
 const mockLogSecurityEvent = vi.hoisted(() => vi.fn());
 
@@ -23,11 +22,9 @@ vi.mock('@/auth', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('../prisma', () => ({
-  prisma: {
-    user: {
-      update: mockPrismaUserUpdate,
-    },
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    updateProfile: mockUpdateProfile,
   },
 }));
 
@@ -118,7 +115,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123', email: 'test@example.com' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({
+      vi.mocked(mockUpdateProfile).mockResolvedValue({
         id: 'user-123',
         name: 'John Doe',
         firstName: 'John',
@@ -128,21 +125,18 @@ describe('updateProfileAction', () => {
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
-        where: { id: 'user-123' },
-        data: {
-          name: 'John Doe',
-          firstName: 'John',
-          lastName: 'Doe',
-          phone: '555-1234',
-          addressLine1: '123 Main St',
-          addressLine2: 'Apt 4',
-          city: 'New York',
-          state: 'NY',
-          zipCode: '10001',
-          country: 'US',
-          allowSmsNotifications: true,
-        },
+      expect(mockUpdateProfile).toHaveBeenCalledWith('user-123', {
+        name: 'John Doe',
+        firstName: 'John',
+        lastName: 'Doe',
+        phone: '555-1234',
+        addressLine1: '123 Main St',
+        addressLine2: 'Apt 4',
+        city: 'New York',
+        state: 'NY',
+        zipCode: '10001',
+        country: 'US',
+        allowSmsNotifications: true,
       });
 
       expect(result.success).toBe(true);
@@ -184,15 +178,14 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: 'Jane Smith',
-          }),
+          name: 'Jane Smith',
         })
       );
     });
@@ -232,15 +225,14 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: 'Doe',
-          }),
+          name: 'Doe',
         })
       );
     });
@@ -280,15 +272,14 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: 'John',
-          }),
+          name: 'John',
         })
       );
     });
@@ -325,7 +316,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
@@ -365,13 +356,13 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
-        where: { id: 'user-123' },
-        data: expect.objectContaining({
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
           phone: '555-5555',
           addressLine1: '456 Oak St',
           addressLine2: 'Suite 100',
@@ -380,8 +371,8 @@ describe('updateProfileAction', () => {
           zipCode: '02101',
           country: 'US',
           allowSmsNotifications: true,
-        }),
-      });
+        })
+      );
     });
   });
 
@@ -420,7 +411,7 @@ describe('updateProfileAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
+      expect(mockUpdateProfile).not.toHaveBeenCalled();
       expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
@@ -460,7 +451,7 @@ describe('updateProfileAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
+      expect(mockUpdateProfile).not.toHaveBeenCalled();
     });
 
     it('should initialize formState.errors when it is undefined', async () => {
@@ -571,7 +562,7 @@ describe('updateProfileAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
       expect(mockAuth).not.toHaveBeenCalled();
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
+      expect(mockUpdateProfile).not.toHaveBeenCalled();
     });
 
     it('should not call database when parsed data is invalid', async () => {
@@ -594,13 +585,13 @@ describe('updateProfileAction', () => {
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
+      expect(mockUpdateProfile).not.toHaveBeenCalled();
       expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
   });
 
   describe('database errors', () => {
-    it('should handle Prisma known request errors', async () => {
+    it('should handle DataError from the repository', async () => {
       const mockFormState: FormState = {
         fields: {},
         success: false,
@@ -632,12 +623,9 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      const prismaError = new Prisma.PrismaClientKnownRequestError('Database error', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
+      const dataError = new DataError('NOT_FOUND', 'Database error');
 
-      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(prismaError);
+      vi.mocked(mockUpdateProfile).mockRejectedValue(dataError);
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
@@ -678,7 +666,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(Error('Database connection failed'));
+      vi.mocked(mockUpdateProfile).mockRejectedValue(Error('Database connection failed'));
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
@@ -718,7 +706,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(Error('Update failed'));
+      vi.mocked(mockUpdateProfile).mockRejectedValue(Error('Update failed'));
 
       await updateProfileAction(mockInitialState, mockFormData);
 
@@ -759,17 +747,16 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: '',
-            firstName: '',
-            lastName: '',
-          }),
+          name: '',
+          firstName: '',
+          lastName: '',
         })
       );
     });
@@ -806,15 +793,14 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: 'John     Doe',
-          }),
+          name: 'John     Doe',
         })
       );
     });
@@ -851,15 +837,14 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({
-            allowSmsNotifications: true,
-          }),
+          allowSmsNotifications: true,
         })
       );
     });
@@ -901,7 +886,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 
@@ -960,7 +945,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-456' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
 

@@ -10,13 +10,12 @@ import {
   FREE_DOWNLOAD_WINDOW_MS,
   FreeDownloadQuotaService,
 } from '@/lib/services/free-download-quota-service';
+import type { VisitorIdentityRecord } from '@/lib/types/domain/visitor-identity';
 import type { DownloadSubject } from '@/types/download-subject';
-
-import type { VisitorIdentity } from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 
-const makeRow = (overrides?: Partial<VisitorIdentity>): VisitorIdentity =>
+const makeRow = (overrides?: Partial<VisitorIdentityRecord>): VisitorIdentityRecord =>
   ({
     id: 'vi-1',
     visitorId: 'visitor-cookie',
@@ -26,7 +25,7 @@ const makeRow = (overrides?: Partial<VisitorIdentity>): VisitorIdentity =>
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
-  }) as VisitorIdentity;
+  }) as VisitorIdentityRecord;
 
 describe('FreeDownloadQuotaService', () => {
   const now = new Date('2026-05-08T12:00:00Z');

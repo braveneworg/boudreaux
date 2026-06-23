@@ -5,57 +5,55 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type {
+  CreateImageData,
+  ImageOwnerWhere,
+  ImageRecord,
+  UpdateImageData,
+} from '@/lib/types/domain/image';
 
-import type { Image, Prisma } from '@prisma/client';
+import { runQuery } from './_internal/map-prisma-error';
 
-/** Owner scoping for an image — exactly one of artistId/releaseId is provided. */
-export type ImageOwnerWhere = { artistId: string } | { releaseId: string };
+import type { AssertExact } from './_internal/drift';
+import type { Prisma } from '@prisma/client';
+
+export type { ImageOwnerWhere } from '@/lib/types/domain/image';
+
+// Drift guard: fail typecheck if ImageRecord diverges from the Prisma payload.
+type _ImageDrift = AssertExact<ImageRecord, Prisma.ImageGetPayload<object>>;
+const _imageDrift: _ImageDrift = true;
+
+/** Build a Prisma create payload from domain create data. */
+const toPrismaCreate = (data: CreateImageData): Prisma.ImageUncheckedCreateInput => ({ ...data });
 
 /**
- * Data-access layer for the general Image model.
- *
- * Encapsulates every Prisma call for images owned by artists or releases so
- * services never talk to Prisma directly. Methods return RAW Prisma results;
- * sort-order computation, S3 side effects, and ServiceResponse wrapping stay in
- * the calling service.
+ * Data-access layer for the general Image model. The only layer that touches
+ * Prisma for images: it owns the query shapes, translates domain input, and
+ * wraps every call in `runQuery` so callers see hand-written domain types and
+ * vendor-neutral `DataError`s. Sort-order computation, S3 side effects, and
+ * ServiceResponse wrapping stay in the calling service.
  */
 export class ImageRepository {
-  /**
-   * Find images for a single owner (artist or release) with a caller-supplied
-   * select projection. Used to count existing rows when seeding sortOrder.
-   */
-  static async findManyByOwner(
-    owner: ImageOwnerWhere,
-    select: Prisma.ImageSelect
-  ): Promise<Partial<Image>[]> {
-    return prisma.image.findMany({
-      where: owner,
-      select,
-    }) as Promise<Partial<Image>[]>;
+  /** Find the (id-only) images for a single owner. Used to seed sortOrder. */
+  static async findManyByOwner(owner: ImageOwnerWhere): Promise<Array<{ id: string }>> {
+    return runQuery(() => prisma.image.findMany({ where: owner, select: { id: true } }));
   }
 
-  /** Create a single image row from the supplied (unchecked) create data. */
-  static async create(data: Prisma.ImageUncheckedCreateInput): Promise<Image> {
-    return prisma.image.create({ data });
+  /** Create a single image row from the supplied create data. */
+  static async create(data: CreateImageData): Promise<ImageRecord> {
+    return runQuery(() => prisma.image.create({ data: toPrismaCreate(data) }));
   }
 
-  /** Find a single image by id with a caller-supplied select projection. */
-  static async findUniqueById(
-    id: string,
-    select: Prisma.ImageSelect
-  ): Promise<Partial<Image> | null> {
-    return prisma.image.findUnique({
-      where: { id },
-      select,
-    }) as Promise<Partial<Image> | null>;
+  /** Find a single image by id (all scalar fields). */
+  static async findUniqueById(id: string): Promise<ImageRecord | null> {
+    return runQuery(() => prisma.image.findUnique({ where: { id } }));
   }
 
   /** Find all images for an artist, ordered by sortOrder ascending. */
-  static async findManyByArtist(artistId: string): Promise<Image[]> {
-    return prisma.image.findMany({
-      where: { artistId },
-      orderBy: { sortOrder: 'asc' },
-    });
+  static async findManyByArtist(artistId: string): Promise<ImageRecord[]> {
+    return runQuery(() =>
+      prisma.image.findMany({ where: { artistId }, orderBy: { sortOrder: 'asc' } })
+    );
   }
 
   /**
@@ -65,33 +63,24 @@ export class ImageRepository {
   static async findManyByArtistAndIds(
     artistId: string,
     ids: string[]
-  ): Promise<Pick<Image, 'id'>[]> {
-    return prisma.image.findMany({
-      where: { artistId, id: { in: ids } },
-      select: { id: true },
-    });
+  ): Promise<Array<{ id: string }>> {
+    return runQuery(() =>
+      prisma.image.findMany({ where: { artistId, id: { in: ids } }, select: { id: true } })
+    );
   }
 
   /** Update an image's caption/altText (and any other supplied scalar fields). */
-  static async update(id: string, data: Prisma.ImageUpdateInput): Promise<Image> {
-    return prisma.image.update({
-      where: { id },
-      data,
-    });
+  static async update(id: string, data: UpdateImageData): Promise<ImageRecord> {
+    return runQuery(() => prisma.image.update({ where: { id }, data }));
   }
 
   /** Update a single image's sortOrder. Used by the reorder operation. */
-  static async updateSortOrder(id: string, sortOrder: number): Promise<Image> {
-    return prisma.image.update({
-      where: { id },
-      data: { sortOrder },
-    });
+  static async updateSortOrder(id: string, sortOrder: number): Promise<ImageRecord> {
+    return runQuery(() => prisma.image.update({ where: { id }, data: { sortOrder } }));
   }
 
   /** Hard-delete an image row by id. */
-  static async delete(id: string): Promise<Image> {
-    return prisma.image.delete({
-      where: { id },
-    });
+  static async delete(id: string): Promise<ImageRecord> {
+    return runQuery(() => prisma.image.delete({ where: { id } }));
   }
 }

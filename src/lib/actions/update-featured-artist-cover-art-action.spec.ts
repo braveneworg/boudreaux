@@ -4,7 +4,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import { cache } from '@/lib/utils/simple-cache';
 import { requireRole } from '@/utils/auth/require-role';
 
@@ -12,15 +12,15 @@ import { updateFeaturedArtistCoverArtAction } from './update-featured-artist-cov
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
-vi.mock('../prisma', () => ({
-  prisma: {
-    featuredArtist: {
-      update: vi.fn(),
-    },
+vi.mock('../repositories/featured-artist-repository', () => ({
+  FeaturedArtistRepository: {
+    updateCoverArt: vi.fn(),
   },
 }));
 vi.mock('../utils/auth/require-role');
 vi.mock('../utils/simple-cache', () => ({ cache: { deleteByPrefix: vi.fn() } }));
+
+const mockUpdateCoverArt = vi.mocked(FeaturedArtistRepository.updateCoverArt);
 
 const VALID_FEATURED_ARTIST_ID = '507f1f77bcf86cd799439011';
 const VALID_COVER_URL = 'https://cdn.example.com/cover.webp';
@@ -28,7 +28,7 @@ const VALID_COVER_URL = 'https://cdn.example.com/cover.webp';
 describe('updateFeaturedArtistCoverArtAction', () => {
   beforeEach(() => {
     vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
-    vi.mocked(prisma.featuredArtist.update).mockResolvedValue({} as never);
+    mockUpdateCoverArt.mockResolvedValue(undefined);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -44,21 +44,21 @@ describe('updateFeaturedArtistCoverArtAction', () => {
     const result = await updateFeaturedArtistCoverArtAction('not-an-objectid', VALID_COVER_URL);
 
     expect(result).toEqual({ success: false, error: 'Invalid featured artist ID' });
-    expect(prisma.featuredArtist.update).not.toHaveBeenCalled();
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('rejects empty cover art URL', async () => {
     const result = await updateFeaturedArtistCoverArtAction(VALID_FEATURED_ARTIST_ID, '');
 
     expect(result).toEqual({ success: false, error: 'Cover art URL is required' });
-    expect(prisma.featuredArtist.update).not.toHaveBeenCalled();
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('rejects whitespace-only cover art URL', async () => {
     const result = await updateFeaturedArtistCoverArtAction(VALID_FEATURED_ARTIST_ID, '   ');
 
     expect(result).toEqual({ success: false, error: 'Cover art URL is required' });
-    expect(prisma.featuredArtist.update).not.toHaveBeenCalled();
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('rejects non-string cover art values', async () => {
@@ -68,7 +68,7 @@ describe('updateFeaturedArtistCoverArtAction', () => {
     );
 
     expect(result).toEqual({ success: false, error: 'Cover art URL is required' });
-    expect(prisma.featuredArtist.update).not.toHaveBeenCalled();
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('rejects data URIs', async () => {
@@ -78,7 +78,7 @@ describe('updateFeaturedArtistCoverArtAction', () => {
     );
 
     expect(result).toEqual({ success: false, error: 'Cover art must be an HTTP(S) URL' });
-    expect(prisma.featuredArtist.update).not.toHaveBeenCalled();
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('accepts http:// URLs', async () => {
@@ -88,10 +88,10 @@ describe('updateFeaturedArtistCoverArtAction', () => {
     );
 
     expect(result).toEqual({ success: true });
-    expect(prisma.featuredArtist.update).toHaveBeenCalledWith({
-      where: { id: VALID_FEATURED_ARTIST_ID },
-      data: { coverArt: 'http://cdn.example.com/cover.webp' },
-    });
+    expect(mockUpdateCoverArt).toHaveBeenCalledWith(
+      VALID_FEATURED_ARTIST_ID,
+      'http://cdn.example.com/cover.webp'
+    );
   });
 
   it('persists the cover art and revalidates the home page', async () => {
@@ -101,16 +101,13 @@ describe('updateFeaturedArtistCoverArtAction', () => {
     );
 
     expect(result).toEqual({ success: true });
-    expect(prisma.featuredArtist.update).toHaveBeenCalledWith({
-      where: { id: VALID_FEATURED_ARTIST_ID },
-      data: { coverArt: VALID_COVER_URL },
-    });
+    expect(mockUpdateCoverArt).toHaveBeenCalledWith(VALID_FEATURED_ARTIST_ID, VALID_COVER_URL);
     expect(cache.deleteByPrefix).toHaveBeenCalledWith('featured-artists:');
     expect(revalidatePath).toHaveBeenCalledWith('/');
   });
 
   it('returns the underlying error message when prisma throws Error', async () => {
-    vi.mocked(prisma.featuredArtist.update).mockRejectedValue(new Error('connection lost'));
+    mockUpdateCoverArt.mockRejectedValue(new Error('connection lost'));
 
     const result = await updateFeaturedArtistCoverArtAction(
       VALID_FEATURED_ARTIST_ID,
@@ -122,7 +119,7 @@ describe('updateFeaturedArtistCoverArtAction', () => {
   });
 
   it('returns a generic message when prisma throws a non-Error value', async () => {
-    vi.mocked(prisma.featuredArtist.update).mockRejectedValue('string error');
+    mockUpdateCoverArt.mockRejectedValue('string error');
 
     const result = await updateFeaturedArtistCoverArtAction(
       VALID_FEATURED_ARTIST_ID,

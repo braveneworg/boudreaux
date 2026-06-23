@@ -2,16 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
-import {
-  publishedReleaseDetailInclude,
-  publishedReleaseListingSelect,
-  releaseListItemInclude,
-} from '@/lib/types/media-models';
+import { DataError } from '@/lib/types/domain/errors';
+import type { CreateReleaseData } from '@/lib/types/domain/release';
 
 import { ReleaseRepository } from './release-repository';
-
-import type { Prisma } from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 
@@ -24,6 +21,7 @@ vi.mock('@/lib/prisma', () => ({
       findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      count: vi.fn(),
     },
     releaseUrl: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -41,36 +39,90 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('ReleaseRepository', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   const mockRelease = { id: 'release-123', title: 'Test Album' };
 
-  const detailIncludeNoImages = {
+  // Detail include with unordered images (create/softDelete/restore/update).
+  const detailIncludeUnordered = {
+    images: true,
+    artistReleases: { include: { artist: true } },
+    digitalFormats: { include: { files: true } },
+    releaseUrls: { include: { url: true } },
+  };
+
+  // Detail include with sortOrder-ordered images and trackNumber-ordered files
+  // (findById).
+  const detailIncludeOrdered = {
+    images: { orderBy: { sortOrder: 'asc' } },
     artistReleases: { include: { artist: true } },
     digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
     releaseUrls: { include: { url: true } },
   };
 
-  describe('create', () => {
-    it('creates a release with the full detail include (images unbounded)', async () => {
-      vi.mocked(prisma.release.create).mockResolvedValue(mockRelease as never);
-      const data = { title: 'Test Album' } as Prisma.ReleaseCreateInput;
+  const listItemInclude = {
+    images: { orderBy: { sortOrder: 'asc' }, take: 3 },
+    artistReleases: { include: { artist: true } },
+  };
 
-      const result = await ReleaseRepository.create(data);
+  const listingSelect = {
+    id: true,
+    title: true,
+    coverArt: true,
+    releasedOn: true,
+    images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
+    artistReleases: {
+      select: {
+        artist: { select: { id: true, firstName: true, surname: true, displayName: true } },
+      },
+    },
+    releaseUrls: { select: { url: { select: { platform: true, url: true } } } },
+  };
+
+  const detailSelect = {
+    images: { orderBy: { sortOrder: 'asc' } },
+    artistReleases: {
+      select: {
+        artist: {
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            surname: true,
+            displayName: true,
+            title: true,
+            suffix: true,
+          },
+        },
+      },
+    },
+    digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+    releaseUrls: { include: { url: true } },
+  };
+
+  const createData: CreateReleaseData = {
+    title: 'Test Album',
+    releasedOn: new Date('2024-01-15'),
+    coverArt: 'https://example.com/cover.jpg',
+    formats: ['DIGITAL'],
+  };
+
+  describe('create', () => {
+    it('creates a release with the unordered-images detail include', async () => {
+      vi.mocked(prisma.release.create).mockResolvedValue(mockRelease as never);
+
+      const result = await ReleaseRepository.create(createData);
 
       expect(result).toEqual(mockRelease);
       expect(prisma.release.create).toHaveBeenCalledWith({
-        data,
-        include: {
-          artistReleases: { include: { artist: true } },
-          digitalFormats: { include: { files: true } },
-          releaseUrls: { include: { url: true } },
-          images: true,
-        },
+        data: createData,
+        include: detailIncludeUnordered,
       });
     });
   });
 
   describe('findById', () => {
-    it('finds a release with unbounded images ordered by sortOrder and full detail include', async () => {
+    it('finds a release with ordered images and the full detail include', async () => {
       vi.mocked(prisma.release.findUnique).mockResolvedValue(mockRelease as never);
 
       const result = await ReleaseRepository.findById('release-123');
@@ -78,10 +130,7 @@ describe('ReleaseRepository', () => {
       expect(result).toEqual(mockRelease);
       expect(prisma.release.findUnique).toHaveBeenCalledWith({
         where: { id: 'release-123' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' } },
-          ...detailIncludeNoImages,
-        },
+        include: detailIncludeOrdered,
       });
     });
 
@@ -92,41 +141,168 @@ describe('ReleaseRepository', () => {
 
       expect(result).toBeNull();
     });
+
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.release.findUnique).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
+      );
+
+      await expect(ReleaseRepository.findById('a')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.release.findUnique).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(ReleaseRepository.findById('a')).rejects.toBeInstanceOf(DataError);
+    });
   });
 
   describe('findMany', () => {
-    it('queries with the caller where, pagination, createdAt desc, and the lightweight listing include', async () => {
+    it('uses the listing include, default pagination, and createdAt desc order', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease] as never);
-      const where = { AND: [{ title: 'x' }] } as Prisma.ReleaseWhereInput;
 
-      const result = await ReleaseRepository.findMany({ where, skip: 10, take: 5 });
+      const result = await ReleaseRepository.findMany({});
 
       expect(result).toEqual([mockRelease]);
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where,
-        skip: 10,
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: releaseListItemInclude,
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.skip).toBe(0);
+      expect(arg?.take).toBe(50);
+      expect(arg?.orderBy).toEqual({ createdAt: 'desc' });
+      expect(arg?.include).toEqual(listItemInclude);
+    });
+
+    it('excludes soft-deleted releases by default (Mongo null-safe)', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({});
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+      });
+    });
+
+    it('includes soft-deleted releases when deleted=true', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({});
+    });
+
+    it('filters to published releases when published=true', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true, published: true });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({ AND: [{ publishedAt: { not: null } }] });
+    });
+
+    it('filters to unpublished releases when published=false', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true, published: false });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [{ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }],
+      });
+    });
+
+    it('adds a case-insensitive search OR across title/catalog/description', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true, search: 'foo' });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [
+          {
+            OR: [
+              { title: { contains: 'foo', mode: 'insensitive' } },
+              { catalogNumber: { contains: 'foo', mode: 'insensitive' } },
+              { description: { contains: 'foo', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('filters by artistIds when provided', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true, artistIds: ['artist-1', 'artist-2'] });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        artistReleases: { some: { artistId: { in: ['artist-1', 'artist-2'] } } },
+      });
+    });
+
+    it('does NOT filter by artistIds when an empty array is provided', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ deleted: true, artistIds: [] });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0] ?? {};
+      expect(arg.where).not.toHaveProperty('artistReleases');
+    });
+
+    it('honors custom pagination', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ skip: 10, take: 5 });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.skip).toBe(10);
+      expect(arg?.take).toBe(5);
+    });
+  });
+
+  describe('count', () => {
+    it('counts all releases with no filter', async () => {
+      vi.mocked(prisma.release.count).mockResolvedValue(7 as never);
+
+      const result = await ReleaseRepository.count();
+
+      expect(result).toBe(7);
+      expect(prisma.release.count).toHaveBeenCalledWith({ where: {} });
+    });
+
+    it('counts only published releases when published=true', async () => {
+      vi.mocked(prisma.release.count).mockResolvedValue(3 as never);
+
+      await ReleaseRepository.count({ published: true });
+
+      expect(prisma.release.count).toHaveBeenCalledWith({ where: { publishedAt: { not: null } } });
+    });
+
+    it('counts only unpublished releases when published=false', async () => {
+      vi.mocked(prisma.release.count).mockResolvedValue(4 as never);
+
+      await ReleaseRepository.count({ published: false });
+
+      expect(prisma.release.count).toHaveBeenCalledWith({
+        where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] },
       });
     });
   });
 
   describe('update', () => {
-    it('updates with the full detail include (images unbounded)', async () => {
+    it('updates with the unordered-images detail include', async () => {
       vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
-      const data = { title: 'New' } as Prisma.ReleaseUpdateInput;
 
-      const result = await ReleaseRepository.update('release-123', data);
+      const result = await ReleaseRepository.update('release-123', { title: 'New' });
 
       expect(result).toEqual(mockRelease);
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
-        data,
-        include: {
-          images: true,
-          ...detailIncludeNoImages,
-        },
+        data: { title: 'New' },
+        include: detailIncludeUnordered,
       });
     });
   });
@@ -145,7 +321,7 @@ describe('ReleaseRepository', () => {
   });
 
   describe('softDelete', () => {
-    it('sets deletedOn to a Date with the unordered-files detail include', async () => {
+    it('sets deletedOn to a Date with the unordered-images detail include', async () => {
       vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
 
       await ReleaseRepository.softDelete('release-123');
@@ -153,18 +329,13 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         data: { deletedOn: expect.any(Date) },
-        include: {
-          images: true,
-          artistReleases: { include: { artist: true } },
-          digitalFormats: { include: { files: true } },
-          releaseUrls: { include: { url: true } },
-        },
+        include: detailIncludeUnordered,
       });
     });
   });
 
   describe('restore', () => {
-    it('clears deletedOn with the unordered-files detail include', async () => {
+    it('clears deletedOn with the unordered-images detail include', async () => {
       vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
 
       await ReleaseRepository.restore('release-123');
@@ -172,12 +343,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         data: { deletedOn: null },
-        include: {
-          images: true,
-          artistReleases: { include: { artist: true } },
-          digitalFormats: { include: { files: true } },
-          releaseUrls: { include: { url: true } },
-        },
+        include: detailIncludeUnordered,
       });
     });
   });
@@ -247,18 +413,55 @@ describe('ReleaseRepository', () => {
   });
 
   describe('findPublished', () => {
-    it('queries with the caller where, listing select, releasedOn desc, and pagination', async () => {
+    it('uses the listing select, releasedOn desc, pagination, and a published+non-deleted where', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
-      const where = { publishedAt: { not: null } } as Prisma.ReleaseWhereInput;
 
-      await ReleaseRepository.findPublished({ where, skip: 24, take: 12 });
+      await ReleaseRepository.findPublished({ skip: 24, take: 12 });
 
       expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where,
+        where: {
+          publishedAt: { not: null },
+          AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+        },
         orderBy: { releasedOn: 'desc' },
         skip: 24,
         take: 12,
-        select: publishedReleaseListingSelect,
+        select: listingSelect,
+      });
+    });
+
+    it('adds a server-side search OR across title/catalog/description/artist', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findPublished({ search: 'Doe' });
+
+      const contains = { contains: 'Doe', mode: 'insensitive' };
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        publishedAt: { not: null },
+        AND: [
+          { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+          {
+            OR: [
+              { title: contains },
+              { catalogNumber: contains },
+              { description: contains },
+              {
+                artistReleases: {
+                  some: {
+                    artist: {
+                      OR: [
+                        { firstName: contains },
+                        { surname: contains },
+                        { displayName: contains },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        ],
       });
     });
   });
@@ -276,7 +479,7 @@ describe('ReleaseRepository', () => {
           publishedAt: { not: null },
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
-        include: publishedReleaseDetailInclude,
+        include: detailSelect,
       });
     });
   });

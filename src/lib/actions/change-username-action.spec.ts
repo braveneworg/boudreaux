@@ -2,15 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Get the mocked functions using hoisted
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
+import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
-const mockUpdateUser = vi.hoisted(() => vi.fn());
+const mockUpdateUsername = vi.hoisted(() => vi.fn());
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
@@ -22,14 +21,10 @@ vi.mock('@/auth', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('@/lib/prisma-adapter', () => ({
-  CustomPrismaAdapter: vi.fn(() => ({
-    updateUser: mockUpdateUser,
-  })),
-}));
-
-vi.mock('../prisma', () => ({
-  prisma: {},
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    updateUsername: mockUpdateUsername,
+  },
 }));
 
 vi.mock('next/cache', () => ({
@@ -86,17 +81,14 @@ describe('changeUsernameAction', () => {
         user: { id: 'user-123', email: 'test@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateUsername).mockResolvedValue({
         id: 'user-123',
         username: 'newusername',
       });
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
-      expect(mockUpdateUser).toHaveBeenCalledWith({
-        id: 'user-123',
-        username: 'newusername',
-      });
+      expect(mockUpdateUsername).toHaveBeenCalledWith('user-123', 'newusername');
 
       expect(result.success).toBe(true);
       expect(result.hasTimeout).toBe(false);
@@ -124,7 +116,7 @@ describe('changeUsernameAction', () => {
         user: { id: 'user-123', email: 'test@example.com' },
       });
 
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateUsername).mockResolvedValue({
         id: 'user-123',
         username: 'newusername',
       });
@@ -162,7 +154,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result).toEqual(mockFormState);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
 
     it('should return error when usernames do not match', async () => {
@@ -191,7 +183,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.errors?.confirmUsername).toEqual(['Usernames do not match']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
 
     it('should add general errors from Zod formErrors', async () => {
@@ -220,7 +212,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.errors?.general).toEqual(['Usernames must be different from current']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
 
     it('should initialize formState.errors when undefined during validation failure', async () => {
@@ -249,7 +241,7 @@ describe('changeUsernameAction', () => {
 
       expect(result.errors).toBeDefined();
       expect(result.errors?.username).toEqual(['Required']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
   });
 
@@ -278,7 +270,7 @@ describe('changeUsernameAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to change your username']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
 
     it('should return error when session has no user id', async () => {
@@ -307,7 +299,7 @@ describe('changeUsernameAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to change your username']);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
   });
 
@@ -336,13 +328,9 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle duplicate username errors', async () => {
-      const duplicateUsernameError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_username_key' },
-      });
+      const duplicateUsernameError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateUsernameError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(duplicateUsernameError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -350,9 +338,9 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.username).toEqual(['Username is already taken.']);
     });
 
-    it('should handle timeout errors with ETIMEOUT in message', async () => {
-      const timeoutError = Error('Connection ETIMEOUT');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors signalled by a TIMEOUT DataError code', async () => {
+      const timeoutError = new DataError('TIMEOUT', 'Database timed out');
+      vi.mocked(mockUpdateUsername).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -361,9 +349,9 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle timeout errors with "timeout" in message', async () => {
-      const timeoutError = Error('Connection timeout exceeded');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "timeout" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Connection timeout exceeded');
+      vi.mocked(mockUpdateUsername).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -372,9 +360,9 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle timeout errors with "timed out" in message', async () => {
-      const timeoutError = Error('Operation timed out');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "timed out" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Operation timed out');
+      vi.mocked(mockUpdateUsername).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -383,9 +371,9 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle timeout errors with ETIMEOUT error code', async () => {
-      const timeoutError = Object.assign(Error('Network timeout'), { code: 'ETIMEOUT' });
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+    it('should handle timeout errors with "ETIMEOUT" in the DataError message', async () => {
+      const timeoutError = new DataError('UNKNOWN', 'Network ETIMEOUT');
+      vi.mocked(mockUpdateUsername).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -394,43 +382,9 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
-    it('should handle unknown Prisma errors with P2002 but different target', async () => {
-      const unknownError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
-
-      vi.mocked(mockUpdateUser).mockRejectedValue(unknownError);
-
-      const result = await changeUsernameAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'This User_email_key is already in use. Please choose a different one.',
-      ]);
-    });
-
-    it('should handle P2002 error with array meta.target', async () => {
-      const arrayTargetError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: ['email', 'username'] },
-      });
-
-      vi.mocked(mockUpdateUser).mockRejectedValue(arrayTargetError);
-
-      const result = await changeUsernameAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'This email, username is already in use. Please choose a different one.',
-      ]);
-    });
-
-    it('should use fallback message when Error has an empty message string', async () => {
+    it('should use fallback message when a plain Error is thrown', async () => {
       const emptyMessageError = new Error('');
-      vi.mocked(mockUpdateUser).mockRejectedValue(emptyMessageError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(emptyMessageError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -440,13 +394,10 @@ describe('changeUsernameAction', () => {
       ]);
     });
 
-    it('should handle other Prisma errors', async () => {
-      const unknownError = new PrismaClientKnownRequestError('Database error', {
-        code: 'P1000',
-        clientVersion: '4.0.0',
-      });
+    it('should handle other data-access errors', async () => {
+      const unknownError = new DataError('UNKNOWN', 'Database error');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(unknownError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(unknownError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -456,13 +407,10 @@ describe('changeUsernameAction', () => {
       ]);
     });
 
-    it('should handle Prisma P2025 error (user not found)', async () => {
-      const notFoundError = new PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '4.0.0',
-      });
+    it('should handle a NOT_FOUND DataError (user not found)', async () => {
+      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(notFoundError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(notFoundError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -470,13 +418,10 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.general).toEqual(['User not found. Please refresh and try again.']);
     });
 
-    it('should handle Prisma P2023 error (data validation)', async () => {
-      const dataValidationError = new PrismaClientKnownRequestError('Data validation failed', {
-        code: 'P2023',
-        clientVersion: '4.0.0',
-      });
+    it('should handle a VALIDATION DataError (data validation)', async () => {
+      const dataValidationError = new DataError('VALIDATION', 'Data validation failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(dataValidationError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(dataValidationError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -488,7 +433,7 @@ describe('changeUsernameAction', () => {
 
     it('should handle general errors', async () => {
       const generalError = Error('Something went wrong');
-      vi.mocked(mockUpdateUser).mockRejectedValue(generalError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(generalError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -499,7 +444,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle non-Error thrown values', async () => {
-      vi.mocked(mockUpdateUser).mockRejectedValue('string error');
+      vi.mocked(mockUpdateUsername).mockRejectedValue('string error');
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -526,8 +471,8 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      const timeoutError = Error('Connection ETIMEOUT');
-      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+      const timeoutError = new DataError('TIMEOUT', 'Database timed out');
+      vi.mocked(mockUpdateUsername).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -554,13 +499,9 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      const duplicateUsernameError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_username_key' },
-      });
+      const duplicateUsernameError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateUsernameError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(duplicateUsernameError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -594,7 +535,7 @@ describe('changeUsernameAction', () => {
 
       // Make the updateUser succeed but formState.success stays false
       // This simulates an edge case where success flag isn't set properly
-      vi.mocked(mockUpdateUser).mockResolvedValue({
+      vi.mocked(mockUpdateUsername).mockResolvedValue({
         id: 'user-123',
         username: 'newusername',
       });
@@ -660,13 +601,9 @@ describe('changeUsernameAction', () => {
         user: { id: 'user-123', email: 'test@example.com' },
       });
 
-      const duplicateError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_username_key' },
-      });
+      const duplicateError = new DataError('DUPLICATE', 'Unique constraint failed');
 
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateError);
+      vi.mocked(mockUpdateUsername).mockRejectedValue(duplicateError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -702,7 +639,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
   });
 });

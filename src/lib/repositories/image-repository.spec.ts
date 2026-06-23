@@ -27,7 +27,7 @@ describe('ImageRepository', () => {
     it('queries images by artistId owner with a select projection', async () => {
       vi.mocked(prisma.image.findMany).mockResolvedValue([{ id: 'a' }] as never);
 
-      const result = await ImageRepository.findManyByOwner({ artistId: 'artist-1' }, { id: true });
+      const result = await ImageRepository.findManyByOwner({ artistId: 'artist-1' });
 
       expect(result).toEqual([{ id: 'a' }]);
       expect(prisma.image.findMany).toHaveBeenCalledWith({
@@ -39,7 +39,7 @@ describe('ImageRepository', () => {
     it('queries images by releaseId owner', async () => {
       vi.mocked(prisma.image.findMany).mockResolvedValue([] as never);
 
-      await ImageRepository.findManyByOwner({ releaseId: 'release-1' }, { id: true });
+      await ImageRepository.findManyByOwner({ releaseId: 'release-1' });
 
       expect(prisma.image.findMany).toHaveBeenCalledWith({
         where: { releaseId: 'release-1' },
@@ -75,20 +75,13 @@ describe('ImageRepository', () => {
   });
 
   describe('findUniqueById', () => {
-    it('finds an image by id with a select projection', async () => {
+    it('finds an image by id (all scalar fields)', async () => {
       vi.mocked(prisma.image.findUnique).mockResolvedValue({ id: 'img-1' } as never);
 
-      const result = await ImageRepository.findUniqueById('img-1', {
-        id: true,
-        src: true,
-        artistId: true,
-      });
+      const result = await ImageRepository.findUniqueById('img-1');
 
       expect(result).toEqual({ id: 'img-1' });
-      expect(prisma.image.findUnique).toHaveBeenCalledWith({
-        where: { id: 'img-1' },
-        select: { id: true, src: true, artistId: true },
-      });
+      expect(prisma.image.findUnique).toHaveBeenCalledWith({ where: { id: 'img-1' } });
     });
   });
 

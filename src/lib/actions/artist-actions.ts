@@ -7,40 +7,29 @@ import 'server-only';
 
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
-import type { Artist } from '@/lib/types/media-models';
+import type { Artist, CreateArtistData } from '@/lib/types/domain/artist';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
-
-import type { Prisma } from '@prisma/client';
 
 export const createArtistAction = async (artist: Artist): Promise<ServiceResponse<Artist>> => {
   try {
     await requireRole('admin');
-    const { images, urls, labels: _labels, releases: _releases, ...artistData } = artist;
+    const { images, urls, labels: _labels, releases: _releases, ...scalars } = artist;
 
-    const createInput: Prisma.ArtistCreateInput = {
-      ...artistData,
-      images: images
-        ? {
-            connectOrCreate: images.map((image: Artist['images'][number]) => ({
-              where: { id: image.id },
-              create: { ...image },
-            })),
-          }
-        : undefined,
-      urls: urls
-        ? {
-            connectOrCreate: urls.map((url: Artist['urls'][number]) => ({
-              where: { id: url.id },
-              create: { ...url },
-            })),
-          }
-        : undefined,
+    // The repository owns the nested connectOrCreate translation; the action
+    // forwards plain image/url inputs alongside the writable scalar fields.
+    const data: CreateArtistData = {
+      ...scalars,
+      images: images.map((image) => ({
+        id: image.id,
+        src: image.src ?? '',
+        altText: image.altText,
+        caption: image.caption,
+      })),
+      urls: urls.map((url) => ({ id: url.id, platform: url.platform, url: url.url })),
     };
 
-    const result = await ArtistService.createArtist(createInput);
-
-    return result;
+    return await ArtistService.createArtist(data);
   } catch (error) {
     loggers.media.error('Error creating artist', error);
     return { success: false, error: 'Failed to create artist' };

@@ -1,13 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Prisma } from '@prisma/client';
-
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
+import { DataError } from '@/lib/types/domain/errors';
 
 import { FeaturedArtistsService } from './featured-artists-service';
-
-import type * as PrismaClientModule from '@prisma/client';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/repositories/featured-artist-repository', () => ({
@@ -20,31 +17,6 @@ vi.mock('@/lib/repositories/featured-artist-repository', () => ({
     delete: vi.fn(),
   },
 }));
-vi.mock('@prisma/client', async () => {
-  const actual = await vi.importActual<typeof PrismaClientModule>('@prisma/client');
-  return {
-    ...actual,
-    Prisma: {
-      ...actual.Prisma,
-      PrismaClientInitializationError: class PrismaClientInitializationError extends Error {
-        clientVersion = '0.0.0';
-        constructor(message: string) {
-          super(message);
-          this.name = 'PrismaClientInitializationError';
-        }
-      },
-      PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
-        code: string;
-        clientVersion = '0.0.0';
-        constructor(message: string, opts: { code: string; clientVersion: string }) {
-          super(message);
-          this.name = 'PrismaClientKnownRequestError';
-          this.code = opts.code;
-        }
-      },
-    },
-  };
-});
 vi.mock('@/lib/utils/simple-cache', () => ({
   withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
 }));
@@ -85,8 +57,8 @@ describe('FeaturedArtistsService', () => {
       expect(mockCreate).toHaveBeenCalledWith({ displayName: 'Test Featured Artist' });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockCreate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockCreate.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.createFeaturedArtist({
         displayName: 'Test',
@@ -126,10 +98,8 @@ describe('FeaturedArtistsService', () => {
       expect(mockFindFeatured).toHaveBeenCalledWith(expect.any(Date), 10);
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockFindFeatured.mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
-      );
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockFindFeatured.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.getFeaturedArtists(new Date());
 
@@ -153,76 +123,35 @@ describe('FeaturedArtistsService', () => {
       const result = await FeaturedArtistsService.getAllFeaturedArtists();
 
       expect(result).toMatchObject({ success: true, data: artists });
-      expect(mockFindAll).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 0, take: 50, where: {} })
-      );
+      expect(mockFindAll).toHaveBeenCalledWith({});
     });
 
-    it('should apply search filter when provided', async () => {
+    it('should forward the search filter to the repository', async () => {
       mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ search: 'jazz' });
 
-      expect(mockFindAll).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            AND: [
-              {
-                OR: [
-                  { displayName: { contains: 'jazz', mode: 'insensitive' } },
-                  { description: { contains: 'jazz', mode: 'insensitive' } },
-                ],
-              },
-            ],
-          },
-        })
-      );
+      expect(mockFindAll).toHaveBeenCalledWith({ search: 'jazz' });
     });
 
-    it('should apply publishedOn filter when published=true', async () => {
+    it('should forward the published filter to the repository', async () => {
       mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ published: true });
 
-      expect(mockFindAll).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { AND: [{ publishedOn: { not: null } }] },
-        })
-      );
+      expect(mockFindAll).toHaveBeenCalledWith({ published: true });
     });
 
-    it('should apply unpublished filter when published=false', async () => {
-      mockFindAll.mockResolvedValue([]);
-
-      await FeaturedArtistsService.getAllFeaturedArtists({ published: false });
-
-      expect(mockFindAll).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
-          },
-        })
-      );
-    });
-
-    it('should not add any soft-delete constraint (model has no deletedOn)', async () => {
-      mockFindAll.mockResolvedValue([]);
-
-      await FeaturedArtistsService.getAllFeaturedArtists({ deleted: false });
-
-      expect(mockFindAll).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
-    });
-
-    it('should apply pagination when provided', async () => {
+    it('should forward pagination to the repository', async () => {
       mockFindAll.mockResolvedValue([]);
 
       await FeaturedArtistsService.getAllFeaturedArtists({ skip: 10, take: 20 });
 
-      expect(mockFindAll).toHaveBeenCalledWith(expect.objectContaining({ skip: 10, take: 20 }));
+      expect(mockFindAll).toHaveBeenCalledWith({ skip: 10, take: 20 });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockFindAll.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockFindAll.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.getAllFeaturedArtists();
 
@@ -259,10 +188,8 @@ describe('FeaturedArtistsService', () => {
       expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockFindById.mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('DB down', '0.0.0')
-      );
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockFindById.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.getFeaturedArtistById('fa-1');
 
@@ -294,13 +221,8 @@ describe('FeaturedArtistsService', () => {
       expect(mockUpdate).toHaveBeenCalledWith('fa-1', { displayName: 'Updated Name' });
     });
 
-    it('should return not found error on P2025', async () => {
-      mockUpdate.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
+    it('should return not found error on NOT_FOUND DataError', async () => {
+      mockUpdate.mockRejectedValue(new DataError('NOT_FOUND', 'Record not found'));
 
       const result = await FeaturedArtistsService.updateFeaturedArtist('missing', {
         displayName: 'X',
@@ -309,8 +231,8 @@ describe('FeaturedArtistsService', () => {
       expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockUpdate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockUpdate.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.updateFeaturedArtist('fa-1', {
         displayName: 'X',
@@ -343,21 +265,16 @@ describe('FeaturedArtistsService', () => {
       expect(mockDelete).toHaveBeenCalledWith('fa-1');
     });
 
-    it('should return not found error on P2025', async () => {
-      mockDelete.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
+    it('should return not found error on NOT_FOUND DataError', async () => {
+      mockDelete.mockRejectedValue(new DataError('NOT_FOUND', 'Record not found'));
 
       const result = await FeaturedArtistsService.hardDeleteFeaturedArtist('missing');
 
       expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockDelete.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockDelete.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.hardDeleteFeaturedArtist('fa-1');
 
@@ -387,21 +304,16 @@ describe('FeaturedArtistsService', () => {
       expect(mockUpdate).toHaveBeenCalledWith('fa-1', { publishedOn: expect.any(Date) });
     });
 
-    it('should return not found error on P2025', async () => {
-      mockUpdate.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
+    it('should return not found error on NOT_FOUND DataError', async () => {
+      mockUpdate.mockRejectedValue(new DataError('NOT_FOUND', 'Record not found'));
 
       const result = await FeaturedArtistsService.publishFeaturedArtist('missing');
 
       expect(result).toMatchObject({ success: false, error: 'Featured artist not found' });
     });
 
-    it('should return error on PrismaClientInitializationError', async () => {
-      mockUpdate.mockRejectedValue(new Prisma.PrismaClientInitializationError('DB down', '0.0.0'));
+    it('should return error on UNAVAILABLE DataError', async () => {
+      mockUpdate.mockRejectedValue(new DataError('UNAVAILABLE', 'DB down'));
 
       const result = await FeaturedArtistsService.publishFeaturedArtist('fa-1');
 

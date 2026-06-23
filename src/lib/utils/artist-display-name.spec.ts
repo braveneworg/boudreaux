@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import type { ArtistScalars } from '@/lib/types/domain/artist';
+
 import { getArtistDisplayNameForTour } from './artist-display-name';
 
-import type { Artist } from '@prisma/client';
-
 describe('getArtistDisplayNameForTour', () => {
-  const baseArtist: Artist = {
+  const baseArtist: ArtistScalars = {
     id: '1',
     firstName: 'John',
     surname: 'Doe',
@@ -59,7 +59,7 @@ describe('getArtistDisplayNameForTour', () => {
 
   describe('Fallback Algorithm', () => {
     it('should return artist displayName when present', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: 'Johnny D',
       };
@@ -68,7 +68,7 @@ describe('getArtistDisplayNameForTour', () => {
     });
 
     it('should return firstName + surname when no displayName', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: null,
         firstName: 'Jane',
@@ -79,7 +79,7 @@ describe('getArtistDisplayNameForTour', () => {
     });
 
     it('should return null when all fields are missing', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: null,
         firstName: '',
@@ -92,7 +92,7 @@ describe('getArtistDisplayNameForTour', () => {
 
   describe('Edge Cases', () => {
     it('should return firstName only when surname is missing', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: null,
         firstName: 'Madonna',
@@ -103,7 +103,7 @@ describe('getArtistDisplayNameForTour', () => {
     });
 
     it('should return surname only when firstName is missing', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: null,
         firstName: '',
@@ -114,7 +114,7 @@ describe('getArtistDisplayNameForTour', () => {
     });
 
     it('should trim whitespace from displayName', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: '  Artist Name  ',
       };
@@ -123,7 +123,7 @@ describe('getArtistDisplayNameForTour', () => {
     });
 
     it('should trim whitespace from names', () => {
-      const artist: Artist = {
+      const artist: ArtistScalars = {
         ...baseArtist,
         displayName: null,
         firstName: '  John  ',

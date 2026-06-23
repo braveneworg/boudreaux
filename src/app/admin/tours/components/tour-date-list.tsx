@@ -34,7 +34,7 @@ import type { HeadlinerWithRelations } from './artist-pill';
 
 /**
  * Local interfaces matching Prisma model shapes.
- * Client components should not import directly from @prisma/client.
+ * Client components do not import the generated Prisma client types directly.
  */
 interface VenueFields {
   id: string;

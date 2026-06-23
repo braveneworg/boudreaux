@@ -8,7 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
@@ -63,22 +63,19 @@ export const updateProfileAction = async (
       // Combine first and last name into the 'name' field for backward compatibility
       const fullName = `${firstName} ${lastName}`.trim();
 
-      // Update user in database
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: {
-          name: fullName,
-          firstName,
-          lastName,
-          phone,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          zipCode,
-          country,
-          allowSmsNotifications,
-        },
+      // Update user in database via the repository (keeps Prisma out of the action)
+      await UserRepository.updateProfile(session.user.id, {
+        name: fullName,
+        firstName,
+        lastName,
+        phone,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        zipCode,
+        country,
+        allowSmsNotifications,
       });
 
       // Log profile update for security audit

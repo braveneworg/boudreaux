@@ -1,82 +1,54 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { Prisma } from '@prisma/client';
+import type {
+  Artist,
+  ArtistListWithBio,
+  ArtistScalars,
+  ArtistWithPublishedReleases,
+} from '@/lib/types/domain/artist';
+import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/domain/featured-artist';
+import type {
+  PublishedReleaseDetail,
+  PublishedReleaseListing,
+  Release,
+  ReleaseCarouselItem,
+  ReleaseListItem,
+  ReleaseScalars,
+} from '@/lib/types/domain/release';
+import type { Platform } from '@/lib/types/domain/shared';
+import type { UrlRecord } from '@/lib/types/domain/url';
+import type { User } from '@/lib/types/domain/user';
 
 /**
  * Media model types that match the models in prisma/schema.prisma
  * These types are shared across the application for audio/media-related features
  */
 
-// =============================================================================
-// Enums (matching Prisma schema enums)
-// =============================================================================
+// Vendor-neutral primitives now live in the Prisma-free domain layer. Re-exported
+// here so existing importers keep working until they migrate to `@/lib/types/domain`.
+export { FORMATS } from '@/lib/types/domain/shared';
+export type { Format, Json, Platform } from '@/lib/types/domain/shared';
 
-/**
- * Platform enum - matches Prisma Platform enum
- */
-export type Platform =
-  | 'SPOTIFY'
-  | 'APPLE_MUSIC'
-  | 'BANDCAMP'
-  | 'YOUTUBE'
-  | 'SOUNDCLOUD'
-  | 'AMAZON_MUSIC'
-  | 'FACEBOOK'
-  | 'TWITTER'
-  | 'INSTAGRAM'
-  | 'BLUESKY'
-  | 'TIKTOK'
-  | 'WEBSITE'
-  | 'PATREON'
-  | 'DISCOGS';
+// Artist types are now hand-written, Prisma-free domain types (drift-checked in
+// artist-repository). Imported above for local use, re-exported for back-compat.
+export type { Artist, ArtistListWithBio, ArtistWithPublishedReleases };
 
-export const FORMATS = {
-  // Use AI to expand this list as needed
-  DIGITAL: 'DIGITAL',
-  MP3_320KBPS: 'MP3_320KBPS',
-  MP3_256KBPS: 'MP3_256KBPS',
-  MP3_192KBPS: 'MP3_192KBPS',
-  MP3_128KBPS: 'MP3_128KBPS',
-  FLAC: 'FLAC',
-  ALAC: 'ALAC',
-  WAV: 'WAV',
-  AIFF: 'AIFF',
-  AAC: 'AAC',
-  OGG_VORBIS: 'OGG_VORBIS',
-  WMA: 'WMA',
-  CD: 'CD',
-  VINYL: 'VINYL',
-  VINYL_7_INCH: 'VINYL_7_INCH',
-  VINYL_10_INCH: 'VINYL_10_INCH',
-  VINYL_12_INCH: 'VINYL_12_INCH',
-  VINYL_180G: 'VINYL_180G',
-  VINYL_COLORED: 'VINYL_COLORED',
-  VINYL_PICTURE_DISC: 'VINYL_PICTURE_DISC',
-  VINYL_GATEFOLD: 'VINYL_GATEFOLD',
-  VINYL_SPLATTERED: 'VINYL_SPLATTERED',
-  VINYL_ETCHED: 'VINYL_ETCHED',
-  VINYL_45RPM: 'VINYL_45RPM',
-  VINYL_33RPM: 'VINYL_33RPM',
-  VINYL_TRANSPARENT: 'VINYL_TRANSPARENT',
-  VINYL_DOUBLE_LP: 'VINYL_DOUBLE_LP',
-  VINYL_TRIPLE_LP: 'VINYL_TRIPLE_LP',
-  VINYL_QUAD_LP: 'VINYL_QUAD_LP',
-  CASSETTE: 'CASSETTE',
-  VIDEO: 'VIDEO',
-  OTHER: 'OTHER',
-} as const;
+// Release output types are now hand-written, Prisma-free domain types
+// (drift-checked in release-repository). Imported above for local use,
+// re-exported for back-compat with existing importers of `@/lib/types/media-models`.
+export type {
+  PublishedReleaseDetail,
+  PublishedReleaseListing,
+  Release,
+  ReleaseCarouselItem,
+  ReleaseListItem,
+};
 
-export type Format = (typeof FORMATS)[keyof typeof FORMATS];
-
-// =============================================================================
-// Base Types
-// =============================================================================
-
-/**
- * Json type for extended data fields
- */
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+// FeaturedArtist types are now hand-written, Prisma-free domain types
+// (drift-checked in featured-artist-repository). Imported above for local use,
+// re-exported for back-compat with existing importers of this module.
+export type { FeaturedArtist, FeaturedArtistFormatFile };
 
 // =============================================================================
 // Model Interfaces (matching Prisma schema models)
@@ -194,280 +166,48 @@ export interface Instrument {
   updatedAt: Date;
 }
 
-export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
-  include: {
-    artists: {
-      select: {
-        id: true;
-        displayName: true;
-        firstName: true;
-        surname: true;
-        slug: true;
-        images: { select: { src: true } };
-      };
-    };
-    digitalFormat: {
-      include: {
-        files: true;
-      };
-    };
-    release: {
-      select: {
-        id: true;
-        title: true;
-        coverArt: true;
-        images: { select: { src: true } };
-      };
-    };
-  };
-}>;
+// `Artist` is re-exported from the domain layer at the top of this file.
+// `FeaturedArtist` and `FeaturedArtistFormatFile` are re-exported from the
+// domain layer above; their query include lives in featured-artist-repository
+// (drift-checked against the domain types).
+
+// `User` is now a hand-written, Prisma-free domain type (drift-checked in
+// user-repository). Imported above for local use, re-exported for back-compat
+// with existing importers of `@/lib/types/media-models`.
+export type { User };
 
 /**
- * A single file within a digital format, used for playback in the
- * featured artists player.
+ * Hand-written, Prisma-free mirror of the Prisma `Url` model with its optional
+ * `artist` and `release` relations loaded. Mirrors `model Url` in
+ * prisma/schema.prisma; both relations are optional in the schema, so each is
+ * `| null` when included.
  */
-export type FeaturedArtistFormatFile = NonNullable<
-  FeaturedArtist['digitalFormat']
->['files'][number];
+export interface Url {
+  id: string;
+  artistId: string | null;
+  releaseId: string | null;
+  platform: Platform;
+  url: string;
+  artist: ArtistScalars | null;
+  release: ReleaseScalars | null;
+}
 
 /**
- * Artist model - matches Prisma Artist model
+ * Hand-written, Prisma-free mirror of the Prisma `ReleaseUrl` join model with
+ * its required `release` and `url` relations loaded. Mirrors `model ReleaseUrl`
+ * in prisma/schema.prisma.
  */
-export type Artist = Prisma.ArtistGetPayload<{
-  include: {
-    images: true;
-    labels: true;
-    releases: {
-      include: {
-        release: true;
-      };
-    };
-    urls: true;
-  };
-}>;
+export interface ReleaseUrl {
+  id: string;
+  releaseId: string;
+  urlId: string;
+  release: ReleaseScalars;
+  url: UrlRecord;
+}
 
-export type User = Prisma.UserGetPayload<{
-  include: {
-    accounts: true;
-    sessions: true;
-  };
-}>;
-
-export type Release = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-    artistReleases: {
-      include: {
-        artist: true;
-      };
-    };
-    digitalFormats: {
-      include: {
-        files: true;
-      };
-    };
-    releaseUrls: {
-      include: {
-        url: true;
-      };
-    };
-  };
-}>;
-
-/**
- * Prisma include for the admin releases listing. The admin grid only renders
- * release scalars, cover-art images, and the album-artist display name, so the
- * heavy `digitalFormats.files` and `releaseUrls` relations (loaded by the full
- * detail include) are deliberately omitted. Single source of truth for
- * `ReleaseListItem` — the repository query and the derived type reference this
- * same const so they can't drift.
- */
-export const releaseListItemInclude = {
-  images: {
-    orderBy: { sortOrder: 'asc' },
-    take: 3,
-  },
-  artistReleases: {
-    include: {
-      artist: true,
-    },
-  },
-} as const satisfies Prisma.ReleaseInclude;
-
-/**
- * Lightweight release row for the admin releases listing — release scalars
- * plus capped cover-art images and the artist join rows used to derive the
- * album-artist display name.
- */
-export type ReleaseListItem = Prisma.ReleaseGetPayload<{
-  include: typeof releaseListItemInclude;
-}>;
-
-export type Url = Prisma.UrlGetPayload<{
-  include: {
-    artist: true;
-    release: true;
-  };
-}>;
-
-export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
-  include: {
-    release: true;
-    url: true;
-  };
-}>;
-
-// =============================================================================
-// Public Release Types (for /releases pages)
-// =============================================================================
-
-/**
- * Prisma projection for the public releases grid page. Only the fields the
- * listing UI consumes (release cards + search combobox) are selected, keeping
- * both the Mongo read and the API payload small — this is the single source
- * of truth for `PublishedReleaseListing`.
- */
-export const publishedReleaseListingSelect = {
-  id: true,
-  title: true,
-  coverArt: true,
-  releasedOn: true,
-  images: {
-    orderBy: { sortOrder: 'asc' },
-    take: 1,
-    select: { src: true, altText: true },
-  },
-  artistReleases: {
-    select: {
-      artist: {
-        select: { id: true, firstName: true, surname: true, displayName: true },
-      },
-    },
-  },
-  releaseUrls: {
-    select: {
-      url: { select: { platform: true, url: true } },
-    },
-  },
-} as const satisfies Prisma.ReleaseSelect;
-
-/**
- * Published release listing for the public releases grid page.
- * Includes artist display-name fields, first image (for cover art fallback),
- * and URLs (for Bandcamp link).
- */
-export type PublishedReleaseListing = Prisma.ReleaseGetPayload<{
-  select: typeof publishedReleaseListingSelect;
-}>;
-
-/**
- * Prisma projection for the media player page at /releases/[releaseId].
- * Artist rows are narrowed to display-name fields — the player never renders
- * artist images/labels/urls or the artist's other releases, and the full
- * nested include shipped every artist document (plus all of its releases)
- * in the page payload. Single source of truth for `PublishedReleaseDetail`.
- */
-export const publishedReleaseDetailInclude = {
-  images: {
-    orderBy: { sortOrder: 'asc' },
-  },
-  artistReleases: {
-    select: {
-      artist: {
-        // The full name-part set consumed by `getArtistDisplayName`.
-        select: {
-          id: true,
-          firstName: true,
-          middleName: true,
-          surname: true,
-          displayName: true,
-          title: true,
-          suffix: true,
-        },
-      },
-    },
-  },
-  digitalFormats: {
-    include: {
-      files: {
-        orderBy: { trackNumber: 'asc' },
-      },
-    },
-  },
-  releaseUrls: {
-    include: {
-      url: true,
-    },
-  },
-} as const satisfies Prisma.ReleaseInclude;
-
-/**
- * Published release detail for the media player page at /releases/[releaseId].
- * Includes MP3_320KBPS digital format files for audio playback, images, artist info, and URLs.
- */
-export type PublishedReleaseDetail = Prisma.ReleaseGetPayload<{
-  include: typeof publishedReleaseDetailInclude;
-}>;
-
-/**
- * Lightweight release type for the "other releases by this artist" carousel.
- * Only includes images for cover art display.
- */
-export type ReleaseCarouselItem = Prisma.ReleaseGetPayload<{
-  include: {
-    images: true;
-  };
-}>;
-
-/**
- * Prisma include for the public artist detail page at /artists/[slug].
- * Single source of truth for `ArtistWithPublishedReleases` — the service query
- * and the derived type are guaranteed to match because both reference this
- * const, so a relation can't be declared on the type yet dropped from the query
- * (which would make the response fail client-side schema validation).
- */
-export const artistWithPublishedReleasesInclude = {
-  images: true,
-  labels: true,
-  urls: true,
-  bioImages: { orderBy: { sortOrder: 'asc' } },
-  bioLinks: { orderBy: { sortOrder: 'asc' } },
-  members: { include: { member: true } },
-  releases: {
-    include: {
-      release: {
-        include: {
-          images: true,
-          artistReleases: { include: { artist: true } },
-          digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
-          releaseUrls: { include: { url: true } },
-        },
-      },
-    },
-  },
-} as const satisfies Prisma.ArtistInclude;
-
-/**
- * Artist with full published release data including MP3_320KBPS digital format files.
- * Used on the public artist detail page.
- */
-export type ArtistWithPublishedReleases = Prisma.ArtistGetPayload<{
-  include: typeof artistWithPublishedReleasesInclude;
-}>;
-
-/**
- * Prisma include for the public artists index at `/artists`. Pulls only the
- * primary identifying images (2–3) shown beside each card's short bio.
- */
-export const artistListWithBioInclude = {
-  bioImages: {
-    where: { isPrimary: true },
-    orderBy: { sortOrder: 'asc' },
-    take: 3,
-  },
-} as const satisfies Prisma.ArtistInclude;
-
-/** Published artist with its primary bio images, for the public listing. */
-export type ArtistListWithBio = Prisma.ArtistGetPayload<{
-  include: typeof artistListWithBioInclude;
-}>;
+// `ArtistListWithBio` and `ArtistWithPublishedReleases` are re-exported from the
+// domain layer at the top of this file; their query includes live in
+// artist-repository (drift-checked against the domain types). The public release
+// listing/detail/carousel types are re-exported from the domain layer near the
+// top of this file; their query includes/selects live in release-repository
+// (drift-checked against the domain types).

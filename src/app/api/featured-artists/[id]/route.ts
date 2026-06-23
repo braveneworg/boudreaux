@@ -8,13 +8,12 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import type { UpdateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
-
-import type { Prisma } from '@prisma/client';
 
 /**
  * GET /api/featured-artists/[id]
@@ -67,9 +66,9 @@ export const PATCH = withAdmin(
         return validation.response;
       }
 
-      // Convert date strings to Date objects for Prisma DateTime fields
+      // Convert date strings to Date objects for the domain DateTime fields
       const { artistIds, ...scalarData } = validation.data;
-      const updateData: Prisma.FeaturedArtistUpdateInput = {
+      const updateData: UpdateFeaturedArtistData = {
         ...(scalarData as Record<string, unknown>),
         ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
         ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
