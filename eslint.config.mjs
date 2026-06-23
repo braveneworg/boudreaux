@@ -12,6 +12,7 @@ import unusedImports from 'eslint-plugin-unused-imports';
 import preferArrowFunctions from 'eslint-plugin-prefer-arrow-functions';
 import vitest from '@vitest/eslint-plugin';
 import pluginQuery from '@tanstack/eslint-plugin-query';
+import betterTailwind from 'eslint-plugin-better-tailwindcss';
 
 // typescript-eslint's recommended preset ships as an array of flat-config objects:
 // [0] base (registers parser/plugin), [1] eslint-recommended (disables core rules TS
@@ -26,6 +27,46 @@ const tsEslintRecommendedRules = Object.assign(
 
 const eslintConfig = [
   ...pluginQuery.configs['flat/recommended'],
+  {
+    files: ['src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
+    plugins: {
+      'better-tailwindcss': betterTailwind,
+    },
+    settings: {
+      'better-tailwindcss': {
+        // Tailwind v4 is CSS-first: point at the stylesheet that `@import`s tailwindcss
+        // so the plugin can resolve the full set of valid utility classes.
+        entryPoint: 'src/app/globals.css',
+      },
+    },
+    rules: {
+      // Validation only. Class *ordering/formatting* is owned by
+      // prettier-plugin-tailwindcss (prettier.config.js), so better-tailwindcss's
+      // stylistic rules (enforce-consistent-class-order, line-wrapping, etc.) are
+      // intentionally omitted to avoid fighting Prettier.
+      'better-tailwindcss/no-conflicting-classes': 'error',
+      'better-tailwindcss/no-duplicate-classes': 'error',
+      'better-tailwindcss/no-deprecated-classes': 'error',
+      // Catches invalid/typo'd utilities that compile to nothing. `ignore` is a
+      // list of anchored regexes for genuine non-Tailwind classes the resolver
+      // can't know about: video.js skin classes (`vjs-*`) and its player-container
+      // hook, sonner's wrapper, and the banner animation marker (keyframes live in
+      // globals.css). Test placeholder classNames are handled by the spec override
+      // below. See docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
+      'better-tailwindcss/no-unknown-classes': [
+        'error',
+        { ignore: ['^vjs-', '^audio-player-wrapper$', '^toaster$', '^banner-strip-slide$'] },
+      ],
+    },
+  },
+  {
+    // Specs pass placeholder classNames (`custom-class`, `class1`, …) to assert
+    // className plumbing; those aren't real utilities, so don't flag them.
+    files: ['**/*.spec.{js,jsx,ts,tsx}'],
+    rules: {
+      'better-tailwindcss/no-unknown-classes': 'off',
+    },
+  },
   {
     ignores: [
       '**/node_modules/**',
