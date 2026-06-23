@@ -299,7 +299,7 @@ export const ImageCropper = ({
           </div>
 
           {/* Instructions */}
-          <p className="text-zinc-950-foreground text-sm">
+          <p className="text-sm text-zinc-950">
             💡 <strong>Tip:</strong> Drag the top or bottom edges to adjust height, sides to adjust
             width, or corners to resize freely. Drag inside to reposition.
           </p>
@@ -338,7 +338,7 @@ export const ImageCropper = ({
                   />
                 </div>
                 <div
-                  className="h-8 w-8 rounded border"
+                  className="h-8 w-8 rounded-sm border"
                   style={{ backgroundColor }}
                   aria-label={`Background color preview: ${backgroundColor}`}
                 />
@@ -347,7 +347,7 @@ export const ImageCropper = ({
           </div>
 
           {/* Preview dimensions info */}
-          <p className="text-zinc-950-foreground text-sm">
+          <p className="text-sm text-zinc-950">
             Final image size: {BANNER_WIDTH}×{BANNER_HEIGHT} pixels (golden ratio)
           </p>
         </div>

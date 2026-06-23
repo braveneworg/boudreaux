@@ -400,7 +400,7 @@ export const FeaturedArtistForm = ({
   if (isLoadingFeaturedArtist) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-zinc-950-foreground">Loading featured artist...</div>
+        <div className="text-zinc-950">Loading featured artist...</div>
       </div>
     );
   }
@@ -434,7 +434,7 @@ export const FeaturedArtistForm = ({
             {/* Media Associations */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Media Associations</h3>
-              <p className="text-zinc-950-foreground text-sm">
+              <p className="text-sm text-zinc-950">
                 Associate this featured artist with a release. The MP3 320kbps digital format is
                 automatically used for audio playback.
               </p>
@@ -452,9 +452,7 @@ export const FeaturedArtistForm = ({
 
                   {/* Digital format status indicator */}
                   {formatStatus === 'loading' && (
-                    <p className="text-zinc-950-foreground text-sm">
-                      Checking for MP3 320kbps format...
-                    </p>
+                    <p className="text-sm text-zinc-950">Checking for MP3 320kbps format...</p>
                   )}
                   {formatStatus === 'found' && (
                     <p className="flex items-center gap-1.5 text-sm text-green-600">
@@ -515,7 +513,7 @@ export const FeaturedArtistForm = ({
 
               {/* Derived artists indicator */}
               {derivedArtistNames.length > 0 && (
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   Associated artists: {derivedArtistNames.join(', ')}
                 </p>
               )}
@@ -529,7 +527,7 @@ export const FeaturedArtistForm = ({
                 label="Display Name (Optional)"
                 placeholder="Override display name when featured"
               />
-              <p className="text-zinc-950-foreground -mt-4 text-sm">
+              <p className="-mt-4 text-sm text-zinc-950">
                 If not provided, the artist&apos;s default display name will be used.
               </p>
 

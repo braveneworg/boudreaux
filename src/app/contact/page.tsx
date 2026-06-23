@@ -166,7 +166,7 @@ const ContactPage = () => {
             </Fragment>
           ))}
         </div>
-        <p className="text-zinc-950-foreground mb-6">
+        <p className="mb-6 text-zinc-950">
           Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
           back to you.
         </p>

@@ -77,7 +77,7 @@ const StatusIcon = ({
   if (state.status === 'error') {
     return <AlertCircle className="text-destructive h-5 w-5" aria-label="Upload failed" />;
   }
-  return <FileAudio className="text-zinc-950-foreground h-5 w-5" />;
+  return <FileAudio className="h-5 w-5 text-zinc-950" />;
 };
 
 const getStatusText = (state: UploadState, uploaded: boolean): string => {
@@ -130,7 +130,7 @@ export const FormatAccordionItem = ({
         <StatusIcon state={state} uploaded={uploaded} uploading={uploading} />
         <span className="font-medium">{config.label}</span>
         {selected && (
-          <span className="text-zinc-950-foreground mr-4 ml-auto text-xs">
+          <span className="mr-4 ml-auto text-xs text-zinc-950">
             {selected.fileName}
             {selected.fileSize > 0 && ` (${formatFileSize(selected.fileSize)})`}
           </span>
@@ -147,7 +147,7 @@ export const FormatAccordionItem = ({
       }}
     >
       <div className="space-y-4 pt-2">
-        <p className="text-zinc-950-foreground text-sm">{config.description}</p>
+        <p className="text-sm text-zinc-950">{config.description}</p>
 
         {/* Drag and drop zone */}
         <div
@@ -161,15 +161,15 @@ export const FormatAccordionItem = ({
             (uploading || isLocked || isBlockedByOtherUpload) && 'pointer-events-none opacity-50'
           )}
         >
-          <Upload className="text-zinc-950-foreground mb-3 h-8 w-8" />
+          <Upload className="mb-3 h-8 w-8 text-zinc-950" />
           {isLocked ? (
-            <p className="text-zinc-950-foreground mb-1 text-sm">Upload MP3 320kbps first</p>
+            <p className="mb-1 text-sm text-zinc-950">Upload MP3 320kbps first</p>
           ) : (
-            <p className="text-zinc-950-foreground mb-1 text-sm">
+            <p className="mb-1 text-sm text-zinc-950">
               Drag and drop a {config.label} file or folder here, or choose a folder below
             </p>
           )}
-          <p className="text-zinc-950-foreground mb-3 text-xs">Accepts: {config.acceptTypes}</p>
+          <p className="mb-3 text-xs text-zinc-950">Accepts: {config.acceptTypes}</p>
           <div className="space-y-2">
             <Label htmlFor={`upload-${config.type}`} className="sr-only">
               Upload {config.label} folder
@@ -232,15 +232,13 @@ export const FormatAccordionItem = ({
                       'text-xs',
                       state.status === 'error' && 'text-destructive',
                       state.status === 'success' && 'text-green-600',
-                      !['error', 'success'].includes(state.status) && 'text-zinc-950-foreground'
+                      !['error', 'success'].includes(state.status) && 'text-zinc-950'
                     )}
                   >
                     {getStatusText(state, uploaded)}
                   </p>
                   {selected && selected.fileSize > 0 && (
-                    <p className="text-zinc-950-foreground text-xs">
-                      {formatFileSize(selected.fileSize)}
-                    </p>
+                    <p className="text-xs text-zinc-950">{formatFileSize(selected.fileSize)}</p>
                   )}
                 </div>
               </div>
@@ -263,7 +261,7 @@ export const FormatAccordionItem = ({
                 {uploadedFiles.map((fileInfo, idx) => (
                   <li
                     key={fileInfo.s3Key}
-                    className="text-zinc-950-foreground flex items-center gap-2 text-xs"
+                    className="flex items-center gap-2 text-xs text-zinc-950"
                   >
                     <FileAudio className="h-3 w-3 shrink-0" />
                     <span className="truncate">

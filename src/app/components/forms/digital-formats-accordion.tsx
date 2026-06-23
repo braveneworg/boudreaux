@@ -91,7 +91,7 @@ export const DigitalFormatsAccordion = ({
               <AccordionItem key={config.type} value={config.type}>
                 <AccordionTrigger className="hover:no-underline" disabled>
                   <div className="flex w-full items-center gap-3 opacity-50">
-                    <FileAudio className="text-zinc-950-foreground h-5 w-5" />
+                    <FileAudio className="h-5 w-5 text-zinc-950" />
                     <span className="font-medium">{config.label}</span>
                   </div>
                 </AccordionTrigger>
@@ -110,9 +110,7 @@ export const DigitalFormatsAccordion = ({
           <Music className="h-5 w-5" />
           Digital Formats
           {albumTitle && (
-            <span className="text-zinc-950-foreground ml-2 text-sm font-normal">
-              &mdash; {albumTitle}
-            </span>
+            <span className="ml-2 text-sm font-normal text-zinc-950">&mdash; {albumTitle}</span>
           )}
         </CardTitle>
         <CardDescription className="text-sm">

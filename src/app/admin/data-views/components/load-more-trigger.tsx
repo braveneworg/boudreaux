@@ -38,14 +38,14 @@ export const LoadMoreTrigger = ({
       {isFetchingNextPage ? (
         <div className="flex items-center gap-2">
           <Spinner className="size-4" />
-          <span className="text-zinc-950-foreground text-sm">Loading more...</span>
+          <span className="text-sm text-zinc-950">Loading more...</span>
         </div>
       ) : hasNextPage ? (
         <Button variant="outline" size="sm" onClick={() => fetchNextPage?.()}>
           Load More
         </Button>
       ) : (
-        <span className="text-zinc-950-foreground text-sm">All items loaded</span>
+        <span className="text-sm text-zinc-950">All items loaded</span>
       )}
     </div>
   );

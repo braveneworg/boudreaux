@@ -1,11 +1,10 @@
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import js from '@eslint/js';
-import typescript from '@typescript-eslint/eslint-plugin';
-import typescriptParser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import importPlugin from 'eslint-plugin-import';
+import importX from 'eslint-plugin-import-x';
 import nextPlugin from '@next/eslint-plugin-next';
 import security from 'eslint-plugin-security';
 import globals from 'globals';
@@ -13,6 +12,7 @@ import unusedImports from 'eslint-plugin-unused-imports';
 import preferArrowFunctions from 'eslint-plugin-prefer-arrow-functions';
 import vitest from '@vitest/eslint-plugin';
 import pluginQuery from '@tanstack/eslint-plugin-query';
+import betterTailwind from 'eslint-plugin-better-tailwindcss';
 
 // typescript-eslint's recommended preset ships as an array of flat-config objects:
 // [0] base (registers parser/plugin), [1] eslint-recommended (disables core rules TS
@@ -20,7 +20,7 @@ import pluginQuery from '@tanstack/eslint-plugin-query';
 // TS-scoped block below; the plugin itself is registered in the main config block.
 const tsEslintRecommendedRules = Object.assign(
   {},
-  ...typescript.configs['flat/recommended']
+  ...tseslint.configs.recommended
     .filter((config) => config.rules)
     .map((config) => config.rules)
 );
@@ -28,11 +28,43 @@ const tsEslintRecommendedRules = Object.assign(
 const eslintConfig = [
   ...pluginQuery.configs['flat/recommended'],
   {
-    files: ['./src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
+    files: ['src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
+    plugins: {
+      'better-tailwindcss': betterTailwind,
+    },
     settings: {
       'better-tailwindcss': {
-        cwd: './src/app',
+        // Tailwind v4 is CSS-first: point at the stylesheet that `@import`s tailwindcss
+        // so the plugin can resolve the full set of valid utility classes.
+        entryPoint: 'src/app/globals.css',
       },
+    },
+    rules: {
+      // Validation only. Class *ordering/formatting* is owned by
+      // prettier-plugin-tailwindcss (prettier.config.js), so better-tailwindcss's
+      // stylistic rules (enforce-consistent-class-order, line-wrapping, etc.) are
+      // intentionally omitted to avoid fighting Prettier.
+      'better-tailwindcss/no-conflicting-classes': 'error',
+      'better-tailwindcss/no-duplicate-classes': 'error',
+      'better-tailwindcss/no-deprecated-classes': 'error',
+      // Catches invalid/typo'd utilities that compile to nothing. `ignore` is a
+      // list of anchored regexes for genuine non-Tailwind classes the resolver
+      // can't know about: video.js skin classes (`vjs-*`) and its player-container
+      // hook, sonner's wrapper, and the banner animation marker (keyframes live in
+      // globals.css). Test placeholder classNames are handled by the spec override
+      // below. See docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
+      'better-tailwindcss/no-unknown-classes': [
+        'error',
+        { ignore: ['^vjs-', '^audio-player-wrapper$', '^toaster$', '^banner-strip-slide$'] },
+      ],
+    },
+  },
+  {
+    // Specs pass placeholder classNames (`custom-class`, `class1`, …) to assert
+    // className plumbing; those aren't real utilities, so don't flag them.
+    files: ['**/*.spec.{js,jsx,ts,tsx}'],
+    rules: {
+      'better-tailwindcss/no-unknown-classes': 'off',
     },
   },
   {
@@ -77,16 +109,16 @@ const eslintConfig = [
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: {
-      '@typescript-eslint': typescript,
+      '@typescript-eslint': tseslint.plugin,
       '@next/next': nextPlugin,
       react,
       'react-hooks': reactHooks,
-      import: importPlugin,
+      'import-x': importX,
       'unused-imports': unusedImports,
       'prefer-arrow-functions': preferArrowFunctions,
     },
     languageOptions: {
-      parser: typescriptParser,
+      parser: tseslint.parser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
@@ -114,7 +146,7 @@ const eslintConfig = [
       react: {
         version: '19',
       },
-      'import/resolver': {
+      'import-x/resolver': {
         typescript: true,
         node: true,
       },
@@ -171,8 +203,8 @@ const eslintConfig = [
       // React rules
       'react/react-in-jsx-scope': 'off', // Not needed in React 17+
       'react/prop-types': 'off', // Using TypeScript
-      'react/jsx-uses-react': 'off',
-      'react/jsx-uses-vars': 'error',
+      // react/jsx-uses-react and react/jsx-uses-vars removed: ESLint 10 tracks JSX
+      // references natively, so both rules are redundant.
       'react/self-closing-comp': 'error',
       'react/jsx-curly-brace-presence': ['error', { props: 'never', children: 'never' }],
       'react/jsx-boolean-value': ['error', 'never'],
@@ -205,7 +237,7 @@ const eslintConfig = [
       'jsx-a11y/heading-has-content': ['error', { components: ['Heading'] }],
 
       // Import rules and sorting
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: [
@@ -242,11 +274,11 @@ const eslintConfig = [
           },
         },
       ],
-      'import/no-duplicates': 'error',
-      'import/no-unresolved': 'off', // TypeScript handles this
-      'import/first': 'error',
-      'import/newline-after-import': 'error',
-      'import/no-anonymous-default-export': 'warn',
+      'import-x/no-duplicates': 'error',
+      'import-x/no-unresolved': 'off', // TypeScript handles this
+      'import-x/first': 'error',
+      'import-x/newline-after-import': 'error',
+      'import-x/no-anonymous-default-export': 'warn',
 
       // General best practices
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],

@@ -180,7 +180,7 @@ export const ArtistPillList = ({
   );
 
   if (headliners.length === 0) {
-    return <span className="text-zinc-950-foreground text-sm">No headliners</span>;
+    return <span className="text-sm text-zinc-950">No headliners</span>;
   }
 
   return (

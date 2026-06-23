@@ -81,7 +81,7 @@ const SheetDescription = ({
 }: React.ComponentProps<typeof SheetPrimitive.Description>) => (
   <SheetPrimitive.Description
     data-slot="sheet-description"
-    className={cn('text-zinc-950-foreground text-sm', className)}
+    className={cn('text-sm text-zinc-950', className)}
     {...props}
   />
 );

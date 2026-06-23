@@ -390,7 +390,7 @@ export const AudioPlayer = ({
   return (
     <div className="flex w-full flex-col">
       {poster && (
-        <div className="responsive vjs-layout-small mx-auto w-[90%] overflow-hidden shadow-lg">
+        <div className="vjs-layout-small mx-auto w-[90%] overflow-hidden shadow-lg">
           <Image
             width={380}
             height={380}

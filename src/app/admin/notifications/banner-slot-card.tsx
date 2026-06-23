@@ -120,7 +120,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   return (
     <div className="rounded-lg border p-4">
       <div className="mb-3 flex items-center gap-3">
-        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded">
+        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-sm">
           <Image
             src={thumbnailUrl}
             alt={`Banner ${slot.slotNumber}`}
@@ -145,7 +145,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
             maxLength={500}
             className="font-mono text-sm"
           />
-          <p className="text-zinc-950-foreground text-xs">{content.length}/500 characters</p>
+          <p className="text-xs text-zinc-950">{content.length}/500 characters</p>
           {formState.errors?.content && (
             <p className="text-destructive text-sm">{formState.errors.content[0]}</p>
           )}
@@ -161,9 +161,9 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
                 id={`textColor-${slot.slotNumber}`}
                 value={textColor}
                 onChange={(e) => setTextColor(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded border"
+                className="h-9 w-12 cursor-pointer rounded-sm border"
               />
-              <span className="text-zinc-950-foreground text-xs">{textColor}</span>
+              <span className="text-xs text-zinc-950">{textColor}</span>
             </div>
           </div>
           <div className="space-y-2">
@@ -174,9 +174,9 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
                 id={`bgColor-${slot.slotNumber}`}
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded border"
+                className="h-9 w-12 cursor-pointer rounded-sm border"
               />
-              <span className="text-zinc-950-foreground text-xs">{backgroundColor}</span>
+              <span className="text-xs text-zinc-950">{backgroundColor}</span>
             </div>
           </div>
         </div>
@@ -185,7 +185,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
         {content && (
           <div
             className={cn(
-              'rounded px-4 py-2 text-center text-sm',
+              'rounded-sm px-4 py-2 text-center text-sm',
               isDarkColor(backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
             )}
             style={{ color: textColor, backgroundColor }}

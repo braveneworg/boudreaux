@@ -99,7 +99,7 @@ const PurchaseCheckoutForm = ({
   if (checkoutState.type === 'loading') {
     return (
       <div className="flex min-h-50 items-center justify-center" role="status">
-        <Loader2Icon className="text-zinc-950-foreground size-8 animate-spin" />
+        <Loader2Icon className="size-8 animate-spin text-zinc-950" />
       </div>
     );
   }
@@ -261,7 +261,7 @@ export const PurchaseCheckoutStep = ({
           <DialogDescription>Preparing your checkout...</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-50 items-center justify-center" role="status">
-          <Loader2Icon className="text-zinc-950-foreground size-8 animate-spin" />
+          <Loader2Icon className="size-8 animate-spin text-zinc-950" />
         </div>
       </>
     );
@@ -294,7 +294,7 @@ export const PurchaseCheckoutStep = ({
 
         {!timedOut && (
           <div className="flex items-center justify-center py-6" role="status">
-            <Loader2Icon className="text-zinc-950-foreground size-6 animate-spin" />
+            <Loader2Icon className="size-6 animate-spin text-zinc-950" />
           </div>
         )}
       </>

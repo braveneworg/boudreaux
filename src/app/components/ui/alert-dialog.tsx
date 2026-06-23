@@ -90,7 +90,7 @@ const AlertDialogDescription = ({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Description>) => (
   <AlertDialogPrimitive.Description
     data-slot="alert-dialog-description"
-    className={cn('text-zinc-950-foreground text-sm', className)}
+    className={cn('text-sm text-zinc-950', className)}
     {...props}
   />
 );

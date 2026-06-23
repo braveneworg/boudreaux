@@ -96,7 +96,7 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
             return (
               <CarouselItem key={artist.id}>
                 <Image
-                  className="border-radius-[0.5rem]"
+                  className="rounded-[0.5rem]"
                   src={buildCdnImageVariantUrl(latestCoverArt, 256)}
                   alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
                   width={144}
@@ -716,7 +716,7 @@ const TrackListDrawer = ({
                       {index + 1}.
                     </span>
                     {coverArt && (
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm">
                         <Image
                           src={buildCdnImageVariantUrl(coverArt, 384)}
                           alt={getTrackDisplayTitle(file.title, file.fileName)}

@@ -41,10 +41,10 @@ const ReleaseThumb = ({ src, title }: { src: string | null; title: string }) =>
       alt=""
       width={28}
       height={28}
-      className="size-7 shrink-0 rounded object-cover"
+      className="size-7 shrink-0 rounded-sm object-cover"
     />
   ) : (
-    <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded text-xs">
+    <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-sm text-xs">
       {title.charAt(0).toUpperCase() || <Disc3 className="size-4" aria-hidden />}
     </span>
   );

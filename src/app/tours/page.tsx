@@ -45,9 +45,7 @@ export default async function ToursPage() {
       <div className="container mx-auto py-8">
         <div className="mb-8 space-y-2">
           <ImageHeading src="/media/headings/TOURS.webp" alt="tours" imageHeight={480} priority />
-          <p className="text-zinc-950-foreground text-lg">
-            Search and browse upcoming and recent tour dates
-          </p>
+          <p className="text-lg text-zinc-950">Search and browse upcoming and recent tour dates</p>
         </div>
 
         <ToursContent />

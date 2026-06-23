@@ -238,7 +238,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {resetInHours !== null
                     ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -293,7 +293,7 @@ export const DownloadDialog = ({
                       <DownloadIcon className="size-4" />
                       Download limit reached
                     </Button>
-                    <p className="text-zinc-950-foreground text-sm">
+                    <p className="text-sm text-zinc-950">
                       You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                       {resetInHours !== null
                         ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -486,7 +486,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {resetInHours !== null
                     ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -594,7 +594,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {guestResetInHours !== null
                     ? ` Resets in ${guestResetInHours} hour${guestResetInHours === 1 ? '' : 's'}.`

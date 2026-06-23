@@ -145,7 +145,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   if (releases.length === 0) {
     return (
-      <div className="text-zinc-950-foreground flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-12 text-zinc-950">
         <p>No releases available for this artist.</p>
       </div>
     );

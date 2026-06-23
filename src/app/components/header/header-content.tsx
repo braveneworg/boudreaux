@@ -17,7 +17,7 @@ const HeaderContent = () => {
     // server misdetects (e.g. an iPhone with Safari's "Request Desktop Website"
     // enabled). The height steps 58px → 122px (`md`, to meet the hamburger
     // sheet) → 224px (`xl`, the desktop header).
-    <header className="border-b-px relative z-20 mx-auto flex h-14.5 w-full min-w-0 items-center justify-between overflow-hidden pb-1 pl-0 leading-14.5 md:h-30.5 xl:h-56 xl:max-w-480 xl:justify-start">
+    <header className="relative z-20 mx-auto flex h-14.5 w-full min-w-0 items-center justify-between overflow-hidden border-b pb-1 pl-0 leading-14.5 md:h-30.5 xl:h-56 xl:max-w-480 xl:justify-start">
       <HeaderMobile />
       <HeaderDesktop />
     </header>

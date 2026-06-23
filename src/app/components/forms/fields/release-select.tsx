@@ -174,7 +174,7 @@ export const ReleaseSelect = <
                       onValueChange={setSearchValue}
                     />
                     {isLoading && (
-                      <div className="text-zinc-950-foreground py-6 text-center text-sm">
+                      <div className="py-6 text-center text-sm text-zinc-950">
                         Loading releases...
                       </div>
                     )}

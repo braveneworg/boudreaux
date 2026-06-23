@@ -179,7 +179,7 @@ export const ChatMessageList = ({
       {pinnedMessages && pinnedMessages.length > 0 && (
         <div
           data-testid="chat-pinned-messages"
-          className="sticky top-0 z-10 border-y border-zinc-500 bg-transparent shadow-[0_4px_12px_rgba(0,0,0,0.22)] backdrop-blur"
+          className="sticky top-0 z-10 border-y border-zinc-500 bg-transparent shadow-[0_4px_12px_rgba(0,0,0,0.22)] backdrop-blur-sm"
         >
           <ul className="divide-y">
             {pinnedMessages.map((message) => (

@@ -531,7 +531,7 @@ export const useDigitalFormatUploads = ({
           const resolvedReleaseId = autoCreateResult.releaseId;
           const resolvedReleaseTitle = autoCreateResult.releaseTitle;
 
-          let confirmOk = false;
+          let confirmOk: boolean;
           if (successFiles.length === 1) {
             const cr = await confirmDigitalFormatUploadAction({
               releaseId: resolvedReleaseId,
@@ -625,7 +625,7 @@ export const useDigitalFormatUploads = ({
           return;
         }
         /* v8 ignore stop */
-        let confirmOk = false;
+        let confirmOk: boolean;
         if (successFiles.length === 1) {
           const cr = await confirmDigitalFormatUploadAction({
             releaseId,
