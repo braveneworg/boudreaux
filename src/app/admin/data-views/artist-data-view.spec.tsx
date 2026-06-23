@@ -45,47 +45,57 @@ vi.mock('@/lib/actions/restore-artist-action', () => ({
 }));
 
 type EntityMutation = (id: string) => Promise<{ success: boolean; error?: string }>;
+type EntityMutations = {
+  publish: EntityMutation;
+  delete: EntityMutation;
+  restore?: EntityMutation;
+};
+type DataViewFilters = { onShowUnpublishedChange: (value: boolean) => void };
 
 // DataView is mocked to a stub exposing the injected mutation callbacks as
 // buttons, so the wrapper's `(id) => xAsync({ artistId: id })` arrows execute.
 vi.mock('./data-view', () => ({
-  DataView: (props: Record<string, unknown>) => (
-    <div
-      data-testid="data-view"
-      data-entity={String(props.entity)}
-      data-image-field={String(props.imageField)}
-    >
-      DataView
-      <button
-        type="button"
-        data-testid="toggle-unpublished"
-        onClick={() => (props.onShowUnpublishedChange as (value: boolean) => void)(false)}
+  DataView: (props: Record<string, unknown>) => {
+    const mutations = props.mutations as EntityMutations;
+    const filters = props.filters as DataViewFilters;
+    return (
+      <div
+        data-testid="data-view"
+        data-entity={String(props.entity)}
+        data-image-field={String(props.imageField)}
       >
-        toggle unpublished
-      </button>
-      <button
-        type="button"
-        data-testid="invoke-publish"
-        onClick={() => void (props.onPublishEntity as EntityMutation)('artist-1')}
-      >
-        publish
-      </button>
-      <button
-        type="button"
-        data-testid="invoke-delete"
-        onClick={() => void (props.onDeleteEntity as EntityMutation)('artist-1')}
-      >
-        delete
-      </button>
-      <button
-        type="button"
-        data-testid="invoke-restore"
-        onClick={() => void (props.onRestoreEntity as EntityMutation)('artist-1')}
-      >
-        restore
-      </button>
-    </div>
-  ),
+        DataView
+        <button
+          type="button"
+          data-testid="toggle-unpublished"
+          onClick={() => filters.onShowUnpublishedChange(false)}
+        >
+          toggle unpublished
+        </button>
+        <button
+          type="button"
+          data-testid="invoke-publish"
+          onClick={() => void mutations.publish('artist-1')}
+        >
+          publish
+        </button>
+        <button
+          type="button"
+          data-testid="invoke-delete"
+          onClick={() => void mutations.delete('artist-1')}
+        >
+          delete
+        </button>
+        <button
+          type="button"
+          data-testid="invoke-restore"
+          onClick={() => void mutations.restore?.('artist-1')}
+        >
+          restore
+        </button>
+      </div>
+    );
+  },
 }));
 
 const baseInfiniteResult = {

@@ -96,23 +96,25 @@ export const FeaturedArtistDataView = () => {
         entity={ENTITIES.featuredArtist}
         data={{ featuredArtists: rows }}
         fieldsToShow={fieldsToShow}
-        onPublishEntity={(id) => publishFeaturedArtistAsync({ featuredArtistId: id })}
-        onDeleteEntity={(id) => deleteFeaturedArtistAsync({ featuredArtistId: id })}
+        mutations={{
+          publish: (id) => publishFeaturedArtistAsync({ featuredArtistId: id }),
+          delete: (id) => deleteFeaturedArtistAsync({ featuredArtistId: id }),
+        }}
         refetch={refetch}
         isPending={isPending}
         isFetching={isFetching}
         error={null}
-        hasNextPage={hasNextPage}
-        fetchNextPage={fetchNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        searchValue={search}
-        onSearchChange={setSearch}
-        showPublished={showPublished}
-        onShowPublishedChange={setShowPublished}
-        showUnpublished={showUnpublished}
-        onShowUnpublishedChange={setShowUnpublished}
-        showDeleted={showDeleted}
-        onShowDeletedChange={setShowDeleted}
+        pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
+        filters={{
+          search,
+          onSearchChange: setSearch,
+          showPublished,
+          onShowPublishedChange: setShowPublished,
+          showUnpublished,
+          onShowUnpublishedChange: setShowUnpublished,
+          showDeleted,
+          onShowDeletedChange: setShowDeleted,
+        }}
         getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
       />
     </>
