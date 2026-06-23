@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { TourRepository, type TourWithRelations } from '@/lib/repositories/tours/tour-repository';
 import { computeNextSkip, type PaginatedResponse } from '@/lib/types/pagination';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,7 @@ export const GET = withRateLimit(
       }
     );
   } catch (error) {
-    console.error('Tours GET error:', error);
+    loggers.media.error('Tours GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

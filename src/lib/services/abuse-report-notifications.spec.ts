@@ -22,6 +22,7 @@ vi.mock('@/lib/services/get-sms-service', () => ({
   getSmsService: getSmsServiceMock,
 }));
 
+const { loggers } = await import('@/lib/utils/logger');
 const { dispatchAbuseReportNotifications } = await import('./abuse-report-notifications');
 
 describe('dispatchAbuseReportNotifications', () => {
@@ -107,7 +108,7 @@ describe('dispatchAbuseReportNotifications', () => {
   });
 
   it('logs and recovers when an SMS send resolves with a non-ok result', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
     adminFindManyMock.mockResolvedValue([
       {
         id: 'a1',
@@ -122,14 +123,12 @@ describe('dispatchAbuseReportNotifications', () => {
 
     await dispatchAbuseReportNotifications({ reportedUsername: 'target' });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('SMS failed for admin a1')
-    );
-    consoleErrorSpy.mockRestore();
+    expect(loggerErrorSpy).toHaveBeenCalledWith(expect.stringContaining('SMS failed for admin a1'));
+    loggerErrorSpy.mockRestore();
   });
 
   it('does not throw when an SMS send rejects', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(loggers.chat, 'error').mockImplementation(() => {});
     adminFindManyMock.mockResolvedValue([
       {
         id: 'a1',
@@ -145,7 +144,7 @@ describe('dispatchAbuseReportNotifications', () => {
     await expect(
       dispatchAbuseReportNotifications({ reportedUsername: 'target' })
     ).resolves.toBeUndefined();
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   it('does not throw when one admin email send fails', async () => {

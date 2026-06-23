@@ -8,6 +8,7 @@ import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('Release GET error:', error);
+    loggers.media.error('Release GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -138,7 +139,7 @@ export const POST = withAdmin(async (request: NextRequest) => {
 
     return NextResponse.json(result.data, { status: 201 });
   } catch (error) {
-    console.error('Release POST error:', error);
+    loggers.media.error('Release POST error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

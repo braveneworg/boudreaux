@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
+import { loggers } from '@/lib/utils/logger';
+
 import { GET } from './route';
 
 // Mock rate limiting to pass through
@@ -234,7 +236,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
     it('handles Stripe API error gracefully and returns confirmed: false', async () => {
       mockFindBySessionId.mockResolvedValue(null);
       mockStripeSessionsRetrieve.mockRejectedValue(new Error('Stripe API error'));
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(loggers.payments, 'warn').mockImplementation(() => {});
 
       const request = makeRequest('cs_test_stripeerr');
       const response = await GET(request, makeContext());
@@ -242,10 +244,9 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json).toEqual({ confirmed: false });
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[purchase-status] Dev fallback failed:',
-        'Stripe API error'
-      );
+      expect(warnSpy).toHaveBeenCalledWith('[purchase-status] Dev fallback failed', {
+        error: 'Stripe API error',
+      });
 
       warnSpy.mockRestore();
     });
@@ -253,7 +254,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
     it('handles non-Error throw from Stripe gracefully', async () => {
       mockFindBySessionId.mockResolvedValue(null);
       mockStripeSessionsRetrieve.mockRejectedValue('string error');
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(loggers.payments, 'warn').mockImplementation(() => {});
 
       const request = makeRequest('cs_test_stringerr');
       const response = await GET(request, makeContext());
@@ -261,10 +262,9 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json).toEqual({ confirmed: false });
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[purchase-status] Dev fallback failed:',
-        'string error'
-      );
+      expect(warnSpy).toHaveBeenCalledWith('[purchase-status] Dev fallback failed', {
+        error: 'string error',
+      });
 
       warnSpy.mockRestore();
     });

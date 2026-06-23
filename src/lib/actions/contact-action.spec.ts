@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { contactAction } from '@/lib/actions/contact-action';
+import { loggers } from '@/lib/utils/logger';
 
 // Hoisted mocks
 const mockGetActionState = vi.hoisted(() => vi.fn());
@@ -479,7 +480,7 @@ describe('contactAction', () => {
 
     it('should return error when EMAIL_FROM is not set', async () => {
       vi.stubEnv('EMAIL_FROM', '');
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
       const result = await contactAction(mockInitialState, validFormData());
 
@@ -488,17 +489,17 @@ describe('contactAction', () => {
         expect.objectContaining({}),
         'Unable to send message. Please try again later.'
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         'EMAIL_FROM or CONTACT_EMAIL environment variable is not set'
       );
       expect(mockSend).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('should handle SES send failure', async () => {
       mockSend.mockRejectedValueOnce(new Error('SES failure'));
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
       const result = await contactAction(mockInitialState, validFormData());
 
@@ -507,12 +508,9 @@ describe('contactAction', () => {
         expect.objectContaining({}),
         'Unable to send message. Please try again later.'
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Contact form email send error:',
-        expect.any(Error)
-      );
+      expect(errorSpy).toHaveBeenCalledWith('Contact form email send error', expect.any(Error));
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
     });
   });
 });

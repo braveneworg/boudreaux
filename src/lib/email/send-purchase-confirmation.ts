@@ -9,6 +9,7 @@ import { SendRawEmailCommand } from '@aws-sdk/client-ses';
 import nodemailer from 'nodemailer';
 
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { loggers } from '@/lib/utils/logger';
 import { sesClient } from '@/lib/utils/ses-client';
 
 import { buildPurchaseConfirmationEmailHtml } from './purchase-confirmation-email-html';
@@ -37,14 +38,14 @@ export const sendPurchaseConfirmationEmail = async (
 ): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
-    console.error('[sendPurchaseConfirmationEmail] EMAIL_FROM is not configured');
+    loggers.payments.error('[sendPurchaseConfirmationEmail] EMAIL_FROM is not configured');
     return false;
   }
 
   // Acquire the idempotency lock — prevents concurrent sends for the same purchase.
   const shouldSend = await PurchaseRepository.markEmailSent(input.purchaseId);
   if (!shouldSend) {
-    console.warn(
+    loggers.payments.warn(
       `[sendPurchaseConfirmationEmail] Skipped: confirmationEmailSentAt already set for purchase ${input.purchaseId}`
     );
     return false;
@@ -98,7 +99,7 @@ export const sendPurchaseConfirmationEmail = async (
     });
 
     await sesClient.send(command);
-    console.info(
+    loggers.payments.info(
       `[sendPurchaseConfirmationEmail] Email sent to ${input.customerEmail} for purchase ${input.purchaseId}`
     );
     return true;
@@ -106,7 +107,10 @@ export const sendPurchaseConfirmationEmail = async (
     // SES send failed — reset the flag so a retry (e.g. duplicate webhook
     // delivery) can attempt the email again.
     await PurchaseRepository.resetEmailSent(input.purchaseId);
-    console.error(`Failed to send purchase confirmation email to ${input.customerEmail}:`, error);
+    loggers.payments.error(
+      `Failed to send purchase confirmation email to ${input.customerEmail}`,
+      error
+    );
     return false;
   }
 };

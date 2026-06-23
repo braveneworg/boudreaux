@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { ImageRepository } from '@/lib/repositories/tours/image-repository';
 import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import {
   confirmUploadSchema,
   deleteImageSchema,
@@ -24,6 +25,8 @@ import {
   type PresignedUrlResponse,
   type UpdateImageAltText,
 } from '@/lib/validation/tours/image-schema';
+
+const logger = loggers.s3;
 
 export interface TourImageActionResponse<T = unknown> {
   success: boolean;
@@ -63,7 +66,7 @@ export const generateUploadUrlAction = async (
 
     return { success: true, data: result.data };
   } catch (error) {
-    console.error('Error generating upload URL:', error);
+    logger.error('Error generating upload URL', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -131,7 +134,7 @@ export const confirmUploadAction = async (
       },
     };
   } catch (error) {
-    console.error('Error confirming upload:', error);
+    logger.error('Error confirming upload', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -170,7 +173,7 @@ export const deleteImageAction = async (
     // Delete from S3
     const s3Result = await ImageUploadService.deleteFromS3(image.s3Key);
     if (!s3Result.success) {
-      console.error('Failed to delete from S3:', s3Result.error);
+      logger.error('Failed to delete from S3', s3Result.error);
       // Continue with database deletion even if S3 delete fails
     }
 
@@ -184,7 +187,7 @@ export const deleteImageAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting image:', error);
+    logger.error('Error deleting image', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -231,7 +234,7 @@ export const reorderImagesAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error reordering images:', error);
+    logger.error('Error reordering images', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };
@@ -272,7 +275,7 @@ export const updateImageAltTextAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error updating alt text:', error);
+    logger.error('Error updating alt text', error);
 
     if (error instanceof Error) {
       return { success: false, error: error.message };

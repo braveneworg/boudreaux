@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
+import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,7 @@ export const GET = withRateLimit<{ id: string }>(
       }
     );
   } catch (error) {
-    console.error('Related releases GET error:', error);
+    loggers.media.error('Related releases GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { signinAction } from '@/lib/actions/signin-action';
+import { loggers } from '@/lib/utils/logger';
 
 // Get the mocked functions using hoisted
 const mockSignIn = vi.hoisted(() => vi.fn());
@@ -351,15 +352,15 @@ describe('signinAction', () => {
       const testError = Error('Development error');
       vi.mocked(mockSignIn).mockRejectedValue(testError);
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
       mockRedirect.mockImplementation(() => {});
 
       await signinAction(mockInitialState, mockFormData);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', testError);
+      expect(errorSpy).toHaveBeenCalledWith('Sign-in error', testError);
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 
@@ -384,15 +385,15 @@ describe('signinAction', () => {
 
       vi.mocked(mockSignIn).mockRejectedValue(Error('Production error'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
       mockRedirect.mockImplementation(() => {});
 
       await signinAction(mockInitialState, mockFormData);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', 'Production error');
+      expect(errorSpy).toHaveBeenCalledWith('Sign-in error', 'Production error');
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 
@@ -417,15 +418,15 @@ describe('signinAction', () => {
 
       vi.mocked(mockSignIn).mockRejectedValue('String thrown error');
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
       mockRedirect.mockImplementation(() => {});
 
       await signinAction(mockInitialState, mockFormData);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', 'Unknown error');
+      expect(errorSpy).toHaveBeenCalledWith('Sign-in error', 'Unknown error');
 
-      consoleErrorSpy.mockRestore();
+      errorSpy.mockRestore();
       vi.unstubAllEnvs();
     });
 

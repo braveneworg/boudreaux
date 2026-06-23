@@ -8,6 +8,7 @@ import path from 'path';
 import { SendRawEmailCommand } from '@aws-sdk/client-ses';
 import nodemailer from 'nodemailer';
 
+import { loggers } from '@/lib/utils/logger';
 import { sesClient } from '@/lib/utils/ses-client';
 
 import { buildChatMentionEmailHtml, type ChatMentionEntry } from './chat-mention-email-html';
@@ -28,7 +29,7 @@ interface SendChatMentionEmailInput {
 export const sendChatMentionEmail = async (input: SendChatMentionEmailInput): Promise<boolean> => {
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
-    console.error('[sendChatMentionEmail] EMAIL_FROM is not configured');
+    loggers.chat.error('[sendChatMentionEmail] EMAIL_FROM is not configured');
     return false;
   }
   if (input.mentions.length === 0) return false;
@@ -87,12 +88,12 @@ export const sendChatMentionEmail = async (input: SendChatMentionEmailInput): Pr
     });
 
     await sesClient.send(command);
-    console.info(
+    loggers.chat.info(
       `[sendChatMentionEmail] Email sent to ${input.toEmail} (${input.mentions.length} mention${input.mentions.length === 1 ? '' : 's'})`
     );
     return true;
   } catch (error) {
-    console.error(`Failed to send chat mention email to ${input.toEmail}:`, error);
+    loggers.chat.error(`Failed to send chat mention email to ${input.toEmail}`, error);
     throw error;
   }
 };

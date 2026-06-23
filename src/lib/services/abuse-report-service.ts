@@ -9,6 +9,7 @@ import {
   checkAbuseReportRateLimit,
   type AbuseReportRateLimitTier,
 } from '@/lib/utils/abuse-report-rate-limit';
+import { loggers } from '@/lib/utils/logger';
 
 export type SubmitAbuseReportResult =
   | { ok: true }
@@ -51,7 +52,7 @@ export class AbuseReportService {
     if (!reportedUser) {
       // Log for admin audit but tell the caller everything's fine — no
       // enumeration oracle. Caller still sees the "thank you" confirmation.
-      console.warn(
+      loggers.chat.warn(
         `[AbuseReportService] report against unknown username "${username}" by reporter ${input.reporterId}`
       );
       return { ok: true };
@@ -81,7 +82,7 @@ export class AbuseReportService {
         reporterFingerprint: input.reporterFingerprint,
       });
     } catch (error) {
-      console.error('[AbuseReportService] failed to persist abuse report', error);
+      loggers.chat.error('[AbuseReportService] failed to persist abuse report', error);
       return { ok: false, code: 'unknown_error' };
     }
 

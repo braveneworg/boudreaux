@@ -7,6 +7,8 @@ import { ReadableStream } from 'node:stream/web';
 
 import { NextRequest } from 'next/server';
 
+import { loggers } from '@/lib/utils/logger';
+
 import { PUT } from './route';
 
 // Polyfill ReadableStream for jsdom env
@@ -265,7 +267,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   });
 
   it('should return 500 on unexpected error', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
     mockUploadDone.mockRejectedValue(new Error('S3 upload failed'));
 
     const response = await PUT(makeRequest(), makeParams());
@@ -275,11 +277,11 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(body.error).toBe('INTERNAL_ERROR');
     expect(body.message).toBe('Upload failed. Please try again.');
 
-    consoleSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('should handle non-Error throw in error handler', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
     mockUploadDone.mockRejectedValue('string error');
 
     const response = await PUT(makeRequest(), makeParams());
@@ -288,7 +290,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(response.status).toBe(500);
     expect(body.message).toBe('Upload failed. Please try again.');
 
-    consoleSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('should return 400 when request body is empty', async () => {
@@ -330,12 +332,12 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
         }
       }
     );
-    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
 
     await PUT(makeRequest(), makeParams());
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
-    consoleSpy.mockRestore();
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
+    infoSpy.mockRestore();
   });
 
   it('should handle progress callback without loaded property', async () => {
@@ -346,12 +348,12 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
         }
       }
     );
-    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
 
     await PUT(makeRequest(), makeParams());
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
-    consoleSpy.mockRestore();
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
+    infoSpy.mockRestore();
   });
 
   it('should call writeComment during upload', async () => {
@@ -443,18 +445,18 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
         }
       }
     );
-    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
 
     await PUT(makeRequest(), makeParams());
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('?%'));
-    consoleSpy.mockRestore();
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('?%'));
+    infoSpy.mockRestore();
   });
 
   it('should handle non-Error throw during temp file cleanup', async () => {
     const { unlink } = await import('node:fs/promises');
     vi.mocked(unlink).mockRejectedValue('string cleanup error');
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(loggers.s3, 'warn').mockImplementation(() => {});
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
@@ -472,7 +474,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   it('should log Error details during temp file cleanup failure', async () => {
     const { unlink } = await import('node:fs/promises');
     vi.mocked(unlink).mockRejectedValue(new Error('ENOENT'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(loggers.s3, 'warn').mockImplementation(() => {});
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();

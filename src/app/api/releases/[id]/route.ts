@@ -11,6 +11,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
@@ -62,7 +63,7 @@ export const GET = withRateLimit<{ id: string }>(
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {
-    console.error('Release GET by ID error:', error);
+    loggers.media.error('Release GET by ID error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
@@ -101,7 +102,7 @@ export const PATCH = withAdmin(
 
       return NextResponse.json(serializeForResponse(result.data));
     } catch (error) {
-      console.error('Release PATCH error:', error);
+      loggers.media.error('Release PATCH error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }
@@ -130,7 +131,7 @@ export const DELETE = withAdmin(
 
       return NextResponse.json({ message: 'Release deleted successfully' });
     } catch (error) {
-      console.error('Release DELETE error:', error);
+      loggers.media.error('Release DELETE error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }

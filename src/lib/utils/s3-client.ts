@@ -14,6 +14,9 @@ import {
 } from '@/lib/constants/digital-formats';
 import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.s3;
 
 /**
  * Get configured S3 client for AWS operations
@@ -199,7 +202,7 @@ export const deleteS3Object = async (s3Key: string): Promise<boolean> => {
     await s3Client.send(deleteCommand);
     return true;
   } catch (error) {
-    console.error('Failed to delete S3 object:', error);
+    logger.error('Failed to delete S3 object', error);
     return false;
   }
 };

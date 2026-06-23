@@ -7,9 +7,12 @@ import { Prisma } from '@prisma/client';
 
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { loggers } from '@/lib/utils/logger';
 import { withCache } from '@/lib/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
+
+const logger = loggers.media;
 
 export class FeaturedArtistsService {
   static async createFeaturedArtist(
@@ -21,12 +24,12 @@ export class FeaturedArtistsService {
     } catch (error) {
       // Connection/network issues
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
       // Unknown errors
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to create artist' };
     }
   }
@@ -48,12 +51,12 @@ export class FeaturedArtistsService {
         } catch (error) {
           // Connection/network issues
           if (error instanceof Prisma.PrismaClientInitializationError) {
-            console.error('Database connection failed:', error);
+            logger.error('Database connection failed', error);
             return { success: false as const, error: 'Database unavailable' };
           }
 
           // Unknown errors
-          console.error('Unexpected error:', error);
+          logger.error('Unexpected error', error);
           return { success: false as const, error: 'Failed to fetch artists' };
         }
       },
@@ -105,11 +108,11 @@ export class FeaturedArtistsService {
       return { success: true, data: featuredArtists };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve featured artists' };
     }
   }
@@ -128,11 +131,11 @@ export class FeaturedArtistsService {
       return { success: true, data: featuredArtist };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to retrieve featured artist' };
     }
   }
@@ -154,11 +157,11 @@ export class FeaturedArtistsService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to update featured artist' };
     }
   }
@@ -177,11 +180,11 @@ export class FeaturedArtistsService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to delete featured artist' };
     }
   }
@@ -204,11 +207,11 @@ export class FeaturedArtistsService {
       }
 
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error('Database connection failed:', error);
+        logger.error('Database connection failed', error);
         return { success: false, error: 'Database unavailable' };
       }
 
-      console.error('Unexpected error:', error);
+      logger.error('Unexpected error', error);
       return { success: false, error: 'Failed to publish featured artist' };
     }
   }

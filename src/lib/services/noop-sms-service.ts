@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { loggers } from '@/lib/utils/logger';
+
 import type { SmsResult, SmsSendOptions, SmsService } from './sms-service';
 
 export interface CapturedSms {
@@ -14,9 +16,9 @@ export interface CapturedSms {
 
 /**
  * Local-dev / test SMS provider. Captures every send into an in-memory
- * array so Vitest specs can assert on dispatched messages, and logs to
- * the console so a developer running `pnpm run dev` can see what would
- * have gone out without ever hitting AWS.
+ * array so Vitest specs can assert on dispatched messages, and logs via
+ * the project logger so a developer running `pnpm run dev` can see what
+ * would have gone out without ever hitting AWS.
  */
 export class NoOpSmsService implements SmsService {
   private readonly captured: CapturedSms[] = [];
@@ -32,7 +34,7 @@ export class NoOpSmsService implements SmsService {
     this.captured.push(record);
     // Phone numbers are PII; log a redacted form so transcripts stay clean.
     const redactedTo = redactPhone(to);
-    console.info(
+    loggers.notifications.debug(
       `[NoOpSmsService] would send ${transactional ? 'transactional' : 'promotional'} SMS to ${redactedTo}: ${body}`
     );
     return { ok: true, messageId: `noop-${Date.now()}-${this.captured.length}` };

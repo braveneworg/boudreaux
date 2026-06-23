@@ -12,6 +12,7 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { ImageService } from '@/lib/services/image-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 /**
@@ -87,7 +88,7 @@ export const registerArtistImagesAction = async (
 
     return { success: true, data: results };
   } catch (error) {
-    console.error('Register artist images action error:', error);
+    loggers.s3.error('Register artist images action error', error);
     return { success: false, error: 'Failed to register images' };
   }
 };
@@ -134,7 +135,7 @@ export const registerReleaseImagesAction = async (
 
     return { success: true, data: results };
   } catch (error) {
-    console.error('Register release images action error:', error);
+    loggers.s3.error('Register release images action error', error);
     return { success: false, error: 'Failed to register images' };
   }
 };

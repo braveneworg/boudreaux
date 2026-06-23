@@ -5,6 +5,7 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import {
   createTourDateAction,
   deleteTourDateAction,
@@ -102,7 +103,7 @@ export const useDeleteTourDateMutation = () => {
     isError: isDeleteTourDateError,
     error: deleteTourDateError,
     reset: resetDeleteTourDate,
-  } = useMutation<Awaited<ReturnType<typeof deleteTourDateAction>>, Error, { tourDateId: string }>({
+  } = useMutation<AdminActionResult, Error, { tourDateId: string }>({
     mutationFn: ({ tourDateId }) => deleteTourDateAction(tourDateId),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });
@@ -130,7 +131,7 @@ export const useUpdateHeadlinerSetTimeMutation = () => {
     error: updateHeadlinerSetTimeError,
     reset: resetUpdateHeadlinerSetTime,
   } = useMutation<
-    Awaited<ReturnType<typeof updateHeadlinerSetTimeAction>>,
+    AdminActionResult,
     Error,
     { headlinerId: string; setTime: string | null; tourDateId?: string; artistId?: string }
   >({
@@ -162,7 +163,7 @@ export const useRemoveHeadlinerMutation = () => {
     error: removeHeadlinerError,
     reset: resetRemoveHeadliner,
   } = useMutation<
-    Awaited<ReturnType<typeof removeHeadlinerAction>>,
+    AdminActionResult,
     Error,
     { headlinerId: string; tourDateId?: string; artistId?: string }
   >({
@@ -193,11 +194,7 @@ export const useReorderHeadlinersMutation = () => {
     isError: isReorderHeadlinersError,
     error: reorderHeadlinersError,
     reset: resetReorderHeadliners,
-  } = useMutation<
-    Awaited<ReturnType<typeof reorderHeadlinersAction>>,
-    Error,
-    { tourDateId: string; headlinerIds: string[] }
-  >({
+  } = useMutation<AdminActionResult, Error, { tourDateId: string; headlinerIds: string[] }>({
     mutationFn: ({ tourDateId, headlinerIds }) => reorderHeadlinersAction(tourDateId, headlinerIds),
     onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
   });

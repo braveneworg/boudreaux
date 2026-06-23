@@ -13,6 +13,7 @@ import { buildContactEmailText } from '@/lib/email/contact-email-text';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { sesClient } from '@/lib/utils/ses-client';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
@@ -111,7 +112,7 @@ export const contactAction = async (
     const toAddress = process.env.CONTACT_EMAIL || process.env.EMAIL_FROM;
 
     if (!fromAddress || !toAddress) {
-      console.error('EMAIL_FROM or CONTACT_EMAIL environment variable is not set');
+      loggers.auth.error('EMAIL_FROM or CONTACT_EMAIL environment variable is not set');
       setUnknownError(formState, 'Unable to send message. Please try again later.');
       return formState;
     }
@@ -143,7 +144,7 @@ export const contactAction = async (
     await sesClient.send(command);
     formState.success = true;
   } catch (error: unknown) {
-    console.error('Contact form email send error:', error);
+    loggers.auth.error('Contact form email send error', error);
     formState.success = false;
     setUnknownError(formState, 'Unable to send message. Please try again later.');
   }

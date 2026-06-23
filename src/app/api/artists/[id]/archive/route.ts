@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export const POST = withAdmin(
 
       return NextResponse.json({ message: 'Artist archived successfully', data: result.data });
     } catch (error) {
-      console.error('Artist archive error:', error);
+      loggers.media.error('Artist archive error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }

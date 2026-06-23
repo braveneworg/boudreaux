@@ -7,15 +7,13 @@ import 'server-only';
 
 import { ReleaseService } from '@/lib/services/release-service';
 
-import { runAdminEntityAction } from './run-admin-entity-action';
+import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
  * Server action to publish a release (stamps `publishedAt`). Returns a plain
  * result the {@link usePublishReleaseMutation} hook maps to a toast.
  */
-export const publishReleaseAction = async (
-  releaseId: string
-): Promise<{ success: boolean; error?: string }> =>
+export const publishReleaseAction = async (releaseId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({
     id: releaseId,
     entityLabel: 'release',

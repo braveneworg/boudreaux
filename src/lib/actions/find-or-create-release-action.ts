@@ -12,6 +12,7 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 /**
@@ -115,7 +116,9 @@ const connectArtistFromMetadata = async (
     }
   } catch (err) {
     // Artist connection is best-effort — never fail the release creation
-    console.warn('[findOrCreateRelease] Could not connect artist from metadata:', err);
+    loggers.media.warn('[findOrCreateRelease] Could not connect artist from metadata', {
+      error: err,
+    });
   }
   return undefined;
 };
@@ -246,7 +249,7 @@ export const findOrCreateReleaseAction = async (
       artistId: createdArtistId,
     };
   } catch (error) {
-    console.error('Error in findOrCreateReleaseAction:', error);
+    loggers.media.error('Error in findOrCreateReleaseAction', error);
 
     return {
       success: false,

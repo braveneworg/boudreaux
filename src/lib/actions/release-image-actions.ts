@@ -12,8 +12,13 @@ import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { logSecurityEvent } from '@/utils/audit-log';
+
+import type { AdminActionResult } from './run-admin-entity-action';
+
+const logger = loggers.s3;
 
 /**
  * Result type for image upload actions
@@ -33,9 +38,7 @@ export interface ImageUploadActionResult {
 /**
  * Server action to delete a release image
  */
-export const deleteReleaseImageAction = async (
-  imageId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const deleteReleaseImageAction = async (imageId: string): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {
@@ -82,7 +85,7 @@ export const deleteReleaseImageAction = async (
           });
           await s3Client.send(deleteCommand);
         } catch (s3Error) {
-          console.error('S3 delete error (continuing with DB delete):', s3Error);
+          logger.error('S3 delete error (continuing with DB delete)', s3Error);
         }
       }
     }
@@ -109,7 +112,7 @@ export const deleteReleaseImageAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Delete release image action error:', error);
+    logger.error('Delete release image action error', error);
     return { success: false, error: 'Failed to delete image' };
   }
 };
@@ -152,7 +155,7 @@ export const getReleaseImagesAction = async (
       ),
     };
   } catch (error) {
-    console.error('Get release images action error:', error);
+    logger.error('Get release images action error', error);
     return { success: false, error: 'Failed to retrieve images' };
   }
 };
@@ -163,7 +166,7 @@ export const getReleaseImagesAction = async (
 export const updateReleaseImageAction = async (
   imageId: string,
   data: { caption?: string; altText?: string }
-): Promise<{ success: boolean; error?: string }> => {
+): Promise<AdminActionResult> => {
   await requireRole('admin');
 
   try {
@@ -185,7 +188,7 @@ export const updateReleaseImageAction = async (
     revalidatePath(`/releases/[slug]`, 'page');
     return { success: true };
   } catch (error) {
-    console.error('Update release image action error:', error);
+    logger.error('Update release image action error', error);
     return { success: false, error: 'Failed to update image' };
   }
 };
@@ -269,7 +272,7 @@ export const reorderReleaseImagesAction = async (
       ),
     };
   } catch (error) {
-    console.error('Reorder release images action error:', error);
+    logger.error('Reorder release images action error', error);
     return { success: false, error: 'Failed to reorder images' };
   }
 };

@@ -10,6 +10,7 @@ import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
+import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export const GET = withAuth<{ id: string }>(async (_request, context, session) =
       availableFormats,
     });
   } catch (error) {
-    console.error('Release user-status GET error:', error);
+    loggers.media.error('Release user-status GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

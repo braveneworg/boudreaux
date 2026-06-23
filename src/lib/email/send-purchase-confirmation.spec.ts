@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { loggers } from '@/lib/utils/logger';
+
 import { buildPurchaseConfirmationEmailHtml } from './purchase-confirmation-email-html';
 import { buildPurchaseConfirmationEmailText } from './purchase-confirmation-email-text';
 import { sendPurchaseConfirmationEmail } from './send-purchase-confirmation';
@@ -81,30 +83,30 @@ describe('sendPurchaseConfirmationEmail', () => {
   describe('EMAIL_FROM guard', () => {
     it('should not call sesClient.send and should return false when EMAIL_FROM is not set', async () => {
       vi.stubEnv('EMAIL_FROM', '');
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.payments, 'error').mockImplementation(() => {});
 
       const result = await sendPurchaseConfirmationEmail(validInput);
 
       expect(result).toBe(false);
       expect(mockMarkEmailSent).not.toHaveBeenCalled();
       expect(mockSesClientSend).not.toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
   });
 
   describe('markEmailSent deduplication', () => {
     it('should not call sesClient.send and return false when markEmailSent returns false (email already sent)', async () => {
       mockMarkEmailSent.mockResolvedValue(false);
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const loggerWarnSpy = vi.spyOn(loggers.payments, 'warn').mockImplementation(() => {});
 
       const result = await sendPurchaseConfirmationEmail(validInput);
 
       expect(result).toBe(false);
       expect(mockSesClientSend).not.toHaveBeenCalled();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Skipped: confirmationEmailSentAt already set')
       );
-      consoleWarnSpy.mockRestore();
+      loggerWarnSpy.mockRestore();
     });
 
     it('should call markEmailSent with the purchaseId before sending', async () => {
@@ -204,23 +206,26 @@ describe('sendPurchaseConfirmationEmail', () => {
   describe('error handling', () => {
     it('should catch a sesClient.send error, not re-throw it, and return false', async () => {
       mockSesClientSend.mockRejectedValue(new Error('SES network failure'));
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.payments, 'error').mockImplementation(() => {});
 
       const result = await sendPurchaseConfirmationEmail(validInput);
 
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to send purchase confirmation email'),
+        expect.anything()
+      );
+      loggerErrorSpy.mockRestore();
     });
 
     it('should reset the email sent flag when sesClient.send fails so retries can succeed', async () => {
       mockSesClientSend.mockRejectedValue(new Error('SES temporary failure'));
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn(loggers.payments, 'error').mockImplementation(() => {});
 
       await sendPurchaseConfirmationEmail(validInput);
 
       expect(mockResetEmailSent).toHaveBeenCalledWith('purchase-1');
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should not reset the email sent flag when sesClient.send succeeds', async () => {
