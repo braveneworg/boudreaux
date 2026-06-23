@@ -65,6 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.156.0] - 2026-06-23
+
+### Added
+
+- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n
+
 ## [4.155.0] - 2026-06-23
 
 ### Added
