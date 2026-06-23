@@ -5,7 +5,6 @@
 import { NextRequest } from 'next/server';
 
 import { UserService } from '@/lib/services/user-service';
-
 import { loggers } from '@/lib/utils/logger';
 
 import { POST } from './route';

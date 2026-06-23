@@ -2,12 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { DataError } from '@/lib/types/domain/errors';
+import { loggers } from '@/lib/utils/logger';
 
 import { failFromError } from './map-data-error';
 
 describe('failFromError', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(loggers.database, 'error').mockImplementation(() => undefined);
   });
 
   it('returns a failure result', () => {
@@ -89,12 +90,12 @@ describe('failFromError', () => {
   it('logs UNAVAILABLE failures', () => {
     failFromError(new DataError('UNAVAILABLE', 'db down'));
 
-    expect(console.error).toHaveBeenCalled();
+    expect(loggers.database.error).toHaveBeenCalled();
   });
 
   it('does not log a routine NOT_FOUND failure', () => {
     failFromError(new DataError('NOT_FOUND', 'missing'));
 
-    expect(console.error).not.toHaveBeenCalled();
+    expect(loggers.database.error).not.toHaveBeenCalled();
   });
 });

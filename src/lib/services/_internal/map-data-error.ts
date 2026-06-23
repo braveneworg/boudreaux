@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { DataError, type DataErrorCode } from '@/lib/types/domain/errors';
+import { loggers } from '@/lib/utils/logger';
 
 /** Default user-facing message per data-error code. */
 const DEFAULT_MESSAGE = new Map<DataErrorCode, string>([
@@ -41,7 +42,7 @@ export const failFromError = (
   const code: DataErrorCode = error instanceof DataError ? error.code : 'UNKNOWN';
 
   if (LOGGED_CODES.has(code)) {
-    console.error(error instanceof DataError ? error.message : 'Unexpected error:', error);
+    loggers.database.error(error instanceof DataError ? error.message : 'Unexpected error', error);
   }
 
   const overrideMap = new Map<string, string>(Object.entries(overrides ?? {}));
