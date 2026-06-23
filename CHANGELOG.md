@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.157.0] - 2026-06-23
+
+### Added
+
+- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n
+
 ## [4.156.0] - 2026-06-23
 
 ### Added
