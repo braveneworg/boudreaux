@@ -94,7 +94,7 @@ export const MultiCombobox = ({
                 selected
               </span>
             ) : (
-              <span className="text-zinc-950-foreground">{placeholder}</span>
+              <span className="text-zinc-950">{placeholder}</span>
             )}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
               {open && (

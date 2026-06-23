@@ -47,16 +47,16 @@ export default function HomeLoading() {
         {/* Search input skeleton */}
         <div className="bg-muted mb-0 h-9 w-full animate-pulse rounded-md" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}
-        <div className="bg-muted mb-0 h-13 w-48 animate-pulse rounded" />
+        <div className="bg-muted mb-0 h-13 w-48 animate-pulse rounded-sm" />
         {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper.
             mb-1 mirrors the actual component, where the link-row uses -mt-1
             to sit closer to the carousel above. */}
-        <div className="bg-muted mb-1 min-h-19 w-full animate-pulse rounded" />
+        <div className="bg-muted mb-1 min-h-19 w-full animate-pulse rounded-sm" />
         {/* View / Download link-row + NowPlayingHeading skeleton.
             min-h-10 holds the row stable across loading → hydrated states
             so there's no CLS once the link buttons render. */}
         <div className="mb-2 flex min-h-10 flex-col items-center">
-          <div className="bg-muted h-6 w-72 animate-pulse rounded" />
+          <div className="bg-muted h-6 w-72 animate-pulse rounded-sm" />
         </div>
         {/* Cover art skeleton — aspect-square with bg-muted, rounded-t */}
         <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse rounded-t-lg" />
@@ -66,7 +66,7 @@ export default function HomeLoading() {
         <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse rounded-b-lg bg-zinc-800/20" />
         {/* Share widget skeleton */}
         <div className="mb-2 flex justify-center gap-1">
-          <div className="bg-muted h-8 w-48 animate-pulse rounded" />
+          <div className="bg-muted h-8 w-48 animate-pulse rounded-sm" />
         </div>
         <div className="bg-muted mx-auto h-px max-w-[calc(100%-2rem)]" />
       </div>

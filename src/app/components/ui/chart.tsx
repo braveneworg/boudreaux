@@ -203,7 +203,7 @@ const ChartTooltipContent = ({
               <div
                 key={item.dataKey}
                 className={cn(
-                  '[&>svg]:text-zinc-950-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5',
+                  'flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-zinc-950',
                   indicator === 'dot' && 'items-center'
                 )}
               >
@@ -243,9 +243,7 @@ const ChartTooltipContent = ({
                     >
                       <div className="grid gap-1.5">
                         {nestLabel ? tooltipLabel : null}
-                        <span className="text-zinc-950-foreground">
-                          {itemConfig?.label || item.name}
-                        </span>
+                        <span className="text-zinc-950">{itemConfig?.label || item.name}</span>
                       </div>
                       {item.value !== undefined && (
                         <span className="text-foreground font-mono font-medium tabular-nums">
@@ -311,7 +309,7 @@ const ChartLegendContent = ({
             <div
               key={item.value}
               className={cn(
-                '[&>svg]:text-zinc-950-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3'
+                'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-zinc-950'
               )}
             >
               {itemConfig?.icon && !hideIcon ? (

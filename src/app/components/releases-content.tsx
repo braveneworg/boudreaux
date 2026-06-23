@@ -55,7 +55,7 @@ export const ReleasesContent = () => {
   if (isPending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="text-zinc-950-foreground h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-950" />
       </div>
     );
   }
@@ -63,7 +63,7 @@ export const ReleasesContent = () => {
   if (error && !data) {
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-12 text-center">
-        <p className="text-zinc-950-foreground">Unable to load releases. Please try again later.</p>
+        <p className="text-zinc-950">Unable to load releases. Please try again later.</p>
         <Link
           href="/releases"
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2"
@@ -86,9 +86,7 @@ export const ReleasesContent = () => {
         className="flex min-h-12 items-center justify-center py-2"
         aria-hidden={!hasNextPage}
       >
-        {isFetchingNextPage ? (
-          <Loader2 className="text-zinc-950-foreground h-6 w-6 animate-spin" />
-        ) : null}
+        {isFetchingNextPage ? <Loader2 className="h-6 w-6 animate-spin text-zinc-950" /> : null}
       </div>
     </div>
   );

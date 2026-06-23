@@ -795,7 +795,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
                 {/* Show all other formats in a collapsible section */}
                 <details className="mt-4">
-                  <summary className="text-zinc-950-foreground hover:text-foreground cursor-pointer text-sm">
+                  <summary className="hover:text-foreground cursor-pointer text-sm text-zinc-950">
                     Show all formats ({Object.keys(FORMATS).length} total)
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -836,7 +836,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
               {/* Images Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Images</h2>
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   Add images for this release. You can drag to reorder them. Images will be uploaded
                   after the release is created or updated.
                 </p>

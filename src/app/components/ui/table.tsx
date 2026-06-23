@@ -73,7 +73,7 @@ const TableCell = ({ className, ...props }: React.ComponentProps<'td'>) => (
 const TableCaption = ({ className, ...props }: React.ComponentProps<'caption'>) => (
   <caption
     data-slot="table-caption"
-    className={cn('text-zinc-950-foreground mt-4 text-sm', className)}
+    className={cn('mt-4 text-sm text-zinc-950', className)}
     {...props}
   />
 );

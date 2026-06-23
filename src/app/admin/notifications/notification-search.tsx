@@ -83,9 +83,7 @@ export const NotificationSearch = ({ onSelect }: NotificationSearchProps) => {
             value={searchValue}
             onValueChange={setSearchValue}
           />
-          {isLoading && (
-            <div className="text-zinc-950-foreground py-6 text-center text-sm">Searching...</div>
-          )}
+          {isLoading && <div className="py-6 text-center text-sm text-zinc-950">Searching...</div>}
           {!isLoading && (
             <>
               <CommandEmpty>No past notifications found.</CommandEmpty>
@@ -103,7 +101,7 @@ export const NotificationSearch = ({ onSelect }: NotificationSearchProps) => {
                             ? stripHtml(notification.content).slice(0, 80)
                             : '(empty)'}
                         </span>
-                        <span className="text-zinc-950-foreground text-xs">
+                        <span className="text-xs text-zinc-950">
                           Slot {notification.slotNumber} &middot;{' '}
                           {new Date(notification.createdAt).toLocaleDateString()}
                         </span>

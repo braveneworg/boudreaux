@@ -267,7 +267,7 @@ export const VenueSelect = <
                         disabled={disabled}
                         className={cn(
                           'w-full min-w-0 shrink justify-between',
-                          !selectedId && 'text-zinc-950-foreground'
+                          !selectedId && 'text-zinc-950'
                         )}
                       >
                         <span className="truncate">

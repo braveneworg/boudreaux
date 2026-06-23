@@ -117,7 +117,7 @@ export const TimePicker = ({
           variant="outline"
           className={cn(
             'w-full justify-start text-left font-normal',
-            !displayValue && 'text-zinc-950-foreground',
+            !displayValue && 'text-zinc-950',
             className
           )}
         >
@@ -151,7 +151,7 @@ export const TimePicker = ({
             className="h-9 w-14 [appearance:textfield] text-center tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
 
-          <span className="text-zinc-950-foreground font-medium">:</span>
+          <span className="font-medium text-zinc-950">:</span>
 
           {/* Minute */}
           <Input
@@ -175,7 +175,7 @@ export const TimePicker = ({
                 type="button"
                 onClick={() => setPeriod(p)}
                 className={cn(
-                  'rounded border px-2 py-0.5 text-xs font-medium transition-colors',
+                  'rounded-sm border px-2 py-0.5 text-xs font-medium transition-colors',
                   period === p
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-input hover:bg-accent hover:text-accent-foreground'
@@ -193,7 +193,7 @@ export const TimePicker = ({
             type="button"
             variant="ghost"
             size="sm"
-            className="text-zinc-950-foreground h-7 px-2 text-xs"
+            className="h-7 px-2 text-xs text-zinc-950"
             onClick={handleClear}
           >
             Clear

@@ -72,7 +72,7 @@ export const ToursPageClient = ({
           <TourSearch value={search} onChange={onSearchChange} />
         </div>
         {search && (
-          <div className="text-zinc-950-foreground text-sm">
+          <div className="text-sm text-zinc-950">
             {tours.length === 1 ? '1 tour found' : `${tours.length} tours found`}
           </div>
         )}
@@ -82,8 +82,8 @@ export const ToursPageClient = ({
       {tours.length === 0 && search ? (
         <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
           <div className="text-center">
-            <h3 className="text-zinc-950-foreground text-lg font-semibold">No tours found</h3>
-            <p className="text-zinc-950-foreground mt-2 text-sm">
+            <h3 className="text-lg font-semibold text-zinc-950">No tours found</h3>
+            <p className="mt-2 text-sm text-zinc-950">
               Try adjusting your search or clear filters to see all tours.
             </p>
           </div>
@@ -96,9 +96,7 @@ export const ToursPageClient = ({
             className="flex min-h-12 items-center justify-center py-6"
             aria-hidden={!hasNextPage}
           >
-            {isFetchingNextPage ? (
-              <Loader2 className="text-zinc-950-foreground h-6 w-6 animate-spin" />
-            ) : null}
+            {isFetchingNextPage ? <Loader2 className="h-6 w-6 animate-spin text-zinc-950" /> : null}
           </div>
         </>
       )}

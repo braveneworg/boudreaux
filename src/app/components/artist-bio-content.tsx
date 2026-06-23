@@ -120,7 +120,7 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
       )}
 
       {artist.bio ? (
-        <article className="prose prose-zinc dark:prose-invert max-w-none [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6">
+        <article className="max-w-none [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6">
           {/* The bio HTML is sanitized server-side on read (sanitizeBioHtml) and
               again at generation time; BioHtml maps its <a>/<img> tags to Next
               Link/Image instead of dangerouslySetInnerHTML. Links are woven

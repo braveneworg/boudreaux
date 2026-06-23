@@ -183,7 +183,7 @@ export const ParticleGeneratorDemo = () => {
               max="500"
               value={count}
               onChange={(e) => updateCount(type, e.target.value)}
-              className="mt-2 w-full rounded border border-gray-300 px-1 py-1"
+              className="mt-2 w-full rounded-sm border border-gray-300 px-1 py-1"
             />
           </div>
         ))}
@@ -200,14 +200,14 @@ export const ParticleGeneratorDemo = () => {
                 type="color"
                 value={particleColor === 'white' ? '#ffffff' : particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
-                className="h-10 w-[60px] cursor-pointer rounded border border-gray-300"
+                className="h-10 w-[60px] cursor-pointer rounded-sm border border-gray-300"
               />
               <input
                 type="text"
                 value={particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
                 placeholder="e.g., white, #ffffff, rgb(255,255,255)"
-                className="flex-1 rounded border border-gray-300 px-2 py-2"
+                className="flex-1 rounded-sm border border-gray-300 px-2 py-2"
               />
             </div>
           </div>
@@ -248,14 +248,14 @@ export const ParticleGeneratorDemo = () => {
                     type="color"
                     value={bgColor === 'black' ? '#000000' : bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    className="h-10 w-[60px] cursor-pointer rounded border border-gray-300"
+                    className="h-10 w-[60px] cursor-pointer rounded-sm border border-gray-300"
                   />
                   <input
                     type="text"
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
                     placeholder="e.g., black, #000000, rgb(0,0,0)"
-                    className="flex-1 rounded border border-gray-300 px-2 py-2"
+                    className="flex-1 rounded-sm border border-gray-300 px-2 py-2"
                   />
                 </div>
               </div>

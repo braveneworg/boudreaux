@@ -146,7 +146,7 @@ const SortableImageItem = ({
           {item.uploadProgress !== undefined && (
             <div className="w-3/4">
               <Progress value={item.uploadProgress} className="h-1.5" />
-              <span className="text-zinc-950-foreground mt-1 block text-center text-xs">
+              <span className="mt-1 block text-center text-xs text-zinc-950">
                 {Math.round(item.uploadProgress)}%
               </span>
             </div>
@@ -156,7 +156,7 @@ const SortableImageItem = ({
 
       {/* Error indicator */}
       {item.error && (
-        <div className="bg-destructive/90 text-destructive-foreground absolute inset-x-0 bottom-0 px-2 py-1 text-xs">
+        <div className="bg-destructive/90 absolute inset-x-0 bottom-0 px-2 py-1 text-xs text-white">
           {item.error}
         </div>
       )}
@@ -169,7 +169,7 @@ const SortableImageItem = ({
             ? { ...attributes, ...listeners }
             : {})}
         >
-          <GripVertical className="text-zinc-950-foreground h-3.5 w-3.5" />
+          <GripVertical className="h-3.5 w-3.5 text-zinc-950" />
         </div>
       )}
 
@@ -181,7 +181,7 @@ const SortableImageItem = ({
             e.stopPropagation();
             onDeleteRequest(item);
           }}
-          className="bg-destructive/90 text-destructive-foreground hover:bg-destructive absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+          className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
           aria-label="Remove image"
         >
           <X className="h-3.5 w-3.5" />
@@ -432,7 +432,7 @@ export const ImageUploader = ({
     <div className={cn('space-y-4', className)}>
       {/* Reordering/Deleting indicator */}
       {(isReordering || isDeleting) && (
-        <div className="bg-muted/50 text-zinc-950-foreground flex items-center justify-center gap-2 rounded-md py-2 text-sm">
+        <div className="bg-muted/50 flex items-center justify-center gap-2 rounded-md py-2 text-sm text-zinc-950">
           <SpinnerRingCircle size="sm" />
           <span>{isDeleting ? 'Deleting...' : 'Saving order...'}</span>
         </div>
@@ -462,8 +462,8 @@ export const ImageUploader = ({
           className="absolute inset-0 cursor-pointer opacity-0"
           aria-label={label}
         />
-        <ImagePlus className="text-zinc-950-foreground mb-2 h-8 w-8" />
-        <p className="text-zinc-950-foreground text-center text-sm">
+        <ImagePlus className="mb-2 h-8 w-8 text-zinc-950" />
+        <p className="text-center text-sm text-zinc-950">
           {canAddMore ? (
             <>
               <span className="text-foreground font-medium">Click to upload</span> or drag and drop
@@ -478,7 +478,7 @@ export const ImageUploader = ({
           )}
         </p>
         {images.length > 0 && (
-          <p className="text-zinc-950-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-zinc-950">
             {images.length} / {maxImages} images
           </p>
         )}
@@ -560,7 +560,7 @@ export const ImageUploader = ({
       <Dialog open={!!imageToDelete} onOpenChange={handleCancelDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete Image</DialogTitle>
-          <p className="text-zinc-950-foreground text-sm">
+          <p className="text-sm text-zinc-950">
             Are you sure you want to delete this image? This action cannot be undone.
           </p>
           {imageToDelete && (

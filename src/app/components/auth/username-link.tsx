@@ -5,10 +5,7 @@ import Link from 'next/link';
 
 export const UsernameLink = ({ username }: { username: string }) => {
   return (
-    <Link
-      href={`/profile/${username}`}
-      className="text-zinc-950-foreground hover:text-foreground text-sm"
-    >
+    <Link href={`/profile/${username}`} className="hover:text-foreground text-sm text-zinc-950">
       @{username}
     </Link>
   );

@@ -124,16 +124,14 @@ export const TourCard = ({ tour }: TourCardProps) => {
             {tour.title}
           </Link>
         </CardTitle>
-        {tour.subtitle && (
-          <p className="text-zinc-950-foreground line-clamp-1 text-sm">{tour.subtitle}</p>
-        )}
+        {tour.subtitle && <p className="line-clamp-1 text-sm text-zinc-950">{tour.subtitle}</p>}
       </CardHeader>
 
       <CardContent className="space-y-3">
         {/* Headliners */}
         {headlinerNames && (
           <div className="flex items-start gap-2">
-            <Music className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
+            <Music className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
             <span className="line-clamp-2 text-sm">{headlinerNames}</span>
           </div>
         )}
@@ -141,7 +139,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
         {/* Venue */}
         {venueDisplay && (
           <div className="flex items-start gap-2">
-            <MapPin className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
             {singleVenue ? (
               <>
                 <VenueDirectionsLink
@@ -161,7 +159,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
                   <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
                   <span>&middot;</span>{' '}
                 </VenueDirectionsLink>
-                <span className="text-zinc-950-foreground text-sm">
+                <span className="text-sm text-zinc-950">
                   {singleVenue.city}, {singleVenue.state}
                 </span>
               </>
@@ -173,12 +171,12 @@ export const TourCard = ({ tour }: TourCardProps) => {
 
         {/* Date & Time */}
         <div className="flex items-start gap-2">
-          <Calendar className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
           <div className="text-sm">
             <div>{dateRange}</div>
             {hasTourDates && firstTourDate?.showStartTime && (
               <>
-                <div className="text-zinc-950-foreground">
+                <div className="text-zinc-950">
                   {sortedTourDates.length === 1
                     ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
                     : `${sortedTourDates.length} shows`}
@@ -197,7 +195,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
         {/* Ticket Price */}
         {firstTourDate?.ticketPrices && (
           <div className="flex items-center gap-2">
-            <Ticket className="text-zinc-950-foreground h-4 w-4 shrink-0" />
+            <Ticket className="h-4 w-4 shrink-0 text-zinc-950" />
             <span className="text-sm font-medium">{firstTourDate.ticketPrices}</span>
           </div>
         )}

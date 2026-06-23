@@ -228,7 +228,7 @@ const ArtistPill = ({
               <div className="space-y-3">
                 {/* Set Time picker */}
                 <div className="space-y-1.5">
-                  <span className="text-zinc-950-foreground flex items-center gap-1.5 text-xs font-medium">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-950">
                     <Clock className="size-3" />
                     Set Time (optional)
                   </span>
@@ -260,7 +260,7 @@ const ArtistPill = ({
 
         {/* Set time display below the pill */}
         {setTimeDisplay && (
-          <span className="text-zinc-950-foreground mt-0.5 pl-8 text-xs">{setTimeDisplay}</span>
+          <span className="mt-0.5 pl-8 text-xs text-zinc-950">{setTimeDisplay}</span>
         )}
       </div>
 

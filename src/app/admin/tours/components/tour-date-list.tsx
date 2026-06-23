@@ -170,9 +170,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">Tour Dates</h3>
-            <p className="text-zinc-950-foreground text-sm">
-              Manage individual show dates for this tour
-            </p>
+            <p className="text-sm text-zinc-950">Manage individual show dates for this tour</p>
           </div>
           {tourDates.length > 0 && (
             <Button type="button" onClick={handleAddClick} size="sm">
@@ -185,9 +183,9 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
         {tourDates.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="text-zinc-950-foreground mb-4 size-12" />
+              <Calendar className="mb-4 size-12 text-zinc-950" />
               <h4 className="mb-2 text-lg font-medium">No tour dates yet</h4>
-              <p className="text-zinc-950-foreground mb-4 text-sm">
+              <p className="mb-4 text-sm text-zinc-950">
                 Get started by adding your first show date
               </p>
               <Button type="button" onClick={handleAddClick} variant="outline">
@@ -205,14 +203,14 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
                     <div className="flex-1 space-y-3">
                       {/* Date and Time */}
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="text-zinc-950-foreground size-4" />
+                        <Calendar className="size-4 text-zinc-950" />
                         <span className="font-medium">
                           {formatTourDate(tourDate.startDate, tourDate.timeZone)}
                           {tourDate.endDate &&
                             ` - ${formatTourDate(tourDate.endDate, tourDate.timeZone)}`}
                         </span>
                         <Separator orientation="vertical" className="h-4" />
-                        <span className="text-zinc-950-foreground">
+                        <span className="text-zinc-950">
                           {formatTourTime(tourDate.showStartTime, tourDate.timeZone, {
                             ...(tourDate.timeZone ? { timeZoneName: 'short' } : {}),
                           })}{' '}
@@ -225,8 +223,8 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
 
                       {/* Doors Open */}
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="text-zinc-950-foreground size-4" />
-                        <span className="text-zinc-950-foreground">
+                        <Calendar className="size-4 text-zinc-950" />
+                        <span className="text-zinc-950">
                           Doors:{' '}
                           {tourDate.doorsOpenAt
                             ? formatTourTime(tourDate.doorsOpenAt, tourDate.timeZone)
@@ -236,7 +234,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
 
                       {/* Venue */}
                       <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="text-zinc-950-foreground size-4" />
+                        <MapPin className="size-4 text-zinc-950" />
                         <span>
                           {tourDate.venue.name}
                           {tourDate.venue.city && `, ${tourDate.venue.city}`}
@@ -246,7 +244,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
 
                       {/* Headliners */}
                       <div className="flex items-start gap-2 text-sm">
-                        <Music className="text-zinc-950-foreground mt-0.5 size-4 shrink-0" />
+                        <Music className="mt-0.5 size-4 shrink-0 text-zinc-950" />
                         <ArtistPillList
                           tourDateId={tourDate.id}
                           headliners={tourDate.headliners}
@@ -276,9 +274,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
                           {tourDate.ticketPrices && (
                             <>
                               <Separator orientation="vertical" className="h-4" />
-                              <span className="text-zinc-950-foreground">
-                                {tourDate.ticketPrices}
-                              </span>
+                              <span className="text-zinc-950">{tourDate.ticketPrices}</span>
                             </>
                           )}
                         </div>
@@ -287,7 +283,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
                       {/* Notes */}
                       {tourDate.notes && (
                         <div className="bg-muted mt-2 rounded-md p-3 text-sm">
-                          <p className="text-zinc-950-foreground">{tourDate.notes}</p>
+                          <p className="text-zinc-950">{tourDate.notes}</p>
                         </div>
                       )}
                     </div>

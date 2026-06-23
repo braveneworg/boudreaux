@@ -117,21 +117,18 @@ const Calendar = ({
           'select-none font-medium',
           captionLayout === 'label'
             ? 'text-sm'
-            : 'rounded-md pl-2 pr-1 flex items-center gap-1 text-sm h-8 [&>svg]:text-zinc-950-foreground [&>svg]:size-3.5',
+            : 'rounded-md pl-2 pr-1 flex items-center gap-1 text-sm h-8 [&>svg]:text-zinc-950 [&>svg]:size-3.5',
           defaultClassNames.caption_label
         ),
         table: 'w-full border-collapse',
         weekdays: cn('flex', defaultClassNames.weekdays),
         weekday: cn(
-          'text-zinc-950-foreground rounded-md flex-1 font-normal text-[0.8rem] select-none',
+          'text-zinc-950 rounded-md flex-1 font-normal text-[0.8rem] select-none',
           defaultClassNames.weekday
         ),
         week: cn('flex w-full mt-2', defaultClassNames.week),
         week_number_header: cn('select-none w-(--cell-size)', defaultClassNames.week_number_header),
-        week_number: cn(
-          'text-[0.8rem] select-none text-zinc-950-foreground',
-          defaultClassNames.week_number
-        ),
+        week_number: cn('text-[0.8rem] select-none text-zinc-950', defaultClassNames.week_number),
         day: cn(
           'relative w-full h-full p-0 text-center [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md group/day aspect-square select-none',
           defaultClassNames.day
@@ -143,11 +140,8 @@ const Calendar = ({
           'bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none',
           defaultClassNames.today
         ),
-        outside: cn(
-          'text-zinc-950-foreground aria-selected:text-zinc-950-foreground',
-          defaultClassNames.outside
-        ),
-        disabled: cn('text-zinc-950-foreground opacity-50', defaultClassNames.disabled),
+        outside: cn('text-zinc-950 aria-selected:text-zinc-950', defaultClassNames.outside),
+        disabled: cn('text-zinc-950 opacity-50', defaultClassNames.disabled),
         hidden: cn('invisible', defaultClassNames.hidden),
         ...classNames,
       }}

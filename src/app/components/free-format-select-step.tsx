@@ -80,7 +80,7 @@ export const FreeFormatSelectStep = ({
         aria-live="polite"
         aria-label="Loading available formats"
       >
-        <Loader2 className="text-zinc-950-foreground size-6 animate-spin" />
+        <Loader2 className="size-6 animate-spin text-zinc-950" />
       </div>
     );
   }
@@ -90,7 +90,7 @@ export const FreeFormatSelectStep = ({
     // free radio when no free formats are published, but this guards against
     // race conditions between status fetch and dialog render.
     return (
-      <p className="text-zinc-950-foreground text-sm" aria-live="polite">
+      <p className="text-sm text-zinc-950" aria-live="polite">
         No free formats available for this release
       </p>
     );
@@ -101,13 +101,13 @@ export const FreeFormatSelectStep = ({
     return (
       <div className="space-y-4" data-testid="free-cap-reached">
         <p
-          className="text-zinc-950-foreground text-sm font-semibold"
+          className="text-sm font-semibold text-zinc-950"
           aria-live="polite"
           id="free-cap-reached-title"
         >
           Download limit reached
         </p>
-        <p className="text-zinc-950-foreground text-sm" id="free-cap-reached-description">
+        <p className="text-sm text-zinc-950" id="free-cap-reached-description">
           You can download up to 3 free bundles of this release every 24 hours. Try again in{' '}
           <TimeRemaining resetsAtIso={capReachedResetsAtIso} id="free-cap-reached-countdown" />, or
           get instant access by paying what you want.
@@ -134,7 +134,7 @@ export const FreeFormatSelectStep = ({
 
   return (
     <div className="space-y-4">
-      <p className="text-zinc-950-foreground text-sm" aria-live="polite">
+      <p className="text-sm text-zinc-950" aria-live="polite">
         Select one or both free formats to download.
       </p>
       <FormatBundleDownload

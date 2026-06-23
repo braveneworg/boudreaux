@@ -48,7 +48,7 @@ export const PurchaseSuccessStep = ({
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-4" role="status">
-            <Loader2Icon className="text-zinc-950-foreground size-5 animate-spin" />
+            <Loader2Icon className="size-5 animate-spin text-zinc-950" />
           </div>
         ) : resolvedFormats.length > 0 ? (
           <FormatBundleDownload
@@ -58,12 +58,10 @@ export const PurchaseSuccessStep = ({
             onDownloadComplete={onDownloadComplete}
           />
         ) : (
-          <p className="text-zinc-950-foreground text-sm">
-            No digital formats available for download.
-          </p>
+          <p className="text-sm text-zinc-950">No digital formats available for download.</p>
         )}
 
-        <p className="text-zinc-950-foreground text-sm">
+        <p className="text-sm text-zinc-950">
           A confirmation email with your download link is also on its way.
         </p>
       </div>

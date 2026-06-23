@@ -155,7 +155,7 @@ describe('CheckboxField', () => {
     );
 
     const formItem = screen.getByTestId('form-item');
-    expect(formItem).toHaveClass('flex', 'flex-row', 'items-start', 'space-0');
+    expect(formItem).toHaveClass('flex', 'flex-row', 'items-start');
   });
 
   it('renders complex label content', () => {

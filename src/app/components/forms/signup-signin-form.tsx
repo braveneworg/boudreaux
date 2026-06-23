@@ -96,7 +96,7 @@ export const SignupSigninForm = ({
                   </FormControl>
                   <FormLabel htmlFor="terms-and-conditions">
                     <Link
-                      className=":hover:no-underline :visited:text-rebeccapurple underline"
+                      className="underline hover:no-underline"
                       href="/legal/terms-and-conditions"
                     >
                       Accept terms and conditions?

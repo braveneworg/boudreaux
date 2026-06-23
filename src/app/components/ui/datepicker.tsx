@@ -140,7 +140,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               type="button"
               variant="ghost"
               size="sm"
-              className="text-zinc-950-foreground h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs text-zinc-950"
               onClick={() => {
                 setDate(undefined);
                 onSelect?.('', fieldName);

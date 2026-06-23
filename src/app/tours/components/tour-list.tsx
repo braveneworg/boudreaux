@@ -16,10 +16,8 @@ export const TourList = ({ tours }: TourListProps) => {
     return (
       <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
         <div className="text-center">
-          <h3 className="text-zinc-950-foreground text-lg font-semibold">No tours found</h3>
-          <p className="text-zinc-950-foreground mt-2 text-sm">
-            Check back later for upcoming tour dates.
-          </p>
+          <h3 className="text-lg font-semibold text-zinc-950">No tours found</h3>
+          <p className="mt-2 text-sm text-zinc-950">Check back later for upcoming tour dates.</p>
         </div>
       </div>
     );

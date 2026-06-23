@@ -231,15 +231,13 @@ export const FormatBundleDownload = ({
   if (isLoadingFormatsResolved) {
     return (
       <div className="flex items-center justify-center py-4" role="status">
-        <Loader2 className="text-zinc-950-foreground size-5 animate-spin" />
+        <Loader2 className="size-5 animate-spin text-zinc-950" />
       </div>
     );
   }
 
   if (resolvedFormats.length === 0) {
-    return (
-      <p className="text-zinc-950-foreground text-sm">No digital formats available for download.</p>
-    );
+    return <p className="text-sm text-zinc-950">No digital formats available for download.</p>;
   }
 
   return (
@@ -256,7 +254,7 @@ export const FormatBundleDownload = ({
       )}
 
       {autoStart && isDownloading && (
-        <p className="text-zinc-950-foreground flex items-center gap-2 text-sm">
+        <p className="flex items-center gap-2 text-sm text-zinc-950">
           <Loader2 className="size-4 animate-spin" />
           Preparing your download...
         </p>

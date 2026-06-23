@@ -33,7 +33,7 @@ export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
     data-slot="breadcrumb-menu"
     className={cn('relative left-5 mt-1 flex items-center gap-2 text-sm', className)}
   >
-    <Link href="/" className="hover:text-foreground text-zinc-950-foreground transition-colors">
+    <Link href="/" className="hover:text-foreground text-zinc-950 transition-colors">
       <Home className="size-5" />
       <span className="sr-only">Home</span>
     </Link>
