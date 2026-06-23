@@ -86,7 +86,8 @@ export const parseMongoUri = (uri: string): MongoConnectionInfo => {
     };
   } catch (error) {
     throw new Error(
-      `Failed to parse MongoDB URI: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to parse MongoDB URI: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { cause: error }
     );
   }
 };

@@ -5,6 +5,14 @@ peerDependencyRules:
     react: '^19.2.0'
     react-dom: '^19.2.0'
     nodemailer: '^9.0.1'
+    # eslint-plugin-react and eslint-plugin-jsx-a11y have not yet published a release
+    # declaring an ESLint 10 peer, but both run on v10 with the rules this repo enables
+    # (the rule files using v10-removed APIs are all formatting rules we don't turn on).
+    'eslint-plugin-react>eslint': '10'
+    'eslint-plugin-jsx-a11y>eslint': '10'
+    # Transitive only: eslint-import-resolver-typescript pulls in the legacy
+    # eslint-plugin-import (we lint with eslint-plugin-import-x). Cosmetic peer.
+    'eslint-plugin-import>eslint': '10'
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'

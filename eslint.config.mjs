@@ -1,11 +1,10 @@
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import js from '@eslint/js';
-import typescript from '@typescript-eslint/eslint-plugin';
-import typescriptParser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import importPlugin from 'eslint-plugin-import';
+import importX from 'eslint-plugin-import-x';
 import nextPlugin from '@next/eslint-plugin-next';
 import security from 'eslint-plugin-security';
 import globals from 'globals';
@@ -20,21 +19,13 @@ import pluginQuery from '@tanstack/eslint-plugin-query';
 // TS-scoped block below; the plugin itself is registered in the main config block.
 const tsEslintRecommendedRules = Object.assign(
   {},
-  ...typescript.configs['flat/recommended']
+  ...tseslint.configs.recommended
     .filter((config) => config.rules)
     .map((config) => config.rules)
 );
 
 const eslintConfig = [
   ...pluginQuery.configs['flat/recommended'],
-  {
-    files: ['./src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}'],
-    settings: {
-      'better-tailwindcss': {
-        cwd: './src/app',
-      },
-    },
-  },
   {
     ignores: [
       '**/node_modules/**',
@@ -77,16 +68,16 @@ const eslintConfig = [
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: {
-      '@typescript-eslint': typescript,
+      '@typescript-eslint': tseslint.plugin,
       '@next/next': nextPlugin,
       react,
       'react-hooks': reactHooks,
-      import: importPlugin,
+      'import-x': importX,
       'unused-imports': unusedImports,
       'prefer-arrow-functions': preferArrowFunctions,
     },
     languageOptions: {
-      parser: typescriptParser,
+      parser: tseslint.parser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
@@ -114,7 +105,7 @@ const eslintConfig = [
       react: {
         version: '19',
       },
-      'import/resolver': {
+      'import-x/resolver': {
         typescript: true,
         node: true,
       },
@@ -171,8 +162,8 @@ const eslintConfig = [
       // React rules
       'react/react-in-jsx-scope': 'off', // Not needed in React 17+
       'react/prop-types': 'off', // Using TypeScript
-      'react/jsx-uses-react': 'off',
-      'react/jsx-uses-vars': 'error',
+      // react/jsx-uses-react and react/jsx-uses-vars removed: ESLint 10 tracks JSX
+      // references natively, so both rules are redundant.
       'react/self-closing-comp': 'error',
       'react/jsx-curly-brace-presence': ['error', { props: 'never', children: 'never' }],
       'react/jsx-boolean-value': ['error', 'never'],
@@ -205,7 +196,7 @@ const eslintConfig = [
       'jsx-a11y/heading-has-content': ['error', { components: ['Heading'] }],
 
       // Import rules and sorting
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: [
@@ -242,11 +233,11 @@ const eslintConfig = [
           },
         },
       ],
-      'import/no-duplicates': 'error',
-      'import/no-unresolved': 'off', // TypeScript handles this
-      'import/first': 'error',
-      'import/newline-after-import': 'error',
-      'import/no-anonymous-default-export': 'warn',
+      'import-x/no-duplicates': 'error',
+      'import-x/no-unresolved': 'off', // TypeScript handles this
+      'import-x/first': 'error',
+      'import-x/newline-after-import': 'error',
+      'import-x/no-anonymous-default-export': 'warn',
 
       // General best practices
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],

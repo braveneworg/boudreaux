@@ -584,7 +584,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
   // Auto-generate slug from name fields
   useEffect(() => {
-    let slugSource = '';
+    let slugSource: string;
 
     if (displayName?.trim()) {
       slugSource = displayName.trim();
@@ -752,7 +752,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
               {/* Images Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Images</h2>
-                <p className="text-zinc-950-foreground text-sm">
+                <p className="text-sm text-zinc-950">
                   Add images for this artist. You can drag to reorder them. Images will be uploaded
                   after the artist is created or updated.
                 </p>
@@ -920,7 +920,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
                     </FormItem>
                   )}
                 />
-                <p className="text-zinc-950-foreground text-xs">Only used for bands</p>
+                <p className="text-xs text-zinc-950">Only used for bands</p>
               </section>
             </div>
 

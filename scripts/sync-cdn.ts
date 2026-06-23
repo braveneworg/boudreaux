@@ -154,7 +154,7 @@ class CDNSync {
         errorMessage += `\nStdout: ${err.stdout.toString()}`;
       }
 
-      throw new Error(errorMessage);
+      throw new Error(errorMessage, { cause: error });
     }
   }
 
