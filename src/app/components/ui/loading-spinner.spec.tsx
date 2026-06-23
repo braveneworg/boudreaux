@@ -46,7 +46,7 @@ describe('LoadingSpinner', () => {
     expect(container).toHaveClass('gap-2');
   });
 
-  it('loading text has muted foreground style', () => {
+  it('loading text has foreground color', () => {
     render(<LoadingSpinner />);
 
     expect(screen.getByText('Loading...')).toHaveClass('text-zinc-950');

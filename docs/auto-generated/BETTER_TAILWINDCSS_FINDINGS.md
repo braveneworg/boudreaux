@@ -38,9 +38,10 @@ so the stylistic rules are intentionally omitted to avoid fighting Prettier.
 propagated to **204** spots across ~70 files via copy-paste. Replaced everywhere
 with **`text-zinc-950`**:
 
-- The app has no `.dark` theme block, and `--foreground` is
+- Dark mode is wired (next-themes) but disabled — pinned to `light`, with no
+  theme toggle and no `.dark` token block in globals.css. `--foreground` is
   `oklch(0.141 0.005 285.823)` — i.e. zinc-950 — so `text-zinc-950` renders
-  identically to the foreground color in the only mode that exists. This pins the
+  identically to the foreground color in the only active mode. This pins the
   current (inherited) appearance rather than risking a visual shift.
 - Two specs that asserted the old class were updated in lockstep
   (`username-link.spec.tsx`, `loading-spinner.spec.tsx`).

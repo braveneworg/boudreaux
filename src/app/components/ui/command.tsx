@@ -68,7 +68,7 @@ const CommandInput = ({
       ref={ref}
       data-slot="command-input"
       className={cn(
-        'flex h-10 w-full border-0 bg-transparent! py-3 text-sm outline-hidden placeholder:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50',
+        'flex h-10 w-full border-0 bg-transparent! py-3 text-sm outline-hidden placeholder:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50',
         className
       )}
       {...props}
