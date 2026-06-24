@@ -12,6 +12,135 @@ import type { NextConfig } from 'next';
 // which emits matching `imagesrcset`/`imagesizes` so the browser's preload
 // picker selects the same variant the rendered `<img>` will use.
 
+// Build the Content-Security-Policy header value based on environment.
+// Known widenings and why they remain:
+//   - 'unsafe-inline' on script-src/style-src: Next.js inlines small runtime
+//     scripts and CSS-in-JS. Moving to a nonce-based CSP requires wiring
+//     `headers()` into middleware so the nonce is per-request.
+//   - 'unsafe-eval' is required by Next.js HMR in dev only. Production
+//     drops it by default (modern Stripe.js no longer needs eval).
+//     Escape hatch: set CSP_ALLOW_UNSAFE_EVAL=true to restore the legacy
+//     widening without a code change if a third-party script regresses.
+const buildContentSecurityPolicy = (): string => {
+  const isDev = process.env.NODE_ENV !== 'production';
+  const allowUnsafeEval = isDev || process.env.CSP_ALLOW_UNSAFE_EVAL === 'true';
+
+  const scriptSrc = [
+    "'self'",
+    "'unsafe-inline'",
+    ...(allowUnsafeEval ? ["'unsafe-eval'"] : []),
+    'https://challenges.cloudflare.com',
+    'https://cdn.fakefourrecords.com',
+    'https://js.stripe.com',
+  ].join(' ');
+
+  const cspParts = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    // Next.js requires 'unsafe-inline' for CSS-in-JS / <style jsx>.
+    "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
+    // Tight img-src: enumerate the CDN + S3 rather than allowing any https:.
+    // This prevents the page from being weaponized as a tracking pixel relay.
+    "img-src 'self' data: blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://challenges.cloudflare.com https://www.gravatar.com",
+    "font-src 'self' data: https://cdn.fakefourrecords.com",
+    // Third-party iframes we embed: Turnstile + Stripe.
+    "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
+    "worker-src 'self' blob:",
+    // Stripe API + Maps + own CDN. Add more connect targets here (do NOT use https:).
+    "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://*.pusher.com wss://*.pusher.com",
+    // Restrict media to own CDN and S3 buckets (drop the wildcard https:).
+    "media-src 'self' blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ];
+
+  // In E2E builds, the app runs on http://localhost in CI/Playwright.
+  // Forcing upgrade-insecure-requests would rewrite localhost URLs to HTTPS
+  // and break client hydration/scripts in standalone test runs.
+  const shouldUpgradeInsecureRequests =
+    process.env.NODE_ENV === 'production' && process.env.SKIP_CDN_ASSET_PREFIX !== 'true';
+
+  if (shouldUpgradeInsecureRequests) {
+    cspParts.push('upgrade-insecure-requests');
+  }
+
+  return cspParts.join('; ');
+};
+
+// Build the full list of response-header rules. Split out from `headers()` so
+// the config method stays within the function-length limit; behavior is identical.
+const buildResponseHeaders = () => [
+  // Next.js already emits `public, max-age=31536000, immutable` for hashed
+  // build assets — overriding it here triggers a dev-mode warning and
+  // breaks HMR. We only emit the CORS header so cross-origin font/chunk
+  // requests work when assetPrefix points at the CDN.
+  {
+    source: '/_next/static/:path*',
+    headers: [
+      {
+        key: 'Access-Control-Allow-Origin',
+        value: '*',
+      },
+    ],
+  },
+  // Favicon — rarely changes; 1-day cache + 7-day SWR
+  {
+    source: '/favicon.ico',
+    headers: [
+      {
+        key: 'Cache-Control',
+        value: 'public, max-age=86400, stale-while-revalidate=604800',
+      },
+    ],
+  },
+  // Media assets proxied from CDN — content-addressed, safe to cache forever
+  {
+    source: '/media/:path*',
+    headers: [
+      {
+        key: 'Cache-Control',
+        value: 'public, max-age=31536000, immutable',
+      },
+    ],
+  },
+  {
+    source: '/(.*)',
+    headers: [
+      {
+        key: 'X-Content-Type-Options',
+        value: 'nosniff',
+      },
+      {
+        key: 'X-Frame-Options',
+        value: 'DENY',
+      },
+      {
+        key: 'Strict-Transport-Security',
+        value: 'max-age=63072000; includeSubDomains; preload',
+      },
+      {
+        key: 'Referrer-Policy',
+        value: 'strict-origin-when-cross-origin',
+      },
+      {
+        key: 'Permissions-Policy',
+        value:
+          'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(self "https://js.stripe.com")',
+      },
+      {
+        key: 'Cross-Origin-Opener-Policy',
+        value: 'same-origin',
+      },
+      {
+        key: 'Content-Security-Policy',
+        value: buildContentSecurityPolicy(),
+      },
+    ],
+  },
+];
+
 const config = {
   // Use full CDN URL for all static assets in production
   // This eliminates the need for NGINX redirects and avoids 301 caching issues
@@ -127,130 +256,11 @@ const config = {
     },
   },
 
-  // Configure headers
+  // Configure headers. CSP assembly and the header-rule list are lifted into
+  // `buildContentSecurityPolicy` / `buildResponseHeaders` (module scope) to keep
+  // this method within the function-length limit; output is identical.
   async headers() {
-    // Build Content-Security-Policy based on environment.
-    // Known widenings and why they remain:
-    //   - 'unsafe-inline' on script-src/style-src: Next.js inlines small runtime
-    //     scripts and CSS-in-JS. Moving to a nonce-based CSP requires wiring
-    //     `headers()` into middleware so the nonce is per-request.
-    //   - 'unsafe-eval' is required by Next.js HMR in dev only. Production
-    //     drops it by default (modern Stripe.js no longer needs eval).
-    //     Escape hatch: set CSP_ALLOW_UNSAFE_EVAL=true to restore the legacy
-    //     widening without a code change if a third-party script regresses.
-    const isDev = process.env.NODE_ENV !== 'production';
-    const allowUnsafeEval = isDev || process.env.CSP_ALLOW_UNSAFE_EVAL === 'true';
-
-    const scriptSrc = [
-      "'self'",
-      "'unsafe-inline'",
-      ...(allowUnsafeEval ? ["'unsafe-eval'"] : []),
-      'https://challenges.cloudflare.com',
-      'https://cdn.fakefourrecords.com',
-      'https://js.stripe.com',
-    ].join(' ');
-
-    const cspParts = [
-      "default-src 'self'",
-      `script-src ${scriptSrc}`,
-      // Next.js requires 'unsafe-inline' for CSS-in-JS / <style jsx>.
-      "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
-      // Tight img-src: enumerate the CDN + S3 rather than allowing any https:.
-      // This prevents the page from being weaponized as a tracking pixel relay.
-      "img-src 'self' data: blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://challenges.cloudflare.com https://www.gravatar.com",
-      "font-src 'self' data: https://cdn.fakefourrecords.com",
-      // Third-party iframes we embed: Turnstile + Stripe.
-      "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
-      "worker-src 'self' blob:",
-      // Stripe API + Maps + own CDN. Add more connect targets here (do NOT use https:).
-      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://*.pusher.com wss://*.pusher.com",
-      // Restrict media to own CDN and S3 buckets (drop the wildcard https:).
-      "media-src 'self' blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ];
-
-    // In E2E builds, the app runs on http://localhost in CI/Playwright.
-    // Forcing upgrade-insecure-requests would rewrite localhost URLs to HTTPS
-    // and break client hydration/scripts in standalone test runs.
-    const shouldUpgradeInsecureRequests =
-      process.env.NODE_ENV === 'production' && process.env.SKIP_CDN_ASSET_PREFIX !== 'true';
-
-    if (shouldUpgradeInsecureRequests) {
-      cspParts.push('upgrade-insecure-requests');
-    }
-
-    return [
-      // Next.js already emits `public, max-age=31536000, immutable` for hashed
-      // build assets — overriding it here triggers a dev-mode warning and
-      // breaks HMR. We only emit the CORS header so cross-origin font/chunk
-      // requests work when assetPrefix points at the CDN.
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-        ],
-      },
-      // Favicon — rarely changes; 1-day cache + 7-day SWR
-      {
-        source: '/favicon.ico',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=86400, stale-while-revalidate=604800',
-          },
-        ],
-      },
-      // Media assets proxied from CDN — content-addressed, safe to cache forever
-      {
-        source: '/media/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value:
-              'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(self "https://js.stripe.com")',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: cspParts.join('; '),
-          },
-        ],
-      },
-    ];
+    return buildResponseHeaders();
   },
 
   // Configure rewrites if needed

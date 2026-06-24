@@ -9,6 +9,7 @@ import { loggers } from '@/lib/utils/logger';
 
 import type { User } from 'next-auth';
 import type { AdapterUser } from 'next-auth/adapters';
+import type { JWT } from 'next-auth/jwt';
 
 //keywords: auth, next-auth, mongodb, mongodb-adapter
 //docs: https://authjs.dev/reference/adapters/mongodb-adapter
@@ -48,6 +49,98 @@ import type { AdapterUser } from 'next-auth/adapters';
 // - The `@map` attribute is used to map a field to a different name in the database.
 // - The `@@index` attribute is used to create an index on a field or fields.
 // - The `@@unique` attribute is used to create a unique index on a field or fields.
+
+// Whitelist of fields the client may update via `useSession().update()`.
+// Never allow `role`, `id`, `email`, or `emailVerified` to be written from the client —
+// those are authoritative only via DB re-fetch in `refreshUserFromDatabase`.
+const ALLOWED_UPDATE_FIELDS = [
+  'name',
+  'username',
+  'image',
+  'firstName',
+  'lastName',
+  'phone',
+  'addressLine1',
+  'addressLine2',
+  'city',
+  'state',
+  'zipCode',
+  'country',
+  'allowSmsNotifications',
+] as const;
+
+// Merge a client-initiated session update into the token, keeping only
+// whitelisted fields. Security: never trust the client for authoritative fields.
+const buildSessionUpdatedToken = ({ token, session }: { token: JWT; session: unknown }): JWT => {
+  const sessionObj = (session ?? {}) as Record<string, unknown>;
+  const safeUpdates = Object.fromEntries(
+    Object.entries(sessionObj).filter(([key]) =>
+      (ALLOWED_UPDATE_FIELDS as readonly string[]).includes(key)
+    )
+  );
+  token.user = {
+    ...((token.user as object) || {}),
+    ...safeUpdates,
+  };
+  return token;
+};
+
+// Re-fetch the user from the database so the session stays in sync with the
+// latest DB state. If the role changed since the token was issued, strip the
+// embedded user to force re-authentication. On DB error, keep existing token data.
+const refreshUserFromDatabase = async (token: JWT): Promise<JWT> => {
+  try {
+    const userId = (token.user as { id: string }).id;
+    const freshUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        image: true,
+        email: true,
+        emailVerified: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        country: true,
+        allowSmsNotifications: true,
+      },
+    });
+
+    if (!freshUser) {
+      return token;
+    }
+
+    // Security: Check if role has changed - force re-authentication if so
+    const oldRole = (token.user as { role?: string }).role;
+    if (oldRole && freshUser.role !== oldRole) {
+      loggers.auth.warn('User role changed - re-authentication required', {
+        userId: freshUser.id,
+        oldRole,
+        newRole: freshUser.role,
+      });
+      // Remove the embedded user from the JWT to force re-login without
+      // leaving a token where `token.user` is explicitly `null`.
+      const { user: _user, ...tokenWithoutUser } = token;
+      return tokenWithoutUser;
+    }
+
+    token.user = freshUser;
+  } catch (error) {
+    // Logger redacts sensitive fields; stack is structured data
+    loggers.auth.error('Error fetching user data', error);
+    // Keep existing token data if database fetch fails
+  }
+
+  return token;
+};
 
 // Validate AUTH_SECRET exists and is sufficiently long
 // Skip validation during build when SKIP_ENV_VALIDATION is set
@@ -117,34 +210,9 @@ const { handlers, auth, signIn, signOut } = NextAuth({
       // Handle session updates (when user profile is updated).
       // Security: whitelist fields that the client may update via `useSession().update()`.
       // Never allow `role`, `id`, `email`, or `emailVerified` to be written from the client —
-      // those are authoritative only via DB re-fetch below.
+      // those are authoritative only via the DB re-fetch in `refreshUserFromDatabase`.
       if (trigger === 'update' && session) {
-        const ALLOWED_UPDATE_FIELDS = [
-          'name',
-          'username',
-          'image',
-          'firstName',
-          'lastName',
-          'phone',
-          'addressLine1',
-          'addressLine2',
-          'city',
-          'state',
-          'zipCode',
-          'country',
-          'allowSmsNotifications',
-        ] as const;
-        const sessionObj = (session ?? {}) as Record<string, unknown>;
-        const safeUpdates = Object.fromEntries(
-          Object.entries(sessionObj).filter(([key]) =>
-            (ALLOWED_UPDATE_FIELDS as readonly string[]).includes(key)
-          )
-        );
-        token.user = {
-          ...((token.user as object) || {}),
-          ...safeUpdates,
-        };
-        return token;
+        return buildSessionUpdatedToken({ token, session });
       }
 
       // Initial sign in - store user data in token
@@ -155,53 +223,7 @@ const { handlers, auth, signIn, signOut } = NextAuth({
       // On subsequent requests, refresh user data from database
       // This ensures session stays in sync with latest user data
       if (token.user && typeof token.user === 'object' && 'id' in token.user && !trigger) {
-        try {
-          const userId = (token.user as { id: string }).id;
-          const freshUser = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              image: true,
-              email: true,
-              emailVerified: true,
-              role: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              addressLine1: true,
-              addressLine2: true,
-              city: true,
-              state: true,
-              zipCode: true,
-              country: true,
-              allowSmsNotifications: true,
-            },
-          });
-
-          if (freshUser) {
-            // Security: Check if role has changed - force re-authentication if so
-            const oldRole = (token.user as { role?: string }).role;
-            if (oldRole && freshUser.role !== oldRole) {
-              loggers.auth.warn('User role changed - re-authentication required', {
-                userId: freshUser.id,
-                oldRole,
-                newRole: freshUser.role,
-              });
-              // Remove the embedded user from the JWT to force re-login without
-              // leaving a token where `token.user` is explicitly `null`.
-              const { user: _user, ...tokenWithoutUser } = token;
-              return tokenWithoutUser;
-            }
-
-            token.user = freshUser;
-          }
-        } catch (error) {
-          // Logger redacts sensitive fields; stack is structured data
-          loggers.auth.error('Error fetching user data', error);
-          // Keep existing token data if database fetch fails
-        }
+        return await refreshUserFromDatabase(token);
       }
 
       return token;

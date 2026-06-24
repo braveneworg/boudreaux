@@ -6,85 +6,81 @@ import type { Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const createAdminUsers = async () => {
-  const adminFirstName = process.env.ADMIN_FIRST_NAME;
-  const adminLastName = process.env.ADMIN_LAST_NAME;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPhone = process.env.ADMIN_PHONE;
-  const secondaryFirstName = process.env.SECONDARY_ADMIN_FIRST_NAME;
-  const secondaryLastName = process.env.SECONDARY_ADMIN_LAST_NAME;
-  const secondaryEmail = process.env.SECONDARY_ADMIN_EMAIL;
-  const secondaryPhone = process.env.SECONDARY_ADMIN_PHONE;
-  const tertiaryFirstName = process.env.TERTIARY_ADMIN_FIRST_NAME;
-  const tertiaryLastName = process.env.TERTIARY_ADMIN_LAST_NAME;
-  const tertiaryEmail = process.env.TERTIARY_ADMIN_EMAIL;
-  const tertiaryPhone = process.env.TERTIARY_ADMIN_PHONE;
-
-  if (!adminFirstName || !adminLastName || !adminEmail || !adminPhone) {
-    console.error(
-      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE'
-    );
-    process.exit(1);
-  }
-
-  if (!secondaryFirstName || !secondaryLastName || !secondaryEmail || !secondaryPhone) {
-    console.error(
-      '❌ Check that the following environment variables are set: SECONDARY_ADMIN_FIRST_NAME, SECONDARY_ADMIN_LAST_NAME, SECONDARY_ADMIN_EMAIL, SECONDARY_ADMIN_PHONE'
-    );
-    process.exit(1);
-  }
-
-  if (!tertiaryFirstName || !tertiaryLastName || !tertiaryEmail || !tertiaryPhone) {
-    console.error(
-      '❌ Check that the following environment variables are set: TERTIARY_ADMIN_FIRST_NAME, TERTIARY_ADMIN_LAST_NAME, TERTIARY_ADMIN_EMAIL, TERTIARY_ADMIN_PHONE'
-    );
+// Validate one admin's env-derived fields and create the admin user. Exits the
+// process (code 1) with a descriptive message if any required field is missing —
+// extracted from `createAdminUsers` to keep its cyclomatic complexity in bounds.
+const ensureAdminFromEnv = async ({
+  firstName,
+  lastName,
+  email,
+  phone,
+  missingEnvMessage,
+}: {
+  firstName: string | undefined;
+  lastName: string | undefined;
+  email: string | undefined;
+  phone: string | undefined;
+  missingEnvMessage: string;
+}): Promise<void> => {
+  if (!firstName || !lastName || !email || !phone) {
+    console.error(missingEnvMessage);
     process.exit(1);
   }
 
   await UserService.ensureAdminUser({
-    firstName: adminFirstName,
-    lastName: adminLastName,
-    email: adminEmail,
-    phone: adminPhone,
-    role: 'admin',
-  });
-
-  await UserService.ensureAdminUser({
-    firstName: secondaryFirstName,
-    lastName: secondaryLastName,
-    email: secondaryEmail,
-    phone: secondaryPhone,
-    role: 'admin',
-  });
-
-  await UserService.ensureAdminUser({
-    firstName: tertiaryFirstName,
-    lastName: tertiaryLastName,
-    email: tertiaryEmail,
-    phone: tertiaryPhone,
+    firstName,
+    lastName,
+    email,
+    phone,
     role: 'admin',
   });
 };
 
-const createDefaultArtists = async () => {
-  // Delete existing artists and their related URLs first
-  await prisma.url.deleteMany({ where: { artistId: { not: undefined } } });
-  await prisma.artist.deleteMany({});
+const createAdminUsers = async () => {
+  await ensureAdminFromEnv({
+    firstName: process.env.ADMIN_FIRST_NAME,
+    lastName: process.env.ADMIN_LAST_NAME,
+    email: process.env.ADMIN_EMAIL,
+    phone: process.env.ADMIN_PHONE,
+    missingEnvMessage:
+      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE',
+  });
 
-  // Define artist data with URLs stored separately for later creation
-  const artistsWithUrls = [
-    {
-      artist: {
-        akaNames: 'Ceschi',
-        firstName: 'Julio',
-        middleName: 'Francisco',
-        surname: 'Ramos',
-        slug: 'julio-francisco-ramos-aka-ceschi',
-        displayName: 'Ceschi',
-        email: 'update-this-email-address@example.com',
-        // TODO: strip telephone formatting leaving +country code and phone number numbers only
-        phone: '+1234567890',
-        bio: `
+  await ensureAdminFromEnv({
+    firstName: process.env.SECONDARY_ADMIN_FIRST_NAME,
+    lastName: process.env.SECONDARY_ADMIN_LAST_NAME,
+    email: process.env.SECONDARY_ADMIN_EMAIL,
+    phone: process.env.SECONDARY_ADMIN_PHONE,
+    missingEnvMessage:
+      '❌ Check that the following environment variables are set: SECONDARY_ADMIN_FIRST_NAME, SECONDARY_ADMIN_LAST_NAME, SECONDARY_ADMIN_EMAIL, SECONDARY_ADMIN_PHONE',
+  });
+
+  await ensureAdminFromEnv({
+    firstName: process.env.TERTIARY_ADMIN_FIRST_NAME,
+    lastName: process.env.TERTIARY_ADMIN_LAST_NAME,
+    email: process.env.TERTIARY_ADMIN_EMAIL,
+    phone: process.env.TERTIARY_ADMIN_PHONE,
+    missingEnvMessage:
+      '❌ Check that the following environment variables are set: TERTIARY_ADMIN_FIRST_NAME, TERTIARY_ADMIN_LAST_NAME, TERTIARY_ADMIN_EMAIL, TERTIARY_ADMIN_PHONE',
+  });
+};
+
+// Artist seed data with URLs stored separately for later creation.
+// Defined at module scope so `createDefaultArtists` stays within the
+// function-length limit; the data is content, not logic.
+const DEFAULT_ARTISTS_WITH_URLS = [
+  {
+    artist: {
+      akaNames: 'Ceschi',
+      firstName: 'Julio',
+      middleName: 'Francisco',
+      surname: 'Ramos',
+      slug: 'julio-francisco-ramos-aka-ceschi',
+      displayName: 'Ceschi',
+      email: 'update-this-email-address@example.com',
+      // TODO: strip telephone formatting leaving +country code and phone number numbers only
+      phone: '+1234567890',
+      bio: `
         Ceschi Ramos (the name is pronounced like "chess-key") crafts a
         distinctive blend of progressive hip-hop infused with folk and
         indie rock influences. While he possesses nearly mathematical
@@ -94,25 +90,25 @@ const createDefaultArtists = async () => {
         blistering speed, while the next could be a stripped-down folk ballad
         accompanied only by acoustic guitar.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        { platform: Platform.PATREON, url: 'https://www.patreon.com/ceschi' },
-        { platform: Platform.BANDCAMP, url: 'https://ceschi.bandcamp.com' },
-        { platform: Platform.WEBSITE, url: 'https://ceschiramos.com' },
-        { platform: Platform.WEBSITE, url: 'https://linktr.ee/ceschi' },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Myles',
-        middleName: '',
-        surname: 'Bullen',
-        akaNames: 'beatboxpoet',
-        slug: 'myles-bullen',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      { platform: Platform.PATREON, url: 'https://www.patreon.com/ceschi' },
+      { platform: Platform.BANDCAMP, url: 'https://ceschi.bandcamp.com' },
+      { platform: Platform.WEBSITE, url: 'https://ceschiramos.com' },
+      { platform: Platform.WEBSITE, url: 'https://linktr.ee/ceschi' },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'Myles',
+      middleName: '',
+      surname: 'Bullen',
+      akaNames: 'beatboxpoet',
+      slug: 'myles-bullen',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         Myles Bullen (they/he) is an Indigenous genre-fluid artist,
         ukulele-playing rapper, and spoken-word poet based in Portland, Maine.
         Often described as a "soft rap art poet," Bullen creates music that
@@ -120,23 +116,23 @@ const createDefaultArtists = async () => {
         folk punk, indie rock, spoken word, and emo rap into something wholly
         their own.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        { platform: Platform.BANDCAMP, url: 'https://mylesbullen.bandcamp.com/community' },
-        { platform: Platform.WEBSITE, url: 'https://mylesbullen.com' },
-        { platform: Platform.INSTAGRAM, url: 'https://instagram.com/beatboxpoet' },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Gregory',
-        middleName: '',
-        surname: 'Pepper',
-        slug: 'gregory-pepper',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      { platform: Platform.BANDCAMP, url: 'https://mylesbullen.bandcamp.com/community' },
+      { platform: Platform.WEBSITE, url: 'https://mylesbullen.com' },
+      { platform: Platform.INSTAGRAM, url: 'https://instagram.com/beatboxpoet' },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'Gregory',
+      middleName: '',
+      surname: 'Pepper',
+      slug: 'gregory-pepper',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         Greggory Pepper is a Canadian singer, songwriter, and music producer
         known for his eclectic blend of indie pop, folk, and electronic music.
         Based in Toronto, Pepper has released several albums and EPs that showcase
@@ -147,23 +143,23 @@ const createDefaultArtists = async () => {
         and experimenting with different styles and genres. With a dedicated fanbase
         and critical acclaim, Greggory Pepper continues to make a significant impact.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        { platform: Platform.BANDCAMP, url: 'https://gregorypepper.bandcamp.com/' },
-        { platform: Platform.WEBSITE, url: 'https://www.camppepper.com/' },
-        { platform: Platform.INSTAGRAM, url: 'https://www.instagram.com/gregorypepper/?hl=en' },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'David',
-        middleName: '',
-        surname: 'Ramos',
-        slug: 'david-ramos',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      { platform: Platform.BANDCAMP, url: 'https://gregorypepper.bandcamp.com/' },
+      { platform: Platform.WEBSITE, url: 'https://www.camppepper.com/' },
+      { platform: Platform.INSTAGRAM, url: 'https://www.instagram.com/gregorypepper/?hl=en' },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'David',
+      middleName: '',
+      surname: 'Ramos',
+      slug: 'david-ramos',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         David Ramos is an American multi-instrumentalist, producer, and
         co-founder of Fake Four Inc., the independent record label he
         established alongside his brother Ceschi in 2008 in New Haven,
@@ -172,19 +168,19 @@ const createDefaultArtists = async () => {
         (ranked just after Thomas Pridgen) while still a student at
         Wesleyan University.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [{ platform: Platform.BANDCAMP, url: 'https://davidramos.bandcamp.com/' }],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Factor',
-        middleName: '',
-        surname: 'Chandelier',
-        slug: 'factor-chandelier',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [{ platform: Platform.BANDCAMP, url: 'https://davidramos.bandcamp.com/' }],
+  },
+  {
+    artist: {
+      firstName: 'Factor',
+      middleName: '',
+      surname: 'Chandelier',
+      slug: 'factor-chandelier',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         20 years after the release of his first album, Factor Chandelier
         has created Time Invested II, a nostalgic and energetic compilation
         reminiscent of how his music career started. With the intent of
@@ -196,31 +192,31 @@ const createDefaultArtists = async () => {
         The release of the album aligns with his 40th birthday and somehow
         still feels like this might just be the beginning.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        { platform: Platform.WEBSITE, url: 'https://factorchandelier.com/' },
-        { platform: Platform.BANDCAMP, url: 'https://factorchandelier.bandcamp.com/' },
-        { platform: Platform.INSTAGRAM, url: 'https://www.instagram.com/factorchandelier/?hl=en' },
-        {
-          platform: Platform.PATREON,
-          url: 'https://www.patreon.com/factorchandelier?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGnPQelGoEVGUDmGYNrjq7YjywmNSjdAlF89CxrBPLylVohYkxm8eFyhWNQPrM_aem_MhJV08208R2ZaV8B328M1w',
-        },
-        {
-          platform: Platform.SPOTIFY,
-          url: 'https://open.spotify.com/artist/68XL9b5CHwRP50KMcVGl33',
-        },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Nathan',
-        surname: 'Conrad',
-        akaNames: 'Spoken Nerd',
-        slug: 'spoken-nerd',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      { platform: Platform.WEBSITE, url: 'https://factorchandelier.com/' },
+      { platform: Platform.BANDCAMP, url: 'https://factorchandelier.bandcamp.com/' },
+      { platform: Platform.INSTAGRAM, url: 'https://www.instagram.com/factorchandelier/?hl=en' },
+      {
+        platform: Platform.PATREON,
+        url: 'https://www.patreon.com/factorchandelier?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGnPQelGoEVGUDmGYNrjq7YjywmNSjdAlF89CxrBPLylVohYkxm8eFyhWNQPrM_aem_MhJV08208R2ZaV8B328M1w',
+      },
+      {
+        platform: Platform.SPOTIFY,
+        url: 'https://open.spotify.com/artist/68XL9b5CHwRP50KMcVGl33',
+      },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'Nathan',
+      surname: 'Conrad',
+      akaNames: 'Spoken Nerd',
+      slug: 'spoken-nerd',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         Spoken Nerd has built a reputation for crafting cleverly layered lyrics that strike the perfect balance of wit
         and self-awareness. Now, with his debut release on Fake Four Records, he's generating significant buzz in the
         underground hip-hop community. Creative imagery and explorations of the human condition have long been hallmarks
@@ -231,24 +227,24 @@ const createDefaultArtists = async () => {
         trusted companion—and as he hits the road for his Fall tour, he's eager to connect with audiences
         ready to join him on the journey.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        {
-          platform: Platform.BANDCAMP,
-          url: 'https://fakefour.bandcamp.com/album/i-need-a-friend-like-you',
-        },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Scotty',
-        surname: 'Trimble',
-        akaNames: 'Sixo',
-        slug: 'sixo',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      {
+        platform: Platform.BANDCAMP,
+        url: 'https://fakefour.bandcamp.com/album/i-need-a-friend-like-you',
+      },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'Scotty',
+      surname: 'Trimble',
+      akaNames: 'Sixo',
+      slug: 'sixo',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         Scotty Trimble, who traded a career as a professional motocross racer
         for life as an indie rap producer under the name Sixo, has long
         grappled with philosophical questions about human agency.
@@ -261,23 +257,23 @@ const createDefaultArtists = async () => {
         Sixo into his home studio to create The Odds of Free Will, his third
         and final full-length album. R.I.P Sixo.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [
-        {
-          platform: Platform.BANDCAMP,
-          url: 'https://fakefour.bandcamp.com/album/the-odds-of-free-will',
-        },
-      ],
+      publishedOn: new Date(),
     },
-    {
-      artist: {
-        firstName: 'Onry',
-        surname: 'Ozzborn',
-        slug: 'onry-ozzborn',
-        email: 'update-this-email-address@example.com',
-        phone: '+1234567890',
-        bio: `
+    urls: [
+      {
+        platform: Platform.BANDCAMP,
+        url: 'https://fakefour.bandcamp.com/album/the-odds-of-free-will',
+      },
+    ],
+  },
+  {
+    artist: {
+      firstName: 'Onry',
+      surname: 'Ozzborn',
+      slug: 'onry-ozzborn',
+      email: 'update-this-email-address@example.com',
+      phone: '+1234567890',
+      bio: `
         Onry Ozzborn, born Onry Lorenz Ozzborn, is an American rapper and producer
           from Seattle, Washington. He is a founding member of the hip-hop group
           Dark Time Sunshine alongside Zavala, and has been associated with the
@@ -286,20 +282,25 @@ const createDefaultArtists = async () => {
           and collaborative projects throughout his career, establishing himself
           as a significant figure in the Pacific Northwest underground hip-hop scene.
       `,
-        publishedOn: new Date(),
-      },
-      urls: [{ platform: Platform.WEBSITE, url: 'https://en.wikipedia.org/wiki/Onry_Ozzborn' }],
+      publishedOn: new Date(),
     },
-  ];
+    urls: [{ platform: Platform.WEBSITE, url: 'https://en.wikipedia.org/wiki/Onry_Ozzborn' }],
+  },
+];
+
+const createDefaultArtists = async () => {
+  // Delete existing artists and their related URLs first
+  await prisma.url.deleteMany({ where: { artistId: { not: undefined } } });
+  await prisma.artist.deleteMany({});
 
   // Create artists first (without URLs since it's a relation)
-  const artistData = artistsWithUrls.map(({ artist }) => artist);
+  const artistData = DEFAULT_ARTISTS_WITH_URLS.map(({ artist }) => artist);
   await prisma.artist.createMany({
     data: artistData as Prisma.ArtistCreateManyInput[],
   });
 
   // Now create URLs linked to artists by slug
-  for (const { artist, urls } of artistsWithUrls) {
+  for (const { artist, urls } of DEFAULT_ARTISTS_WITH_URLS) {
     const createdArtist = await prisma.artist.findUnique({
       where: { slug: artist.slug },
     });
