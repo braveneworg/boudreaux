@@ -123,6 +123,120 @@ const connectArtistFromMetadata = async (
   return undefined;
 };
 
+type FoundRelease = {
+  id: string;
+  title: string;
+  publishedAt: Date | null;
+  deletedOn: Date | null;
+};
+
+type ReleaseActionContext = {
+  albumTitle: string;
+  userId: string;
+  options: FindOrCreateReleaseOptions;
+};
+
+const handleFoundRelease = async (
+  metadata: ReleaseMetadata,
+  existingRelease: FoundRelease,
+  ctx: ReleaseActionContext
+): Promise<FindOrCreateReleaseResult> => {
+  const undelete = Boolean(existingRelease.deletedOn);
+  const publish = Boolean(ctx.options.publish && !existingRelease.publishedAt);
+
+  if (undelete || publish) {
+    await ReleaseService.applyFoundReleaseUpdate(existingRelease.id, { undelete, publish });
+    revalidatePath('/admin/releases');
+  }
+
+  logSecurityEvent({
+    event: 'media.release.found',
+    userId: ctx.userId,
+    metadata: {
+      releaseId: existingRelease.id,
+      releaseTitle: existingRelease.title,
+      searchedTitle: ctx.albumTitle,
+    },
+  });
+
+  const foundArtistId = await connectArtistFromMetadata(metadata, existingRelease.id);
+
+  return {
+    success: true,
+    releaseId: existingRelease.id,
+    releaseTitle: existingRelease.title,
+    created: false,
+    artistId: foundArtistId,
+  };
+};
+
+const buildCreateParams = (
+  metadata: ReleaseMetadata,
+  ctx: ReleaseActionContext
+): Parameters<typeof ReleaseService.createRelease>[0] => {
+  const releasedOn = parseReleaseDate(metadata.year, metadata.date) ?? new Date();
+  const formats = determineFormat(metadata.lossless);
+  const labels = metadata.label ? [metadata.label.trim()] : [];
+  return {
+    ...(metadata.id ? { id: metadata.id } : {}),
+    title: ctx.albumTitle,
+    releasedOn,
+    formats,
+    labels,
+    catalogNumber: metadata.catalogNumber?.trim() || undefined,
+    coverArt: metadata.coverArt || '',
+    ...(ctx.options.publish ? { publishedAt: new Date() } : {}),
+  };
+};
+
+const handleCreateResponse = async (
+  createResponse: Awaited<ReturnType<typeof ReleaseService.createRelease>>,
+  metadata: ReleaseMetadata,
+  ctx: ReleaseActionContext
+): Promise<FindOrCreateReleaseResult> => {
+  if (!createResponse.success) {
+    logSecurityEvent({
+      event: 'media.release.create_failed',
+      userId: ctx.userId,
+      metadata: { attemptedTitle: ctx.albumTitle, error: createResponse.error },
+    });
+    return { success: false, error: createResponse.error || 'Failed to create release' };
+  }
+
+  logSecurityEvent({
+    event: 'media.release.created',
+    userId: ctx.userId,
+    metadata: {
+      releaseId: createResponse.data.id,
+      releaseTitle: createResponse.data.title,
+      fromMetadata: true,
+      metadataFields: Object.keys(metadata).filter(
+        (key) => metadata[key as keyof ReleaseMetadata] !== undefined
+      ),
+    },
+  });
+
+  revalidatePath('/admin/releases');
+
+  const createdArtistId = await connectArtistFromMetadata(metadata, createResponse.data.id);
+
+  return {
+    success: true,
+    releaseId: createResponse.data.id,
+    releaseTitle: createResponse.data.title,
+    created: true,
+    artistId: createdArtistId,
+  };
+};
+
+const getAdminUserId = async (): Promise<string | null> => {
+  const session = await auth();
+  if (!session || !session.user || !session.user.id || session.user.role !== 'admin') {
+    return null;
+  }
+  return session.user.id;
+};
+
 /**
  * Find an existing release by title (case-insensitive) or create a new one
  * from audio metadata. This action requires admin role.
@@ -137,120 +251,31 @@ export const findOrCreateReleaseAction = async (
 ): Promise<FindOrCreateReleaseResult> => {
   await requireRole('admin');
 
-  // Validate required field
   if (!metadata.album || metadata.album.trim() === '') {
-    return {
-      success: false,
-      error: 'Album name is required to find or create a release',
-    };
+    return { success: false, error: 'Album name is required to find or create a release' };
   }
 
   const albumTitle = metadata.album.trim();
 
   try {
-    const session = await auth();
+    const userId = await getAdminUserId();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return {
-        success: false,
-        error: 'You must be a logged in admin user to manage releases',
-      };
+    if (!userId) {
+      return { success: false, error: 'You must be a logged in admin user to manage releases' };
     }
 
-    // Try to find an existing release by title (case-insensitive)
+    const ctx: ReleaseActionContext = { albumTitle, userId, options };
     const existingRelease = await ReleaseService.findByTitleInsensitive(albumTitle);
 
     if (existingRelease) {
-      const undelete = Boolean(existingRelease.deletedOn);
-      const publish = Boolean(options.publish && !existingRelease.publishedAt);
-
-      if (undelete || publish) {
-        await ReleaseService.applyFoundReleaseUpdate(existingRelease.id, { undelete, publish });
-        revalidatePath('/admin/releases');
-      }
-
-      logSecurityEvent({
-        event: 'media.release.found',
-        userId: session.user.id,
-        metadata: {
-          releaseId: existingRelease.id,
-          releaseTitle: existingRelease.title,
-          searchedTitle: albumTitle,
-        },
-      });
-
-      // Connect artist from metadata (best-effort)
-      const foundArtistId = await connectArtistFromMetadata(metadata, existingRelease.id);
-
-      return {
-        success: true,
-        releaseId: existingRelease.id,
-        releaseTitle: existingRelease.title,
-        created: false,
-        artistId: foundArtistId,
-      };
+      return handleFoundRelease(metadata, existingRelease, ctx);
     }
 
-    // No existing release found - create a new one
-    const releasedOn = parseReleaseDate(metadata.year, metadata.date) ?? new Date();
-    const formats = determineFormat(metadata.lossless);
-    const labels = metadata.label ? [metadata.label.trim()] : [];
-
-    const createResponse = await ReleaseService.createRelease({
-      ...(metadata.id ? { id: metadata.id } : {}),
-      title: albumTitle,
-      releasedOn,
-      formats,
-      labels,
-      catalogNumber: metadata.catalogNumber?.trim() || undefined,
-      coverArt: metadata.coverArt || '',
-      ...(options.publish ? { publishedAt: new Date() } : {}),
-    });
-
-    if (!createResponse.success) {
-      logSecurityEvent({
-        event: 'media.release.create_failed',
-        userId: session.user.id,
-        metadata: {
-          attemptedTitle: albumTitle,
-          error: createResponse.error,
-        },
-      });
-
-      return {
-        success: false,
-        error: createResponse.error || 'Failed to create release',
-      };
-    }
-
-    logSecurityEvent({
-      event: 'media.release.created',
-      userId: session.user.id,
-      metadata: {
-        releaseId: createResponse.data.id,
-        releaseTitle: createResponse.data.title,
-        fromMetadata: true,
-        metadataFields: Object.keys(metadata).filter(
-          (key) => metadata[key as keyof ReleaseMetadata] !== undefined
-        ),
-      },
-    });
-
-    revalidatePath('/admin/releases');
-
-    // Connect artist from metadata (best-effort)
-    const createdArtistId = await connectArtistFromMetadata(metadata, createResponse.data.id);
-
-    return {
-      success: true,
-      releaseId: createResponse.data.id,
-      releaseTitle: createResponse.data.title,
-      created: true,
-      artistId: createdArtistId,
-    };
+    const createParams = buildCreateParams(metadata, ctx);
+    const createResponse = await ReleaseService.createRelease(createParams);
+    return handleCreateResponse(createResponse, metadata, ctx);
   } catch (error) {
     loggers.media.error('Error in findOrCreateReleaseAction', error);
-
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred',

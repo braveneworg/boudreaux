@@ -141,12 +141,102 @@ const validateFile = (
   return { valid: true };
 };
 
+type EntityType = 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
+
+interface S3UploadContext {
+  s3Client: ReturnType<typeof getS3Client>;
+  s3Bucket: string;
+  cdnDomain: string | undefined;
+  awsRegion: string;
+  entityType: EntityType;
+  entityId: string;
+}
+
+/**
+ * Validate all files and return an error result on the first failure.
+ * Returns null when all files pass validation.
+ */
+const validateAllFiles = (files: PresignedUrlRequest[]): PresignedUrlActionResult | null => {
+  for (const file of files) {
+    const validation = validateFile(file.contentType, file.fileSize);
+    if (!validation.valid) {
+      logger.warn('File validation failed', {
+        fileName: file.fileName,
+        contentType: file.contentType,
+        fileSize: file.fileSize,
+        error: validation.error,
+      });
+      return { success: false, error: validation.error };
+    }
+  }
+  return null;
+};
+
+/**
+ * Resolve the S3 key for a single file, enforcing path-traversal safety on
+ * existingS3Key values.
+ */
+const resolveS3Key = (
+  file: PresignedUrlRequest,
+  entityType: EntityType,
+  entityId: string
+): string => {
+  if (!file.existingS3Key) {
+    return generateS3Key(entityType, entityId, file.fileName);
+  }
+  const expectedPrefix = `media/${entityType}/${entityId}/`;
+  if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {
+    throw new Error(`Invalid S3 key: must start with ${expectedPrefix}`);
+  }
+  return file.existingS3Key;
+};
+
+/**
+ * Generate one presigned upload URL result for a single file.
+ */
+const buildPresignedUrlResult = async (
+  file: PresignedUrlRequest,
+  ctx: S3UploadContext
+): Promise<PresignedUrlResult> => {
+  const { s3Client, s3Bucket, cdnDomain, awsRegion, entityType, entityId } = ctx;
+  const s3Key = resolveS3Key(file, entityType, entityId);
+
+  const putCommand = new PutObjectCommand({
+    Bucket: s3Bucket,
+    Key: s3Key,
+    ContentType: file.contentType,
+    ContentLength: file.fileSize,
+    CacheControl: 'public, max-age=31536000, immutable',
+    Metadata: {
+      entityType,
+      entityId,
+      originalFileName: file.fileName,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
+  const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
+  const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
+
+  logger.debug('Generated presigned URL', {
+    s3Key,
+    cdnUrl,
+    s3DirectUrl,
+    uploadUrlHost: new URL(uploadUrl).hostname,
+    bucket: s3Bucket,
+    region: awsRegion,
+  });
+
+  return { uploadUrl, s3Key, cdnUrl };
+};
+
 /**
  * Server action to get presigned URLs for direct S3 upload
  * This allows clients to upload directly to S3, bypassing Next.js server body size limits
  */
 export const getPresignedUploadUrlsAction = async (
-  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: EntityType,
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {
@@ -172,26 +262,16 @@ export const getPresignedUploadUrlsAction = async (
       return { success: false, error: 'No files provided' };
     }
 
-    // Validate all files first
-    for (const file of files) {
-      const validation = validateFile(file.contentType, file.fileSize);
-      if (!validation.valid) {
-        logger.warn('File validation failed', {
-          fileName: file.fileName,
-          contentType: file.contentType,
-          fileSize: file.fileSize,
-          error: validation.error,
-        });
-        return { success: false, error: validation.error };
-      }
-    }
+    const validationError = validateAllFiles(files);
+    if (validationError) return validationError;
 
     const s3Client = getS3Client();
     const s3Bucket = getS3BucketName();
     const cdnDomainRaw = process.env.CDN_DOMAIN;
     // Strip any existing protocol from CDN domain to avoid double https://
     const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
-    const awsRegion = process.env.AWS_REGION || 'us-east-1';
+    const awsRegion = process.env.AWS_REGION ?? 'us-east-1';
+    const ctx: S3UploadContext = { s3Client, s3Bucket, cdnDomain, awsRegion, entityType, entityId };
 
     logger.operationStart(operation, {
       entityType,
@@ -202,57 +282,7 @@ export const getPresignedUploadUrlsAction = async (
 
     // Each file's presigned URL is independent; generate them concurrently.
     // Promise.all preserves input order in the returned results array.
-    const results: PresignedUrlResult[] = await Promise.all(
-      files.map(async (file) => {
-        // Security: validate existingS3Key belongs to the expected entity path
-        let s3Key: string;
-        if (file.existingS3Key) {
-          const expectedPrefix = `media/${entityType}/${entityId}/`;
-          if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {
-            throw new Error(`Invalid S3 key: must start with ${expectedPrefix}`);
-          }
-          s3Key = file.existingS3Key;
-        } else {
-          s3Key = generateS3Key(entityType, entityId, file.fileName);
-        }
-
-        const putCommand = new PutObjectCommand({
-          Bucket: s3Bucket,
-          Key: s3Key,
-          ContentType: file.contentType,
-          ContentLength: file.fileSize,
-          CacheControl: 'public, max-age=31536000, immutable',
-          Metadata: {
-            entityType,
-            entityId,
-            originalFileName: file.fileName,
-            uploadedAt: new Date().toISOString(),
-          },
-        });
-
-        // Generate presigned URL with 15 minute expiry
-        const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
-
-        // Construct the CDN URL
-        const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
-        const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
-
-        logger.debug('Generated presigned URL', {
-          s3Key,
-          cdnUrl,
-          s3DirectUrl,
-          uploadUrlHost: new URL(uploadUrl).hostname,
-          bucket: s3Bucket,
-          region: awsRegion,
-        });
-
-        return {
-          uploadUrl,
-          s3Key,
-          cdnUrl,
-        };
-      })
-    );
+    const results = await Promise.all(files.map((file) => buildPresignedUrlResult(file, ctx)));
 
     logger.operationComplete(operation, {
       entityType,

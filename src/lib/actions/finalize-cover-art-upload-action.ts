@@ -54,6 +54,99 @@ const isOrphan = (fileName: string, newExt: string): boolean => {
   return true;
 };
 
+interface S3DeleteOrphansResult {
+  deletedKeys: string[];
+  error?: string;
+}
+
+/**
+ * Lists all objects under `prefix`, identifies cross-extension orphans, and
+ * batch-deletes them. Returns the deleted keys or an error string on failure.
+ */
+const deleteOrphanFiles = async (
+  prefix: string,
+  newExt: string
+): Promise<S3DeleteOrphansResult> => {
+  const s3 = getS3Client();
+  const bucket = getS3BucketName();
+
+  let listed: _Object[] = [];
+  try {
+    let continuationToken: string | undefined;
+    do {
+      const response = await s3.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+      listed = listed.concat(response.Contents ?? []);
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown S3 list error';
+    return { deletedKeys: [], error: `S3 list failed: ${msg}` };
+  }
+
+  const orphans = listed
+    .map((o) => o.Key)
+    .filter((k): k is string => typeof k === 'string' && k.startsWith(prefix))
+    .filter((k) => isOrphan(k.substring(prefix.length), newExt));
+
+  if (orphans.length > 0) {
+    try {
+      // S3 DeleteObjects accepts up to 1000 keys per call. Cover-art prefixes
+      // hold a handful of files at most, so a single batch is safe.
+      await s3.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: orphans.map((Key) => ({ Key })), Quiet: true },
+        })
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown S3 delete error';
+      return { deletedKeys: [], error: `S3 delete failed: ${msg}` };
+    }
+  }
+
+  return { deletedKeys: orphans };
+};
+
+/**
+ * Issues a single wildcard CloudFront invalidation for the given prefix.
+ * Best-effort: logs and swallows errors so callers always succeed.
+ * Returns the invalidation ID, or undefined if skipped or on error.
+ */
+const invalidateCloudFront = async (
+  prefix: string,
+  entityType: string,
+  entityId: string
+): Promise<string | undefined> => {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (!distributionId) return undefined;
+
+  try {
+    const region = process.env.AWS_REGION ?? 'us-east-1';
+    const cf = new CloudFrontClient({ region });
+    const invalidationPath = `/${prefix}*`;
+    const result = await cf.send(
+      new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `cover-art-${entityType}-${entityId}-${Date.now()}`,
+          Paths: { Quantity: 1, Items: [invalidationPath] },
+        },
+      })
+    );
+    return result.Invalidation?.Id;
+  } catch (err) {
+    // Best-effort: cleanup already succeeded; cache will refresh on TTL.
+    loggers.s3.warn('[finalizeCoverArtUpload] CloudFront invalidation failed', { error: err });
+    return undefined;
+  }
+};
+
 /**
  * Run AFTER a successful cover-art upload + variant generation. Two jobs:
  *
@@ -100,74 +193,14 @@ export const finalizeCoverArtUploadAction = async (
   }
   const newExt = newExtMatch[0].toLowerCase();
 
-  const s3 = getS3Client();
-  const bucket = getS3BucketName();
-
-  let listed: _Object[] = [];
-  try {
-    let continuationToken: string | undefined;
-    do {
-      const response = await s3.send(
-        new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        })
-      );
-      listed = listed.concat(response.Contents ?? []);
-      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-    } while (continuationToken);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown S3 list error';
-    return { success: false, deletedKeys: [], error: `S3 list failed: ${msg}` };
+  // (a) Orphan detection + S3 delete
+  const s3Result = await deleteOrphanFiles(prefix, newExt);
+  if (s3Result.error !== undefined) {
+    return { success: false, deletedKeys: [], error: s3Result.error };
   }
 
-  const orphans = listed
-    .map((o) => o.Key)
-    .filter((k): k is string => typeof k === 'string' && k.startsWith(prefix))
-    .filter((k) => isOrphan(k.substring(prefix.length), newExt));
+  // (b) CloudFront invalidation (wildcard covers new cover + variants + deleted orphans)
+  const invalidationId = await invalidateCloudFront(prefix, entityType, entityId);
 
-  if (orphans.length > 0) {
-    try {
-      // S3 DeleteObjects accepts up to 1000 keys per call. Cover-art prefixes
-      // hold a handful of files at most, so a single batch is safe.
-      await s3.send(
-        new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: { Objects: orphans.map((Key) => ({ Key })), Quiet: true },
-        })
-      );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown S3 delete error';
-      return { success: false, deletedKeys: [], error: `S3 delete failed: ${msg}` };
-    }
-  }
-
-  // Wildcard invalidation covers (a) the freshly-overwritten new cover key,
-  // (b) every regenerated `_w{N}.{ext}` and `_w{N}.webp` variant, and
-  // (c) every just-deleted orphan — all in one billable path.
-  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
-  let invalidationId: string | undefined;
-  if (distributionId) {
-    try {
-      const region = process.env.AWS_REGION ?? 'us-east-1';
-      const cf = new CloudFrontClient({ region });
-      const invalidationPath = `/${prefix}*`;
-      const result = await cf.send(
-        new CreateInvalidationCommand({
-          DistributionId: distributionId,
-          InvalidationBatch: {
-            CallerReference: `cover-art-${entityType}-${entityId}-${Date.now()}`,
-            Paths: { Quantity: 1, Items: [invalidationPath] },
-          },
-        })
-      );
-      invalidationId = result.Invalidation?.Id;
-    } catch (err) {
-      // Best-effort: cleanup already succeeded; cache will refresh on TTL.
-      loggers.s3.warn('[finalizeCoverArtUpload] CloudFront invalidation failed', { error: err });
-    }
-  }
-
-  return { success: true, deletedKeys: orphans, invalidationId };
+  return { success: true, deletedKeys: s3Result.deletedKeys, invalidationId };
 };
