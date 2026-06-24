@@ -154,59 +154,73 @@ const SidebarProvider = ({
   );
 };
 
-const Sidebar = ({
-  side = 'left',
-  variant = 'sidebar',
-  collapsible = 'offcanvas',
+type SidebarSide = 'left' | 'right';
+type SidebarVariant = 'sidebar' | 'floating' | 'inset';
+type SidebarCollapsible = 'offcanvas' | 'icon' | 'none';
+
+type SidebarProps = React.ComponentProps<'div'> & {
+  side?: SidebarSide;
+  variant?: SidebarVariant;
+  collapsible?: SidebarCollapsible;
+};
+
+const SidebarNonCollapsible = ({ className, children, ...props }: React.ComponentProps<'div'>) => (
+  <div
+    data-slot="sidebar"
+    className={cn(
+      'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const SidebarMobile = ({
+  side,
+  children,
+  ...props
+}: React.ComponentProps<'div'> & { side: SidebarSide }) => {
+  const { openMobile, setOpenMobile } = useSidebar();
+
+  return (
+    <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <SheetContent
+        data-sidebar="sidebar"
+        data-slot="sidebar"
+        data-mobile="true"
+        className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+        style={
+          {
+            '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
+          } as React.CSSProperties
+        }
+        side={side}
+      >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Sidebar</SheetTitle>
+          <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+        </SheetHeader>
+        <div className="flex h-full w-full flex-col">{children}</div>
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+const SidebarDesktop = ({
+  side,
+  variant,
+  collapsible,
   className,
   children,
   ...props
 }: React.ComponentProps<'div'> & {
-  side?: 'left' | 'right';
-  variant?: 'sidebar' | 'floating' | 'inset';
-  collapsible?: 'offcanvas' | 'icon' | 'none';
+  side: SidebarSide;
+  variant: SidebarVariant;
+  collapsible: SidebarCollapsible;
 }) => {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
-
-  if (collapsible === 'none') {
-    return (
-      <div
-        data-slot="sidebar"
-        className={cn(
-          'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  if (isMobile) {
-    return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-          style={
-            {
-              '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
-    );
-  }
+  const { state } = useSidebar();
 
   return (
     <div
@@ -253,6 +267,45 @@ const Sidebar = ({
         </div>
       </div>
     </div>
+  );
+};
+
+const Sidebar = ({
+  side = 'left',
+  variant = 'sidebar',
+  collapsible = 'offcanvas',
+  className,
+  children,
+  ...props
+}: SidebarProps) => {
+  const { isMobile } = useSidebar();
+
+  if (collapsible === 'none') {
+    return (
+      <SidebarNonCollapsible className={className} {...props}>
+        {children}
+      </SidebarNonCollapsible>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <SidebarMobile side={side} {...props}>
+        {children}
+      </SidebarMobile>
+    );
+  }
+
+  return (
+    <SidebarDesktop
+      side={side}
+      variant={variant}
+      collapsible={collapsible}
+      className={className}
+      {...props}
+    >
+      {children}
+    </SidebarDesktop>
   );
 };
 

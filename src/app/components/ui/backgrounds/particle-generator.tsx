@@ -16,14 +16,27 @@ type ParticleCounts = {
   arc: number;
 };
 
-const ParticleGenerator = ({
-  width = 1000,
-  height = 2000,
-  bgColor = 'black',
-  bgOpacity = 1,
-  particleColor = 'white',
-  particleOpacity = 1,
-  particleCounts = {
+interface ParticleGeneratorProps {
+  width?: number;
+  height?: number;
+  bgColor?: string;
+  bgOpacity?: number;
+  particleColor?: string;
+  particleOpacity?: number;
+  particleCounts?: ParticleCounts;
+  brightnessRange?: number[];
+  scaleRange?: number[];
+  seed?: number;
+}
+
+const PARTICLE_GENERATOR_DEFAULTS: Required<ParticleGeneratorProps> = {
+  width: 1000,
+  height: 2000,
+  bgColor: 'black',
+  bgOpacity: 1,
+  particleColor: 'white',
+  particleOpacity: 1,
+  particleCounts: {
     dot: 4,
     diamond: 5,
     triangle: 2,
@@ -31,10 +44,24 @@ const ParticleGenerator = ({
     crescent: 3,
     arc: 3,
   },
-  brightnessRange = [0.1, 0.95],
-  scaleRange = [0.5, 2.0],
-  seed = 0,
-}) => {
+  brightnessRange: [0.1, 0.95],
+  scaleRange: [0.5, 2.0],
+  seed: 0,
+};
+
+const ParticleGenerator = (props: ParticleGeneratorProps) => {
+  const {
+    width,
+    height,
+    bgColor,
+    bgOpacity,
+    particleColor,
+    particleOpacity,
+    particleCounts,
+    brightnessRange,
+    scaleRange,
+    seed,
+  } = { ...PARTICLE_GENERATOR_DEFAULTS, ...props };
   // Particle shape definitions
   const particleShapes = {
     dot: <circle cx="0" cy="1.25" r="1.25" fill="inherit" />,

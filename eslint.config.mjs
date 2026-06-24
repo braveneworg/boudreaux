@@ -349,6 +349,17 @@ const eslintConfig = [
       'max-lines-per-function': 'off',
     },
   },
+  // Vendored shadcn/ui chart wrapper around Recharts. `ChartTooltipFormatter`
+  // mirrors Recharts' tooltip `formatter` contract, which Recharts invokes
+  // positionally as (value, name, item, index, payload) — five parameters fixed
+  // by the external API, not by choice. The signature can't be collapsed to an
+  // options object without breaking the contract, so scope `max-params` off here.
+  {
+    files: ['src/app/components/ui/chart.tsx'],
+    rules: {
+      'max-params': 'off',
+    },
+  },
   // Next.js App Router special files conventionally use named (often default-exported)
   // function declarations — keep them as-is and exempt them from the arrow-function rule.
   {

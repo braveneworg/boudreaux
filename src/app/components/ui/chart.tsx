@@ -115,6 +115,250 @@ type ChartTooltipPayloadItem = {
   payload?: Record<string, unknown> & { fill?: string };
 };
 
+type TooltipLabelValueOptions = {
+  config: ChartConfig;
+  item: ChartTooltipPayloadItem | undefined;
+  labelKey?: string;
+  label?: React.ReactNode;
+};
+
+// Derives the lookup key for a payload item, falling back through dataKey/name.
+const resolveItemKey = (
+  explicitKey: string | undefined,
+  item: ChartTooltipPayloadItem | undefined
+): string => `${explicitKey || item?.dataKey || item?.name || 'value'}`;
+
+// Resolves the rendered label value for a tooltip from config/payload/label.
+const getTooltipLabelValue = ({
+  config,
+  item,
+  labelKey,
+  label,
+}: TooltipLabelValueOptions): React.ReactNode => {
+  if (!labelKey && typeof label === 'string') {
+    return config[label as keyof typeof config]?.label || label;
+  }
+
+  const key = resolveItemKey(labelKey, item);
+  const itemConfig = getPayloadConfigFromPayload(config, item, key);
+
+  return itemConfig?.label;
+};
+
+type TooltipLabelOptions = {
+  hideLabel: boolean;
+  payload: ChartTooltipPayloadItem[] | undefined;
+  config: ChartConfig;
+  label?: React.ReactNode;
+  labelKey?: string;
+  labelClassName?: string;
+  labelFormatter?: (value: React.ReactNode, payload: ChartTooltipPayloadItem[]) => React.ReactNode;
+};
+
+// Renders the tooltip label node (or null) from the supplied options.
+const renderTooltipLabel = ({
+  hideLabel,
+  payload,
+  config,
+  label,
+  labelKey,
+  labelClassName,
+  labelFormatter,
+}: TooltipLabelOptions): React.ReactNode => {
+  if (hideLabel || !payload?.length) {
+    return null;
+  }
+
+  const [item] = payload;
+  const value = getTooltipLabelValue({ config, item, labelKey, label });
+
+  if (labelFormatter) {
+    return (
+      <div className={cn('font-medium', labelClassName)}>{labelFormatter(value, payload)}</div>
+    );
+  }
+
+  if (!value) {
+    return null;
+  }
+
+  return <div className={cn('font-medium', labelClassName)}>{value}</div>;
+};
+
+type ChartTooltipIndicatorKind = 'line' | 'dot' | 'dashed';
+
+type ChartTooltipFormatter = (
+  value: number | string | undefined,
+  name: number | string,
+  item: ChartTooltipPayloadItem,
+  index: number,
+  itemPayload: ChartTooltipPayloadItem['payload']
+) => React.ReactNode;
+
+type ChartTooltipIndicatorProps = {
+  itemConfig: ReturnType<typeof getPayloadConfigFromPayload>;
+  hideIndicator: boolean;
+  indicator: ChartTooltipIndicatorKind;
+  indicatorColor: string | undefined;
+  nestLabel: boolean;
+};
+
+// Renders the per-item colour indicator (icon, dot, line, or dashed marker).
+const ChartTooltipIndicator = ({
+  itemConfig,
+  hideIndicator,
+  indicator,
+  indicatorColor,
+  nestLabel,
+}: ChartTooltipIndicatorProps) => {
+  if (itemConfig?.icon) {
+    return <itemConfig.icon />;
+  }
+
+  if (hideIndicator) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn('shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)', {
+        'h-2.5 w-2.5': indicator === 'dot',
+        'w-1': indicator === 'line',
+        'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
+        'my-0.5': nestLabel && indicator === 'dashed',
+      })}
+      style={
+        {
+          '--color-bg': indicatorColor,
+          '--color-border': indicatorColor,
+        } as React.CSSProperties
+      }
+    />
+  );
+};
+
+// Renders the numeric/string value on the right of a tooltip row.
+const ChartTooltipItemValue = ({ value }: { value?: number | string }) => {
+  if (value === undefined) {
+    return null;
+  }
+
+  return (
+    <span className="text-foreground font-mono font-medium tabular-nums">
+      {typeof value === 'number' ? value.toLocaleString() : value}
+    </span>
+  );
+};
+
+type ChartTooltipItemBodyProps = {
+  item: ChartTooltipPayloadItem;
+  itemConfig: ReturnType<typeof getPayloadConfigFromPayload>;
+  indicator: ChartTooltipIndicatorKind;
+  hideIndicator: boolean;
+  indicatorColor: string | undefined;
+  nestLabel: boolean;
+  tooltipLabel: React.ReactNode;
+};
+
+// Default (non-formatter) body of a tooltip row: indicator + label + value.
+const ChartTooltipItemBody = ({
+  item,
+  itemConfig,
+  indicator,
+  hideIndicator,
+  indicatorColor,
+  nestLabel,
+  tooltipLabel,
+}: ChartTooltipItemBodyProps) => (
+  <>
+    <ChartTooltipIndicator
+      itemConfig={itemConfig}
+      hideIndicator={hideIndicator}
+      indicator={indicator}
+      indicatorColor={indicatorColor}
+      nestLabel={nestLabel}
+    />
+    <div
+      className={cn(
+        'flex flex-1 justify-between leading-none',
+        nestLabel ? 'items-end' : 'items-center'
+      )}
+    >
+      <div className="grid gap-1.5">
+        {nestLabel ? tooltipLabel : null}
+        <span className="text-zinc-950">{itemConfig?.label || item.name}</span>
+      </div>
+      <ChartTooltipItemValue value={item.value} />
+    </div>
+  </>
+);
+
+type ChartTooltipItemProps = {
+  item: ChartTooltipPayloadItem;
+  index: number;
+  config: ChartConfig;
+  color?: string;
+  indicator: ChartTooltipIndicatorKind;
+  hideIndicator: boolean;
+  nameKey?: string;
+  formatter?: ChartTooltipFormatter;
+  nestLabel: boolean;
+  tooltipLabel: React.ReactNode;
+};
+
+// Derives the tooltip row lookup key, preferring nameKey then the item's own fields.
+const resolveTooltipItemKey = (
+  nameKey: string | undefined,
+  item: ChartTooltipPayloadItem
+): string => `${nameKey || item.name || item.dataKey || 'value'}`;
+
+// Resolves the indicator colour for a tooltip row.
+const resolveIndicatorColor = (
+  color: string | undefined,
+  item: ChartTooltipPayloadItem
+): string | undefined => color || item.payload?.fill || item.color;
+
+// Renders a single row within the tooltip content.
+const ChartTooltipItem = ({
+  item,
+  index,
+  config,
+  color,
+  indicator,
+  hideIndicator,
+  nameKey,
+  formatter,
+  nestLabel,
+  tooltipLabel,
+}: ChartTooltipItemProps) => {
+  const key = resolveTooltipItemKey(nameKey, item);
+  const itemConfig = getPayloadConfigFromPayload(config, item, key);
+  const indicatorColor = resolveIndicatorColor(color, item);
+
+  return (
+    <div
+      className={cn(
+        'flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-zinc-950',
+        indicator === 'dot' && 'items-center'
+      )}
+    >
+      {formatter && item?.value !== undefined && item.name ? (
+        formatter(item.value, item.name, item, index, item.payload)
+      ) : (
+        <ChartTooltipItemBody
+          item={item}
+          itemConfig={itemConfig}
+          indicator={indicator}
+          hideIndicator={hideIndicator}
+          indicatorColor={indicatorColor}
+          nestLabel={nestLabel}
+          tooltipLabel={tooltipLabel}
+        />
+      )}
+    </div>
+  );
+};
+
 const ChartTooltipContent = ({
   active,
   payload,
@@ -135,47 +379,29 @@ const ChartTooltipContent = ({
   label?: React.ReactNode;
   labelClassName?: string;
   labelFormatter?: (value: React.ReactNode, payload: ChartTooltipPayloadItem[]) => React.ReactNode;
-  formatter?: (
-    value: number | string | undefined,
-    name: number | string,
-    item: ChartTooltipPayloadItem,
-    index: number,
-    itemPayload: ChartTooltipPayloadItem['payload']
-  ) => React.ReactNode;
+  formatter?: ChartTooltipFormatter;
   color?: string;
   hideLabel?: boolean;
   hideIndicator?: boolean;
-  indicator?: 'line' | 'dot' | 'dashed';
+  indicator?: ChartTooltipIndicatorKind;
   nameKey?: string;
   labelKey?: string;
 }) => {
   const { config } = useChart();
 
-  const tooltipLabel = React.useMemo(() => {
-    if (hideLabel || !payload?.length) {
-      return null;
-    }
-
-    const [item] = payload;
-    const key = `${labelKey || item?.dataKey || item?.name || 'value'}`;
-    const itemConfig = getPayloadConfigFromPayload(config, item, key);
-    const value =
-      !labelKey && typeof label === 'string'
-        ? config[label as keyof typeof config]?.label || label
-        : itemConfig?.label;
-
-    if (labelFormatter) {
-      return (
-        <div className={cn('font-medium', labelClassName)}>{labelFormatter(value, payload)}</div>
-      );
-    }
-
-    if (!value) {
-      return null;
-    }
-
-    return <div className={cn('font-medium', labelClassName)}>{value}</div>;
-  }, [label, labelFormatter, payload, hideLabel, labelClassName, config, labelKey]);
+  const tooltipLabel = React.useMemo(
+    () =>
+      renderTooltipLabel({
+        hideLabel,
+        payload,
+        config,
+        label,
+        labelKey,
+        labelClassName,
+        labelFormatter,
+      }),
+    [label, labelFormatter, payload, hideLabel, labelClassName, config, labelKey]
+  );
 
   if (!active || !payload?.length) {
     return null;
@@ -194,70 +420,21 @@ const ChartTooltipContent = ({
       <div className="grid gap-1.5">
         {payload
           .filter((item) => item.type !== 'none')
-          .map((item, index) => {
-            const key = `${nameKey || item.name || item.dataKey || 'value'}`;
-            const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload?.fill || item.color;
-
-            return (
-              <div
-                key={item.dataKey}
-                className={cn(
-                  'flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-zinc-950',
-                  indicator === 'dot' && 'items-center'
-                )}
-              >
-                {formatter && item?.value !== undefined && item.name ? (
-                  formatter(item.value, item.name, item, index, item.payload)
-                ) : (
-                  <>
-                    {itemConfig?.icon ? (
-                      <itemConfig.icon />
-                    ) : (
-                      !hideIndicator && (
-                        <div
-                          className={cn(
-                            'shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)',
-                            {
-                              'h-2.5 w-2.5': indicator === 'dot',
-                              'w-1': indicator === 'line',
-                              'w-0 border-[1.5px] border-dashed bg-transparent':
-                                indicator === 'dashed',
-                              'my-0.5': nestLabel && indicator === 'dashed',
-                            }
-                          )}
-                          style={
-                            {
-                              '--color-bg': indicatorColor,
-                              '--color-border': indicatorColor,
-                            } as React.CSSProperties
-                          }
-                        />
-                      )
-                    )}
-                    <div
-                      className={cn(
-                        'flex flex-1 justify-between leading-none',
-                        nestLabel ? 'items-end' : 'items-center'
-                      )}
-                    >
-                      <div className="grid gap-1.5">
-                        {nestLabel ? tooltipLabel : null}
-                        <span className="text-zinc-950">{itemConfig?.label || item.name}</span>
-                      </div>
-                      {item.value !== undefined && (
-                        <span className="text-foreground font-mono font-medium tabular-nums">
-                          {typeof item.value === 'number'
-                            ? item.value.toLocaleString()
-                            : item.value}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
+          .map((item, index) => (
+            <ChartTooltipItem
+              key={item.dataKey}
+              item={item}
+              index={index}
+              config={config}
+              color={color}
+              indicator={indicator}
+              hideIndicator={hideIndicator}
+              nameKey={nameKey}
+              formatter={formatter}
+              nestLabel={nestLabel}
+              tooltipLabel={tooltipLabel}
+            />
+          ))}
       </div>
     </div>
   );
@@ -330,6 +507,16 @@ const ChartLegendContent = ({
   );
 };
 
+// Reads a string-valued property `key` from an object, returning undefined when
+// the property is absent or not a string.
+const readStringProp = (source: object, key: string): string | undefined => {
+  if (key in source && typeof source[key as keyof typeof source] === 'string') {
+    return source[key as keyof typeof source] as string;
+  }
+
+  return undefined;
+};
+
 // Helper to extract item config from a payload.
 const getPayloadConfigFromPayload = (config: ChartConfig, payload: unknown, key: string) => {
   if (typeof payload !== 'object' || payload === null) {
@@ -341,17 +528,10 @@ const getPayloadConfigFromPayload = (config: ChartConfig, payload: unknown, key:
       ? payload.payload
       : undefined;
 
-  let configLabelKey: string = key;
-
-  if (key in payload && typeof payload[key as keyof typeof payload] === 'string') {
-    configLabelKey = payload[key as keyof typeof payload] as string;
-  } else if (
-    payloadPayload &&
-    key in payloadPayload &&
-    typeof payloadPayload[key as keyof typeof payloadPayload] === 'string'
-  ) {
-    configLabelKey = payloadPayload[key as keyof typeof payloadPayload] as string;
-  }
+  const configLabelKey =
+    readStringProp(payload, key) ??
+    (payloadPayload ? readStringProp(payloadPayload, key) : undefined) ??
+    key;
 
   return configLabelKey in config
     ? new Map(Object.entries(config)).get(configLabelKey)

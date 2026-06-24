@@ -83,24 +83,37 @@ const createCenteredCrop = (mediaWidth: number, mediaHeight: number, aspect: num
 };
 
 /**
- * Creates a cropped image from canvas
- * @param imageSrc - The source image URL
- * @param pixelCrop - The crop area in pixels (relative to displayed image)
- * @param targetWidth - The target output width
- * @param targetHeight - The target output height
- * @param scaleX - Scale factor from displayed to natural width
- * @param scaleY - Scale factor from displayed to natural height
- * @param backgroundColor - Optional background color
+ * Options for {@link createCroppedImage}.
  */
-const createCroppedImage = async (
-  imageSrc: string,
-  pixelCrop: PixelCrop,
-  targetWidth: number,
-  targetHeight: number,
-  scaleX: number,
-  scaleY: number,
-  backgroundColor?: string
-): Promise<Blob> => {
+interface CreateCroppedImageOptions {
+  /** The source image URL */
+  imageSrc: string;
+  /** The crop area in pixels (relative to displayed image) */
+  pixelCrop: PixelCrop;
+  /** The target output width */
+  targetWidth: number;
+  /** The target output height */
+  targetHeight: number;
+  /** Scale factor from displayed to natural width */
+  scaleX: number;
+  /** Scale factor from displayed to natural height */
+  scaleY: number;
+  /** Optional background color */
+  backgroundColor?: string;
+}
+
+/**
+ * Creates a cropped image from canvas
+ */
+const createCroppedImage = async ({
+  imageSrc,
+  pixelCrop,
+  targetWidth,
+  targetHeight,
+  scaleX,
+  scaleY,
+  backgroundColor,
+}: CreateCroppedImageOptions): Promise<Blob> => {
   const image = new Image();
   image.crossOrigin = 'anonymous';
 
@@ -223,15 +236,15 @@ export const ImageCropper = ({
 
     setIsProcessing(true);
     try {
-      const blob = await createCroppedImage(
+      const blob = await createCroppedImage({
         imageSrc,
-        completedCrop,
-        BANNER_WIDTH,
-        BANNER_HEIGHT,
+        pixelCrop: completedCrop,
+        targetWidth: BANNER_WIDTH,
+        targetHeight: BANNER_HEIGHT,
         scaleX,
         scaleY,
-        useBackgroundColor ? backgroundColor : undefined
-      );
+        backgroundColor: useBackgroundColor ? backgroundColor : undefined,
+      });
 
       // Convert PixelCrop to Area for compatibility (using natural coordinates)
       const croppedAreaPixels: Area = {

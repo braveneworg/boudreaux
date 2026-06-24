@@ -43,18 +43,33 @@ export interface HamburgerPattyProps {
   opacityClosed?: number;
 }
 
-export const HamburgerPatty = ({
-  isOpen = false,
-  rotateOpen = 45,
-  rotateClosed = 0,
-  yOffset = -8,
-  width = 'w-5',
-  height = 'h-0.5',
-  bgColor = 'bg-white',
-  duration = 0.5,
-  opacityOpen = 1,
-  opacityClosed = 1,
-}: HamburgerPattyProps) => {
+const HAMBURGER_PATTY_DEFAULTS: Required<HamburgerPattyProps> = {
+  isOpen: false,
+  rotateOpen: 45,
+  rotateClosed: 0,
+  yOffset: -8,
+  width: 'w-5',
+  height: 'h-0.5',
+  bgColor: 'bg-white',
+  duration: 0.5,
+  opacityOpen: 1,
+  opacityClosed: 1,
+};
+
+export const HamburgerPatty = (props: HamburgerPattyProps) => {
+  const {
+    isOpen,
+    rotateOpen,
+    rotateClosed,
+    yOffset,
+    width,
+    height,
+    bgColor,
+    duration,
+    opacityOpen,
+    opacityClosed,
+  } = { ...HAMBURGER_PATTY_DEFAULTS, ...props };
+
   const rotate = isOpen ? rotateOpen : rotateClosed;
   const y = isOpen ? 0 : yOffset;
   const opacity = isOpen ? opacityOpen : opacityClosed;

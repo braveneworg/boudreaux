@@ -15,19 +15,52 @@ interface MessageSpinnerProps {
   variant?: SpinnerVariant;
 }
 
+/** Size-variant Tailwind class groups for the spinner layout. */
+interface MessageSpinnerSizeClasses {
+  gapClass: string;
+  textClass: string;
+  containerSize: string;
+  spinnerContainerSize: string;
+}
+
+const SMALL_SPINNER_SIZE_CLASSES: MessageSpinnerSizeClasses = {
+  gapClass: 'gap-2',
+  textClass: 'text-sm',
+  containerSize: 'size-8 leading-8',
+  spinnerContainerSize: 'h-8 w-full relative -left-4',
+};
+
+const MESSAGE_SPINNER_SIZE_CLASSES = new Map<SpinnerSize, MessageSpinnerSizeClasses>([
+  ['sm', SMALL_SPINNER_SIZE_CLASSES],
+  [
+    'md',
+    {
+      gapClass: 'gap-4',
+      textClass: 'text-lg',
+      containerSize: 'h-8 w-8',
+      spinnerContainerSize: 'h-3 w-full relative -left-4',
+    },
+  ],
+  [
+    'lg',
+    {
+      gapClass: 'gap-6',
+      textClass: 'text-2xl',
+      containerSize: 'h-10 w-10',
+      spinnerContainerSize: 'h-3 w-full relative -left-4',
+    },
+  ],
+]);
+
 export const MessageSpinner = ({
   title = 'Loading...',
   size = 'sm',
   variant = 'default',
   className,
 }: Readonly<MessageSpinnerProps>) => {
-  // Size-variant gap and text classes
-  const gapClass = size === 'sm' ? 'gap-2' : size === 'md' ? 'gap-4' : 'gap-6';
-  const textClass = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-lg' : 'text-2xl';
-  const containerSize =
-    size === 'sm' ? 'size-8 leading-8' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
-  const spinnerContainerSize =
-    size === 'sm' ? 'h-8 w-full relative -left-4' : 'h-3 w-full relative -left-4';
+  // Size-variant gap, text, and container classes
+  const { gapClass, textClass, containerSize, spinnerContainerSize } =
+    MESSAGE_SPINNER_SIZE_CLASSES.get(size) ?? SMALL_SPINNER_SIZE_CLASSES;
 
   return (
     <div
