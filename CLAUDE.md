@@ -90,6 +90,7 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Arrow functions over `function`** — declare functions and callbacks as arrow expressions (`const foo = () => …`), not `function` declarations or named function expressions. Enforced by `prefer-arrow-functions` (auto-fixed by `pnpm run lint`). Exempted in config: Next.js App Router special files (`page`/`layout`/`loading`/`error`/`global-error`/`not-found`/`template`/`default`/`route`/`middleware`/`instrumentation`/`manifest`/`sitemap`/`robots`/`opengraph-image`/`icon`). Where a `function` is genuinely required, refactor instead of suppressing: `new`-constructed things (incl. constructor mocks) → a `class`; code needing its own `this`/`arguments`/`new.target` → restructure to avoid it.
 - **Named exports only** — except App Router files that require a default export: `page`, `layout`, `loading`, `error`, `not-found`, `template`, `default`, `route`, `middleware`.
 - **Never suppress lint/type errors** — no `eslint-disable` (inline, block, or file-level) and no `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck`, for any rule. A lint/type error means the code is wrong for the rule: fix the code (preferred), or — only when a rule is genuinely inapplicable to a context — scope it in `eslint.config.mjs` (e.g. a `files`-scoped setting). No deprecated syntax. JSDoc only for genuinely complex functions.
+- **Prefer destructuring objects whenever possible,** including function parameters.
 
 ## Components, forms, styling
 
