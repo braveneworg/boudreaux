@@ -5,8 +5,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import Image from 'next/image';
-
 import { flushSync } from 'react-dom';
 
 import {
@@ -14,12 +12,15 @@ import {
   BANNER_CDN_PATH,
   DEFAULT_ROTATION_INTERVAL,
 } from '@/lib/constants/banner-slots';
-import { cn } from '@/lib/utils';
-import { isDarkColor } from '@/lib/utils/color';
 import {
   addLinkAttributes,
   sanitizeNotificationHtml,
 } from '@/lib/validation/banner-notification-schema';
+
+import { BannerCarouselDots } from './banner-carousel-dots';
+import { BannerCarouselStrip } from './banner-carousel-strip';
+import { BannerCarouselTrack } from './banner-carousel-track';
+import { useBannerCarouselDrag } from './use-banner-carousel-drag';
 
 export interface BannerSlotData {
   slotNumber: number;
@@ -46,10 +47,74 @@ export const buildBannerSrc = (filename: string, width?: number): string => {
   return `${base.substring(0, lastDot)}_w${width}${base.substring(lastDot)}`;
 };
 
-const SWIPE_THRESHOLD = 50;
-const VELOCITY_THRESHOLD = 500;
 const TRANSITION_DURATION = 400; // ms — matches CSS transition
 const EASING = 'cubic-bezier(0.42, 0, 0.58, 1)'; // ease-in-out
+
+type BannerNotification = BannerSlotData['notification'];
+
+interface StripContent {
+  isTransitioning: boolean;
+  outgoingNotification: BannerNotification;
+  activeNotification: BannerNotification;
+  stripVisible: boolean;
+  outgoingHtml: string | null;
+  activeHtml: string | null;
+}
+
+interface StripContentInput {
+  banners: BannerSlotData[];
+  sanitizedHtmlByIndex: Array<string | null>;
+  currentIndex: number;
+  incomingIndex: number | null;
+  isTabVisible: boolean;
+}
+
+interface StripFrame<T> {
+  outgoing: T | null;
+  active: T | null;
+}
+
+/**
+ * Pick the outgoing (current) and active values from an indexable source. During
+ * a transition the active value is the incoming slide's; otherwise it stays the
+ * current one — the same select used for both notifications and their HTML.
+ */
+const pickFrame = <T,>(
+  source: Array<T | null>,
+  currentIndex: number,
+  incomingIndex: number | null
+): StripFrame<T> => {
+  const outgoing = source.at(currentIndex) ?? null;
+  const active = incomingIndex === null ? outgoing : (source.at(incomingIndex) ?? null);
+  return { outgoing, active };
+};
+
+/**
+ * Derive the notification strip's content for the current frame: which strip is
+ * showing (and which is sliding out), its pre-sanitized HTML, and whether the
+ * strip should be visible. Kept at module scope so the component stays under the
+ * cyclomatic-complexity ceiling. Mirrors the prior inline derivation exactly.
+ */
+const deriveStripContent = ({
+  banners,
+  sanitizedHtmlByIndex,
+  currentIndex,
+  incomingIndex,
+  isTabVisible,
+}: StripContentInput): StripContent => {
+  const notifications = banners.map((banner) => banner.notification);
+  const notification = pickFrame(notifications, currentIndex, incomingIndex);
+  const html = pickFrame(sanitizedHtmlByIndex, currentIndex, incomingIndex);
+
+  return {
+    isTransitioning: incomingIndex !== null,
+    outgoingNotification: notification.outgoing,
+    activeNotification: notification.active,
+    stripVisible: notification.active !== null && isTabVisible,
+    outgoingHtml: html.outgoing,
+    activeHtml: html.active,
+  };
+};
 
 /**
  * BannerCarousel displays rotating banner images with optional notification
@@ -74,12 +139,6 @@ export const BannerCarousel = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const totalSlides = banners.length;
-
-  // Pointer tracking refs for drag/swipe
-  const pointerStartXRef = useRef(0);
-  const pointerStartTimeRef = useRef(0);
-  const isDraggingRef = useRef(false);
-  const currentDragXRef = useRef(0);
 
   /** Run `fn` with the track element when it is mounted. */
   const withTrack = useCallback((fn: (track: HTMLDivElement) => void) => {
@@ -196,15 +255,6 @@ export const BannerCarousel = ({
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // Derive outgoing and incoming notification strips for seamless crossfade
-  const isTransitioning = incomingIndex !== null;
-  const outgoingNotification = banners.at(currentIndex)?.notification ?? null;
-  const incomingNotification =
-    incomingIndex !== null ? (banners.at(incomingIndex)?.notification ?? null) : null;
-  // Show the strip container when either the static notification or incoming notification exists
-  const activeNotification = isTransitioning ? incomingNotification : outgoingNotification;
-  const stripVisible = activeNotification !== null && isTabVisible;
-
   // Sanitize each notification once per banners payload rather than on every
   // rotation tick — the regex chain is pure string work on unchanging input.
   // (Content is already sanitized server-side at the read boundary; this
@@ -218,11 +268,22 @@ export const BannerCarousel = ({
       ),
     [banners]
   );
-  const outgoingHtml = sanitizedHtmlByIndex.at(currentIndex) ?? null;
-  const activeHtml =
-    isTransitioning && incomingIndex !== null
-      ? (sanitizedHtmlByIndex.at(incomingIndex) ?? null)
-      : outgoingHtml;
+
+  // Derive outgoing and incoming notification strips for seamless crossfade.
+  const {
+    isTransitioning,
+    outgoingNotification,
+    activeNotification,
+    stripVisible,
+    outgoingHtml,
+    activeHtml,
+  } = deriveStripContent({
+    banners,
+    sanitizedHtmlByIndex,
+    currentIndex,
+    incomingIndex,
+    isTabVisible,
+  });
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
@@ -240,75 +301,17 @@ export const BannerCarousel = ({
     [goToNext, goToPrevious, resetTimer]
   );
 
-  // Pointer-based drag/swipe handlers
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (isAnimatingRef.current || totalSlides <= 1) return;
-      isDraggingRef.current = true;
-      pointerStartXRef.current = e.clientX;
-      pointerStartTimeRef.current = Date.now();
-      currentDragXRef.current = 0;
-
-      withTrack((track) => {
-        track.style.transition = 'none';
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      });
-    },
-    [totalSlides, withTrack]
-  );
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      const deltaX = e.clientX - pointerStartXRef.current;
-      // Apply elastic resistance (10% of drag distance beyond edge)
-      const width = measureWidth(1);
-      const elasticDelta =
-        Math.abs(deltaX) > width * 0.5
-          ? Math.sign(deltaX) * (width * 0.5 + (Math.abs(deltaX) - width * 0.5) * 0.1)
-          : deltaX;
-      currentDragXRef.current = elasticDelta;
-
-      withTrack((track) => {
-        track.style.transform = `translateX(${elasticDelta}px)`;
-      });
-    },
-    [measureWidth, withTrack]
-  );
-
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      isDraggingRef.current = false;
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-
-      if (isAnimatingRef.current) return;
-
-      const deltaX = currentDragXRef.current;
-      const elapsed = Date.now() - pointerStartTimeRef.current;
-      const velocity = elapsed > 0 ? (deltaX / elapsed) * 1000 : 0;
-      const width = measureWidth(0);
-
-      if (deltaX < -SWIPE_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
-        isAnimatingRef.current = true;
-        const next = (currentIndexRef.current + 1) % totalSlides;
-        setIncomingIndex(next);
-        animateTrack(-width, () => completeTransition(next));
-      } else if (deltaX > SWIPE_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
-        isAnimatingRef.current = true;
-        const prev = (currentIndexRef.current - 1 + totalSlides) % totalSlides;
-        setIncomingIndex(prev);
-        animateTrack(width, () => completeTransition(prev));
-      } else {
-        // Snap back to center
-        animateTrack(0, () => {
-          isAnimatingRef.current = false;
-        });
-      }
-      resetTimer();
-    },
-    [totalSlides, measureWidth, animateTrack, completeTransition, resetTimer]
-  );
+  const { handlePointerDown, handlePointerMove, handlePointerUp } = useBannerCarouselDrag({
+    totalSlides,
+    isAnimatingRef,
+    currentIndexRef,
+    measureWidth,
+    withTrack,
+    animateTrack,
+    completeTransition,
+    setIncomingIndex,
+    resetTimer,
+  });
 
   /** Navigate to a specific dot — animate if adjacent, instant jump otherwise */
   const goToIndex = useCallback(
@@ -365,167 +368,40 @@ export const BannerCarousel = ({
       // itself a tab stop — mirrors the shadcn Carousel pattern in ui/carousel.tsx.
       onKeyDownCapture={handleKeyDown}
     >
-      {/* Notification strip — always reserves 2.5rem to prevent CLS */}
-      <div
-        className="relative w-full overflow-hidden"
-        style={{
-          minHeight: '2.5rem',
-          opacity: stripVisible ? 1 : 0,
-          transition: `opacity 300ms ${EASING}`,
-        }}
-      >
-        {/* Outgoing strip — slides out to the right during transitions */}
-        {isTransitioning && outgoingNotification && (
-          <div
-            key={`strip-out-${currentIndex}`}
-            className={cn(
-              'banner-strip-slide absolute inset-0 w-full px-4 py-2 text-center text-sm',
-              isDarkColor(outgoingNotification.backgroundColor)
-                ? 'banner-strip-dark'
-                : 'banner-strip-light'
-            )}
-            style={{
-              color: outgoingNotification.textColor ?? undefined,
-              backgroundColor: outgoingNotification.backgroundColor ?? 'transparent',
-              animation: `banner-strip-exit-right ${TRANSITION_DURATION}ms ${EASING} forwards`,
-            }}
-            dangerouslySetInnerHTML={{
-              __html: outgoingHtml ?? '',
-            }}
-          />
-        )}
-        {/* Incoming strip — slides in from the left; static strip when not transitioning */}
-        {activeNotification && (
-          <div
-            key={`strip-${isTransitioning ? `in-${incomingIndex}` : currentIndex}`}
-            className={cn(
-              'banner-strip-slide w-full px-4 py-2 text-center text-sm',
-              isDarkColor(activeNotification.backgroundColor)
-                ? 'banner-strip-dark'
-                : 'banner-strip-light'
-            )}
-            style={{
-              color: activeNotification.textColor ?? undefined,
-              backgroundColor: activeNotification.backgroundColor ?? 'transparent',
-              ...(isTransitioning
-                ? {
-                    animation: `banner-strip-slide-right ${TRANSITION_DURATION}ms ${EASING}`,
-                  }
-                : {}),
-            }}
-            dangerouslySetInnerHTML={{
-              __html: activeHtml ?? '',
-            }}
-          />
-        )}
-      </div>
+      <BannerCarouselStrip
+        active={activeNotification}
+        outgoing={outgoingNotification}
+        activeHtml={activeHtml}
+        outgoingHtml={outgoingHtml}
+        isTransitioning={isTransitioning}
+        visible={stripVisible}
+        transitionDurationMs={TRANSITION_DURATION}
+        easing={EASING}
+        activeKey={`strip-${isTransitioning ? `in-${incomingIndex}` : currentIndex}`}
+        outgoingKey={`strip-out-${currentIndex}`}
+      />
 
-      {/* Banner image track */}
-      <div
-        ref={containerRef}
-        className="relative w-full overflow-hidden"
-        style={{ paddingBottom: BANNER_ASPECT_PADDING }}
-      >
-        <div
-          ref={trackRef}
-          className="absolute inset-0 touch-pan-y"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          role="group"
-          aria-roledescription="slide"
-          aria-label={`Banner ${currentIndex + 1} of ${totalSlides}`}
-        >
-          {banners.map((banner, idx) => {
-            const isCurrentSlide = idx === currentIndex;
-            const isPrevSlide = idx === prevIndex;
-            const isNextSlide = idx === nextIndex;
-            const isVisible = isCurrentSlide || (totalSlides > 1 && (isPrevSlide || isNextSlide));
-            // Mount the current and any adjacent (or incoming) slide eagerly.
-            // Browser still respects fetchPriority/loading hints below, so the
-            // LCP image wins the priority queue while the rest stream in.
-            const isIncoming = idx === incomingIndex;
-            const shouldRenderImage = isCurrentSlide || isIncoming || isVisible;
-
-            return (
-              <div
-                key={banner.slotNumber}
-                className="pointer-events-none absolute inset-0 select-none"
-                style={{
-                  transform: isPrevSlide
-                    ? 'translateX(-100%)'
-                    : isNextSlide
-                      ? 'translateX(100%)'
-                      : isCurrentSlide
-                        ? 'translateX(0)'
-                        : 'translateX(-200%)',
-                  visibility: isVisible ? 'visible' : 'hidden',
-                }}
-              >
-                {shouldRenderImage && (
-                  // No `priority` here. `priority` makes `next/image` emit an
-                  // unconditional `<link rel=preload>` that the browser also
-                  // honors on desktop — where this carousel is `md:hidden` and
-                  // the `BannerStrip` is shown instead — producing Chrome's
-                  // "preloaded but not used" warning. The mobile LCP preload
-                  // (still REQUIRED: HomeContent hydrates from a client query
-                  // cache, so without a server-rendered preload the banner isn't
-                  // discovered until hydration, pushing LCP to ~9s) is instead
-                  // emitted from `app/page.tsx` as a media-scoped
-                  // `<link rel=preload media="(max-width: 767.98px)">`, so only
-                  // viewports that actually render this carousel fetch it.
-                  // `loading="eager"` + high `fetchPriority` on the current slide
-                  // keep it first in the request queue once it does render.
-                  <Image
-                    src={buildBannerSrc(banner.imageFilename)}
-                    alt={`Banner ${banner.slotNumber}`}
-                    fill
-                    // The carousel is full-bleed below `xl` but its `<main>`
-                    // ancestor caps width at `max-w-7xl` (1280px) from the `xl`
-                    // breakpoint up, so above 1280px the banner never fills the
-                    // viewport. Match `sizes` to that layout so the browser picks
-                    // the 1280px variant instead of a needlessly large
-                    // full-viewport one on wide screens.
-                    sizes="(min-width: 1280px) 1280px, 100vw"
-                    fetchPriority={isCurrentSlide ? 'high' : 'low'}
-                    loading={isCurrentSlide ? 'eager' : 'lazy'}
-                    className="object-cover"
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <BannerCarouselTrack
+        banners={banners}
+        currentIndex={currentIndex}
+        prevIndex={prevIndex}
+        nextIndex={nextIndex}
+        incomingIndex={incomingIndex}
+        totalSlides={totalSlides}
+        containerRef={containerRef}
+        trackRef={trackRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      />
 
       {/* Screen-reader live region for slide announcements */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {`Showing banner ${currentIndex + 1} of ${totalSlides}`}
       </div>
 
-      {/* Dot indicators */}
       {totalSlides > 1 && (
-        <div className="flex justify-center gap-2 py-2" role="tablist" aria-label="Banner slides">
-          {banners.map((banner, idx) => (
-            <button
-              key={banner.slotNumber}
-              type="button"
-              role="tab"
-              aria-selected={idx === currentIndex}
-              aria-label={`Go to banner ${idx + 1}`}
-              className="flex h-11 w-11 items-center justify-center p-0"
-              onClick={() => goToIndex(idx)}
-            >
-              <span
-                className={cn(
-                  'h-2.5 w-2.5 rounded-full transition-colors',
-                  idx === currentIndex ? 'bg-foreground' : 'bg-foreground/30'
-                )}
-              />
-            </button>
-          ))}
-        </div>
+        <BannerCarouselDots banners={banners} currentIndex={currentIndex} onSelect={goToIndex} />
       )}
     </section>
   );
