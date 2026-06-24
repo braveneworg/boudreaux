@@ -20,6 +20,50 @@ import type { LookupAddress, LookupOptions } from 'node:dns';
 // any legitimate album artwork.
 const MAX_PROXY_BODY_BYTES = 20 * 1024 * 1024;
 
+// Returns true when `b` falls within `[lo, hi]` inclusive (second-octet range checks).
+const inRange = (b: number, lo: number, hi: number): boolean => b >= lo && b <= hi;
+
+// Returns true when the second octet makes (a, b) land in a private /16 or /12 block.
+const isPrivateSecondOctet = (a: number, b: number): boolean => {
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && inRange(b, 16, 31)) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && inRange(b, 64, 127)) return true;
+  return false;
+};
+
+// Checks private/reserved IPv4 ranges for SSRF protection.
+// 0.0.0.0/8, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, 100.64/10 (CGNAT), 224/4+
+const isDisallowedIPv4 = (address: string): boolean => {
+  const parts = address.split('.').map((octet) => Number.parseInt(octet, 10));
+  /* v8 ignore start -- defensive: isIP() already guarantees version 4 means exactly four numeric octets, so this guard is unreachable */
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
+  /* v8 ignore stop */
+  const [a, b] = parts;
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return true;
+  return isPrivateSecondOctet(a, b);
+};
+
+// Checks private/reserved IPv6 ranges for SSRF protection.
+// loopback, unspecified, link-local (fe80::/10), unique-local (fc00::/7), IPv4-mapped private
+const isDisallowedIPv6 = (lower: string): boolean => {
+  if (lower === '::1' || lower === '::') return true;
+  if (
+    lower.startsWith('fe8') ||
+    lower.startsWith('fe9') ||
+    lower.startsWith('fea') ||
+    lower.startsWith('feb')
+  ) {
+    return true;
+  }
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+  if (lower.startsWith('::ffff:')) {
+    // IPv4-mapped — check the tail with the IPv4 rules.
+    return isDisallowedAddress(lower.slice('::ffff:'.length));
+  }
+  return false;
+};
+
 /**
  * Returns true for IPv4/IPv6 addresses in loopback, link-local, private, or
  * the AWS/GCP instance-metadata ranges. We block these before issuing the
@@ -27,42 +71,163 @@ const MAX_PROXY_BODY_BYTES = 20 * 1024 * 1024;
  */
 function isDisallowedAddress(address: string): boolean {
   const version = isIP(address);
-  if (version === 4) {
-    const parts = address.split('.').map((octet) => Number.parseInt(octet, 10));
-    /* v8 ignore start -- defensive: isIP() already guarantees version 4 means exactly four numeric octets, so this guard is unreachable */
-    if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
-    /* v8 ignore stop */
-    const [a, b] = parts;
-    // 0.0.0.0/8, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, 100.64/10 (CGNAT), 224/4+
-    if (a === 0 || a === 10 || a === 127) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
-    if (a >= 224) return true;
-    return false;
-  }
-  if (version === 6) {
-    const lower = address.toLowerCase();
-    // loopback, unspecified, link-local (fe80::/10), unique-local (fc00::/7), IPv4-mapped private
-    if (lower === '::1' || lower === '::') return true;
-    if (
-      lower.startsWith('fe8') ||
-      lower.startsWith('fe9') ||
-      lower.startsWith('fea') ||
-      lower.startsWith('feb')
-    ) {
-      return true;
-    }
-    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
-    if (lower.startsWith('::ffff:')) {
-      // IPv4-mapped — check the tail with the IPv4 rules.
-      return isDisallowedAddress(lower.slice('::ffff:'.length));
-    }
-    return false;
-  }
+  if (version === 4) return isDisallowedIPv4(address);
+  if (version === 6) return isDisallowedIPv6(address.toLowerCase());
   return true;
 }
+
+// Allowlist of hostnames. Exact match, or "<sub>.<allowed>" suffix match.
+// S3 is included because image cropper uses S3-hosted originals, but the
+// SSRF-via-redirect + DNS IP checks below still apply.
+const buildAllowedDomains = (): Set<string> => {
+  const domains = new Set<string>([
+    'cdn.fakefourrecords.com',
+    's3.amazonaws.com',
+    's3.us-east-1.amazonaws.com',
+    's3.us-west-2.amazonaws.com',
+    'fakefourrecords.com',
+  ]);
+  const cdnDomain = process.env.CDN_DOMAIN;
+  if (cdnDomain) {
+    try {
+      domains.add(new URL(cdnDomain).hostname);
+    } catch {
+      // Ignore malformed CDN_DOMAIN
+    }
+  }
+  return domains;
+};
+
+type VettedAddress = { address: string; family: number };
+
+/**
+ * Resolves `hostname` via DNS and validates the result against the SSRF
+ * blocklist. Returns the vetted address on success, or a NextResponse error
+ * (403/502) that the caller should return immediately.
+ */
+const resolveAndVetAddress = async (hostname: string): Promise<VettedAddress | NextResponse> => {
+  try {
+    const { address, family } = await lookup(hostname);
+    if (isDisallowedAddress(address)) {
+      loggers.s3.warn('[proxy-image] Blocked request resolving to disallowed IP', { address });
+      return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
+    }
+    return { address, family };
+  } catch (error) {
+    loggers.s3.error('[proxy-image] DNS lookup failed', error);
+    return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
+  }
+};
+
+/**
+ * Builds an undici Agent whose DNS lookup is pinned to the already-validated
+ * address/family pair, closing the DNS-rebinding window that node's global
+ * fetch would otherwise leave open between validation and socket connect.
+ * TLS SNI still uses the original hostname so certificate validation is
+ * unaffected. (M2)
+ */
+const buildPinnedDispatcher = (vettedAddress: string, vettedFamily: number): Agent => {
+  const pinnedLookup = (
+    _hostname: string,
+    options: LookupOptions,
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | LookupAddress[],
+      family?: number
+    ) => void
+  ): void => {
+    if (options.all) {
+      callback(null, [{ address: vettedAddress, family: vettedFamily }]);
+    } else {
+      callback(null, vettedAddress, vettedFamily);
+    }
+  };
+  return new Agent({ connect: { lookup: pinnedLookup } });
+};
+
+/**
+ * Validates the upstream Response for redirect, status, content-type, and
+ * content-length. Returns a NextResponse error on failure, or the resolved
+ * contentType string on success.
+ */
+const validateUpstreamResponse = (response: Response): NextResponse | string => {
+  if (response.status >= 300 && response.status < 400) {
+    return NextResponse.json({ error: 'Upstream redirect rejected' }, { status: 502 });
+  }
+  if (!response.ok) {
+    return NextResponse.json(
+      { error: `Failed to fetch image: ${response.statusText}` },
+      { status: response.status }
+    );
+  }
+  const contentType = response.headers.get('content-type') ?? 'image/jpeg';
+  if (!contentType.startsWith('image/')) {
+    return NextResponse.json({ error: 'Upstream is not an image' }, { status: 415 });
+  }
+  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+  if (Number.isFinite(contentLength) && contentLength > MAX_PROXY_BODY_BYTES) {
+    return NextResponse.json({ error: 'Image too large' }, { status: 413 });
+  }
+  return contentType;
+};
+
+/**
+ * Streams a Response body into a capped Buffer. Returns a NextResponse error
+ * if the body is absent or exceeds MAX_PROXY_BODY_BYTES; otherwise returns
+ * the accumulated Buffer.
+ */
+const streamToBuffer = async (
+  body: Response['body']
+): Promise<Buffer<ArrayBuffer> | NextResponse> => {
+  const reader = body?.getReader();
+  if (!reader) {
+    return NextResponse.json({ error: 'Empty upstream body' }, { status: 502 });
+  }
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    received += value.byteLength;
+    if (received > MAX_PROXY_BODY_BYTES) {
+      await reader.cancel();
+      return NextResponse.json({ error: 'Image too large' }, { status: 413 });
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, received);
+};
+
+/**
+ * Issues the DNS-pinned fetch, validates the response (redirect, content-type,
+ * size), streams the body into a capped buffer, and returns a NextResponse.
+ * `redirect: 'manual'` prevents follow-on requests to attacker-controlled
+ * Location headers (e.g. 302 → 169.254.169.254).
+ */
+const fetchAndBuffer = async (url: string, dispatcher: Agent): Promise<NextResponse> => {
+  const fetchInit = {
+    headers: { Accept: 'image/*' },
+    redirect: 'manual' as const,
+    signal: AbortSignal.timeout(10_000),
+    dispatcher,
+  };
+  const response = await fetch(url, fetchInit);
+
+  const contentTypeOrError = validateUpstreamResponse(response);
+  if (contentTypeOrError instanceof NextResponse) return contentTypeOrError;
+
+  const bufferOrError = await streamToBuffer(response.body);
+  if (bufferOrError instanceof NextResponse) return bufferOrError;
+
+  return new NextResponse(bufferOrError, {
+    status: 200,
+    headers: {
+      'Content-Type': contentTypeOrError,
+      'Cache-Control': 'private, no-store',
+    },
+  });
+};
 
 /**
  * Proxy endpoint to fetch remote images and return them as blobs.
@@ -82,25 +247,6 @@ export const GET = withRateLimit(
       return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
     }
 
-    // Allowlist of hostnames. Exact match, or "<sub>.<allowed>" suffix match.
-    // S3 is included because image cropper uses S3-hosted originals, but the
-    // SSRF-via-redirect + DNS IP checks below still apply.
-    const allowedDomains = new Set<string>([
-      'cdn.fakefourrecords.com',
-      's3.amazonaws.com',
-      's3.us-east-1.amazonaws.com',
-      's3.us-west-2.amazonaws.com',
-      'fakefourrecords.com',
-    ]);
-    const cdnDomain = process.env.CDN_DOMAIN;
-    if (cdnDomain) {
-      try {
-        allowedDomains.add(new URL(cdnDomain).hostname);
-      } catch {
-        // Ignore malformed CDN_DOMAIN
-      }
-    }
-
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(url);
@@ -113,6 +259,7 @@ export const GET = withRateLimit(
     }
 
     const hostname = parsedUrl.hostname;
+    const allowedDomains = buildAllowedDomains();
     const isAllowedHost = [...allowedDomains].some(
       (domain) => hostname === domain || hostname.endsWith('.' + domain)
     );
@@ -121,112 +268,18 @@ export const GET = withRateLimit(
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
 
-    // Resolve DNS ourselves and reject private/metadata addresses before fetch.
-    // Reject literal IP hostnames too — allowlist is strictly DNS-name based.
+    // Reject literal IP hostnames — allowlist is strictly DNS-name based.
     if (isIP(parsedUrl.hostname) !== 0) {
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
-    let vettedAddress: string;
-    let vettedFamily: number;
-    try {
-      const { address, family } = await lookup(parsedUrl.hostname);
-      if (isDisallowedAddress(address)) {
-        loggers.s3.warn('[proxy-image] Blocked request resolving to disallowed IP', { address });
-        return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
-      }
-      vettedAddress = address;
-      vettedFamily = family;
-    } catch (error) {
-      loggers.s3.error('[proxy-image] DNS lookup failed', error);
-      return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
-    }
 
-    // Pin the TCP connection to the exact address we just validated. Node's
-    // global fetch re-resolves DNS independently of the check above, leaving a
-    // DNS-rebinding window where an allowlisted hostname could flip to an
-    // internal IP between validation and socket connect. A dispatcher with a
-    // fixed lookup closes that window; TLS SNI still uses the original hostname,
-    // so certificate validation for the allowlisted CDN/S3 domain is
-    // unaffected. (M2)
-    const pinnedLookup = (
-      _hostname: string,
-      options: LookupOptions,
-      callback: (
-        err: NodeJS.ErrnoException | null,
-        address: string | LookupAddress[],
-        family?: number
-      ) => void
-    ): void => {
-      if (options.all) {
-        callback(null, [{ address: vettedAddress, family: vettedFamily }]);
-      } else {
-        callback(null, vettedAddress, vettedFamily);
-      }
-    };
-    const pinnedDispatcher = new Agent({ connect: { lookup: pinnedLookup } });
+    const vetted = await resolveAndVetAddress(hostname);
+    if (vetted instanceof NextResponse) return vetted;
+
+    const pinnedDispatcher = buildPinnedDispatcher(vetted.address, vetted.family);
 
     try {
-      // redirect: 'manual' prevents follow-on requests to attacker-controlled
-      // Location headers (e.g. 302 → 169.254.169.254). Redirects = treated as an error.
-      // `dispatcher` is a Node/undici fetch extension (not in the DOM RequestInit
-      // type); passing it via a variable lets the extra property through without
-      // naming a DOM lib global that `no-undef` would flag.
-      const fetchInit = {
-        headers: { Accept: 'image/*' },
-        redirect: 'manual' as const,
-        signal: AbortSignal.timeout(10_000),
-        dispatcher: pinnedDispatcher,
-      };
-      const response = await fetch(url, fetchInit);
-
-      if (response.status >= 300 && response.status < 400) {
-        return NextResponse.json({ error: 'Upstream redirect rejected' }, { status: 502 });
-      }
-
-      if (!response.ok) {
-        return NextResponse.json(
-          { error: `Failed to fetch image: ${response.statusText}` },
-          { status: response.status }
-        );
-      }
-
-      const contentType = response.headers.get('content-type') ?? 'image/jpeg';
-      if (!contentType.startsWith('image/')) {
-        return NextResponse.json({ error: 'Upstream is not an image' }, { status: 415 });
-      }
-
-      const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10);
-      if (Number.isFinite(contentLength) && contentLength > MAX_PROXY_BODY_BYTES) {
-        return NextResponse.json({ error: 'Image too large' }, { status: 413 });
-      }
-
-      // Stream into a capped buffer so a missing/lying Content-Length can't OOM us.
-      const reader = response.body?.getReader();
-      if (!reader) {
-        return NextResponse.json({ error: 'Empty upstream body' }, { status: 502 });
-      }
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        received += value.byteLength;
-        if (received > MAX_PROXY_BODY_BYTES) {
-          await reader.cancel();
-          return NextResponse.json({ error: 'Image too large' }, { status: 413 });
-        }
-        chunks.push(value);
-      }
-      const buffer = Buffer.concat(chunks, received);
-
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'private, no-store',
-        },
-      });
+      return await fetchAndBuffer(url, pinnedDispatcher);
     } catch (error) {
       loggers.s3.error('[proxy-image] Error proxying image', error);
       return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
