@@ -22,6 +22,12 @@ import type {
   UploadConfirmationParams,
 } from '@/types/digital-format';
 
+import {
+  confirmUploadErrorMessage,
+  isInvalidS3Key,
+  isUniqueConstraintError,
+} from './confirm-upload-action-helpers';
+
 /**
  * Server Action: Confirm digital format upload after S3 transfer
  *
@@ -56,7 +62,7 @@ const confirmDigitalFormatUploadActionHandler = async (
 
     // Security: validate s3Key matches expected path pattern
     const expectedPrefix = `releases/${releaseId}/digital-formats/${formatType}/`;
-    if (!s3Key.startsWith(expectedPrefix) || s3Key.includes('..')) {
+    if (isInvalidS3Key(s3Key, expectedPrefix)) {
       return {
         success: false,
         error: `Invalid S3 key: must start with ${expectedPrefix}`,
@@ -106,7 +112,7 @@ const confirmDigitalFormatUploadActionHandler = async (
     loggers.s3.error('Confirmation action error', error);
 
     // Handle unique constraint violation (format already exists)
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+    if (isUniqueConstraintError(error)) {
       return {
         success: false,
         error: 'A digital format of this type already exists for this release',
@@ -115,7 +121,7 @@ const confirmDigitalFormatUploadActionHandler = async (
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to confirm upload',
+      error: confirmUploadErrorMessage(error, 'Failed to confirm upload'),
     };
   }
 };

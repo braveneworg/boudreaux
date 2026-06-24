@@ -13,6 +13,9 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
+import { validateImageFiles } from './artist-image-actions-helpers';
+import { isAdminSession } from './image-action-auth';
+
 import type { AdminActionResult } from './run-admin-entity-action';
 
 const logger = loggers.s3;
@@ -44,7 +47,7 @@ export const uploadArtistImagesAction = async (
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -58,22 +61,9 @@ export const uploadArtistImagesAction = async (
     }
 
     // Validate files
-    const maxFileSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-    for (const file of files) {
-      if (!allowedTypes.includes(file.type)) {
-        return {
-          success: false,
-          error: `Invalid file type: ${file.type}. Allowed: ${allowedTypes.join(', ')}`,
-        };
-      }
-      if (file.size > maxFileSize) {
-        return {
-          success: false,
-          error: `File ${file.name} exceeds maximum size of 5MB`,
-        };
-      }
+    const validationError = validateImageFiles(files);
+    if (validationError) {
+      return { success: false, error: validationError };
     }
 
     // Convert files to ImageUploadInput format
@@ -131,7 +121,7 @@ export const deleteArtistImageAction = async (imageId: string): Promise<AdminAct
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -191,7 +181,7 @@ export const updateArtistImageAction = async (
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -236,7 +226,7 @@ export const reorderArtistImagesAction = async (
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 

@@ -7,14 +7,14 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
-import { getS3Client } from '@/lib/utils/s3-client';
 import { logSecurityEvent } from '@/utils/audit-log';
+
+import { isAdminSession } from './image-action-auth';
+import { deleteS3Object, extractS3KeyFromImageSrc } from './release-image-actions-helpers';
 
 import type { AdminActionResult } from './run-admin-entity-action';
 
@@ -44,7 +44,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -60,33 +60,13 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
 
     // Extract S3 key from URL and delete from S3
     const s3Bucket = process.env.S3_BUCKET;
-    const cdnDomainRaw = process.env.CDN_DOMAIN;
-    const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
+    const cdnDomain = process.env.CDN_DOMAIN?.replace(/^https?:\/\//, '');
 
     if (image.src && s3Bucket) {
-      let s3Key: string | null = null;
-
-      if (cdnDomain && image.src.includes(cdnDomain)) {
-        s3Key = image.src.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
-      } else if (image.src.includes('.s3.')) {
-        const urlParts = image.src.split('.s3.');
-        if (urlParts[1]) {
-          const keyPart = urlParts[1].split('/').slice(1).join('/');
-          s3Key = keyPart;
-        }
-      }
+      const s3Key = extractS3KeyFromImageSrc(image.src, cdnDomain);
 
       if (s3Key) {
-        try {
-          const s3Client = getS3Client();
-          const deleteCommand = new DeleteObjectCommand({
-            Bucket: s3Bucket,
-            Key: s3Key,
-          });
-          await s3Client.send(deleteCommand);
-        } catch (s3Error) {
-          logger.error('S3 delete error (continuing with DB delete)', s3Error);
-        }
+        await deleteS3Object(s3Bucket, s3Key);
       }
     }
 
@@ -172,7 +152,7 @@ export const updateReleaseImageAction = async (
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -207,7 +187,7 @@ export const reorderReleaseImagesAction = async (
   try {
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
+    if (!isAdminSession(session)) {
       return { success: false, error: 'Unauthorized' };
     }
 

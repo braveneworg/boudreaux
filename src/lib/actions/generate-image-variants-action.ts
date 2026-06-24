@@ -14,6 +14,8 @@ import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { generateImageVariantsSchema } from '@/lib/validation/admin-asset-schemas';
 
+import { collectS3ObjectBuffer } from './generate-image-variants-action-helpers';
+
 /** Extensions that cannot be raster-resized. */
 const SKIP_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 const ALLOWED_KEY_PREFIX = 'media/';
@@ -124,38 +126,14 @@ export const generateImageVariantsAction = async (
     // Download the original image
     const getCommand = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
     const response = await s3Client.send(getCommand);
-    const stream = response.Body;
-    const contentLength = response.ContentLength;
 
-    if (!stream) {
-      return { success: false, variantsGenerated: 0, error: 'Empty response body from S3' };
+    const bufferResult = await collectS3ObjectBuffer(response, MAX_SOURCE_IMAGE_SIZE_BYTES);
+    if (!bufferResult.success) {
+      return { success: false, variantsGenerated: 0, error: bufferResult.error };
     }
-
-    if (typeof contentLength === 'number' && contentLength > MAX_SOURCE_IMAGE_SIZE_BYTES) {
-      return {
-        success: false,
-        variantsGenerated: 0,
-        error: `Source image exceeds ${MAX_SOURCE_IMAGE_SIZE_BYTES / (1024 * 1024)}MB limit`,
-      };
-    }
-
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    for await (const chunk of stream as AsyncIterable<Uint8Array>) {
-      totalBytes += chunk.byteLength;
-      if (totalBytes > MAX_SOURCE_IMAGE_SIZE_BYTES) {
-        return {
-          success: false,
-          variantsGenerated: 0,
-          error: `Source image exceeds ${MAX_SOURCE_IMAGE_SIZE_BYTES / (1024 * 1024)}MB limit`,
-        };
-      }
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
 
     // Resize + upload every `_w{width}` variant (and WebP siblings) to S3.
-    const { variantsGenerated } = await generateVariantsFromBuffer(buffer, s3Key);
+    const { variantsGenerated } = await generateVariantsFromBuffer(bufferResult.buffer, s3Key);
 
     return { success: true, variantsGenerated };
   } catch (error) {

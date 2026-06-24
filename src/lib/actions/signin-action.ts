@@ -11,10 +11,11 @@ import { signIn } from '@/auth';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { signinSchema } from '@/lib/validation/signin-schema';
+
+import { logSigninError, resolveClientIp } from './signin-action-helpers';
 
 // Rate limiter: 5 signin attempts per minute per IP
 const limiter = rateLimit({
@@ -25,10 +26,7 @@ const limiter = rateLimit({
 export const signinAction = async (_initialState: FormState, payload: FormData) => {
   // Get IP address for rate limiting
   const headersList = await headers();
-  const ip =
-    headersList.get('x-real-ip') ||
-    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'anonymous';
+  const ip = resolveClientIp(headersList);
 
   // Check rate limit
   try {
@@ -77,14 +75,7 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     } catch (error) {
       formState.success = false;
       // Log the error for debugging (only in development to avoid exposing details)
-      if (process.env.NODE_ENV === 'development') {
-        loggers.auth.error('Sign-in error', error);
-      } else {
-        loggers.auth.error(
-          'Sign-in error',
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-      }
+      logSigninError(error);
       // Set a generic error message for the user
       setUnknownError(formState);
     }
