@@ -10,7 +10,10 @@ import {
 } from '@/lib/constants/banner-slots';
 import { BannerNotificationRepository } from '@/lib/repositories/banner-notification-repository';
 import { SiteSettingsRepository } from '@/lib/repositories/site-settings-repository';
-import type { UpsertBannerNotificationData } from '@/lib/types/domain/banner-notification';
+import type {
+  BannerNotificationRecord,
+  UpsertBannerNotificationData,
+} from '@/lib/types/domain/banner-notification';
 import { DataError } from '@/lib/types/domain/errors';
 import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import { cache, withCache } from '@/lib/utils/simple-cache';
@@ -73,6 +76,47 @@ const getCacheKey = (): string => {
   return `banner-notifications:${today}`;
 };
 
+/**
+ * A slot is active when it has content and `now` falls within its optional
+ * display window. Narrows `notification` to a defined record so callers can read
+ * its fields without re-checking for `undefined`.
+ */
+const isNotificationActive = (
+  notification: BannerNotificationRecord | undefined,
+  now: Date
+): notification is BannerNotificationRecord =>
+  Boolean(
+    notification?.content &&
+    (!notification.displayFrom || notification.displayFrom <= now) &&
+    (!notification.displayUntil || notification.displayUntil >= now)
+  );
+
+/**
+ * Build the API response for a single banner slot. When the slot's notification
+ * is active its content is re-sanitized at the read boundary (parser-based) so
+ * the public carousel always receives robustly-sanitized HTML, regardless of
+ * how the content entered the DB (write action, seed, migration). The client
+ * carousel keeps its regex pass as an extra defense-in-depth layer.
+ */
+const toBannerSlotResponse = (
+  slot: (typeof BANNER_SLOTS)[number],
+  notification: BannerNotificationRecord | undefined,
+  now: Date
+): BannerSlotResponse => ({
+  slotNumber: slot.slotNumber,
+  imageFilename: slot.filename,
+  notification: isNotificationActive(notification, now)
+    ? {
+        id: notification.id,
+        content: sanitizeBannerHtmlServer(notification.content as string),
+        textColor: notification.textColor,
+        backgroundColor: notification.backgroundColor,
+        displayFrom: notification.displayFrom?.toISOString() ?? null,
+        displayUntil: notification.displayUntil?.toISOString() ?? null,
+      }
+    : null,
+});
+
 export class BannerNotificationService {
   /**
    * Get all 5 banner slots with their active notifications for the current date.
@@ -89,35 +133,13 @@ export class BannerNotificationService {
 
           const rotationInterval = await BannerNotificationService.getRotationInterval();
 
-          const banners: BannerSlotResponse[] = BANNER_SLOTS.map((slot) => {
-            const notification = notifications.find((n) => n.slotNumber === slot.slotNumber);
-
-            const isActive =
-              notification?.content &&
-              (!notification.displayFrom || notification.displayFrom <= now) &&
-              (!notification.displayUntil || notification.displayUntil >= now);
-
-            return {
-              slotNumber: slot.slotNumber,
-              imageFilename: slot.filename,
-              notification: isActive
-                ? {
-                    id: notification.id,
-                    // Re-sanitize at the read boundary with the parser-based
-                    // sanitizer so the publicly-rendered carousel always
-                    // receives robustly-sanitized HTML, regardless of how the
-                    // content entered the DB (write action, seed, migration).
-                    // The client carousel keeps its regex pass as an extra
-                    // defense-in-depth layer.
-                    content: sanitizeBannerHtmlServer(notification.content as string),
-                    textColor: notification.textColor,
-                    backgroundColor: notification.backgroundColor,
-                    displayFrom: notification.displayFrom?.toISOString() ?? null,
-                    displayUntil: notification.displayUntil?.toISOString() ?? null,
-                  }
-                : null,
-            };
-          });
+          const banners: BannerSlotResponse[] = BANNER_SLOTS.map((slot) =>
+            toBannerSlotResponse(
+              slot,
+              notifications.find((n) => n.slotNumber === slot.slotNumber),
+              now
+            )
+          );
 
           return { banners, rotationInterval };
         },

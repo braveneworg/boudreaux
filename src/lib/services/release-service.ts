@@ -15,11 +15,13 @@ import type {
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
+  ReleaseForDeletion,
   ReleaseListFilters,
   ReleaseListItem,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 import { deleteS3Object } from '@/utils/s3-client';
+import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 import { cache, withCache } from '@/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
@@ -44,6 +46,34 @@ const PUBLISHED_RELEASES_CACHE_PREFIX = 'published-releases:';
 const digitalFormatRepository = new ReleaseDigitalFormatRepository();
 const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
 const downloadEventRepository = new DownloadEventRepository();
+
+/**
+ * Collect every S3 key that should be removed when a release is hard-deleted:
+ * the stored `s3Key` of each digital-format file plus the keys derived from the
+ * release's image `src`s and `coverArt` URL. URL→key extraction (CDN and S3
+ * styles, honouring `CDN_DOMAIN`) is delegated to {@link extractS3KeyFromUrl}.
+ */
+const collectReleaseS3Keys = (release: ReleaseForDeletion): string[] => {
+  const s3Keys: string[] = [];
+
+  for (const format of release.digitalFormats) {
+    for (const file of format.files) {
+      if (file.s3Key) s3Keys.push(file.s3Key);
+    }
+  }
+
+  const imageUrls = release.images
+    .map((image) => image.src)
+    .filter((src): src is string => Boolean(src));
+  if (release.coverArt) imageUrls.push(release.coverArt);
+
+  for (const url of imageUrls) {
+    const s3Key = extractS3KeyFromUrl(url);
+    if (s3Key) s3Keys.push(s3Key);
+  }
+
+  return s3Keys;
+};
 
 export class ReleaseService {
   /**
@@ -136,33 +166,8 @@ export class ReleaseService {
         return { success: false, error: 'Release not found' };
       }
 
-      // Collect S3 keys for cleanup
-      const s3KeysToDelete: string[] = [];
-      for (const format of existing.digitalFormats) {
-        for (const file of format.files) {
-          if (file.s3Key) s3KeysToDelete.push(file.s3Key);
-        }
-      }
-
-      // Collect S3 keys from images and coverArt
-      const cdnDomainRaw = process.env.CDN_DOMAIN;
-      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
-      const imageUrls = existing.images
-        .map((image) => image.src)
-        .filter((src): src is string => Boolean(src));
-      if (existing.coverArt) imageUrls.push(existing.coverArt);
-      for (const url of imageUrls) {
-        let s3Key: string | null = null;
-        if (cdnDomain && url.includes(cdnDomain)) {
-          s3Key = url.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
-        } else if (url.includes('.s3.')) {
-          const urlParts = url.split('.s3.');
-          if (urlParts[1]) {
-            s3Key = urlParts[1].split('/').slice(1).join('/');
-          }
-        }
-        if (s3Key) s3KeysToDelete.push(s3Key);
-      }
+      // Collect S3 keys (digital-format files + image/coverArt URLs) for cleanup.
+      const s3KeysToDelete = collectReleaseS3Keys(existing);
 
       // Delete related records in dependency order (children first).
       // 1. Digital format files (children of ReleaseDigitalFormat) — one delete
