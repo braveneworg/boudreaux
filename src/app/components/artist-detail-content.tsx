@@ -28,6 +28,110 @@ const splitList = (value: string | null | undefined): string[] =>
     .map((item) => item.trim())
     .filter(Boolean) ?? [];
 
+type ArtistRelease = ArtistWithPublishedReleases['releases'][number];
+
+/** Whether a release has at least one playable MP3_320KBPS track. */
+const hasPlayableTracks = (artistRelease: ArtistRelease): boolean =>
+  (artistRelease.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files
+    .length ?? 0) > 0;
+
+/** Sort comparator: most recently released first (missing dates sort last). */
+const byReleasedOnDesc = (a: ArtistRelease, b: ArtistRelease): number => {
+  const dateA = a.release.releasedOn ? new Date(a.release.releasedOn).getTime() : 0;
+  const dateB = b.release.releasedOn ? new Date(b.release.releasedOn).getTime() : 0;
+  return dateB - dateA;
+};
+
+/**
+ * Project an artist down to only its releases with playable tracks, sorted
+ * newest-first — the shape the {@link ArtistPlayer} expects.
+ */
+const withPlayableReleases = (
+  artist: ArtistWithPublishedReleases
+): ArtistWithPublishedReleases => ({
+  ...artist,
+  releases: artist.releases.filter(hasPlayableTracks).sort(byReleasedOnDesc),
+});
+
+type ArtistBioImage = ArtistWithPublishedReleases['bioImages'][number];
+
+interface ArtistDetailHeaderProps {
+  artist: ArtistWithPublishedReleases;
+  slug: string;
+  displayName: string;
+  genres: string[];
+  detailImages: ArtistBioImage[];
+  hasFullBio: boolean;
+}
+
+/**
+ * Concise artist header: a few identifying thumbnails, genre badges, a short bio
+ * teaser, and a "Read full bio" link. Rendered only when there is something to
+ * show (short bio, genres, or images).
+ */
+const ArtistDetailHeader = ({
+  artist,
+  slug,
+  displayName,
+  genres,
+  detailImages,
+  hasFullBio,
+}: ArtistDetailHeaderProps) => {
+  if (!artist.shortBio && genres.length === 0 && detailImages.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      {detailImages.length > 0 && (
+        <ul className="flex shrink-0 gap-2">
+          {detailImages.map((image) => (
+            <li key={image.id} className="size-20 sm:size-24">
+              <ExpandableThumbnail
+                src={image.url}
+                thumbnailSrc={image.thumbnailUrl}
+                alt={image.title ?? `${displayName} image`}
+                caption={image.title}
+                attribution={image.attribution}
+                license={image.license}
+                sourceUrl={image.sourceUrl}
+                className="size-full"
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="space-y-2">
+        {genres.length > 0 && (
+          <ul className="flex flex-wrap gap-2">
+            {genres.map((genre) => (
+              <li key={genre}>
+                <Badge variant="secondary" className="gap-1">
+                  <Music2 className="size-3" aria-hidden />
+                  {genre}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+        {artist.shortBio && (
+          // Header shows a short plain-text teaser; the full rich short bio
+          // (with inline links) lives on the dedicated /bio page.
+          <p className="text-muted-foreground text-sm">{toBioTeaser(artist.shortBio)}</p>
+        )}
+        {hasFullBio && (
+          <Link
+            href={`/artists/${slug}/bio`}
+            className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
+          >
+            Read full bio
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+};
+
 /**
  * Client content wrapper for the artist detail page.
  *
@@ -72,27 +176,6 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   const hasFullBio =
     Boolean(artist.bio) || artist.bioImages.length > 0 || artist.bioLinks.length > 0;
 
-  // Filter to only releases with playable tracks, sorted newest-first
-  const artistWithPlayableReleases = {
-    ...artist,
-    releases: artist.releases
-      .filter(
-        (ar: ArtistWithPublishedReleases['releases'][number]) =>
-          (ar.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files
-            .length ?? 0) > 0
-      )
-      .sort(
-        (
-          a: ArtistWithPublishedReleases['releases'][number],
-          b: ArtistWithPublishedReleases['releases'][number]
-        ) => {
-          const dateA = a.release.releasedOn ? new Date(a.release.releasedOn).getTime() : 0;
-          const dateB = b.release.releasedOn ? new Date(b.release.releasedOn).getTime() : 0;
-          return dateB - dateA;
-        }
-      ),
-  };
-
   const breadcrumbItems = [
     { anchorText: 'Home', url: '/', isActive: false },
     { anchorText: 'Artists', url: '/artists', isActive: false },
@@ -108,59 +191,16 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
     <div className="space-y-5">
       <BreadcrumbMenu items={breadcrumbItems} />
 
-      {(artist.shortBio || genres.length > 0 || detailImages.length > 0) && (
-        <section className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          {detailImages.length > 0 && (
-            <ul className="flex shrink-0 gap-2">
-              {detailImages.map((image) => (
-                <li key={image.id} className="size-20 sm:size-24">
-                  <ExpandableThumbnail
-                    src={image.url}
-                    thumbnailSrc={image.thumbnailUrl}
-                    alt={image.title ?? `${displayName} image`}
-                    caption={image.title}
-                    attribution={image.attribution}
-                    license={image.license}
-                    sourceUrl={image.sourceUrl}
-                    className="size-full"
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+      <ArtistDetailHeader
+        artist={artist}
+        slug={slug}
+        displayName={displayName}
+        genres={genres}
+        detailImages={detailImages}
+        hasFullBio={hasFullBio}
+      />
 
-          <div className="space-y-2">
-            {genres.length > 0 && (
-              <ul className="flex flex-wrap gap-2">
-                {genres.map((genre) => (
-                  <li key={genre}>
-                    <Badge variant="secondary" className="gap-1">
-                      <Music2 className="size-3" aria-hidden />
-                      {genre}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {artist.shortBio && (
-              // Header shows a short plain-text teaser; the full rich short bio
-              // (with inline links) lives on the dedicated /bio page.
-              <p className="text-muted-foreground text-sm">{toBioTeaser(artist.shortBio)}</p>
-            )}
-            {hasFullBio && (
-              <Link
-                href={`/artists/${slug}/bio`}
-                className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
-              >
-                Read full bio
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
-
-      <ArtistPlayer artist={artistWithPlayableReleases} initialReleaseId={initialReleaseId} />
+      <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
     </div>
   );
 };

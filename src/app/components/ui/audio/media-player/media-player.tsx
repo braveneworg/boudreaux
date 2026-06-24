@@ -527,6 +527,35 @@ interface InfoTickerTapeFeaturedArtistProps {
 
 type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps;
 
+/** Resolved display values shown by {@link InfoTickerTape}, derived from either prop variant. */
+interface InfoTickerTapeDisplay {
+  displayName: string | null;
+  releaseTitle: string | null;
+  trackTitle: string;
+}
+
+/**
+ * Derive the artist/release/track display strings for {@link InfoTickerTape}
+ * from whichever prop variant was supplied (featuredArtist or artistRelease).
+ */
+const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTapeDisplay => {
+  if ('featuredArtist' in props && props.featuredArtist) {
+    const { featuredArtist } = props;
+    return {
+      displayName: getFeaturedArtistDisplayName(featuredArtist),
+      releaseTitle: featuredArtist.release?.title ?? null,
+      trackTitle: props.trackTitle ?? '',
+    };
+  }
+
+  const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
+  return {
+    displayName: getArtistDisplayName(artistRelease.artist),
+    releaseTitle: artistRelease.release.title,
+    trackTitle: trackName,
+  };
+};
+
 /**
  * InfoTickerTape component displays scrolling information about the currently playing track.
  *
@@ -557,23 +586,7 @@ type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeat
  */
 const InfoTickerTape = (props: InfoTickerTapeProps) => {
   const { isPlaying = false } = props;
-
-  // Determine display values based on prop type
-  let displayName: string | null;
-  let releaseTitle: string | null;
-  let trackTitle: string;
-
-  if ('featuredArtist' in props && props.featuredArtist) {
-    const { featuredArtist } = props;
-    displayName = getFeaturedArtistDisplayName(featuredArtist);
-    releaseTitle = featuredArtist.release?.title ?? null;
-    trackTitle = props.trackTitle ?? '';
-  } else {
-    const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
-    displayName = getArtistDisplayName(artistRelease.artist);
-    releaseTitle = artistRelease.release.title;
-    trackTitle = trackName;
-  }
+  const { displayName, releaseTitle, trackTitle } = resolveInfoTickerTapeDisplay(props);
 
   return (
     <div className={`w-full rounded-b-lg bg-zinc-800 py-2 ${isPlaying ? '' : 'text-center'}`}>
@@ -813,6 +826,118 @@ interface FormatFileListDrawerProps {
   downloadTrigger?: React.ReactNode;
 }
 
+/** Format a duration in seconds as `m:ss`. */
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+/** A single track file from {@link FormatFileListDrawerProps.files}. */
+type FormatFileListItem = FormatFileListDrawerProps['files'][number];
+
+interface FormatFileRowProps {
+  file: FormatFileListItem;
+  isCurrentFile: boolean;
+  featuredTrackNumber?: number;
+  onFileSelect?: (fileId: string) => void;
+}
+
+interface FormatFileRowContentProps {
+  file: FormatFileListItem;
+  isCurrentFile: boolean;
+  featuredTrackNumber?: number;
+}
+
+/** The inner content (number, title, featured star, duration) of a {@link FormatFileRow}. */
+const FormatFileRowContent = ({
+  file,
+  isCurrentFile,
+  featuredTrackNumber,
+}: FormatFileRowContentProps) => {
+  const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
+  const isFeatured = featuredTrackNumber != null && file.trackNumber === featuredTrackNumber;
+
+  return (
+    <>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span
+          className={`w-6 shrink-0 text-right text-sm font-medium ${
+            isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
+          }`}
+        >
+          {file.trackNumber}.
+        </span>
+        <span
+          className={`truncate text-sm ${
+            isCurrentFile ? 'font-semibold text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
+          }`}
+        >
+          {displayTitle}
+        </span>
+        {isFeatured && (
+          <Star
+            className={cn(
+              'h-3.5 w-3.5 shrink-0 fill-current',
+              isCurrentFile ? 'text-amber-400' : 'text-amber-500'
+            )}
+            aria-label="Featured track"
+          />
+        )}
+      </div>
+      {file.duration != null && (
+        <span
+          className={`shrink-0 font-mono text-sm ${
+            isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
+          }`}
+        >
+          {formatDuration(file.duration)}
+        </span>
+      )}
+    </>
+  );
+};
+
+/**
+ * A single row in {@link FormatFileListDrawer}: track number, title, optional
+ * featured-track star, and duration. Rendered as a selectable button (wrapped
+ * in `DrawerClose`) when `onFileSelect` is provided, otherwise a static row.
+ */
+const FormatFileRow = ({
+  file,
+  isCurrentFile,
+  featuredTrackNumber,
+  onFileSelect,
+}: FormatFileRowProps) => {
+  const rowClassName = `flex items-center justify-between gap-4 p-3 transition-colors ${
+    isCurrentFile ? 'bg-zinc-800 text-zinc-50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+  } ${onFileSelect ? 'cursor-pointer' : ''}`;
+
+  const rowContent = (
+    <FormatFileRowContent
+      file={file}
+      isCurrentFile={isCurrentFile}
+      featuredTrackNumber={featuredTrackNumber}
+    />
+  );
+
+  if (!onFileSelect) {
+    return <div className={rowClassName}>{rowContent}</div>;
+  }
+
+  return (
+    <DrawerClose asChild>
+      <button
+        type="button"
+        className={`w-full text-left ${rowClassName}`}
+        onClick={() => onFileSelect(file.id)}
+      >
+        {rowContent}
+      </button>
+    </DrawerClose>
+  );
+};
+
 /**
  * FormatFileListDrawer component displays a collapsible drawer with digital format files.
  * Used by the FeaturedArtistsPlayer to show track-by-track navigation from ReleaseDigitalFormatFiles.
@@ -826,12 +951,6 @@ const FormatFileListDrawer = ({
   featuredTrackNumber,
   downloadTrigger,
 }: FormatFileListDrawerProps) => {
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
   return (
     <Drawer>
       {/* Stable min-h-10 keeps the row height invariant across loading
@@ -873,75 +992,16 @@ const FormatFileListDrawer = ({
         </DrawerHeader>
         <div className="max-h-[60vh] overflow-y-auto px-0 pb-4">
           <ol className="-ml-2 px-0">
-            {files.map((file) => {
-              const isCurrentFile = currentFileId === file.id;
-              const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
-
-              const rowClassName = `flex items-center justify-between gap-4 p-3 transition-colors ${
-                isCurrentFile
-                  ? 'bg-zinc-800 text-zinc-50'
-                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
-              } ${onFileSelect ? 'cursor-pointer' : ''}`;
-
-              const rowContent = (
-                <>
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span
-                      className={`w-6 shrink-0 text-right text-sm font-medium ${
-                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
-                      }`}
-                    >
-                      {file.trackNumber}.
-                    </span>
-                    <span
-                      className={`truncate text-sm ${
-                        isCurrentFile
-                          ? 'font-semibold text-zinc-50!'
-                          : 'text-zinc-950 dark:text-zinc-950'
-                      }`}
-                    >
-                      {displayTitle}
-                    </span>
-                    {featuredTrackNumber != null && file.trackNumber === featuredTrackNumber && (
-                      <Star
-                        className={cn(
-                          'h-3.5 w-3.5 shrink-0 fill-current',
-                          isCurrentFile ? 'text-amber-400' : 'text-amber-500'
-                        )}
-                        aria-label="Featured track"
-                      />
-                    )}
-                  </div>
-                  {file.duration != null && (
-                    <span
-                      className={`shrink-0 font-mono text-sm ${
-                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
-                      }`}
-                    >
-                      {formatDuration(file.duration)}
-                    </span>
-                  )}
-                </>
-              );
-
-              return (
-                <li key={file.id}>
-                  {onFileSelect ? (
-                    <DrawerClose asChild>
-                      <button
-                        type="button"
-                        className={`w-full text-left ${rowClassName}`}
-                        onClick={() => onFileSelect(file.id)}
-                      >
-                        {rowContent}
-                      </button>
-                    </DrawerClose>
-                  ) : (
-                    <div className={rowClassName}>{rowContent}</div>
-                  )}
-                </li>
-              );
-            })}
+            {files.map((file) => (
+              <li key={file.id}>
+                <FormatFileRow
+                  file={file}
+                  isCurrentFile={currentFileId === file.id}
+                  featuredTrackNumber={featuredTrackNumber}
+                  onFileSelect={onFileSelect}
+                />
+              </li>
+            ))}
           </ol>
         </div>
         {files.some((f) => f.duration != null) && (

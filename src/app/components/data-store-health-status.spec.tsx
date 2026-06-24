@@ -19,27 +19,36 @@ vi.mock('./health-status-icon', () => ({
   ),
 }));
 
-vi.mock('./health-status-message', () => ({
-  HealthStatusMessage: ({
-    healthStatus,
-    isLoading,
-  }: {
-    healthStatus: HealthStatus | null;
-    isLoading: boolean;
-  }) => (
-    <span
-      data-error={healthStatus?.error ?? 'none'}
-      data-is-loading={isLoading}
-      data-status={healthStatus?.status ?? 'null'}
-      data-testid="health-status-message"
-    >
-      {isLoading ? 'Loading...' : (healthStatus?.database ?? 'No status')}
-      {healthStatus?.error && process.env.NODE_ENV === 'development'
-        ? ` - ${healthStatus.error}`
-        : ''}
-    </span>
-  ),
-}));
+vi.mock('./health-status-message', () => {
+  // Derive the mock's body text: a loading placeholder or the database status,
+  // with the error appended in development (independently of loading — matching
+  // the original two-text-node concatenation). Extracted from the component so
+  // the rendered mock stays trivial (keeps its complexity in check).
+  const renderMessageText = (healthStatus: HealthStatus | null, isLoading: boolean): string => {
+    const base = isLoading ? 'Loading...' : (healthStatus?.database ?? 'No status');
+    const showError = Boolean(healthStatus?.error) && process.env.NODE_ENV === 'development';
+    return showError ? `${base} - ${healthStatus?.error}` : base;
+  };
+
+  return {
+    HealthStatusMessage: ({
+      healthStatus,
+      isLoading,
+    }: {
+      healthStatus: HealthStatus | null;
+      isLoading: boolean;
+    }) => (
+      <span
+        data-error={healthStatus?.error ?? 'none'}
+        data-is-loading={isLoading}
+        data-status={healthStatus?.status ?? 'null'}
+        data-testid="health-status-message"
+      >
+        {renderMessageText(healthStatus, isLoading)}
+      </span>
+    ),
+  };
+});
 
 // Mock api base url helper
 vi.mock('../../lib/utils/api-base-url', () => ({

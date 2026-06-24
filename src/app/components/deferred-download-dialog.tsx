@@ -26,6 +26,31 @@ const DownloadDialog = nextDynamic(
   }
 );
 
+/** The resolved (non-null) payload returned by {@link useReleaseUserStatusQuery}. */
+type ReleaseUserStatus = NonNullable<ReturnType<typeof useReleaseUserStatusQuery>['data']>;
+
+/** Purchase/download status passed through to the lazily-mounted DownloadDialog. */
+interface ResolvedUserStatus {
+  hasPurchase: boolean;
+  downloadCount: number;
+  resetInHours: number | null;
+  availableFormats: ReleaseUserStatus['availableFormats'];
+}
+
+/**
+ * Normalize the optional release user-status payload into defaulted values for
+ * the DownloadDialog (purchase flag, download count, reset window, formats).
+ * `purchasedAt` is resolved separately so its `Date` instance can be memoized.
+ */
+const resolveUserStatus = (
+  userStatus: ReleaseUserStatus | null | undefined
+): ResolvedUserStatus => ({
+  hasPurchase: userStatus?.hasPurchase ?? false,
+  downloadCount: userStatus?.downloadCount ?? 0,
+  resetInHours: userStatus?.resetInHours ?? null,
+  availableFormats: userStatus?.availableFormats ?? [],
+});
+
 interface DeferredDownloadDialogProps {
   artistName: string;
   releaseId: string;
@@ -55,14 +80,12 @@ export const DeferredDownloadDialog = ({
   const [openCounter, setOpenCounter] = useState(0);
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
 
-  const hasPurchase = userStatus?.hasPurchase ?? false;
+  const { hasPurchase, downloadCount, resetInHours, availableFormats } =
+    resolveUserStatus(userStatus);
   const purchasedAt = useMemo(
     () => (userStatus?.purchasedAt ? new Date(userStatus.purchasedAt) : null),
     [userStatus?.purchasedAt]
   );
-  const downloadCount = userStatus?.downloadCount ?? 0;
-  const resetInHours = userStatus?.resetInHours ?? null;
-  const availableFormats = userStatus?.availableFormats ?? [];
 
   const handleTriggerClick = useCallback(
     (event: MouseEvent<HTMLElement>) => {
