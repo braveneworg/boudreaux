@@ -13,10 +13,36 @@ import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
+import type { Session } from 'next-auth';
+
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_TAKE = 24;
 const MAX_TAKE = 100;
+
+/** Parse and clamp the `skip`/`take` offset-pagination params from a request. */
+const parsePagination = (searchParams: URLSearchParams): { skip: number; take: number } => {
+  const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
+  const take = Math.min(
+    Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+    MAX_TAKE
+  );
+  return { skip, take };
+};
+
+/** Parse the tri-state `published` filter ('true' → true, 'false' → false, else undefined). */
+const parsePublished = (value: string | null): boolean | undefined =>
+  value === 'true' ? true : value === 'false' ? false : undefined;
+
+/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
+const errorStatus = (error: string | undefined): number =>
+  error === 'Database unavailable' ? 503 : 500;
+
+/** Return a 401 response unless the session belongs to an authenticated admin. */
+const requireAdmin = (session: Session | null): NextResponse | null =>
+  !session?.user?.id || session.user?.role !== 'admin'
+    ? NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    : null;
 
 /**
  * GET /api/artists
@@ -29,20 +55,15 @@ const MAX_TAKE = 100;
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user?.role !== 'admin') {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const authError = requireAdmin(session);
+    if (authError) {
+      return authError;
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
-    const take = Math.min(
-      Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
-      MAX_TAKE
-    );
+    const { skip, take } = parsePagination(searchParams);
     const search = searchParams.get('search');
-    const publishedParam = searchParams.get('published');
-    const published =
-      publishedParam === 'true' ? true : publishedParam === 'false' ? false : undefined;
+    const published = parsePublished(searchParams.get('published'));
     const deleted = searchParams.get('deleted') === 'true';
 
     const params = {
@@ -56,10 +77,7 @@ export async function GET(request: NextRequest) {
     const result = await ArtistService.getArtists(params);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.error === 'Database unavailable' ? 503 : 500 }
-      );
+      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
     }
 
     return NextResponse.json(

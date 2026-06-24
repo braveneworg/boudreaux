@@ -14,6 +14,26 @@ import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Validate slug format: lowercase alphanumeric + hyphens, max 100 chars,
+ * must start and end with an alphanumeric character.
+ */
+const isValidSlug = (slug: string): boolean => {
+  const firstChar = slug.at(0) ?? '';
+  const lastChar = slug.at(-1) ?? '';
+  return (
+    slug.length >= 1 &&
+    slug.length <= 100 &&
+    /^[a-z0-9]$/.test(firstChar) &&
+    /^[a-z0-9]$/.test(lastChar) &&
+    /^[a-z0-9-]+$/.test(slug)
+  );
+};
+
+/** Map a service error to a 404 (not found), 503 (DB unavailable), or 500 status. */
+const errorStatus = (error: string | undefined): number =>
+  error === 'Artist not found' ? 404 : error === 'Database unavailable' ? 503 : 500;
+
+/**
  * GET /api/artist/slug/[slug]
  * Get a single artist by slug.
  *
@@ -28,17 +48,7 @@ export const GET = withRateLimit<{ slug: string }>(
   try {
     const { slug } = await params;
 
-    // Validate slug format: lowercase alphanumeric + hyphens, max 100 chars,
-    // must start and end with an alphanumeric character.
-    const firstChar = slug.at(0) ?? '';
-    const lastChar = slug.at(-1) ?? '';
-    const isValidSlug =
-      slug.length >= 1 &&
-      slug.length <= 100 &&
-      /^[a-z0-9]$/.test(firstChar) &&
-      /^[a-z0-9]$/.test(lastChar) &&
-      /^[a-z0-9-]+$/.test(slug);
-    if (!isValidSlug) {
+    if (!isValidSlug(slug)) {
       return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
     }
 
@@ -49,13 +59,7 @@ export const GET = withRateLimit<{ slug: string }>(
       : await ArtistService.getArtistBySlug(slug);
 
     if (!result.success) {
-      const status =
-        result.error === 'Artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
     }
 
     const responseData = withReleases
