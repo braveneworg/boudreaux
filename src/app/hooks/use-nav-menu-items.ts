@@ -24,6 +24,82 @@ export interface NavMenuItem {
   color: string;
 }
 
+// Static nav items whose `hasBullet` value never changes with auth state.
+// Defined at module scope so the hook body stays under the max-lines limit.
+const STATIC_NAV_ITEMS_HEAD: NavMenuItem[] = [
+  {
+    name: 'Home',
+    href: '/',
+    hasBullet: true,
+    color:
+      'aria-[current=page]:text-menu-item-yellow-400 hover:text-menu-item-yellow-400 hover:decoration-menu-item-yellow-400',
+  },
+  {
+    name: 'Artists',
+    href: '/artists',
+    hasBullet: true,
+    color:
+      'aria-[current=page]:text-menu-item-pink-300 aria-[current=page]:decoration-menu-item-pink-300 hover:text-menu-item-pink-300 hover:decoration-menu-item-pink-300',
+  },
+  {
+    name: 'Releases',
+    href: '/releases',
+    hasBullet: true,
+    color:
+      'aria-[current=page]:text-menu-item-cyan-400 aria-[current=page]:decoration-menu-item-cyan-400 hover:text-menu-item-cyan-400 hover:decoration-menu-item-cyan-400',
+  },
+];
+
+// Tours sits between the auth-sensitive Videos and Merch items.
+const TOURS_ITEM: NavMenuItem = {
+  name: 'Tours',
+  href: '/tours',
+  hasBullet: true,
+  color:
+    'aria-[current=page]:text-menu-item-tan-200 aria-[current=page]:decoration-menu-item-tan-200 hover:text-menu-item-tan-200 hover:decoration-menu-item-tan-200',
+};
+
+// Tail items that follow Merch and never change.
+const STATIC_NAV_ITEMS_TAIL: NavMenuItem[] = [
+  {
+    name: 'Playlists',
+    href: '/playlists',
+    hasBullet: true,
+    color:
+      'aria-[current=page]:text-menu-item-teal-400 aria-[current=page]:decoration-menu-item-teal-400 hover:text-menu-item-teal-400 hover:decoration-menu-item-teal-400',
+  },
+  {
+    name: 'About',
+    href: '/about',
+    hasBullet: true,
+    color:
+      'aria-[current=page]:text-menu-item-pink-400 aria-[current=page]:decoration-menu-item-pink-400 hover:text-menu-item-pink-400 hover:decoration-menu-item-pink-400',
+  },
+  {
+    name: 'Contact Us',
+    href: '/contact',
+    hasBullet: false,
+    color:
+      'aria-[current=page]:text-menu-item-orange-300 aria-[current=page]:decoration-menu-item-orange-300 hover:text-menu-item-orange-300 hover:decoration-menu-item-orange-300',
+  },
+];
+
+// Static data for the authenticated-only item. Insertion is conditional but
+// the item's own fields are invariant.
+const MY_COLLECTION_ITEM: NavMenuItem = {
+  name: 'My Collection',
+  href: '/collection',
+  hasBullet: true,
+  color:
+    'aria-[current=page]:text-menu-item-green-400 aria-[current=page]:decoration-menu-item-green-400 hover:text-menu-item-green-400 hover:decoration-menu-item-green-400',
+};
+
+// Static color strings for the two items whose `hasBullet` flips with auth state.
+const VIDEOS_COLOR =
+  'aria-[current=page]:text-menu-item-tan-400 aria-[current=page]:decoration-menu-item-tan-400 hover:text-menu-item-tan-400 hover:decoration-menu-item-tan-400';
+const MERCH_COLOR =
+  'aria-[current=page]:text-menu-item-yellow-300 aria-[current=page]:decoration-menu-item-yellow-300 hover:text-menu-item-yellow-300 hover:decoration-menu-item-yellow-300';
+
 /**
  * Single source of truth for the primary navigation, shared by the desktop
  * menu and the mobile hamburger menu so the two can never drift apart.
@@ -37,80 +113,31 @@ export const useNavMenuItems = (): NavMenuItem[] => {
   const isAuthenticated = status === 'authenticated';
 
   return useMemo(() => {
+    const videos: NavMenuItem = {
+      name: 'Videos',
+      href: '/videos',
+      hasBullet: !isAuthenticated,
+      color: VIDEOS_COLOR,
+    };
+    const merch: NavMenuItem = {
+      name: 'Merch',
+      href: '/merch',
+      hasBullet: isAuthenticated,
+      color: MERCH_COLOR,
+    };
+
+    // Order: Home, Artists, Releases, [My Collection], Videos, Tours, Merch, Playlists, About, Contact Us
     const items: NavMenuItem[] = [
-      {
-        name: 'Home',
-        href: '/',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-yellow-400 hover:text-menu-item-yellow-400 hover:decoration-menu-item-yellow-400',
-      },
-      {
-        name: 'Artists',
-        href: '/artists',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-pink-300 aria-[current=page]:decoration-menu-item-pink-300 hover:text-menu-item-pink-300 hover:decoration-menu-item-pink-300',
-      },
-      {
-        name: 'Releases',
-        href: '/releases',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-cyan-400 aria-[current=page]:decoration-menu-item-cyan-400 hover:text-menu-item-cyan-400 hover:decoration-menu-item-cyan-400',
-      },
-      {
-        name: 'Videos',
-        href: '/videos',
-        hasBullet: !isAuthenticated,
-        color:
-          'aria-[current=page]:text-menu-item-tan-400 aria-[current=page]:decoration-menu-item-tan-400 hover:text-menu-item-tan-400 hover:decoration-menu-item-tan-400',
-      },
-      {
-        name: 'Tours',
-        href: '/tours',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-tan-200 aria-[current=page]:decoration-menu-item-tan-200 hover:text-menu-item-tan-200 hover:decoration-menu-item-tan-200',
-      },
-      {
-        name: 'Merch',
-        href: '/merch',
-        hasBullet: isAuthenticated,
-        color:
-          'aria-[current=page]:text-menu-item-yellow-300 aria-[current=page]:decoration-menu-item-yellow-300 hover:text-menu-item-yellow-300 hover:decoration-menu-item-yellow-300',
-      },
-      {
-        name: 'Playlists',
-        href: '/playlists',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-teal-400 aria-[current=page]:decoration-menu-item-teal-400 hover:text-menu-item-teal-400 hover:decoration-menu-item-teal-400',
-      },
-      {
-        name: 'About',
-        href: '/about',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-pink-400 aria-[current=page]:decoration-menu-item-pink-400 hover:text-menu-item-pink-400 hover:decoration-menu-item-pink-400',
-      },
-      {
-        name: 'Contact Us',
-        href: '/contact',
-        hasBullet: false,
-        color:
-          'aria-[current=page]:text-menu-item-orange-300 aria-[current=page]:decoration-menu-item-orange-300 hover:text-menu-item-orange-300 hover:decoration-menu-item-orange-300',
-      },
+      ...STATIC_NAV_ITEMS_HEAD,
+      videos,
+      TOURS_ITEM,
+      merch,
+      ...STATIC_NAV_ITEMS_TAIL,
     ];
 
     if (isAuthenticated) {
-      items.splice(3, 0, {
-        name: 'My Collection',
-        href: '/collection',
-        hasBullet: true,
-        color:
-          'aria-[current=page]:text-menu-item-green-400 aria-[current=page]:decoration-menu-item-green-400 hover:text-menu-item-green-400 hover:decoration-menu-item-green-400',
-      });
+      // Insert My Collection immediately after Releases (index 3).
+      items.splice(3, 0, MY_COLLECTION_ITEM);
     }
 
     return items;

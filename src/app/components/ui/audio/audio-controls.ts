@@ -15,42 +15,12 @@ import type Player from 'video.js/dist/types/player';
 
 type VideoJSComponent = ReturnType<typeof videojs.getComponent>;
 
-let _AudioRewindButton: VideoJSComponent | null = null;
-let _AudioFastForwardButton: VideoJSComponent | null = null;
-let _SkipPreviousButton: VideoJSComponent | null = null;
-let _SkipNextButton: VideoJSComponent | null = null;
-let _classesBuilt = false;
+// Each factory accepts the runtime Button base class and returns a subclass.
+// Factories are module-scoped arrow functions; the returned classes use `class`
+// because they are new-constructed Video.js components (project exemption).
 
-/**
- * Forces the cached classes to be rebuilt on the next call to ensureClasses().
- * Call this before re-registering components (e.g. after client-side navigation).
- */
-export const resetClasses = (): void => {
-  _classesBuilt = false;
-  _AudioRewindButton = null;
-  _AudioFastForwardButton = null;
-  _SkipPreviousButton = null;
-  _SkipNextButton = null;
-};
-
-/**
- * Lazily builds and caches the custom Video.js button classes.
- * Must only be called when video.js is fully loaded (i.e. inside a useEffect
- * or after the video.js player has been created).
- *
- * Re-validates on every call to handle Video.js internal state resets
- * during Next.js client-side navigation.
- */
-export const ensureClasses = (): void => {
-  const Button = videojs.getComponent('Button');
-  if (!Button) {
-    resetClasses();
-    return;
-  }
-
-  if (_classesBuilt) return;
-
-  _AudioRewindButton = class extends Button {
+const makeAudioRewindButton = (Button: NonNullable<VideoJSComponent>): VideoJSComponent =>
+  class extends Button {
     private seconds: number;
 
     constructor(player: Player, options?: Record<string, unknown>) {
@@ -92,7 +62,8 @@ export const ensureClasses = (): void => {
     }
   } as unknown as VideoJSComponent;
 
-  _AudioFastForwardButton = class extends Button {
+const makeAudioFastForwardButton = (Button: NonNullable<VideoJSComponent>): VideoJSComponent =>
+  class extends Button {
     private seconds: number;
 
     constructor(player: Player, options?: Record<string, unknown>) {
@@ -135,7 +106,8 @@ export const ensureClasses = (): void => {
     }
   } as unknown as VideoJSComponent;
 
-  _SkipPreviousButton = class extends Button {
+const makeSkipPreviousButton = (Button: NonNullable<VideoJSComponent>): VideoJSComponent =>
+  class extends Button {
     constructor(player: Player, options: Record<string, unknown> = {}) {
       super(player, options);
     }
@@ -166,7 +138,8 @@ export const ensureClasses = (): void => {
     }
   } as unknown as VideoJSComponent;
 
-  _SkipNextButton = class extends Button {
+const makeSkipNextButton = (Button: NonNullable<VideoJSComponent>): VideoJSComponent =>
+  class extends Button {
     constructor(player: Player, options: Record<string, unknown> = {}) {
       super(player, options);
     }
@@ -196,6 +169,46 @@ export const ensureClasses = (): void => {
       return el;
     }
   } as unknown as VideoJSComponent;
+
+let _AudioRewindButton: VideoJSComponent | null = null;
+let _AudioFastForwardButton: VideoJSComponent | null = null;
+let _SkipPreviousButton: VideoJSComponent | null = null;
+let _SkipNextButton: VideoJSComponent | null = null;
+let _classesBuilt = false;
+
+/**
+ * Forces the cached classes to be rebuilt on the next call to ensureClasses().
+ * Call this before re-registering components (e.g. after client-side navigation).
+ */
+export const resetClasses = (): void => {
+  _classesBuilt = false;
+  _AudioRewindButton = null;
+  _AudioFastForwardButton = null;
+  _SkipPreviousButton = null;
+  _SkipNextButton = null;
+};
+
+/**
+ * Lazily builds and caches the custom Video.js button classes.
+ * Must only be called when video.js is fully loaded (i.e. inside a useEffect
+ * or after the video.js player has been created).
+ *
+ * Re-validates on every call to handle Video.js internal state resets
+ * during Next.js client-side navigation.
+ */
+export const ensureClasses = (): void => {
+  const Button = videojs.getComponent('Button');
+  if (!Button) {
+    resetClasses();
+    return;
+  }
+
+  if (_classesBuilt) return;
+
+  _AudioRewindButton = makeAudioRewindButton(Button);
+  _AudioFastForwardButton = makeAudioFastForwardButton(Button);
+  _SkipPreviousButton = makeSkipPreviousButton(Button);
+  _SkipNextButton = makeSkipNextButton(Button);
 
   _classesBuilt = true;
 };

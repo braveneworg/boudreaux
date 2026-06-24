@@ -51,6 +51,70 @@ type PresenceMembersSnapshot = {
   me: PresenceMember | null;
 };
 
+interface PresenceHandlers {
+  handleSucceeded: (presenceMembers: PresenceMembersSnapshot) => void;
+  handleAdded: (member: PresenceMember) => void;
+  handleRemoved: (member: PresenceMember) => void;
+  handleNewMessage: (payload: ChatMessageDto) => void;
+  handleReaction: (payload: ChatMessageDto) => void;
+  handleMessageDeleted: (payload: MessageDeletedPayload) => void;
+  handleMessagePinChanged: (payload: ChatMessageDto) => void;
+  handleTyping: (payload: TypingPayload) => void;
+}
+
+/** Refs holding the latest caller-supplied event callbacks. */
+interface CallbackRefs {
+  onNewMessage: React.RefObject<((message: ChatMessageDto) => void) | undefined>;
+  onReactionUpdated: React.RefObject<((message: ChatMessageDto) => void) | undefined>;
+  onMessageDeleted: React.RefObject<((payload: MessageDeletedPayload) => void) | undefined>;
+  onMessagePinChanged: React.RefObject<((message: ChatMessageDto) => void) | undefined>;
+  onTyping: React.RefObject<((payload: TypingPayload) => void) | undefined>;
+}
+
+/** Build all Pusher event handlers for the presence channel. */
+const makePresenceHandlers = (
+  setMembers: React.Dispatch<React.SetStateAction<PresenceMember[]>>,
+  refs: CallbackRefs
+): PresenceHandlers => ({
+  handleSucceeded: (presenceMembers) => {
+    const roster: PresenceMember[] = [];
+    presenceMembers.each((m) => roster.push(m));
+    setMembers(roster);
+  },
+  handleAdded: (member) =>
+    setMembers((prev) => (prev.some((m) => m.id === member.id) ? prev : [...prev, member])),
+  handleRemoved: (member) => setMembers((prev) => prev.filter((m) => m.id !== member.id)),
+  handleNewMessage: (payload) => refs.onNewMessage.current?.(payload),
+  handleReaction: (payload) => refs.onReactionUpdated.current?.(payload),
+  handleMessageDeleted: (payload) => refs.onMessageDeleted.current?.(payload),
+  handleMessagePinChanged: (payload) => refs.onMessagePinChanged.current?.(payload),
+  handleTyping: (payload) => refs.onTyping.current?.(payload),
+});
+
+/** Bind all presence-channel handlers to the given channel. */
+const bindPresenceHandlers = (channel: PresenceChannel, h: PresenceHandlers): void => {
+  channel.bind('pusher:subscription_succeeded', h.handleSucceeded);
+  channel.bind('pusher:member_added', h.handleAdded);
+  channel.bind('pusher:member_removed', h.handleRemoved);
+  channel.bind(SERVER_NEW_MESSAGE, h.handleNewMessage);
+  channel.bind(SERVER_REACTION_UPDATED, h.handleReaction);
+  channel.bind(SERVER_MESSAGE_DELETED, h.handleMessageDeleted);
+  channel.bind(SERVER_MESSAGE_PIN_CHANGED, h.handleMessagePinChanged);
+  channel.bind(CLIENT_TYPING_EVENT, h.handleTyping);
+};
+
+/** Unbind all presence-channel handlers from the given channel. */
+const unbindPresenceHandlers = (channel: PresenceChannel, h: PresenceHandlers): void => {
+  channel.unbind('pusher:subscription_succeeded', h.handleSucceeded);
+  channel.unbind('pusher:member_added', h.handleAdded);
+  channel.unbind('pusher:member_removed', h.handleRemoved);
+  channel.unbind(SERVER_NEW_MESSAGE, h.handleNewMessage);
+  channel.unbind(SERVER_REACTION_UPDATED, h.handleReaction);
+  channel.unbind(SERVER_MESSAGE_DELETED, h.handleMessageDeleted);
+  channel.unbind(SERVER_MESSAGE_PIN_CHANGED, h.handleMessagePinChanged);
+  channel.unbind(CLIENT_TYPING_EVENT, h.handleTyping);
+};
+
 /**
  * Subscribe to the global presence chat channel. Wires server-broadcast
  * events to caller-supplied callbacks (held in refs so identity changes
@@ -66,7 +130,10 @@ export const useChatChannel = ({
   onMessageDeleted,
   onMessagePinChanged,
   onTyping,
-}: UseChatChannelParams) => {
+}: UseChatChannelParams): {
+  members: PresenceMember[];
+  sendTyping: (payload: TypingPayload) => void;
+} => {
   const [members, setMembers] = useState<PresenceMember[]>([]);
 
   const channelRef = useRef<PresenceChannel | null>(null);
@@ -93,51 +160,17 @@ export const useChatChannel = ({
     const channel = client.subscribe(CHAT_CHANNEL_NAME) as PresenceChannel;
     channelRef.current = channel;
 
-    const handleSucceeded = (presenceMembers: PresenceMembersSnapshot) => {
-      const roster: PresenceMember[] = [];
-      presenceMembers.each((m) => roster.push(m));
-      setMembers(roster);
-    };
-    const handleAdded = (member: PresenceMember) => {
-      setMembers((prev) => (prev.some((m) => m.id === member.id) ? prev : [...prev, member]));
-    };
-    const handleRemoved = (member: PresenceMember) => {
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
-    };
-    const handleNewMessage = (payload: ChatMessageDto) => {
-      onNewMessageRef.current?.(payload);
-    };
-    const handleReaction = (payload: ChatMessageDto) => {
-      onReactionUpdatedRef.current?.(payload);
-    };
-    const handleMessageDeleted = (payload: MessageDeletedPayload) => {
-      onMessageDeletedRef.current?.(payload);
-    };
-    const handleMessagePinChanged = (payload: ChatMessageDto) => {
-      onMessagePinChangedRef.current?.(payload);
-    };
-    const handleTyping = (payload: TypingPayload) => {
-      onTypingRef.current?.(payload);
-    };
-
-    channel.bind('pusher:subscription_succeeded', handleSucceeded);
-    channel.bind('pusher:member_added', handleAdded);
-    channel.bind('pusher:member_removed', handleRemoved);
-    channel.bind(SERVER_NEW_MESSAGE, handleNewMessage);
-    channel.bind(SERVER_REACTION_UPDATED, handleReaction);
-    channel.bind(SERVER_MESSAGE_DELETED, handleMessageDeleted);
-    channel.bind(SERVER_MESSAGE_PIN_CHANGED, handleMessagePinChanged);
-    channel.bind(CLIENT_TYPING_EVENT, handleTyping);
+    const handlers = makePresenceHandlers(setMembers, {
+      onNewMessage: onNewMessageRef,
+      onReactionUpdated: onReactionUpdatedRef,
+      onMessageDeleted: onMessageDeletedRef,
+      onMessagePinChanged: onMessagePinChangedRef,
+      onTyping: onTypingRef,
+    });
+    bindPresenceHandlers(channel, handlers);
 
     return () => {
-      channel.unbind('pusher:subscription_succeeded', handleSucceeded);
-      channel.unbind('pusher:member_added', handleAdded);
-      channel.unbind('pusher:member_removed', handleRemoved);
-      channel.unbind(SERVER_NEW_MESSAGE, handleNewMessage);
-      channel.unbind(SERVER_REACTION_UPDATED, handleReaction);
-      channel.unbind(SERVER_MESSAGE_DELETED, handleMessageDeleted);
-      channel.unbind(SERVER_MESSAGE_PIN_CHANGED, handleMessagePinChanged);
-      channel.unbind(CLIENT_TYPING_EVENT, handleTyping);
+      unbindPresenceHandlers(channel, handlers);
       client.unsubscribe(CHAT_CHANNEL_NAME);
       channelRef.current = null;
       setMembers([]);
@@ -148,7 +181,7 @@ export const useChatChannel = ({
    * Broadcast a client-typing event. Throttled to once per 1.5s so a long
    * burst of keystrokes doesn't exhaust the Pusher message quota.
    */
-  const sendTyping = useCallback((payload: TypingPayload) => {
+  const sendTyping = useCallback((payload: TypingPayload): void => {
     const channel = channelRef.current;
     if (!channel) return;
     const now = Date.now();
