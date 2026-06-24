@@ -130,6 +130,108 @@ const listAllKeys = async (s3: S3Client, bucket: string, prefix: string): Promis
   return keys;
 };
 
+/**
+ * Collect every DB-referenced cover-art URL (Release.coverArt,
+ * FeaturedArtist.coverArt, Image.src), reduce each to an S3 key, then to its
+ * parent directory. The returned set is every "referenced directory".
+ */
+const collectReferencedDirs = async (
+  prisma: PrismaClient
+): Promise<{ referencedKeys: Set<string>; referencedDirs: Set<string> }> => {
+  const [releases, featuredArtists, images] = await Promise.all([
+    prisma.release.findMany({ select: { coverArt: true } }),
+    prisma.featuredArtist.findMany({ select: { coverArt: true } }),
+    prisma.image.findMany({ select: { src: true } }),
+  ]);
+
+  const urls = [
+    ...releases.map((r) => r.coverArt),
+    ...featuredArtists.map((fa) => fa.coverArt),
+    ...images.map((img) => img.src),
+  ];
+
+  const referencedKeys = new Set<string>();
+  for (const url of urls) {
+    const key = extractS3KeyFromUrl(url);
+    if (key) referencedKeys.add(key);
+  }
+
+  const referencedDirs = new Set<string>();
+  for (const key of referencedKeys) {
+    const dir = parentPrefix(key);
+    if (dir) referencedDirs.add(dir);
+  }
+
+  return { referencedKeys, referencedDirs };
+};
+
+/** Log up to 20 orphan keys for visibility, plus an "and N more" summary line. */
+const logOrphanSample = (orphans: string[]): void => {
+  const sample = orphans.slice(0, 20);
+  for (const k of sample) {
+    log(`  ${colors.dim}-${colors.reset} ${k}`, 'info');
+  }
+  if (orphans.length > sample.length) {
+    log(`  ${colors.dim}... and ${orphans.length - sample.length} more${colors.reset}`, 'info');
+  }
+};
+
+/** Delete orphans in batches of 1000 (the S3 DeleteObjects limit). */
+const deleteOrphansInBatches = async (
+  s3: S3Client,
+  bucket: string,
+  orphans: string[]
+): Promise<number> => {
+  let totalDeleted = 0;
+  for (let i = 0; i < orphans.length; i += 1000) {
+    const batch = orphans.slice(i, i + 1000);
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+      })
+    );
+    totalDeleted += batch.length;
+    log(`Deleted batch ${i / 1000 + 1} (${batch.length} key(s))`, 'info');
+  }
+  return totalDeleted;
+};
+
+/**
+ * CloudFront invalidation — single wildcard for the entire prefix. Honors the
+ * --no-invalidate flag and a missing distribution id (logging a skip in the
+ * latter case). Failures are non-fatal.
+ */
+const invalidateCloudFront = async (
+  invalidate: boolean,
+  region: string,
+  prefix: string
+): Promise<void> => {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (!distributionId) {
+    log('CLOUDFRONT_DISTRIBUTION_ID not set — skipping invalidation', 'info');
+    return;
+  }
+  if (!invalidate) return;
+
+  try {
+    const cf = new CloudFrontClient({ region });
+    await cf.send(
+      new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `cleanup-orphans-${Date.now()}`,
+          Paths: { Quantity: 1, Items: [`/${prefix}*`] },
+        },
+      })
+    );
+    log(`CloudFront invalidation initiated for /${prefix}*`, 'success');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown';
+    log(`CloudFront invalidation failed (non-fatal): ${msg}`, 'warning');
+  }
+};
+
 const HELP = `
 ${colors.cyan}Cleanup S3 orphan images${colors.reset}
 
@@ -153,13 +255,11 @@ ${colors.yellow}Required env:${colors.reset} S3_BUCKET, DATABASE_URL, AWS_*
 ${colors.yellow}Optional env:${colors.reset} AWS_REGION (default us-east-1), CLOUDFRONT_DISTRIBUTION_ID
 `;
 
-const main = async (): Promise<void> => {
-  const opts = parseArgs(process.argv.slice(2));
-  if (opts.help) {
-    console.info(HELP);
-    return;
-  }
-
+/**
+ * Validate required env and resolve the bucket + region. Exits the process with
+ * code 1 if S3_BUCKET or DATABASE_URL is missing.
+ */
+const resolveRequiredEnv = (): { bucket: string; region: string } => {
   const bucket = process.env.S3_BUCKET;
   const region = process.env.AWS_REGION ?? 'us-east-1';
   if (!bucket) {
@@ -170,6 +270,17 @@ const main = async (): Promise<void> => {
     log('DATABASE_URL env var is required', 'error');
     process.exit(1);
   }
+  return { bucket, region };
+};
+
+const main = async (): Promise<void> => {
+  const opts = parseArgs(process.argv.slice(2));
+  if (opts.help) {
+    console.info(HELP);
+    return;
+  }
+
+  const { bucket, region } = resolveRequiredEnv();
 
   const s3 = new S3Client({ region });
   const prisma = new PrismaClient();
@@ -178,34 +289,8 @@ const main = async (): Promise<void> => {
   log(`Scanning s3://${bucket}/${opts.prefix}...`, 'info');
 
   try {
-    // 1. Collect every DB-referenced cover-art URL.
-    const [releases, featuredArtists, images] = await Promise.all([
-      prisma.release.findMany({ select: { coverArt: true } }),
-      prisma.featuredArtist.findMany({ select: { coverArt: true } }),
-      prisma.image.findMany({ select: { src: true } }),
-    ]);
-
-    const referencedKeys = new Set<string>();
-    for (const r of releases) {
-      const k = extractS3KeyFromUrl(r.coverArt);
-      if (k) referencedKeys.add(k);
-    }
-    for (const fa of featuredArtists) {
-      const k = extractS3KeyFromUrl(fa.coverArt);
-      if (k) referencedKeys.add(k);
-    }
-    for (const img of images) {
-      const k = extractS3KeyFromUrl(img.src);
-      if (k) referencedKeys.add(k);
-    }
-
-    // 2. Build set of referenced directories (parent prefixes).
-    const referencedDirs = new Set<string>();
-    for (const k of referencedKeys) {
-      const dir = parentPrefix(k);
-      if (dir) referencedDirs.add(dir);
-    }
-
+    // 1 & 2. Collect DB-referenced cover-art keys and their parent directories.
+    const { referencedKeys, referencedDirs } = await collectReferencedDirs(prisma);
     log(
       `DB references ${referencedKeys.size} cover-art key(s) across ${referencedDirs.size} directory(ies)`,
       'info'
@@ -235,13 +320,7 @@ const main = async (): Promise<void> => {
     }
 
     // Sample up to 20 for visibility before deletion.
-    const sample = orphans.slice(0, 20);
-    for (const k of sample) {
-      log(`  ${colors.dim}-${colors.reset} ${k}`, 'info');
-    }
-    if (orphans.length > sample.length) {
-      log(`  ${colors.dim}... and ${orphans.length - sample.length} more${colors.reset}`, 'info');
-    }
+    logOrphanSample(orphans);
 
     if (!opts.execute) {
       log('DRY RUN — re-run with --execute to delete.', 'warning');
@@ -250,41 +329,10 @@ const main = async (): Promise<void> => {
     }
 
     // 5. Delete in batches of 1000 (S3 DeleteObjects limit).
-    let totalDeleted = 0;
-    for (let i = 0; i < orphans.length; i += 1000) {
-      const batch = orphans.slice(i, i + 1000);
-      await s3.send(
-        new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
-        })
-      );
-      totalDeleted += batch.length;
-      log(`Deleted batch ${i / 1000 + 1} (${batch.length} key(s))`, 'info');
-    }
+    const totalDeleted = await deleteOrphansInBatches(s3, bucket, orphans);
 
     // 6. CloudFront invalidation — single wildcard for the entire prefix.
-    const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
-    if (opts.invalidate && distributionId) {
-      try {
-        const cf = new CloudFrontClient({ region });
-        await cf.send(
-          new CreateInvalidationCommand({
-            DistributionId: distributionId,
-            InvalidationBatch: {
-              CallerReference: `cleanup-orphans-${Date.now()}`,
-              Paths: { Quantity: 1, Items: [`/${opts.prefix}*`] },
-            },
-          })
-        );
-        log(`CloudFront invalidation initiated for /${opts.prefix}*`, 'success');
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown';
-        log(`CloudFront invalidation failed (non-fatal): ${msg}`, 'warning');
-      }
-    } else if (!distributionId) {
-      log('CLOUDFRONT_DISTRIBUTION_ID not set — skipping invalidation', 'info');
-    }
+    await invalidateCloudFront(opts.invalidate, region, opts.prefix);
 
     log(`Done. Deleted ${totalDeleted} orphan(s).`, 'success');
   } finally {

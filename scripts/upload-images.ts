@@ -195,16 +195,24 @@ export const generateS3Key = (filePath: string, prefix?: string): string => {
   return key;
 };
 
+interface UploadFileOptions {
+  s3Client: S3Client;
+  bucket: string;
+  localPath: string;
+  s3Key: string;
+  result: UploadResult;
+}
+
 /**
  * Upload a single file to S3
  */
-const uploadFile = async (
-  s3Client: S3Client,
-  bucket: string,
-  localPath: string,
-  s3Key: string,
-  result: UploadResult
-): Promise<void> => {
+const uploadFile = async ({
+  s3Client,
+  bucket,
+  localPath,
+  s3Key,
+  result,
+}: UploadFileOptions): Promise<void> => {
   try {
     if (!existsSync(localPath)) {
       log(`File not found: ${localPath}`, 'error');
@@ -284,6 +292,58 @@ export const collectImagesFromDirectory = (dirPath: string): string[] => {
   return images;
 };
 
+/** CloudFront allows at most 3,000 explicit paths per invalidation request. */
+const MAX_PATHS_PER_REQUEST = 3000;
+
+/** Send a single wildcard (`/*`) invalidation for very large uploads. */
+const sendWildcardInvalidation = async (
+  cloudfront: CloudFrontClient,
+  distributionId: string,
+  keyCount: number
+): Promise<void> => {
+  log(`Invalidating CloudFront cache using wildcard for ${keyCount} file(s)...`, 'info');
+
+  const command = new CreateInvalidationCommand({
+    DistributionId: distributionId,
+    InvalidationBatch: {
+      CallerReference: `upload-images-wildcard-${Date.now()}`,
+      Paths: {
+        Quantity: 1,
+        Items: ['/*'],
+      },
+    },
+  });
+
+  await cloudfront.send(command);
+  log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+};
+
+/** Send an invalidation listing each uploaded key as an explicit path. */
+const sendSpecificInvalidation = async (
+  cloudfront: CloudFrontClient,
+  distributionId: string,
+  keys: string[]
+): Promise<void> => {
+  log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
+
+  // CloudFront paths must start with /
+  const paths = keys.map((key) => `/${key}`);
+
+  const command = new CreateInvalidationCommand({
+    DistributionId: distributionId,
+    InvalidationBatch: {
+      CallerReference: `upload-images-${Date.now()}`,
+      Paths: {
+        Quantity: paths.length,
+        Items: paths,
+      },
+    },
+  });
+
+  await cloudfront.send(command);
+  log('✓ CloudFront cache invalidation initiated', 'success');
+};
+
 /**
  * Invalidate CloudFront cache for uploaded files.
  * CloudFront has a limit of 3,000 paths per invalidation request.
@@ -301,52 +361,58 @@ const invalidateCloudFront = async (
 
   try {
     const cloudfront = new CloudFrontClient({ region });
-    const MAX_PATHS_PER_REQUEST = 3000;
 
-    // For very large uploads (>3000 files), use wildcard invalidation
-    // This is more cost-effective and faster than multiple requests
+    // For very large uploads (>3000 files), use wildcard invalidation —
+    // more cost-effective and faster than multiple requests.
     if (keys.length > MAX_PATHS_PER_REQUEST) {
-      log(`Invalidating CloudFront cache using wildcard for ${keys.length} file(s)...`, 'info');
-
-      const command = new CreateInvalidationCommand({
-        DistributionId: distributionId,
-        InvalidationBatch: {
-          CallerReference: `upload-images-wildcard-${Date.now()}`,
-          Paths: {
-            Quantity: 1,
-            Items: ['/*'],
-          },
-        },
-      });
-
-      await cloudfront.send(command);
-      log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+      await sendWildcardInvalidation(cloudfront, distributionId, keys.length);
       return;
     }
 
-    // For smaller batches (≤3000 files), invalidate specific paths
-    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-
-    // CloudFront paths must start with /
-    const paths = keys.map((key) => `/${key}`);
-
-    const command = new CreateInvalidationCommand({
-      DistributionId: distributionId,
-      InvalidationBatch: {
-        CallerReference: `upload-images-${Date.now()}`,
-        Paths: {
-          Quantity: paths.length,
-          Items: paths,
-        },
-      },
-    });
-
-    await cloudfront.send(command);
-    log('✓ CloudFront cache invalidation initiated', 'success');
+    await sendSpecificInvalidation(cloudfront, distributionId, keys);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     log(`Warning: Failed to invalidate CloudFront cache: ${errorMessage}`, 'warning');
   }
+};
+
+/**
+ * Compute the S3 key for one file. When `baseDir` is set, the key is derived
+ * from the path relative to it; files that traverse outside `baseDir` are
+ * recorded as skipped on `result` and the function returns `null`.
+ */
+const computeS3Key = (
+  filePath: string,
+  resolvedPath: string,
+  options: UploadOptions,
+  result: UploadResult
+): string | null => {
+  // If baseDir is provided, compute the relative path from baseDir
+  // This is used when uploading from a directory to get correct S3 keys
+  let pathForS3Key = filePath;
+  if (options.baseDir) {
+    const resolvedBaseDir = resolvePath(options.baseDir);
+    const relativePath = relative(resolvedBaseDir, resolvedPath);
+
+    // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
+    const hasParentTraversal = relativePath.split(/[\\/]+/).includes('..');
+
+    if (hasParentTraversal || isAbsolute(relativePath)) {
+      const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
+      log(message, 'error');
+      result.skipped += 1;
+      result.errors.push({ path: filePath, error: message });
+      return null;
+    }
+
+    // Use the safe, normalized relative path for the S3 key
+    pathForS3Key = relativePath.replace(/\\/g, '/');
+  }
+
+  // When baseDir is used without an explicit prefix, use empty prefix to preserve directory structure
+  // Otherwise, generateS3Key will apply its default 'media' prefix
+  const effectivePrefix = options.baseDir && options.prefix === undefined ? '' : options.prefix;
+  return generateS3Key(pathForS3Key, effectivePrefix);
 };
 
 /**
@@ -373,34 +439,10 @@ export const uploadImages = async (
 
   for (const filePath of filePaths) {
     const resolvedPath = resolvePath(filePath);
-
-    // If baseDir is provided, compute the relative path from baseDir
-    // This is used when uploading from a directory to get correct S3 keys
-    let pathForS3Key = filePath;
-    if (options.baseDir) {
-      const resolvedBaseDir = resolvePath(options.baseDir);
-      const relativePath = relative(resolvedBaseDir, resolvedPath);
-
-      // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
-      const hasParentTraversal = relativePath.split(/[\\/]+/).includes('..');
-
-      if (hasParentTraversal || isAbsolute(relativePath)) {
-        const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
-        log(message, 'error');
-        result.skipped += 1;
-        result.errors.push({ path: filePath, error: message });
-        continue;
-      }
-
-      // Use the safe, normalized relative path for the S3 key
-      pathForS3Key = relativePath.replace(/\\/g, '/');
-    }
-
-    // When baseDir is used without an explicit prefix, use empty prefix to preserve directory structure
-    // Otherwise, generateS3Key will apply its default 'media' prefix
-    const effectivePrefix = options.baseDir && options.prefix === undefined ? '' : options.prefix;
-    const s3Key = generateS3Key(pathForS3Key, effectivePrefix);
-    await uploadFile(s3Client, bucket, resolvedPath, s3Key, result);
+    const s3Key = computeS3Key(filePath, resolvedPath, options, result);
+    // `null` means the file fell outside baseDir and was recorded as skipped.
+    if (s3Key === null) continue;
+    await uploadFile({ s3Client, bucket, localPath: resolvedPath, s3Key, result });
   }
 
   // Invalidate CloudFront cache if configured
@@ -412,60 +454,92 @@ export const uploadImages = async (
   return result;
 };
 
-/**
- * Parse command line arguments
- */
-export const parseArgs = (
-  args: string[]
-): {
+interface ParsedArgs {
   mode: 'files' | 'directory';
   paths: string[];
   prefix?: string;
   invalidateCache: boolean;
   baseDir?: string;
-} => {
-  const result = {
-    mode: 'files' as 'files' | 'directory',
-    paths: [] as string[],
-    prefix: undefined as string | undefined,
+}
+
+/**
+ * Read the value following a value-taking flag at `args[i]`. Returns the value
+ * and advanced index, or `null` when the next token is missing or another flag.
+ */
+const readFlagValue = (args: string[], i: number): { value: string; nextIndex: number } | null => {
+  if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
+    return { value: args[i + 1], nextIndex: i + 1 };
+  }
+  return null;
+};
+
+const isDirFlag = (arg: string | undefined): boolean => arg === '--dir' || arg === '-d';
+const isPrefixFlag = (arg: string | undefined): boolean => arg === '--prefix' || arg === '-p';
+
+/** A bare positional argument (a path), not an option flag. */
+const isPositionalToken = (arg: string | undefined): arg is string =>
+  arg !== undefined && !arg.startsWith('--') && !arg.startsWith('-');
+
+/** Handle the `--dir`/`--prefix` value flags; returns the next index, or `i`. */
+const applyValueFlag = (
+  result: ParsedArgs,
+  arg: string | undefined,
+  args: string[],
+  i: number
+): number => {
+  if (isDirFlag(arg)) {
+    result.mode = 'directory';
+  }
+  const read = readFlagValue(args, i);
+  if (!read) {
+    return i;
+  }
+  if (isDirFlag(arg)) {
+    result.paths.push(read.value);
+  } else {
+    result.prefix = read.value;
+  }
+  return read.nextIndex;
+};
+
+/** Apply a single token to `result`, returning the index to continue from. */
+const applyArg = (result: ParsedArgs, args: string[], i: number): number => {
+  const arg = args.at(i);
+
+  if (isDirFlag(arg) || isPrefixFlag(arg)) {
+    return applyValueFlag(result, arg, args, i);
+  }
+
+  if (arg === '--no-invalidate') {
+    result.invalidateCache = false;
+  } else if (isPositionalToken(arg)) {
+    // Handle comma-separated paths
+    result.paths.push(...arg.split(',').map((p) => p.trim()));
+  }
+
+  return i;
+};
+
+/**
+ * Parse command line arguments
+ */
+export const parseArgs = (args: string[]): ParsedArgs => {
+  const result: ParsedArgs = {
+    mode: 'files',
+    paths: [],
+    prefix: undefined,
     invalidateCache: true,
-    baseDir: undefined as string | undefined,
+    baseDir: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args.at(i);
-
-    if (arg === '--dir' || arg === '-d') {
-      result.mode = 'directory';
-      if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-        result.paths.push(args[i + 1]);
-        i++;
-      }
-    } else if (arg === '--prefix' || arg === '-p') {
-      if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-        result.prefix = args[i + 1];
-        i++;
-      }
-    } else if (arg === '--no-invalidate') {
-      result.invalidateCache = false;
-    } else if (arg !== undefined && !arg.startsWith('--') && !arg.startsWith('-')) {
-      // Handle comma-separated paths
-      const paths = arg.split(',').map((p) => p.trim());
-      result.paths.push(...paths);
-    }
+    i = applyArg(result, args, i);
   }
 
   return result;
 };
 
-/**
- * Main function
- */
-const main = async (): Promise<void> => {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
-    console.info(`
+const HELP_TEXT = `
 ${colors.cyan}Image Upload Utility${colors.reset}
 
 Upload images to S3 bucket with support for single files, multiple files, or entire directories.
@@ -494,7 +568,62 @@ ${colors.yellow}Environment Variables:${colors.reset}
   S3_BUCKET                    - S3 bucket name (required)
   AWS_REGION                   - AWS region (default: us-east-1)
   CLOUDFRONT_DISTRIBUTION_ID   - CloudFront distribution ID (optional)
-    `);
+    `;
+
+/**
+ * Resolve the concrete list of files to upload from parsed args. In directory
+ * mode, sets `parsedArgs.baseDir` for correct S3 key generation. Exits the
+ * process on missing-path errors, mirroring the original main() control flow.
+ */
+const resolveFilePaths = (parsedArgs: ParsedArgs): string[] => {
+  if (parsedArgs.mode === 'directory') {
+    if (parsedArgs.paths.length === 0) {
+      log('No directory specified with --dir option', 'error');
+      process.exit(1);
+    }
+
+    const dirPath = resolvePath(parsedArgs.paths[0]);
+    log(`Collecting images from directory: ${dirPath}`, 'info');
+    const filePaths = collectImagesFromDirectory(dirPath);
+    log(`Found ${filePaths.length} image(s)`, 'info');
+
+    // Pass the base directory for proper S3 key generation
+    parsedArgs.baseDir = dirPath;
+    return filePaths;
+  }
+
+  if (parsedArgs.paths.length === 0) {
+    log('No file paths specified', 'error');
+    process.exit(1);
+  }
+  return parsedArgs.paths;
+};
+
+/** Print the upload summary banner and any per-file errors. */
+const printSummary = (result: UploadResult): void => {
+  console.info('\n' + '='.repeat(60));
+  log(
+    `Upload Summary: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`,
+    result.failed > 0 ? 'warning' : 'success'
+  );
+  console.info('='.repeat(60));
+
+  if (result.errors.length > 0) {
+    console.error(`\n${colors.red}Errors:${colors.reset}`);
+    result.errors.forEach(({ path, error }) => {
+      console.error(`  ${path}: ${error}`);
+    });
+  }
+};
+
+/**
+ * Main function
+ */
+const main = async (): Promise<void> => {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    console.info(HELP_TEXT);
     process.exit(0);
   }
 
@@ -505,28 +634,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
 
   try {
     const parsedArgs = parseArgs(args);
-    let filePaths: string[] = [];
-
-    if (parsedArgs.mode === 'directory') {
-      if (parsedArgs.paths.length === 0) {
-        log('No directory specified with --dir option', 'error');
-        process.exit(1);
-      }
-
-      const dirPath = resolvePath(parsedArgs.paths[0]);
-      log(`Collecting images from directory: ${dirPath}`, 'info');
-      filePaths = collectImagesFromDirectory(dirPath);
-      log(`Found ${filePaths.length} image(s)`, 'info');
-
-      // Pass the base directory for proper S3 key generation
-      parsedArgs.baseDir = dirPath;
-    } else {
-      if (parsedArgs.paths.length === 0) {
-        log('No file paths specified', 'error');
-        process.exit(1);
-      }
-      filePaths = parsedArgs.paths;
-    }
+    const filePaths = resolveFilePaths(parsedArgs);
 
     if (filePaths.length === 0) {
       log('No images to upload', 'warning');
@@ -539,20 +647,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
       baseDir: parsedArgs.baseDir,
     });
 
-    // Print summary
-    console.info('\n' + '='.repeat(60));
-    log(
-      `Upload Summary: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`,
-      result.failed > 0 ? 'warning' : 'success'
-    );
-    console.info('='.repeat(60));
-
-    if (result.errors.length > 0) {
-      console.error(`\n${colors.red}Errors:${colors.reset}`);
-      result.errors.forEach(({ path, error }) => {
-        console.error(`  ${path}: ${error}`);
-      });
-    }
+    printSummary(result);
 
     process.exit(result.failed > 0 ? 1 : 0);
   } catch (error) {

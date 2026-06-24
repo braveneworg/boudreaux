@@ -165,13 +165,21 @@ const downloadObject = async (s3: S3Client, bucket: string, key: string): Promis
   return Buffer.concat(chunks);
 };
 
-const uploadBuffer = async (
-  s3: S3Client,
-  bucket: string,
-  key: string,
-  buffer: Buffer,
-  contentType: string
-): Promise<void> => {
+interface UploadBufferOptions {
+  s3: S3Client;
+  bucket: string;
+  key: string;
+  buffer: Buffer;
+  contentType: string;
+}
+
+const uploadBuffer = async ({
+  s3,
+  bucket,
+  key,
+  buffer,
+  contentType,
+}: UploadBufferOptions): Promise<void> => {
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -285,6 +293,107 @@ interface ProcessResult {
   error?: string;
 }
 
+interface VariantWidthContext {
+  s3: S3Client;
+  bucket: string;
+  key: string;
+  buffer: Buffer;
+  contentType: string;
+  shouldTranscodeToWebp: boolean;
+  originalWidth: number;
+  dryRun: boolean;
+}
+
+interface VariantKeys {
+  targetWidth: number;
+  variantKey: string;
+  webpVariantKey: string | null;
+}
+
+/** Log the would-generate lines for one width in dry-run mode; returns count. */
+const logDryRunVariant = (ctx: VariantWidthContext, keys: VariantKeys): number => {
+  const { targetWidth, variantKey, webpVariantKey } = keys;
+  log(
+    `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${variantKey} (${targetWidth}px from ${ctx.originalWidth}px)`,
+    'info'
+  );
+  if (!webpVariantKey) return 1;
+  log(
+    `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpVariantKey} (${targetWidth}px WebP)`,
+    'info'
+  );
+  return 2;
+};
+
+/** Resize, upload, and (optionally) transcode a single width into `result`. */
+const uploadVariantWidth = async (
+  ctx: VariantWidthContext,
+  keys: VariantKeys,
+  result: ProcessResult
+): Promise<void> => {
+  const { targetWidth, variantKey, webpVariantKey } = keys;
+  const pipeline = sharp(ctx.buffer).resize(targetWidth, undefined, {
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
+
+  const resized = await pipeline.clone().toBuffer();
+  await uploadBuffer({
+    s3: ctx.s3,
+    bucket: ctx.bucket,
+    key: variantKey,
+    buffer: resized,
+    contentType: ctx.contentType,
+  });
+  result.variantsUploaded++;
+  result.uploadedVariantKeys.push(variantKey);
+
+  log(
+    `  ${colors.green}+${colors.reset} ${variantKey} (${targetWidth}px, ${formatBytes(resized.length)})`,
+    'info'
+  );
+
+  if (!webpVariantKey) return;
+
+  const webpBuffer = await pipeline.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
+  await uploadBuffer({
+    s3: ctx.s3,
+    bucket: ctx.bucket,
+    key: webpVariantKey,
+    buffer: webpBuffer,
+    contentType: 'image/webp',
+  });
+  result.variantsUploaded++;
+  result.uploadedVariantKeys.push(webpVariantKey);
+
+  log(
+    `  ${colors.green}+${colors.reset} ${webpVariantKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
+    'info'
+  );
+};
+
+/** Process one width: dry-run logging or real resize/upload. */
+const processVariantWidth = async (
+  ctx: VariantWidthContext,
+  targetWidth: number,
+  result: ProcessResult
+): Promise<void> => {
+  const keys: VariantKeys = {
+    targetWidth,
+    variantKey: buildVariantKey(ctx.key, targetWidth),
+    webpVariantKey: ctx.shouldTranscodeToWebp
+      ? buildVariantKey(ctx.key, targetWidth, '.webp')
+      : null,
+  };
+
+  if (ctx.dryRun) {
+    result.variantsUploaded += logDryRunVariant(ctx, keys);
+    return;
+  }
+
+  await uploadVariantWidth(ctx, keys, result);
+};
+
 const processImage = async (
   s3: S3Client,
   bucket: string,
@@ -308,62 +417,23 @@ const processImage = async (
       return result;
     }
 
-    const contentType = mime.getType(key) ?? 'application/octet-stream';
-    const ext = getExtension(key);
-    const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
-
     // Generate every variant width, including ones >= the original.
     // `withoutEnlargement: true` keeps sharp from upscaling — a 500px source
     // asked for at 1200px just emits a 500px image saved at the `_w1200`
     // filename. Keeps every srcset URL live for small originals.
+    const ctx: VariantWidthContext = {
+      s3,
+      bucket,
+      key,
+      buffer,
+      contentType: mime.getType(key) ?? 'application/octet-stream',
+      shouldTranscodeToWebp: WEBP_TRANSCODE_EXTENSIONS.has(getExtension(key)),
+      originalWidth,
+      dryRun,
+    };
+
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
-      const variantKey = buildVariantKey(key, targetWidth);
-      const webpVariantKey = shouldTranscodeToWebp
-        ? buildVariantKey(key, targetWidth, '.webp')
-        : null;
-
-      if (dryRun) {
-        log(
-          `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${variantKey} (${targetWidth}px from ${originalWidth}px)`,
-          'info'
-        );
-        result.variantsUploaded++;
-        if (webpVariantKey) {
-          log(
-            `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpVariantKey} (${targetWidth}px WebP)`,
-            'info'
-          );
-          result.variantsUploaded++;
-        }
-        continue;
-      }
-
-      const pipeline = sharp(buffer).resize(targetWidth, undefined, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      });
-
-      const resized = await pipeline.clone().toBuffer();
-      await uploadBuffer(s3, bucket, variantKey, resized, contentType);
-      result.variantsUploaded++;
-      result.uploadedVariantKeys.push(variantKey);
-
-      log(
-        `  ${colors.green}+${colors.reset} ${variantKey} (${targetWidth}px, ${formatBytes(resized.length)})`,
-        'info'
-      );
-
-      if (webpVariantKey) {
-        const webpBuffer = await pipeline.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
-        await uploadBuffer(s3, bucket, webpVariantKey, webpBuffer, 'image/webp');
-        result.variantsUploaded++;
-        result.uploadedVariantKeys.push(webpVariantKey);
-
-        log(
-          `  ${colors.green}+${colors.reset} ${webpVariantKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
-          'info'
-        );
-      }
+      await processVariantWidth(ctx, targetWidth, result);
     }
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Unknown error';
@@ -440,11 +510,7 @@ const parseArgs = (args: string[]): CliOptions => {
 // Main
 // ---------------------------------------------------------------------------
 
-const main = async (): Promise<void> => {
-  const args = process.argv.slice(2);
-
-  if (args.includes('--help') || args.includes('-h')) {
-    console.info(`
+const HELP_TEXT = `
 ${colors.cyan}Generate Image Width Variants${colors.reset}
 
 Download original images from S3, resize to each device-size breakpoint,
@@ -467,7 +533,88 @@ ${colors.yellow}Environment Variables:${colors.reset}
   S3_BUCKET                    S3 bucket name (required)
   AWS_REGION                   AWS region (default: us-east-1)
   CLOUDFRONT_DISTRIBUTION_ID   CloudFront distribution ID (optional)
-`);
+`;
+
+interface RunSummary {
+  uploadedKeys: string[];
+  totalVariants: number;
+  totalSkipped: number;
+  totalErrors: number;
+}
+
+/** Pick the originals to process and log how many are already complete. */
+const selectOriginals = (
+  allKeys: string[],
+  options: CliOptions
+): { originals: string[]; alreadyComplete: number } => {
+  const existingKeys = new Set(allKeys);
+  const candidates = allKeys.filter((key) => isProcessableImage(key) && !isExistingVariant(key));
+  log(
+    `${candidates.length} original image(s) found (excluding SVG/ICO/GIF and existing variants)`,
+    'info'
+  );
+
+  const originals = options.force
+    ? candidates
+    : candidates.filter((key) => !hasAllVariants(key, existingKeys));
+  const alreadyComplete = candidates.length - originals.length;
+
+  if (alreadyComplete > 0) {
+    log(
+      `Skipping ${alreadyComplete} image(s) that already have all variants on S3${
+        options.force ? '' : ' (use --force to regenerate)'
+      }`,
+      'info'
+    );
+  }
+
+  return { originals, alreadyComplete };
+};
+
+/** Aggregate per-image results into totals, logging errors as they surface. */
+const summarizeResults = (results: ProcessResult[], dryRun: boolean): RunSummary => {
+  const summary: RunSummary = {
+    uploadedKeys: [],
+    totalVariants: 0,
+    totalSkipped: 0,
+    totalErrors: 0,
+  };
+
+  for (const r of results) {
+    summary.totalVariants += r.variantsUploaded;
+    summary.totalSkipped += r.variantsSkipped;
+    if (r.error) {
+      summary.totalErrors++;
+      log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
+    }
+    // Collect exact uploaded variant keys for invalidation
+    if (!dryRun && r.uploadedVariantKeys.length > 0) {
+      summary.uploadedKeys.push(...r.uploadedVariantKeys);
+    }
+  }
+
+  return summary;
+};
+
+/** Invalidate CloudFront for uploaded keys, swallowing failures as warnings. */
+const maybeInvalidate = async (options: CliOptions, uploadedKeys: string[]): Promise<void> => {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (options.dryRun || !options.invalidateCache || !distributionId || uploadedKeys.length === 0) {
+    return;
+  }
+  try {
+    await invalidateCloudFront(distributionId, uploadedKeys, AWS_REGION);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    log(`CloudFront invalidation failed: ${msg}`, 'warning');
+  }
+};
+
+const main = async (): Promise<void> => {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.info(HELP_TEXT);
     process.exit(0);
   }
 
@@ -488,29 +635,8 @@ ${colors.yellow}Environment Variables:${colors.reset}
   const allKeys = await listAllObjects(s3, S3_BUCKET, options.prefix);
   log(`Found ${allKeys.length} total object(s)`, 'info');
 
-  // 2. Filter to processable originals
-  const existingKeys = new Set(allKeys);
-  const candidates = allKeys.filter((key) => isProcessableImage(key) && !isExistingVariant(key));
-  log(
-    `${candidates.length} original image(s) found (excluding SVG/ICO/GIF and existing variants)`,
-    'info'
-  );
-
-  // 3. Skip originals whose variants are all already on S3 (unless --force).
-  const originals = options.force
-    ? candidates
-    : candidates.filter((key) => !hasAllVariants(key, existingKeys));
-  const alreadyComplete = candidates.length - originals.length;
-
-  if (alreadyComplete > 0) {
-    log(
-      `Skipping ${alreadyComplete} image(s) that already have all variants on S3${
-        options.force ? '' : ' (use --force to regenerate)'
-      }`,
-      'info'
-    );
-  }
-
+  // 2 & 3. Filter to processable originals and skip already-complete ones.
+  const { originals, alreadyComplete } = selectOriginals(allKeys, options);
   log(`${originals.length} image(s) to process`, 'info');
 
   if (originals.length === 0) {
@@ -519,39 +645,18 @@ ${colors.yellow}Environment Variables:${colors.reset}
   }
 
   // 4. Process with concurrency
-  const uploadedKeys: string[] = [];
-  let totalVariants = 0;
-  let totalSkipped = 0;
-  let totalErrors = 0;
-
   const results = await mapWithConcurrency(originals, CONCURRENCY, async (key) => {
     log(`Processing: ${key}`, 'info');
     return processImage(s3, S3_BUCKET, key, options.dryRun);
   });
 
-  for (const r of results) {
-    totalVariants += r.variantsUploaded;
-    totalSkipped += r.variantsSkipped;
-    if (r.error) {
-      totalErrors++;
-      log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
-    }
-    // Collect exact uploaded variant keys for invalidation
-    if (!options.dryRun && r.uploadedVariantKeys.length > 0) {
-      uploadedKeys.push(...r.uploadedVariantKeys);
-    }
-  }
+  const { uploadedKeys, totalVariants, totalSkipped, totalErrors } = summarizeResults(
+    results,
+    options.dryRun
+  );
 
   // 5. CloudFront invalidation
-  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
-  if (!options.dryRun && options.invalidateCache && distributionId && uploadedKeys.length > 0) {
-    try {
-      await invalidateCloudFront(distributionId, uploadedKeys, AWS_REGION);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      log(`CloudFront invalidation failed: ${msg}`, 'warning');
-    }
-  }
+  await maybeInvalidate(options, uploadedKeys);
 
   // 6. Summary
   console.info('\n' + '='.repeat(60));

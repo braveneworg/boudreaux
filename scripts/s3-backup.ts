@@ -129,6 +129,12 @@ interface RestoreResult {
   errors: Array<{ key: string; error: string }>;
 }
 
+interface S3ManifestEntry {
+  key: string;
+  size: number;
+  lastModified: string;
+}
+
 /**
  * Format bytes to human-readable string
  */
@@ -306,6 +312,192 @@ const hasChangedSinceLastBackup = (
 };
 
 /**
+ * Convert a listed S3 object into a manifest entry, or null when it is not an
+ * eligible media file (or has no key).
+ */
+const toManifestEntry = (object: {
+  Key?: string;
+  Size?: number;
+  LastModified?: Date;
+}): S3ManifestEntry | null => {
+  if (!object.Key || !isAllowedMediaFile(object.Key)) {
+    return null;
+  }
+
+  return {
+    key: object.Key,
+    size: object.Size || 0,
+    lastModified: object.LastModified?.toISOString() || '',
+  };
+};
+
+/**
+ * Collect the full manifest of eligible media files from S3, paging through
+ * every ListObjectsV2 response.
+ */
+const collectS3Manifest = async ({
+  s3Client,
+  bucket,
+  prefix,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  prefix: string;
+}): Promise<S3ManifestEntry[]> => {
+  const manifest: S3ManifestEntry[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const listResponse = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (!listResponse.Contents || listResponse.Contents.length === 0) {
+      break;
+    }
+
+    for (const object of listResponse.Contents) {
+      const entry = toManifestEntry(object);
+      if (entry) {
+        manifest.push(entry);
+      }
+    }
+
+    continuationToken = listResponse.NextContinuationToken;
+  } while (continuationToken);
+
+  return manifest;
+};
+
+/**
+ * Download a single manifest entry to its sanitized local path, updating the
+ * backup metadata accumulator on success. Invalid keys and download errors are
+ * logged and skipped (behavior matches the original inline loop body).
+ */
+const downloadManifestFile = async ({
+  s3Client,
+  bucket,
+  localDir,
+  manifest,
+  metadata,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  localDir: string;
+  manifest: S3ManifestEntry;
+  metadata: BackupMetadata;
+}): Promise<void> => {
+  // Sanitize the S3 key to prevent path traversal attacks
+  let sanitizedKey: string;
+  try {
+    sanitizedKey = sanitizeFilePath(manifest.key, localDir);
+  } catch (error) {
+    log(
+      `Skipping object with invalid key: ${manifest.key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+      'warning'
+    );
+    return;
+  }
+
+  const localPath = join(localDir, sanitizedKey);
+  const localDirPath = dirname(localPath);
+
+  // Create directory structure
+  if (!existsSync(localDirPath)) {
+    mkdirSync(localDirPath, { recursive: true });
+  }
+
+  log(`Downloading: ${manifest.key} (${formatBytes(manifest.size)})`, 'info');
+
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: manifest.key })
+    );
+
+    if (!response.Body) {
+      log(`Warning: No body for ${manifest.key}`, 'warning');
+      return;
+    }
+
+    // Stream to file
+    const writeStream = createWriteStream(localPath);
+    await pipeline(response.Body as NodeJS.ReadableStream, writeStream);
+
+    // Add to metadata
+    metadata.files.push({
+      key: manifest.key,
+      size: manifest.size,
+      lastModified: manifest.lastModified,
+      contentType: response.ContentType,
+    });
+
+    metadata.totalSize += manifest.size;
+    metadata.totalFiles++;
+
+    log(`Downloaded: ${manifest.key}`, 'success');
+  } catch (error) {
+    log(
+      `Error downloading ${manifest.key}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'error'
+    );
+  }
+};
+
+/**
+ * Ensure the backup directory exists, then download every manifest entry into
+ * it, accumulating results onto the provided metadata object.
+ */
+const downloadAllManifestFiles = async ({
+  s3Client,
+  bucket,
+  localDir,
+  manifest,
+  metadata,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  localDir: string;
+  manifest: S3ManifestEntry[];
+  metadata: BackupMetadata;
+}): Promise<void> => {
+  // Ensure backup directory exists
+  if (!existsSync(localDir)) {
+    mkdirSync(localDir, { recursive: true });
+  }
+
+  for (const entry of manifest) {
+    await downloadManifestFile({ s3Client, bucket, localDir, manifest: entry, metadata });
+  }
+};
+
+/**
+ * Compare the current S3 manifest against the most recent backup and log the
+ * outcome. Returns false when nothing changed (the caller should skip the
+ * download), true otherwise.
+ */
+const shouldProceedWithBackup = (localDir: string, manifest: S3ManifestEntry[]): boolean => {
+  const backupDir = getBackupRootDir(localDir);
+  const previousMetadata = getLatestBackupMetadata(backupDir);
+
+  if (previousMetadata && !hasChangedSinceLastBackup(manifest, previousMetadata)) {
+    log('No changes detected since last backup. Skipping.', 'success');
+    return false;
+  }
+
+  if (previousMetadata) {
+    log('Changes detected since last backup. Proceeding with download...', 'info');
+  } else {
+    log('No previous backup found. Proceeding with full download...', 'info');
+  }
+
+  return true;
+};
+
+/**
  * Backup S3 bucket to local directory
  */
 export const backupS3ToLocal = async (
@@ -334,42 +526,7 @@ export const backupS3ToLocal = async (
     log(`Fetching list of objects from S3...`, 'info');
 
     // Phase 1: Collect the full manifest of eligible media files from S3
-    const s3Manifest: Array<{
-      key: string;
-      size: number;
-      lastModified: string;
-    }> = [];
-    let continuationToken: string | undefined;
-
-    do {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      });
-
-      const listResponse = await s3Client.send(listCommand);
-
-      if (!listResponse.Contents || listResponse.Contents.length === 0) {
-        break;
-      }
-
-      for (const object of listResponse.Contents) {
-        if (!object.Key) continue;
-
-        if (!isAllowedMediaFile(object.Key)) {
-          continue;
-        }
-
-        s3Manifest.push({
-          key: object.Key,
-          size: object.Size || 0,
-          lastModified: object.LastModified?.toISOString() || '',
-        });
-      }
-
-      continuationToken = listResponse.NextContinuationToken;
-    } while (continuationToken);
+    const s3Manifest = await collectS3Manifest({ s3Client, bucket, prefix });
 
     if (s3Manifest.length === 0) {
       log('No eligible media files found in bucket', 'warning');
@@ -379,86 +536,12 @@ export const backupS3ToLocal = async (
     log(`Found ${s3Manifest.length} eligible media file(s) in S3`, 'info');
 
     // Phase 2: Compare against the most recent backup to detect changes
-    const backupDir = getBackupRootDir(localDir);
-    const previousMetadata = getLatestBackupMetadata(backupDir);
-
-    if (previousMetadata && !hasChangedSinceLastBackup(s3Manifest, previousMetadata)) {
-      log('No changes detected since last backup. Skipping.', 'success');
+    if (!shouldProceedWithBackup(localDir, s3Manifest)) {
       return metadata;
     }
 
-    if (previousMetadata) {
-      log('Changes detected since last backup. Proceeding with download...', 'info');
-    } else {
-      log('No previous backup found. Proceeding with full download...', 'info');
-    }
-
     // Phase 3: Download all eligible files
-    // Ensure backup directory exists
-    if (!existsSync(localDir)) {
-      mkdirSync(localDir, { recursive: true });
-    }
-
-    for (const manifest of s3Manifest) {
-      // Sanitize the S3 key to prevent path traversal attacks
-      let sanitizedKey: string;
-      try {
-        sanitizedKey = sanitizeFilePath(manifest.key, localDir);
-      } catch (error) {
-        log(
-          `Skipping object with invalid key: ${manifest.key} (${error instanceof Error ? error.message : 'Invalid path'})`,
-          'warning'
-        );
-        continue;
-      }
-
-      const localPath = join(localDir, sanitizedKey);
-      const localDirPath = dirname(localPath);
-
-      // Create directory structure
-      if (!existsSync(localDirPath)) {
-        mkdirSync(localDirPath, { recursive: true });
-      }
-
-      log(`Downloading: ${manifest.key} (${formatBytes(manifest.size)})`, 'info');
-
-      try {
-        // Get object metadata and content
-        const getCommand = new GetObjectCommand({
-          Bucket: bucket,
-          Key: manifest.key,
-        });
-
-        const response = await s3Client.send(getCommand);
-
-        if (!response.Body) {
-          log(`Warning: No body for ${manifest.key}`, 'warning');
-          continue;
-        }
-
-        // Stream to file
-        const writeStream = createWriteStream(localPath);
-        await pipeline(response.Body as NodeJS.ReadableStream, writeStream);
-
-        // Add to metadata
-        metadata.files.push({
-          key: manifest.key,
-          size: manifest.size,
-          lastModified: manifest.lastModified,
-          contentType: response.ContentType,
-        });
-
-        metadata.totalSize += manifest.size;
-        metadata.totalFiles++;
-
-        log(`Downloaded: ${manifest.key}`, 'success');
-      } catch (error) {
-        log(
-          `Error downloading ${manifest.key}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'error'
-        );
-      }
-    }
+    await downloadAllManifestFiles({ s3Client, bucket, localDir, manifest: s3Manifest, metadata });
 
     // Save metadata
     const metadataPath = join(localDir, 'backup-metadata.json');
@@ -478,6 +561,48 @@ export const backupS3ToLocal = async (
 };
 
 /**
+ * Load backup metadata from a restore source directory, logging its summary.
+ * Returns null when no metadata file is present or it cannot be parsed.
+ */
+const loadBackupMetadata = (localDir: string): BackupMetadata | null => {
+  const metadataPath = join(localDir, 'backup-metadata.json');
+
+  if (!existsSync(metadataPath)) {
+    return null;
+  }
+
+  try {
+    const metadataContent = readFileSync(metadataPath, 'utf8');
+    const parsedMetadata = JSON.parse(metadataContent) as BackupMetadata;
+    log(`Found backup metadata from ${parsedMetadata.timestamp}`, 'info');
+    log(`Original bucket: ${parsedMetadata.bucket}`, 'info');
+    log(`Files to restore: ${parsedMetadata.totalFiles}`, 'info');
+    return parsedMetadata;
+  } catch {
+    log('Warning: Could not read backup metadata', 'warning');
+    return null;
+  }
+};
+
+/**
+ * Log the final restore summary (successful / skipped / failed + per-file errors).
+ */
+const logRestoreSummary = (result: RestoreResult): void => {
+  log(`Restore complete!`, 'success');
+  log(`Successful: ${result.successful}`, 'success');
+  if (result.skipped > 0) {
+    log(`Skipped: ${result.skipped}`, 'warning');
+  }
+  if (result.failed > 0) {
+    log(`Failed: ${result.failed}`, 'error');
+    if (result.errors.length > 0) {
+      log('Errors:', 'error');
+      result.errors.forEach((err) => log(`  ${err.key}: ${err.error}`, 'error'));
+    }
+  }
+};
+
+/**
  * Restore backup from local directory to S3
  */
 export const restoreLocalToS3 = async (
@@ -493,21 +618,7 @@ export const restoreLocalToS3 = async (
     throw new Error(`Backup directory not found: ${localDir}`);
   }
 
-  const metadataPath = join(localDir, 'backup-metadata.json');
-  let metadata: BackupMetadata | null = null;
-
-  if (existsSync(metadataPath)) {
-    try {
-      const metadataContent = readFileSync(metadataPath, 'utf8');
-      const parsedMetadata = JSON.parse(metadataContent) as BackupMetadata;
-      metadata = parsedMetadata;
-      log(`Found backup metadata from ${parsedMetadata.timestamp}`, 'info');
-      log(`Original bucket: ${parsedMetadata.bucket}`, 'info');
-      log(`Files to restore: ${parsedMetadata.totalFiles}`, 'info');
-    } catch {
-      log('Warning: Could not read backup metadata', 'warning');
-    }
-  }
+  const metadata = loadBackupMetadata(localDir);
 
   const s3Client = new S3Client({ region });
   const result: RestoreResult = {
@@ -521,34 +632,30 @@ export const restoreLocalToS3 = async (
     // If metadata exists, use it to restore files
     if (metadata && metadata.files.length > 0) {
       for (const file of metadata.files) {
-        await restoreFile(
+        await restoreFile({
           s3Client,
           bucket,
           localDir,
-          file.key,
-          file.contentType,
+          key: file.key,
+          contentType: file.contentType,
           overwrite,
-          result
-        );
+          result,
+        });
       }
     } else {
       // Otherwise, scan directory and upload all files
       log('No metadata found, scanning directory...', 'warning');
-      await restoreDirectory(s3Client, bucket, localDir, '', overwrite, result);
+      await restoreDirectory({
+        s3Client,
+        bucket,
+        baseDir: localDir,
+        currentPath: '',
+        overwrite,
+        result,
+      });
     }
 
-    log(`Restore complete!`, 'success');
-    log(`Successful: ${result.successful}`, 'success');
-    if (result.skipped > 0) {
-      log(`Skipped: ${result.skipped}`, 'warning');
-    }
-    if (result.failed > 0) {
-      log(`Failed: ${result.failed}`, 'error');
-      if (result.errors.length > 0) {
-        log('Errors:', 'error');
-        result.errors.forEach((err) => log(`  ${err.key}: ${err.error}`, 'error'));
-      }
-    }
+    logRestoreSummary(result);
 
     return result;
   } catch (error) {
@@ -604,66 +711,91 @@ export const invalidateCloudFrontCache = async (
   }
 };
 
+interface RestoreFileOptions {
+  s3Client: S3Client;
+  bucket: string;
+  localDir: string;
+  key: string;
+  contentType: string | undefined;
+  overwrite: boolean;
+  result: RestoreResult;
+}
+
+interface RestoreDirectoryOptions {
+  s3Client: S3Client;
+  bucket: string;
+  baseDir: string;
+  currentPath: string;
+  overwrite: boolean;
+  result: RestoreResult;
+}
+
 /**
- * Restore a single file to S3
+ * Check whether an object already exists in S3 via a HEAD request.
+ * Returns false when the object is absent (404 / NotFound / NoSuchKey) and
+ * re-throws any other error (permissions, region, transient, etc.).
  */
-const restoreFile = async (
-  s3Client: S3Client,
-  bucket: string,
-  localDir: string,
-  key: string,
-  contentType: string | undefined,
-  overwrite: boolean,
-  result: RestoreResult
-): Promise<void> => {
-  // Sanitize the key to prevent path traversal (defense in depth)
-  let sanitizedKey: string;
+const objectExistsInS3 = async ({
+  s3Client,
+  bucket,
+  key,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  key: string;
+}): Promise<boolean> => {
   try {
-    sanitizedKey = sanitizeFilePath(key, localDir);
+    await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
   } catch (error) {
-    log(
-      `Skipping file with invalid key: ${key} (${error instanceof Error ? error.message : 'Invalid path'})`,
-      'warning'
-    );
-    result.skipped++;
-    return;
-  }
+    const headObjectError = error as {
+      $metadata?: { httpStatusCode?: number };
+      Code?: string;
+      name?: string;
+    };
+    const statusCode = headObjectError?.$metadata?.httpStatusCode;
+    const errorCode = headObjectError?.Code ?? headObjectError?.name;
 
-  const localPath = join(localDir, sanitizedKey);
-
-  if (!existsSync(localPath)) {
-    log(`Warning: File not found locally: ${key}`, 'warning');
-    result.skipped++;
-    return;
-  }
-
-  try {
-    // Check if file exists in S3
-    if (!overwrite) {
-      try {
-        await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-        log(`Skipping (already exists): ${key}`, 'warning');
-        result.skipped++;
-        return;
-      } catch (error) {
-        const headObjectError = error as {
-          $metadata?: { httpStatusCode?: number };
-          Code?: string;
-          name?: string;
-        };
-        const statusCode = headObjectError?.$metadata?.httpStatusCode;
-        const errorCode = headObjectError?.Code ?? headObjectError?.name;
-
-        // Only treat 404/NotFound/NoSuchKey as "object does not exist"
-        if (statusCode === 404 || errorCode === 'NotFound' || errorCode === 'NoSuchKey') {
-          // File doesn't exist, continue with upload
-        } else {
-          // Re-throw other errors (permissions, region, transient, etc.)
-          throw error;
-        }
-      }
+    // Only treat 404/NotFound/NoSuchKey as "object does not exist"
+    if (statusCode === 404 || errorCode === 'NotFound' || errorCode === 'NoSuchKey') {
+      return false;
     }
 
+    // Re-throw other errors (permissions, region, transient, etc.)
+    throw error;
+  }
+};
+
+/**
+ * Record a failed upload on the shared result accumulator. Matches the original
+ * inline error handling: non-Error throws collapse to 'Unknown error'.
+ */
+const recordUploadFailure = (key: string, error: unknown, result: RestoreResult): void => {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  log(`Error uploading ${key}: ${errorMessage}`, 'error');
+  result.failed++;
+  result.errors.push({ key, error: errorMessage });
+};
+
+/**
+ * Upload a local file to S3 and record success/failure on the result accumulator.
+ */
+const uploadFileToS3 = async ({
+  s3Client,
+  bucket,
+  key,
+  localPath,
+  contentType,
+  result,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  key: string;
+  localPath: string;
+  contentType: string | undefined;
+  result: RestoreResult;
+}): Promise<void> => {
+  try {
     log(`Uploading: ${key}`, 'info');
 
     // Read file and upload
@@ -685,24 +817,76 @@ const restoreFile = async (
     log(`Uploaded: ${key} (${formatBytes(fileStats.size)})`, 'success');
     result.successful++;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log(`Error uploading ${key}: ${errorMessage}`, 'error');
-    result.failed++;
-    result.errors.push({ key, error: errorMessage });
+    recordUploadFailure(key, error, result);
   }
+};
+
+/**
+ * Restore a single file to S3
+ */
+const restoreFile = async ({
+  s3Client,
+  bucket,
+  localDir,
+  key,
+  contentType,
+  overwrite,
+  result,
+}: RestoreFileOptions): Promise<void> => {
+  // Sanitize the key to prevent path traversal (defense in depth)
+  let sanitizedKey: string;
+  try {
+    sanitizedKey = sanitizeFilePath(key, localDir);
+  } catch (error) {
+    log(
+      `Skipping file with invalid key: ${key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+      'warning'
+    );
+    result.skipped++;
+    return;
+  }
+
+  const localPath = join(localDir, sanitizedKey);
+
+  if (!existsSync(localPath)) {
+    log(`Warning: File not found locally: ${key}`, 'warning');
+    result.skipped++;
+    return;
+  }
+
+  // Skip files that already exist in S3 unless overwrite is requested. A HEAD
+  // failure other than 404/NotFound/NoSuchKey is recorded as an upload failure
+  // (matching the original combined try/catch) rather than propagated.
+  if (!overwrite) {
+    let existsInS3: boolean;
+    try {
+      existsInS3 = await objectExistsInS3({ s3Client, bucket, key });
+    } catch (error) {
+      recordUploadFailure(key, error, result);
+      return;
+    }
+
+    if (existsInS3) {
+      log(`Skipping (already exists): ${key}`, 'warning');
+      result.skipped++;
+      return;
+    }
+  }
+
+  await uploadFileToS3({ s3Client, bucket, key, localPath, contentType, result });
 };
 
 /**
  * Recursively restore directory to S3
  */
-const restoreDirectory = async (
-  s3Client: S3Client,
-  bucket: string,
-  baseDir: string,
-  currentPath: string,
-  overwrite: boolean,
-  result: RestoreResult
-): Promise<void> => {
+const restoreDirectory = async ({
+  s3Client,
+  bucket,
+  baseDir,
+  currentPath,
+  overwrite,
+  result,
+}: RestoreDirectoryOptions): Promise<void> => {
   const fullPath = join(baseDir, currentPath);
   const items = readdirSync(fullPath);
 
@@ -718,10 +902,53 @@ const restoreDirectory = async (
     const stats = statSync(itemPath);
 
     if (stats.isDirectory()) {
-      await restoreDirectory(s3Client, bucket, baseDir, relativePath, overwrite, result);
+      await restoreDirectory({
+        s3Client,
+        bucket,
+        baseDir,
+        currentPath: relativePath,
+        overwrite,
+        result,
+      });
     } else {
-      await restoreFile(s3Client, bucket, baseDir, relativePath, undefined, overwrite, result);
+      await restoreFile({
+        s3Client,
+        bucket,
+        localDir: baseDir,
+        key: relativePath,
+        contentType: undefined,
+        overwrite,
+        result,
+      });
     }
+  }
+};
+
+/**
+ * Print the metadata summary for a single backup directory, or a placeholder
+ * when metadata is missing or unreadable.
+ */
+const printBackupMetadata = (backupPath: string): void => {
+  const metadataPath = join(backupPath, 'backup-metadata.json');
+
+  if (!existsSync(metadataPath)) {
+    console.info(`  ${colors.yellow}(no metadata)${colors.reset}`);
+    return;
+  }
+
+  try {
+    const metadataContent = readFileSync(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent) as BackupMetadata;
+
+    console.info(`  Timestamp: ${metadata.timestamp}`);
+    console.info(`  Bucket: ${metadata.bucket}`);
+    if (metadata.prefix) {
+      console.info(`  Prefix: ${metadata.prefix}`);
+    }
+    console.info(`  Files: ${metadata.totalFiles}`);
+    console.info(`  Size: ${formatBytes(metadata.totalSize)}`);
+  } catch {
+    console.info(`  ${colors.yellow}(metadata read error)${colors.reset}`);
   }
 };
 
@@ -753,29 +980,12 @@ export const listBackups = (backupDir = 'backups'): void => {
 
   for (const backup of s3Backups) {
     const backupPath = join(backupDir, backup);
-    const metadataPath = join(backupPath, 'backup-metadata.json');
 
     console.info(`${colors.cyan}${backup}${colors.reset}`);
     console.info(`  Path: ${backupPath}`);
 
-    if (existsSync(metadataPath)) {
-      try {
-        const metadataContent = readFileSync(metadataPath, 'utf8');
-        const metadata = JSON.parse(metadataContent) as BackupMetadata;
+    printBackupMetadata(backupPath);
 
-        console.info(`  Timestamp: ${metadata.timestamp}`);
-        console.info(`  Bucket: ${metadata.bucket}`);
-        if (metadata.prefix) {
-          console.info(`  Prefix: ${metadata.prefix}`);
-        }
-        console.info(`  Files: ${metadata.totalFiles}`);
-        console.info(`  Size: ${formatBytes(metadata.totalSize)}`);
-      } catch {
-        console.info(`  ${colors.yellow}(metadata read error)${colors.reset}`);
-      }
-    } else {
-      console.info(`  ${colors.yellow}(no metadata)${colors.reset}`);
-    }
     console.info('');
   }
 };
@@ -853,6 +1063,86 @@ const deleteDirectory = (dirPath: string): void => {
 };
 
 /**
+ * Handle the `backup` command: download the bucket then prune old backups.
+ */
+const runBackupCommand = async (args: string[]): Promise<void> => {
+  const localDir = args[1] || getDefaultBackupPath();
+  await backupS3ToLocal(localDir);
+
+  // Clean up old backups after successful backup
+  const backupDir = getBackupRootDir(localDir);
+  if (existsSync(backupDir)) {
+    const deletedCount = cleanupOldBackups(backupDir);
+    if (deletedCount > 0) {
+      log(`Cleanup complete: removed ${deletedCount} old backup(s)`, 'info');
+    }
+  }
+};
+
+/**
+ * Handle the `restore` command: upload a local backup to S3, then optionally
+ * invalidate the CloudFront cache.
+ */
+const runRestoreCommand = async (args: string[]): Promise<void> => {
+  const localDir = args[1];
+  if (!localDir) {
+    console.error('Error: Local directory path is required for restore');
+    console.error('Usage: pnpm run s3:restore <local-directory>');
+    process.exit(1);
+  }
+  const overwrite = args.includes('--overwrite') || args.includes('-f');
+  const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
+  const restoreResult = await restoreLocalToS3(
+    localDir,
+    S3_BUCKET as string,
+    AWS_REGION,
+    overwrite
+  );
+  if (restoreResult.successful > 0 && !skipInvalidation) {
+    await invalidateCloudFrontCache();
+  }
+};
+
+/**
+ * Handle the `upload` command (deprecated alias for restore without overwrite).
+ */
+const runUploadCommand = async (args: string[]): Promise<void> => {
+  const localDir = args[1];
+  if (!localDir) {
+    console.error('Error: Local directory path is required for upload');
+    console.error('Usage: pnpm run s3:upload <local-directory>');
+    process.exit(1);
+  }
+  const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
+  const uploadResult = await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
+  if (uploadResult.successful > 0 && !skipInvalidation) {
+    await invalidateCloudFrontCache();
+  }
+};
+
+/**
+ * Print CLI usage help to stderr and exit with a non-zero status.
+ */
+const printUsage = (): never => {
+  console.error('Usage:');
+  console.error('  pnpm run s3:backup [local-directory]');
+  console.error('  pnpm run s3:restore <local-directory> [--overwrite] [--skip-invalidation]');
+  console.error('  pnpm run s3:list [backups-directory]');
+  console.error('  pnpm run s3:upload <local-directory> [--skip-invalidation]');
+  console.error('');
+  console.error('Commands:');
+  console.error('  backup   - Download S3 bucket contents to local directory');
+  console.error('  restore  - Upload local backup to S3 bucket');
+  console.error('  list     - List available S3 backups');
+  console.error('  upload   - Upload local backup to S3 bucket (deprecated, use restore instead)');
+  console.error('');
+  console.error('Options:');
+  console.error('  --overwrite, -f        - Overwrite existing files in S3 during restore');
+  console.error('  --skip-invalidation    - Skip CloudFront cache invalidation after upload');
+  process.exit(1);
+};
+
+/**
  * Main CLI handler
  */
 const main = async (): Promise<void> => {
@@ -861,84 +1151,24 @@ const main = async (): Promise<void> => {
 
   try {
     switch (command) {
-      case 'backup': {
-        const localDir = args[1] || getDefaultBackupPath();
-        await backupS3ToLocal(localDir);
-
-        // Clean up old backups after successful backup
-        const backupDir = getBackupRootDir(localDir);
-        if (existsSync(backupDir)) {
-          const deletedCount = cleanupOldBackups(backupDir);
-          if (deletedCount > 0) {
-            log(`Cleanup complete: removed ${deletedCount} old backup(s)`, 'info');
-          }
-        }
+      case 'backup':
+        await runBackupCommand(args);
         break;
-      }
 
-      case 'restore': {
-        const localDir = args[1];
-        if (!localDir) {
-          console.error('Error: Local directory path is required for restore');
-          console.error('Usage: pnpm run s3:restore <local-directory>');
-          process.exit(1);
-        }
-        const overwrite = args.includes('--overwrite') || args.includes('-f');
-        const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
-        const restoreResult = await restoreLocalToS3(
-          localDir,
-          S3_BUCKET as string,
-          AWS_REGION,
-          overwrite
-        );
-        if (restoreResult.successful > 0 && !skipInvalidation) {
-          await invalidateCloudFrontCache();
-        }
+      case 'restore':
+        await runRestoreCommand(args);
         break;
-      }
 
-      case 'list': {
-        const backupDir = args[1] || 'backups';
-        listBackups(backupDir);
+      case 'list':
+        listBackups(args[1] || 'backups');
         break;
-      }
 
-      case 'upload': {
-        const localDir = args[1];
-        if (!localDir) {
-          console.error('Error: Local directory path is required for upload');
-          console.error('Usage: pnpm run s3:upload <local-directory>');
-          process.exit(1);
-        }
-        const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
-        const uploadResult = await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
-        if (uploadResult.successful > 0 && !skipInvalidation) {
-          await invalidateCloudFrontCache();
-        }
+      case 'upload':
+        await runUploadCommand(args);
         break;
-      }
 
       default:
-        console.error('Usage:');
-        console.error('  pnpm run s3:backup [local-directory]');
-        console.error(
-          '  pnpm run s3:restore <local-directory> [--overwrite] [--skip-invalidation]'
-        );
-        console.error('  pnpm run s3:list [backups-directory]');
-        console.error('  pnpm run s3:upload <local-directory> [--skip-invalidation]');
-        console.error('');
-        console.error('Commands:');
-        console.error('  backup   - Download S3 bucket contents to local directory');
-        console.error('  restore  - Upload local backup to S3 bucket');
-        console.error('  list     - List available S3 backups');
-        console.error(
-          '  upload   - Upload local backup to S3 bucket (deprecated, use restore instead)'
-        );
-        console.error('');
-        console.error('Options:');
-        console.error('  --overwrite, -f        - Overwrite existing files in S3 during restore');
-        console.error('  --skip-invalidation    - Skip CloudFront cache invalidation after upload');
-        process.exit(1);
+        printUsage();
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
