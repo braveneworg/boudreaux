@@ -13,21 +13,15 @@ const escapeHtml = (text: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-export const buildPurchaseConfirmationEmailHtml = (
-  data: PurchaseConfirmationEmailData
-): string => `<!DOCTYPE html>
+const buildDocumentHead = (): string => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Purchase Confirmed</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5;">
-    <tr>
-      <td align="center" style="padding: 24px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
+</head>`;
+
+const buildHeaderSection = (): string => `          <!-- Header -->
           <tr>
             <td style="background-color: #18181b; padding: 24px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
@@ -42,19 +36,20 @@ export const buildPurchaseConfirmationEmailHtml = (
                 </tr>
               </table>
             </td>
-          </tr>
+          </tr>`;
 
-          <!-- Thank you -->
+const buildThankYouSection = (releaseTitle: string): string => `          <!-- Thank you -->
           <tr>
             <td style="padding: 24px 32px 0;">
               <h2 style="margin: 0; color: #18181b; font-size: 18px; font-weight: 600;">Thank You!</h2>
               <p style="margin: 8px 0 0; color: #27272a; font-size: 14px; line-height: 1.6;">
-                Your purchase of <strong>${escapeHtml(data.releaseTitle)}</strong> has been confirmed.
+                Your purchase of <strong>${escapeHtml(releaseTitle)}</strong> has been confirmed.
               </p>
             </td>
-          </tr>
+          </tr>`;
 
-          <!-- Purchase Details -->
+const buildPurchaseDetailsSection = (data: PurchaseConfirmationEmailData): string =>
+  `          <!-- Purchase Details -->
           <tr>
             <td style="padding: 20px 32px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden;">
@@ -78,26 +73,44 @@ export const buildPurchaseConfirmationEmailHtml = (
                 </tr>
               </table>
             </td>
-          </tr>
+          </tr>`;
 
-          <!-- Download CTA -->
+const buildDownloadCtaSection = (downloadUrl: string): string => `          <!-- Download CTA -->
           <tr>
             <td style="padding: 24px 32px;">
               <p style="margin: 0 0 16px; color: #27272a; font-size: 14px; line-height: 1.6;">
                 Your download is ready. You can download up to 5 times using the link below.
               </p>
-              <a href="${data.downloadUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">Download Now</a>
+              <a href="${downloadUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">Download Now</a>
             </td>
-          </tr>
+          </tr>`;
 
-          <!-- Footer -->
+const buildFooterSection = (): string => `          <!-- Footer -->
           <tr>
             <td style="padding: 16px 32px 24px; border-top: 1px solid #e4e4e7;">
               <p style="margin: 0; color: #a1a1aa; font-size: 12px; text-align: center;">
                 Fake Four Inc. &mdash; fakefourrecords.com
               </p>
             </td>
-          </tr>
+          </tr>`;
+
+export const buildPurchaseConfirmationEmailHtml = (
+  data: PurchaseConfirmationEmailData
+): string => `${buildDocumentHead()}
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5;">
+    <tr>
+      <td align="center" style="padding: 24px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+${buildHeaderSection()}
+
+${buildThankYouSection(data.releaseTitle)}
+
+${buildPurchaseDetailsSection(data)}
+
+${buildDownloadCtaSection(data.downloadUrl)}
+
+${buildFooterSection()}
         </table>
       </td>
     </tr>
