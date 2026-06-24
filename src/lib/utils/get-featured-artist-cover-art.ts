@@ -13,22 +13,31 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
  *   4. First `featured.artists[].images[].src`
  *   5. null
  */
-export const getFeaturedArtistCoverArt = (featured: FeaturedArtist): string | null => {
-  if (featured.coverArt) {
-    return featured.coverArt;
-  }
+const releaseCoverArt = (featured: FeaturedArtist): string | null => {
   if (featured.release?.coverArt) {
     return featured.release.coverArt;
   }
   if (featured.release?.images?.length && featured.release.images[0].src) {
     return featured.release.images[0].src;
   }
-  if (featured.artists?.length) {
-    for (const artist of featured.artists) {
-      if (artist.images?.length && artist.images[0].src) {
-        return artist.images[0].src;
-      }
+  return null;
+};
+
+const firstArtistImageSrc = (featured: FeaturedArtist): string | null => {
+  if (!featured.artists?.length) {
+    return null;
+  }
+  for (const artist of featured.artists) {
+    if (artist.images?.length && artist.images[0].src) {
+      return artist.images[0].src;
     }
   }
   return null;
+};
+
+export const getFeaturedArtistCoverArt = (featured: FeaturedArtist): string | null => {
+  if (featured.coverArt) {
+    return featured.coverArt;
+  }
+  return releaseCoverArt(featured) ?? firstArtistImageSrc(featured);
 };

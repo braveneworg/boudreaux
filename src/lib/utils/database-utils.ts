@@ -41,40 +41,71 @@ export const checkDatabaseHealth = async (): Promise<HealthCheckResult> => {
 /**
  * Retry database operation with exponential backoff
  */
+const toError = (error: unknown): Error => (error instanceof Error ? error : Error(String(error)));
+
+const delayFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Outcome of a single attempt — a value on success, or the normalized error. */
+type AttemptResult<T> = { ok: true; value: T } | { ok: false; error: Error };
+
+const runAttempt = async <T>(operation: () => Promise<T>): Promise<AttemptResult<T>> => {
+  try {
+    return { ok: true, value: await operation() };
+  } catch (error) {
+    return { ok: false, error: toError(error) };
+  }
+};
+
+interface RetryOptions {
+  maxRetries?: number;
+  initialDelay?: number;
+  maxDelay?: number;
+  factor?: number;
+}
+
+interface ResolvedRetryOptions {
+  maxRetries: number;
+  initialDelay: number;
+  maxDelay: number;
+  factor: number;
+}
+
+const resolveRetryOptions = (options: RetryOptions): ResolvedRetryOptions => ({
+  maxRetries: options.maxRetries ?? 3,
+  initialDelay: options.initialDelay ?? 1000,
+  maxDelay: options.maxDelay ?? 10000,
+  factor: options.factor ?? 2,
+});
+
 export const withRetry = async <T>(
   operation: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    initialDelay?: number;
-    maxDelay?: number;
-    factor?: number;
-  } = {}
+  options: RetryOptions = {}
 ): Promise<T> => {
-  const { maxRetries = 3, initialDelay = 1000, maxDelay = 10000, factor = 2 } = options;
+  const { maxRetries, initialDelay, maxDelay, factor } = resolveRetryOptions(options);
 
   let lastError: Error | undefined;
   let delay = initialDelay;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error instanceof Error ? error : Error(String(error));
-
-      // Don't retry on last attempt
-      if (attempt === maxRetries) {
-        break;
-      }
-
-      // Check if error is retryable
-      if (!isRetryableError(lastError)) {
-        throw lastError;
-      }
-
-      // Wait before retrying with exponential backoff
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * factor, maxDelay);
+    const result = await runAttempt(operation);
+    if (result.ok) {
+      return result.value;
     }
+    lastError = result.error;
+
+    // Don't retry on last attempt
+    if (attempt === maxRetries) {
+      break;
+    }
+
+    // Check if error is retryable
+    if (!isRetryableError(lastError)) {
+      throw lastError;
+    }
+
+    // Wait before retrying with exponential backoff
+    await delayFor(delay);
+    delay = Math.min(delay * factor, maxDelay);
   }
 
   throw lastError || Error('Operation failed after retries');

@@ -25,6 +25,42 @@ export interface ObjectToFormDataOptions {
  *   appended individually (decoded server-side via `FormData.getAll`).
  * - numbers and booleans are stringified (`getActionState` coerces them back).
  */
+/**
+ * Append an array value: each item individually when the key is in
+ * `repeatKeys` (read server-side via `FormData.getAll`), otherwise a single
+ * `JSON.stringify`-ed entry (decoded by `getActionState`'s `[`-prefix branch).
+ */
+const appendArrayValue = (
+  formData: FormData,
+  key: string,
+  value: unknown[],
+  repeatKeys: string[]
+): void => {
+  if (repeatKeys.includes(key)) {
+    for (const item of value) {
+      formData.append(key, String(item));
+    }
+    return;
+  }
+  formData.append(key, JSON.stringify(value));
+};
+
+/**
+ * Append a single non-array, non-nullish value, honouring the empty-string
+ * rule: an empty string is omitted unless `keepEmptyStrings` is set.
+ */
+const appendScalarValue = (
+  formData: FormData,
+  key: string,
+  value: unknown,
+  keepEmptyStrings: boolean
+): void => {
+  if (typeof value === 'string' && value === '' && !keepEmptyStrings) {
+    return;
+  }
+  formData.append(key, String(value));
+};
+
 export const objectToFormData = (
   values: Record<string, unknown>,
   options: ObjectToFormDataOptions = {}
@@ -38,21 +74,11 @@ export const objectToFormData = (
     }
 
     if (Array.isArray(value)) {
-      if (repeatKeys.includes(key)) {
-        for (const item of value) {
-          formData.append(key, String(item));
-        }
-      } else {
-        formData.append(key, JSON.stringify(value));
-      }
+      appendArrayValue(formData, key, value, repeatKeys);
       continue;
     }
 
-    if (typeof value === 'string' && value === '' && !keepEmptyStrings) {
-      continue;
-    }
-
-    formData.append(key, String(value));
+    appendScalarValue(formData, key, value, keepEmptyStrings);
   }
 
   return formData;

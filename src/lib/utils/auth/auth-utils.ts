@@ -69,6 +69,12 @@ export const isValidEmailFormat = (value: string): boolean => {
   return true;
 };
 
+const isValidLocalPart = (localPart: string): boolean => {
+  if (!localPart || localPart.length > 64) return false;
+  if (localPart.startsWith('.') || localPart.endsWith('.')) return false;
+  return !localPart.includes('..');
+};
+
 // Alternative: More readable with helper function
 export const isValidEmail = (email: string): boolean => {
   if (!email || email.length > 254) return false;
@@ -79,9 +85,7 @@ export const isValidEmail = (email: string): boolean => {
   const domain = domainParts[0];
 
   // Validate local part (before @)
-  if (!localPart || localPart.length > 64) return false;
-  if (localPart.startsWith('.') || localPart.endsWith('.')) return false;
-  if (localPart.includes('..')) return false;
+  if (!isValidLocalPart(localPart)) return false;
 
   // Validate domain
   if (!domain || !domain.includes('.')) return false;

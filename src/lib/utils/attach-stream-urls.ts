@@ -56,18 +56,14 @@ export const attachStreamUrls = <T>(payload: T): T => {
   return payload;
 };
 
-const walk = (node: unknown): void => {
-  if (!node || typeof node !== 'object') {
-    return;
-  }
+// Recurse into nested release / releases / artists structures so the
+// artist-with-releases payload (releases[].release.digitalFormats[]) and
+// featured-artist payload (artists[].digitalFormat) get covered.
+const RECURSE_KEYS = new Set(['release', 'releases', 'artists', 'artist']);
 
-  if (Array.isArray(node)) {
-    for (const item of node) walk(item);
-    return;
-  }
-
-  const obj = node as Record<string, unknown>;
-
+// Sign the file lists for both the singular `digitalFormat` (FeaturedArtist)
+// and the plural `digitalFormats[]` (Release) shapes on this object.
+const signObjectFormats = (obj: Record<string, unknown>): void => {
   // FeaturedArtist shape: digitalFormat?.files[]
   const digitalFormat = obj.digitalFormat as DigitalFormatLike | null | undefined;
   if (digitalFormat && Array.isArray(digitalFormat.files)) {
@@ -83,13 +79,24 @@ const walk = (node: unknown): void => {
       }
     }
   }
+};
 
-  // Recurse into nested release / releases / artists structures so the
-  // artist-with-releases payload (releases[].release.digitalFormats[]) and
-  // featured-artist payload (artists[].digitalFormat) get covered.
-  const recurseKeys = new Set(['release', 'releases', 'artists', 'artist']);
+const walk = (node: unknown): void => {
+  if (!node || typeof node !== 'object') {
+    return;
+  }
+
+  if (Array.isArray(node)) {
+    for (const item of node) walk(item);
+    return;
+  }
+
+  const obj = node as Record<string, unknown>;
+
+  signObjectFormats(obj);
+
   for (const [key, value] of Object.entries(obj)) {
-    if (recurseKeys.has(key)) walk(value);
+    if (RECURSE_KEYS.has(key)) walk(value);
   }
 };
 

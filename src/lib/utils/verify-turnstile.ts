@@ -18,6 +18,28 @@ interface TurnstileVerifyResponse {
 }
 
 /**
+ * Whether to skip the live siteverify call. Bypass only when BOTH conditions
+ * are met: Cloudflare's well-known test secret key is in use AND we are not in
+ * production. This prevents accidental bypass in production if the test secret
+ * is misconfigured.
+ * @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+ */
+const shouldBypassVerification = (secret: string): boolean =>
+  secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.NODE_ENV !== 'production';
+
+/**
+ * Map a failed Turnstile verification result to a user-facing error message.
+ * `invalid-input-response` signals a stale/invalid token the user can retry.
+ */
+const verificationFailureMessage = (result: TurnstileVerifyResponse): string => {
+  const errorCodes = result['error-codes'] || [];
+  logger.error('Turnstile verification failed', undefined, { errorCodes });
+  return errorCodes.includes('invalid-input-response')
+    ? 'Invalid verification. Please try again.'
+    : 'Verification failed. Please refresh and try again.';
+};
+
+/**
  * Verifies a Cloudflare Turnstile token on the server side.
  * @param token - The token received from the Turnstile widget
  * @param ip - Optional IP address of the client for additional validation
@@ -38,13 +60,8 @@ export const verifyTurnstile = async (
     return { success: false, error: 'Turnstile token is required' };
   }
 
-  // Cloudflare's well-known test secret key — skip the API call during testing
-  // @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
-  // Bypass when BOTH conditions are met:
-  // 1. Using Cloudflare's test secret key
-  // 2. Not running in production
-  // This prevents accidental bypass in production if test secret is misconfigured
-  if (secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.NODE_ENV !== 'production') {
+  // Skip the live API call when using Cloudflare's test secret outside production.
+  if (shouldBypassVerification(secret)) {
     return { success: true };
   }
 
@@ -74,14 +91,7 @@ export const verifyTurnstile = async (
     const result: TurnstileVerifyResponse = await response.json();
 
     if (!result.success) {
-      const errorCodes = result['error-codes'] || [];
-      logger.error('Turnstile verification failed', undefined, { errorCodes });
-      return {
-        success: false,
-        error: errorCodes.includes('invalid-input-response')
-          ? 'Invalid verification. Please try again.'
-          : 'Verification failed. Please refresh and try again.',
-      };
+      return { success: false, error: verificationFailureMessage(result) };
     }
 
     return { success: true };

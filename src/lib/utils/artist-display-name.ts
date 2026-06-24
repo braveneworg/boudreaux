@@ -21,6 +21,13 @@ import type { ArtistScalars } from '@/lib/types/domain/artist';
  * // Returns: "Artist Name" or "John Doe" or null
  * ```
  */
+const buildNameFromParts = (firstName: string, surname: string): string | null => {
+  if (firstName && surname) {
+    return `${firstName} ${surname}`;
+  }
+  return firstName || surname || null;
+};
+
 export const getArtistDisplayNameForTour = (artist: ArtistScalars | null): string | null => {
   if (!artist) {
     return null;
@@ -35,14 +42,6 @@ export const getArtistDisplayNameForTour = (artist: ArtistScalars | null): strin
   const firstName = artist.firstName?.trim() || '';
   const surname = artist.surname?.trim() || '';
 
-  if (firstName && surname) {
-    return `${firstName} ${surname}`;
-  } else if (firstName) {
-    return firstName;
-  } else if (surname) {
-    return surname;
-  }
-
-  // 3. No name available
-  return null;
+  // 3. No name available → null
+  return buildNameFromParts(firstName, surname);
 };
