@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { ResponseValidationError } from './fetch-and-parse';
+import { ResponseValidationError } from '@/hooks/fetch-and-parse';
+
 import { reportResponseValidationError } from './query-error-reporter';
 
 const reportClientError = vi.hoisted(() => vi.fn());
