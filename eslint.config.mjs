@@ -333,7 +333,13 @@ const eslintConfig = [
   // limit: describe/it/setup blocks and CLI scripts are legitimately long, so the rule
   // would add noise rather than signal there.
   {
-    files: ['**/*.spec.{ts,tsx}', 'e2e/**', 'scripts/**/*.{ts,tsx}', '**/test-utils/**', 'tests/**'],
+    files: [
+      '**/*.spec.{ts,tsx}',
+      'e2e/**',
+      'scripts/**/*.{ts,tsx}',
+      '**/test-utils/**',
+      'tests/**',
+    ],
     rules: {
       'max-lines-per-function': 'off',
     },
