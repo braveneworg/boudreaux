@@ -3,18 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
-import Link from 'next/link';
-
-import { zodResolver } from '@hookform/resolvers/zod';
-import { DownloadIcon, LogInIcon } from 'lucide-react';
-import { useSession } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
-
 import { EmailStep } from '@/app/components/email-step';
-import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { FreeFormatSelectStep } from '@/app/components/free-format-select-step';
 import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
 import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
@@ -27,36 +18,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/app/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/app/components/ui/form';
-import { Input } from '@/app/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
-import { useFreeDownloadStatusQuery } from '@/app/hooks/use-free-download-status-query';
-import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
-import { ALREADY_PURCHASED_ERROR, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { cn } from '@/lib/utils/tailwind-utils';
-import {
-  downloadSchema,
-  DOWNLOAD_OPTIONS,
-  type DownloadFormSchemaType,
-} from '@/lib/validation/download-schema';
 
-type DialogStep =
-  | 'download'
-  | 'format-select'
-  | 'free-format-select'
-  | 'email-step'
-  | 'purchase-checkout'
-  | 'purchase-confirmed'
-  | 'purchase-success'
-  | 'returning-download';
+import { DownloadStep } from './download-step';
+import { FormatSelectStep } from './format-select-step';
+import { PurchaseConfirmedStep } from './purchase-confirmed-step';
+import { ReturningDownloadStep } from './returning-download-step';
+import { useDownloadDialogState } from './use-download-dialog-state';
+
+import type { UseDownloadDialogStateReturn } from './use-download-dialog-state';
 
 interface AvailableFormat {
   formatType: DigitalFormatType;
@@ -79,540 +50,185 @@ interface DownloadDialogProps {
   children: ReactElement;
 }
 
-export const DownloadDialog = ({
-  artistName,
-  premiumPrice = 8,
-  releaseId,
-  releaseTitle = '',
-  suggestedPrice = null,
-  hasPurchase = false,
-  purchasedAt = null,
-  downloadCount = 0,
-  resetInHours = null,
-  availableFormats = [],
-  openOnMount = false,
-  children,
-}: DownloadDialogProps) => {
-  const initialStep: DialogStep = 'download';
-  const [open, setOpen] = useState(openOnMount);
-  const [step, setStep] = useState<DialogStep>(initialStep);
-  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
-  const [amountCents, setAmountCents] = useState<number>(0);
-  const [guestAtCap, setGuestAtCap] = useState(false);
-  const [guestResetInHours, setGuestResetInHours] = useState<number | null>(null);
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const { data: session } = useSession();
+/** The dialog props with every optional defaulted — shared by the hook call and the step router. */
+interface ResolvedDialogProps {
+  artistName: string;
+  releaseId: string;
+  releaseTitle: string;
+  hasPurchase: boolean;
+  purchasedAt: Date | null;
+  downloadCount: number;
+  resetInHours: number | null;
+  availableFormats: AvailableFormat[];
+}
 
-  // Pre-fetch the free-download status as soon as the dialog opens. This
-  // gives us `availableFreeFormats` for FreeFormatSelectStep and lets us
-  // gate the Free radio when no free formats are published.
-  // Feature: 007-free-digital-downloads (US1).
-  const { data: freeStatus, isPending: isFreeStatusPending } = useFreeDownloadStatusQuery(
-    releaseId,
-    { enabled: open }
-  );
-  const availableFreeFormats = freeStatus?.availableFreeFormats ?? [];
-  const freeRadioDisabled = freeStatus !== undefined && availableFreeFormats.length === 0;
+/** Apply the dialog's default prop values once so the component body stays branch-free. */
+const resolveDialogProps = (props: DownloadDialogProps): ResolvedDialogProps => ({
+  artistName: props.artistName,
+  releaseId: props.releaseId,
+  releaseTitle: props.releaseTitle ?? '',
+  hasPurchase: props.hasPurchase ?? false,
+  purchasedAt: props.purchasedAt ?? null,
+  downloadCount: props.downloadCount ?? 0,
+  resetInHours: props.resetInHours ?? null,
+  availableFormats: props.availableFormats ?? [],
+});
 
-  // Auto-advance authenticated purchasers directly to format selection
-  useEffect(() => {
-    if (open && hasPurchase && session?.user && step === 'download') {
-      setStep('format-select');
-    }
-  }, [open, hasPurchase, session, step]);
+/** Screen-reader dialog title — release-specific once purchased, otherwise artist-scoped. */
+const dialogTitleFor = (resolved: ResolvedDialogProps): string =>
+  resolved.hasPurchase
+    ? `Download ${resolved.releaseTitle}`
+    : `Download ${resolved.artistName}'s music`;
 
-  const form = useForm<DownloadFormSchemaType>({
-    resolver: zodResolver(downloadSchema),
-    defaultValues: {
-      downloadOption: undefined,
-      finalAmount: '',
-    },
-  });
+/**
+ * Render the content for the dialog's active step. Centralising the per-step
+ * routing here keeps the `DownloadDialog` component body free of the eight
+ * `step === …` branches (and the email/checkout decision logic, which now lives
+ * in {@link useDownloadDialogState}). Returns `null` for the unreachable default.
+ */
+const renderDialogStep = (
+  state: UseDownloadDialogStateReturn,
+  resolved: ResolvedDialogProps
+): ReactElement | null => {
+  const { artistName, releaseId, releaseTitle, hasPurchase, purchasedAt } = resolved;
+  const { downloadCount, resetInHours, availableFormats } = resolved;
 
-  const selectedOption = form.watch('downloadOption');
-  const rawAmount = form
-    .watch('finalAmount')
-    ?.replace(/[^\d.]/g, '')
-    .trim();
+  switch (state.step) {
+    case 'purchase-confirmed':
+      return (
+        <PurchaseConfirmedStep
+          releaseTitle={releaseTitle}
+          purchasedAt={purchasedAt}
+          downloadCount={downloadCount}
+          resetInHours={resetInHours}
+          onContinue={() => state.setStep('format-select')}
+        />
+      );
+    case 'download':
+      return (
+        <DownloadStep
+          hasPurchase={hasPurchase}
+          session={state.session}
+          purchasedAt={purchasedAt}
+          downloadCount={downloadCount}
+          resetInHours={resetInHours}
+          releaseTitle={releaseTitle}
+          purchaseError={state.purchaseError}
+          form={state.form}
+          selectedOption={state.selectedOption}
+          effectiveSuggestedPrice={state.effectiveSuggestedPrice}
+          displayAmount={state.displayAmount}
+          freeRadioDisabled={state.freeRadioDisabled}
+          onSubmit={state.handleSubmit}
+          onContinueToFormatSelect={() => state.setStep('format-select')}
+          artistName={artistName}
+        />
+      );
+    case 'format-select':
+      return (
+        <FormatSelectStep
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+          hasPurchase={hasPurchase}
+          purchasedAt={purchasedAt}
+          downloadCount={downloadCount}
+          resetInHours={resetInHours}
+          availableFormats={availableFormats}
+          onDownloadComplete={state.handleDialogDownloadComplete}
+        />
+      );
+    case 'free-format-select':
+      return (
+        <>
+          <DialogHeader>
+            <DialogTitle>Free Download</DialogTitle>
+            <DialogDescription>
+              Choose your free formats for <strong>{releaseTitle}</strong>
+            </DialogDescription>
+          </DialogHeader>
 
-  const effectiveSuggestedPrice = suggestedPrice ?? premiumPrice ?? 5;
-  const parsedRaw = rawAmount ? parseFloat(rawAmount) : NaN;
-  const displayAmount = Number.isFinite(parsedRaw)
-    ? `$${parsedRaw.toFixed(2)}`
-    : `$${effectiveSuggestedPrice.toFixed(2)}`;
+          <FreeFormatSelectStep
+            releaseId={releaseId}
+            availableFreeFormats={state.availableFreeFormats}
+            isLoading={state.isFreeStatusPending}
+            capReachedResetsAtIso={state.freeCapResetsAtIso}
+            onDownloadComplete={state.handleDialogDownloadComplete}
+          />
 
-  const handleSubmit = (data: DownloadFormSchemaType) => {
-    if (data.downloadOption === 'premium-digital') {
-      const cleanedAmount = data.finalAmount?.replace(/[^\d.]/g, '').trim();
-      const dollars = cleanedAmount ? Number(cleanedAmount) : effectiveSuggestedPrice;
-      /* v8 ignore start -- Zod resolver rejects non-numeric amounts before handleSubmit runs, so this guard is unreachable from tests */
-      if (!Number.isFinite(dollars)) {
-        form.setError('finalAmount', { message: 'Amount must be a valid number' });
-        return;
-      }
-      /* v8 ignore stop */
-      const cents = Math.round(dollars * 100);
-      if (cents < 50) {
-        form.setError('finalAmount', { message: 'Minimum amount is $0.50' });
-        return;
-      }
-      setAmountCents(cents);
-      if (session?.user) {
-        setStep('purchase-checkout');
-      } else {
-        setStep('email-step');
-      }
-    } else {
-      // Free download path — advance to a step where the user explicitly
-      // picks which free formats (MP3 320Kbps and/or AAC) to bundle. This
-      // replaces the previous auto-start flow so that visitors who only want
-      // one format can opt out of the second.
-      // Feature: 007-free-digital-downloads (US1).
-      setStep('free-format-select');
-    }
-  };
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => state.setStep('download')}
+          >
+            Back
+          </Button>
+        </>
+      );
+    case 'email-step':
+      return (
+        <EmailStep
+          onCancel={() => state.setStep('download')}
+          onConfirm={state.handleEmailConfirm}
+        />
+      );
+    case 'purchase-checkout':
+      return (
+        <PurchaseCheckoutStep
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+          amountCents={state.amountCents}
+          customerEmail={state.checkoutEmail}
+          onConfirmed={() => state.setStep('purchase-success')}
+          onCancel={() => state.setStep('download')}
+          onError={state.handlePurchaseError}
+        />
+      );
+    case 'purchase-success':
+      return (
+        <PurchaseSuccessStep
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+          availableFormats={availableFormats}
+          downloadCount={downloadCount}
+          onDownloadComplete={state.handleDialogDownloadComplete}
+        />
+      );
+    case 'returning-download':
+      return (
+        <ReturningDownloadStep
+          releaseTitle={releaseTitle}
+          guestAtCap={state.guestAtCap}
+          guestResetInHours={state.guestResetInHours}
+        />
+      );
+    /* v8 ignore next 2 -- exhaustive switch: `step` is a closed union, so the default is unreachable */
+    default:
+      return null;
+  }
+};
 
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      setOpen(nextOpen);
-      if (!nextOpen) {
-        form.reset();
-        setStep(initialStep);
-        setCustomerEmail(null);
-        setAmountCents(0);
-        setGuestAtCap(false);
-        setGuestResetInHours(null);
-        setPurchaseError(null);
-      }
-    },
-    [form, initialStep]
-  );
-
-  const handleDialogDownloadComplete = useCallback(() => {
-    handleOpenChange(false);
-  }, [handleOpenChange]);
+export const DownloadDialog = (props: DownloadDialogProps): ReactElement => {
+  const resolved = resolveDialogProps(props);
+  const state = useDownloadDialogState(props);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={state.open} onOpenChange={state.handleOpenChange}>
+      <DialogTrigger asChild>{props.children}</DialogTrigger>
       <DialogContent
         className={cn(
           'sm:max-w-md',
-          step === 'purchase-checkout' && 'max-h-[90vh] overflow-y-auto sm:max-w-lg'
+          state.step === 'purchase-checkout' && 'max-h-[90vh] overflow-y-auto sm:max-w-lg'
         )}
         /* v8 ignore start -- Radix UI callback: not invocable from userEvent without real Radix focus management */
         onOpenAutoFocus={(e) => {
-          if (step === 'purchase-checkout') e.preventDefault();
+          if (state.step === 'purchase-checkout') e.preventDefault();
         }}
         /* v8 ignore stop */
       >
-        <DialogTitle className="sr-only">
-          {hasPurchase ? `Download ${releaseTitle}` : `Download ${artistName}'s music`}
-        </DialogTitle>
-        {step === 'purchase-confirmed' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Download</DialogTitle>
-              <DialogDescription>
-                You&apos;ve already purchased <strong>{releaseTitle}</strong>
-              </DialogDescription>
-            </DialogHeader>
+        <DialogTitle className="sr-only">{dialogTitleFor(resolved)}</DialogTitle>
 
-            <p className="text-sm text-zinc-900">
-              Purchased on{' '}
-              <strong>
-                {purchasedAt
-                  ? new Date(purchasedAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })
-                  : 'a previous date'}
-              </strong>
-              .
-            </p>
-
-            {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
-              <>
-                <Button className="w-full" type="button" disabled>
-                  <DownloadIcon className="size-4" />
-                  Download limit reached
-                </Button>
-                <p className="text-sm text-zinc-950">
-                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
-                  {resetInHours !== null
-                    ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
-                    : ''}
-                </p>
-              </>
-            ) : (
-              <Button className="w-full" type="button" onClick={() => setStep('format-select')}>
-                <DownloadIcon className="size-4" />
-                Continue
-              </Button>
-            )}
-          </>
-        )}
-
-        {step === 'download' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Download</DialogTitle>
-              <DialogDescription>
-                {hasPurchase ? (
-                  <>
-                    You&apos;ve already purchased <strong>{releaseTitle}</strong>
-                  </>
-                ) : (
-                  'Choose download format(s)'
-                )}
-              </DialogDescription>
-            </DialogHeader>
-
-            {purchaseError && <p className="text-destructive text-sm">{purchaseError}</p>}
-
-            {hasPurchase && session?.user ? (
-              <>
-                <p className="text-sm text-zinc-900">
-                  Purchased on{' '}
-                  <strong>
-                    {purchasedAt
-                      ? new Date(purchasedAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })
-                      : 'a previous date'}
-                  </strong>
-                  .
-                </p>
-
-                {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
-                  <>
-                    <Button className="w-full" type="button" disabled>
-                      <DownloadIcon className="size-4" />
-                      Download limit reached
-                    </Button>
-                    <p className="text-sm text-zinc-950">
-                      You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
-                      {resetInHours !== null
-                        ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
-                        : ''}
-                    </p>
-                  </>
-                ) : (
-                  <Button
-                    className="w-full"
-                    type="button"
-                    /* v8 ignore start -- dead onClick: the auto-advance effect moves a signed-in purchaser straight to 'format-select', so this download-step Continue button is never clicked */
-                    onClick={() => setStep('format-select')}
-                    /* v8 ignore stop */
-                  >
-                    <DownloadIcon className="size-4" />
-                    Continue to Download
-                  </Button>
-                )}
-              </>
-            ) : hasPurchase && !session?.user ? (
-              <Button asChild className="w-full">
-                <Link href="/signin">
-                  <LogInIcon className="size-4" />
-                  Sign in to access your downloads
-                </Link>
-              </Button>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                  {/* Download option radio group */}
-                  <FormField
-                    control={form.control}
-                    name="downloadOption"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value ?? ''}
-                            className="gap-4"
-                          >
-                            {DOWNLOAD_OPTIONS.map((option) => {
-                              const isFreeOption = option.value === 'free-320-aac';
-                              const optionDisabled = isFreeOption && freeRadioDisabled;
-                              return (
-                                <FormItem
-                                  key={option.value}
-                                  className="flex items-center gap-3 space-y-0"
-                                >
-                                  <FormControl>
-                                    <RadioGroupItem
-                                      className="size-6"
-                                      value={option.value}
-                                      disabled={optionDisabled}
-                                    />
-                                  </FormControl>
-                                  <FormLabel
-                                    className={cn(
-                                      'cursor-pointer font-normal',
-                                      optionDisabled && 'cursor-not-allowed opacity-50'
-                                    )}
-                                  >
-                                    <div className="flex flex-col gap-1">
-                                      <span className="leading-snug">{option.label}</span>
-                                      {optionDisabled && (
-                                        <span className="text-xs text-zinc-500">
-                                          Not available for this release
-                                        </span>
-                                      )}
-                                    </div>
-                                  </FormLabel>
-                                </FormItem>
-                              );
-                            })}
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Custom amount section — visible when premium is selected */}
-                  {selectedOption === 'premium-digital' && (
-                    <FormField
-                      control={form.control}
-                      name="finalAmount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <div>
-                            <FormControl>
-                              <div className="flex items-center gap-2 text-sm">
-                                <span>Pay</span>
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    {...field}
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder={`$${effectiveSuggestedPrice.toFixed(2)}`}
-                                    className="w-24 text-center"
-                                    aria-label="Custom amount"
-                                    onChange={(e) => {
-                                      const raw = e.target.value
-                                        .replace(/[^\d.]/g, '')
-                                        .replace(/(\..*)\./g, '$1');
-                                      const [whole, decimal] = raw.split('.');
-                                      const sanitized =
-                                        decimal !== undefined
-                                          ? `${whole}.${decimal.slice(0, 2)}`
-                                          : raw;
-                                      field.onChange(sanitized ? `$${sanitized}` : '');
-                                    }}
-                                    onFocus={(e) => {
-                                      const raw = e.target.value.replace(/[^\d.]/g, '');
-                                      field.onChange(raw ? `$${raw}` : '');
-                                    }}
-                                    onBlur={(e) => {
-                                      field.onBlur();
-                                      const raw = e.target.value.replace(/[^\d.]/g, '');
-                                      if (!raw) return;
-                                      const num = parseFloat(raw);
-                                      if (Number.isFinite(num) && num >= 0) {
-                                        field.onChange(`$${num.toFixed(2)}`);
-                                      }
-                                    }}
-                                    /* v8 ignore start -- field.value is always a defined string (RHF defaultValues.finalAmount = ''), so the `?? ''` fallback is unreachable */
-                                    value={field.value ?? ''}
-                                    /* v8 ignore stop */
-                                  />
-                                  <em>suggested or pay what you want</em>
-                                </div>
-                              </div>
-                            </FormControl>
-
-                            <span className="text-sm">
-                              to extend your support for{' '}
-                              <span className="font-semibold">{artistName}</span>
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {selectedOption === 'premium-digital' ? (
-                    <Button className="w-full" type="submit">
-                      <DownloadIcon className="size-4" />
-                      Buy &amp; Download for {displayAmount}
-                    </Button>
-                  ) : (
-                    <Button className="w-full" type="submit">
-                      <DownloadIcon className="size-4" />
-                      Download
-                    </Button>
-                  )}
-                </form>
-              </Form>
-            )}
-          </>
-        )}
-
-        {step === 'format-select' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>{hasPurchase ? 'Download Again' : 'Download'}</DialogTitle>
-              <DialogDescription>
-                Select formats for <strong>{releaseTitle}</strong>
-              </DialogDescription>
-            </DialogHeader>
-
-            {hasPurchase ? (
-              <p className="text-sm text-zinc-900">
-                You already purchased this on{' '}
-                <strong>
-                  {purchasedAt
-                    ? new Date(purchasedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : 'a previous date'}
-                </strong>
-                .
-              </p>
-            ) : null}
-
-            {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
-              <>
-                <Button className="w-full" type="button" disabled>
-                  <DownloadIcon className="size-4" />
-                  Download limit reached
-                </Button>
-                <p className="text-sm text-zinc-950">
-                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
-                  {resetInHours !== null
-                    ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
-                    : ''}
-                </p>
-              </>
-            ) : (
-              <FormatBundleDownload
-                releaseId={releaseId}
-                availableFormats={availableFormats}
-                downloadCount={downloadCount}
-                onDownloadComplete={handleDialogDownloadComplete}
-              />
-            )}
-          </>
-        )}
-
-        {step === 'free-format-select' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Free Download</DialogTitle>
-              <DialogDescription>
-                Choose your free formats for <strong>{releaseTitle}</strong>
-              </DialogDescription>
-            </DialogHeader>
-
-            <FreeFormatSelectStep
-              releaseId={releaseId}
-              availableFreeFormats={availableFreeFormats}
-              isLoading={isFreeStatusPending}
-              capReachedResetsAtIso={
-                freeStatus?.blockedReason === 'cap-reached' ? freeStatus.resetsAtIso : null
-              }
-              onDownloadComplete={handleDialogDownloadComplete}
-            />
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => setStep('download')}
-            >
-              Back
-            </Button>
-          </>
-        )}
-
-        {step === 'email-step' && (
-          <EmailStep
-            onCancel={() => setStep('download')}
-            onConfirm={async (email: string) => {
-              setCustomerEmail(email);
-              const status = await checkGuestPurchaseAction(email, releaseId);
-              if (status.hasPurchase) {
-                setGuestAtCap(status.atCap);
-                setGuestResetInHours(status.resetInHours);
-                setStep('returning-download');
-              } else {
-                setStep('purchase-checkout');
-              }
-            }}
-          />
-        )}
-
-        {step === 'purchase-checkout' && (
-          <PurchaseCheckoutStep
-            releaseId={releaseId}
-            releaseTitle={releaseTitle}
-            amountCents={amountCents}
-            customerEmail={customerEmail ?? session?.user?.email}
-            onConfirmed={() => setStep('purchase-success')}
-            onCancel={() => setStep('download')}
-            onError={(msg) => {
-              if (msg === ALREADY_PURCHASED_ERROR) {
-                setStep('purchase-confirmed');
-              } else {
-                setPurchaseError(msg);
-                setStep('download');
-              }
-            }}
-          />
-        )}
-
-        {step === 'purchase-success' && (
-          <PurchaseSuccessStep
-            releaseId={releaseId}
-            releaseTitle={releaseTitle}
-            availableFormats={availableFormats}
-            downloadCount={downloadCount}
-            onDownloadComplete={handleDialogDownloadComplete}
-          />
-        )}
-
-        {step === 'returning-download' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Welcome Back!</DialogTitle>
-              <DialogDescription>
-                You&apos;ve already purchased <strong>{releaseTitle}</strong>.
-              </DialogDescription>
-            </DialogHeader>
-            {guestAtCap ? (
-              <>
-                <Button className="w-full" disabled>
-                  <DownloadIcon className="size-4" />
-                  Download limit reached
-                </Button>
-                <p className="text-sm text-zinc-950">
-                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
-                  {guestResetInHours !== null
-                    ? ` Resets in ${guestResetInHours} hour${guestResetInHours === 1 ? '' : 's'}.`
-                    : ''}
-                </p>
-              </>
-            ) : (
-              <>
-                <Button asChild className="w-full">
-                  <Link href="/signin">
-                    <LogInIcon className="size-4" />
-                    Sign in to access your downloads
-                  </Link>
-                </Button>
-              </>
-            )}
-          </>
-        )}
+        {renderDialogStep(state, resolved)}
       </DialogContent>
     </Dialog>
   );
