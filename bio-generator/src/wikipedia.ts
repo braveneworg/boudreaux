@@ -49,6 +49,28 @@ const truncateExtract = (extract: string): string => {
 };
 
 /**
+ * Reads the title/extract out of a parsed Action API response, or `null` when
+ * the page is missing or has no usable extract text.
+ */
+const extractFromResponse = (
+  body: WikipediaQueryResponse,
+  wikipediaUrl: string,
+  fallbackTitle: string
+): WikipediaExtract | null => {
+  const page = Object.values(body.query?.pages ?? {})[0];
+  if (!page || page.missing !== undefined) return null;
+
+  const extract = page.extract?.trim();
+  if (!extract) return null;
+
+  return {
+    title: page.title ?? fallbackTitle,
+    extract: truncateExtract(extract),
+    url: wikipediaUrl,
+  };
+};
+
+/**
  * Fetches the full plain-text body of a Wikipedia article via the Action API
  * (`prop=extracts&explaintext`). This is the primary grounding source: the LLM
  * rewrites it into an original, encyclopedic bio rather than being handed only a
@@ -84,15 +106,5 @@ export const getWikipediaExtract = async (
   if (!response.ok) return null;
 
   const body = (await response.json()) as WikipediaQueryResponse;
-  const page = Object.values(body.query?.pages ?? {})[0];
-  if (!page || page.missing !== undefined) return null;
-
-  const extract = page.extract?.trim();
-  if (!extract) return null;
-
-  return {
-    title: page.title ?? title,
-    extract: truncateExtract(extract),
-    url: wikipediaUrl,
-  };
+  return extractFromResponse(body, wikipediaUrl, title);
 };

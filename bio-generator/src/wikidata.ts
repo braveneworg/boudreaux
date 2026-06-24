@@ -32,6 +32,20 @@ const stringValues = (entries: Claim[] | undefined): string[] =>
     .filter((value): value is string => typeof value === 'string');
 
 /**
+ * Extracts the media/link data from a parsed EntityData body. The endpoint
+ * returns a single entity keyed by its id, so we read it without a dynamic key
+ * lookup.
+ */
+const extractWikidataData = (body: WikidataEntities): WikidataData => {
+  const entity = Object.values(body.entities ?? {})[0];
+  return {
+    imageFileNames: stringValues(entity?.claims?.P18),
+    officialUrl: stringValues(entity?.claims?.P856)[0],
+    wikipediaUrl: entity?.sitelinks?.enwiki?.url,
+  };
+};
+
+/**
  * Fetches structured data for a Wikidata entity and extracts the artist's
  * image file name(s) (P18), official website (P856), and English Wikipedia URL.
  *
@@ -52,13 +66,5 @@ export const getWikidataData = async (
   }
 
   const body = (await response.json()) as WikidataEntities;
-  // The EntityData endpoint returns a single entity keyed by its id; read it
-  // without a dynamic key lookup.
-  const entity = Object.values(body.entities ?? {})[0];
-
-  const imageFileNames = stringValues(entity?.claims?.P18);
-  const officialUrl = stringValues(entity?.claims?.P856)[0];
-  const wikipediaUrl = entity?.sitelinks?.enwiki?.url;
-
-  return { imageFileNames, officialUrl, wikipediaUrl };
+  return extractWikidataData(body);
 };

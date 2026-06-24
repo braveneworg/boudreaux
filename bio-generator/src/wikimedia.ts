@@ -33,6 +33,39 @@ interface CommonsResponse {
 
 const stripHtml = (value: string): string => value.replace(/<[^>]*>/g, '').trim();
 
+type CommonsImageInfo = NonNullable<
+  NonNullable<NonNullable<CommonsResponse['query']>['pages']>[string]['imageinfo']
+>[number];
+
+/**
+ * Derives the attribution + license from the Commons `extmetadata`. Falls back
+ * to a generic attribution when the artist/credit fields are absent.
+ */
+const readAttribution = (
+  meta: NonNullable<CommonsImageInfo['extmetadata']>
+): { attribution: string; license: string | null } => {
+  const artist = meta.Artist?.value ? stripHtml(meta.Artist.value) : 'Wikimedia Commons';
+  const credit = meta.Credit?.value ? stripHtml(meta.Credit.value) : undefined;
+  const license = meta.LicenseShortName?.value ? stripHtml(meta.LicenseShortName.value) : null;
+  return { attribution: credit ? `${artist} (${credit})` : artist, license };
+};
+
+/** Maps a single Commons imageinfo entry to the displayable {@link BioImage}. */
+const toBioImage = (info: CommonsImageInfo, title: string): BioImage => {
+  const { attribution, license } = readAttribution(info.extmetadata ?? {});
+  return {
+    url: info.url ?? '',
+    thumbnailUrl: info.thumburl ?? null,
+    title: stripHtml(title.replace(/^File:/, '')),
+    attribution,
+    license,
+    sourceUrl: info.descriptionurl ?? null,
+    width: info.width ?? null,
+    height: info.height ?? null,
+    isPrimary: false,
+  };
+};
+
 /**
  * Resolves a Wikimedia Commons file name to a displayable image with the
  * attribution and license text required to hotlink it compliantly.
@@ -71,20 +104,5 @@ export const getCommonsImage = async (
     return null;
   }
 
-  const meta = info.extmetadata ?? {};
-  const artist = meta.Artist?.value ? stripHtml(meta.Artist.value) : 'Wikimedia Commons';
-  const credit = meta.Credit?.value ? stripHtml(meta.Credit.value) : undefined;
-  const license = meta.LicenseShortName?.value ? stripHtml(meta.LicenseShortName.value) : null;
-
-  return {
-    url: info.url,
-    thumbnailUrl: info.thumburl ?? null,
-    title: stripHtml(title.replace(/^File:/, '')),
-    attribution: credit ? `${artist} (${credit})` : artist,
-    license,
-    sourceUrl: info.descriptionurl ?? null,
-    width: info.width ?? null,
-    height: info.height ?? null,
-    isPrimary: false,
-  };
+  return toBioImage(info, title);
 };
