@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -31,13 +31,16 @@ import {
   DialogTrigger,
 } from '@/app/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { useCollectionDownload } from '@/hooks/use-collection-download';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 import { computeResetInHours } from '@/lib/utils/download-reset';
-import { parseSSEBuffer } from '@/lib/utils/parse-sse';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
-import { triggerDownload } from '@/lib/utils/trigger-download';
+
+import { FormatProgressList } from './format-progress-list';
+
+import type { FormatProgress } from './format-progress-list';
 
 /**
  * Lookup map for format labels keyed by format type. Backed by a `Map` so
@@ -142,7 +145,7 @@ interface CollectionListItemProps {
 
 /**
  * A single collection row. Memoized so that toggling another row's delete
- * spinner (the parent's `deletingId`) doesn't re-render every row \u2014 and, more
+ * spinner (the parent's `deletingId`) doesn't re-render every row — and, more
  * importantly, doesn't re-render each row's `CollectionDownloadDialog`, which
  * holds its own download/SSE state. Per-row derivations only recompute when
  * this row's own props change.
@@ -192,7 +195,7 @@ const CollectionListItem = memo(
           <p className="truncate text-sm text-zinc-500">{artistName}</p>
           <p className="mt-1 text-xs text-zinc-400">
             {formatPrice(purchase.amountPaid, purchase.currency)}
-            {' \u00b7 '}
+            {' · '}
             {new Date(purchase.purchasedAt).toLocaleDateString()}
           </p>
         </div>
@@ -255,20 +258,107 @@ interface AvailableFormat {
   fileName: string;
 }
 
+interface DownloadFormatFormProps {
+  availableFormats: AvailableFormat[];
+  downloadCount: number;
+  selectedFormats: string[];
+  onValueChange: (formats: string[]) => void;
+  isDownloading: boolean;
+  formatProgress: FormatProgress[];
+  downloadPhase: 'idle' | 'downloading' | 'complete' | 'error';
+  downloadError: string | null;
+  onDownload: () => void;
+}
+
+/** Active download form: format toggles, progress list, error banner, and download button. */
+const DownloadFormatForm = ({
+  availableFormats,
+  downloadCount,
+  selectedFormats,
+  onValueChange,
+  isDownloading,
+  formatProgress,
+  downloadPhase,
+  downloadError,
+  onDownload,
+}: DownloadFormatFormProps) => {
+  const hasSelection = selectedFormats.length > 0;
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Select formats:</p>
+        <p className="text-xs text-zinc-950">
+          {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT} downloads used
+        </p>
+      </div>
+
+      <ToggleGroup
+        type="multiple"
+        variant="outline"
+        size="sm"
+        value={selectedFormats}
+        onValueChange={onValueChange}
+        className="flex flex-wrap gap-2"
+        disabled={isDownloading}
+      >
+        {availableFormats.map(({ formatType }) => (
+          <ToggleGroupItem
+            key={formatType}
+            value={formatType}
+            aria-label={`Select ${getFormatLabel(formatType)}`}
+            className="rounded-md px-3"
+          >
+            {getFormatLabel(formatType)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
+      {formatProgress.length > 0 && <FormatProgressList progress={formatProgress} />}
+
+      {downloadPhase === 'error' && downloadError && (
+        <div className="text-destructive flex items-center gap-2 text-sm" role="alert">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
+
+      {downloadPhase === 'complete' ? (
+        <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
+          <CheckCircle2 className="size-4" />
+          Downloads started!
+        </div>
+      ) : (
+        <Button
+          className="w-full"
+          type="button"
+          disabled={!hasSelection || isDownloading}
+          onClick={onDownload}
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Preparing...
+            </>
+          ) : (
+            <>
+              <DownloadIcon className="size-4" />
+              {hasSelection
+                ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
+                : 'Select at least one format'}
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+};
+
 interface CollectionDownloadDialogProps {
   releaseId: string;
   releaseTitle: string;
   availableFormats: AvailableFormat[];
   downloadCount: number;
   resetInHours: number | null;
-}
-
-type FormatDownloadStatus = 'pending' | 'zipping' | 'done' | 'uploading' | 'complete' | 'error';
-
-interface FormatProgress {
-  formatType: string;
-  label: string;
-  status: FormatDownloadStatus;
 }
 
 const CollectionDownloadDialog = ({
@@ -278,146 +368,24 @@ const CollectionDownloadDialog = ({
   downloadCount,
   resetInHours,
 }: CollectionDownloadDialogProps) => {
-  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allFormatTypes = useMemo(
     () => availableFormats.map((f) => f.formatType),
     [availableFormats]
   );
   const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
-  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'downloading' | 'complete' | 'error'>(
-    'idle'
-  );
-  const [formatProgress, setFormatProgress] = useState<FormatProgress[]>([]);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
+  const {
+    downloadPhase,
+    formatProgress,
+    downloadError,
+    isDownloading,
+    handleDownload,
+    resetDownloadState,
+  } = useCollectionDownload(releaseId);
+
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
-  const hasSelection = selectedFormats.length > 0;
   const noFormats = availableFormats.length === 0;
-  const isDownloading = downloadPhase === 'downloading';
-
-  useEffect(() => {
-    return () => {
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const scheduleReset = () => {
-    if (resetTimeoutRef.current) {
-      clearTimeout(resetTimeoutRef.current);
-    }
-
-    resetTimeoutRef.current = setTimeout(() => {
-      setDownloadPhase('idle');
-      setFormatProgress([]);
-      resetTimeoutRef.current = null;
-    }, 3000);
-  };
-
-  const handleDownload = async () => {
-    if (!hasSelection || atLimit || isDownloading) return;
-
-    const joined = selectedFormats.join(',');
-    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
-
-    setDownloadPhase('downloading');
-    setDownloadError(null);
-
-    // Initialize all selected formats as pending
-    setFormatProgress(
-      selectedFormats.map((ft) => ({
-        formatType: ft,
-        label: getFormatLabel(ft),
-        status: 'pending' as const,
-      }))
-    );
-
-    let downloadTriggered = false;
-
-    try {
-      const response = await fetch(apiUrl);
-
-      if (!response.ok || !response.body) {
-        setDownloadPhase('error');
-        setFormatProgress([]);
-        setDownloadError('Download failed. Please try again.');
-        return;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const { events, remaining } = parseSSEBuffer(buffer);
-        buffer = remaining;
-
-        for (const evt of events) {
-          const data = JSON.parse(evt.data) as Record<string, unknown>;
-
-          if (evt.event === 'progress') {
-            const status = data.status as FormatDownloadStatus;
-
-            if (data.formatType) {
-              setFormatProgress((prev) =>
-                prev.map((fp) => (fp.formatType === data.formatType ? { ...fp, status } : fp))
-              );
-            } else if (status === 'uploading') {
-              // Global uploading phase fires after every format finished
-              // zipping. Do NOT regress formats already marked `done` back
-              // to a spinner — only advance still-pending formats.
-              setFormatProgress((prev) =>
-                prev.map((fp) =>
-                  fp.status === 'pending' || fp.status === 'zipping'
-                    ? { ...fp, status: 'uploading' as const }
-                    : fp
-                )
-              );
-            }
-          } else if (evt.event === 'ready') {
-            triggerDownload(data.downloadUrl as string, data.fileName as string);
-            downloadTriggered = true;
-            setFormatProgress((prev) =>
-              prev.map((fp) =>
-                fp.status !== 'error' ? { ...fp, status: 'complete' as const } : fp
-              )
-            );
-          } else if (evt.event === 'error') {
-            if (data.formatType) {
-              setFormatProgress((prev) =>
-                prev.map((fp) =>
-                  fp.formatType === data.formatType ? { ...fp, status: 'error' as const } : fp
-                )
-              );
-            }
-          }
-        }
-      }
-
-      if (downloadTriggered) {
-        setDownloadPhase('complete');
-        scheduleReset();
-      } else {
-        setDownloadPhase('error');
-        setDownloadError('No formats could be prepared. Please try again.');
-      }
-    } catch {
-      if (downloadTriggered) {
-        setDownloadPhase('complete');
-        scheduleReset();
-      } else {
-        setDownloadPhase('error');
-        setFormatProgress([]);
-        setDownloadError('Something went wrong. Please try again.');
-      }
-    }
-  };
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -425,12 +393,10 @@ const CollectionDownloadDialog = ({
       setOpen(nextOpen);
       if (nextOpen) {
         setSelectedFormats(allFormatTypes);
-        setDownloadPhase('idle');
-        setDownloadError(null);
-        setFormatProgress([]);
+        resetDownloadState();
       }
     },
-    [allFormatTypes, isDownloading]
+    [allFormatTypes, isDownloading, resetDownloadState]
   );
 
   return (
@@ -474,99 +440,17 @@ const CollectionDownloadDialog = ({
             No digital formats are available for download yet.
           </p>
         ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Select formats:</p>
-              <p className="text-xs text-zinc-950">
-                {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT} downloads used
-              </p>
-            </div>
-
-            <ToggleGroup
-              type="multiple"
-              variant="outline"
-              size="sm"
-              value={selectedFormats}
-              onValueChange={setSelectedFormats}
-              className="flex flex-wrap gap-2"
-              disabled={isDownloading}
-            >
-              {availableFormats.map(({ formatType }) => (
-                <ToggleGroupItem
-                  key={formatType}
-                  value={formatType}
-                  aria-label={`Select ${getFormatLabel(formatType)}`}
-                  className="rounded-md px-3"
-                >
-                  {getFormatLabel(formatType)}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-
-            {formatProgress.length > 0 && (
-              <ul className="space-y-1" role="status">
-                {formatProgress.map((fp) => (
-                  <li key={fp.formatType} className="flex items-center gap-2 text-sm">
-                    {fp.status === 'complete' || fp.status === 'done' ? (
-                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-                    ) : fp.status === 'zipping' || fp.status === 'uploading' ? (
-                      <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
-                    ) : fp.status === 'error' ? (
-                      <AlertCircle className="text-destructive size-4 shrink-0" />
-                    ) : (
-                      <span className="size-4 shrink-0 text-center text-zinc-950">&bull;</span>
-                    )}
-                    <span
-                      className={
-                        fp.status === 'complete' || fp.status === 'done'
-                          ? 'text-emerald-600'
-                          : fp.status === 'error'
-                            ? 'text-destructive'
-                            : ''
-                      }
-                    >
-                      {fp.label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {downloadPhase === 'error' && downloadError && (
-              <div className="text-destructive flex items-center gap-2 text-sm" role="alert">
-                <AlertCircle className="size-4 shrink-0" />
-                <span>{downloadError}</span>
-              </div>
-            )}
-
-            {downloadPhase === 'complete' ? (
-              <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
-                <CheckCircle2 className="size-4" />
-                Downloads started!
-              </div>
-            ) : (
-              <Button
-                className="w-full"
-                type="button"
-                disabled={!hasSelection || isDownloading}
-                onClick={handleDownload}
-              >
-                {isDownloading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Preparing...
-                  </>
-                ) : (
-                  <>
-                    <DownloadIcon className="size-4" />
-                    {hasSelection
-                      ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
-                      : 'Select at least one format'}
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+          <DownloadFormatForm
+            availableFormats={availableFormats}
+            downloadCount={downloadCount}
+            selectedFormats={selectedFormats}
+            onValueChange={setSelectedFormats}
+            isDownloading={isDownloading}
+            formatProgress={formatProgress}
+            downloadPhase={downloadPhase}
+            downloadError={downloadError}
+            onDownload={() => handleDownload(selectedFormats)}
+          />
         )}
       </DialogContent>
     </Dialog>

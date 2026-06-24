@@ -12,19 +12,7 @@ import { Image as TiptapImage } from '@tiptap/extension-image';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
-import {
-  Bold,
-  Heading2,
-  Heading3,
-  ImageIcon,
-  Italic,
-  Link2,
-  Link2Off,
-  List,
-  ListOrdered,
-  Pilcrow,
-  Type,
-} from 'lucide-react';
+import { Link2Off } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import {
@@ -35,17 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/app/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/app/components/ui/dropdown-menu';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { cn } from '@/lib/utils';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 
+import { RichTextEditorToolbar } from './rich-text-editor-toolbar';
+
+import type { ToolbarState } from './rich-text-editor-toolbar';
 import type { Editor } from '@tiptap/react';
 
 /** An image the admin can insert into a bio (uploaded or re-hosted bio image). */
@@ -69,14 +54,6 @@ interface RichTextEditorProps {
   className?: string;
 }
 
-/** Font-size presets offered in the toolbar dropdown. */
-const FONT_SIZES = [
-  { label: 'Small', value: '14px' },
-  { label: 'Normal', value: '16px' },
-  { label: 'Large', value: '20px' },
-  { label: 'Extra large', value: '24px' },
-] as const;
-
 /** Image node that also persists width/height so variants render at the right size. */
 const BioEditorImage = TiptapImage.extend({
   addAttributes() {
@@ -95,6 +72,31 @@ const BioEditorImage = TiptapImage.extend({
     };
   },
 });
+
+const isActive = (instance: Editor | null, name: string, attrs?: object): boolean =>
+  instance?.isActive(name, attrs) ?? false;
+
+/** Derive active-state flags from the editor for the toolbar. */
+const selectToolbarState = ({ editor: instance }: { editor: Editor | null }): ToolbarState => ({
+  isBold: isActive(instance, 'bold'),
+  isItalic: isActive(instance, 'italic'),
+  isLink: isActive(instance, 'link'),
+  isHeading2: isActive(instance, 'heading', { level: 2 }),
+  isHeading3: isActive(instance, 'heading', { level: 3 }),
+  isBulletList: isActive(instance, 'bulletList'),
+  isOrderedList: isActive(instance, 'orderedList'),
+});
+
+/** All-inactive fallback used before the editor instance is ready. */
+const INACTIVE_TOOLBAR: ToolbarState = {
+  isBold: false,
+  isItalic: false,
+  isLink: false,
+  isHeading2: false,
+  isHeading3: false,
+  isBulletList: false,
+  isOrderedList: false,
+};
 
 /**
  * Minimal Tiptap rich-text editor for the artist bio fields. Toolbar: bold,
@@ -166,18 +168,7 @@ export const RichTextEditor = ({
     }
   }, [editor, value]);
 
-  const toolbarState = useEditorState({
-    editor,
-    selector: ({ editor: instance }: { editor: Editor | null }) => ({
-      isBold: instance?.isActive('bold') ?? false,
-      isItalic: instance?.isActive('italic') ?? false,
-      isLink: instance?.isActive('link') ?? false,
-      isHeading2: instance?.isActive('heading', { level: 2 }) ?? false,
-      isHeading3: instance?.isActive('heading', { level: 3 }) ?? false,
-      isBulletList: instance?.isActive('bulletList') ?? false,
-      isOrderedList: instance?.isActive('orderedList') ?? false,
-    }),
-  });
+  const toolbarState = useEditorState({ editor, selector: selectToolbarState });
 
   if (!editor) {
     return <div className={cn('border-input rounded-md border', className)} aria-busy="true" />;
@@ -216,123 +207,13 @@ export const RichTextEditor = ({
 
   return (
     <div className={cn('border-input rounded-md border', className)}>
-      <div className="border-input flex flex-wrap items-center gap-1 border-b p-1" role="toolbar">
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isBold ? 'secondary' : 'ghost'}
-          aria-label="Bold"
-          aria-pressed={toolbarState?.isBold}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <Bold className="size-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isItalic ? 'secondary' : 'ghost'}
-          aria-label="Italic"
-          aria-pressed={toolbarState?.isItalic}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
-          <Italic className="size-4" aria-hidden />
-        </Button>
-
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isHeading2 ? 'secondary' : 'ghost'}
-          aria-label="Heading 2"
-          aria-pressed={toolbarState?.isHeading2}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        >
-          <Heading2 className="size-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isHeading3 ? 'secondary' : 'ghost'}
-          aria-label="Heading 3"
-          aria-pressed={toolbarState?.isHeading3}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        >
-          <Heading3 className="size-4" aria-hidden />
-        </Button>
-
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isBulletList ? 'secondary' : 'ghost'}
-          aria-label="Bulleted list"
-          aria-pressed={toolbarState?.isBulletList}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          <List className="size-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isOrderedList ? 'secondary' : 'ghost'}
-          aria-label="Numbered list"
-          aria-pressed={toolbarState?.isOrderedList}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          <ListOrdered className="size-4" aria-hidden />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" size="icon" variant="ghost" aria-label="Font size">
-              <Type className="size-4" aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {FONT_SIZES.map((size) => (
-              <DropdownMenuItem
-                key={size.value}
-                onSelect={() => editor.chain().focus().setFontSize(size.value).run()}
-              >
-                {size.label}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuItem onSelect={() => editor.chain().focus().unsetFontSize().run()}>
-              Reset
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          type="button"
-          size="icon"
-          variant={toolbarState?.isLink ? 'secondary' : 'ghost'}
-          aria-label="Link"
-          aria-pressed={toolbarState?.isLink}
-          onClick={openLinkDialog}
-        >
-          <Link2 className="size-4" aria-hidden />
-        </Button>
-
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          aria-label="Insert image"
-          disabled={images.length === 0}
-          onClick={() => setImageOpen(true)}
-        >
-          <ImageIcon className="size-4" aria-hidden />
-        </Button>
-
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          aria-label="New paragraph"
-          onClick={() => editor.chain().focus().insertContent('<p></p>').run()}
-        >
-          <Pilcrow className="size-4" aria-hidden />
-        </Button>
-      </div>
+      <RichTextEditorToolbar
+        editor={editor}
+        toolbarState={toolbarState ?? INACTIVE_TOOLBAR}
+        images={images}
+        onOpenLink={openLinkDialog}
+        onOpenImage={() => setImageOpen(true)}
+      />
 
       <EditorContent editor={editor} />
 
