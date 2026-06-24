@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Link from 'next/link';
 
@@ -32,6 +32,153 @@ export interface ArtistOption {
   firstName?: string;
   surname?: string;
 }
+
+const getArtistDisplayName = (artist: ArtistOption): string => {
+  if (artist.displayName) {
+    return artist.displayName;
+  }
+  const parts = [artist.firstName, artist.surname].filter(Boolean);
+  return parts.join(' ') || '(no name)';
+};
+
+/**
+ * Build the artist-list query params: when there's a search term it filters by
+ * it with no `take` cap; otherwise it falls back to the first 5 artists.
+ */
+const buildArtistListParams = (
+  debouncedSearch: string
+): { search: string | undefined; take: number | undefined } => ({
+  search: debouncedSearch || undefined,
+  take: debouncedSearch ? undefined : 5,
+});
+
+const buildCreateArtistUrl = (releaseId: string | null | undefined): string => {
+  const params = new URLSearchParams();
+  if (releaseId) {
+    params.set('returnTo', `/admin/releases/${releaseId}`);
+    params.set('releaseId', releaseId);
+  }
+  const queryString = params.toString();
+  return `/admin/artists/new${queryString ? `?${queryString}` : ''}`;
+};
+
+/**
+ * Keeps a stable cache of {@link ArtistOption} keyed by id so selected pills
+ * persist across searches and survive `initialArtists` changes (e.g. the
+ * dialog being reused for a different tour date). Returns the cache map.
+ */
+const useArtistSelectionCache = (
+  initialArtists: ArtistOption[],
+  artists: ArtistOption[]
+): Map<string, ArtistOption> => {
+  const [cache, setCache] = useState<Map<string, ArtistOption>>(
+    () => new Map(initialArtists.map((a) => [a.id, a]))
+  );
+
+  const mergeIntoCache = useCallback((incoming: ArtistOption[]): void => {
+    if (incoming.length === 0) return;
+    setCache((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const artist of incoming) {
+        if (!next.has(artist.id)) {
+          next.set(artist.id, artist);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => mergeIntoCache(initialArtists), [initialArtists, mergeIntoCache]);
+  useEffect(() => mergeIntoCache(artists), [artists, mergeIntoCache]);
+
+  return cache;
+};
+
+interface ArtistTriggerLabelProps {
+  selectedCount: number;
+  placeholder: string;
+}
+
+const ArtistTriggerLabel = ({ selectedCount, placeholder }: ArtistTriggerLabelProps) => (
+  <>
+    {selectedCount > 0
+      ? `${selectedCount} artist${selectedCount === 1 ? '' : 's'} selected`
+      : placeholder}
+  </>
+);
+
+interface ArtistCommandEmptyProps {
+  isLoading: boolean;
+  error: string | null;
+  emptyMessage: string;
+  createArtistUrl: string;
+}
+
+const ArtistCommandEmpty = ({
+  isLoading,
+  error,
+  emptyMessage,
+  createArtistUrl,
+}: ArtistCommandEmptyProps) => {
+  if (isLoading) return <>Loading...</>;
+  if (error) return <span className="text-destructive">{error}</span>;
+  return (
+    <div className="flex flex-col items-center gap-2 py-2">
+      <span>{emptyMessage}</span>
+      <Link
+        href={createArtistUrl}
+        className="text-primary flex items-center gap-1 text-sm hover:underline"
+      >
+        <Plus className="h-4 w-4" />
+        Create new artist
+      </Link>
+    </div>
+  );
+};
+
+interface ArtistOptionRowProps {
+  artist: ArtistOption;
+  isSelected: boolean;
+  onSelect: (artistId: string) => void;
+}
+
+const ArtistOptionRow = ({ artist, isSelected, onSelect }: ArtistOptionRowProps) => (
+  <CommandItem value={artist.id} onSelect={() => onSelect(artist.id)}>
+    <Check className={`mr-2 h-4 w-4 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+    {getArtistDisplayName(artist)}
+  </CommandItem>
+);
+
+interface SelectedArtistBadgesProps {
+  selectedArtists: ArtistOption[];
+  disabled: boolean;
+  onRemove: (artistId: string) => void;
+}
+
+const SelectedArtistBadges = ({
+  selectedArtists,
+  disabled,
+  onRemove,
+}: SelectedArtistBadgesProps) => (
+  <div className="flex flex-wrap gap-2">
+    {selectedArtists.map((artist) => (
+      <Badge key={artist.id} variant="secondary" className="gap-1">
+        {getArtistDisplayName(artist)}
+        <button
+          type="button"
+          onClick={() => onRemove(artist.id)}
+          className="hover:bg-muted-foreground/20 ml-1 rounded-full"
+          disabled={disabled}
+          aria-label={`Remove ${getArtistDisplayName(artist)}`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </Badge>
+    ))}
+  </div>
+);
 
 interface ArtistMultiSelectProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -68,19 +215,13 @@ export const ArtistMultiSelect = <
 }: ArtistMultiSelectProps<TFieldValues, TName>) => {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const [selectedArtistCache, setSelectedArtistCache] = useState<Map<string, ArtistOption>>(
-    () => new Map(initialArtists.map((a) => [a.id, a]))
-  );
 
   const debouncedSearch = useDebounce(searchValue, 300);
   const {
     isPending: isLoading,
     error: fetchError,
     data,
-  } = useArtistListQuery(
-    { search: debouncedSearch || undefined, take: debouncedSearch ? undefined : 5 },
-    { enabled: open }
-  );
+  } = useArtistListQuery(buildArtistListParams(debouncedSearch), { enabled: open });
   const artists: ArtistOption[] = useMemo(
     () =>
       (data ?? []).map((item) => ({
@@ -91,38 +232,8 @@ export const ArtistMultiSelect = <
       })),
     [data]
   );
-  const error = fetchError?.message ?? null;
 
-  // Sync cache when initialArtists changes (e.g. dialog reused for a different tour date)
-  useEffect(() => {
-    if (initialArtists.length === 0) return;
-    setSelectedArtistCache((prev) => {
-      const next = new Map(prev);
-      let changed = false;
-      for (const artist of initialArtists) {
-        if (!next.has(artist.id)) {
-          next.set(artist.id, artist);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [initialArtists]);
-
-  // Whenever fetched artists change, cache them so selected pills persist across searches
-  useEffect(() => {
-    setSelectedArtistCache((prev) => {
-      const next = new Map(prev);
-      let changed = false;
-      for (const artist of artists) {
-        if (!next.has(artist.id)) {
-          next.set(artist.id, artist);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [artists]);
+  const selectedArtistCache = useArtistSelectionCache(initialArtists, artists);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
@@ -131,24 +242,7 @@ export const ArtistMultiSelect = <
     }
   };
 
-  const getArtistDisplayName = (artist: ArtistOption): string => {
-    if (artist.displayName) {
-      return artist.displayName;
-    }
-    const parts = [artist.firstName, artist.surname].filter(Boolean);
-    return parts.join(' ') || '(no name)';
-  };
-
-  // Build the create artist URL with querystring parameters
-  const getCreateArtistUrl = (): string => {
-    const params = new URLSearchParams();
-    if (releaseId) {
-      params.set('returnTo', `/admin/releases/${releaseId}`);
-      params.set('releaseId', releaseId);
-    }
-    const queryString = params.toString();
-    return `/admin/artists/new${queryString ? `?${queryString}` : ''}`;
-  };
+  const createArtistUrl = buildCreateArtistUrl(releaseId);
 
   return (
     <FormField
@@ -201,9 +295,10 @@ export const ArtistMultiSelect = <
                       className="w-full justify-between"
                       disabled={disabled}
                     >
-                      {selectedIds.length > 0
-                        ? `${selectedIds.length} artist${selectedIds.length === 1 ? '' : 's'} selected`
-                        : placeholder}
+                      <ArtistTriggerLabel
+                        selectedCount={selectedIds.length}
+                        placeholder={placeholder}
+                      />
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </FormControl>
@@ -223,46 +318,30 @@ export const ArtistMultiSelect = <
                       onValueChange={setSearchValue}
                     />
                     <CommandEmpty>
-                      {isLoading ? (
-                        'Loading...'
-                      ) : error ? (
-                        <span className="text-destructive">{error}</span>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 py-2">
-                          <span>{emptyMessage}</span>
-                          <Link
-                            href={getCreateArtistUrl()}
-                            className="text-primary flex items-center gap-1 text-sm hover:underline"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Create new artist
-                          </Link>
-                        </div>
-                      )}
+                      <ArtistCommandEmpty
+                        isLoading={isLoading}
+                        error={fetchError?.message ?? null}
+                        emptyMessage={emptyMessage}
+                        createArtistUrl={createArtistUrl}
+                      />
                     </CommandEmpty>
                     <CommandList
                       style={{ maxHeight: 'var(--radix-popover-content-available-height)' }}
                     >
                       <CommandGroup>
                         {artists.map((artist) => (
-                          <CommandItem
+                          <ArtistOptionRow
                             key={artist.id}
-                            value={artist.id}
-                            onSelect={() => handleSelect(artist.id)}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                selectedIds.includes(artist.id) ? 'opacity-100' : 'opacity-0'
-                              }`}
-                            />
-                            {getArtistDisplayName(artist)}
-                          </CommandItem>
+                            artist={artist}
+                            isSelected={selectedIds.includes(artist.id)}
+                            onSelect={handleSelect}
+                          />
                         ))}
                       </CommandGroup>
                     </CommandList>
                     <div className="border-t p-2">
                       <Link
-                        href={getCreateArtistUrl()}
+                        href={createArtistUrl}
                         className="text-primary flex items-center gap-1 text-sm hover:underline"
                       >
                         <Plus className="h-4 w-4" />
@@ -275,22 +354,11 @@ export const ArtistMultiSelect = <
 
               {/* Display selected artists as badges */}
               {selectedArtists.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedArtists.map((artist) => (
-                    <Badge key={artist.id} variant="secondary" className="gap-1">
-                      {getArtistDisplayName(artist)}
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(artist.id)}
-                        className="hover:bg-muted-foreground/20 ml-1 rounded-full"
-                        disabled={disabled}
-                        aria-label={`Remove ${getArtistDisplayName(artist)}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
+                <SelectedArtistBadges
+                  selectedArtists={selectedArtists}
+                  disabled={disabled}
+                  onRemove={handleRemove}
+                />
               )}
             </div>
             <FormMessage />

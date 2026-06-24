@@ -34,6 +34,107 @@ interface MultiComboboxProps {
   disabled?: boolean;
 }
 
+interface ComboboxTriggerContentProps {
+  selectedCount: number;
+  placeholder: string;
+  open: boolean;
+}
+
+const ComboboxTriggerContent = ({
+  selectedCount,
+  placeholder,
+  open,
+}: ComboboxTriggerContentProps) => (
+  <>
+    {selectedCount > 0 ? (
+      <span>
+        {selectedCount} {selectedCount === 1 ? 'format' : 'formats'} selected
+      </span>
+    ) : (
+      <span className="text-zinc-950">{placeholder}</span>
+    )}
+    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+      {open && (
+        <X className="size-3.5 opacity-40 transition-opacity hover:opacity-80" aria-hidden="true" />
+      )}
+      <ChevronsUpDown className="shrink-0 opacity-50" />
+    </span>
+    {open && <span className="sr-only">Close formats menu</span>}
+  </>
+);
+
+interface ComboboxOptionListProps {
+  options: MultiComboboxOption[];
+  value: string[];
+  allSelected: boolean;
+  emptyMessage: string;
+  onToggle: (optionValue: string) => void;
+  onSelectAll: () => void;
+}
+
+const ComboboxOptionList = ({
+  options,
+  value,
+  allSelected,
+  emptyMessage,
+  onToggle,
+  onSelectAll,
+}: ComboboxOptionListProps) => (
+  <CommandList>
+    <CommandEmpty>{emptyMessage}</CommandEmpty>
+    <CommandGroup>
+      {options.length > 1 && (
+        <CommandItem onSelect={onSelectAll} className="font-medium">
+          {allSelected ? 'Deselect all' : 'Select all'}
+          <Check className={cn('ml-auto', allSelected ? 'opacity-100' : 'opacity-0')} />
+        </CommandItem>
+      )}
+      {options.map((option) => (
+        <CommandItem
+          key={option.value}
+          value={option.value}
+          onSelect={() => onToggle(option.value)}
+        >
+          {option.label}
+          <Check
+            className={cn('ml-auto', value.includes(option.value) ? 'opacity-100' : 'opacity-0')}
+          />
+        </CommandItem>
+      ))}
+    </CommandGroup>
+  </CommandList>
+);
+
+interface SelectedFormatBadgesProps {
+  selectedOptions: MultiComboboxOption[];
+  disabled: boolean;
+  onRemove: (optionValue: string) => void;
+}
+
+const SelectedFormatBadges = ({
+  selectedOptions,
+  disabled,
+  onRemove,
+}: SelectedFormatBadgesProps) => (
+  <div className="flex flex-wrap gap-1.5" role="list" aria-label="Selected formats">
+    {selectedOptions.map((option) => (
+      <Badge key={option.value} variant="secondary" className="gap-1 text-xs" role="listitem">
+        {option.label}
+        {!disabled && (
+          <button
+            type="button"
+            className="hover:text-foreground ml-0.5 rounded-full outline-none"
+            onClick={() => onRemove(option.value)}
+            aria-label={`Remove ${option.label}`}
+          >
+            <X className="size-3" />
+          </button>
+        )}
+      </Badge>
+    ))}
+  </div>
+);
+
 export const MultiCombobox = ({
   className,
   options,
@@ -88,74 +189,33 @@ export const MultiCombobox = ({
             disabled={disabled}
             className={cn('w-full justify-between', className)}
           >
-            {selectedOptions.length > 0 ? (
-              <span>
-                {selectedOptions.length} {selectedOptions.length === 1 ? 'format' : 'formats'}{' '}
-                selected
-              </span>
-            ) : (
-              <span className="text-zinc-950">{placeholder}</span>
-            )}
-            <span className="ml-auto flex shrink-0 items-center gap-1.5">
-              {open && (
-                <X
-                  className="size-3.5 opacity-40 transition-opacity hover:opacity-80"
-                  aria-hidden="true"
-                />
-              )}
-              <ChevronsUpDown className="shrink-0 opacity-50" />
-            </span>
-            {open && <span className="sr-only">Close formats menu</span>}
+            <ComboboxTriggerContent
+              selectedCount={selectedOptions.length}
+              placeholder={placeholder}
+              open={open}
+            />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" asChild>
           <Command>
-            <CommandList>
-              <CommandEmpty>{emptyMessage}</CommandEmpty>
-              <CommandGroup>
-                {options.length > 1 && (
-                  <CommandItem onSelect={handleSelectAll} className="font-medium">
-                    {allSelected ? 'Deselect all' : 'Select all'}
-                    <Check className={cn('ml-auto', allSelected ? 'opacity-100' : 'opacity-0')} />
-                  </CommandItem>
-                )}
-                {options.map((option) => {
-                  const isSelected = value.includes(option.value);
-                  return (
-                    <CommandItem
-                      key={option.value}
-                      value={option.value}
-                      onSelect={() => handleToggle(option.value)}
-                    >
-                      {option.label}
-                      <Check className={cn('ml-auto', isSelected ? 'opacity-100' : 'opacity-0')} />
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
+            <ComboboxOptionList
+              options={options}
+              value={value}
+              allSelected={allSelected}
+              emptyMessage={emptyMessage}
+              onToggle={handleToggle}
+              onSelectAll={handleSelectAll}
+            />
           </Command>
         </PopoverContent>
       </Popover>
 
       {selectedOptions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" role="list" aria-label="Selected formats">
-          {selectedOptions.map((option) => (
-            <Badge key={option.value} variant="secondary" className="gap-1 text-xs" role="listitem">
-              {option.label}
-              {!disabled && (
-                <button
-                  type="button"
-                  className="hover:text-foreground ml-0.5 rounded-full outline-none"
-                  onClick={() => handleRemove(option.value)}
-                  aria-label={`Remove ${option.label}`}
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
-        </div>
+        <SelectedFormatBadges
+          selectedOptions={selectedOptions}
+          disabled={disabled}
+          onRemove={handleRemove}
+        />
       )}
     </div>
   );

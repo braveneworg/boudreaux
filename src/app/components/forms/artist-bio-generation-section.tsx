@@ -29,6 +29,147 @@ interface ArtistBioGenerationSectionProps {
   onGenerated: (content: GeneratedBioContent) => void;
 }
 
+interface ReferenceLinksListProps {
+  links: string[];
+  onRemove: (url: string) => void;
+}
+
+const ReferenceLinksList = ({ links, onRemove }: ReferenceLinksListProps) => (
+  <ul className="flex flex-wrap gap-2">
+    {links.map((url) => (
+      <li key={url}>
+        <Badge variant="secondary" className="gap-1">
+          <Link2 className="size-3" aria-hidden />
+          <span className="max-w-48 truncate">{url}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(url)}
+            aria-label={`Remove ${url}`}
+            className="hover:text-destructive ml-1 rounded-full"
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        </Badge>
+      </li>
+    ))}
+  </ul>
+);
+
+interface DiscoveredImagesProps {
+  images: GeneratedBioContent['images'];
+}
+
+const DiscoveredImages = ({ images }: DiscoveredImagesProps) => (
+  <div className="space-y-2">
+    <h3 className="text-sm font-semibold">Discovered images</h3>
+    <ul className="flex flex-wrap gap-3">
+      {images.map((image) => (
+        <li key={image.url} className="relative">
+          <Image
+            src={image.thumbnailUrl ?? image.url}
+            alt={image.title ?? 'Discovered artist image'}
+            width={80}
+            height={80}
+            unoptimized
+            className="ring-border size-20 rounded-md object-cover ring-1"
+          />
+          {image.isPrimary && (
+            <Star
+              className="absolute -top-1 -right-1 size-4 fill-yellow-400 text-yellow-500"
+              aria-label="Primary image"
+            />
+          )}
+        </li>
+      ))}
+    </ul>
+    <p className="text-muted-foreground text-xs">
+      Starred images are shown beside the short bio on the public pages.
+    </p>
+  </div>
+);
+
+interface DiscoveredLinksProps {
+  links: GeneratedBioContent['links'];
+}
+
+const DiscoveredLinks = ({ links }: DiscoveredLinksProps) => (
+  <div className="space-y-2">
+    <h3 className="text-sm font-semibold">Discovered links</h3>
+    <ul className="space-y-1">
+      {links.map((link) => (
+        <li key={link.url} className="flex items-center gap-2 text-sm">
+          <ExternalLink className="text-muted-foreground size-3.5" aria-hidden />
+          <a
+            href={link.url}
+            target="_blank"
+            rel="nofollow noopener noreferrer"
+            className="text-primary truncate hover:underline"
+          >
+            {link.label}
+          </a>
+          {link.kind && (
+            <Badge variant="outline" className="text-xs">
+              {link.kind}
+            </Badge>
+          )}
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+interface GenerateBioButtonProps {
+  hasResult: boolean;
+  isPending: boolean;
+  onGenerate: () => void;
+}
+
+const GenerateBioButton = ({ hasResult, isPending, onGenerate }: GenerateBioButtonProps) => (
+  <Button type="button" onClick={onGenerate} disabled={isPending} className="w-full sm:w-auto">
+    {hasResult ? (
+      <RefreshCw className={cn('size-4', isPending && 'animate-spin')} aria-hidden />
+    ) : (
+      <Sparkles className={cn('size-4', isPending && 'animate-pulse')} aria-hidden />
+    )}
+    {isPending ? 'Generating…' : hasResult ? 'Regenerate bios' : 'Generate bios'}
+  </Button>
+);
+
+const BioGeneratingSkeleton = () => (
+  <div className="space-y-2">
+    <p className="text-muted-foreground text-sm" role="status">
+      Researching the web and writing the bio — this can take a few minutes. You can keep working;
+      the results will appear here when ready.
+    </p>
+    <div className="space-y-2" aria-hidden>
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-20 w-full" />
+    </div>
+  </div>
+);
+
+interface BioResultPreviewProps {
+  result: GeneratedBioContent;
+}
+
+const BioResultPreview = ({ result }: BioResultPreviewProps) => (
+  <div className="space-y-4 border-t pt-4">
+    <div className="space-y-1">
+      <h3 className="text-sm font-semibold">Short bio</h3>
+      <BioHtml html={result.shortBio} className="text-muted-foreground text-sm" />
+    </div>
+
+    {result.images.length > 0 && <DiscoveredImages images={result.images} />}
+
+    {result.links.length > 0 && <DiscoveredLinks links={result.links} />}
+
+    <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <Trash2 className="size-3" aria-hidden />
+      Regenerating replaces the images and links above. Save the form to keep the result.
+    </p>
+  </div>
+);
+
 /**
  * Admin tool that generates an artist's short + long bio plus discovered images
  * and links via the bio-generator Lambda. Reference links and the description
@@ -141,26 +282,7 @@ export const ArtistBioGenerationSection = ({
             <span className="sr-only sm:not-sr-only">Add</span>
           </Button>
         </div>
-        {links.length > 0 && (
-          <ul className="flex flex-wrap gap-2">
-            {links.map((url) => (
-              <li key={url}>
-                <Badge variant="secondary" className="gap-1">
-                  <Link2 className="size-3" aria-hidden />
-                  <span className="max-w-48 truncate">{url}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeLink(url)}
-                    aria-label={`Remove ${url}`}
-                    className="hover:text-destructive ml-1 rounded-full"
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        )}
+        {links.length > 0 && <ReferenceLinksList links={links} onRemove={removeLink} />}
       </div>
 
       <div className="space-y-2">
@@ -176,101 +298,15 @@ export const ArtistBioGenerationSection = ({
         />
       </div>
 
-      <Button
-        type="button"
-        onClick={() => void generate()}
-        disabled={isPending}
-        className="w-full sm:w-auto"
-      >
-        {result ? (
-          <RefreshCw className={cn('size-4', isPending && 'animate-spin')} aria-hidden />
-        ) : (
-          <Sparkles className={cn('size-4', isPending && 'animate-pulse')} aria-hidden />
-        )}
-        {isPending ? 'Generating…' : result ? 'Regenerate bios' : 'Generate bios'}
-      </Button>
+      <GenerateBioButton
+        hasResult={result !== null}
+        isPending={isPending}
+        onGenerate={() => void generate()}
+      />
 
-      {isPending && (
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-sm" role="status">
-            Researching the web and writing the bio — this can take a few minutes. You can keep
-            working; the results will appear here when ready.
-          </p>
-          <div className="space-y-2" aria-hidden>
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        </div>
-      )}
+      {isPending && <BioGeneratingSkeleton />}
 
-      {result && !isPending && (
-        <div className="space-y-4 border-t pt-4">
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold">Short bio</h3>
-            <BioHtml html={result.shortBio} className="text-muted-foreground text-sm" />
-          </div>
-
-          {result.images.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Discovered images</h3>
-              <ul className="flex flex-wrap gap-3">
-                {result.images.map((image) => (
-                  <li key={image.url} className="relative">
-                    <Image
-                      src={image.thumbnailUrl ?? image.url}
-                      alt={image.title ?? 'Discovered artist image'}
-                      width={80}
-                      height={80}
-                      unoptimized
-                      className="ring-border size-20 rounded-md object-cover ring-1"
-                    />
-                    {image.isPrimary && (
-                      <Star
-                        className="absolute -top-1 -right-1 size-4 fill-yellow-400 text-yellow-500"
-                        aria-label="Primary image"
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-muted-foreground text-xs">
-                Starred images are shown beside the short bio on the public pages.
-              </p>
-            </div>
-          )}
-
-          {result.links.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Discovered links</h3>
-              <ul className="space-y-1">
-                {result.links.map((link) => (
-                  <li key={link.url} className="flex items-center gap-2 text-sm">
-                    <ExternalLink className="text-muted-foreground size-3.5" aria-hidden />
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="nofollow noopener noreferrer"
-                      className="text-primary truncate hover:underline"
-                    >
-                      {link.label}
-                    </a>
-                    {link.kind && (
-                      <Badge variant="outline" className="text-xs">
-                        {link.kind}
-                      </Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Trash2 className="size-3" aria-hidden />
-            Regenerating replaces the images and links above. Save the form to keep the result.
-          </p>
-        </div>
-      )}
+      {result && !isPending && <BioResultPreview result={result} />}
     </section>
   );
 };

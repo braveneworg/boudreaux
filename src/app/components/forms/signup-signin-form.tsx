@@ -36,6 +36,140 @@ interface SignupSigninFormProps {
   state: FormState;
 }
 
+interface EmailFieldProps {
+  control: Control<BaseFormSchema>;
+  isSigningIn: boolean;
+  isVerified: boolean;
+  state: FormState;
+}
+
+const EmailField = ({ control, isSigningIn, isVerified, state }: EmailFieldProps) => (
+  <FormField
+    control={control}
+    name="email"
+    render={({ field }) => (
+      <FormItem className={cn(isSigningIn ? 'mb-2' : 'mb-0')}>
+        <FormLabel className="sr-only" htmlFor="email">
+          Email address
+        </FormLabel>
+        <FormControl>
+          {isVerified && (
+            <FormInput
+              id="email"
+              placeholder="Email address"
+              type="email"
+              autoComplete="email"
+              {...field}
+              autoFocusOnMount
+            />
+          )}
+        </FormControl>
+        <FormMessage>
+          {state.errors?.email && state.errors.email.length > 0 && state.errors.email[0]}
+        </FormMessage>
+      </FormItem>
+    )}
+  />
+);
+
+interface TermsFieldProps {
+  control: Control<BaseFormSchema>;
+  state: FormState;
+}
+
+const TermsField = ({ control, state }: TermsFieldProps) => (
+  <FormField
+    control={control}
+    name="termsAndConditions"
+    render={({ field }) => (
+      <FormItem className="mt-4 mb-4 flex flex-wrap items-center gap-4">
+        <FormControl>
+          <Switch
+            name="termsAndConditions"
+            id="terms-and-conditions"
+            checked={!!field.value || false}
+            onCheckedChange={field.onChange}
+            required
+          />
+        </FormControl>
+        <FormLabel htmlFor="terms-and-conditions">
+          <Link className="underline hover:no-underline" href="/legal/terms-and-conditions">
+            Accept terms and conditions?
+          </Link>
+        </FormLabel>
+        <FormMessage className="relative -top-1.5">
+          {state.errors?.termsAndConditions &&
+            state.errors.termsAndConditions.length > 0 &&
+            state.errors.termsAndConditions[0]}
+        </FormMessage>
+      </FormItem>
+    )}
+  />
+);
+
+interface VerifiedFieldsProps {
+  control: Control<BaseFormSchema>;
+  hasTermsAndConditions: boolean;
+  isSigningIn: boolean;
+  isVerified: boolean;
+  state: FormState;
+}
+
+const VerifiedFields = ({
+  control,
+  hasTermsAndConditions,
+  isSigningIn,
+  isVerified,
+  state,
+}: VerifiedFieldsProps) => (
+  <>
+    <EmailField control={control} isSigningIn={isSigningIn} isVerified={isVerified} state={state} />
+    {hasTermsAndConditions && !isSigningIn && <TermsField control={control} state={state} />}
+  </>
+);
+
+interface FormSubmitRowProps {
+  isPending: boolean;
+  isVerified: boolean;
+  state: FormState;
+}
+
+const FormSubmitRow = ({ isPending, isVerified, state }: FormSubmitRowProps) => (
+  <div className="mt-4 flex items-center gap-3">
+    {!isVerified && <Skeleton className="h-10 w-24" />}
+    {isVerified && (
+      <Button disabled={isPending} size="lg">
+        Submit
+      </Button>
+    )}
+    <StatusIndicator
+      isSuccess={state.success}
+      hasError={!!(state.errors && Object.keys(state.errors).length > 0)}
+      hasTimeout={state.hasTimeout}
+      isPending={isPending}
+    />
+  </div>
+);
+
+interface FormStatusMessagesProps {
+  state: FormState;
+}
+
+const FormStatusMessages = ({ state }: FormStatusMessagesProps) => (
+  <>
+    {state.hasTimeout && (
+      <div className="mt-2 text-center">
+        <FormMessage className="text-red-600">Connection timed out. Please try again.</FormMessage>
+      </div>
+    )}
+    {state.errors?.general && state.errors.general.length > 0 && (
+      <div className="mt-2 text-center">
+        <FormMessage className="text-red-600">{state.errors.general[0]}</FormMessage>
+      </div>
+    )}
+  </>
+);
+
 export const SignupSigninForm = ({
   control,
   hasTermsAndConditions = true, // Should be true when signing up
@@ -52,98 +186,21 @@ export const SignupSigninForm = ({
     <PageContainer>
       {!isVerified && <Skeleton className="mx-auto h-10 w-full" />}
       {isVerified && (
-        <>
-          <FormField
-            control={control}
-            name="email"
-            render={({ field }) => (
-              <FormItem className={cn(isSigningIn ? 'mb-2' : 'mb-0')}>
-                <FormLabel className="sr-only" htmlFor="email">
-                  Email address
-                </FormLabel>
-                <FormControl>
-                  {isVerified && (
-                    <FormInput
-                      id="email"
-                      placeholder="Email address"
-                      type="email"
-                      autoComplete="email"
-                      {...field}
-                      autoFocusOnMount
-                    />
-                  )}
-                </FormControl>
-                <FormMessage>
-                  {state.errors?.email && state.errors.email.length > 0 && state.errors.email[0]}
-                </FormMessage>
-              </FormItem>
-            )}
-          />
-          {hasTermsAndConditions && !isSigningIn && (
-            <FormField
-              control={control}
-              name="termsAndConditions"
-              render={({ field }) => (
-                <FormItem className="mt-4 mb-4 flex flex-wrap items-center gap-4">
-                  <FormControl>
-                    <Switch
-                      name="termsAndConditions"
-                      id="terms-and-conditions"
-                      checked={!!field.value || false}
-                      onCheckedChange={field.onChange}
-                      required
-                    />
-                  </FormControl>
-                  <FormLabel htmlFor="terms-and-conditions">
-                    <Link
-                      className="underline hover:no-underline"
-                      href="/legal/terms-and-conditions"
-                    >
-                      Accept terms and conditions?
-                    </Link>
-                  </FormLabel>
-                  <FormMessage className="relative -top-1.5">
-                    {state.errors?.termsAndConditions &&
-                      state.errors.termsAndConditions.length > 0 &&
-                      state.errors.termsAndConditions[0]}
-                  </FormMessage>
-                </FormItem>
-              )}
-            />
-          )}
-        </>
+        <VerifiedFields
+          control={control}
+          hasTermsAndConditions={hasTermsAndConditions}
+          isSigningIn={isSigningIn}
+          isVerified={isVerified}
+          state={state}
+        />
       )}
       <TurnstileWidget
         isVerified={isVerified}
         setIsVerified={setIsVerified}
         onToken={onTurnstileToken}
       />
-      <div className="mt-4 flex items-center gap-3">
-        {!isVerified && <Skeleton className="h-10 w-24" />}
-        {isVerified && (
-          <Button disabled={isPending} size="lg">
-            Submit
-          </Button>
-        )}
-        <StatusIndicator
-          isSuccess={state.success}
-          hasError={!!(state.errors && Object.keys(state.errors).length > 0)}
-          hasTimeout={state.hasTimeout}
-          isPending={isPending}
-        />
-      </div>
-      {state.hasTimeout && (
-        <div className="mt-2 text-center">
-          <FormMessage className="text-red-600">
-            Connection timed out. Please try again.
-          </FormMessage>
-        </div>
-      )}
-      {state.errors?.general && state.errors.general.length > 0 && (
-        <div className="mt-2 text-center">
-          <FormMessage className="text-red-600">{state.errors.general[0]}</FormMessage>
-        </div>
-      )}
+      <FormSubmitRow isPending={isPending} isVerified={isVerified} state={state} />
+      <FormStatusMessages state={state} />
     </PageContainer>
   );
 };
