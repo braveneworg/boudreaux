@@ -99,42 +99,64 @@ const formatDateForForm = (dateValue: Date | null): string => {
   return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
 };
 
-/** Coalesce a nullable string field to an empty string (keeps mappers branch-free). */
-const str = (value: string | null | undefined): string => value || '';
+/** Coalesce a nullable string field to the empty-string default the form uses. */
+const orEmpty = (value: string | null | undefined): string => value ?? '';
 
 /** Project a loaded artist record into the form's default values (pure mapping). */
-const mapArtistToFormValues = (artist: ArtistDetail, userId?: string): ArtistFormData => ({
-  firstName: str(artist.firstName),
-  middleName: str(artist.middleName),
-  surname: str(artist.surname),
-  akaNames: str(artist.akaNames),
-  displayName: str(artist.displayName),
-  title: str(artist.title),
-  suffix: str(artist.suffix),
-  slug: str(artist.slug),
+const mapArtistToFormValues = (
+  {
+    firstName,
+    middleName,
+    surname,
+    akaNames,
+    displayName,
+    title,
+    suffix,
+    slug,
+    bio,
+    shortBio,
+    altBio,
+    genres,
+    tags,
+    bornOn,
+    diedOn,
+    formedOn,
+    publishedOn,
+    createdBy,
+  }: ArtistDetail,
+  userId?: string
+): ArtistFormData => ({
+  firstName: orEmpty(firstName),
+  middleName: orEmpty(middleName),
+  surname: orEmpty(surname),
+  akaNames: orEmpty(akaNames),
+  displayName: orEmpty(displayName),
+  title: orEmpty(title),
+  suffix: orEmpty(suffix),
+  slug: orEmpty(slug),
   // Convert legacy plain-text bios to HTML so the rich-text editor preserves
   // their line breaks instead of collapsing them.
-  bio: plainTextToBioHtml(artist.bio),
-  shortBio: plainTextToBioHtml(artist.shortBio),
-  altBio: plainTextToBioHtml(artist.altBio),
-  genres: str(artist.genres),
-  tags: str(artist.tags),
-  bornOn: formatDateForForm(artist.bornOn),
-  diedOn: formatDateForForm(artist.diedOn),
-  formedOn: formatDateForForm(artist.formedOn),
-  publishedOn: formatDateForForm(artist.publishedOn),
-  createdBy: artist.createdBy || userId,
+  bio: plainTextToBioHtml(bio),
+  shortBio: plainTextToBioHtml(shortBio),
+  altBio: plainTextToBioHtml(altBio),
+  genres: orEmpty(genres),
+  tags: orEmpty(tags),
+  bornOn: formatDateForForm(bornOn),
+  diedOn: formatDateForForm(diedOn),
+  formedOn: formatDateForForm(formedOn),
+  publishedOn: formatDateForForm(publishedOn),
+  createdBy: createdBy || userId,
 });
 
 /** Map a loaded artist's persisted images into uploader items. */
 const mapArtistImages = (artist: ArtistDetail): ImageItem[] =>
-  artist.images.map((img) => ({
-    id: img.id,
-    preview: img.src ?? '',
-    uploadedUrl: img.src ?? '',
-    caption: img.caption || '',
-    altText: img.altText || '',
-    sortOrder: img.sortOrder ?? 0,
+  artist.images.map(({ id, src, caption, altText, sortOrder }) => ({
+    id,
+    preview: src ?? '',
+    uploadedUrl: src ?? '',
+    caption: caption || '',
+    altText: altText || '',
+    sortOrder: sortOrder ?? 0,
   }));
 
 /** Build the create-mode default form values (only `createdBy` is dynamic). */

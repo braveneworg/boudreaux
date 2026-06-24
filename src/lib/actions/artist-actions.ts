@@ -14,19 +14,20 @@ import { loggers } from '@/lib/utils/logger';
 export const createArtistAction = async (artist: Artist): Promise<ServiceResponse<Artist>> => {
   try {
     await requireRole('admin');
+
     const { images, urls, labels: _labels, releases: _releases, ...scalars } = artist;
 
     // The repository owns the nested connectOrCreate translation; the action
     // forwards plain image/url inputs alongside the writable scalar fields.
     const data: CreateArtistData = {
       ...scalars,
-      images: images.map((image) => ({
-        id: image.id,
-        src: image.src ?? '',
-        altText: image.altText,
-        caption: image.caption,
+      images: images.map(({ id, src, altText, caption }) => ({
+        id,
+        src: src ?? '',
+        altText,
+        caption,
       })),
-      urls: urls.map((url) => ({ id: url.id, platform: url.platform, url: url.url })),
+      urls: urls.map(({ id, platform, url }) => ({ id, platform, url })),
     };
 
     return await ArtistService.createArtist(data);
