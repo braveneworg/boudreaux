@@ -83,6 +83,35 @@ export interface HeadlinerWithRelations extends TourDateHeadlinerFields {
   artist: ArtistFields | null;
 }
 
+/** Resolves the artist's display name, or a placeholder when unset. */
+const resolveHeadlinerName = (artist: ArtistFields | null): string =>
+  artist ? getDisplayName(artist as unknown as Record<string, unknown>) : '(no name)';
+
+/** Formats a stored set time (UTC) as a 12-hour "h:mm AM/PM" label, or null. */
+const formatSetTimeDisplay = (setTime: Date | null): string | null => {
+  if (!setTime) {
+    return null;
+  }
+  const d = new Date(setTime);
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+/**
+ * Extracts HH:mm from a set time for the TimePicker value (read UTC to match the
+ * stored Z-suffix format), or an empty string when unset.
+ */
+const formatTimePickerValue = (setTime: Date | null): string => {
+  if (!setTime) {
+    return '';
+  }
+  const d = new Date(setTime);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+};
+
 interface ArtistPillProps {
   headliner: HeadlinerWithRelations;
   index: number;
@@ -115,20 +144,9 @@ const ArtistPill = ({
   const useBlack = shouldUseBlackText(color.bg);
   const textColor = useBlack ? '#000000' : '#ffffff';
 
-  const displayName = headliner.artist
-    ? getDisplayName(headliner.artist as unknown as Record<string, unknown>)
-    : '(no name)';
+  const displayName = resolveHeadlinerName(headliner.artist);
 
-  const setTimeDisplay = headliner.setTime
-    ? (() => {
-        const d = new Date(headliner.setTime);
-        const h = d.getUTCHours();
-        const m = d.getUTCMinutes();
-        const period = h >= 12 ? 'PM' : 'AM';
-        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
-      })()
-    : null;
+  const setTimeDisplay = formatSetTimeDisplay(headliner.setTime);
 
   const handleSetTimeChange = async (time: string) => {
     if (!time) {
@@ -159,12 +177,7 @@ const ArtistPill = ({
   };
 
   // Extract HH:mm from setTime for the TimePicker value (read UTC to match stored Z-suffix format)
-  const timePickerValue = headliner.setTime
-    ? (() => {
-        const d = new Date(headliner.setTime);
-        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-      })()
-    : '';
+  const timePickerValue = formatTimePickerValue(headliner.setTime);
 
   return (
     <>

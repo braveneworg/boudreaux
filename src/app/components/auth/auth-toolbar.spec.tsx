@@ -50,22 +50,21 @@ vi.mock('../ui/spinners/message-spinner', () => ({
   ),
 }));
 
-vi.mock('@/lib/utils/tailwind-utils', () => ({
-  cn: (...args: unknown[]): string => {
-    const classes: string[] = [];
-    for (const arg of args) {
-      if (!arg) continue;
-      if (typeof arg === 'string') {
-        classes.push(arg);
-      } else if (typeof arg === 'object' && !Array.isArray(arg)) {
-        for (const [key, value] of Object.entries(arg as Record<string, boolean>)) {
-          if (value) classes.push(key);
-        }
-      }
+vi.mock('@/lib/utils/tailwind-utils', () => {
+  const argToClasses = (arg: unknown): string[] => {
+    if (!arg) return [];
+    if (typeof arg === 'string') return [arg];
+    if (typeof arg === 'object' && !Array.isArray(arg)) {
+      return Object.entries(arg as Record<string, boolean>)
+        .filter(([, value]) => value)
+        .map(([key]) => key);
     }
-    return classes.join(' ');
-  },
-}));
+    return [];
+  };
+  return {
+    cn: (...args: unknown[]): string => args.flatMap(argToClasses).join(' '),
+  };
+});
 
 // Mock console logger
 const mockLog = vi.fn();

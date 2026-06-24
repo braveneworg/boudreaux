@@ -14,6 +14,24 @@ import { EditProfileButton } from './edit-profile-button';
 import { SignOutButton } from './sign-out-button';
 import { SignedInAs } from './signed-in-as';
 
+import type { Session } from 'next-auth';
+
+interface GravatarProps {
+  email: string;
+  firstName?: string;
+  surname?: string;
+}
+
+/** Derives the Gravatar props (email + split name parts) from the session. */
+const resolveGravatarProps = (session: Session | null): GravatarProps => {
+  const nameParts = session?.user?.name?.split(' ');
+  return {
+    email: session?.user?.email || '',
+    firstName: nameParts?.[0],
+    surname: nameParts?.[1],
+  };
+};
+
 // Use in hamburger menu on mobile
 export const SignedInToolbar = ({
   className,
@@ -25,15 +43,12 @@ export const SignedInToolbar = ({
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
+  const gravatarProps = resolveGravatarProps(session);
 
   return (
     <div className={cn('mt-3', className)}>
       <div className="mb-3 flex items-center gap-3">
-        <GravatarAvatar
-          email={session?.user?.email || ''}
-          firstName={session?.user?.name?.split(' ')[0]}
-          surname={session?.user?.name?.split(' ')[1]}
-        />
+        <GravatarAvatar {...gravatarProps} />
         <div className="flex flex-col gap-1.5">
           <SignedInAs onClick={onNavigate} />
           <div className="flex items-center gap-4">

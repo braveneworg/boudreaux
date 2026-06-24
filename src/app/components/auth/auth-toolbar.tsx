@@ -17,6 +17,23 @@ import { SignInLink } from './signin-link';
 import { SignedInToolbar } from './signout-button';
 import { SignUpLink } from './signup-link';
 
+import type { Session } from 'next-auth';
+
+const LOGGING_PREFIX = '[AuthToolbar]';
+
+/** Emits the development-only session diagnostics for the toolbar. */
+const logToolbarSession = (session: Session | null, status: string): void => {
+  log(LOGGING_PREFIX, 'Session status:', status);
+  log(LOGGING_PREFIX, 'Session data:', session);
+  log(LOGGING_PREFIX, 'User data:', session?.user);
+  log(LOGGING_PREFIX, 'Username:', session?.user?.username);
+};
+
+/** Logs the resolved admin role (or N/A) for an authenticated admin in development. */
+const logAdminRole = (session: Session): void => {
+  log(LOGGING_PREFIX, 'User role:', session.user.role || CONSTANTS.NA);
+};
+
 export const AuthToolbar = ({
   className,
   onNavigate,
@@ -27,16 +44,12 @@ export const AuthToolbar = ({
   const { data: session, status } = useSession();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
   const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
-  const loggingPrefix = '[AuthToolbar]';
   const pathName = usePathname();
   const isSigninOrSignupPage = /(signin|signup)/gi.test(pathName);
 
   // Debug logging in development
   if (isDevelopment) {
-    log(loggingPrefix, 'Session status:', status);
-    log(loggingPrefix, 'Session data:', session);
-    log(loggingPrefix, 'User data:', session?.user);
-    log(loggingPrefix, 'Username:', session?.user?.username);
+    logToolbarSession(session, status);
   }
 
   // Show loading state or nothing while checking authentication
@@ -47,15 +60,15 @@ export const AuthToolbar = ({
   // Show authenticated toolbar if user is logged in
   if (status === CONSTANTS.AUTHENTICATION.STATUS.AUTHENTICATED && session) {
     if (isAdmin && isDevelopment) {
-      log(loggingPrefix, 'User role:', session.user.role || CONSTANTS.NA);
+      logAdminRole(session);
     }
 
-    log(loggingPrefix, 'Rendering authenticated toolbar');
+    log(LOGGING_PREFIX, 'Rendering authenticated toolbar');
     return <SignedInToolbar className={className} onNavigate={onNavigate} />;
   }
 
   // Show sign in/up links for unauthenticated users
-  log(loggingPrefix, 'Rendering unauthenticated links');
+  log(LOGGING_PREFIX, 'Rendering unauthenticated links');
   return (
     <div className={cn('mt-2 mb-4', className, { hidden: isSigninOrSignupPage })}>
       <div
