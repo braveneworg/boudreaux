@@ -5,51 +5,45 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { ArtistBioGenerationSection } from '@/app/components/forms/artist-bio-generation-section';
-import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
-import { TextField } from '@/app/components/forms/fields';
-import { Button } from '@/app/components/ui/button';
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from '@/app/components/ui/form';
-import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+import { useImageOperations } from '@/app/components/forms/hooks/use-image-operations';
+import { ArtistBioSection } from '@/app/components/forms/sections/artist-bio-section';
+import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-footer';
+import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
+import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
+import { ArtistImagesSection } from '@/app/components/forms/sections/artist-images-section';
+import { ArtistMusicAndDatesSection } from '@/app/components/forms/sections/artist-music-dates-section';
+import { ArtistNameSection } from '@/app/components/forms/sections/artist-name-section';
+import { Form } from '@/app/components/ui/form';
+import { type ImageItem } from '@/app/components/ui/image-uploader';
 import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
-import { SectionHeader } from '@/app/components/ui/section-header';
 import { Separator } from '@/app/components/ui/separator';
 import {
   useArchiveArtistMutation,
   useCreateArtistMutation,
   useUpdateArtistMutation,
 } from '@/app/hooks/mutations/use-artist-mutations';
-import { useArtistQuery } from '@/app/hooks/use-artist-query';
+import { type ArtistDetail, useArtistQuery } from '@/app/hooks/use-artist-query';
 import {
   deleteArtistImageAction,
   reorderArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
-import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
 import { error } from '@/lib/utils/console-logger';
-import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
+import { type GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
-import { DatePicker } from '@/ui/datepicker';
+
+import type { UseFormReturn } from 'react-hook-form';
 
 type FormFieldName = keyof ArtistFormData;
 
@@ -62,16 +56,6 @@ interface ArtistFormProps {
    */
   returnTo?: string;
 }
-
-// Admin-only rich-text editor for the bio fields. Lazy + `ssr: false` so the
-// Tiptap/ProseMirror bundle never ships to (or runs on) public pages.
-const RichTextEditor = dynamic(
-  () => import('@/app/components/ui/rich-text-editor').then((mod) => mod.RichTextEditor),
-  {
-    ssr: false,
-    loading: () => <div className="border-input min-h-40 rounded-md border" aria-busy="true" />,
-  }
-);
 
 /**
  * Validates a URL slug (lowercase alphanumeric segments joined by single
@@ -103,72 +87,296 @@ const PublishedToastContent = ({ fullName }: { fullName: string }) => (
   </>
 );
 
-export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormProps) => {
+const CreatedWithImagesToast = ({ fullName, count }: { fullName: string; count: number }) => (
+  <>
+    Artist <b>{fullName}</b> created with {count} image{count !== 1 ? 's' : ''}.
+  </>
+);
+
+const formatDateForForm = (dateValue: Date | null): string => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+};
+
+/** Coalesce a nullable string field to an empty string (keeps mappers branch-free). */
+const str = (value: string | null | undefined): string => value || '';
+
+/** Project a loaded artist record into the form's default values (pure mapping). */
+const mapArtistToFormValues = (artist: ArtistDetail, userId?: string): ArtistFormData => ({
+  firstName: str(artist.firstName),
+  middleName: str(artist.middleName),
+  surname: str(artist.surname),
+  akaNames: str(artist.akaNames),
+  displayName: str(artist.displayName),
+  title: str(artist.title),
+  suffix: str(artist.suffix),
+  slug: str(artist.slug),
+  // Convert legacy plain-text bios to HTML so the rich-text editor preserves
+  // their line breaks instead of collapsing them.
+  bio: plainTextToBioHtml(artist.bio),
+  shortBio: plainTextToBioHtml(artist.shortBio),
+  altBio: plainTextToBioHtml(artist.altBio),
+  genres: str(artist.genres),
+  tags: str(artist.tags),
+  bornOn: formatDateForForm(artist.bornOn),
+  diedOn: formatDateForForm(artist.diedOn),
+  formedOn: formatDateForForm(artist.formedOn),
+  publishedOn: formatDateForForm(artist.publishedOn),
+  createdBy: artist.createdBy || userId,
+});
+
+/** Map a loaded artist's persisted images into uploader items. */
+const mapArtistImages = (artist: ArtistDetail): ImageItem[] =>
+  artist.images.map((img) => ({
+    id: img.id,
+    preview: img.src ?? '',
+    uploadedUrl: img.src ?? '',
+    caption: img.caption || '',
+    altText: img.altText || '',
+    sortOrder: img.sortOrder ?? 0,
+  }));
+
+/** Build the create-mode default form values (only `createdBy` is dynamic). */
+const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
+  firstName: '',
+  middleName: '',
+  surname: '',
+  akaNames: '',
+  displayName: '',
+  title: '',
+  suffix: '',
+  slug: '',
+  bio: '',
+  shortBio: '',
+  altBio: '',
+  genres: '',
+  tags: '',
+  bornOn: '',
+  diedOn: '',
+  formedOn: '',
+  createdBy: userId,
+  publishedOn: '',
+});
+
+/**
+ * Images selectable in the bio editor: uploaded artist images plus re-hosted bio
+ * images, deduped by URL (uploaded first).
+ */
+const computeBioEditorImages = (
+  images: ImageItem[],
+  bioPickerImages: RichTextEditorImage[]
+): RichTextEditorImage[] => {
+  const seen = new Set<string>();
+  const collected: RichTextEditorImage[] = [];
+  for (const image of images) {
+    const url = image.uploadedUrl;
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      collected.push({ url, alt: image.altText ?? '' });
+    }
+  }
+  for (const image of bioPickerImages) {
+    if (!seen.has(image.url)) {
+      seen.add(image.url);
+      collected.push(image);
+    }
+  }
+  return collected;
+};
+
+/** Derive the slug source from the name fields (display name wins). */
+const deriveSlugSource = (
+  displayName: string | undefined,
+  firstName: string | undefined,
+  middleName: string | undefined,
+  surname: string | undefined
+): string => {
+  if (displayName?.trim()) {
+    return displayName.trim();
+  }
+  return [firstName?.trim(), middleName?.trim(), surname?.trim()].filter(Boolean).join(' ');
+};
+
+/** firstName/surname are only required when both displayName and akaNames are empty. */
+const computeIsNameRequired = (
+  displayName: string | undefined,
+  akaNames: string | undefined
+): boolean => !displayName?.trim() && !akaNames?.trim();
+
+const formatValidationErrors = (errors: Record<string, { message?: string }>): string => {
+  const errorMessages = Object.entries(errors)
+    .map(([field, err]) => `${field}: ${err.message || 'Invalid'}`)
+    .join(', ');
+  return errorMessages || 'Please check the form for errors.';
+};
+
+interface SubmittingState {
+  isCreatingArtist: boolean;
+  isUpdatingArtist: boolean;
+  isTransitionPending: boolean;
+  isUploadingImages: boolean;
+}
+
+const computeIsSubmitting = ({
+  isCreatingArtist,
+  isUpdatingArtist,
+  isTransitionPending,
+  isUploadingImages,
+}: SubmittingState): boolean =>
+  isCreatingArtist || isUpdatingArtist || isTransitionPending || isUploadingImages;
+
+const computeIsDirty = (
+  formIsDirty: boolean,
+  imagesReordered: boolean,
+  hasPendingImages: boolean
+): boolean => formIsDirty || imagesReordered || hasPendingImages;
+
+const fullNameOf = (data: ArtistFormData): string =>
+  data.displayName || `${data.firstName} ${data.surname}`.trim();
+
+const pendingImages = (images: ImageItem[]): ImageItem[] =>
+  images.filter((img) => img.file && !img.uploadedUrl);
+
+interface SubmitArtistDeps {
+  artistForm: UseFormReturn<ArtistFormData>;
+  images: ReturnType<typeof useImageOperations>;
+  isPublished: boolean;
+  setIsPublished: (value: boolean) => void;
+  setArtistId: (id: string) => void;
+  createArtistAsync: ReturnType<typeof useCreateArtistMutation>['createArtistAsync'];
+  updateArtistAsync: ReturnType<typeof useUpdateArtistMutation>['updateArtistAsync'];
+}
+
+const submitArtistUpdate = async (
+  artistId: string,
+  data: ArtistFormData,
+  deps: SubmitArtistDeps
+): Promise<void> => {
+  const { artistForm, images, isPublished, setIsPublished, updateArtistAsync } = deps;
+  const fullName = fullNameOf(data);
+
+  const newFormState = await updateArtistAsync({ id: artistId, values: data });
+  if (!newFormState.success) {
+    toast.error('Failed to update artist. Please check the form for errors.');
+    return;
+  }
+
+  const imagesToUpload = pendingImages(images.images);
+  if (imagesToUpload.length > 0) {
+    await images.uploadImages(imagesToUpload, artistId, {
+      register: registerArtistImagesAction,
+      mergeStrategy: 'counter',
+      onSuccess: () => {},
+    });
+  }
+
+  if (data.publishedOn && !isPublished) {
+    setIsPublished(true);
+    toast.success(<PublishedToastContent fullName={fullName} />);
+  } else {
+    toast.success(<UpdatedToastContent fullName={fullName} />);
+  }
+  artistForm.reset(data);
+  images.resetImagesReordered();
+};
+
+const submitArtistCreate = async (data: ArtistFormData, deps: SubmitArtistDeps): Promise<void> => {
+  const { artistForm, images, setIsPublished, setArtistId, createArtistAsync } = deps;
+  const fullName = fullNameOf(data);
+
+  const newFormState = await createArtistAsync(data);
+  if (!newFormState.success) {
+    toast.error('Failed to create artist. Please check the form for errors.');
+    return;
+  }
+
+  const createdArtistId = newFormState.data?.artistId as string | undefined;
+  if (!createdArtistId) {
+    toast.success(<ToastContent fullName={fullName} />);
+    return;
+  }
+
+  setArtistId(createdArtistId);
+  if (data.publishedOn) {
+    setIsPublished(true);
+  }
+
+  const imagesToUpload = pendingImages(images.images);
+  if (imagesToUpload.length > 0) {
+    await images.uploadImages(imagesToUpload, createdArtistId, {
+      register: registerArtistImagesAction,
+      mergeStrategy: 'by-index',
+      onSuccess: (uploaded) =>
+        toast.success(<CreatedWithImagesToast fullName={fullName} count={uploaded.length} />),
+      onError: () => toast.success(<ToastContent fullName={fullName} />),
+    });
+  } else {
+    toast.success(<ToastContent fullName={fullName} />);
+  }
+
+  artistForm.reset(data);
+  images.resetImagesReordered();
+};
+
+/** Guard the form ref then dispatch to the create/update submit path. */
+const runArtistSubmit = async (
+  formEl: HTMLFormElement | null,
+  artistId: string | null,
+  data: ArtistFormData,
+  deps: SubmitArtistDeps
+): Promise<void> => {
+  if (!formEl) {
+    error('ArtistForm: Form reference is null on submit.');
+    toast.error('Please refresh the page and try again, or check back later.');
+    return;
+  }
+
+  if (artistId) {
+    await submitArtistUpdate(artistId, data, deps);
+  } else {
+    await submitArtistCreate(data, deps);
+  }
+};
+
+export const ArtistForm = ({
+  artistId: initialArtistId,
+  returnTo,
+}: ArtistFormProps): React.ReactElement => {
   const [isTransitionPending, startTransition] = useTransition();
   const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
   const { archiveArtistAsync } = useArchiveArtistMutation();
-  const [images, setImages] = useState<ImageItem[]>([]);
   // Re-hosted bio images (existing + freshly generated) offered in the
   // rich-text editor's insert-image picker, alongside uploaded images.
   const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
-  const [isUploadingImages, setIsUploadingImages] = useState(false);
   // artistId will be set after artist creation or from URL param for persisting image reordering
   const [artistId, setArtistId] = useState<string | null>(initialArtistId || null);
   // Track if artist is published (publishedOn date exists)
   const [isPublished, setIsPublished] = useState(false);
-  // Track if images have been reordered (for enabling Save button)
-  const [imagesReordered, setImagesReordered] = useState(false);
   // Track if we're in edit mode (after artist creation or when loading existing artist)
   const isEditMode = artistId !== null;
   const hasNavigatedToEditRef = useRef(false);
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
-
-  // Images selectable in the bio editor: uploaded artist images plus re-hosted
-  // bio images, deduped by URL (uploaded first).
-  const bioEditorImages = useMemo<RichTextEditorImage[]>(() => {
-    const seen = new Set<string>();
-    const collected: RichTextEditorImage[] = [];
-    for (const image of images) {
-      const url = image.uploadedUrl;
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        collected.push({ url, alt: image.altText ?? '' });
-      }
-    }
-    for (const image of bioPickerImages) {
-      if (!seen.has(image.url)) {
-        seen.add(image.url);
-        collected.push(image);
-      }
-    }
-    return collected;
-  }, [images, bioPickerImages]);
   const formRef = useRef<HTMLFormElement>(null);
+
+  const images = useImageOperations({
+    entityType: 'artists',
+    entityId: artistId,
+    reorderAction: reorderArtistImagesAction,
+    deleteAction: deleteArtistImageAction,
+  });
+
+  const bioEditorImages = useMemo(
+    () => computeBioEditorImages(images.images, bioPickerImages),
+    [images.images, bioPickerImages]
+  );
+
   const artistForm = useForm<ArtistFormData>({
     resolver: zodResolver(createArtistSchema),
-    defaultValues: {
-      firstName: '',
-      middleName: '',
-      surname: '',
-      akaNames: '',
-      displayName: '',
-      title: '',
-      suffix: '',
-      slug: '',
-      bio: '',
-      shortBio: '',
-      altBio: '',
-      genres: '',
-      tags: '',
-      bornOn: '',
-      diedOn: '',
-      formedOn: '',
-      createdBy: user?.id,
-      publishedOn: '',
-    },
+    defaultValues: buildArtistDefaults(user?.id),
   });
   const { control, setValue } = artistForm;
 
@@ -185,61 +393,22 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   // create mode there's nothing to load.
   const isLoadingArtist = !!initialArtistId && isArtistPending;
 
+  const { setImages } = images;
   useEffect(() => {
     if (!initialArtistId || !artistData) return;
 
-    const artist = artistData;
+    artistForm.reset(mapArtistToFormValues(artistData, user?.id));
 
-    // Format dates for the form (YYYY-MM-DD format)
-    const formatDate = (dateValue: Date | null): string => {
-      if (!dateValue) return '';
-      const date = new Date(dateValue);
-      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-    };
-
-    // Reset form with fetched data
-    artistForm.reset({
-      firstName: artist.firstName || '',
-      middleName: artist.middleName || '',
-      surname: artist.surname || '',
-      akaNames: artist.akaNames || '',
-      displayName: artist.displayName || '',
-      title: artist.title || '',
-      suffix: artist.suffix || '',
-      slug: artist.slug || '',
-      // Convert legacy plain-text bios to HTML so the rich-text editor
-      // preserves their line breaks instead of collapsing them.
-      bio: plainTextToBioHtml(artist.bio),
-      shortBio: plainTextToBioHtml(artist.shortBio),
-      altBio: plainTextToBioHtml(artist.altBio),
-      genres: artist.genres || '',
-      tags: artist.tags || '',
-      bornOn: formatDate(artist.bornOn),
-      diedOn: formatDate(artist.diedOn),
-      formedOn: formatDate(artist.formedOn),
-      publishedOn: formatDate(artist.publishedOn),
-      createdBy: artist.createdBy || user?.id,
-    });
-
-    // Set published state
-    if (artist.publishedOn) {
+    if (artistData.publishedOn) {
       setIsPublished(true);
     }
 
     // Load existing images if any. The by-id route returns scalars + `images`
     // only (no `bioImages` relation), so there's no bio-picker hydration here.
-    if (artist.images.length > 0) {
-      const existingImages: ImageItem[] = artist.images.map((img) => ({
-        id: img.id,
-        preview: img.src ?? '',
-        uploadedUrl: img.src ?? '',
-        caption: img.caption || '',
-        altText: img.altText || '',
-        sortOrder: img.sortOrder ?? 0,
-      }));
-      setImages(existingImages);
+    if (artistData.images.length > 0) {
+      setImages(mapArtistImages(artistData));
     }
-  }, [initialArtistId, artistData, artistForm, user?.id]);
+  }, [initialArtistId, artistData, artistForm, user?.id, setImages]);
 
   // Surface a load failure (edit mode only) without unmounting the form. Gate
   // on `isError` — `artistError` is defaulted to a non-null Error, so it is
@@ -266,310 +435,28 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     }
   }, [artistId, initialArtistId, returnTo, router]);
 
-  const handleImagesChange = useCallback((newImages: ImageItem[]) => {
-    setImages(newImages);
-  }, []);
-
-  const handleReorder = useCallback(
-    async (imageIds: string[]) => {
-      // Mark images as reordered for Save button enablement
-      setImagesReordered(true);
-
-      // Only persist reorder if we have an artistId (after artist creation)
-      // and there are uploaded images to reorder
-      if (!artistId) {
-        // In create mode, local reordering is handled by ImageUploader
-        // The order will be preserved when images are uploaded after artist creation
-        return;
-      }
-
-      const result = await reorderArtistImagesAction(artistId, imageIds);
-
-      if (!result.success) {
-        toast.error(result.error || 'Failed to save image order');
-      }
-    },
-    [artistId]
-  );
-
-  const handleDeleteImage = useCallback(
-    async (imageId: string): Promise<{ success: boolean; error?: string }> => {
-      // Call the server action to delete from database and CDN
-      const result = await deleteArtistImageAction(imageId);
-
-      if (!result.success) {
-        toast.error(result.error || 'Failed to delete image');
-      }
-
-      return result;
-    },
-    []
-  );
-
   const onSubmitArtistForm = useCallback(
-    async (data: ArtistFormData) => {
-      startTransition(async () => {
-        if (formRef.current) {
-          const fullName = data.displayName || `${data.firstName} ${data.surname}`.trim();
-
-          // If we already have an artistId, this is an update
-          if (artistId) {
-            const newFormState = await updateArtistAsync({ id: artistId, values: data });
-            if (newFormState.success) {
-              // Upload any pending images for existing artist
-              const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
-              if (imagesToUpload.length > 0) {
-                setIsUploadingImages(true);
-                setImages((prev) =>
-                  prev.map((img) =>
-                    img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
-                  )
-                );
-
-                try {
-                  // Step 1: Get presigned URLs for direct S3 upload
-                  const imagesWithFiles = imagesToUpload.filter(
-                    (img): img is (typeof imagesToUpload)[number] & { file: File } =>
-                      img.file instanceof File
-                  );
-                  const fileInfos = imagesWithFiles.map((img) => ({
-                    fileName: img.file.name,
-                    contentType: img.file.type,
-                    fileSize: img.file.size,
-                  }));
-
-                  const presignedResult = await getPresignedUploadUrlsAction(
-                    'artists',
-                    artistId,
-                    fileInfos
-                  );
-
-                  if (!presignedResult.success || !presignedResult.data) {
-                    throw Error(presignedResult.error || 'Failed to get upload URLs');
-                  }
-
-                  // Step 2: Upload files directly to S3
-                  const files = imagesWithFiles.map((img) => img.file);
-                  const uploadResults = await uploadFilesToS3(files, presignedResult.data);
-
-                  // Check for upload failures
-                  const failedUploads = uploadResults.filter((r) => !r.success);
-                  if (failedUploads.length > 0) {
-                    throw Error(`Failed to upload ${failedUploads.length} image(s)`);
-                  }
-
-                  // Step 3: Register uploaded images in the database
-                  const imageInfos = presignedResult.data.map((presigned, index) => {
-                    const imageWithFile = imagesWithFiles.at(index);
-                    return {
-                      s3Key: presigned.s3Key,
-                      cdnUrl: presigned.cdnUrl,
-                      caption: imageWithFile?.caption || '',
-                      altText: imageWithFile?.altText || '',
-                    };
-                  });
-
-                  const registerResult = await registerArtistImagesAction(artistId, imageInfos);
-
-                  if (registerResult.success && registerResult.data) {
-                    setImages((prev) => {
-                      const uploadedData = registerResult.data || [];
-                      let uploadIndex = 0;
-                      return prev.map((img) => {
-                        const uploaded = uploadedData.at(uploadIndex);
-                        if (img.file && !img.uploadedUrl && uploaded) {
-                          uploadIndex++;
-                          return {
-                            ...img,
-                            id: uploaded.id,
-                            uploadedUrl: uploaded.src,
-                            isUploading: false,
-                            sortOrder: uploaded.sortOrder,
-                          };
-                        }
-                        return { ...img, isUploading: false };
-                      });
-                    });
-                  } else {
-                    throw Error(registerResult.error || 'Failed to register images');
-                  }
-                } catch (uploadError) {
-                  error('Image upload error:', uploadError);
-                  const errorMessage =
-                    uploadError instanceof Error ? uploadError.message : 'Upload failed';
-                  setImages((prev) =>
-                    prev.map((img) =>
-                      img.file && !img.uploadedUrl
-                        ? { ...img, isUploading: false, error: errorMessage }
-                        : img
-                    )
-                  );
-                  toast.error(errorMessage);
-                } finally {
-                  setIsUploadingImages(false);
-                }
-              }
-
-              // Check if this was a publish action (publishedOn was set)
-              if (data.publishedOn && !isPublished) {
-                setIsPublished(true);
-                toast.success(<PublishedToastContent fullName={fullName} />);
-              } else {
-                toast.success(<UpdatedToastContent fullName={fullName} />);
-              }
-              // Reset form dirty state after successful save
-              artistForm.reset(data);
-              setImagesReordered(false);
-            } else {
-              toast.error('Failed to update artist. Please check the form for errors.');
-            }
-          } else {
-            // This is a create action
-            const newFormState = await createArtistAsync(data);
-            if (newFormState.success) {
-              const createdArtistId = newFormState.data?.artistId as string | undefined;
-
-              // Set artistId for image reordering persistence
-              if (createdArtistId) {
-                setArtistId(createdArtistId);
-
-                // Check if this was a publish action
-                if (data.publishedOn) {
-                  setIsPublished(true);
-                }
-
-                // Upload images if any were added
-                const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
-                if (imagesToUpload.length > 0) {
-                  setIsUploadingImages(true);
-
-                  // Update image states to show uploading
-                  setImages((prev) =>
-                    prev.map((img) =>
-                      img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
-                    )
-                  );
-
-                  try {
-                    // Step 1: Get presigned URLs for direct S3 upload
-                    const imagesWithFiles = imagesToUpload.filter(
-                      (img): img is (typeof imagesToUpload)[number] & { file: File } =>
-                        img.file instanceof File
-                    );
-                    const fileInfos = imagesWithFiles.map((img) => ({
-                      fileName: img.file.name,
-                      contentType: img.file.type,
-                      fileSize: img.file.size,
-                    }));
-
-                    const presignedResult = await getPresignedUploadUrlsAction(
-                      'artists',
-                      createdArtistId,
-                      fileInfos
-                    );
-
-                    if (!presignedResult.success || !presignedResult.data) {
-                      throw Error(presignedResult.error || 'Failed to get upload URLs');
-                    }
-
-                    // Step 2: Upload files directly to S3
-                    const files = imagesWithFiles.map((img) => img.file);
-                    const uploadResults = await uploadFilesToS3(files, presignedResult.data);
-
-                    // Check for upload failures
-                    const failedUploads = uploadResults.filter((r) => !r.success);
-                    if (failedUploads.length > 0) {
-                      throw Error(`Failed to upload ${failedUploads.length} image(s)`);
-                    }
-
-                    // Step 3: Register uploaded images in the database
-                    const imageInfos = presignedResult.data.map((presigned, index) => {
-                      const imageWithFile = imagesWithFiles.at(index);
-                      return {
-                        s3Key: presigned.s3Key,
-                        cdnUrl: presigned.cdnUrl,
-                        caption: imageWithFile?.caption || '',
-                        altText: imageWithFile?.altText || '',
-                      };
-                    });
-
-                    const registerResult = await registerArtistImagesAction(
-                      createdArtistId,
-                      imageInfos
-                    );
-
-                    if (registerResult.success && registerResult.data) {
-                      // Update images with uploaded URLs
-                      setImages((prev) => {
-                        const uploadedData = registerResult.data || [];
-                        return prev.map((img, index) => {
-                          const uploaded = uploadedData.at(index);
-                          if (img.file && !img.uploadedUrl && uploaded) {
-                            return {
-                              ...img,
-                              id: uploaded.id,
-                              uploadedUrl: uploaded.src,
-                              isUploading: false,
-                              sortOrder: uploaded.sortOrder,
-                            };
-                          }
-                          return { ...img, isUploading: false };
-                        });
-                      });
-                      // Show combined success message for artist + images
-                      toast.success(
-                        <>
-                          Artist <b>{fullName}</b> created with {registerResult.data.length} image
-                          {registerResult.data.length !== 1 ? 's' : ''}.
-                        </>
-                      );
-                    } else {
-                      throw Error(registerResult.error || 'Failed to register images');
-                    }
-                  } catch (uploadError) {
-                    error('Image upload error:', uploadError);
-                    const errorMessage =
-                      uploadError instanceof Error ? uploadError.message : 'Upload failed';
-                    setImages((prev) =>
-                      prev.map((img) =>
-                        img.file && !img.uploadedUrl
-                          ? { ...img, isUploading: false, error: errorMessage }
-                          : img
-                      )
-                    );
-                    toast.error(errorMessage);
-                    // Still show artist creation success
-                    toast.success(<ToastContent fullName={fullName} />);
-                  } finally {
-                    setIsUploadingImages(false);
-                  }
-                } else {
-                  // No images to upload, just show artist creation success
-                  toast.success(<ToastContent fullName={fullName} />);
-                }
-
-                // Reset form dirty state
-                artistForm.reset(data);
-                setImagesReordered(false);
-              } else {
-                // No artistId returned but success - show generic success
-                toast.success(<ToastContent fullName={fullName} />);
-              }
-            } else {
-              toast.error('Failed to create artist. Please check the form for errors.');
-            }
-          }
-        } else {
-          error('ArtistForm: Form reference is null on submit.');
-          toast.error('Please refresh the page and try again, or check back later.');
-        }
-      });
+    async (data: ArtistFormData): Promise<void> => {
+      const deps: SubmitArtistDeps = {
+        artistForm,
+        images,
+        isPublished,
+        setIsPublished,
+        setArtistId,
+        createArtistAsync,
+        updateArtistAsync,
+      };
+      startTransition(() => runArtistSubmit(formRef.current, artistId, data, deps));
     },
-    [images, artistId, isPublished, artistForm, createArtistAsync, updateArtistAsync]
+    [artistForm, images, artistId, isPublished, createArtistAsync, updateArtistAsync]
   );
 
-  const isSubmitting =
-    isCreatingArtist || isUpdatingArtist || isTransitionPending || isUploadingImages;
+  const isSubmitting = computeIsSubmitting({
+    isCreatingArtist,
+    isUpdatingArtist,
+    isTransitionPending,
+    isUploadingImages: images.isUploadingImages,
+  });
 
   // Watch name fields for auto-generating slug (using useWatch for React Compiler compatibility)
   const displayName = useWatch({ control, name: 'displayName' });
@@ -580,19 +467,11 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
   const slug = useWatch({ control, name: 'slug' });
 
   // firstName and surname are only required when both displayName and akaNames are empty
-  const isNameRequired = !displayName?.trim() && !akaNames?.trim();
+  const isNameRequired = computeIsNameRequired(displayName, akaNames);
 
   // Auto-generate slug from name fields
   useEffect(() => {
-    let slugSource: string;
-
-    if (displayName?.trim()) {
-      slugSource = displayName.trim();
-    } else {
-      const nameParts = [firstName?.trim(), middleName?.trim(), surname?.trim()].filter(Boolean);
-      slugSource = nameParts.join(' ');
-    }
-
+    const slugSource = deriveSlugSource(displayName, firstName, middleName, surname);
     if (slugSource) {
       artistForm.setValue('slug', generateSlug(slugSource), { shouldValidate: false });
     }
@@ -605,58 +484,55 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     }
   }, [slug, artistForm]);
 
-  const handleSelectDate = (dateString: string, fieldName: string): void => {
-    artistForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
-  };
+  const handleSelectDate = useCallback(
+    (dateString: string, fieldName: string): void => {
+      artistForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
+    },
+    [artistForm]
+  );
 
-  // Helper to format validation errors for toast display
-  const formatValidationErrors = useCallback((errors: Record<string, { message?: string }>) => {
-    const errorMessages = Object.entries(errors)
-      .map(([field, error]) => `${field}: ${error.message || 'Invalid'}`)
-      .join(', ');
-    return errorMessages || 'Please check the form for errors.';
+  const handleBioGenerated = useCallback(
+    (content: GeneratedBioContent): void => {
+      setValue('shortBio', content.shortBio, { shouldDirty: true });
+      setValue('bio', content.longBio, { shouldDirty: true });
+      if (content.genres) {
+        setValue('genres', content.genres, { shouldDirty: true });
+      }
+      setBioPickerImages(
+        content.images.map((image) => ({ url: image.url, alt: image.title ?? '' }))
+      );
+    },
+    [setValue]
+  );
+
+  const onInvalidSubmit = useCallback((errors: Record<string, { message?: string }>): void => {
+    console.error('Form validation errors:', errors);
+    toast.error(formatValidationErrors(errors));
   }, []);
+
+  const submitForm = artistForm.handleSubmit(onSubmitArtistForm, onInvalidSubmit);
 
   // Handler for Create & Publish (create mode) or Publish (edit mode)
   const handleClickPublishButton = useCallback(() => {
     artistForm.setValue('publishedOn', new Date().toISOString(), { shouldDirty: true });
-    artistForm.handleSubmit(onSubmitArtistForm, (errors) => {
-      console.error('Form validation errors:', errors);
-      toast.error(formatValidationErrors(errors));
-    })();
-  }, [artistForm, onSubmitArtistForm, formatValidationErrors]);
+    artistForm.handleSubmit(onSubmitArtistForm, onInvalidSubmit)();
+  }, [artistForm, onSubmitArtistForm, onInvalidSubmit]);
 
-  // Track form dirty state for Save button enablement (includes image reordering)
-  const hasPendingImages = images.some((img) => img.file && !img.uploadedUrl);
-  const isDirty = artistForm.formState.isDirty || imagesReordered || hasPendingImages;
+  const isDirty = computeIsDirty(
+    artistForm.formState.isDirty,
+    images.imagesReordered,
+    images.hasPendingImages
+  );
 
-  // Ensure form is fully initialized before rendering
-  if (!artistForm || !control || isLoadingArtist) {
-    return (
-      <div className="space-y-6">
-        <SectionHeader
-          icon={Users}
-          title={initialArtistId ? 'Edit Artist' : 'Create New Artist'}
-          helpText="Loading artist details…"
-        />
-        <div className="space-y-4">
-          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-          <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-        </div>
-      </div>
-    );
+  if (isLoadingArtist) {
+    return <ArtistFormSkeleton isEditMode={!!initialArtistId} />;
   }
 
   return (
     <>
       <BreadcrumbMenu
         items={[
-          {
-            anchorText: 'Admin',
-            url: '/admin',
-            isActive: false,
-          },
+          { anchorText: 'Admin', url: '/admin', isActive: false },
           {
             anchorText: isEditMode ? 'Edit Artist' : 'Create Artist',
             url: '/admin/artists',
@@ -665,305 +541,48 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
         ]}
       />
       <div className="space-y-6">
-        <div className="space-y-1">
-          <SectionHeader
-            icon={Users}
-            title={isEditMode ? 'Edit Artist' : 'Create New Artist'}
-            helpText="Manage the artist's name, images, biography, music metadata, and key dates. Required fields are marked with an asterisk."
-          />
-          <p className="text-muted-foreground text-sm">
-            {isEditMode
-              ? 'Update artist information. Changes are saved when you click Save.'
-              : 'Required fields are marked with an asterisk *'}
-          </p>
-        </div>
+        <ArtistFormHeader isEditMode={isEditMode} />
         <Form {...artistForm}>
-          <form
-            ref={formRef}
-            onSubmit={artistForm.handleSubmit(onSubmitArtistForm, (errors) => {
-              console.error('Form validation errors:', errors);
-              toast.error(formatValidationErrors(errors));
-            })}
-            noValidate
-          >
+          <form ref={formRef} onSubmit={submitForm} noValidate>
             <div className="space-y-6">
               <Separator />
-              {/* Name Section */}
-              <section className="space-y-4 pt-0">
-                <h2 className="font-semibold">Name Information</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="title"
-                    label="Title"
-                    placeholder="e.g., Dr., Prof., DJ"
-                  />
-                  <TextField
-                    control={control}
-                    name="firstName"
-                    label={`First Name${isNameRequired ? ' *' : ''}`}
-                    placeholder="First name"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="middleName"
-                    label="Middle Name"
-                    placeholder="Middle name"
-                  />
-                  <TextField
-                    control={control}
-                    name="surname"
-                    label={`Surname${isNameRequired ? ' *' : ''}`}
-                    placeholder="Last name"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="suffix"
-                    label="Suffix"
-                    placeholder="e.g., Jr., Sr., III"
-                  />
-                  <TextField
-                    control={control}
-                    name="displayName"
-                    label="Display Name"
-                    placeholder="Public display name (optional)"
-                  />
-                </div>
-                <TextField
-                  control={control}
-                  name="akaNames"
-                  label="AKA Names"
-                  placeholder="Also known as (comma-separated)"
-                />
-                <TextField
-                  control={control}
-                  name="slug"
-                  label="Slug *"
-                  placeholder="url-friendly-identifier"
-                />
-              </section>
+
+              <ArtistNameSection control={control} isNameRequired={isNameRequired} />
 
               <Separator />
 
-              {/* Images Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-zinc-950">
-                  Add images for this artist. You can drag to reorder them. Images will be uploaded
-                  after the artist is created or updated.
-                </p>
-                <ImageUploader
-                  images={images}
-                  onImagesChange={handleImagesChange}
-                  onReorder={handleReorder}
-                  onDelete={handleDeleteImage}
-                  maxImages={10}
-                  disabled={isSubmitting}
-                  label="Upload artist images"
-                />
-              </section>
+              <ArtistImagesSection
+                images={images.images}
+                isSubmitting={isSubmitting}
+                onImagesChange={images.handleImagesChange}
+                onReorder={images.handleReorder}
+                onDelete={images.handleDeleteImage}
+              />
 
               <Separator />
 
-              {/* Biography Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Biography</h2>
-
-                {/* AI Bio Generation — first action; edit mode only (needs a
-                    persisted artist). Populates the bio fields below. */}
-                {isEditMode && artistId && (
-                  <ArtistBioGenerationSection
-                    artistId={artistId}
-                    onGenerated={(content) => {
-                      setValue('shortBio', content.shortBio, { shouldDirty: true });
-                      setValue('bio', content.longBio, { shouldDirty: true });
-                      if (content.genres) {
-                        setValue('genres', content.genres, { shouldDirty: true });
-                      }
-                      setBioPickerImages(
-                        content.images.map((image) => ({ url: image.url, alt: image.title ?? '' }))
-                      );
-                    }}
-                  />
-                )}
-
-                <FormField
-                  control={control}
-                  name="bio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bio</FormLabel>
-                      <FormControl>
-                        <RichTextEditor
-                          value={field.value ?? ''}
-                          onChange={field.onChange}
-                          images={bioEditorImages}
-                          ariaLabel="Bio"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="shortBio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Short Bio</FormLabel>
-                      <FormControl>
-                        <RichTextEditor
-                          value={field.value ?? ''}
-                          onChange={field.onChange}
-                          images={bioEditorImages}
-                          ariaLabel="Short Bio"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="altBio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Alternative Bio</FormLabel>
-                      <FormControl>
-                        <RichTextEditor
-                          value={field.value ?? ''}
-                          onChange={field.onChange}
-                          images={bioEditorImages}
-                          ariaLabel="Alternative Bio"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </section>
+              <ArtistBioSection
+                control={control}
+                isEditMode={isEditMode}
+                artistId={artistId}
+                bioEditorImages={bioEditorImages}
+                onBioGenerated={handleBioGenerated}
+              />
 
               <Separator />
 
-              {/* Music Information */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Music Information</h2>
-                <TextField
-                  control={control}
-                  name="genres"
-                  label="Genres"
-                  placeholder="e.g., indie-rock, synth-pop (comma-separated)"
-                />
-                <TextField
-                  control={control}
-                  name="tags"
-                  label="Tags"
-                  placeholder="e.g., experimental, electronic (comma-separated)"
-                />
-              </section>
-
-              <Separator />
-
-              {/* Dates Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Important Dates</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <FormField
-                    control={control}
-                    name="bornOn"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Born on</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            fieldName={field.name}
-                            onSelect={handleSelectDate}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={control}
-                    name="diedOn"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Died on</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            fieldName={field.name}
-                            onSelect={handleSelectDate}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={control}
-                  name="formedOn"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Formed on</FormLabel>
-                      <FormControl>
-                        <DatePicker fieldName={field.name} onSelect={handleSelectDate} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <p className="text-xs text-zinc-950">Only used for bands</p>
-              </section>
+              <ArtistMusicAndDatesSection control={control} onSelectDate={handleSelectDate} />
             </div>
 
-            <div className="flex justify-end gap-4 pt-6">
-              {isEditMode ? (
-                // Edit mode buttons
-                <>
-                  {artistId && (
-                    <EntityDeleteButton
-                      label="Delete Artist"
-                      title="Delete this artist?"
-                      description="The artist is archived and hidden from listings. You can restore it later from the artists list."
-                      successMessage="Artist deleted successfully"
-                      failureMessage="Failed to delete artist"
-                      redirectTo="/admin/artists"
-                      disabled={isSubmitting}
-                      onDelete={() => archiveArtistAsync({ artistId })}
-                    />
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting || isPublished}
-                    onClick={handleClickPublishButton}
-                  >
-                    {isPublished ? 'Published' : 'Publish'}
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting || !isDirty}>
-                    {isSubmitting ? 'Saving...' : 'Save'}
-                  </Button>
-                </>
-              ) : (
-                // Create mode buttons
-                <>
-                  <Button type="button" disabled={isSubmitting} onClick={handleClickPublishButton}>
-                    Create &amp; Publish
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : 'Create'}
-                  </Button>
-                </>
-              )}
-            </div>
+            <ArtistFormFooter
+              isEditMode={isEditMode}
+              artistId={artistId}
+              isPublished={isPublished}
+              isSubmitting={isSubmitting}
+              isDirty={isDirty}
+              onPublish={handleClickPublishButton}
+              onDelete={() => archiveArtistAsync({ artistId: artistId ?? '' })}
+            />
           </form>
         </Form>
       </div>
