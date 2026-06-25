@@ -1,271 +1,32 @@
-import NextAuth from 'next-auth';
-import Nodemailer from 'next-auth/providers/nodemailer';
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import 'server-only';
 
-import { sendVerificationRequest } from '@/lib/email/send-verification-request';
-import { prisma } from '@/lib/prisma';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
-import { BannedIdentityRepository } from '@/lib/repositories/banned-identity-repository';
-import { loggers } from '@/lib/utils/logger';
+import { headers } from 'next/headers';
 
-import type { User } from 'next-auth';
-import type { AdapterUser } from 'next-auth/adapters';
-import type { JWT } from 'next-auth/jwt';
+import { auth as betterAuth } from '@/lib/auth';
+import { getServerSession } from '@/lib/auth/get-server-session';
+import type { ServerSession } from '@/lib/auth/get-server-session';
 
-//keywords: auth, next-auth, mongodb, mongodb-adapter
-//docs: https://authjs.dev/reference/adapters/mongodb-adapter
+/**
+ * Backwards-compatible server-session reader.
+ *
+ * This is the single façade the rest of the server code imports as `@/auth` —
+ * it returns the same `{ user: { id, email, role, username, ... } } | null`
+ * shape the Auth.js `auth()` helper used to, so the ~30 downstream call sites
+ * (decorators, server actions, API routes) keep working unchanged after the
+ * migration to better-auth. The implementation now delegates to
+ * {@link getServerSession}, which re-hydrates the user from the database.
+ */
+export const auth = async (): Promise<ServerSession | null> => getServerSession();
 
-// For more information on each option (and a full list of options) go to
-// https://next-auth.js.org/configuration/options
-
-// For more information on each option (and a full list of options) go to
-// https://next-auth.js.org/configuration/providers/oauth
-// https://next-auth.js.org/providers/
-
-// For more information on using MongoDB with NextAuth.js, see:
-// https://authjs.dev/guides/database/mongodb
-
-// For more information on using environment variables with NextAuth.js, see:
-// https://next-auth.js.org/configuration/options#environment-variables
-
-// You can add more providers here
-// https://next-auth.js.org/providers/overview
-
-// Prisma Adapter Docs: https://authjs.dev/reference/adapters/prisma-adapter
-// Prisma Adapter GitHub: https://github.com/next-auth/prisma-adapter
-// Prisma Schema: https://authjs.dev/guides/database/prisma
-// Prisma Client: https://www.prisma.io/docs/concepts/components/prisma-client
-
-// Prisma and MongoDB Notes:
-// - MongoDB does not support transactions. Any operations that would normally
-//   be wrapped in a transaction will be executed sequentially instead.
-// - MongoDB does not support relations. Any relational fields will be ignored
-//   when using the Prisma Adapter with MongoDB.
-// - MongoDB does not support some query filters, such as `contains` and `startsWith`.
-//   These filters will throw an error if used with the Prisma Adapter and MongoDB.
-
-// Prisma Schema Notes:
-// - The `@db.ObjectId` attribute is used to indicate that a field should be
-//   treated as an ObjectId in MongoDB.
-// - The `@map` attribute is used to map a field to a different name in the database.
-// - The `@@index` attribute is used to create an index on a field or fields.
-// - The `@@unique` attribute is used to create a unique index on a field or fields.
-
-// Whitelist of fields the client may update via `useSession().update()`.
-// Never allow `role`, `id`, `email`, or `emailVerified` to be written from the client —
-// those are authoritative only via DB re-fetch in `refreshUserFromDatabase`.
-const ALLOWED_UPDATE_FIELDS = [
-  'name',
-  'username',
-  'image',
-  'firstName',
-  'lastName',
-  'phone',
-  'addressLine1',
-  'addressLine2',
-  'city',
-  'state',
-  'zipCode',
-  'country',
-  'allowSmsNotifications',
-] as const;
-
-// Merge a client-initiated session update into the token, keeping only
-// whitelisted fields. Security: never trust the client for authoritative fields.
-const buildSessionUpdatedToken = ({ token, session }: { token: JWT; session: unknown }): JWT => {
-  const sessionObj = (session ?? {}) as Record<string, unknown>;
-  const safeUpdates = Object.fromEntries(
-    Object.entries(sessionObj).filter(([key]) =>
-      (ALLOWED_UPDATE_FIELDS as readonly string[]).includes(key)
-    )
-  );
-  token.user = {
-    ...((token.user as object) || {}),
-    ...safeUpdates,
-  };
-  return token;
+/**
+ * Server-side sign-out façade. Mirrors the old Auth.js `signOut` signature
+ * (an optional `{ redirect }` flag, ignored here — server actions handle their
+ * own redirect) and revokes the better-auth session for the current request.
+ */
+export const signOut = async (_options?: { redirect?: boolean }): Promise<void> => {
+  const requestHeaders = await headers();
+  await betterAuth.api.signOut({ headers: requestHeaders });
 };
-
-// Re-fetch the user from the database so the session stays in sync with the
-// latest DB state. If the role changed since the token was issued, strip the
-// embedded user to force re-authentication. On DB error, keep existing token data.
-const refreshUserFromDatabase = async (token: JWT): Promise<JWT> => {
-  try {
-    const userId = (token.user as { id: string }).id;
-    const freshUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        image: true,
-        email: true,
-        emailVerified: true,
-        role: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        addressLine1: true,
-        addressLine2: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        country: true,
-        allowSmsNotifications: true,
-      },
-    });
-
-    if (!freshUser) {
-      return token;
-    }
-
-    // Security: Check if role has changed - force re-authentication if so
-    const oldRole = (token.user as { role?: string }).role;
-    if (oldRole && freshUser.role !== oldRole) {
-      loggers.auth.warn('User role changed - re-authentication required', {
-        userId: freshUser.id,
-        oldRole,
-        newRole: freshUser.role,
-      });
-      // Remove the embedded user from the JWT to force re-login without
-      // leaving a token where `token.user` is explicitly `null`.
-      const { user: _user, ...tokenWithoutUser } = token;
-      return tokenWithoutUser;
-    }
-
-    token.user = freshUser;
-  } catch (error) {
-    // Logger redacts sensitive fields; stack is structured data
-    loggers.auth.error('Error fetching user data', error);
-    // Keep existing token data if database fetch fails
-  }
-
-  return token;
-};
-
-// Validate AUTH_SECRET exists and is sufficiently long
-// Skip validation during build when SKIP_ENV_VALIDATION is set
-if (process.env.SKIP_ENV_VALIDATION !== 'true') {
-  if (!process.env.AUTH_SECRET) {
-    throw new Error('AUTH_SECRET environment variable is required');
-  }
-
-  if (process.env.AUTH_SECRET.length < 32) {
-    throw new Error('AUTH_SECRET must be at least 32 characters long for security');
-  }
-
-  // Security: prevent E2E_MODE from degrading cookie security in production
-  if (process.env.E2E_MODE === 'true' && process.env.NODE_ENV === 'production') {
-    throw new Error('E2E_MODE must not be enabled in production — it disables cookie security');
-  }
-}
-
-const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: CustomPrismaAdapter(prisma),
-  // Trust host header from reverse proxy (NGINX)
-  // Required when running behind a proxy
-  trustHost: true,
-  providers: [
-    Nodemailer({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT ?? 25),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
-        },
-      },
-      from: process.env.EMAIL_FROM,
-      // Cast through `never` to bridge the type mismatch between our narrower
-      // SmtpServer type and nodemailer's AllTransportOptions union. Runtime-compatible.
-      sendVerificationRequest: sendVerificationRequest as never,
-    }),
-  ],
-  callbacks: {
-    // Ban-evasion gate (010-chat-abuse-reporting). Reject sign-in for
-    // any email or userId that matches an active BannedIdentity. The
-    // Auth.js v5 signIn callback only gives us account/email here —
-    // fingerprint-based blocking happens at the request layer
-    // (`/api/chat/me`, chat send) where headers are available.
-    async signIn({ user }) {
-      const email = user.email ?? null;
-      const userId = user.id ?? null;
-      if (!email && !userId) return true;
-      try {
-        const match = await BannedIdentityRepository.findActiveMatch({ userId, email });
-        if (match) {
-          loggers.auth.warn('Sign-in rejected for banned identity', {
-            maskedEmail: email ? `${email[0]}***` : null,
-            userId: userId ?? undefined,
-          });
-          return false;
-        }
-      } catch (error) {
-        // Fail-open on transient DB errors so a temporary outage does
-        // not lock everyone out. The chat-time check still gates abuse.
-        loggers.auth.error('Ban check failed; allowing sign-in', error);
-      }
-      return true;
-    },
-    async jwt({ token, user, trigger, session }) {
-      // Handle session updates (when user profile is updated).
-      // Security: whitelist fields that the client may update via `useSession().update()`.
-      // Never allow `role`, `id`, `email`, or `emailVerified` to be written from the client —
-      // those are authoritative only via the DB re-fetch in `refreshUserFromDatabase`.
-      if (trigger === 'update' && session) {
-        return buildSessionUpdatedToken({ token, session });
-      }
-
-      // Initial sign in - store user data in token
-      if (user) {
-        token.user = user as User;
-      }
-
-      // On subsequent requests, refresh user data from database
-      // This ensures session stays in sync with latest user data
-      if (token.user && typeof token.user === 'object' && 'id' in token.user && !trigger) {
-        return await refreshUserFromDatabase(token);
-      }
-
-      return token;
-    },
-    async redirect({ baseUrl }) {
-      // Upon logging in we want to redirect to the home page
-      return baseUrl;
-    },
-    async session({ session, token }) {
-      if (session) {
-        session.user = token.user as User &
-          AdapterUser & { id: string; username: string; email: string; role: string };
-      }
-
-      return session;
-    },
-  },
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // 24 hours
-  },
-  secret: process.env.AUTH_SECRET,
-  pages: {
-    signIn: '/signin',
-  },
-  cookies: {
-    sessionToken: {
-      name:
-        process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true'
-          ? `__Secure-next-auth.session-token`
-          : `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true',
-      },
-    },
-  },
-  // Enable CSRF protection
-  useSecureCookies: process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true',
-});
-
-export { handlers, auth, signIn, signOut };

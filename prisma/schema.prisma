@@ -12,14 +12,22 @@ model User {
   id                 String    @id @default(auto()) @map("_id") @db.ObjectId
   name               String?
   email              String    @unique
-  emailVerified      DateTime?
+  // better-auth: emailVerified is a Boolean flag (was DateTime? under Auth.js).
+  emailVerified      Boolean   @default(false)
   previousEmail      String?
   image              String?
   accounts           Account[]
   sessions           Session[]
   termsAndConditions Boolean   @default(false)
+  // Timestamp the user accepted the terms during signup (better-auth additionalField).
+  termsAcceptedAt    DateTime?
   username           String?   @unique
-  role               String?
+  role               String?   @default("user")
+
+  // better-auth admin plugin: native account ban (blocks sign-in + revokes sessions).
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
 
   // Security fields for account lockout
   failedLoginAttempts Int       @default(0)
@@ -73,50 +81,61 @@ model User {
 }
 
 model Account {
-  id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String  @db.ObjectId
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.String
-  access_token      String? @db.String
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.String
-  session_state     String?
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String  @db.ObjectId
+  // better-auth field names: provider -> providerId, providerAccountId -> accountId.
+  providerId String
+  accountId  String
+  // OAuth tokens (camelCase under better-auth). `password` is unused (passwordless).
+  accessToken           String?   @db.String
+  refreshToken          String?   @db.String
+  idToken               String?   @db.String
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
+  @@unique([providerId, accountId])
   @@index([userId])
-  @@index([provider])
+  @@index([providerId])
 }
 
 model Session {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  sessionToken String   @unique
-  userId       String   @db.ObjectId
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  // better-auth field names: sessionToken -> token, expires -> expiresAt.
+  token  String @unique
+  userId String @db.ObjectId
+  expiresAt DateTime
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // better-auth session metadata + admin-plugin impersonation.
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
-  @@index([expires])
+  @@index([expiresAt])
 }
 
-model VerificationToken {
+// better-auth verification store (was Auth.js `VerificationToken`).
+// token -> value, expires -> expiresAt.
+model Verification {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   identifier String
-  token      String
-  expires    DateTime
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@unique([identifier, token])
+  @@index([identifier])
 }
 
 // Optional for WebAuthn support

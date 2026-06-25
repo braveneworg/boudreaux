@@ -7,7 +7,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { signIn } from '@/auth';
+import { auth } from '@/lib/auth';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -67,9 +67,13 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     try {
       const { email } = formState.fields;
 
-      // Redirect happens below because next throws an error if you redirect inside a try/catch
-      // The property redirectTo is responsible for the magic link callback URL
-      await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
+      // Trigger better-auth's magic-link send. `callbackURL` is the post-verify
+      // landing page. The redirect happens below — `next` throws if you redirect
+      // inside a try/catch.
+      await auth.api.signInMagicLink({
+        body: { email: email as string, callbackURL: '/' },
+        headers: headersList,
+      });
 
       formState.success = true;
     } catch (error) {

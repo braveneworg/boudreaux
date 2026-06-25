@@ -3,14 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import type { ServerSession } from '@/lib/auth/get-server-session';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { setRuntimeLogLevel } from '@/lib/utils/logger';
 import type { LogLevelState } from '@/lib/utils/logger';
 import { setLogLevelSchema } from '@/lib/validation/log-level-schema';
 import type { SetLogLevelInput } from '@/lib/validation/log-level-schema';
-
-import type { Session } from 'next-auth';
 
 const DEFAULT_TTL_MINUTES = 60;
 
@@ -25,7 +24,7 @@ export type SetLogLevelActionResult =
 export const setLogLevelAction = async (
   input: SetLogLevelInput
 ): Promise<SetLogLevelActionResult> => {
-  let session: Session;
+  let session: ServerSession;
   try {
     session = await requireRole('admin');
   } catch {

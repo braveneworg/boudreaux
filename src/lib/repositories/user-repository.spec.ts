@@ -49,6 +49,19 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('findById', () => {
+    it('looks up a user by id with accounts and sessions', async () => {
+      const user = { id: 'u1', email: 'a@b.co' };
+      findUniqueMock.mockResolvedValue(user);
+
+      await expect(UserRepository.findById('u1')).resolves.toBe(user);
+      expect(findUniqueMock).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        include: fullInclude,
+      });
+    });
+  });
+
   describe('findIdByEmail', () => {
     it('looks up a user by email selecting only the id', async () => {
       findUniqueMock.mockResolvedValue({ id: 'u1' });
@@ -90,7 +103,7 @@ describe('UserRepository', () => {
     it('creates a user with the supplied data and full include', async () => {
       const created = { id: 'u1' };
       createMock.mockResolvedValue(created);
-      const data = { email: 'a@b.co', name: 'Admin', role: 'admin', emailVerified: new Date() };
+      const data = { email: 'a@b.co', name: 'Admin', role: 'admin', emailVerified: true };
 
       await expect(UserRepository.create(data)).resolves.toBe(created);
       expect(createMock).toHaveBeenCalledWith({ data, include: fullInclude });
@@ -100,7 +113,7 @@ describe('UserRepository', () => {
   describe('createGuest', () => {
     it('creates a guest user returning only the id', async () => {
       createMock.mockResolvedValue({ id: 'new-id' });
-      const verified = new Date();
+      const verified = true;
       const data = { email: 'g@x.io', emailVerified: verified, username: 'guest-name' };
 
       await expect(UserRepository.createGuest(data)).resolves.toEqual({ id: 'new-id' });

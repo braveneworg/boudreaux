@@ -81,7 +81,7 @@ export const buildLoginVerificationEmailHtml = (data: LoginVerificationEmailData
           <tr>
             <td style="padding: 24px 32px;">
               <p style="margin: 0 0 16px; color: #27272a; font-size: 14px; line-height: 1.6;">
-                This link expires in 24 hours and can only be used once.
+                This link expires in 5 minutes and can only be used once.
               </p>
               <a href="${data.url}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">Sign In</a>
             </td>

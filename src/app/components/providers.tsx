@@ -6,7 +6,6 @@
 import { useState } from 'react';
 
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { reportResponseValidationError } from '@/lib/query-error-reporter';
@@ -37,13 +36,13 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
       })
   );
 
+  // better-auth's `useSession` reads from its own nanostore and needs no
+  // React context provider, so the old next-auth `SessionProvider` is gone.
   return (
     <QueryClientProvider client={client}>
-      <SessionProvider refetchInterval={0} refetchOnWindowFocus refetchWhenOffline={false}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          {children}
-        </ThemeProvider>
-      </SessionProvider>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        {children}
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

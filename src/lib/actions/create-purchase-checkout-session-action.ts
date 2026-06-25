@@ -6,14 +6,13 @@
 import 'server-only';
 
 import { auth } from '@/auth';
+import type { ServerSession } from '@/lib/auth/get-server-session';
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
-
-import type { Session } from 'next-auth';
 
 const limiter = rateLimit({
   interval: 60 * 1000, // 1 minute
@@ -37,7 +36,7 @@ type UserIdentity = { userId: string | null; email: string | null };
 /** Extracts userId and email from the server-side auth session combined with
  * the optional guest customerEmail. Never trusts client-supplied userId. */
 const resolveUserIdentity = (
-  authSession: Session | null,
+  authSession: ServerSession | null,
   customerEmail: string | undefined
 ): UserIdentity => ({
   userId: authSession?.user?.id ?? null,

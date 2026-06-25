@@ -22,7 +22,7 @@ Signing in as: ${data.email}
 Sign In:
 ${data.url}
 
-This link expires in 24 hours and can only be used once.
+This link expires in 5 minutes and can only be used once.
 
 If you did not request this email, you can safely ignore it.
 

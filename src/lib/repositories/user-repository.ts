@@ -56,6 +56,13 @@ export class UserRepository {
     ) as Promise<User | null>;
   }
 
+  /** Look up a full user record by id. Returns `null` when not found. */
+  static async findById(id: string): Promise<User | null> {
+    return runQuery(() =>
+      prisma.user.findUnique({ where: { id }, include: userFullInclude })
+    ) as Promise<User | null>;
+  }
+
   /** Look up a user by email, selecting only their id. */
   static async findIdByEmail(email: string): Promise<UserIdRecord | null> {
     return runQuery(() => prisma.user.findUnique({ where: { email }, select: { id: true } }));

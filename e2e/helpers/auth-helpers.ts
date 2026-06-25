@@ -33,7 +33,7 @@ interface TestUser {
   role: 'user' | 'admin';
   firstName?: string;
   lastName?: string;
-  emailVerified?: Date | null;
+  emailVerified?: boolean;
   image?: string | null;
   phone?: string | null;
   addressLine1?: string | null;

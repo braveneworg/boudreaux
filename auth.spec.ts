@@ -2,47 +2,59 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { auth, signOut } from './auth';
+
 vi.mock('server-only', () => ({}));
-vi.mock('next-auth', () => ({
-  default: vi.fn(() => ({
-    handlers: {},
-    auth: vi.fn(),
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  })),
-}));
-vi.mock('next-auth/providers/nodemailer', () => ({
-  default: vi.fn(() => ({})),
-}));
-vi.mock('@/lib/prisma', () => ({ prisma: {} }));
-vi.mock('@/lib/prisma-adapter', () => ({
-  CustomPrismaAdapter: vi.fn(() => ({})),
+
+const getServerSessionMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/auth/get-server-session', () => ({
+  getServerSession: getServerSessionMock,
 }));
 
-describe('auth module — E2E_MODE production guard', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
+const signOutMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { signOut: signOutMock } },
+}));
+
+const headersMock = vi.hoisted(() => vi.fn());
+
+vi.mock('next/headers', () => ({
+  headers: headersMock,
+}));
+
+describe('auth façade', () => {
+  beforeEach(() => {
+    getServerSessionMock.mockReset();
+    signOutMock.mockReset();
+    headersMock.mockResolvedValue(new Headers());
   });
 
-  it('should throw when E2E_MODE is true in production', async () => {
-    vi.resetModules();
-    vi.stubEnv('E2E_MODE', 'true');
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('SKIP_ENV_VALIDATION', '');
-    vi.stubEnv('AUTH_SECRET', 'a-very-long-secret-that-is-at-least-32-characters');
+  describe('auth()', () => {
+    it('delegates to getServerSession', async () => {
+      const session = { user: { id: 'u1', role: 'admin' } };
+      getServerSessionMock.mockResolvedValue(session);
 
-    await expect(async () => import('./auth')).rejects.toThrow(
-      'E2E_MODE must not be enabled in production'
-    );
+      await expect(auth()).resolves.toBe(session);
+    });
+
+    it('returns null when there is no session', async () => {
+      getServerSessionMock.mockResolvedValue(null);
+
+      await expect(auth()).resolves.toBeNull();
+    });
   });
 
-  it('should not throw when E2E_MODE is true in development', async () => {
-    vi.resetModules();
-    vi.stubEnv('E2E_MODE', 'true');
-    vi.stubEnv('NODE_ENV', 'development');
-    vi.stubEnv('SKIP_ENV_VALIDATION', '');
-    vi.stubEnv('AUTH_SECRET', 'a-very-long-secret-that-is-at-least-32-characters');
+  describe('signOut()', () => {
+    it('revokes the better-auth session with the request headers', async () => {
+      const headers = new Headers({ cookie: 'x=1' });
+      headersMock.mockResolvedValue(headers);
+      signOutMock.mockResolvedValue(undefined);
 
-    await expect(import('./auth')).resolves.toBeDefined();
+      await signOut({ redirect: false });
+
+      expect(signOutMock).toHaveBeenCalledWith({ headers });
+    });
   });
 });

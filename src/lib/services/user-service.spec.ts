@@ -49,7 +49,7 @@ describe('UserService', () => {
         email: 'admin@example.com',
         name: 'Admin',
         role: 'admin',
-        emailVerified: expect.any(Date),
+        emailVerified: true,
       });
     });
 

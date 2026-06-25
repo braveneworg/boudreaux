@@ -6,7 +6,7 @@ import { signinAction } from '@/lib/actions/signin-action';
 import { loggers } from '@/lib/utils/logger';
 
 // Get the mocked functions using hoisted
-const mockSignIn = vi.hoisted(() => vi.fn());
+const mockSignInMagicLink = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
@@ -38,10 +38,9 @@ vi.mock('@/lib/utils/verify-turnstile', () => ({
   verifyTurnstile: mockVerifyTurnstile,
 }));
 
-// Mock dependencies
-// Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  signIn: mockSignIn,
+// Mock the better-auth instance — signin now triggers magic-link via its API.
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { signInMagicLink: mockSignInMagicLink } },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -101,7 +100,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -110,16 +109,16 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/' },
+        })
+      );
 
       expect(mockRedirect).toHaveBeenCalledWith('/success/signin?email=test%40example.com');
     });
 
-    it('should use nodemailer provider for magic link', async () => {
+    it('should trigger the better-auth magic-link send', async () => {
       const mockFormState: FormState = {
         fields: { email: 'user@test.com' },
         success: false,
@@ -136,7 +135,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -145,11 +144,11 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'user@test.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'user@test.com', callbackURL: '/' },
+        })
+      );
     });
 
     it('should set redirect parameter correctly', async () => {
@@ -169,7 +168,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -178,11 +177,11 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/' },
+        })
+      );
     });
   });
 
@@ -197,7 +196,7 @@ describe('signinAction', () => {
       expect(result.errors?.general).toContain(
         'CAPTCHA verification required. Please complete the verification.'
       );
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
 
     it('should return error when Turnstile verification fails', async () => {
@@ -210,7 +209,7 @@ describe('signinAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('Invalid token');
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
 
     it('should proceed when Turnstile verification succeeds', async () => {
@@ -232,14 +231,14 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw Error('NEXT_REDIRECT');
       });
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
       expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', '127.0.0.1');
-      expect(mockSignIn).toHaveBeenCalled();
+      expect(mockSignInMagicLink).toHaveBeenCalled();
     });
   });
 
@@ -266,7 +265,7 @@ describe('signinAction', () => {
       const result = await signinAction(mockInitialState, mockFormData);
 
       expect(result).toEqual(mockFormState);
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
       expect(mockRedirect).not.toHaveBeenCalled();
     });
 
@@ -313,7 +312,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {
@@ -323,11 +322,11 @@ describe('signinAction', () => {
       const result = await signinAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/' },
+        })
+      );
     });
 
     it('should log full error object in development mode', async () => {
@@ -350,7 +349,7 @@ describe('signinAction', () => {
       });
 
       const testError = Error('Development error');
-      vi.mocked(mockSignIn).mockRejectedValue(testError);
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(testError);
 
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -383,7 +382,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue(Error('Production error'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(Error('Production error'));
 
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -416,7 +415,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue('String thrown error');
+      vi.mocked(mockSignInMagicLink).mockRejectedValue('String thrown error');
 
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
 
@@ -447,7 +446,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue(Error('Network failure'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(Error('Network failure'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {
@@ -477,7 +476,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -590,7 +589,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -630,7 +629,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Mock redirect to throw to prevent actual redirect
       mockRedirect.mockImplementation(() => {
@@ -658,7 +657,7 @@ describe('signinAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
 
     it('should return custom Turnstile error message when provided', async () => {

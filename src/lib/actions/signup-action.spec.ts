@@ -10,7 +10,7 @@ import { loggers } from '@/lib/utils/logger';
 import type { Mock } from 'vitest';
 
 const mockCreateUser = vi.hoisted(() => vi.fn());
-const mockSignIn = vi.hoisted(() => vi.fn());
+const mockSignInMagicLink = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
@@ -55,10 +55,9 @@ vi.mock('@/lib/utils/audit-log', () => ({
   logSecurityEvent: vi.fn(),
 }));
 
-// Mock dependencies
-// Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  signIn: mockSignIn,
+// Mock the better-auth instance — signup triggers magic-link via its API.
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { signInMagicLink: mockSignInMagicLink } },
 }));
 
 vi.mock('@/lib/repositories/user-repository', () => ({
@@ -128,7 +127,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockCreateUser.mockResolvedValue({
         id: '1',
         email: 'test@example.com',
@@ -143,17 +142,18 @@ describe('signupAction', () => {
 
       expect(mockCreateUser).toHaveBeenCalledWith({
         email: 'test@example.com',
-        emailVerified: null,
+        emailVerified: false,
+        termsAcceptedAt: expect.any(Date),
         name: null,
         image: null,
         username: 'test-user-1234',
       });
 
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/' },
+        })
+      );
 
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
@@ -177,7 +177,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1' });
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -270,7 +270,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw Error('NEXT_REDIRECT');
       });
@@ -318,7 +318,7 @@ describe('signupAction', () => {
 
       expect(result).toEqual(mockFormState);
       expect(mockCreateUser).not.toHaveBeenCalled();
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
 
     it('should return error when email security validation fails', async () => {
@@ -409,7 +409,7 @@ describe('signupAction', () => {
       const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
       mockCreateUser.mockRejectedValue(duplicateEmailError);
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
       });
@@ -417,11 +417,11 @@ describe('signupAction', () => {
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       // Magic-link flow should be triggered for the duplicate email too
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/' },
+        })
+      );
       // Should redirect to the same success page as a new signup
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
@@ -433,7 +433,7 @@ describe('signupAction', () => {
       const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
       mockCreateUser.mockRejectedValue(duplicateEmailError);
-      vi.mocked(mockSignIn).mockRejectedValue(new Error('SES send failed'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(new Error('SES send failed'));
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
@@ -565,7 +565,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1' });
-      vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {

@@ -30,7 +30,7 @@ const TEST_USERS: Record<string, TestUser> = {
     role: 'user',
     firstName: 'Test',
     lastName: 'User',
-    emailVerified: new Date(),
+    emailVerified: true,
   },
   admin: {
     id: '65a1b2c3d4e5f6a7b8c9d0e2',
@@ -40,7 +40,7 @@ const TEST_USERS: Record<string, TestUser> = {
     role: 'admin',
     firstName: 'Admin',
     lastName: 'User',
-    emailVerified: new Date(),
+    emailVerified: true,
   },
 };
 
@@ -58,7 +58,7 @@ const waitForReplicaSet = async (prisma: PrismaClient, maxWaitMs = 30_000): Prom
     try {
       // A simple findMany doesn't require transactions; use deleteMany on a
       // likely-empty collection to exercise the write path that needs the RS.
-      await prisma.verificationToken.deleteMany({ where: { identifier: '__rs_probe__' } });
+      await prisma.verification.deleteMany({ where: { identifier: '__rs_probe__' } });
       return;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -142,7 +142,7 @@ const seedTestDatabase = async () => {
     await prisma.authenticator.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.account.deleteMany({});
-    await prisma.verificationToken.deleteMany({});
+    await prisma.verification.deleteMany({});
     await prisma.user.deleteMany({});
 
     // Create test users
@@ -155,7 +155,7 @@ const seedTestDatabase = async () => {
         role: TEST_USERS.admin.role,
         firstName: TEST_USERS.admin.firstName,
         lastName: TEST_USERS.admin.lastName,
-        emailVerified: new Date(),
+        emailVerified: true,
         termsAndConditions: true,
       },
     });
@@ -169,7 +169,7 @@ const seedTestDatabase = async () => {
         role: TEST_USERS.regular.role,
         firstName: TEST_USERS.regular.firstName,
         lastName: TEST_USERS.regular.lastName,
-        emailVerified: new Date(),
+        emailVerified: true,
         termsAndConditions: true,
       },
     });
