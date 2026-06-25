@@ -1,8 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { E2E_AUTH_SECRET } from './e2e/helpers/auth-constants';
 import { CONSTANTS } from './src/lib/constants';
 
-const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
+// Shared with global-setup + the disposable-session helper so the web server
+// signs/verifies session cookies with the exact secret the harness mints with.
+const AUTH_SECRET = E2E_AUTH_SECRET;
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 

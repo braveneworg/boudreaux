@@ -195,4 +195,64 @@ test.describe('Profile Management', () => {
       await expect(userPage.locator('input[name="confirmUsername"]')).not.toBeVisible();
     });
   });
+
+  test.describe('Connected accounts (better-auth)', () => {
+    // The regular user is seeded with a linked Google account and no other
+    // providers, so the section renders one "Connected" row + three unlinked.
+    // We assert the unlink confirm UI but always Cancel — never Disconnect — so
+    // the shared seed account is not mutated by a parallel run.
+
+    test('renders the Social accounts section', async ({ userPage }) => {
+      await userPage.goto('/profile');
+      await expect(userPage.getByRole('heading', { name: 'Social accounts' })).toBeVisible({
+        timeout: 10_000,
+      });
+    });
+
+    test('shows the linked Google account as connected with an Unlink control', async ({
+      userPage,
+    }) => {
+      await userPage.goto('/profile');
+
+      const googleRow = userPage
+        .locator('div')
+        .filter({ hasText: /^Google/ })
+        .filter({ has: userPage.getByRole('button', { name: 'Unlink' }) })
+        .first();
+      await expect(googleRow.getByText('Connected', { exact: true })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(googleRow.getByRole('button', { name: 'Unlink' })).toBeVisible();
+    });
+
+    test('shows an unlinked provider as not connected with a Link control', async ({
+      userPage,
+    }) => {
+      await userPage.goto('/profile');
+
+      // Apple is not seeded as linked, so it offers a Link button.
+      await expect(userPage.getByRole('button', { name: 'Link' }).first()).toBeVisible({
+        timeout: 10_000,
+      });
+    });
+
+    test('opens an unlink confirmation dialog with Disconnect / Cancel actions', async ({
+      userPage,
+    }) => {
+      await userPage.goto('/profile');
+
+      const unlinkButton = userPage.getByRole('button', { name: 'Unlink' });
+      await expect(unlinkButton).toBeVisible({ timeout: 10_000 });
+      await unlinkButton.click();
+
+      const dialog = userPage.getByRole('alertdialog');
+      await expect(dialog.getByText('Disconnect Google?')).toBeVisible();
+      await expect(dialog.getByText('You can reconnect it at any time.')).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
+
+      // Cancel — do NOT mutate the shared seeded account.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(userPage.getByRole('alertdialog')).toHaveCount(0);
+    });
+  });
 });

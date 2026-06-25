@@ -11,3 +11,7 @@ useDefault = true
 [[allowlists]]
 description = "bio-generator unit tests use placeholder credentials, not real secrets"
 paths = ['''bio-generator/src/.*\.spec\.ts$''']
+
+[[allowlists]]
+description = "E2E test AUTH_SECRET is a hardcoded non-secret placeholder shared by the Playwright harness (config, global setup, disposable-session helper); the real AUTH_SECRET lives only in the deploy environment"
+regexes = ['''e2e-test-secret-key-that-is-at-least-32-characters-long''']
