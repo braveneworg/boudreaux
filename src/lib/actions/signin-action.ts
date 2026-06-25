@@ -28,15 +28,18 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   const headersList = await headers();
   const ip = resolveClientIp(headersList);
 
-  // Check rate limit
-  try {
-    await limiter.check(5, ip); // 5 requests per minute per IP
-  } catch {
-    return {
-      success: false,
-      errors: { general: ['Too many signin attempts. Please try again later.'] },
-      fields: {},
-    };
+  // Check rate limit. Skipped under E2E (shards share one IP, same opt-out as
+  // `withRateLimit`) so the suite isn't tripped by the 5/min/IP limit.
+  if (process.env.E2E_MODE !== 'true') {
+    try {
+      await limiter.check(5, ip); // 5 requests per minute per IP
+    } catch {
+      return {
+        success: false,
+        errors: { general: ['Too many signin attempts. Please try again later.'] },
+        fields: {},
+      };
+    }
   }
 
   // Verify Turnstile token

@@ -615,6 +615,32 @@ describe('signinAction', () => {
       expect(result.errors?.general).toContain('Too many signin attempts. Please try again later.');
     });
 
+    it('skips the rate limit in E2E mode even when the limiter would reject', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+      const mockParsed = { success: true, data: { email: 'test@example.com' } };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockRateLimitCheck).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).toHaveBeenCalled();
+    });
+
     it('should use IP address for rate limiting', async () => {
       const mockFormState: FormState = {
         fields: { email: 'test@example.com' },

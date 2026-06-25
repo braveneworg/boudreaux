@@ -50,6 +50,22 @@ describe('checkPublicFormGuards', () => {
     expect(limiterOk.check).toHaveBeenCalledWith(5, '192.168.1.1');
   });
 
+  it('skips the rate limit in E2E mode even when the limiter would reject', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    const limiter = { check: vi.fn().mockRejectedValue(new Error('limit')) };
+
+    const result = await checkPublicFormGuards({
+      payload: makePayload('tok'),
+      limiter,
+      maxRequests: 3,
+      rateLimitMessage: 'Too many requests.',
+    });
+
+    expect(result).toBeNull();
+    expect(limiter.check).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it('returns the provided rate-limit message when the limiter rejects', async () => {
     const limiter = { check: vi.fn().mockRejectedValue(new Error('limit')) };
     const result = await checkPublicFormGuards({
