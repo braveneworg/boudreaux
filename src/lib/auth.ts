@@ -9,6 +9,10 @@ import { nextCookies } from 'better-auth/next-js';
 import { admin, magicLink } from 'better-auth/plugins';
 
 import { assertNotBanEvading } from '@/lib/auth/ban-evasion-hook';
+import {
+  accountLinkingConfig,
+  buildSocialProvidersConfig,
+} from '@/lib/auth/social-providers-config';
 import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
 import { prisma } from '@/lib/prisma';
 import { UserRepository } from '@/lib/repositories/user-repository';
@@ -77,6 +81,11 @@ export const auth = betterAuth({
     // Passwordless: no username/password login, now or ever.
     enabled: false,
   },
+  // Social OAuth providers. Each provider is conditionally included only when
+  // its credentials are present in the environment (see social-providers-config.ts).
+  // Redirect URIs are automatically handled by better-auth at:
+  //   <AUTH_URL>/api/auth/callback/<provider>
+  socialProviders: buildSocialProvidersConfig(),
   user: {
     additionalFields: {
       // Server-controlled; never writable from the client.
@@ -89,6 +98,13 @@ export const auth = betterAuth({
       enabled: true,
       maxAge: SESSION_COOKIE_CACHE_MAX_AGE_SECONDS,
     },
+  },
+  account: {
+    // Auto-link existing accounts by verified email when a trusted OAuth
+    // provider is used. Twitter is excluded from trustedProviders because
+    // X/Twitter does not reliably return an email without elevated permissions
+    // — users must manually link their X account from their profile (Task 7).
+    accountLinking: accountLinkingConfig,
   },
   advanced: {
     useSecureCookies: isProductionRuntime,

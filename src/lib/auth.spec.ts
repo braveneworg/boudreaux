@@ -12,6 +12,13 @@ vi.mock('better-auth/plugins', () => ({
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/auth/ban-evasion-hook', () => ({ assertNotBanEvading: vi.fn() }));
+vi.mock('@/lib/auth/social-providers-config', () => ({
+  buildSocialProvidersConfig: vi.fn(() => ({ google: { clientId: 'g', clientSecret: 'gs' } })),
+  accountLinkingConfig: {
+    enabled: true,
+    trustedProviders: ['google', 'apple', 'facebook'],
+  },
+}));
 vi.mock('@/lib/email/send-magic-link-email', () => ({ sendMagicLinkEmail: vi.fn() }));
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: { findEmailById: vi.fn() },
@@ -21,6 +28,41 @@ vi.mock('@/lib/repositories/user-repository', () => ({
 // threshold). Built from a repeated filler so it carries no real entropy and
 // is never mistaken for a credential.
 const FAKE_TEST_SECRET = `test-secret-${'x'.repeat(32)}`;
+
+// ---------------------------------------------------------------------------
+// auth.ts integration — socialProviders + accountLinking wiring
+//
+// The top-level `vi.mock` for `better-auth` gives us a spy on `betterAuth`.
+// On the first import (module load), `auth.ts` calls `betterAuth(config)` —
+// we can capture that call by importing `betterAuth` and reading its mock
+// call args.
+// ---------------------------------------------------------------------------
+describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
+  it('calls betterAuth with socialProviders and account.accountLinking', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+
+    await import('./auth');
+
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+
+    const config = calls[calls.length - 1][0];
+    // socialProviders is present (value comes from buildSocialProvidersConfig mock)
+    expect(config).toHaveProperty('socialProviders');
+    // account.accountLinking is wired with enabled + trustedProviders
+    expect(config).toHaveProperty('account.accountLinking.enabled', true);
+    expect(config.account.accountLinking.trustedProviders).toContain('google');
+    expect(config.account.accountLinking.trustedProviders).toContain('apple');
+    expect(config.account.accountLinking.trustedProviders).toContain('facebook');
+    expect(config.account.accountLinking.trustedProviders).not.toContain('twitter');
+
+    vi.unstubAllEnvs();
+  });
+});
 
 describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {
   afterEach(() => {
