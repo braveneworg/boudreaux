@@ -64,6 +64,30 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
     expect(config.account.accountLinking.trustedProviders).toContain('facebook');
     expect(config.account.accountLinking.trustedProviders).not.toContain('twitter');
   });
+
+  it('exposes username as a server-controlled (read-only) additional session field', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+
+    await import('./auth');
+
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    const config = calls[calls.length - 1][0];
+
+    // `username` must ride along on the better-auth session so the client
+    // `useSession()` can render the `@username` profile link (desktop header).
+    // It is written only via the dedicated change-username action (with its
+    // own uniqueness validation), so it is `input: false` — never writable
+    // through better-auth's updateUser.
+    expect(config.user.additionalFields.username).toEqual({
+      type: 'string',
+      required: false,
+      input: false,
+    });
+  });
 });
 
 describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {

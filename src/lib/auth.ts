@@ -92,6 +92,11 @@ export const auth = betterAuth({
       // Server-controlled; never writable from the client.
       role: { type: 'string', required: false, input: false },
       termsAcceptedAt: { type: 'date', required: false, input: false },
+      // Surface `username` on the session so the client `useSession()` can render
+      // the `@username` profile link (desktop/mobile auth menus). It is written
+      // only via the dedicated change-username action (with uniqueness checks),
+      // so `input: false` keeps it read-only through better-auth's updateUser.
+      username: { type: 'string', required: false, input: false },
     },
   },
   session: {
