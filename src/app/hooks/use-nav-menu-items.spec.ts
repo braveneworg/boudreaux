@@ -8,7 +8,7 @@ import { useNavMenuItems } from './use-nav-menu-items';
 
 const mockUseSession = vi.hoisted(() => vi.fn());
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: mockUseSession,
 }));
 

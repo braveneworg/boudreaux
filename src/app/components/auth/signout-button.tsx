@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useSession } from 'next-auth/react';
-
 import { useIsMobile } from '@/app/hooks/use-mobile';
+import { useSession } from '@/app/hooks/use-session';
+import type { ClientSessionData } from '@/app/hooks/use-session';
 import { GravatarAvatar } from '@/components/gravatar-avatar';
 import { CONSTANTS } from '@/lib/constants';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -14,8 +14,6 @@ import { EditProfileButton } from './edit-profile-button';
 import { SignOutButton } from './sign-out-button';
 import { SignedInAs } from './signed-in-as';
 
-import type { Session } from 'next-auth';
-
 interface GravatarProps {
   email: string;
   firstName?: string;
@@ -23,7 +21,7 @@ interface GravatarProps {
 }
 
 /** Derives the Gravatar props (email + split name parts) from the session. */
-const resolveGravatarProps = (session: Session | null): GravatarProps => {
+const resolveGravatarProps = (session: ClientSessionData | null): GravatarProps => {
   const nameParts = session?.user?.name?.split(' ');
   return {
     email: session?.user?.email || '',

@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
-import { useSession } from 'next-auth/react';
 import { z } from 'zod';
 
+import { useSession } from '@/hooks/use-session';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';

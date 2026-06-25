@@ -10,9 +10,12 @@ import { DesktopAuthMenu } from './desktop-auth-menu';
 const mockUseSession = vi.fn();
 const mockSignOut = vi.fn();
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
-  signOut: (options?: { redirect?: boolean; callbackUrl?: string }) => mockSignOut(options),
+}));
+
+vi.mock('@/lib/auth-client', () => ({
+  signOut: () => mockSignOut(),
 }));
 
 const mockPush = vi.fn();
@@ -153,21 +156,21 @@ describe('DesktopAuthMenu', () => {
       expect(screen.getByRole('link', { name: 'admin' })).toHaveAttribute('href', '/admin');
     });
 
-    it('signs out with redirect disabled on click', async () => {
-      mockSignOut.mockResolvedValue({ url: '/' });
+    it('signs out on click', async () => {
+      mockSignOut.mockResolvedValue(undefined);
       render(<DesktopAuthMenu />);
       fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
       await vi.waitFor(() => {
-        expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
+        expect(mockSignOut).toHaveBeenCalled();
       });
     });
 
-    it('navigates to the returned URL after signing out', async () => {
-      mockSignOut.mockResolvedValue({ url: '/signed-out' });
+    it('navigates home after signing out', async () => {
+      mockSignOut.mockResolvedValue(undefined);
       render(<DesktopAuthMenu />);
       fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
       await vi.waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/signed-out');
+        expect(mockPush).toHaveBeenCalledWith('/');
       });
     });
   });

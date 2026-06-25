@@ -34,7 +34,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/releases/rel-1',
 }));
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => ({
     data: { user: { id: 'user-1', name: 'Admin', role: 'admin' } },
     status: 'authenticated',

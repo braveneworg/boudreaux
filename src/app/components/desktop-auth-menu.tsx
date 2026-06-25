@@ -7,8 +7,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { LogOutIcon } from 'lucide-react';
-import { signOut, useSession } from 'next-auth/react';
 
+import { useSession } from '@/hooks/use-session';
+import { signOut } from '@/lib/auth-client';
 import { CONSTANTS } from '@/lib/constants';
 import { cn } from '@/lib/utils/tailwind-utils';
 import { VerticalSeparator } from '@/ui/vertical-separator';
@@ -48,8 +49,9 @@ export const DesktopAuthMenu = () => {
     const displayName = user.username ? `@${user.username}` : (user.name ?? user.email);
 
     const handleSignOut = async (): Promise<void> => {
-      const { url } = await signOut({ redirect: false, callbackUrl: '/' });
-      router.push(url);
+      // better-auth's signOut clears the session cookie; navigate home after.
+      await signOut();
+      router.push('/');
     };
 
     return (

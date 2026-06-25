@@ -6,9 +6,9 @@
 import { useRouter } from 'next/navigation';
 
 import { LogOutIcon } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 
 import { Button } from '@/app/components/ui/button';
+import { signOut } from '@/lib/auth-client';
 
 interface SignOutButtonProps {
   onNavigate?: () => void;
@@ -23,8 +23,9 @@ const SignOutButton = ({ onNavigate }: SignOutButtonProps) => {
       variant="link:narrow"
       onClick={async () => {
         onNavigate?.();
-        const { url } = await signOut({ redirect: false, callbackUrl: '/' });
-        router.push(url);
+        // better-auth's signOut clears the session cookie; navigate home after.
+        await signOut();
+        router.push('/');
       }}
     >
       <LogOutIcon size={16} />

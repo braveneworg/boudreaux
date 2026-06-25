@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/use-session';
 
 export interface NavMenuItem {
   name: string;

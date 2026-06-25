@@ -7,7 +7,7 @@ import { DesktopMenu } from './desktop-menu';
 
 const mockUseSession = vi.fn();
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 

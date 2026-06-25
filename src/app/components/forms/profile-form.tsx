@@ -7,7 +7,6 @@ import { useActionState, useCallback, useEffect, useRef, useState, useTransition
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Separator } from '@radix-ui/react-separator';
-import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -17,6 +16,7 @@ import { ProfilePersonalSection } from '@/app/components/forms/sections/profile-
 import { ProfileUsernameSection } from '@/app/components/forms/sections/profile-username-section';
 import { Card, CardContent, CardHeader } from '@/app/components/ui/card';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
 import { updateProfileAction } from '@/lib/actions/update-profile-action';

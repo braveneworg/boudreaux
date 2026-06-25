@@ -7,7 +7,7 @@ import { SignedInToolbar } from './signout-button';
 
 // Mock next-auth
 const mockUseSession = vi.fn();
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 

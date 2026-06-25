@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -32,6 +31,7 @@ import {
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
 import { type ReleaseDetail, useReleaseDetailQuery } from '@/app/hooks/use-release-query';
+import { useSession } from '@/hooks/use-session';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
 import {
   deleteReleaseImageAction,

@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -30,6 +29,7 @@ import {
   useUpdateArtistMutation,
 } from '@/app/hooks/mutations/use-artist-mutations';
 import { type ArtistDetail, useArtistQuery } from '@/app/hooks/use-artist-query';
+import { useSession } from '@/hooks/use-session';
 import {
   deleteArtistImageAction,
   reorderArtistImagesAction,

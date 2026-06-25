@@ -57,7 +57,7 @@ vi.mock('@/lib/validation/profile-schema', () => ({ profileSchema: 'profile' }))
 vi.mock('@/lib/validation/change-email-schema', () => ({ changeEmailSchema: 'email' }));
 vi.mock('@/lib/validation/change-username-schema', () => ({ changeUsernameSchema: 'username' }));
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => useSessionMock(),
 }));
 

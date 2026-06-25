@@ -9,6 +9,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import type { ClientSessionData } from '@/app/hooks/use-session';
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import { deleteChatMessageAction } from '@/lib/actions/delete-chat-message-action';
 import { toggleChatReactionAction } from '@/lib/actions/toggle-chat-reaction-action';
@@ -19,7 +20,6 @@ import type { ChatMessageDto } from '@/lib/services/chat-service';
 import { ChatBody } from './chat-body';
 
 import type * as TanstackReactQuery from '@tanstack/react-query';
-import type { Session } from 'next-auth';
 
 // ────────────────────────────────────────────────────────────────────
 // Mocks
@@ -171,10 +171,10 @@ vi.mock('./chat-typing-indicator', () => ({
 // Helpers / fixtures
 // ────────────────────────────────────────────────────────────────────
 
-const buildSession = (role: string | null = null): Session =>
+const buildSession = (role: string | null = null): ClientSessionData =>
   ({
     user: { id: 'admin-1', email: 'admin@example.com', name: 'Admin', role },
-  }) as unknown as Session;
+  }) as unknown as ClientSessionData;
 
 const makeMessage = (overrides: Partial<OptimisticChatMessage> = {}): OptimisticChatMessage => ({
   id: 'msg-1',
@@ -567,7 +567,10 @@ describe('ChatBody — pinned strip indicators + channel wiring', () => {
     // currentUser is read by ChatInput (mocked out); covering this branch
     // is purely about exercising the `?? ''` / `?? null` fallbacks.
     render(
-      <ChatBody session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session} enabled />
+      <ChatBody
+        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as ClientSessionData}
+        enabled
+      />
     );
     expect(lastListProps).not.toBeNull();
   });
@@ -788,7 +791,7 @@ describe('ChatBody — session fallbacks', () => {
   it('defaults currentUserId to an empty string when session.user is absent', () => {
     // Covers `session.user?.id ?? ''` (line 97) — the whole `user` object is
     // undefined, so the optional chain short-circuits and the `?? ''` fires.
-    render(<ChatBody session={{ user: undefined } as unknown as Session} enabled />);
+    render(<ChatBody session={{ user: undefined } as unknown as ClientSessionData} enabled />);
     expect(lastInputProps).not.toBeNull();
     expect(lastInputProps?.currentUser.id).toBe('');
   });
@@ -802,7 +805,10 @@ describe('ChatBody — session fallbacks', () => {
     });
 
     render(
-      <ChatBody session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session} enabled />
+      <ChatBody
+        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as ClientSessionData}
+        enabled
+      />
     );
     act(() => lastInputProps?.onTyping());
 
@@ -814,7 +820,7 @@ describe('ChatBody — session fallbacks', () => {
     // ternary (line 334).
     render(
       <ChatBody
-        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session}
+        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as ClientSessionData}
         enabled
         scrollToMention
       />
