@@ -6,7 +6,10 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { SocialProviderButtons } from '@/app/components/auth/social-provider-buttons';
+import {
+  SocialProviderButtons,
+  type SocialProvider,
+} from '@/app/components/auth/social-provider-buttons';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
@@ -38,6 +41,11 @@ interface SignupSigninFormProps {
   state: FormState;
   /** URL to redirect to after successful social sign-in. Defaults to "/". */
   callbackURL?: string;
+  /**
+   * Called when social sign-in fails. Forwarded directly to SocialProviderButtons.
+   * Wire this at the page level to show a toast and log the error.
+   */
+  onSocialError?: (provider: SocialProvider, error: unknown) => void;
 }
 
 interface EmailFieldProps {
@@ -151,7 +159,7 @@ const FormSubmitRow = ({
   <div className="mt-4 flex items-center gap-3">
     {!isVerified && <Skeleton className="h-10 w-24" />}
     {isVerified && (
-      <Button disabled={isPending} size="lg">
+      <Button type="submit" disabled={isPending} size="lg">
         Email me a sign-in link
       </Button>
     )}
@@ -236,6 +244,7 @@ export const SignupSigninForm = ({
   onTurnstileToken,
   state,
   callbackURL = '/',
+  onSocialError,
 }: SignupSigninFormProps): React.ReactElement => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin';
@@ -244,7 +253,7 @@ export const SignupSigninForm = ({
     <Card className="mx-auto w-full max-w-md p-0">
       <CardContent className="p-6 sm:p-8">
         {/* Social sign-in — rendered first, always visible */}
-        <SocialProviderButtons callbackURL={callbackURL} className="mb-2" />
+        <SocialProviderButtons callbackURL={callbackURL} className="mb-2" onError={onSocialError} />
 
         {/* Divider */}
         <OrDivider label="or continue with email" />

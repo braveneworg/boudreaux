@@ -17,6 +17,12 @@ vi.mock('@/lib/auth-client', () => ({
   },
 }));
 
+// Mock the client error reporter
+const mockReportClientError = vi.fn();
+vi.mock('@/lib/utils/report-client-error', () => ({
+  reportClientError: (...args: unknown[]) => mockReportClientError(...args),
+}));
+
 // Mock brand icons so SVG rendering doesn't interfere with queries
 vi.mock('@/app/components/ui/brand-icons', () => ({
   AppleIcon: () => <svg data-testid="apple-icon" aria-hidden="true" />,
@@ -53,6 +59,7 @@ vi.mock('@/app/components/ui/button', () => ({
 describe('SocialProviderButtons', () => {
   beforeEach(() => {
     mockSignInSocial.mockClear();
+    mockReportClientError.mockClear();
     mockSignInSocial.mockResolvedValue({ data: null, error: null });
   });
 
@@ -186,6 +193,71 @@ describe('SocialProviderButtons', () => {
     it('accepts a className prop for layout customisation', () => {
       const { container } = render(<SocialProviderButtons callbackURL="/" className="mt-4" />);
       expect(container.firstChild).toHaveClass('mt-4');
+    });
+  });
+
+  describe('error handling', () => {
+    it('calls onError with provider and error when signIn.social rejects, and resets loading', async () => {
+      const networkError = new Error('Network unavailable');
+      mockSignInSocial.mockRejectedValue(networkError);
+      const onError = vi.fn();
+
+      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
+
+      expect(onError).toHaveBeenCalledWith('apple', networkError);
+      // Loading should be reset after the error
+      const buttons = screen.getAllByRole('button');
+      for (const btn of buttons) {
+        expect(btn).not.toBeDisabled();
+      }
+    });
+
+    it('calls onError with provider and error when signIn.social resolves with a non-null error', async () => {
+      const authError = new Error('Provider configuration error');
+      mockSignInSocial.mockResolvedValue({ data: null, error: authError });
+      const onError = vi.fn();
+
+      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /continue with google/i }));
+
+      expect(onError).toHaveBeenCalledWith('google', authError);
+    });
+
+    it('falls back to reportClientError when onError is not provided and signIn rejects', async () => {
+      const networkError = new Error('Connection refused');
+      mockSignInSocial.mockRejectedValue(networkError);
+
+      render(<SocialProviderButtons callbackURL="/" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
+
+      expect(mockReportClientError).toHaveBeenCalledWith(networkError, 'route');
+    });
+
+    it('falls back to reportClientError when onError is not provided and signIn resolves with error', async () => {
+      const authError = new Error('Provider disabled');
+      mockSignInSocial.mockResolvedValue({ data: null, error: authError });
+
+      render(<SocialProviderButtons callbackURL="/" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /continue with facebook/i }));
+
+      expect(mockReportClientError).toHaveBeenCalledWith(authError, 'route');
+    });
+
+    it('does not call onError or reportClientError on a successful sign-in', async () => {
+      mockSignInSocial.mockResolvedValue({ data: { session: {} }, error: null });
+      const onError = vi.fn();
+
+      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(mockReportClientError).not.toHaveBeenCalled();
     });
   });
 });

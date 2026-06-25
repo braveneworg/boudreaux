@@ -144,49 +144,56 @@ vi.mock('@/app/components/ui/separator', () => ({
 
 // Mock SocialProviderButtons so we can test the form independently of its inner workings
 const mockSignInSocial = vi.fn();
+type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
+let capturedSocialOnError: ((provider: SocialProvider, error: unknown) => void) | undefined;
 vi.mock('@/app/components/auth/social-provider-buttons', () => ({
   SocialProviderButtons: ({
     callbackURL,
     className,
+    onError,
   }: {
     callbackURL: string;
     className?: string;
-  }) => (
-    <div
-      data-testid="social-provider-buttons"
-      data-callback-url={callbackURL}
-      className={className}
-    >
-      <button
-        type="button"
-        data-testid="social-apple-btn"
-        onClick={() => mockSignInSocial({ provider: 'apple', callbackURL })}
+    onError?: (provider: SocialProvider, error: unknown) => void;
+  }) => {
+    capturedSocialOnError = onError;
+    return (
+      <div
+        data-testid="social-provider-buttons"
+        data-callback-url={callbackURL}
+        className={className}
       >
-        Continue with Apple
-      </button>
-      <button
-        type="button"
-        data-testid="social-google-btn"
-        onClick={() => mockSignInSocial({ provider: 'google', callbackURL })}
-      >
-        Continue with Google
-      </button>
-      <button
-        type="button"
-        data-testid="social-facebook-btn"
-        onClick={() => mockSignInSocial({ provider: 'facebook', callbackURL })}
-      >
-        Continue with Facebook
-      </button>
-      <button
-        type="button"
-        data-testid="social-twitter-btn"
-        onClick={() => mockSignInSocial({ provider: 'twitter', callbackURL })}
-      >
-        Continue with X (Twitter)
-      </button>
-    </div>
-  ),
+        <button
+          type="button"
+          data-testid="social-apple-btn"
+          onClick={() => mockSignInSocial({ provider: 'apple', callbackURL })}
+        >
+          Continue with Apple
+        </button>
+        <button
+          type="button"
+          data-testid="social-google-btn"
+          onClick={() => mockSignInSocial({ provider: 'google', callbackURL })}
+        >
+          Continue with Google
+        </button>
+        <button
+          type="button"
+          data-testid="social-facebook-btn"
+          onClick={() => mockSignInSocial({ provider: 'facebook', callbackURL })}
+        >
+          Continue with Facebook
+        </button>
+        <button
+          type="button"
+          data-testid="social-twitter-btn"
+          onClick={() => mockSignInSocial({ provider: 'twitter', callbackURL })}
+        >
+          Continue with X (Twitter)
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/app/components/ui/card', () => ({
@@ -367,6 +374,19 @@ describe('SignupSigninForm', () => {
       expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
       mockUsePathname.mockReturnValue('/signup');
     });
+
+    it('forwards onSocialError to SocialProviderButtons as onError', () => {
+      const onSocialError = vi.fn();
+      capturedSocialOnError = undefined;
+      render(<SignupSigninForm {...defaultProps} onSocialError={onSocialError} />);
+      expect(capturedSocialOnError).toBe(onSocialError);
+    });
+
+    it('does not forward onSocialError when prop is omitted', () => {
+      capturedSocialOnError = undefined;
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(capturedSocialOnError).toBeUndefined();
+    });
   });
 
   describe('divider between social and email sections', () => {
@@ -521,6 +541,13 @@ describe('SignupSigninForm', () => {
       const submitButton = screen.getByTestId('submit-button');
       expect(submitButton).toBeInTheDocument();
       expect(submitButton).toHaveTextContent(/email me a sign-in link/i);
+    });
+
+    it('submit button has type="submit" for explicit submit semantics', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+
+      const submitButton = screen.getByTestId('submit-button');
+      expect(submitButton).toHaveAttribute('type', 'submit');
     });
 
     it('should disable submit button when pending', () => {

@@ -9,7 +9,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
+import { toast } from 'sonner';
 
+import type { SocialProvider } from '@/app/components/auth/social-provider-buttons';
 import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
@@ -19,6 +21,7 @@ import { useSession } from '@/hooks/use-session';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
+import { reportClientError } from '@/lib/utils/report-client-error';
 import {
   signinSchema,
   type FormSchemaType as SigninSchemaType,
@@ -26,6 +29,13 @@ import {
 import { signupSchema } from '@/lib/validation/signup-schema';
 
 type CombinedFormSchema = SigninSchemaType & { termsAndConditions?: boolean };
+
+const getSocialProviderDisplayName = (provider: SocialProvider): string => {
+  if (provider === 'apple') return 'Apple';
+  if (provider === 'google') return 'Google';
+  if (provider === 'facebook') return 'Facebook';
+  return 'X (Twitter)';
+};
 
 const SignupPage = () => {
   const path = usePathname();
@@ -64,6 +74,13 @@ const SignupPage = () => {
     },
     resolver: zodResolver(isSignupPath ? signupSchema : signinSchema),
   });
+
+  const handleSocialError = useCallback((provider: SocialProvider, error: unknown): void => {
+    const providerName = getSocialProviderDisplayName(provider);
+    toast.error(`Couldn't start sign-in with ${providerName}. Please try again.`);
+    const err = error instanceof Error ? error : new Error(String(error));
+    reportClientError(err, 'route');
+  }, []);
 
   const handleSubmit = useCallback(
     async (data: CombinedFormSchema) => {
@@ -160,6 +177,7 @@ const SignupPage = () => {
                 state={state}
                 hasTermsAndConditions={isSignupPath}
                 callbackURL="/"
+                onSocialError={handleSocialError}
               />
             </form>
           </FormProvider>

@@ -8,12 +8,16 @@ import userEvent from '@testing-library/user-event';
 
 import SignupPage from './page';
 
+type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
+
 const usePathnameMock = vi.hoisted(() => vi.fn());
 const useRouterMock = vi.hoisted(() => vi.fn());
 const useSearchParamsMock = vi.hoisted(() => vi.fn());
 const useSessionMock = vi.hoisted(() => vi.fn());
 const signupActionMock = vi.hoisted(() => vi.fn());
 const signinActionMock = vi.hoisted(() => vi.fn());
+const toastErrorMock = vi.hoisted(() => vi.fn());
+const reportClientErrorMock = vi.hoisted(() => vi.fn());
 
 // Validated form values returned by the zodResolver mock on every submission.
 const resolvedFormData = vi.hoisted(() => ({
@@ -26,6 +30,14 @@ vi.mock('next/navigation', () => ({
   usePathname: () => usePathnameMock(),
   useRouter: () => useRouterMock(),
   useSearchParams: () => useSearchParamsMock(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { error: toastErrorMock },
+}));
+
+vi.mock('@/lib/utils/report-client-error', () => ({
+  reportClientError: reportClientErrorMock,
 }));
 
 vi.mock('@/app/hooks/use-session', () => ({
@@ -71,13 +83,17 @@ vi.mock('@/app/components/ui/page-container', () => ({
 // submit the surrounding <form> (which calls form.handleSubmit(handleSubmit)).
 let capturedSetIsVerified: ((v: boolean) => void) | null = null;
 let capturedOnToken: ((t: string) => void) | null = null;
+let capturedOnSocialError: ((provider: SocialProvider, error: unknown) => void) | undefined =
+  undefined;
 vi.mock('@/app/components/forms/signup-signin-form', () => ({
   SignupSigninForm: (props: {
     setIsVerified: (v: boolean) => void;
     onTurnstileToken?: (t: string) => void;
+    onSocialError?: (provider: SocialProvider, error: unknown) => void;
   }) => {
     capturedSetIsVerified = props.setIsVerified;
     capturedOnToken = props.onTurnstileToken ?? null;
+    capturedOnSocialError = props.onSocialError;
     return (
       <div data-testid="signup-signin-form">
         <button type="submit">Submit</button>
@@ -101,6 +117,9 @@ describe('SignupPage', () => {
     replaceMock.mockClear();
     signupActionMock.mockReset();
     signinActionMock.mockReset();
+    toastErrorMock.mockClear();
+    reportClientErrorMock.mockClear();
+    capturedOnSocialError = undefined;
     // Reset the shared form data between tests that mutate it.
     delete (resolvedFormData as Record<string, unknown>).nullField;
   });
@@ -275,6 +294,50 @@ describe('SignupPage', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('Form submission error:', expect.any(Error));
       });
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('social sign-in error handling', () => {
+    it('passes onSocialError to SignupSigninForm', () => {
+      render(<SignupPage />);
+      expect(capturedOnSocialError).toBeTypeOf('function');
+    });
+
+    it('shows a toast with the provider display name when onSocialError is invoked for apple', () => {
+      render(<SignupPage />);
+      capturedOnSocialError?.('apple', new Error('Auth failed'));
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Couldn't start sign-in with Apple. Please try again."
+      );
+    });
+
+    it('shows a toast with the provider display name when onSocialError is invoked for google', () => {
+      render(<SignupPage />);
+      capturedOnSocialError?.('google', new Error('Auth failed'));
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Couldn't start sign-in with Google. Please try again."
+      );
+    });
+
+    it('shows a toast with the provider display name when onSocialError is invoked for twitter', () => {
+      render(<SignupPage />);
+      capturedOnSocialError?.('twitter', new Error('Auth failed'));
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Couldn't start sign-in with X (Twitter). Please try again."
+      );
+    });
+
+    it('calls reportClientError when onSocialError is invoked', () => {
+      render(<SignupPage />);
+      const err = new Error('Provider config error');
+      capturedOnSocialError?.('facebook', err);
+      expect(reportClientErrorMock).toHaveBeenCalledWith(err, 'route');
+    });
+
+    it('wraps non-Error errors in an Error before reporting', () => {
+      render(<SignupPage />);
+      capturedOnSocialError?.('apple', 'string error');
+      expect(reportClientErrorMock).toHaveBeenCalledWith(expect.any(Error), 'route');
     });
   });
 });
