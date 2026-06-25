@@ -87,13 +87,16 @@ describe('sendChatMessageAction', () => {
 
     await sendChatMessageAction(validInput);
 
-    expect(ChatService.sendMessage).toHaveBeenCalledWith({
-      userId: 'user-1',
-      email: 'octo@example.com',
-      body: 'hello',
-      fingerprint: 'abcdef1234567890',
-      ip: '203.0.113.5',
-    });
+    expect(ChatService.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        email: 'octo@example.com',
+        body: 'hello',
+        fingerprint: 'abcdef1234567890',
+        ip: '203.0.113.5',
+        banned: false,
+      })
+    );
   });
 
   it('passes through rate_limited with retryAfterSeconds', async () => {

@@ -11,6 +11,16 @@ import { ChatAdminService, MAX_PER_PAGE } from './chat-admin-service';
 
 vi.mock('server-only', () => ({}));
 
+const banUserMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/auth', () => ({
+  auth: {
+    api: {
+      banUser: banUserMock,
+    },
+  },
+}));
+
 vi.mock('@/lib/repositories/chat-user-repository', () => ({
   ChatUserRepository: {
     findManyPaginated: vi.fn(),
@@ -302,8 +312,13 @@ describe('ChatAdminService.listUserMessages', () => {
 });
 
 describe('ChatAdminService.banIdentity', () => {
-  it('forwards all fields verbatim when present', async () => {
+  beforeEach(() => {
+    banUserMock.mockResolvedValue({ user: {} });
+  });
+
+  it('creates the BannedIdentity record with all fields when present', async () => {
     vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+    const adminHeaders = new Headers({ cookie: 'session=abc' });
 
     await ChatAdminService.banIdentity({
       userId: 'user-1',
@@ -311,6 +326,7 @@ describe('ChatAdminService.banIdentity', () => {
       fingerprintHash: 'fp-hash',
       adminId: 'admin-7',
       reason: 'evading prior ban',
+      adminHeaders,
     });
 
     expect(BannedIdentityRepository.create).toHaveBeenCalledWith({
@@ -322,12 +338,70 @@ describe('ChatAdminService.banIdentity', () => {
     });
   });
 
-  it('coerces missing userId / fingerprintHash / reason to null', async () => {
+  it('also calls the admin plugin banUser API when userId is present', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+    const adminHeaders = new Headers({ cookie: 'session=abc' });
+
+    await ChatAdminService.banIdentity({
+      userId: 'user-1',
+      email: 'baduser@example.com',
+      fingerprintHash: 'fp-hash',
+      adminId: 'admin-7',
+      reason: 'spamming',
+      adminHeaders,
+    });
+
+    expect(banUserMock).toHaveBeenCalledWith({
+      body: { userId: 'user-1', banReason: 'spamming' },
+      headers: adminHeaders,
+    });
+  });
+
+  it('maps a banDurationSeconds to banExpiresIn when provided', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+    const adminHeaders = new Headers();
+
+    await ChatAdminService.banIdentity({
+      userId: 'user-1',
+      email: 'baduser@example.com',
+      adminId: 'admin-7',
+      banDurationSeconds: 3600,
+      adminHeaders,
+    });
+
+    expect(banUserMock).toHaveBeenCalledWith({
+      body: { userId: 'user-1', banReason: undefined, banExpiresIn: 3600 },
+      headers: adminHeaders,
+    });
+  });
+
+  it('skips the admin plugin banUser call when no userId is supplied', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+    const adminHeaders = new Headers();
+
+    await ChatAdminService.banIdentity({
+      email: 'baduser@example.com',
+      adminId: 'admin-7',
+      adminHeaders,
+    });
+
+    expect(banUserMock).not.toHaveBeenCalled();
+    expect(BannedIdentityRepository.create).toHaveBeenCalledWith({
+      userId: null,
+      email: 'baduser@example.com',
+      fingerprintHash: null,
+      bannedByAdminId: 'admin-7',
+      reason: null,
+    });
+  });
+
+  it('coerces missing userId / fingerprintHash / reason to null in the repo call', async () => {
     vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
 
     await ChatAdminService.banIdentity({
       email: 'baduser@example.com',
       adminId: 'admin-7',
+      adminHeaders: new Headers(),
     });
 
     expect(BannedIdentityRepository.create).toHaveBeenCalledWith({

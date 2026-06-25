@@ -64,6 +64,7 @@ export const sendChatMessageAction = async (
     fingerprint: parsed.data.fingerprint,
     ip,
     tempId: parsed.data.tempId,
+    banned: session.user.banned ?? false,
   });
 
   if (!result.success) {
