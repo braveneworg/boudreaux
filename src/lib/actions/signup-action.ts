@@ -12,6 +12,7 @@ import { generateUsername } from 'unique-username-generator';
 
 import { auth } from '@/lib/auth';
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { SignupSettingsService } from '@/lib/services/signup-settings-service';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -106,6 +107,14 @@ export const signupAction = async (
       return {
         success: false,
         errors: { email: [emailValidation.error || 'Invalid email address'] },
+        fields: formState.fields,
+      };
+    }
+
+    if (await SignupSettingsService.areSignupsPaused()) {
+      return {
+        success: false,
+        errors: { general: ['Signups are temporarily paused. Please try again later.'] },
         fields: formState.fields,
       };
     }

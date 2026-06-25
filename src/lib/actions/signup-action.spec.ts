@@ -22,6 +22,7 @@ const mockHeaders = vi.hoisted(() =>
 );
 const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
 const mockLimiterCheck = vi.hoisted(() => vi.fn());
+const mockAreSignupsPaused = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -88,6 +89,12 @@ vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
 
 vi.mock('@/lib/validation/signup-schema');
 
+vi.mock('@/lib/services/signup-settings-service', () => ({
+  SignupSettingsService: {
+    areSignupsPaused: mockAreSignupsPaused,
+  },
+}));
+
 describe('signupAction', () => {
   const mockFormData = new FormData();
   const mockInitialState: FormState = {
@@ -106,6 +113,8 @@ describe('signupAction', () => {
     mockVerifyTurnstile.mockResolvedValue({ success: true });
     // Default to passing the rate limit (clearMocks resets the impl each test).
     mockLimiterCheck.mockResolvedValue(undefined);
+    // Default to signups NOT paused so existing tests are unaffected.
+    mockAreSignupsPaused.mockResolvedValue(false);
   });
 
   describe('successful signup flow', () => {
@@ -624,6 +633,45 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', 'anonymous');
+    });
+  });
+
+  describe('signups paused', () => {
+    const validSignupFormData = (): FormData => {
+      const fd = new FormData();
+      fd.set('email', 'test@example.com');
+      fd.set('termsAndConditions', 'true');
+      fd.set('cf-turnstile-response', 'test-turnstile-token');
+      return fd;
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: {
+          fields: { email: 'test@example.com', termsAndConditions: true },
+          success: false,
+          hasTimeout: false,
+          errors: {},
+        },
+        parsed: {
+          success: true,
+          data: { email: 'test@example.com', termsAndConditions: true },
+        },
+      });
+    });
+
+    it('returns the paused message and creates no user when signups are paused', async () => {
+      mockAreSignupsPaused.mockResolvedValue(true);
+      const result = await signupAction(mockInitialState, validSignupFormData());
+      expect(result.errors?.general?.[0]).toBe(
+        'Signups are temporarily paused. Please try again later.'
+      );
+    });
+
+    it('does not create a user when signups are paused', async () => {
+      mockAreSignupsPaused.mockResolvedValue(true);
+      await signupAction(mockInitialState, validSignupFormData());
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
   });
 
