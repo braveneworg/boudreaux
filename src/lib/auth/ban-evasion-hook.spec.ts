@@ -42,17 +42,18 @@ describe('assertNotBanEvading', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('throws when an active ban matches', async () => {
+  it('returns false when an active ban matches (graceful denial — no throw)', async () => {
     findActiveMatchMock.mockResolvedValue({ id: 'ban-1' });
 
-    await expect(assertNotBanEvading({ email: 'fan@example.com', userId: 'u1' })).rejects.toThrow();
+    const result = await assertNotBanEvading({ email: 'fan@example.com', userId: 'u1' });
+    expect(result).toBe(false);
   });
 
-  it('logs a warning when rejecting a banned identity', async () => {
+  it('logs a warning when denying a banned identity', async () => {
     const warnSpy = vi.spyOn(loggers.auth, 'warn').mockImplementation(() => {});
     findActiveMatchMock.mockResolvedValue({ id: 'ban-1' });
 
-    await expect(assertNotBanEvading({ email: 'fan@example.com', userId: 'u1' })).rejects.toThrow();
+    await assertNotBanEvading({ email: 'fan@example.com', userId: 'u1' });
 
     expect(warnSpy).toHaveBeenCalledWith(
       'Sign-in rejected for banned identity',
@@ -77,7 +78,7 @@ describe('assertNotBanEvading', () => {
     const warnSpy = vi.spyOn(loggers.auth, 'warn').mockImplementation(() => {});
     findActiveMatchMock.mockResolvedValue({ id: 'ban-1' });
 
-    await expect(assertNotBanEvading({ email: 'fan@example.com', userId: null })).rejects.toThrow();
+    await assertNotBanEvading({ email: 'fan@example.com', userId: null });
 
     expect(warnSpy).toHaveBeenCalledWith(
       'Sign-in rejected for banned identity',

@@ -117,12 +117,13 @@ export const auth = betterAuth({
     session: {
       create: {
         // Ban-evasion gate (010-chat-abuse-reporting): reject session creation
-        // for any userId/email matching an active BannedIdentity. Throwing here
-        // aborts the sign-in.
+        // for any userId/email matching an active BannedIdentity. Returning
+        // `false` is the better-auth clean-rejection idiom — it aborts the
+        // session create without treating it as an unexpected error.
         before: async (session) => {
           const userId = session.userId ?? null;
           const email = userId ? await resolveEmailForUser(userId) : null;
-          await assertNotBanEvading({ userId, email });
+          return assertNotBanEvading({ userId, email });
         },
       },
     },

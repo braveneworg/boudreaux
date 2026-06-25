@@ -15,22 +15,22 @@ export interface BanEvasionCheckParams {
 }
 
 /**
- * Ban-evasion gate (010-chat-abuse-reporting). Throws when the email or userId
- * matches an active {@link BannedIdentity}, which aborts session creation in the
- * better-auth `databaseHooks.session.create.before` hook.
+ * Ban-evasion gate (010-chat-abuse-reporting). Returns `false` when the email
+ * or userId matches an active {@link BannedIdentity}, which aborts session
+ * creation in the better-auth `databaseHooks.session.create.before` hook.
+ * Returning `false` is the documented clean-rejection idiom — `throw` is
+ * reserved for unexpected errors only.
  *
  * Fingerprint-based blocking happens at the request layer (`/api/chat/me`, chat
  * send) where headers are available — this gate only sees email + userId.
  *
  * Fails open on transient DB errors so a temporary outage does not lock everyone
  * out; the chat-time check still gates abuse.
- *
- * @throws When an active ban matches the supplied identity.
  */
 export const assertNotBanEvading = async ({
   email,
   userId,
-}: BanEvasionCheckParams): Promise<void> => {
+}: BanEvasionCheckParams): Promise<false | void> => {
   if (!email && !userId) return;
 
   try {
@@ -41,12 +41,9 @@ export const assertNotBanEvading = async ({
       maskedEmail: email ? `${email[0]}***` : null,
       userId: userId ?? undefined,
     });
-    throw new Error('Sign-in rejected for banned identity');
+    return false;
   } catch (error) {
-    // Re-throw our own rejection; only swallow unexpected (transient DB) errors.
-    if (error instanceof Error && error.message === 'Sign-in rejected for banned identity') {
-      throw error;
-    }
+    // Fail open on transient DB errors; the chat-time check still gates abuse.
     loggers.auth.error('Ban check failed; allowing sign-in', error);
   }
 };
