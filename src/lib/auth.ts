@@ -8,13 +8,13 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
 import { admin, magicLink } from 'better-auth/plugins';
 
-import { backfillUsername } from '@/lib/auth/backfill-username-hook';
 import { assertNotBanEvading } from '@/lib/auth/ban-evasion-hook';
 import { purchaseSessionPlugin } from '@/lib/auth/purchase-session-plugin';
 import {
   accountLinkingConfig,
   buildSocialProvidersConfig,
 } from '@/lib/auth/social-providers-config';
+import { userCreateBeforeHook } from '@/lib/auth/user-create-before-hook';
 import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
 import { prisma } from '@/lib/prisma';
 import { UserRepository } from '@/lib/repositories/user-repository';
@@ -131,13 +131,14 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // Backfill a placeholder username for users better-auth creates on its
-        // own paths (magic-link auto-create for an unknown email at /signin,
-        // OAuth first sign-in). `username` is `@unique`, so a null/absent value
-        // collides on the second such create — the prior Auth.js adapter
-        // backfilled one for exactly this reason. The signup action sets its own
-        // username, which is preserved.
-        before: async (user) => backfillUsername(user),
+        // Runs on every user better-auth creates on its own paths (magic-link
+        // auto-create for an unknown email at /signin, OAuth first sign-in).
+        // Aborts creation (returns false) when signups are paused; otherwise
+        // backfills a placeholder username. `username` is `@unique`, so a
+        // null/absent value collides on the second such create — the prior
+        // Auth.js adapter backfilled one for exactly this reason. The signup
+        // action sets its own username, which is preserved.
+        before: async (user) => userCreateBeforeHook(user),
       },
     },
     session: {

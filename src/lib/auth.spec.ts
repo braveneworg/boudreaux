@@ -23,6 +23,12 @@ vi.mock('@/lib/email/send-magic-link-email', () => ({ sendMagicLinkEmail: vi.fn(
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: { findEmailById: vi.fn() },
 }));
+vi.mock('@/lib/services/signup-settings-service', () => ({
+  SignupSettingsService: {
+    areSignupsPaused: vi.fn().mockResolvedValue(false),
+    isEnvForced: vi.fn(() => false),
+  },
+}));
 
 // A clearly-fake placeholder secret that is ≥32 chars (the validation
 // threshold). Built from a repeated filler so it carries no real entropy and
