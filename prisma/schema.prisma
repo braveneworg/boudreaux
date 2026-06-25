@@ -29,10 +29,6 @@ model User {
   banReason  String?
   banExpires DateTime?
 
-  // Security fields for account lockout
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-
   // Profile fields
   firstName             String?
   lastName              String?
@@ -75,8 +71,6 @@ model User {
   bannedIdentityActions   BannedIdentity[] @relation("BannedIdentityByAdmin")
 
   // Indexes for performance
-  @@index([failedLoginAttempts])
-  @@index([lockedUntil])
   @@index([role]) // Admin notification fan-out (findAdmins)
 }
 

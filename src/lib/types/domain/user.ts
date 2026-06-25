@@ -34,8 +34,6 @@ export type UserScalars = {
   banned: boolean | null;
   banReason: string | null;
   banExpires: Date | null;
-  failedLoginAttempts: number;
-  lockedUntil: Date | null;
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
