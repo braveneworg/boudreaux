@@ -87,13 +87,20 @@ const resolveCachedRole = async (request: NextRequest): Promise<string | undefin
  * Role-based authorization for `/admin` routes. Returns a response when the
  * request must be short-circuited (403), or `null` to allow it. Assumes a
  * session cookie is already present (the unauth case is handled earlier).
+ *
+ * This is an OPTIMISTIC edge gate: it only blocks when the cookie cache yields a
+ * definitive non-admin role. On a cache miss (`undefined` — cache expired,
+ * absent, or unreadable) it falls through and lets the authoritative
+ * server-side `withAdmin` check decide, so a valid admin is never hard-denied at
+ * the edge just because the cache wasn't populated.
  */
 const handleAdminAuthorization = async (
   request: NextRequest,
   pathname: string
 ): Promise<NextResponse | null> => {
   const userRole = await resolveCachedRole(request);
-  if (userRole === 'admin') {
+  // Admin via cache, or cache miss → allow through (authoritative check follows).
+  if (userRole === 'admin' || userRole === undefined) {
     return null;
   }
 
@@ -101,7 +108,7 @@ const handleAdminAuthorization = async (
   // logging service (the edge runtime keeps this minimal).
   console.warn('Unauthorized admin access attempt:', {
     attemptedPath: pathname,
-    userRole: userRole ?? 'none',
+    userRole,
     ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
     timestamp: new Date().toISOString(),
   });

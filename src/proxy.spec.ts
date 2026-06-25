@@ -371,20 +371,17 @@ describe('proxy middleware', () => {
       );
     });
 
-    it('logs unauthorized access with "none" role when the cache has no role', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn');
+    it('falls through (optimistic) when the cache yields no role', async () => {
+      // Cache miss must not hard-deny a possibly-valid admin at the edge; the
+      // authoritative withAdmin check decides server-side.
       signedIn();
       withCachedRole(undefined);
       const request = createMockRequest('/admin');
 
-      await middleware(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Unauthorized admin access attempt:',
-        expect.objectContaining({
-          userRole: 'none',
-        })
-      );
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
     });
 
     it('allows admin users to access admin routes', async () => {
@@ -409,14 +406,16 @@ describe('proxy middleware', () => {
       expect(result).toEqual({ type: 'next' });
     });
 
-    it('returns 403 when the cookie cache cannot be read for an admin route', async () => {
+    it('falls through (optimistic) when the cookie cache cannot be read', async () => {
+      // A null cache must not lock a real admin out at the edge.
       signedIn();
       vi.mocked(getCookieCache).mockResolvedValue(null);
       const request = createMockRequest('/admin');
 
       const result = await middleware(request as unknown as NextRequest);
 
-      expect(result).toMatchObject({ type: 'json', status: 403 });
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
     });
   });
 
