@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { BetterAuthPlugin } from 'better-auth';
+import type { BetterAuthPlugin, Session, User } from 'better-auth';
 
 vi.mock('server-only', () => ({}));
 
@@ -12,7 +12,9 @@ vi.mock('better-auth/cookies', () => ({
   setSessionCookie: vi.fn(),
 }));
 
-const { handlePurchaseSession, purchaseSessionPlugin } = await import('./purchase-session-plugin');
+const { setSessionCookie } = await import('better-auth/cookies');
+const { buildPurchaseSessionDeps, handlePurchaseSession, purchaseSessionPlugin } =
+  await import('./purchase-session-plugin');
 
 const fakeUser = { id: 'user-123', email: 'buyer@example.com' };
 const fakeSession = { token: 'sess-token', userId: 'user-123' };
@@ -46,6 +48,55 @@ describe('purchaseSessionPlugin', () => {
     const endpoint = (purchaseSessionPlugin as BetterAuthPlugin).endpoints?.createPurchaseSession;
     const metadata = endpoint?.options.metadata as { SERVER_ONLY?: boolean } | undefined;
     expect(metadata?.SERVER_ONLY).toBe(true);
+  });
+});
+
+describe('buildPurchaseSessionDeps', () => {
+  // A structural stand-in for the better-auth endpoint context: the deps only
+  // touch `body.userId` and `context.internalAdapter`. The real
+  // GenericEndpointContext cannot be constructed in a unit test, so the minimal
+  // shape is cast to the parameter type.
+  const makeCtx = () => {
+    const findUserById = vi.fn().mockResolvedValue(fakeUser);
+    const createSession = vi.fn().mockResolvedValue(fakeSession);
+    const ctx = {
+      body: { userId: 'user-123' },
+      context: { internalAdapter: { findUserById, createSession } },
+    } as unknown as Parameters<typeof buildPurchaseSessionDeps>[0];
+    return { ctx, findUserById, createSession };
+  };
+
+  it('carries the userId from the validated request body', () => {
+    const { ctx } = makeCtx();
+
+    expect(buildPurchaseSessionDeps(ctx).userId).toBe('user-123');
+  });
+
+  it('routes findUserById to the better-auth internal adapter', async () => {
+    const { ctx, findUserById } = makeCtx();
+
+    await buildPurchaseSessionDeps(ctx).findUserById('user-123');
+
+    expect(findUserById).toHaveBeenCalledWith('user-123');
+  });
+
+  it('routes createSession to the better-auth internal adapter', async () => {
+    const { ctx, createSession } = makeCtx();
+
+    await buildPurchaseSessionDeps(ctx).createSession('user-123');
+
+    expect(createSession).toHaveBeenCalledWith('user-123');
+  });
+
+  it('sets the cookie via better-auth setSessionCookie with the endpoint ctx', async () => {
+    const { ctx } = makeCtx();
+
+    await buildPurchaseSessionDeps(ctx).setCookie(
+      fakeSession as unknown as Session,
+      fakeUser as unknown as User
+    );
+
+    expect(setSessionCookie).toHaveBeenCalledWith(ctx, { session: fakeSession, user: fakeUser });
   });
 });
 

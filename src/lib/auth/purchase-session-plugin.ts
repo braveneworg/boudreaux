@@ -79,6 +79,33 @@ const createPurchaseSessionBodySchema = z.object({
  * cookie via the better-auth internal adapter and `setSessionCookie`. Because it
  * is HTTP-unreachable, accepting a raw userId here is safe.
  */
+/**
+ * The better-auth endpoint context the `createPurchaseSession` handler receives,
+ * narrowed to the `userId` body this endpoint validates. The base
+ * (`GenericEndpointContext`) is sourced from `setSessionCookie`'s own parameter
+ * so it can never drift from the installed better-auth version.
+ */
+type PurchaseSessionEndpointContext = Parameters<typeof setSessionCookie>[0] & {
+  body: { userId: string };
+};
+
+/**
+ * Adapt a better-auth endpoint `ctx` onto the {@link PurchaseSessionDeps} the
+ * {@link handlePurchaseSession} core consumes. Extracted from the endpoint
+ * handler so the ctx→internal-adapter wiring (session creation runs the
+ * ban-evasion `session.create.before` hook; the cookie is set via the supported
+ * `setSessionCookie` helper) is unit-testable without standing up a full
+ * better-auth endpoint context and a live Mongo adapter.
+ */
+export const buildPurchaseSessionDeps = (
+  ctx: PurchaseSessionEndpointContext
+): PurchaseSessionDeps => ({
+  userId: ctx.body.userId,
+  findUserById: (userId) => ctx.context.internalAdapter.findUserById(userId),
+  createSession: (userId) => ctx.context.internalAdapter.createSession(userId),
+  setCookie: (session, user) => setSessionCookie(ctx, { session, user }),
+});
+
 export const purchaseSessionPlugin = {
   id: 'purchase-session',
   endpoints: {
@@ -87,15 +114,7 @@ export const purchaseSessionPlugin = {
         method: 'POST',
         body: createPurchaseSessionBodySchema,
       },
-      async (ctx) => {
-        const result = await handlePurchaseSession({
-          userId: ctx.body.userId,
-          findUserById: (userId) => ctx.context.internalAdapter.findUserById(userId),
-          createSession: (userId) => ctx.context.internalAdapter.createSession(userId),
-          setCookie: (session, user) => setSessionCookie(ctx, { session, user }),
-        });
-        return ctx.json(result);
-      }
+      async (ctx) => ctx.json(await handlePurchaseSession(buildPurchaseSessionDeps(ctx)))
     ),
   },
 } satisfies BetterAuthPlugin;
