@@ -31,9 +31,11 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   DOWNLOAD_LIMIT: 10,
 }));
 
-const mockGetToken = vi.fn();
-vi.mock('next-auth/jwt', () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
+// Bundle download auth now reads the better-auth session (no next-auth JWT).
+// `mockGetSession` returns `{ user: { id } } | null`, matching `auth.api.getSession`.
+const mockGetSession = vi.fn();
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { getSession: (...args: unknown[]) => mockGetSession(...args) } },
 }));
 
 const mockGetDownloadAccess = vi.fn();
@@ -273,7 +275,7 @@ const readSSEEvents = async (
 
 describe('GET /api/releases/[id]/download/bundle', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue({ sub: 'user-123' });
+    mockGetSession.mockResolvedValue({ user: { id: 'user-123' } });
     mockGetDownloadAccess.mockResolvedValue({
       allowed: true,
       reason: null,
@@ -316,7 +318,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should return 401 when user is not authenticated', async () => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -325,8 +327,8 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(body.error).toBe('UNAUTHORIZED');
   });
 
-  it('should return 401 when token has no sub', async () => {
-    mockGetToken.mockResolvedValue({ sub: undefined });
+  it('should return 401 when the session has no user id', async () => {
+    mockGetSession.mockResolvedValue({ user: { id: undefined } });
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -995,36 +997,23 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(mockAppend).toHaveBeenCalledTimes(3);
   });
 
-  it('should use secure cookie name when NODE_ENV is production and E2E_MODE is not true', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('E2E_MODE', '');
+  it('authenticates by reading the better-auth session from the request headers', async () => {
+    const request = makeRequest();
 
-    await GET(makeRequest(), makeParams());
+    await GET(request, makeParams());
 
-    expect(mockGetToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cookieName: '__Secure-next-auth.session-token',
-        secureCookie: true,
-      })
-    );
-
-    vi.unstubAllEnvs();
+    // better-auth owns cookie naming/secure-prefix selection internally; the
+    // route only forwards the request headers so the session cookie is honored.
+    expect(mockGetSession).toHaveBeenCalledWith({ headers: request.headers });
   });
 
-  it('should use non-secure cookie name when NODE_ENV is production but E2E_MODE is true', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('E2E_MODE', 'true');
+  it('proceeds for a paid download when the better-auth session has a user id', async () => {
+    mockGetSession.mockResolvedValue({ user: { id: 'user-123' } });
 
-    await GET(makeRequest(), makeParams());
+    const response = await GET(makeRequest(), makeParams());
 
-    expect(mockGetToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cookieName: 'next-auth.session-token',
-        secureCookie: false,
-      })
-    );
-
-    vi.unstubAllEnvs();
+    // A valid session with the entitlement reaches the 302 redirect to S3.
+    expect(response.status).toBe(302);
   });
 
   it('should fall back to formatType as folder name when FORMAT_LABELS has no entry', async () => {
@@ -1640,7 +1629,7 @@ const makeFreeRequest = (formats = 'MP3_320KBPS,AAC'): NextRequest =>
 describe('GET /api/releases/[id]/download/bundle (mode=free)', () => {
   beforeEach(() => {
     // Default: anonymous (no token) — free flow accepts this.
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     // resolveVisitorIdentity returns a fresh visitorId requiring cookie reissue.
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
@@ -1783,7 +1772,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free)', () => {
 
 describe('GET /api/releases/[id]/download/bundle (mode=free) — cap enforcement', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -1910,7 +1899,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — cap enforcement
 
 describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency lock + auth user', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -1971,7 +1960,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency loc
   });
 
   it('keys cap by userId (NOT visitorId) for authenticated free-flow users', async () => {
-    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    mockGetSession.mockResolvedValueOnce({ user: { id: 'user-123' } });
     await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
     expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1982,14 +1971,14 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency loc
   });
 
   it('does NOT issue the visitor cookie for authenticated free-flow users', async () => {
-    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    mockGetSession.mockResolvedValueOnce({ user: { id: 'user-123' } });
     await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
     expect(mockSetGuestVisitorIdCookie).not.toHaveBeenCalled();
     expect(mockResolveVisitorIdentity).not.toHaveBeenCalled();
   });
 
   it('uses subjectKey "user:<id>" in the lock key for authenticated users', async () => {
-    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    mockGetSession.mockResolvedValueOnce({ user: { id: 'user-123' } });
     await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
     expect(mockLockAcquire).toHaveBeenCalledWith(
       'user:user-123|507f1f77bcf86cd799439011|MP3_320KBPS'
@@ -2003,7 +1992,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency loc
 
 describe('GET /api/releases/[id]/download/bundle (mode=free) — stream failure audit', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -2056,7 +2045,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — stream failure 
 
 describe('GET /api/releases/[id]/download/bundle (mode=free) — cross-release + identity-union', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -2144,7 +2133,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — cross-release +
 
 describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream parity', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -2304,7 +2293,7 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream 
 
 describe('GET /api/releases/[id]/download/bundle — preflight (respond=preflight)', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -2408,7 +2397,7 @@ const makeFreeStreamRequest = (formats = 'MP3_320KBPS'): NextRequest =>
 
 describe('GET /api/releases/[id]/download/bundle — additional branch coverage', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue(null);
     mockResolveVisitorIdentity.mockResolvedValue({
       primaryVisitorId: 'guest-visitor-1',
       allVisitorIds: ['guest-visitor-1'],
@@ -2692,7 +2681,7 @@ describe('GET /api/releases/[id]/download/bundle — additional branch coverage'
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Use the default (redirect) path. The first append emits an archiver error
     // which the `archive.on('error')` listener pipes into the PassThrough.
-    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    mockGetSession.mockResolvedValueOnce({ user: { id: 'user-123' } });
     mockGetDownloadAccess.mockResolvedValueOnce({
       allowed: true,
       reason: null,
