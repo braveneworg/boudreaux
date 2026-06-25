@@ -5,7 +5,13 @@
 
 import { toast } from 'sonner';
 
-import { AppleIcon, FacebookIcon, GoogleIcon, XIcon } from '@/app/components/ui/brand-icons';
+import {
+  AppleIcon,
+  FacebookIcon,
+  GoogleIcon,
+  XIcon,
+  type BrandIconProps,
+} from '@/app/components/ui/brand-icons';
 import { useConnectedAccounts } from '@/app/hooks/use-connected-accounts';
 import { authClient } from '@/lib/auth-client';
 import { log } from '@/lib/utils/console-logger';
@@ -34,7 +40,7 @@ interface ProviderConfig {
   provider: SocialProvider;
   providerId: string;
   label: string;
-  Icon: ({ className }: { className?: string }) => React.ReactElement;
+  Icon: (props: BrandIconProps) => React.ReactElement;
 }
 
 const PROVIDERS: ProviderConfig[] = [

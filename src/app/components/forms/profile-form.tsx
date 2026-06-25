@@ -6,7 +6,6 @@
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Separator } from '@radix-ui/react-separator';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -31,6 +30,7 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 import { changeUsernameSchema as usernameSchema } from '@/lib/validation/change-username-schema';
 import { profileSchema } from '@/lib/validation/profile-schema';
+import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 

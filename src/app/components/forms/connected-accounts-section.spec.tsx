@@ -65,7 +65,7 @@ describe('ConnectedAccountsSection', () => {
       const { container } = render(<ConnectedAccountsSection />);
 
       const skeletons = container.querySelectorAll('[data-slot="skeleton"], .animate-pulse');
-      expect(skeletons.length).toBeGreaterThanOrEqual(4);
+      expect(skeletons.length).toBe(4);
     });
 
     it('does not show provider names while loading', () => {

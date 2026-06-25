@@ -9,7 +9,7 @@
  * the accessible label.
  */
 
-interface BrandIconProps {
+export interface BrandIconProps {
   className?: string;
 }
 
