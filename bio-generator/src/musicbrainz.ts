@@ -71,6 +71,33 @@ const extractWikidataId = (resource: string): string | undefined => {
 };
 
 /**
+ * Walks the artist's url-relations once, collecting the Wikidata id and the
+ * Wikipedia/official/social links (other kinds are dropped).
+ */
+const collectRelations = (
+  relations: MbLookupResponse['relations']
+): { wikidataId?: string; links: BioLink[] } => {
+  let wikidataId: string | undefined;
+  const links: BioLink[] = [];
+
+  for (const relation of relations ?? []) {
+    const resource = relation.url?.resource;
+    if (!resource) continue;
+
+    if (relation.type === 'wikidata') {
+      wikidataId = extractWikidataId(resource);
+    }
+
+    const kind = classifyRelation(relation.type);
+    if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
+      links.push({ label: relation.type, url: resource, kind });
+    }
+  }
+
+  return { wikidataId, links };
+};
+
+/**
  * Looks up an artist on MusicBrainz by name and resolves its external
  * relations (Wikidata id, official site, Wikipedia, socials).
  *
@@ -93,22 +120,7 @@ export const lookupArtist = async (
   const relUrl = `${MB_BASE}/artist/${top.id}?inc=url-rels+tags&fmt=json`;
   const relData = await request<MbLookupResponse>(relUrl, fetchFn);
 
-  let wikidataId: string | undefined;
-  const links: BioLink[] = [];
-
-  for (const relation of relData.relations ?? []) {
-    const resource = relation.url?.resource;
-    if (!resource) continue;
-
-    if (relation.type === 'wikidata') {
-      wikidataId = extractWikidataId(resource);
-    }
-
-    const kind = classifyRelation(relation.type);
-    if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
-      links.push({ label: relation.type, url: resource, kind });
-    }
-  }
+  const { wikidataId, links } = collectRelations(relData.relations);
 
   links.push({
     label: 'MusicBrainz',

@@ -17,7 +17,10 @@ import { toast } from 'sonner';
 
 import type { MentionMatch } from '@/hooks/use-mention-search-query';
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
-import { sendChatMessageAction } from '@/lib/actions/send-chat-message-action';
+import {
+  sendChatMessageAction,
+  type SendChatMessageActionResult,
+} from '@/lib/actions/send-chat-message-action';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +47,65 @@ const VERTICAL_PADDING_PX = 16; // py-2 (8px top + 8px bottom)
 const SEND_TIMEOUT_MS = 10_000;
 
 const newTempId = (): string => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+type SendFailure = Extract<SendChatMessageActionResult, { success: false }>;
+
+interface MentionKeyHandlers {
+  matches: MentionMatch[];
+  activeIndex: number;
+  onMove: (updater: (index: number) => number) => void;
+  onChoose: (match: MentionMatch) => void;
+  onClose: () => void;
+}
+
+/**
+ * Handle keyboard navigation while the mention autocomplete is open. Returns
+ * `true` when the key was consumed (caller should stop), `false` to let the
+ * key fall through to the composer (e.g. Enter/Tab with no available choice).
+ */
+const handleMentionNavigation = (
+  event: KeyboardEvent<HTMLTextAreaElement>,
+  { matches, activeIndex, onMove, onChoose, onClose }: MentionKeyHandlers
+): boolean => {
+  const count = matches.length;
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    onMove((i) => (i + 1) % count);
+    return true;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    onMove((i) => (i - 1 + count) % count);
+    return true;
+  }
+  if (event.key === 'Enter' || event.key === 'Tab') {
+    const choice = matches.at(activeIndex);
+    if (choice) {
+      event.preventDefault();
+      onChoose(choice);
+      return true;
+    }
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    onClose();
+    return true;
+  }
+  return false;
+};
+
+/** Surface a user-facing toast for a failed send, keyed on the error code. */
+const notifyChatSendFailure = (result: SendFailure): void => {
+  if (result.error === 'rate_limited') {
+    toast.error(`Slow down — try again in ${result.retryAfterSeconds ?? 'a few'} seconds.`);
+  } else if (result.error === 'disabled') {
+    toast.error('Chat access has been disabled for your account.');
+  } else if (result.error === 'unauthorized') {
+    toast.error('Please sign in to chat.');
+  } else {
+    toast.error('Message could not be sent.');
+  }
+};
 
 /**
  * Locate the active `@username` token at the caret. Returns the token
@@ -191,15 +253,7 @@ export const ChatInput = ({
         return;
       }
       onSendFailed(tempId);
-      if (result.error === 'rate_limited') {
-        toast.error(`Slow down — try again in ${result.retryAfterSeconds ?? 'a few'} seconds.`);
-      } else if (result.error === 'disabled') {
-        toast.error('Chat access has been disabled for your account.');
-      } else if (result.error === 'unauthorized') {
-        toast.error('Please sign in to chat.');
-      } else {
-        toast.error('Message could not be sent.');
-      }
+      notifyChatSendFailure(result);
     } catch (error) {
       console.error('Chat send failed', error);
       onSendFailed(tempId);
@@ -224,30 +278,14 @@ export const ChatInput = ({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (mention && mentionMatchesRef.current.length > 0) {
-      const count = mentionMatchesRef.current.length;
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        setMentionActiveIndex((i) => (i + 1) % count);
-        return;
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        setMentionActiveIndex((i) => (i - 1 + count) % count);
-        return;
-      }
-      if (event.key === 'Enter' || event.key === 'Tab') {
-        const choice = mentionMatchesRef.current.at(mentionActiveIndex);
-        if (choice) {
-          event.preventDefault();
-          insertMention(choice);
-          return;
-        }
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setMention(null);
-        return;
-      }
+      const handled = handleMentionNavigation(event, {
+        matches: mentionMatchesRef.current,
+        activeIndex: mentionActiveIndex,
+        onMove: setMentionActiveIndex,
+        onChoose: insertMention,
+        onClose: () => setMention(null),
+      });
+      if (handled) return;
     }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();

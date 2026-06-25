@@ -16,26 +16,93 @@
 
 import { PrismaClient } from '@prisma/client';
 
+import type { Prisma } from '@prisma/client';
+
 const prisma = new PrismaClient();
 const isDryRun = process.argv.includes('--dry-run');
+
+/** The artist fields selected for display/connection below. */
+interface SelectedArtist {
+  id: string;
+  displayName: string | null;
+  firstName: string | null;
+  surname: string | null;
+}
+
+/** The include shape used to load featured artists with their (release) artists. */
+const featuredArtistInclude = {
+  artists: { select: { id: true, displayName: true, firstName: true, surname: true } },
+  release: {
+    include: {
+      artistReleases: {
+        include: {
+          artist: { select: { id: true, displayName: true, firstName: true, surname: true } },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.FeaturedArtistInclude;
+
+type FeaturedArtistWithArtists = Prisma.FeaturedArtistGetPayload<{
+  include: typeof featuredArtistInclude;
+}>;
+
+/** A human-friendly artist label: display name, else full name, else id. */
+const artistLabel = (artist: SelectedArtist): string =>
+  artist.displayName || `${artist.firstName} ${artist.surname}`.trim() || artist.id;
+
+/** Comma-joined labels for a list of artists. */
+const artistNameList = (artists: SelectedArtist[]): string => artists.map(artistLabel).join(', ');
+
+/**
+ * Inspect one featured artist and, unless already connected or lacking release
+ * artists, connect its release's artists. Logs the outcome and returns whether
+ * a (would-be) fix was applied — extracted from main to keep complexity in check.
+ */
+const processFeaturedArtist = async (fa: FeaturedArtistWithArtists): Promise<boolean> => {
+  const name = fa.displayName || `(id: ${fa.id})`;
+  const releaseArtists = fa.release?.artistReleases?.map((ar) => ar.artist) ?? [];
+
+  if (fa.artists.length > 0) {
+    console.info(
+      `✓ ${name} — already has ${fa.artists.length} artist(s): ${artistNameList(fa.artists)}`
+    );
+    return false;
+  }
+
+  if (releaseArtists.length === 0) {
+    const reason = fa.releaseId ? ` (release: ${fa.releaseId})` : ' (no release linked)';
+    console.info(
+      `⚠ ${name} — no connected artists and no release artists to backfill from${reason}`
+    );
+    return false;
+  }
+
+  console.info(
+    `→ ${name} — connecting ${releaseArtists.length} artist(s): ${artistNameList(releaseArtists)}`
+  );
+
+  if (!isDryRun) {
+    // Set featuredArtistId on each Artist to link them to this FeaturedArtist
+    await prisma.featuredArtist.update({
+      where: { id: fa.id },
+      data: {
+        artists: {
+          connect: releaseArtists.map((a) => ({ id: a.id })),
+        },
+      },
+    });
+  }
+
+  return true;
+};
 
 const main = async () => {
   console.info(isDryRun ? '=== DRY RUN ===' : '=== LIVE RUN ===');
 
   // Find all featured artists with their connected artists and release artists
   const featuredArtists = await prisma.featuredArtist.findMany({
-    include: {
-      artists: { select: { id: true, displayName: true, firstName: true, surname: true } },
-      release: {
-        include: {
-          artistReleases: {
-            include: {
-              artist: { select: { id: true, displayName: true, firstName: true, surname: true } },
-            },
-          },
-        },
-      },
-    },
+    include: featuredArtistInclude,
   });
 
   console.info(`Found ${featuredArtists.length} featured artist(s)\n`);
@@ -43,43 +110,9 @@ const main = async () => {
   let fixedCount = 0;
 
   for (const fa of featuredArtists) {
-    const name = fa.displayName || `(id: ${fa.id})`;
-    const hasArtists = fa.artists.length > 0;
-    const releaseArtists = fa.release?.artistReleases?.map((ar) => ar.artist) ?? [];
-
-    if (hasArtists) {
-      const artistNames = fa.artists
-        .map((a) => a.displayName || `${a.firstName} ${a.surname}`.trim() || a.id)
-        .join(', ');
-      console.info(`✓ ${name} — already has ${fa.artists.length} artist(s): ${artistNames}`);
-      continue;
+    if (await processFeaturedArtist(fa)) {
+      fixedCount++;
     }
-
-    if (releaseArtists.length === 0) {
-      console.info(
-        `⚠ ${name} — no connected artists and no release artists to backfill from${fa.releaseId ? ` (release: ${fa.releaseId})` : ' (no release linked)'}`
-      );
-      continue;
-    }
-
-    const artistNames = releaseArtists
-      .map((a) => a.displayName || `${a.firstName} ${a.surname}`.trim() || a.id)
-      .join(', ');
-    console.info(`→ ${name} — connecting ${releaseArtists.length} artist(s): ${artistNames}`);
-
-    if (!isDryRun) {
-      // Set featuredArtistId on each Artist to link them to this FeaturedArtist
-      await prisma.featuredArtist.update({
-        where: { id: fa.id },
-        data: {
-          artists: {
-            connect: releaseArtists.map((a) => ({ id: a.id })),
-          },
-        },
-      });
-    }
-
-    fixedCount++;
   }
 
   console.info(`\n${isDryRun ? 'Would fix' : 'Fixed'} ${fixedCount} featured artist(s)`);

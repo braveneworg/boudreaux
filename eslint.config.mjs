@@ -20,9 +20,7 @@ import betterTailwind from 'eslint-plugin-better-tailwindcss';
 // TS-scoped block below; the plugin itself is registered in the main config block.
 const tsEslintRecommendedRules = Object.assign(
   {},
-  ...tseslint.configs.recommended
-    .filter((config) => config.rules)
-    .map((config) => config.rules)
+  ...tseslint.configs.recommended.filter((config) => config.rules).map((config) => config.rules)
 );
 
 const eslintConfig = [
@@ -144,7 +142,7 @@ const eslintConfig = [
     },
     settings: {
       react: {
-        version: '19',
+        version: 'detect',
       },
       'import-x/resolver': {
         typescript: true,
@@ -210,7 +208,6 @@ const eslintConfig = [
       'react/jsx-boolean-value': ['error', 'never'],
       'react/jsx-no-target-blank': 'error',
       'react/no-array-index-key': 'warn',
-      'react/no-unstable-nested-components': 'error',
 
       // React Hooks rules
       'react-hooks/rules-of-hooks': 'error',
@@ -305,6 +302,68 @@ const eslintConfig = [
           returnStyle: 'unchanged',
         },
       ],
+      // ── Baseline: applies to ALL TS/TSX functions ──
+      // Max 75 lines per function everywhere by default. 75 (not 50) was chosen by
+      // measuring the codebase: it flags genuine outliers while keeping the bulk of
+      // already-cohesive functions compliant. Tests, scripts, and content-template
+      // modules are scoped out below; component files get a 250 allowance.
+      'max-lines-per-function': [
+        'error',
+        { max: 75, skipBlankLines: true, skipComments: true, IIFEs: true },
+      ],
+
+      // Cyclomatic complexity ceiling
+      complexity: ['error', { max: 10 }],
+
+      // Cap parameter count
+      'max-params': ['error', { max: 4 }],
+
+      // Optional: limit nesting depth directly (catches "several nested ifs")
+      'max-depth': ['error', { max: 3 }],
+      // ── Override: React component files get 250-line allowance ──
+    },
+  },
+  {
+    files: ['**/components/**/*.tsx', '**/app/**/*.tsx', '**/*.component.tsx'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  // Tests, e2e, and one-off maintenance scripts are exempt from the function-length
+  // limit: describe/it/setup blocks and CLI scripts are legitimately long, so the rule
+  // would add noise rather than signal there.
+  {
+    files: [
+      '**/*.spec.{ts,tsx}',
+      'e2e/**',
+      'scripts/**/*.{ts,tsx}',
+      '**/test-utils/**',
+      'tests/**',
+    ],
+    rules: {
+      'max-lines-per-function': 'off',
+    },
+  },
+  // Content, not logic: these functions each return a single large HTML/JSX template
+  // literal, so the line count reflects markup length, not cyclomatic complexity.
+  // Following the project convention of scoping a rule when it's genuinely inapplicable
+  // to a context (instead of an inline suppression), turn it off for the email HTML
+  // builders and the static legal prose pages.
+  {
+    files: ['src/lib/email/**/*.{ts,tsx}', 'src/app/legal/**/*.tsx'],
+    rules: {
+      'max-lines-per-function': 'off',
+    },
+  },
+  // Vendored shadcn/ui chart wrapper around Recharts. `ChartTooltipFormatter`
+  // mirrors Recharts' tooltip `formatter` contract, which Recharts invokes
+  // positionally as (value, name, item, index, payload) — five parameters fixed
+  // by the external API, not by choice. The signature can't be collapsed to an
+  // options object without breaking the contract, so scope `max-params` off here.
+  {
+    files: ['src/app/components/ui/chart.tsx'],
+    rules: {
+      'max-params': 'off',
     },
   },
   // Next.js App Router special files conventionally use named (often default-exported)

@@ -35,7 +35,9 @@ import { fileURLToPath } from 'url';
 import {
   CopyObjectCommand,
   HeadObjectCommand,
+  type HeadObjectCommandOutput,
   ListObjectsV2Command,
+  type _Object,
   S3Client,
 } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
@@ -167,6 +169,135 @@ export const parseArgs = (args: string[]): ParsedArgs => {
   return result;
 };
 
+interface ProcessObjectOptions {
+  s3Client: S3Client;
+  bucket: string;
+  key: string;
+  size: number;
+  options: ParsedArgs;
+  result: ScanResult;
+}
+
+/**
+ * Apply the Cache-Control header to a single object via copy-to-self, recording
+ * the outcome on the shared result accumulator.
+ */
+const applyCacheHeaderToObject = async ({
+  s3Client,
+  bucket,
+  key,
+  size,
+  headResponse,
+  result,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  key: string;
+  size: number;
+  headResponse: HeadObjectCommandOutput;
+  result: ScanResult;
+}): Promise<void> => {
+  try {
+    await s3Client.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        CopySource: `${bucket}/${encodeURIComponent(key)}`,
+        ContentType: headResponse.ContentType,
+        CacheControl: CACHE_CONTROL_IMMUTABLE,
+        MetadataDirective: 'REPLACE',
+        // Preserve other important headers
+        ContentDisposition: headResponse.ContentDisposition,
+        ContentEncoding: headResponse.ContentEncoding,
+        ContentLanguage: headResponse.ContentLanguage,
+        Metadata: headResponse.Metadata,
+      })
+    );
+
+    result.updated++;
+    log(`updated  ${key}  ${formatBytes(size)}`, 'success');
+  } catch (error) {
+    result.failed++;
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    log(`FAILED   ${key}: ${msg}`, 'error');
+  }
+};
+
+/**
+ * Process a single S3 object: classify it, check its current Cache-Control,
+ * and (in apply mode) update it. Mutates the shared result accumulator.
+ */
+const processCacheObject = async ({
+  s3Client,
+  bucket,
+  key,
+  size,
+  options,
+  result,
+}: ProcessObjectOptions): Promise<void> => {
+  result.totalObjects++;
+
+  if (!isMediaFile(key)) {
+    return;
+  }
+
+  result.mediaObjects++;
+  result.totalSize += size;
+
+  // Check current Cache-Control header
+  const headResponse = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+
+  const currentCacheControl = headResponse.CacheControl;
+
+  if (currentCacheControl === CACHE_CONTROL_IMMUTABLE && !options.force) {
+    result.alreadyCached++;
+    log(`${colors.dim}skip${colors.reset}  ${key} (already set)`, 'dim');
+    return;
+  }
+
+  result.needsUpdate++;
+
+  if (!options.apply) {
+    const currentHeader = currentCacheControl || '(none)';
+    log(
+      `would update  ${key}  ${formatBytes(size)}  ${currentHeader} → ${CACHE_CONTROL_IMMUTABLE}`,
+      'info'
+    );
+    return;
+  }
+
+  await applyCacheHeaderToObject({ s3Client, bucket, key, size, headResponse, result });
+};
+
+/**
+ * Process every object in a single ListObjectsV2 page, skipping keyless entries.
+ */
+const processCachePage = async ({
+  s3Client,
+  bucket,
+  contents,
+  options,
+  result,
+}: {
+  s3Client: S3Client;
+  bucket: string;
+  contents: _Object[];
+  options: ParsedArgs;
+  result: ScanResult;
+}): Promise<void> => {
+  for (const object of contents) {
+    if (!object.Key) continue;
+    await processCacheObject({
+      s3Client,
+      bucket,
+      key: object.Key,
+      size: object.Size || 0,
+      options,
+      result,
+    });
+  }
+};
+
 /**
  * Apply Cache-Control headers to existing S3 objects.
  *
@@ -213,69 +344,7 @@ export const applyCacheHeaders = async (
       break;
     }
 
-    for (const object of listResponse.Contents) {
-      if (!object.Key) continue;
-      result.totalObjects++;
-
-      if (!isMediaFile(object.Key)) {
-        continue;
-      }
-
-      result.mediaObjects++;
-      result.totalSize += object.Size || 0;
-
-      // Check current Cache-Control header
-      const headResponse = await s3Client.send(
-        new HeadObjectCommand({ Bucket: bucket, Key: object.Key })
-      );
-
-      const currentCacheControl = headResponse.CacheControl;
-
-      if (currentCacheControl === CACHE_CONTROL_IMMUTABLE && !options.force) {
-        result.alreadyCached++;
-        log(`${colors.dim}skip${colors.reset}  ${object.Key} (already set)`, 'dim');
-        continue;
-      }
-
-      result.needsUpdate++;
-
-      const sizeFmt = formatBytes(object.Size || 0);
-      const currentHeader = currentCacheControl || '(none)';
-
-      if (!options.apply) {
-        log(
-          `would update  ${object.Key}  ${sizeFmt}  ${currentHeader} → ${CACHE_CONTROL_IMMUTABLE}`,
-          'info'
-        );
-        continue;
-      }
-
-      // Apply the header via copy-to-self
-      try {
-        await s3Client.send(
-          new CopyObjectCommand({
-            Bucket: bucket,
-            Key: object.Key,
-            CopySource: `${bucket}/${encodeURIComponent(object.Key)}`,
-            ContentType: headResponse.ContentType,
-            CacheControl: CACHE_CONTROL_IMMUTABLE,
-            MetadataDirective: 'REPLACE',
-            // Preserve other important headers
-            ContentDisposition: headResponse.ContentDisposition,
-            ContentEncoding: headResponse.ContentEncoding,
-            ContentLanguage: headResponse.ContentLanguage,
-            Metadata: headResponse.Metadata,
-          })
-        );
-
-        result.updated++;
-        log(`updated  ${object.Key}  ${sizeFmt}`, 'success');
-      } catch (error) {
-        result.failed++;
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        log(`FAILED   ${object.Key}: ${msg}`, 'error');
-      }
-    }
+    await processCachePage({ s3Client, bucket, contents: listResponse.Contents, options, result });
 
     continuationToken = listResponse.NextContinuationToken;
   } while (continuationToken);

@@ -11,7 +11,7 @@ import { GravatarAvatar } from '@/components/gravatar-avatar';
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import { cn } from '@/lib/utils';
 import { parseAdminMarkdown, type AdminMarkdownNode } from '@/lib/utils/admin-markdown';
-import { tokenizeMentions } from '@/lib/utils/mention-parsing';
+import { tokenizeMentions, type MentionToken } from '@/lib/utils/mention-parsing';
 
 interface ChatMessageRowProps {
   message: OptimisticChatMessage;
@@ -96,6 +96,152 @@ const formatTimestamp = (iso: string): { short: string; long: string } => {
   return { short, long };
 };
 
+interface ChatMessageHeaderProps {
+  isRight: boolean;
+  avatar: React.ReactNode;
+  username: React.ReactNode;
+  timestamp: React.ReactNode;
+  statusIcons: React.ReactNode;
+  pinIndicator?: React.ReactNode;
+}
+
+const ChatMessageHeader = ({
+  isRight,
+  avatar,
+  username,
+  timestamp,
+  statusIcons,
+  pinIndicator,
+}: ChatMessageHeaderProps) => {
+  const timestampGroup = (
+    <span className="inline-flex items-center gap-2">
+      {timestamp}
+      {statusIcons}
+    </span>
+  );
+  const identityGroup = (
+    <span className="inline-flex items-center gap-2">
+      {isRight ? (
+        <>
+          {username}
+          {avatar}
+        </>
+      ) : (
+        <>
+          {avatar}
+          {username}
+        </>
+      )}
+    </span>
+  );
+  return (
+    <header className="flex items-center justify-between gap-2 text-xs">
+      {isRight ? timestampGroup : identityGroup}
+      {pinIndicator && <span className="inline-flex items-center">{pinIndicator}</span>}
+      {isRight ? identityGroup : timestampGroup}
+    </header>
+  );
+};
+
+const AdminMarkdownBody = ({ nodes }: { nodes: AdminMarkdownNode[] }): React.ReactNode[] =>
+  nodes.map((node, idx) => {
+    const key = `md-${idx}`;
+    if (node.kind === 'bold') {
+      return <strong key={key}>{renderMentionTokens(node.value, key)}</strong>;
+    }
+    if (node.kind === 'em') {
+      return <em key={key}>{renderMentionTokens(node.value, key)}</em>;
+    }
+    if (node.kind === 'link') {
+      return (
+        <a
+          key={key}
+          href={node.href}
+          {...(node.external ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}
+          className="text-zinc-950 underline underline-offset-2"
+        >
+          {renderMentionTokens(node.text, key)}
+          {node.external && (
+            <ExternalLink
+              aria-label="opens in a new tab"
+              className="ml-0.5 inline size-3 align-[-1px]"
+            />
+          )}
+        </a>
+      );
+    }
+    return <span key={key}>{renderMentionTokens(node.value, key)}</span>;
+  });
+
+const PlainBody = ({
+  bodyTokens,
+}: {
+  bodyTokens: { token: MentionToken; key: string }[];
+}): React.ReactNode[] =>
+  bodyTokens.map(({ token, key }) =>
+    token.kind === 'mention' ? (
+      <span
+        key={key}
+        data-mention-username={token.username.toLowerCase()}
+        className="font-bold text-zinc-950"
+      >
+        {token.value}
+      </span>
+    ) : (
+      <span key={key}>{token.value}</span>
+    )
+  );
+
+interface ChatMessageBodyProps {
+  isRight: boolean;
+  adminNodes: AdminMarkdownNode[] | null;
+  bodyTokens: { token: MentionToken; key: string }[];
+  mentionedUsernames: string[];
+}
+
+const ChatMessageBody = ({
+  isRight,
+  adminNodes,
+  bodyTokens,
+  mentionedUsernames,
+}: ChatMessageBodyProps) => (
+  <p
+    className={cn(
+      'text-foreground text-sm wrap-break-word whitespace-pre-wrap',
+      isRight ? 'pr-8' : 'pl-8'
+    )}
+    data-mention-targets={mentionedUsernames.join(' ')}
+  >
+    {adminNodes ? <AdminMarkdownBody nodes={adminNodes} /> : <PlainBody bodyTokens={bodyTokens} />}
+  </p>
+);
+
+interface ChatAuthorNameProps {
+  username: string | null;
+  isAdmin: boolean;
+}
+
+const ChatAuthorName = ({ username, isAdmin }: ChatAuthorNameProps) => (
+  <span className="text-foreground font-medium">
+    {username ?? 'unknown'}
+    {isAdmin && <span className="ml-1 font-normal text-zinc-700">(moderator)</span>}
+  </span>
+);
+
+interface ChatStatusIconsProps {
+  isPending: boolean;
+  isFailed: boolean;
+}
+
+const ChatStatusIcons = ({ isPending, isFailed }: ChatStatusIconsProps) => (
+  <>
+    {isPending && (
+      <Loader2 aria-label="sending" className="text-muted-foreground size-3 animate-spin" />
+    )}
+    {isFailed && <AlertTriangle aria-label="send failed" className="text-destructive size-3" />}
+  </>
+);
+
 export const ChatMessageRow = ({
   message,
   reactionBar,
@@ -155,12 +301,7 @@ export const ChatMessageRow = ({
     />
   );
   const username = (
-    <span className="text-foreground font-medium">
-      {message.user.username ?? 'unknown'}
-      {message.user.role === 'admin' && (
-        <span className="ml-1 font-normal text-zinc-700">(moderator)</span>
-      )}
-    </span>
+    <ChatAuthorName username={message.user.username} isAdmin={message.user.role === 'admin'} />
   );
   const timestamp = (
     <time
@@ -172,14 +313,7 @@ export const ChatMessageRow = ({
       {formatted.short}
     </time>
   );
-  const statusIcons = (
-    <>
-      {isPending && (
-        <Loader2 aria-label="sending" className="text-muted-foreground size-3 animate-spin" />
-      )}
-      {isFailed && <AlertTriangle aria-label="send failed" className="text-destructive size-3" />}
-    </>
-  );
+  const statusIcons = <ChatStatusIcons isPending={isPending} isFailed={isFailed} />;
 
   return (
     <article
@@ -193,86 +327,21 @@ export const ChatMessageRow = ({
         isFailed && 'bg-destructive/5'
       )}
     >
-      <header className="flex items-center justify-between gap-2 text-xs">
-        {isRight ? (
-          <>
-            <span className="inline-flex items-center gap-2">
-              {timestamp}
-              {statusIcons}
-            </span>
-            {pinIndicator && <span className="inline-flex items-center">{pinIndicator}</span>}
-            <span className="inline-flex items-center gap-2">
-              {username}
-              {avatar}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="inline-flex items-center gap-2">
-              {avatar}
-              {username}
-            </span>
-            {pinIndicator && <span className="inline-flex items-center">{pinIndicator}</span>}
-            <span className="inline-flex items-center gap-2">
-              {timestamp}
-              {statusIcons}
-            </span>
-          </>
-        )}
-      </header>
+      <ChatMessageHeader
+        isRight={isRight}
+        avatar={avatar}
+        username={username}
+        timestamp={timestamp}
+        statusIcons={statusIcons}
+        pinIndicator={pinIndicator}
+      />
 
-      <p
-        className={cn(
-          'text-foreground text-sm wrap-break-word whitespace-pre-wrap',
-          isRight ? 'pr-8' : 'pl-8'
-        )}
-        data-mention-targets={mentionedUsernames.join(' ')}
-      >
-        {adminNodes
-          ? adminNodes.map((node, idx) => {
-              const key = `md-${idx}`;
-              if (node.kind === 'bold') {
-                return <strong key={key}>{renderMentionTokens(node.value, key)}</strong>;
-              }
-              if (node.kind === 'em') {
-                return <em key={key}>{renderMentionTokens(node.value, key)}</em>;
-              }
-              if (node.kind === 'link') {
-                return (
-                  <a
-                    key={key}
-                    href={node.href}
-                    {...(node.external
-                      ? { target: '_blank', rel: 'noopener noreferrer nofollow' }
-                      : {})}
-                    className="text-zinc-950 underline underline-offset-2"
-                  >
-                    {renderMentionTokens(node.text, key)}
-                    {node.external && (
-                      <ExternalLink
-                        aria-label="opens in a new tab"
-                        className="ml-0.5 inline size-3 align-[-1px]"
-                      />
-                    )}
-                  </a>
-                );
-              }
-              return <span key={key}>{renderMentionTokens(node.value, key)}</span>;
-            })
-          : bodyTokens.map(({ token, key }) =>
-              token.kind === 'mention' ? (
-                <span
-                  key={key}
-                  data-mention-username={token.username.toLowerCase()}
-                  className="font-bold text-zinc-950"
-                >
-                  {token.value}
-                </span>
-              ) : (
-                <span key={key}>{token.value}</span>
-              )
-            )}
-      </p>
+      <ChatMessageBody
+        isRight={isRight}
+        adminNodes={adminNodes}
+        bodyTokens={bodyTokens}
+        mentionedUsernames={mentionedUsernames}
+      />
 
       {reactionBar && (
         <div className={cn('flex items-center gap-2', isRight ? 'pr-8' : 'pl-8')}>

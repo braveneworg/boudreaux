@@ -13,6 +13,7 @@ import { AbuseReportService } from '@/lib/services/abuse-report-service';
 import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
 import { loggers } from '@/lib/utils/logger';
 import { computeFingerprintHash } from '@/lib/utils/visitor-fingerprint';
+import { fieldErrorsFromZodIssues } from '@/lib/utils/zod-field-errors';
 import {
   submitAbuseReportSchema,
   type SubmitAbuseReportInput,
@@ -48,14 +49,8 @@ export const submitAbuseReportAction = async (
 
   const parsed = submitAbuseReportSchema.safeParse(input);
   if (!parsed.success) {
-    const fieldErrors = new Map<string, string[]>();
-    for (const issue of parsed.error.issues) {
-      const key = issue.path.join('.') || '_form';
-      const messages = fieldErrors.get(key) ?? [];
-      messages.push(issue.message);
-      fieldErrors.set(key, messages);
-    }
-    return { success: false, error: 'invalid', fieldErrors: Object.fromEntries(fieldErrors) };
+    const fieldErrors = fieldErrorsFromZodIssues(parsed.error.issues, { formKey: '_form' });
+    return { success: false, error: 'invalid', fieldErrors };
   }
 
   const headerList = await headers();

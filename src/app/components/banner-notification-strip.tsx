@@ -31,6 +31,40 @@ const SIZE_STYLES = new Map<BannerNotificationSize, { minHeight: string; body: s
 
 const DEFAULT_SIZE_STYLE = { minHeight: '2.5rem', body: 'px-4 py-2 text-sm' };
 
+interface BannerStripProps {
+  notification: BannerNotification;
+  /** Variant base classes (the outgoing strip is absolutely positioned). */
+  baseClassName: string;
+  /** Body spacing/typography classes for the active size. */
+  body: string;
+  /** CSS `animation` shorthand for this strip, or `undefined` when static. */
+  animation: string | undefined;
+}
+
+/**
+ * A single sanitized notification strip with the author's colors and dark/light
+ * link styling. Shared by the incoming (`active`) and outgoing strips so the
+ * color/animation logic lives in one place. The caller sets `key` to restart
+ * the slide animation on swap.
+ */
+const BannerStrip = ({ notification, baseClassName, body, animation }: BannerStripProps) => (
+  <div
+    className={cn(
+      baseClassName,
+      body,
+      isDarkColor(notification.backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
+    )}
+    style={{
+      color: notification.textColor ?? undefined,
+      backgroundColor: notification.backgroundColor ?? 'transparent',
+      ...(animation ? { animation } : {}),
+    }}
+    dangerouslySetInnerHTML={{
+      __html: addLinkAttributes(sanitizeNotificationHtml(notification.content)),
+    }}
+  />
+);
+
 interface BannerNotificationStripProps {
   /** The notification on screen (the incoming one during a transition). */
   active: BannerNotification | null;
@@ -74,6 +108,9 @@ export const BannerNotificationStrip = ({
   size = 'default',
 }: BannerNotificationStripProps) => {
   const { minHeight, body } = SIZE_STYLES.get(size) ?? DEFAULT_SIZE_STYLE;
+  const activeAnimation = isTransitioning
+    ? `banner-strip-slide-right ${transitionDurationMs}ms ${easing}`
+    : undefined;
 
   return (
     <div
@@ -86,42 +123,22 @@ export const BannerNotificationStrip = ({
     >
       {/* Outgoing strip — slides out to the right during transitions */}
       {isTransitioning && outgoing && (
-        <div
+        <BannerStrip
           key={outgoingKey}
-          className={cn(
-            'banner-strip-slide absolute inset-0 w-full text-center',
-            body,
-            isDarkColor(outgoing.backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
-          )}
-          style={{
-            color: outgoing.textColor ?? undefined,
-            backgroundColor: outgoing.backgroundColor ?? 'transparent',
-            animation: `banner-strip-exit-right ${transitionDurationMs}ms ${easing} forwards`,
-          }}
-          dangerouslySetInnerHTML={{
-            __html: addLinkAttributes(sanitizeNotificationHtml(outgoing.content)),
-          }}
+          notification={outgoing}
+          baseClassName="banner-strip-slide absolute inset-0 w-full text-center"
+          body={body}
+          animation={`banner-strip-exit-right ${transitionDurationMs}ms ${easing} forwards`}
         />
       )}
       {/* Incoming strip — slides in from the left; static when not transitioning */}
       {active && (
-        <div
+        <BannerStrip
           key={activeKey}
-          className={cn(
-            'banner-strip-slide w-full text-center',
-            body,
-            isDarkColor(active.backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
-          )}
-          style={{
-            color: active.textColor ?? undefined,
-            backgroundColor: active.backgroundColor ?? 'transparent',
-            ...(isTransitioning
-              ? { animation: `banner-strip-slide-right ${transitionDurationMs}ms ${easing}` }
-              : {}),
-          }}
-          dangerouslySetInnerHTML={{
-            __html: addLinkAttributes(sanitizeNotificationHtml(active.content)),
-          }}
+          notification={active}
+          baseClassName="banner-strip-slide w-full text-center"
+          body={body}
+          animation={activeAnimation}
         />
       )}
     </div>

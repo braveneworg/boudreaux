@@ -5,16 +5,20 @@
 
 import 'server-only';
 
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 import { encode } from '@auth/core/jwt';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
 import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
+
+import {
+  isPurchaseSessionRateLimited,
+  isValidCheckoutSessionId,
+} from './create-purchase-session-action-helpers';
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
@@ -73,16 +77,11 @@ export const createPurchaseSessionAction = async (
 
   // Rate limit unauthenticated callers (E2E shards share one IP, so the
   // harness opts out the same way withRateLimit does).
-  if (process.env.E2E_MODE !== 'true') {
-    const ip = extractClientIpFromHeaders(await headers());
-    try {
-      await limiter.check(5, ip);
-    } catch {
-      return { success: false, error: 'rate_limited' };
-    }
+  if (await isPurchaseSessionRateLimited(limiter)) {
+    return { success: false, error: 'rate_limited' };
   }
 
-  if (!sessionId || !sessionId.startsWith('cs_')) {
+  if (!isValidCheckoutSessionId(sessionId)) {
     return { success: false, error: 'invalid_session_id' };
   }
 

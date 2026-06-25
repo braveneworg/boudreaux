@@ -20,6 +20,7 @@ import {
   ListObjectsV2Command,
   HeadObjectCommand,
   DeleteObjectsCommand,
+  type DeleteObjectsCommandOutput,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import dotenv from 'dotenv';
@@ -92,6 +93,88 @@ const matchesGlob = (pattern: string, value: string): boolean => {
   }
 
   return true;
+};
+
+type LogType = 'info' | 'success' | 'warning' | 'error';
+
+interface LogLine {
+  message: string;
+  type: LogType;
+}
+
+/**
+ * Map an AWS error name to the user-facing diagnostic lines explaining the failure.
+ * Kept at module scope (it needs no instance state) so the calling method stays
+ * under the cyclomatic-complexity ceiling.
+ */
+const describeAwsCredentialError = (
+  errName: string | undefined,
+  fallbackMessage: string,
+  bucket: string
+): LogLine[] => {
+  if (errName === 'NoSuchBucket') {
+    return [
+      { message: `S3 bucket '${bucket}' does not exist or is not accessible`, type: 'error' },
+      {
+        message: 'Please verify the bucket name and that it exists in your AWS account',
+        type: 'error',
+      },
+    ];
+  }
+
+  if (errName === 'AccessDenied') {
+    return [
+      { message: 'AWS credentials do not have permission to access this S3 bucket', type: 'error' },
+      { message: 'Required permissions: s3:ListBucket, s3:PutObject, s3:GetObject', type: 'error' },
+    ];
+  }
+
+  if (errName === 'CredentialsProviderError' || errName === 'UnknownEndpoint') {
+    return [
+      { message: 'AWS credentials are invalid or not properly configured', type: 'error' },
+      { message: 'Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY', type: 'error' },
+    ];
+  }
+
+  if (errName === 'NetworkingError') {
+    return [
+      { message: 'Network error connecting to AWS. Check your internet connection', type: 'error' },
+    ];
+  }
+
+  return [
+    { message: `Unexpected error: ${fallbackMessage}`, type: 'error' },
+    { message: 'Please check your AWS configuration and try again', type: 'error' },
+  ];
+};
+
+/**
+ * Build the diagnostic lines describing the outcome of a DeleteObjects batch.
+ * Module-scope (no instance state) to keep the calling method under the
+ * cyclomatic-complexity ceiling.
+ */
+const summarizeDeleteResponse = (
+  deleteResponse: DeleteObjectsCommandOutput,
+  prefix: string
+): LogLine[] => {
+  const deletedCount = deleteResponse.Deleted?.length || 0;
+  const errors = deleteResponse.Errors || [];
+
+  const lines: LogLine[] = [
+    {
+      message: `Successfully deleted ${deletedCount} files from S3 (prefix: ${prefix})`,
+      type: 'success',
+    },
+  ];
+
+  if (errors.length > 0) {
+    lines.push({ message: `Failed to delete ${errors.length} files`, type: 'warning' });
+    errors.forEach((error) => {
+      lines.push({ message: `Error deleting ${error.Key}: ${error.Message}`, type: 'error' });
+    });
+  }
+
+  return lines;
 };
 
 class CDNSync {
@@ -202,24 +285,12 @@ class CDNSync {
 
       this.log(`AWS validation failed with error: ${err.name}`, 'error');
 
-      if (err.name === 'NoSuchBucket') {
-        this.log(
-          `S3 bucket '${this.config.s3Bucket}' does not exist or is not accessible`,
-          'error'
-        );
-        this.log('Please verify the bucket name and that it exists in your AWS account', 'error');
-      } else if (err.name === 'AccessDenied') {
-        this.log('AWS credentials do not have permission to access this S3 bucket', 'error');
-        this.log('Required permissions: s3:ListBucket, s3:PutObject, s3:GetObject', 'error');
-      } else if (err.name === 'CredentialsProviderError' || err.name === 'UnknownEndpoint') {
-        this.log('AWS credentials are invalid or not properly configured', 'error');
-        this.log('Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY', 'error');
-      } else if (err.name === 'NetworkingError') {
-        this.log('Network error connecting to AWS. Check your internet connection', 'error');
-      } else {
-        this.log(`Unexpected error: ${err.message || String(error)}`, 'error');
-        this.log('Please check your AWS configuration and try again', 'error');
-      }
+      const diagnostics = describeAwsCredentialError(
+        err.name,
+        err.message || String(error),
+        this.config.s3Bucket
+      );
+      diagnostics.forEach(({ message, type }) => this.log(message, type));
 
       // Additional debugging info
       this.log(`AWS Region: ${this.config.awsRegion}`, 'info');
@@ -483,17 +554,9 @@ class CDNSync {
 
       const deleteResponse = await this.s3Client.send(deleteCommand);
 
-      const deletedCount = deleteResponse.Deleted?.length || 0;
-      const errorCount = deleteResponse.Errors?.length || 0;
-
-      this.log(`Successfully deleted ${deletedCount} files from S3 (prefix: ${prefix})`, 'success');
-
-      if (errorCount > 0) {
-        this.log(`Failed to delete ${errorCount} files`, 'warning');
-        deleteResponse.Errors?.forEach((error) => {
-          this.log(`Error deleting ${error.Key}: ${error.Message}`, 'error');
-        });
-      }
+      summarizeDeleteResponse(deleteResponse, prefix).forEach(({ message, type }) =>
+        this.log(message, type)
+      );
 
       // Handle pagination if there are more than 1000 objects
       if (response.IsTruncated) {

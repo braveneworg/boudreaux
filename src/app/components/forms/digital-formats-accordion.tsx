@@ -18,12 +18,91 @@ import { Progress } from '@/app/components/ui/progress';
 import { Separator } from '@/app/components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
+import type { UploadState } from '@/types/digital-format';
 
 import { FormatAccordionItem } from './digital-formats/format-accordion-item';
 import { ReuploadConfirmDialog } from './digital-formats/reupload-confirm-dialog';
 import { useDigitalFormatUploads } from './digital-formats/use-digital-format-uploads';
 
 import type { DigitalFormatsAccordionProps } from './digital-formats/types';
+
+const DigitalFormatsDisabledCard = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Music className="h-5 w-5" />
+        Digital Formats
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <Accordion type="multiple" className="w-full">
+        {FORMAT_CONFIGS.map((config) => (
+          <AccordionItem key={config.type} value={config.type}>
+            <AccordionTrigger className="hover:no-underline" disabled>
+              <div className="flex w-full items-center gap-3 opacity-50">
+                <FileAudio className="h-5 w-5 text-zinc-950" />
+                <span className="font-medium">{config.label}</span>
+              </div>
+            </AccordionTrigger>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </CardContent>
+  </Card>
+);
+
+interface FormatBadgesProps {
+  successCount: number;
+  errorCount: number;
+  pendingCount: number;
+  totalFilesUploaded: number;
+}
+
+const FormatBadges = ({
+  successCount,
+  errorCount,
+  pendingCount,
+  totalFilesUploaded,
+}: FormatBadgesProps) => (
+  <div className="flex flex-wrap items-center gap-2 pt-2">
+    {successCount > 0 && (
+      <Badge variant="default" className="bg-green-500">
+        {successCount} {successCount === 1 ? 'format' : 'formats'} uploaded
+        {totalFilesUploaded > successCount && ` (${totalFilesUploaded} files)`}
+      </Badge>
+    )}
+    {errorCount > 0 && <Badge variant="destructive">{errorCount} failed</Badge>}
+    {pendingCount > 0 && <Badge variant="secondary">{pendingCount} remaining</Badge>}
+  </div>
+);
+
+interface UploadProgressBarProps {
+  getUploadState: (formatType: (typeof FORMAT_CONFIGS)[number]['type']) => UploadState;
+}
+
+const UploadProgressBar = ({ getUploadState }: UploadProgressBarProps) => {
+  const activeFormat = FORMAT_CONFIGS.find((c) => getUploadState(c.type).status === 'uploading');
+  const activeState = activeFormat ? getUploadState(activeFormat.type) : undefined;
+  const currentFile = activeState?.status === 'uploading' ? activeState.currentFile : 0;
+  const totalFiles = activeState?.status === 'uploading' ? activeState.totalFiles : 1;
+  const label = activeFormat?.label ?? 'format';
+  const progressValue = totalFiles > 0 ? Math.round((currentFile / totalFiles) * 100) : 0;
+
+  return (
+    <>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span>Uploading {label}...</span>
+          <span>
+            {currentFile} / {totalFiles} {totalFiles === 1 ? 'file' : 'files'}
+          </span>
+        </div>
+        <Progress value={progressValue} />
+      </div>
+      <Separator />
+    </>
+  );
+};
 
 export const DigitalFormatsAccordion = ({
   releaseId,
@@ -77,30 +156,7 @@ export const DigitalFormatsAccordion = ({
   );
 
   if (isDisabled) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Music className="h-5 w-5" />
-            Digital Formats
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Accordion type="multiple" className="w-full">
-            {FORMAT_CONFIGS.map((config) => (
-              <AccordionItem key={config.type} value={config.type}>
-                <AccordionTrigger className="hover:no-underline" disabled>
-                  <div className="flex w-full items-center gap-3 opacity-50">
-                    <FileAudio className="h-5 w-5 text-zinc-950" />
-                    <span className="font-medium">{config.label}</span>
-                  </div>
-                </AccordionTrigger>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </CardContent>
-      </Card>
-    );
+    return <DigitalFormatsDisabledCard />;
   }
 
   return (
@@ -119,48 +175,18 @@ export const DigitalFormatsAccordion = ({
             : 'Upload audio files in various formats for user downloads. Expand each format to upload or replace files.'}
         </CardDescription>
         {(successCount > 0 || errorCount > 0) && (
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            {successCount > 0 && (
-              <Badge variant="default" className="bg-green-500">
-                {successCount} {successCount === 1 ? 'format' : 'formats'} uploaded
-                {totalFilesUploaded > successCount && ` (${totalFilesUploaded} files)`}
-              </Badge>
-            )}
-            {errorCount > 0 && <Badge variant="destructive">{errorCount} failed</Badge>}
-            {pendingCount > 0 && <Badge variant="secondary">{pendingCount} remaining</Badge>}
-          </div>
+          <FormatBadges
+            successCount={successCount}
+            errorCount={errorCount}
+            pendingCount={pendingCount}
+            totalFilesUploaded={totalFilesUploaded}
+          />
         )}
       </CardHeader>
 
       <CardContent className="space-y-6">
         {/* Progress bar during active uploads — shows file-level batch progress */}
-        {isAnyUploading &&
-          (() => {
-            const activeFormat = FORMAT_CONFIGS.find((c) => {
-              const s = getUploadState(c.type);
-              return s.status === 'uploading';
-            });
-            const activeState = activeFormat ? getUploadState(activeFormat.type) : undefined;
-            const currentFile = activeState?.status === 'uploading' ? activeState.currentFile : 0;
-            const totalFiles = activeState?.status === 'uploading' ? activeState.totalFiles : 1;
-            const label = activeFormat?.label ?? 'format';
-            const progressValue = totalFiles > 0 ? Math.round((currentFile / totalFiles) * 100) : 0;
-
-            return (
-              <>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Uploading {label}...</span>
-                    <span>
-                      {currentFile} / {totalFiles} {totalFiles === 1 ? 'file' : 'files'}
-                    </span>
-                  </div>
-                  <Progress value={progressValue} />
-                </div>
-                <Separator />
-              </>
-            );
-          })()}
+        {isAnyUploading && <UploadProgressBar getUploadState={getUploadState} />}
 
         <Accordion type="single" collapsible className="w-full">
           {FORMAT_CONFIGS.map((config) => {

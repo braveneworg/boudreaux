@@ -29,49 +29,217 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
  * 5. Log download event
  * 6. Return signed URL
  */
+
+type FormatRecord = NonNullable<
+  Awaited<ReturnType<DownloadAuthorizationService['checkFormatExists']>>
+>;
+
+// Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
+// matching the `withRateLimit` decorator on the sibling free-status route.
+const enforceDownloadRateLimit = async (ip: string): Promise<NextResponse | null> => {
+  if (process.env.E2E_MODE === 'true') {
+    return null;
+  }
+  try {
+    await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+    return null;
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429 }
+    );
+  }
+};
+
+const validateDownloadParams = (releaseId: string, formatType: string): NextResponse | null => {
+  if (!isValidObjectId(releaseId)) {
+    return NextResponse.json(
+      { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
+      { status: 400 }
+    );
+  }
+  if (!VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'INVALID_FORMAT',
+        message: 'Invalid digital format type.',
+      },
+      { status: 400 }
+    );
+  }
+  return null;
+};
+
+const logFailedDownload = async (args: {
+  repo: DownloadEventRepository;
+  request: Request;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+  errorCode: string;
+}): Promise<void> => {
+  await args.repo.logDownloadEvent({
+    userId: args.userId,
+    releaseId: args.releaseId,
+    formatType: args.formatType,
+    success: false,
+    errorCode: args.errorCode,
+    ipAddress: args.request.headers.get('x-forwarded-for') ?? 'unknown',
+    userAgent: args.request.headers.get('user-agent') || 'unknown',
+  });
+};
+
+const enforceFreemiumQuota = async (args: {
+  quotaService: QuotaEnforcementService;
+  downloadEventRepo: DownloadEventRepository;
+  request: Request;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+}): Promise<NextResponse | null> => {
+  const { quotaService, downloadEventRepo, request, userId, releaseId, formatType } = args;
+  const quotaCheck = await quotaService.checkFreeDownloadQuota({ kind: 'user', userId }, releaseId);
+
+  if (!quotaCheck.allowed) {
+    await logFailedDownload({
+      repo: downloadEventRepo,
+      request,
+      userId,
+      releaseId,
+      formatType,
+      errorCode: 'QUOTA_EXCEEDED',
+    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'QUOTA_EXCEEDED',
+        message: `You have reached your free download limit (${MAX_FREE_DOWNLOAD_QUOTA} unique releases). Please purchase this release or contact support.`,
+        contactSupportUrl: '/support',
+      },
+      { status: 403 }
+    );
+  }
+
+  // Track new unique release download (skip if already downloaded)
+  if (quotaCheck.reason === 'WITHIN_QUOTA') {
+    await quotaService.incrementQuota({ kind: 'user', userId }, releaseId);
+  }
+
+  return null;
+};
+
+const enforceSoftDeleteGrace = async (args: {
+  authService: DownloadAuthorizationService;
+  downloadEventRepo: DownloadEventRepository;
+  request: Request;
+  format: FormatRecord;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+  hasPurchased: boolean;
+}): Promise<NextResponse | null> => {
+  const {
+    authService,
+    downloadEventRepo,
+    request,
+    format,
+    userId,
+    releaseId,
+    formatType,
+    hasPurchased,
+  } = args;
+  const withinGracePeriod = await authService.checkSoftDeleteGracePeriod(format);
+
+  if (!withinGracePeriod && !hasPurchased) {
+    await logFailedDownload({
+      repo: downloadEventRepo,
+      request,
+      userId,
+      releaseId,
+      formatType,
+      errorCode: 'DELETED',
+    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'DELETED',
+        message: 'This digital format is no longer available.',
+      },
+      { status: 410 }
+    );
+  }
+
+  // If purchased, allow download even if beyond grace period
+  // (This is a courtesy for purchasers to retain access to deleted formats)
+  return null;
+};
+
+const buildDownloadSuccess = async (args: {
+  authService: DownloadAuthorizationService;
+  downloadEventRepo: DownloadEventRepository;
+  request: Request;
+  format: FormatRecord;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+}): Promise<NextResponse> => {
+  const { authService, downloadEventRepo, request, format, userId, releaseId, formatType } = args;
+
+  if (!format.s3Key || !format.fileName) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'Format file data is incomplete.',
+      },
+      { status: 500 }
+    );
+  }
+
+  const downloadUrl = await authService.generateDownloadUrl(format.s3Key, format.fileName);
+
+  // Calculate expiration timestamp (24 hours from now)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  // Step 7: Log successful download event
+  await downloadEventRepo.logDownloadEvent({
+    userId,
+    releaseId,
+    formatType,
+    success: true,
+    ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
+    userAgent: request.headers.get('user-agent') || 'unknown',
+  });
+
+  // Step 8: Return success response
+  return NextResponse.json(
+    {
+      success: true,
+      downloadUrl,
+      expiresAt,
+      fileName: format.fileName,
+    },
+    { status: 200 }
+  );
+};
+
 export const GET = withLogging<{ id: string; formatType: string }>('DOWNLOADS')(
   withAuth<{ id: string; formatType: string }>(async (request, context, session) => {
     try {
-      // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
-      // matching the `withRateLimit` decorator on the sibling free-status route.
       const ip = extractClientIp(request);
-      if (process.env.E2E_MODE !== 'true') {
-        try {
-          await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-        } catch {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'RATE_LIMITED',
-              message: 'Too many requests. Please try again later.',
-            },
-            { status: 429 }
-          );
-        }
-      }
+      const rateLimitResponse = await enforceDownloadRateLimit(ip);
+      if (rateLimitResponse) return rateLimitResponse;
 
       const userId = session.user.id;
       const { id: releaseId, formatType } = await context.params;
 
-      // Validate IDs
-      if (!isValidObjectId(releaseId)) {
-        return NextResponse.json(
-          { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
-          { status: 400 }
-        );
-      }
-
-      // Validate formatType
-      if (!VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'INVALID_FORMAT',
-            message: 'Invalid digital format type.',
-          },
-          { status: 400 }
-        );
-      }
+      const paramResponse = validateDownloadParams(releaseId, formatType);
+      if (paramResponse) return paramResponse;
 
       // Initialize services and repositories
       const authService = new DownloadAuthorizationService();
@@ -100,107 +268,42 @@ export const GET = withLogging<{ id: string; formatType: string }>('DOWNLOADS')(
 
       // Step 4: If no purchase, check freemium quota
       if (!hasPurchased) {
-        const quotaCheck = await quotaService.checkFreeDownloadQuota(
-          { kind: 'user', userId },
-          releaseId
-        );
-
-        if (!quotaCheck.allowed) {
-          // Log failed download attempt
-          await downloadEventRepo.logDownloadEvent({
-            userId,
-            releaseId,
-            formatType: formatType as DigitalFormatType,
-            success: false,
-            errorCode: 'QUOTA_EXCEEDED',
-            ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
-            userAgent: request.headers.get('user-agent') || 'unknown',
-          });
-
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'QUOTA_EXCEEDED',
-              message: `You have reached your free download limit (${MAX_FREE_DOWNLOAD_QUOTA} unique releases). Please purchase this release or contact support.`,
-              contactSupportUrl: '/support',
-            },
-            { status: 403 }
-          );
-        }
-
-        // Track new unique release download (skip if already downloaded)
-        if (quotaCheck.reason === 'WITHIN_QUOTA') {
-          await quotaService.incrementQuota({ kind: 'user', userId }, releaseId);
-        }
+        const quotaResponse = await enforceFreemiumQuota({
+          quotaService,
+          downloadEventRepo,
+          request,
+          userId,
+          releaseId,
+          formatType: formatType as DigitalFormatType,
+        });
+        if (quotaResponse) return quotaResponse;
       }
 
       // Step 5: Check soft delete grace period (only if deletedAt is set)
       if (format.deletedAt) {
-        const withinGracePeriod = await authService.checkSoftDeleteGracePeriod(format);
-
-        if (!withinGracePeriod && !hasPurchased) {
-          // Log failed download attempt
-          await downloadEventRepo.logDownloadEvent({
-            userId,
-            releaseId,
-            formatType: formatType as DigitalFormatType,
-            success: false,
-            errorCode: 'DELETED',
-            ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
-            userAgent: request.headers.get('user-agent') || 'unknown',
-          });
-
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'DELETED',
-              message: 'This digital format is no longer available.',
-            },
-            { status: 410 }
-          );
-        }
-
-        // If purchased, allow download even if beyond grace period
-        // (This is a courtesy for purchasers to retain access to deleted formats)
+        const deleteResponse = await enforceSoftDeleteGrace({
+          authService,
+          downloadEventRepo,
+          request,
+          format,
+          userId,
+          releaseId,
+          formatType: formatType as DigitalFormatType,
+          hasPurchased,
+        });
+        if (deleteResponse) return deleteResponse;
       }
 
       // Step 6: Generate presigned download URL
-      if (!format.s3Key || !format.fileName) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'INTERNAL_ERROR',
-            message: 'Format file data is incomplete.',
-          },
-          { status: 500 }
-        );
-      }
-
-      const downloadUrl = await authService.generateDownloadUrl(format.s3Key, format.fileName);
-
-      // Calculate expiration timestamp (24 hours from now)
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-      // Step 7: Log successful download event
-      await downloadEventRepo.logDownloadEvent({
+      return buildDownloadSuccess({
+        authService,
+        downloadEventRepo,
+        request,
+        format,
         userId,
         releaseId,
         formatType: formatType as DigitalFormatType,
-        success: true,
-        ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
-        userAgent: request.headers.get('user-agent') || 'unknown',
       });
-
-      // Step 8: Return success response
-      return NextResponse.json(
-        {
-          success: true,
-          downloadUrl,
-          expiresAt,
-          fileName: format.fileName,
-        },
-        { status: 200 }
-      );
     } catch (error) {
       loggers.downloads.error('Download authorization error', error);
 

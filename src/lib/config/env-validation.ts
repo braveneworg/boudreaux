@@ -6,6 +6,50 @@
  * Run this early in the application lifecycle to catch configuration errors
  */
 
+/**
+ * Throw if any of the listed env vars is missing (absent or empty). Uses a Set
+ * of present keys so dynamic env names stay off plain-object access.
+ */
+const assertRequiredPresent = (required: string[]): void => {
+  const presentEnvKeys = new Set(
+    Object.entries(process.env)
+      .filter(([, value]) => Boolean(value))
+      .map(([key]) => key)
+  );
+  const missing = required.filter((key) => !presentEnvKeys.has(key));
+
+  if (missing.length > 0) {
+    throw Error(
+      `Missing required environment variables: ${missing.join(', ')}\n` +
+        'Please check your environment configuration and ensure all required variables are set.'
+    );
+  }
+};
+
+/** Throw if AUTH_SECRET is set but too short to be secure. */
+const assertAuthSecretStrength = (): void => {
+  if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
+    throw Error('AUTH_SECRET must be at least 32 characters for security');
+  }
+};
+
+/** Warn if DATABASE_URL is set but does not look like a MongoDB connection string. */
+const warnOnNonMongoDatabaseUrl = (): void => {
+  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('mongodb')) {
+    console.warn('Warning: DATABASE_URL does not appear to be a MongoDB connection string');
+  }
+};
+
+/** Throw if EMAIL_SERVER_PORT is set but is not a valid port number. */
+const assertValidEmailPort = (): void => {
+  if (process.env.EMAIL_SERVER_PORT) {
+    const port = Number(process.env.EMAIL_SERVER_PORT);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      throw Error('EMAIL_SERVER_PORT must be a valid port number (1-65535)');
+    }
+  }
+};
+
 export const validateEnvironment = () => {
   // Skip validation during build phase (secrets not available in Docker build)
   // or when explicitly disabled (e.g. E2E test runs that inject stub env vars).
@@ -43,37 +87,16 @@ export const validateEnvironment = () => {
     'BIO_GENERATOR_LAMBDA_NAME',
   ];
 
-  const presentEnvKeys = new Set(
-    Object.entries(process.env)
-      .filter(([, value]) => Boolean(value))
-      .map(([key]) => key)
-  );
-  const missing = required.filter((key) => !presentEnvKeys.has(key));
-
-  if (missing.length > 0) {
-    throw Error(
-      `Missing required environment variables: ${missing.join(', ')}\n` +
-        'Please check your environment configuration and ensure all required variables are set.'
-    );
-  }
+  assertRequiredPresent(required);
 
   // Validate AUTH_SECRET length
-  if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
-    throw Error('AUTH_SECRET must be at least 32 characters for security');
-  }
+  assertAuthSecretStrength();
 
   // Validate DATABASE_URL format (basic check)
-  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('mongodb')) {
-    console.warn('Warning: DATABASE_URL does not appear to be a MongoDB connection string');
-  }
+  warnOnNonMongoDatabaseUrl();
 
   // Validate email configuration
-  if (process.env.EMAIL_SERVER_PORT) {
-    const port = Number(process.env.EMAIL_SERVER_PORT);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      throw Error('EMAIL_SERVER_PORT must be a valid port number (1-65535)');
-    }
-  }
+  assertValidEmailPort();
 
   console.info('✅ Environment validation passed');
 };

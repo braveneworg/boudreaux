@@ -78,6 +78,166 @@ const dedupeLinks = (links: BioLink[]): BioLink[] => {
 const appendSourceText = (existing: string | undefined, addition: string): string =>
   existing ? `${existing}\n\n${addition}` : addition;
 
+/** Mutable accumulators threaded through the best-effort gathering steps. */
+interface MetadataAccumulator {
+  images: BioImage[];
+  links: BioLink[];
+  facts: ArtistFacts;
+}
+
+/** The display/real name used to drive both the MusicBrainz and web searches. */
+const searchNameFor = (input: BioGenerationInput): string =>
+  input.realName?.trim() || input.displayName;
+
+/** Two-attempt MusicBrainz lookup: real name first, then display name. */
+const lookupMatch = async (
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<Awaited<ReturnType<BioGeneratorDeps['lookupArtist']>>> =>
+  (await deps.lookupArtist(searchNameFor(input))) ??
+  (input.realName ? await deps.lookupArtist(input.displayName) : null);
+
+/**
+ * Builds the combined long-form grounding text from the Wikipedia article body
+ * (primary source) merged with the official site read via Jina Reader. Either
+ * being absent/failed simply contributes nothing (best-effort).
+ */
+const resolveWikidataSourceText = async (
+  wikipediaUrl: string | undefined,
+  officialUrl: string | undefined,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<string | undefined> => {
+  let sourceText: string | undefined;
+  if (wikipediaUrl) {
+    const article = await deps.getWikipediaExtract(wikipediaUrl);
+    if (article) sourceText = article.extract;
+  }
+  if (officialUrl) {
+    const official = await deps.readUrl(officialUrl, scrapeKey);
+    if (official) sourceText = appendSourceText(sourceText, official);
+  }
+  return sourceText;
+};
+
+/**
+ * Resolves all candidate Commons images, then prefers attribution-free (public
+ * domain / CC0) ones since we re-host without attribution. Truncation happens
+ * after ranking so PD/CC0 images survive over attribution-required ones.
+ */
+const resolveImages = async (fileNames: string[], deps: BioGeneratorDeps): Promise<BioImage[]> => {
+  const candidates = (
+    await Promise.all(fileNames.map((fileName) => deps.getCommonsImage(fileName)))
+  ).filter((image): image is BioImage => image !== null);
+  candidates.sort(
+    (a, b) => Number(isAttributionFree(b.license)) - Number(isAttributionFree(a.license))
+  );
+  return candidates.slice(0, MAX_IMAGES);
+};
+
+/** The Wikipedia/official-site links derived from the Wikidata entity. */
+const wikidataLinks = (
+  wikipediaUrl: string | undefined,
+  officialUrl: string | undefined
+): BioLink[] => {
+  const links: BioLink[] = [];
+  if (wikipediaUrl) links.push({ label: 'Wikipedia', url: wikipediaUrl, kind: 'wikipedia' });
+  if (officialUrl) links.push({ label: 'Official site', url: officialUrl, kind: 'official' });
+  return links;
+};
+
+/** Enriches the accumulator with everything derived from the Wikidata entity. */
+const applyWikidataFacts = async (
+  acc: MetadataAccumulator,
+  wikidataId: string,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const wd = await deps.getWikidataData(wikidataId);
+  acc.facts.wikipediaUrl = wd.wikipediaUrl;
+  acc.facts.officialUrl = wd.officialUrl;
+  acc.links.push(...wikidataLinks(wd.wikipediaUrl, wd.officialUrl));
+
+  const sourceText = await resolveWikidataSourceText(
+    wd.wikipediaUrl,
+    wd.officialUrl,
+    scrapeKey,
+    deps
+  );
+  if (sourceText) acc.facts.sourceText = sourceText;
+
+  acc.images.push(...(await resolveImages(wd.imageFileNames, deps)));
+};
+
+/** Enriches the accumulator with a found MusicBrainz match and its Wikidata data. */
+const applyMatch = async (
+  acc: MetadataAccumulator,
+  match: NonNullable<Awaited<ReturnType<BioGeneratorDeps['lookupArtist']>>>,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  acc.facts.musicBrainzId = match.mbid;
+  acc.facts.artistType = match.artistType;
+  acc.facts.area = match.area;
+  acc.facts.beginDate = match.beginDate;
+  acc.facts.endDate = match.endDate;
+  if (match.tags.length) acc.facts.tags = match.tags;
+  acc.links.push(...match.links);
+
+  if (match.wikidataId) {
+    await applyWikidataFacts(acc, match.wikidataId, scrapeKey, deps);
+  }
+};
+
+/**
+ * Web search (Jina) as additional grounding *context*, not just a fallback:
+ * always gathered and MERGED with any Wikipedia/official-site material so both
+ * the extensive long bio and the informed short bio draw on the fullest
+ * possible material. Optional + best-effort (never throws).
+ */
+const applyWebSearch = async (
+  acc: MetadataAccumulator,
+  input: BioGenerationInput,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const found = await deps.searchArtistSources(searchNameFor(input), scrapeKey);
+  if (!found) return;
+
+  acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
+  acc.facts.sourceUrls = [
+    ...new Set(
+      [
+        acc.facts.wikipediaUrl,
+        acc.facts.officialUrl,
+        ...(acc.facts.sourceUrls ?? []),
+        ...found.sourceUrls,
+      ].filter((url): url is string => Boolean(url))
+    ),
+  ];
+  for (const url of found.sourceUrls) {
+    acc.links.push({ label: 'Reference', url, kind: 'other' });
+  }
+};
+
+/**
+ * Finalizes the accumulator: appends admin links (last, so curated entries
+ * survive dedupe), then drops every streaming/listening service from both the
+ * discovered links and the reference URLs so none can reach the output, and
+ * derives the image-title list for the prompt.
+ */
+const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
+  for (const url of input.links ?? []) {
+    acc.links.push({ label: 'Reference', url, kind: 'other' });
+  }
+
+  acc.links = dedupeLinks(acc.links).filter((link) => !isListeningServiceUrl(link.url));
+  if (acc.facts.sourceUrls) {
+    acc.facts.sourceUrls = acc.facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
+  }
+  acc.facts.imageTitles = acc.images.map((image) => image.title ?? '');
+};
+
 /**
  * Best-effort metadata gathering. Any failure (rate limit, missing entity)
  * degrades to fewer images/links rather than aborting — the artist still gets
@@ -87,15 +247,17 @@ const gatherMetadata = async (
   input: BioGenerationInput,
   deps: BioGeneratorDeps
 ): Promise<{ images: BioImage[]; links: BioLink[]; facts: ArtistFacts }> => {
-  const images: BioImage[] = [];
-  let links: BioLink[] = [];
-  const facts: ArtistFacts = {
-    displayName: input.displayName,
-    realName: input.realName,
-    akaNames: input.akaNames,
-    description: input.description,
-    existingGenres: input.existingGenres,
-    imageTitles: [],
+  const acc: MetadataAccumulator = {
+    images: [],
+    links: [],
+    facts: {
+      displayName: input.displayName,
+      realName: input.realName,
+      akaNames: input.akaNames,
+      description: input.description,
+      existingGenres: input.existingGenres,
+      imageTitles: [],
+    },
   };
 
   // Jina works keyless (lower rate limit); the key just raises the limit, so we
@@ -103,98 +265,18 @@ const gatherMetadata = async (
   const scrapeKey = await deps.getScrapeApiKey();
 
   try {
-    const searchName = input.realName?.trim() || input.displayName;
-    const match =
-      (await deps.lookupArtist(searchName)) ??
-      (input.realName ? await deps.lookupArtist(input.displayName) : null);
-
+    const match = await lookupMatch(input, deps);
     if (match) {
-      facts.musicBrainzId = match.mbid;
-      facts.artistType = match.artistType;
-      facts.area = match.area;
-      facts.beginDate = match.beginDate;
-      facts.endDate = match.endDate;
-      if (match.tags.length) facts.tags = match.tags;
-      links.push(...match.links);
-
-      if (match.wikidataId) {
-        const wd = await deps.getWikidataData(match.wikidataId);
-        facts.wikipediaUrl = wd.wikipediaUrl;
-        facts.officialUrl = wd.officialUrl;
-        if (wd.wikipediaUrl)
-          links.push({ label: 'Wikipedia', url: wd.wikipediaUrl, kind: 'wikipedia' });
-        if (wd.officialUrl)
-          links.push({ label: 'Official site', url: wd.officialUrl, kind: 'official' });
-
-        // Fetch the full Wikipedia article body as the primary grounding source
-        // so the LLM rewrites real depth rather than padding sparse facts. A
-        // failed/absent extract simply leaves sourceText unset (best-effort).
-        if (wd.wikipediaUrl) {
-          const article = await deps.getWikipediaExtract(wd.wikipediaUrl);
-          if (article) facts.sourceText = article.extract;
-        }
-
-        // Read the official site into clean markdown via Jina Reader — high-signal
-        // primary-source grounding that web search often ranks poorly.
-        if (wd.officialUrl) {
-          const official = await deps.readUrl(wd.officialUrl, scrapeKey);
-          if (official) facts.sourceText = appendSourceText(facts.sourceText, official);
-        }
-
-        // Resolve all candidate images, then prefer attribution-free (public
-        // domain / CC0) ones since we re-host without attribution. Truncate
-        // after ranking so PD/CC0 images survive over attribution-required ones.
-        const candidates = (
-          await Promise.all(wd.imageFileNames.map((fileName) => deps.getCommonsImage(fileName)))
-        ).filter((image): image is BioImage => image !== null);
-        candidates.sort(
-          (a, b) => Number(isAttributionFree(b.license)) - Number(isAttributionFree(a.license))
-        );
-        images.push(...candidates.slice(0, MAX_IMAGES));
-      }
+      await applyMatch(acc, match, scrapeKey, deps);
     }
   } catch (err) {
     console.warn('Bio metadata gathering degraded:', err);
   }
 
-  // Web search (Jina) as additional grounding *context*, not just a fallback:
-  // always gather it and MERGE with any Wikipedia/official-site material so both
-  // the extensive long bio and the informed short bio draw on the fullest
-  // possible material. Optional + best-effort (never throws).
-  const searchName = input.realName?.trim() || input.displayName;
-  const found = await deps.searchArtistSources(searchName, scrapeKey);
-  if (found) {
-    facts.sourceText = appendSourceText(facts.sourceText, found.sourceText);
-    facts.sourceUrls = [
-      ...new Set(
-        [
-          facts.wikipediaUrl,
-          facts.officialUrl,
-          ...(facts.sourceUrls ?? []),
-          ...found.sourceUrls,
-        ].filter((url): url is string => Boolean(url))
-      ),
-    ];
-    for (const url of found.sourceUrls) {
-      links.push({ label: 'Reference', url, kind: 'other' });
-    }
-  }
+  await applyWebSearch(acc, input, scrapeKey, deps);
+  finalizeMetadata(acc, input);
 
-  // Admin-supplied links are appended last so curated entries survive dedupe.
-  for (const url of input.links ?? []) {
-    links.push({ label: 'Reference', url, kind: 'other' });
-  }
-
-  // A bio links to informative sources only — drop every streaming/listening
-  // service from both the discovered-links list and the reference URLs the model
-  // may inline, so no listening link can ever reach the output.
-  links = dedupeLinks(links).filter((link) => !isListeningServiceUrl(link.url));
-  if (facts.sourceUrls) {
-    facts.sourceUrls = facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
-  }
-  facts.imageTitles = images.map((image) => image.title ?? '');
-
-  return { images, links, facts };
+  return { images: acc.images, links: acc.links, facts: acc.facts };
 };
 
 /** Applies the LLM's image ranking, marking up to {@link MAX_PRIMARY} primaries. */

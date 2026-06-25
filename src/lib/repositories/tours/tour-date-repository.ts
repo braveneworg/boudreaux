@@ -75,28 +75,53 @@ type _TourDateDrift = AssertExact<
 >;
 const _tourDateDrift: _TourDateDrift = true;
 
+type TourDateUpdateFields = Omit<TourDateUpdateData, 'headlinerIds'>;
+
+/**
+ * Coerce a date/string update value to the Prisma "leave-unchanged" form: a
+ * null or empty value becomes `undefined` so the field is not written. Mirrors
+ * the original `field || undefined` expression.
+ */
+const coalesceUpdateValue = <T extends Date | string | null | undefined>(
+  value: T
+): NonNullable<T> | undefined => value || undefined;
+
+/** Build the schedule (date/time) portion of the update payload. */
+const toScheduleUpdate = (fields: TourDateUpdateFields): Prisma.TourDateUpdateInput => ({
+  ...(fields.startDate !== undefined && { startDate: coalesceUpdateValue(fields.startDate) }),
+  ...(fields.endDate !== undefined && { endDate: coalesceUpdateValue(fields.endDate) }),
+  ...(fields.showStartTime !== undefined && {
+    showStartTime: coalesceUpdateValue(fields.showStartTime),
+  }),
+  ...(fields.showEndTime !== undefined && {
+    showEndTime: coalesceUpdateValue(fields.showEndTime),
+  }),
+  ...(fields.doorsOpenAt !== undefined && {
+    doorsOpenAt: coalesceUpdateValue(fields.doorsOpenAt),
+  }),
+});
+
+/** Build the ticket/notes portion of the update payload. */
+const toDetailsUpdate = (fields: TourDateUpdateFields): Prisma.TourDateUpdateInput => ({
+  ...(fields.ticketsUrl !== undefined && { ticketsUrl: coalesceUpdateValue(fields.ticketsUrl) }),
+  ...(fields.ticketPrices !== undefined && {
+    ticketPrices: coalesceUpdateValue(fields.ticketPrices),
+  }),
+  ...(fields.notes !== undefined && { notes: coalesceUpdateValue(fields.notes) }),
+});
+
 /**
  * Build the Prisma update payload from domain update data. Converts null values
  * to `undefined` (leave-unchanged) for the date/string fields, and translates a
  * `venueId` into a `connect`. Headliner replacement is handled separately.
  */
-const toPrismaUpdate = (
-  data: Omit<TourDateUpdateData, 'headlinerIds'>
-): Prisma.TourDateUpdateInput => {
-  const { venueId, ...fields } = data;
+const toPrismaUpdate = (data: TourDateUpdateFields): Prisma.TourDateUpdateInput => {
+  const { venueId, timeZone, utcOffset } = data;
   return {
-    ...(fields.startDate !== undefined && { startDate: fields.startDate || undefined }),
-    ...(fields.endDate !== undefined && { endDate: fields.endDate || undefined }),
-    ...(fields.showStartTime !== undefined && {
-      showStartTime: fields.showStartTime || undefined,
-    }),
-    ...(fields.showEndTime !== undefined && { showEndTime: fields.showEndTime || undefined }),
-    ...(fields.doorsOpenAt !== undefined && { doorsOpenAt: fields.doorsOpenAt || undefined }),
-    ...(fields.ticketsUrl !== undefined && { ticketsUrl: fields.ticketsUrl || undefined }),
-    ...(fields.ticketPrices !== undefined && { ticketPrices: fields.ticketPrices || undefined }),
-    ...(fields.notes !== undefined && { notes: fields.notes || undefined }),
-    ...(fields.timeZone !== undefined && { timeZone: fields.timeZone }),
-    ...(fields.utcOffset !== undefined && { utcOffset: fields.utcOffset }),
+    ...toScheduleUpdate(data),
+    ...toDetailsUpdate(data),
+    ...(timeZone !== undefined && { timeZone }),
+    ...(utcOffset !== undefined && { utcOffset }),
     ...(venueId && {
       venue: {
         connect: { id: venueId },

@@ -12,11 +12,10 @@ import { CalendarDays } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { TourDateList } from '@/app/admin/tours/components/tour-date-list';
-import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload';
+import { TourEditSections } from '@/app/admin/tours/components/tour-edit-sections';
+import { TourFormActions } from '@/app/admin/tours/components/tour-form-actions';
 import { TextField } from '@/app/components/forms/fields';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Button } from '@/app/components/ui/button';
 import {
   Form,
   FormControl,
@@ -27,7 +26,6 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { SectionHeader } from '@/app/components/ui/section-header';
-import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
   useCreateTourMutation,
@@ -78,6 +76,7 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const [tourImages, setTourImages] = useState<TourImageFields[]>([]);
   const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
   const isEditMode = !!tourId;
+  const tourIdOrEmpty = tourId ?? '';
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const { createTourAsync, isCreatingTour } = useCreateTourMutation();
@@ -88,11 +87,11 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   // Edit-mode data loading. `useTourQuery` is skipped when an `initialTour`
   // prop is supplied (the fast-path resets straight from the prop). Tour images
   // are always fetched in edit mode; `refetch` re-pulls them after an upload.
-  const { data: tourData, isPending: isTourPending } = useTourQuery(tourId ?? '', {
-    enabled: !!tourId && !initialTour,
+  const { data: tourData, isPending: isTourPending } = useTourQuery(tourIdOrEmpty, {
+    enabled: isEditMode && !initialTour,
   });
-  const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(tourId ?? '', {
-    enabled: !!tourId,
+  const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(tourIdOrEmpty, {
+    enabled: isEditMode,
   });
 
   // In edit mode the form renders only after its data has been applied
@@ -311,68 +310,25 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
               />
             </section>
 
-            {/* Tour Dates - Only show in edit mode */}
-            {isEditMode && tourId && (
-              <>
-                <Separator />
-                <TourDateList tourId={tourId} onDialogOpenChange={setIsTourDateDialogOpen} />
-              </>
-            )}
-
-            {/* Images Section - Only show in edit mode after tour is created */}
-            {isEditMode && tourId && (
-              <>
-                <Separator />
-                <section className="space-y-4">
-                  <div className="space-y-2">
-                    <h3>Tour Images</h3>
-                    <p className="text-sm text-zinc-950">
-                      Upload images for this tour. You can add up to 10 images. Images can be
-                      reordered by dragging and dropping.
-                    </p>
-                  </div>
-                  <TourImageUpload
-                    tourId={tourId}
-                    initialImages={tourImages}
-                    onUploadComplete={handleImageUploadComplete}
-                    disabled={isSubmitting || isDeletingTour}
-                  />
-                </section>
-              </>
-            )}
+            <TourEditSections
+              isEditMode={isEditMode}
+              tourId={tourId}
+              tourImages={tourImages}
+              isSubmitting={isSubmitting}
+              isDeletingTour={isDeletingTour}
+              onDialogOpenChange={setIsTourDateDialogOpen}
+              onUploadComplete={handleImageUploadComplete}
+            />
           </div>
 
-          <div className="flex justify-between pt-6">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                disabled={isSubmitting || isDeletingTour}
-              >
-                Cancel
-              </Button>
-              {isEditMode && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={isSubmitting || isDeletingTour}
-                >
-                  {isDeletingTour ? 'Deleting...' : 'Delete Tour'}
-                </Button>
-              )}
-            </div>
-            <Button type="submit" disabled={isSubmitting || isDeletingTour || isTourDateDialogOpen}>
-              {isSubmitting
-                ? isEditMode
-                  ? 'Updating...'
-                  : 'Creating...'
-                : isEditMode
-                  ? 'Update Tour'
-                  : 'Create Tour'}
-            </Button>
-          </div>
+          <TourFormActions
+            isEditMode={isEditMode}
+            isSubmitting={isSubmitting}
+            isDeletingTour={isDeletingTour}
+            isTourDateDialogOpen={isTourDateDialogOpen}
+            onBack={() => router.back()}
+            onDelete={handleDelete}
+          />
         </form>
       </Form>
     </div>

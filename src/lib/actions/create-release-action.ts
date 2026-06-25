@@ -9,6 +9,8 @@ import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { ServiceResponse } from '@/lib/services/service.types';
+import type { Release } from '@/lib/types/domain/release';
 import type { FormState } from '@/lib/types/form-state';
 import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -17,6 +19,81 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
+import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
+
+const buildReleaseCreateInput = (data: ReleaseFormData, preGeneratedId: string | undefined) => {
+  const {
+    title,
+    releasedOn,
+    coverArt,
+    formats,
+    labels,
+    catalogNumber,
+    description,
+    suggestedPrice,
+  } = data;
+
+  const labelsArray = labels
+    ? labels
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean)
+    : [];
+
+  const suggestedPriceCents =
+    suggestedPrice && suggestedPrice !== ''
+      ? Math.round(parseFloat(suggestedPrice) * 100)
+      : undefined;
+
+  return {
+    ...(preGeneratedId !== undefined ? { id: preGeneratedId } : {}),
+    title,
+    releasedOn: new Date(releasedOn),
+    coverArt,
+    formats: (formats || ['DIGITAL']) as Format[],
+    labels: labelsArray,
+    catalogNumber: catalogNumber || undefined,
+    description: description || undefined,
+    suggestedPrice: suggestedPriceCents,
+  };
+};
+
+const applyServiceResponseToFormState = (
+  formState: FormState,
+  response: ServiceResponse<Release>
+): void => {
+  if (response.success) {
+    formState.errors = undefined;
+    formState.data = { releaseId: response.data?.id };
+  } else {
+    if (!formState.errors) {
+      formState.errors = {};
+    }
+    const errorMessage = response.error || 'Failed to create release';
+    const lower = errorMessage.toLowerCase();
+    const isTitleConflict =
+      lower.includes('title') &&
+      (lower.includes('unique') || lower.includes('already exists') || lower.includes('duplicate'));
+    if (isTitleConflict) {
+      formState.errors.title = ['This title is already in use. Please choose a different one.'];
+    } else {
+      formState.errors = { general: ['Failed to create release'] };
+    }
+  }
+  formState.success = response.success;
+};
+
+const createArtistReleaseAssociations = async (
+  response: ServiceResponse<Release>,
+  artistIds: string[] | undefined
+): Promise<void> => {
+  if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
+    const createdReleaseId = response.data.id;
+    await prisma.artistRelease.createMany({
+      data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
+    });
+  }
+};
 
 export const createReleaseAction = async (
   _initialState: FormState,
@@ -48,52 +125,11 @@ export const createReleaseAction = async (
 
   if (parsed.success) {
     try {
-      const {
-        title,
-        releasedOn,
-        coverArt,
-        formats,
-        artistIds,
-        labels,
-        catalogNumber,
-        description,
-        suggestedPrice,
-      } = parsed.data;
+      const response = await ReleaseService.createRelease(
+        buildReleaseCreateInput(parsed.data, preGeneratedId)
+      );
 
-      // Parse labels from comma-separated string to array
-      const labelsArray = labels
-        ? labels
-            .split(',')
-            .map((l) => l.trim())
-            .filter(Boolean)
-        : [];
-
-      // Convert dollar string to cents integer
-      const suggestedPriceCents =
-        suggestedPrice && suggestedPrice !== ''
-          ? Math.round(parseFloat(suggestedPrice) * 100)
-          : undefined;
-
-      // Create release in database
-      const response = await ReleaseService.createRelease({
-        ...(preGeneratedId !== undefined ? { id: preGeneratedId } : {}),
-        title,
-        releasedOn: new Date(releasedOn),
-        coverArt,
-        formats: (formats || ['DIGITAL']) as Format[],
-        labels: labelsArray,
-        catalogNumber: catalogNumber || undefined,
-        description: description || undefined,
-        suggestedPrice: suggestedPriceCents,
-      });
-
-      // Create ArtistRelease associations if release was created and artistIds provided
-      if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
-        const createdReleaseId = response.data.id;
-        await prisma.artistRelease.createMany({
-          data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
-        });
-      }
+      await createArtistReleaseAssociations(response, parsed.data.artistIds);
 
       // Log release creation for security audit
       logSecurityEvent({
@@ -107,31 +143,7 @@ export const createReleaseAction = async (
         },
       });
 
-      if (response.success) {
-        formState.errors = undefined;
-        // Include the created release ID in the response for image uploads
-        formState.data = { releaseId: response.data?.id };
-      } else {
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-
-        const errorMessage = response.error || 'Failed to create release';
-
-        // Check if error is related to title uniqueness
-        if (
-          errorMessage.toLowerCase().includes('title') &&
-          (errorMessage.toLowerCase().includes('unique') ||
-            errorMessage.toLowerCase().includes('already exists') ||
-            errorMessage.toLowerCase().includes('duplicate'))
-        ) {
-          formState.errors.title = ['This title is already in use. Please choose a different one.'];
-        } else {
-          formState.errors = { general: ['Failed to create release'] };
-        }
-      }
-
-      formState.success = response.success;
+      applyServiceResponseToFormState(formState, response);
 
       // Revalidate the create release page to clear data
       revalidatePath('/admin/releases/new');

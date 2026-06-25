@@ -106,26 +106,59 @@ const DEFAULT_OPTIONS: CliOptions = {
   help: false,
 };
 
+/** Parse a strictly-positive integer, or `null` when invalid. */
+const parsePositiveInt = (raw: string): number | null => {
+  const n = parseInt(raw, 10);
+  return !Number.isNaN(n) && n > 0 ? n : null;
+};
+
+/** Map a `--model` value to its model list, or `null` for unknown values. */
+const resolveModels = (value: string): ModelName[] | null => {
+  if (value === 'all') return ['release', 'featured-artist'];
+  if (value === 'release') return ['release'];
+  if (value === 'featured-artist') return ['featured-artist'];
+  return null;
+};
+
+/** Apply boolean flags to `opts`; returns true when the token was consumed. */
+const applyBooleanFlag = (opts: CliOptions, arg: string | undefined): boolean => {
+  if (arg === '--execute') opts.execute = true;
+  else if (arg === '--no-invalidate') opts.invalidate = false;
+  else if (arg === '--help' || arg === '-h') opts.help = true;
+  else return false;
+  return true;
+};
+
+/** Apply a value-taking flag at `argv[i]` to `opts`; returns the next index. */
+const applyValueFlag = (opts: CliOptions, argv: string[], i: number): number => {
+  const arg = argv.at(i);
+  if (i + 1 >= argv.length) return i;
+
+  if (arg === '--limit') {
+    const n = parsePositiveInt(argv[i + 1]);
+    if (n !== null) opts.limit = n;
+    return i + 1;
+  }
+  if (arg === '--concurrency') {
+    const n = parsePositiveInt(argv[i + 1]);
+    if (n !== null) opts.concurrency = n;
+    return i + 1;
+  }
+  if (arg === '--model') {
+    const models = resolveModels(argv[i + 1]);
+    if (models) opts.models = models;
+    return i + 1;
+  }
+
+  return i;
+};
+
 export const parseArgs = (argv: string[]): CliOptions => {
   const opts: CliOptions = { ...DEFAULT_OPTIONS };
 
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv.at(i);
-    if (arg === '--execute') opts.execute = true;
-    else if (arg === '--no-invalidate') opts.invalidate = false;
-    else if (arg === '--help' || arg === '-h') opts.help = true;
-    else if (arg === '--limit' && i + 1 < argv.length) {
-      const n = parseInt(argv[++i], 10);
-      if (!Number.isNaN(n) && n > 0) opts.limit = n;
-    } else if (arg === '--concurrency' && i + 1 < argv.length) {
-      const n = parseInt(argv[++i], 10);
-      if (!Number.isNaN(n) && n > 0) opts.concurrency = n;
-    } else if (arg === '--model' && i + 1 < argv.length) {
-      const value = argv[++i];
-      if (value === 'all') opts.models = ['release', 'featured-artist'];
-      else if (value === 'release') opts.models = ['release'];
-      else if (value === 'featured-artist') opts.models = ['featured-artist'];
-    }
+    if (applyBooleanFlag(opts, argv.at(i))) continue;
+    i = applyValueFlag(opts, argv, i);
   }
 
   return opts;
@@ -253,6 +286,66 @@ const resolveSourceImage = async (
   }
 };
 
+/** Transcode source bytes to WebP, returning the buffer or an error message. */
+const transcodeToWebp = async (source: Buffer): Promise<{ buffer: Buffer } | { error: string }> => {
+  try {
+    return { buffer: await sharp(source).webp({ quality: WEBP_QUALITY }).toBuffer() };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown sharp error';
+    return { error: `WebP transcode failed: ${msg}` };
+  }
+};
+
+/** Upload the WebP buffer to S3; returns `null` on success or an error message. */
+const putWebpObject = async (
+  ctx: UploadContext,
+  key: string,
+  webpBuffer: Buffer
+): Promise<string | null> => {
+  try {
+    await ctx.s3.send(
+      new PutObjectCommand({
+        Bucket: ctx.bucket,
+        Key: key,
+        Body: webpBuffer,
+        ContentType: 'image/webp',
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    );
+    return null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown S3 error';
+    return `S3 upload failed: ${msg}`;
+  }
+};
+
+interface UpdateCoverArtArgs {
+  prisma: PrismaClient;
+  model: ModelName;
+  id: string;
+  cdnUrl: string;
+}
+
+/** Write the new CDN URL to the row; returns `null` on success or an error. */
+const updateCoverArt = async ({
+  prisma,
+  model,
+  id,
+  cdnUrl,
+}: UpdateCoverArtArgs): Promise<string | null> => {
+  try {
+    if (model === 'release') {
+      await prisma.release.update({ where: { id }, data: { coverArt: cdnUrl } });
+    } else {
+      await prisma.featuredArtist.update({ where: { id }, data: { coverArt: cdnUrl } });
+    }
+    return null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown DB error';
+    return `DB update failed: ${msg}`;
+  }
+};
+
 const migrateRow = async (
   ctx: UploadContext,
   model: ModelName,
@@ -273,56 +366,37 @@ const migrateRow = async (
   // path is intuitive and the variant generator can produce siblings under
   // the same prefix. For data URIs, keep the legacy `backfill-{model}-{id}`
   // naming so re-runs are idempotent.
-  const key = resolved.source.existingKey
-    ? swapKeyExtensionToWebp(resolved.source.existingKey)
-    : buildS3Key(model, id, 'webp');
+  const { buffer: sourceBuffer, existingKey } = resolved.source;
+  const key = existingKey ? swapKeyExtensionToWebp(existingKey) : buildS3Key(model, id, 'webp');
   const cdnUrl = buildCdnUrl(ctx.cdnDomain, key);
 
-  let webpBuffer: Buffer;
-  try {
-    webpBuffer = await sharp(resolved.source.buffer).webp({ quality: WEBP_QUALITY }).toBuffer();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown sharp error';
-    return { id, status: 'failed', detail: `WebP transcode failed: ${msg}` };
+  const transcoded = await transcodeToWebp(sourceBuffer);
+  if ('error' in transcoded) {
+    return { id, status: 'failed', detail: transcoded.error };
   }
+  const webpBuffer = transcoded.buffer;
 
-  const sourceLabel = resolved.source.existingKey ?? 'data URI';
+  const sourceLabel = existingKey ?? 'data URI';
   if (!ctx.execute) {
     return {
       id,
       status: 'migrated',
-      detail: `[dry-run] would transcode ${resolved.source.buffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${key}`,
+      detail: `[dry-run] would transcode ${sourceBuffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${key}`,
       uploadedKey: key,
     };
   }
 
-  try {
-    await ctx.s3.send(
-      new PutObjectCommand({
-        Bucket: ctx.bucket,
-        Key: key,
-        Body: webpBuffer,
-        ContentType: 'image/webp',
-        CacheControl: 'public, max-age=31536000, immutable',
-      })
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown S3 error';
-    return { id, status: 'failed', detail: `S3 upload failed: ${msg}` };
+  const uploadError = await putWebpObject(ctx, key, webpBuffer);
+  if (uploadError) {
+    return { id, status: 'failed', detail: uploadError };
   }
 
-  try {
-    if (model === 'release') {
-      await prisma.release.update({ where: { id }, data: { coverArt: cdnUrl } });
-    } else {
-      await prisma.featuredArtist.update({ where: { id }, data: { coverArt: cdnUrl } });
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown DB error';
+  const dbError = await updateCoverArt({ prisma, model, id, cdnUrl });
+  if (dbError) {
     return {
       id,
       status: 'failed',
-      detail: `uploaded to ${key} but DB update failed: ${msg}`,
+      detail: `uploaded to ${key} but ${dbError}`,
       uploadedKey: key,
     };
   }
@@ -330,7 +404,7 @@ const migrateRow = async (
   return {
     id,
     status: 'migrated',
-    detail: `transcoded ${resolved.source.buffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${cdnUrl}`,
+    detail: `transcoded ${sourceBuffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${cdnUrl}`,
     uploadedKey: key,
   };
 };
@@ -413,6 +487,140 @@ ${colors.yellow}Required env:${colors.reset} S3_BUCKET, DATABASE_URL, AWS_ACCESS
 ${colors.yellow}Optional env:${colors.reset} AWS_REGION (default us-east-1), CLOUDFRONT_DISTRIBUTION_ID, NEXT_PUBLIC_CDN_DOMAIN
 `;
 
+interface ResolvedEnv {
+  bucket: string;
+  region: string;
+  cdnDomain: string;
+}
+
+/** Read and validate required env vars; exits the process when one is missing. */
+const resolveEnv = (): ResolvedEnv => {
+  const bucket = process.env.S3_BUCKET;
+  const region = process.env.AWS_REGION ?? 'us-east-1';
+  const cdnDomain =
+    process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? DEFAULT_CDN_DOMAIN;
+
+  if (!bucket) {
+    log('S3_BUCKET env var is required', 'error');
+    process.exit(1);
+  }
+  if (!process.env.DATABASE_URL) {
+    log('DATABASE_URL env var is required', 'error');
+    process.exit(1);
+  }
+
+  return { bucket, region, cdnDomain };
+};
+
+interface RunTotals {
+  uploadedKeys: string[];
+  migrated: number;
+  skipped: number;
+  failed: number;
+}
+
+/** Fold one row result into the running totals, logging migrated/failed rows. */
+const tallyResult = (totals: RunTotals, model: ModelName, r: RowResult): void => {
+  if (r.status === 'migrated') {
+    totals.migrated++;
+    if (r.uploadedKey) totals.uploadedKeys.push(r.uploadedKey);
+    log(`  ${colors.green}✓${colors.reset} ${model} ${r.id}: ${r.detail}`, 'info');
+    return;
+  }
+  if (r.status === 'skipped') {
+    totals.skipped++;
+    return;
+  }
+  totals.failed++;
+  log(`  ${colors.red}✗${colors.reset} ${model} ${r.id}: ${r.detail}`, 'error');
+};
+
+// Pull every row whose coverArt is a data URI or an HTTP(S) URL.
+// `migrateRow` skips ones that are already `.webp` or in unsupported
+// formats. We can't use `{ coverArt: { not: null } }` here because Prisma
+// MongoDB rejects null in `not` filters; the OR avoids the issue and
+// additionally excludes empty / weird values cheaply on the DB side.
+// No `as const` — Prisma's WhereInput expects a mutable `OR` array, and
+// freezing the literal type widens `findMany` row inference back to the
+// full model shape (breaking the `select` projection).
+const COVERART_WHERE = {
+  OR: [{ coverArt: { startsWith: 'data:' } }, { coverArt: { startsWith: 'http' } }],
+};
+
+/** Fetch the candidate rows for one model, honoring the optional row limit. */
+const fetchRows = async (
+  prisma: PrismaClient,
+  model: ModelName,
+  limit: number | null
+): Promise<Array<{ id: string; coverArt: string | null }>> => {
+  if (model === 'release') {
+    return prisma.release.findMany({
+      where: COVERART_WHERE,
+      select: { id: true, coverArt: true },
+      ...(limit ? { take: limit } : {}),
+    });
+  }
+  return prisma.featuredArtist.findMany({
+    where: COVERART_WHERE,
+    select: { id: true, coverArt: true },
+    ...(limit ? { take: limit } : {}),
+  });
+};
+
+interface ProcessModelArgs {
+  ctx: UploadContext;
+  prisma: PrismaClient;
+  model: ModelName;
+  opts: CliOptions;
+  totals: RunTotals;
+}
+
+/** Scan one model: fetch rows, migrate them in parallel, and tally results. */
+const processModel = async ({
+  ctx,
+  prisma,
+  model,
+  opts,
+  totals,
+}: ProcessModelArgs): Promise<void> => {
+  log(`Scanning ${model}...`, 'info');
+  const rows = await fetchRows(prisma, model, opts.limit);
+  log(`  found ${rows.length} ${model} row(s) with non-webp coverArt`, 'info');
+
+  const results = await mapWithConcurrency(rows, opts.concurrency, (row) =>
+    migrateRow(ctx, model, row, prisma)
+  );
+
+  for (const r of results) {
+    tallyResult(totals, model, r);
+  }
+};
+
+/** Invalidate CloudFront for uploaded keys, swallowing failures as warnings. */
+const maybeInvalidate = async (
+  opts: CliOptions,
+  uploadedKeys: string[],
+  region: string
+): Promise<void> => {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (!opts.execute || !opts.invalidate || !distributionId || uploadedKeys.length === 0) {
+    return;
+  }
+  try {
+    await invalidateCloudFront(distributionId, uploadedKeys, region);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown';
+    log(`CloudFront invalidation failed: ${msg}`, 'warning');
+  }
+};
+
+/** Log the run mode banner, selected models, and any row limit. */
+const logRunHeader = (opts: CliOptions): void => {
+  log(opts.execute ? 'LIVE RUN (writes enabled)' : 'DRY RUN — no writes', 'warning');
+  log(`Models: ${opts.models.join(', ')}`, 'info');
+  if (opts.limit) log(`Row limit per model: ${opts.limit}`, 'info');
+};
+
 export const runBackfill = async (
   argv: string[],
   deps?: { prisma?: PrismaClient }
@@ -423,108 +631,38 @@ export const runBackfill = async (
     return;
   }
 
-  const S3_BUCKET = process.env.S3_BUCKET;
-  const AWS_REGION = process.env.AWS_REGION ?? 'us-east-1';
-  const CDN_DOMAIN =
-    process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? DEFAULT_CDN_DOMAIN;
+  const { bucket, region, cdnDomain } = resolveEnv();
+  logRunHeader(opts);
 
-  if (!S3_BUCKET) {
-    log('S3_BUCKET env var is required', 'error');
-    process.exit(1);
-  }
-  if (!process.env.DATABASE_URL) {
-    log('DATABASE_URL env var is required', 'error');
-    process.exit(1);
-  }
+  // Reuse an injected client (tests) and leave its lifecycle to the caller;
+  // otherwise own the client we create and disconnect it in `finally`.
+  const injectedPrisma = deps?.prisma;
+  const prisma = injectedPrisma ?? new PrismaClient();
+  const s3 = new S3Client({ region });
+  const ctx: UploadContext = { s3, bucket, cdnDomain, execute: opts.execute };
 
-  log(opts.execute ? 'LIVE RUN (writes enabled)' : 'DRY RUN — no writes', 'warning');
-  log(`Models: ${opts.models.join(', ')}`, 'info');
-  if (opts.limit) log(`Row limit per model: ${opts.limit}`, 'info');
-
-  const prisma = deps?.prisma ?? new PrismaClient();
-  const s3 = new S3Client({ region: AWS_REGION });
-  const ctx: UploadContext = {
-    s3,
-    bucket: S3_BUCKET,
-    cdnDomain: CDN_DOMAIN,
-    execute: opts.execute,
-  };
-
-  const uploadedKeys: string[] = [];
-  let totalMigrated = 0;
-  let totalSkipped = 0;
-  let totalFailed = 0;
+  const totals: RunTotals = { uploadedKeys: [], migrated: 0, skipped: 0, failed: 0 };
 
   try {
     for (const model of opts.models) {
-      log(`Scanning ${model}...`, 'info');
-      // Pull every row whose coverArt is a data URI or an HTTP(S) URL.
-      // `migrateRow` skips ones that are already `.webp` or in unsupported
-      // formats. We can't use `{ coverArt: { not: null } }` here because Prisma
-      // MongoDB rejects null in `not` filters; the OR avoids the issue and
-      // additionally excludes empty / weird values cheaply on the DB side.
-      // No `as const` — Prisma's WhereInput expects a mutable `OR` array, and
-      // freezing the literal type widens `findMany` row inference back to the
-      // full model shape (breaking the `select` projection).
-      const where = {
-        OR: [{ coverArt: { startsWith: 'data:' } }, { coverArt: { startsWith: 'http' } }],
-      };
-      const rows =
-        model === 'release'
-          ? await prisma.release.findMany({
-              where,
-              select: { id: true, coverArt: true },
-              ...(opts.limit ? { take: opts.limit } : {}),
-            })
-          : await prisma.featuredArtist.findMany({
-              where,
-              select: { id: true, coverArt: true },
-              ...(opts.limit ? { take: opts.limit } : {}),
-            });
-
-      log(`  found ${rows.length} ${model} row(s) with non-webp coverArt`, 'info');
-
-      const results = await mapWithConcurrency(rows, opts.concurrency, (row) =>
-        migrateRow(ctx, model, row, prisma)
-      );
-
-      for (const r of results) {
-        if (r.status === 'migrated') {
-          totalMigrated++;
-          if (r.uploadedKey) uploadedKeys.push(r.uploadedKey);
-          log(`  ${colors.green}✓${colors.reset} ${model} ${r.id}: ${r.detail}`, 'info');
-        } else if (r.status === 'skipped') {
-          totalSkipped++;
-        } else {
-          totalFailed++;
-          log(`  ${colors.red}✗${colors.reset} ${model} ${r.id}: ${r.detail}`, 'error');
-        }
-      }
+      await processModel({ ctx, prisma, model, opts, totals });
     }
 
-    const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
-    if (opts.execute && opts.invalidate && distributionId && uploadedKeys.length > 0) {
-      try {
-        await invalidateCloudFront(distributionId, uploadedKeys, AWS_REGION);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'unknown';
-        log(`CloudFront invalidation failed: ${msg}`, 'warning');
-      }
-    }
+    await maybeInvalidate(opts, totals.uploadedKeys, region);
 
     console.info('\n' + '='.repeat(60));
     log(
-      `Summary: ${totalMigrated} migrated, ${totalSkipped} skipped, ${totalFailed} failed`,
-      totalFailed > 0 ? 'warning' : 'success'
+      `Summary: ${totals.migrated} migrated, ${totals.skipped} skipped, ${totals.failed} failed`,
+      totals.failed > 0 ? 'warning' : 'success'
     );
     console.info('='.repeat(60));
   } finally {
-    if (!deps?.prisma) {
+    if (!injectedPrisma) {
       await prisma.$disconnect();
     }
   }
 
-  if (totalFailed > 0) process.exit(1);
+  if (totals.failed > 0) process.exit(1);
 };
 
 /* istanbul ignore next -- top-level CLI entry */

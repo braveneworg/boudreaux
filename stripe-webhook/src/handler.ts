@@ -61,6 +61,44 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
   });
 };
 
+/**
+ * Enforce the Stripe webhook source-IP allowlist. Returns an HTTP rejection
+ * result when the request must be denied, or `null` when it may proceed
+ * (either because the check is skipped or the source IP is allowlisted).
+ */
+const enforceStripeIpAllowlist = (
+  event: APIGatewayProxyEventV2,
+  webhookIpRanges: string
+): APIGatewayProxyResultV2 | null => {
+  if (shouldSkipStripeIpCheck()) {
+    return null;
+  }
+
+  const sourceIp = getSourceIp(event);
+  const allowedRanges = parseStripeWebhookIpRanges(webhookIpRanges);
+
+  if (!sourceIp) {
+    console.warn('Rejecting Stripe webhook request with missing source IP');
+    return { statusCode: 403, body: 'Forbidden' };
+  }
+
+  if (allowedRanges.length === 0) {
+    console.error('Stripe webhook IP allowlist is empty');
+    return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
+  }
+
+  if (!isIpAllowed(sourceIp, allowedRanges)) {
+    console.warn(`Rejecting Stripe webhook request from non-allowlisted IP: ${sourceIp}`);
+    return { statusCode: 403, body: 'Forbidden' };
+  }
+
+  return null;
+};
+
+/** Decode the raw webhook body for signature verification (never JSON.parse it). */
+const getRawWebhookBody = (event: APIGatewayProxyEventV2): Buffer | string =>
+  event.isBase64Encoded ? Buffer.from(event.body ?? '', 'base64') : (event.body ?? '');
+
 export const lambdaHandler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
@@ -80,29 +118,12 @@ export const lambdaHandler = async (
     return { statusCode: 500, body: 'Internal server error' };
   }
 
-  if (!shouldSkipStripeIpCheck()) {
-    const sourceIp = getSourceIp(event);
-    const allowedRanges = parseStripeWebhookIpRanges(webhookIpRanges);
-
-    if (!sourceIp) {
-      console.warn('Rejecting Stripe webhook request with missing source IP');
-      return { statusCode: 403, body: 'Forbidden' };
-    }
-
-    if (allowedRanges.length === 0) {
-      console.error('Stripe webhook IP allowlist is empty');
-      return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
-    }
-
-    if (!isIpAllowed(sourceIp, allowedRanges)) {
-      console.warn(`Rejecting Stripe webhook request from non-allowlisted IP: ${sourceIp}`);
-      return { statusCode: 403, body: 'Forbidden' };
-    }
+  const ipRejection = enforceStripeIpAllowlist(event, webhookIpRanges);
+  if (ipRejection) {
+    return ipRejection;
   }
 
-  const rawBody = event.isBase64Encoded
-    ? Buffer.from(event.body ?? '', 'base64')
-    : (event.body ?? '');
+  const rawBody = getRawWebhookBody(event);
 
   // Do NOT JSON.parse event.body before passing to constructEvent
   let stripeEvent: Stripe.Event;

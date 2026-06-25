@@ -5,18 +5,20 @@
 
 import 'server-only';
 
-import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
-import { BioGenerationService } from '@/lib/services/bio-generation-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
-import { logSecurityEvent } from '@/utils/audit-log';
+
+import {
+  resolveInFlightBioStatus,
+  runBioGenerationAfterResponse,
+} from './generate-artist-bio-action-helpers';
 
 const logger = loggers.media;
 
@@ -58,11 +60,9 @@ export const generateArtistBioAction = async (
     }
 
     // Don't start a second run while one is genuinely in flight.
-    const inFlight = state.bioStatus === 'pending' || state.bioStatus === 'processing';
-    const startedAt = state.bioStartedAt?.getTime() ?? 0;
-    const isStale = Date.now() - startedAt > STALE_JOB_MS;
-    if (inFlight && !isStale) {
-      return { success: true, status: state.bioStatus === 'processing' ? 'processing' : 'pending' };
+    const inFlightStatus = resolveInFlightBioStatus(state, STALE_JOB_MS);
+    if (inFlightStatus) {
+      return { success: true, status: inFlightStatus };
     }
 
     await ArtistRepository.setBioStatus(artistId, 'pending', {
@@ -73,29 +73,14 @@ export const generateArtistBioAction = async (
     // Run the heavy work after the response is sent. `runGenerationJob` records
     // its own succeeded/failed status and never throws, so the only thing left
     // is to revalidate the public pages and audit-log on success.
-    after(async () => {
-      const result = await BioGenerationService.runGenerationJob(artistId, { links, description });
-      if (!result.success) {
-        return;
-      }
-
-      logSecurityEvent({
-        event: 'media.artist.updated',
+    after(() =>
+      runBioGenerationAfterResponse({
+        artistId,
         userId: session.user.id,
-        metadata: {
-          artistId,
-          action: 'bio-generated',
-          model: result.data.model,
-          imageCount: result.data.images.length,
-          linkCount: result.data.links.length,
-        },
-      });
-
-      revalidatePath('/admin/artists');
-      revalidatePath('/artists');
-      revalidatePath(`/artists/${result.slug}`);
-      revalidatePath(`/artists/${result.slug}/bio`);
-    });
+        links,
+        description,
+      })
+    );
 
     return { success: true, status: 'pending' };
   } catch (error) {

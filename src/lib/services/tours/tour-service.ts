@@ -5,7 +5,7 @@
 import 'server-only';
 
 import { TourRepository, type TourWithRelations } from '@/lib/repositories/tours/tour-repository';
-import type { TourScalars } from '@/lib/types/tours';
+import type { TourDateWithRelations, TourScalars } from '@/lib/types/tours';
 import {
   tourCreateSchema,
   tourUpdateSchema,
@@ -137,30 +137,39 @@ export class TourService {
   private static enrichTourWithDisplayNames(
     tour: TourWithRelations | TourScalars
   ): TourWithDisplayNames {
-    let displayHeadliners: string[] = [];
-
     // Extract headliners from tour dates if available
-    if ('tourDates' in tour && Array.isArray(tour.tourDates)) {
-      const headlinerNames = new Set<string>();
-
-      for (const tourDate of tour.tourDates) {
-        if (tourDate.headliners && Array.isArray(tourDate.headliners)) {
-          for (const headliner of tourDate.headliners) {
-            const name = this.getArtistDisplayName(headliner);
-            if (name) {
-              headlinerNames.add(name);
-            }
-          }
-        }
-      }
-
-      displayHeadliners = Array.from(headlinerNames);
-    }
+    const displayHeadliners =
+      'tourDates' in tour && Array.isArray(tour.tourDates)
+        ? this.collectHeadlinerNames(tour.tourDates)
+        : [];
 
     return {
       ...tour,
       displayHeadliners,
     } as TourWithDisplayNames;
+  }
+
+  /**
+   * Aggregate the unique headliner display names across a tour's dates,
+   * preserving first-seen order.
+   * @private
+   */
+  private static collectHeadlinerNames(tourDates: TourDateWithRelations[]): string[] {
+    const headlinerNames = new Set<string>();
+
+    for (const tourDate of tourDates) {
+      if (!tourDate.headliners || !Array.isArray(tourDate.headliners)) {
+        continue;
+      }
+      for (const headliner of tourDate.headliners) {
+        const name = this.getArtistDisplayName(headliner);
+        if (name) {
+          headlinerNames.add(name);
+        }
+      }
+    }
+
+    return Array.from(headlinerNames);
   }
 
   /**

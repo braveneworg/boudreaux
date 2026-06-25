@@ -205,21 +205,91 @@ interface CountResult {
   n?: number;
 }
 
-const runChecks = async (): Promise<void> => {
+/**
+ * Guard: refuse to run unless E2E_DATABASE_URL is a valid URL pointing at the
+ * local Docker MongoDB (localhost:27018). Throws otherwise.
+ */
+const assertLocalE2eUrl = (url: string): void => {
   try {
-    new URL(E2E_DATABASE_URL);
+    new URL(url);
   } catch {
     throw new Error(
       'check-query-plans refusing to run: E2E_DATABASE_URL is not a valid URL. ' +
         'Expected mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0.'
     );
   }
-  if (!E2E_DATABASE_URL.includes('localhost:27018')) {
+  if (!url.includes('localhost:27018')) {
     throw new Error(
       'check-query-plans refusing to run against a non-local database. ' +
         'It only runs against the Docker E2E MongoDB on localhost:27018.'
     );
   }
+};
+
+/** The PASS/SKIP/FAIL outcome of analyzing one target query. */
+interface TargetResult {
+  status: 'PASS' | 'FAIL' | 'SKIP';
+  note: string;
+  /** True only when the target is a hard FAIL (counts toward the exit code). */
+  failed: boolean;
+}
+
+/** Build the human-readable note for a PASS verdict. */
+const passNote = (verdict: PlanVerdict): string => {
+  const scaleSuffix = verdict.winningIsCollscan
+    ? ' (collscan wins at this data size; index applies at scale)'
+    : '';
+  const sortSuffix = verdict.winningHasBlockingSort ? ' [blocking SORT]' : '';
+  return `index: ${verdict.consideredIndexes.join(', ') || 'n/a'}${scaleSuffix}${sortSuffix}`;
+};
+
+/**
+ * Run the index/count/explain commands for one target and classify the result.
+ * Extracted from runChecks to keep that function within the complexity ceiling.
+ */
+const checkTarget = async (prisma: PrismaClient, target: QueryTarget): Promise<TargetResult> => {
+  const indexes = (await prisma.$runCommandRaw({
+    listIndexes: target.collection,
+  })) as ListIndexesResult;
+  const indexNames = (indexes.cursor?.firstBatch ?? []).map((i) => i.name ?? '');
+
+  const countResult = (await prisma.$runCommandRaw({
+    count: target.collection,
+    query: {},
+  })) as CountResult;
+  const docCount = countResult.n ?? 0;
+
+  const explainCommand = {
+    explain: {
+      find: target.collection,
+      filter: target.filter,
+      ...(target.sort ? { sort: target.sort } : {}),
+    },
+    verbosity: 'queryPlanner',
+  } as Prisma.InputJsonObject;
+  const explain = (await prisma.$runCommandRaw(explainCommand)) as ExplainResult;
+
+  const verdict = analyzePlan(explain, target.acceptableLeadingFields);
+
+  if (verdict.usesAcceptableIndex) {
+    return { status: 'PASS', note: passNote(verdict), failed: false };
+  }
+  if (docCount === 0) {
+    return {
+      status: 'SKIP',
+      note: 'collection empty — cannot plan; seed data to verify applicability',
+      failed: false,
+    };
+  }
+  return {
+    status: 'FAIL',
+    note: `no applicable index scan considered (${docCount} docs). indexes present: ${indexNames.join(', ')}`,
+    failed: true,
+  };
+};
+
+const runChecks = async (): Promise<void> => {
+  assertLocalE2eUrl(E2E_DATABASE_URL);
 
   const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
   let failures = 0;
@@ -228,46 +298,8 @@ const runChecks = async (): Promise<void> => {
     console.info(`\nQuery-plan check against ${E2E_DATABASE_URL}\n`);
 
     for (const target of TARGETS) {
-      const indexes = (await prisma.$runCommandRaw({
-        listIndexes: target.collection,
-      })) as ListIndexesResult;
-      const indexNames = (indexes.cursor?.firstBatch ?? []).map((i) => i.name ?? '');
-
-      const countResult = (await prisma.$runCommandRaw({
-        count: target.collection,
-        query: {},
-      })) as CountResult;
-      const docCount = countResult.n ?? 0;
-
-      const explainCommand = {
-        explain: {
-          find: target.collection,
-          filter: target.filter,
-          ...(target.sort ? { sort: target.sort } : {}),
-        },
-        verbosity: 'queryPlanner',
-      } as Prisma.InputJsonObject;
-      const explain = (await prisma.$runCommandRaw(explainCommand)) as ExplainResult;
-
-      const verdict = analyzePlan(explain, target.acceptableLeadingFields);
-
-      let status: 'PASS' | 'FAIL' | 'SKIP';
-      let note = '';
-      if (verdict.usesAcceptableIndex) {
-        status = 'PASS';
-        note = `index: ${verdict.consideredIndexes.join(', ') || 'n/a'}${
-          verdict.winningIsCollscan
-            ? ' (collscan wins at this data size; index applies at scale)'
-            : ''
-        }${verdict.winningHasBlockingSort ? ' [blocking SORT]' : ''}`;
-      } else if (docCount === 0) {
-        status = 'SKIP';
-        note = 'collection empty — cannot plan; seed data to verify applicability';
-      } else {
-        status = 'FAIL';
-        note = `no applicable index scan considered (${docCount} docs). indexes present: ${indexNames.join(', ')}`;
-        failures += 1;
-      }
+      const { status, note, failed } = await checkTarget(prisma, target);
+      if (failed) failures += 1;
 
       console.info(`  [${status}] ${target.label}`);
       if (note) console.info(`         ${note}`);

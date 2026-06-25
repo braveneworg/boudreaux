@@ -17,10 +17,105 @@ import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
+import type { Session } from 'next-auth';
+
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_TAKE = 24;
 const MAX_TAKE = 100;
+
+/** Parse and clamp the `skip`/`take` offset-pagination params from a request. */
+const parsePagination = (searchParams: URLSearchParams): { skip: number; take: number } => {
+  const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
+  const take = Math.min(
+    Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
+    MAX_TAKE
+  );
+  return { skip, take };
+};
+
+/** Parse the tri-state `published` filter ('true' → true, 'false' → false, else undefined). */
+const parsePublished = (value: string | null): boolean | undefined =>
+  value === 'true' ? true : value === 'false' ? false : undefined;
+
+/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
+const errorStatus = (error: string | undefined): number =>
+  error === 'Database unavailable' ? 503 : 500;
+
+/** Return a 401 response unless the session belongs to an authenticated admin. */
+const requireAdmin = (session: Session | null): NextResponse | null =>
+  !session?.user?.id || session.user?.role !== 'admin'
+    ? NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    : null;
+
+/** Handle the public `active=true` branch of GET /api/featured-artists. */
+const handleActiveListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
+  const limitParam = searchParams.get('limit');
+  const MAX_LIMIT = 100;
+  const DEFAULT_LIMIT = 10;
+  const limit = limitParam
+    ? Math.min(Math.max(1, parseInt(limitParam, 10)), MAX_LIMIT)
+    : DEFAULT_LIMIT;
+
+  const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), limit);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+  }
+
+  return NextResponse.json(
+    {
+      featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
+      count: result.data.length,
+    },
+    {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+      },
+    }
+  );
+};
+
+/** Handle the admin (default) branch of GET /api/featured-artists, gated on admin auth. */
+const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
+  const search = searchParams.get('search');
+  const published = parsePublished(searchParams.get('published'));
+  const deleted = searchParams.get('deleted') === 'true';
+
+  const session = await auth();
+  const authError = requireAdmin(session);
+  if (authError) {
+    return authError;
+  }
+
+  const { skip, take } = parsePagination(searchParams);
+
+  const params = {
+    skip,
+    take,
+    ...(search && { search }),
+    ...(published !== undefined && { published }),
+    ...(deleted && { deleted }),
+  };
+
+  const result = await FeaturedArtistsService.getAllFeaturedArtists(params);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+  }
+
+  return NextResponse.json(
+    {
+      rows: serializeForResponse(result.data),
+      nextSkip: computeNextSkip(result.data.length, skip, take),
+    },
+    {
+      headers: {
+        'Cache-Control': 'private, no-store',
+      },
+    }
+  );
+};
 
 /**
  * GET /api/featured-artists
@@ -40,81 +135,9 @@ export const GET = withRateLimit(
     const searchParams = request.nextUrl.searchParams;
     const active = searchParams.get('active');
 
-    if (active === 'true') {
-      const limitParam = searchParams.get('limit');
-      const MAX_LIMIT = 100;
-      const DEFAULT_LIMIT = 10;
-      const limit = limitParam
-        ? Math.min(Math.max(1, parseInt(limitParam, 10)), MAX_LIMIT)
-        : DEFAULT_LIMIT;
-
-      const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), limit);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: result.error === 'Database unavailable' ? 503 : 500 }
-        );
-      }
-
-      return NextResponse.json(
-        {
-          featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
-          count: result.data.length,
-        },
-        {
-          headers: {
-            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-          },
-        }
-      );
-    }
-
-    const search = searchParams.get('search');
-    const publishedParam = searchParams.get('published');
-    const published =
-      publishedParam === 'true' ? true : publishedParam === 'false' ? false : undefined;
-    const deleted = searchParams.get('deleted') === 'true';
-
-    const session = await auth();
-    if (!session?.user?.id || session.user?.role !== 'admin') {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
-    const skip = Math.max(0, parseInt(searchParams.get('skip') ?? '0', 10) || 0);
-    const take = Math.min(
-      Math.max(1, parseInt(searchParams.get('take') ?? String(DEFAULT_TAKE), 10) || DEFAULT_TAKE),
-      MAX_TAKE
-    );
-
-    const params = {
-      skip,
-      take,
-      ...(search && { search }),
-      ...(published !== undefined && { published }),
-      ...(deleted && { deleted }),
-    };
-
-    const result = await FeaturedArtistsService.getAllFeaturedArtists(params);
-
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.error === 'Database unavailable' ? 503 : 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        rows: serializeForResponse(result.data),
-        nextSkip: computeNextSkip(result.data.length, skip, take),
-      },
-      {
-        headers: {
-          'Cache-Control': 'private, no-store',
-        },
-      }
-    );
+    return active === 'true'
+      ? await handleActiveListing(searchParams)
+      : await handleAdminListing(searchParams);
   } catch (error) {
     loggers.media.error('FeaturedArtist GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

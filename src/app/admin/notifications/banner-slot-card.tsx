@@ -47,15 +47,157 @@ interface BannerSlotCardProps {
   slot: BannerSlotFormData;
 }
 
-export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
-  const [content, setContent] = useState(slot.notification?.content ?? '');
-  const [textColor, setTextColor] = useState(slot.notification?.textColor ?? '#ffffff');
-  const [backgroundColor, setBackgroundColor] = useState(
-    slot.notification?.backgroundColor ?? '#000000'
+/** The default (or persisted) editable values for a banner slot's form. */
+interface BannerSlotValues {
+  content: string;
+  textColor: string;
+  backgroundColor: string;
+  displayFrom: string;
+  displayUntil: string;
+  repostedFromId: string;
+}
+
+/** The values used when a slot has no persisted notification. */
+const DEFAULT_BANNER_VALUES: BannerSlotValues = {
+  content: '',
+  textColor: '#ffffff',
+  backgroundColor: '#000000',
+  displayFrom: '',
+  displayUntil: '',
+  repostedFromId: '',
+};
+
+/** Derives the initial form values from a slot's persisted notification (or defaults). */
+const getInitialBannerValues = (
+  notification: BannerSlotFormData['notification']
+): BannerSlotValues => {
+  if (!notification) {
+    return DEFAULT_BANNER_VALUES;
+  }
+  return {
+    content: notification.content ?? '',
+    textColor: notification.textColor ?? '#ffffff',
+    backgroundColor: notification.backgroundColor ?? '#000000',
+    displayFrom: notification.displayFrom ?? '',
+    displayUntil: notification.displayUntil ?? '',
+    repostedFromId: notification.repostedFromId ?? '',
+  };
+};
+
+interface BannerPreviewProps {
+  content: string;
+  textColor: string;
+  backgroundColor: string;
+}
+
+/** The live preview strip; renders nothing until there is content to show. */
+const BannerPreview = ({ content, textColor, backgroundColor }: BannerPreviewProps) => {
+  if (!content) {
+    return null;
+  }
+  return (
+    <div
+      className={cn(
+        'rounded-sm px-4 py-2 text-center text-sm',
+        isDarkColor(backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
+      )}
+      style={{ color: textColor, backgroundColor }}
+      dangerouslySetInnerHTML={{
+        __html: addLinkAttributes(sanitizeNotificationHtml(content)),
+      }}
+    />
   );
-  const [displayFrom, setDisplayFrom] = useState(slot.notification?.displayFrom ?? '');
-  const [displayUntil, setDisplayUntil] = useState(slot.notification?.displayUntil ?? '');
-  const [repostedFromId, setRepostedFromId] = useState(slot.notification?.repostedFromId ?? '');
+};
+
+interface BannerDatePickersProps {
+  displayFrom: string;
+  displayUntil: string;
+  displayUntilError?: string;
+  onDisplayFromChange: (value: string) => void;
+  onDisplayUntilChange: (value: string) => void;
+}
+
+/** The "Display From" / "Display Until" date pickers plus the until-field error. */
+const BannerDatePickers = ({
+  displayFrom,
+  displayUntil,
+  displayUntilError,
+  onDisplayFromChange,
+  onDisplayUntilChange,
+}: BannerDatePickersProps) => (
+  <>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Display From</Label>
+        <DatePicker
+          fieldName="displayFrom"
+          value={displayFrom ? displayFrom.split('T')[0] : ''}
+          onSelect={onDisplayFromChange}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Display Until</Label>
+        <DatePicker
+          fieldName="displayUntil"
+          value={displayUntil ? displayUntil.split('T')[0] : ''}
+          onSelect={onDisplayUntilChange}
+        />
+      </div>
+    </div>
+    {displayUntilError && <p className="text-destructive text-sm">{displayUntilError}</p>}
+  </>
+);
+
+interface BannerActionsProps {
+  isPending: boolean;
+  isDeletingBanner: boolean;
+  hasNotification: boolean;
+  onDelete: () => void;
+}
+
+/** The Save submit button plus a Delete button shown only for an existing notification. */
+const BannerActions = ({
+  isPending,
+  isDeletingBanner,
+  hasNotification,
+  onDelete,
+}: BannerActionsProps) => (
+  <div className="flex gap-2">
+    <Button type="submit" disabled={isPending} size="sm">
+      {isPending ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        <Save className="mr-2 h-4 w-4" />
+      )}
+      Save
+    </Button>
+    {hasNotification && (
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        disabled={isDeletingBanner}
+        onClick={onDelete}
+      >
+        {isDeletingBanner ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Trash2 className="mr-2 h-4 w-4" />
+        )}
+        Delete Notification
+      </Button>
+    )}
+  </div>
+);
+
+export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
+  const initialValues = getInitialBannerValues(slot.notification);
+  const [content, setContent] = useState(initialValues.content);
+  const [textColor, setTextColor] = useState(initialValues.textColor);
+  const [backgroundColor, setBackgroundColor] = useState(initialValues.backgroundColor);
+  const [displayFrom, setDisplayFrom] = useState(initialValues.displayFrom);
+  const [displayUntil, setDisplayUntil] = useState(initialValues.displayUntil);
+  const [repostedFromId, setRepostedFromId] = useState(initialValues.repostedFromId);
   const { upsertBannerAsync } = useUpsertBannerNotificationMutation();
   const { deleteBannerAsync, isDeletingBanner } = useDeleteBannerNotificationMutation();
 
@@ -182,41 +324,16 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
         </div>
 
         {/* Preview strip */}
-        {content && (
-          <div
-            className={cn(
-              'rounded-sm px-4 py-2 text-center text-sm',
-              isDarkColor(backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
-            )}
-            style={{ color: textColor, backgroundColor }}
-            dangerouslySetInnerHTML={{
-              __html: addLinkAttributes(sanitizeNotificationHtml(content)),
-            }}
-          />
-        )}
+        <BannerPreview content={content} textColor={textColor} backgroundColor={backgroundColor} />
 
         {/* Date pickers */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Display From</Label>
-            <DatePicker
-              fieldName="displayFrom"
-              value={displayFrom ? displayFrom.split('T')[0] : ''}
-              onSelect={(dateString) => setDisplayFrom(dateString)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Display Until</Label>
-            <DatePicker
-              fieldName="displayUntil"
-              value={displayUntil ? displayUntil.split('T')[0] : ''}
-              onSelect={(dateString) => setDisplayUntil(dateString)}
-            />
-          </div>
-        </div>
-        {formState.errors?.displayUntil && (
-          <p className="text-destructive text-sm">{formState.errors.displayUntil[0]}</p>
-        )}
+        <BannerDatePickers
+          displayFrom={displayFrom}
+          displayUntil={displayUntil}
+          displayUntilError={formState.errors?.displayUntil?.[0]}
+          onDisplayFromChange={setDisplayFrom}
+          onDisplayUntilChange={setDisplayUntil}
+        />
 
         {/* Repost search */}
         <div className="space-y-2">
@@ -233,32 +350,12 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
         {formState.success && <p className="text-sm text-green-600">Saved successfully.</p>}
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <Button type="submit" disabled={isPending} size="sm">
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Save
-          </Button>
-          {slot.notification && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={isDeletingBanner}
-              onClick={handleDelete}
-            >
-              {isDeletingBanner ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              Delete Notification
-            </Button>
-          )}
-        </div>
+        <BannerActions
+          isPending={isPending}
+          isDeletingBanner={isDeletingBanner}
+          hasNotification={!!slot.notification}
+          onDelete={handleDelete}
+        />
       </form>
     </div>
   );

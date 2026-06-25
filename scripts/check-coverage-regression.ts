@@ -192,6 +192,72 @@ const parseCurrentCoverage = (): CoverageMetrics => {
   };
 };
 
+// Literal property access for a fixed-shape metric, avoiding computed key indexing.
+const readMetric = (source: CoverageMetrics, metric: keyof CoverageMetrics): number => {
+  switch (metric) {
+    case 'statements':
+      return source.statements;
+    case 'branches':
+      return source.branches;
+    case 'functions':
+      return source.functions;
+    case 'lines':
+      return source.lines;
+  }
+};
+
+/** The classification of a single metric's baseline→current change. */
+interface MetricEvaluation {
+  /** Status cell rendered in the comparison table. */
+  status: string;
+  /** A regression message, when the change is a hard failure. */
+  regression?: string;
+  /** A tolerated-decrease message, when the change is within tolerance. */
+  toleratedDecrease?: string;
+}
+
+/**
+ * Classify one metric's change into a table status plus, where relevant, a
+ * regression or tolerated-decrease message. Extracted from checkForRegressions
+ * to keep that function's cyclomatic complexity within limits; behavior is
+ * identical to the previous inline if/else-if/else.
+ */
+const evaluateMetric = (
+  metric: keyof CoverageMetrics,
+  baselineValue: number,
+  currentValue: number,
+  threshold: number
+): MetricEvaluation => {
+  if (currentValue >= baselineValue) {
+    return { status: '✅' };
+  }
+
+  const diff = currentValue - baselineValue;
+  const label = metric.charAt(0).toUpperCase() + metric.slice(1);
+  const change = `${baselineValue.toFixed(2)}% → ${currentValue.toFixed(2)}% (${diff.toFixed(2)}%`;
+  const decrease = baselineValue - currentValue;
+
+  // Within tolerance AND still above threshold → tolerated.
+  if (decrease <= ALLOWED_DECREASE_TOLERANCE && currentValue >= threshold) {
+    return {
+      status: '⚠️ OK',
+      toleratedDecrease: `${label}: ${change}, within tolerance)`,
+    };
+  }
+
+  if (currentValue < threshold) {
+    return {
+      status: '❌ FAIL',
+      regression: `${label}: ${change}, below threshold of ${threshold}%)`,
+    };
+  }
+
+  return {
+    status: '❌ FAIL',
+    regression: `${label}: ${change}, exceeds ${ALLOWED_DECREASE_TOLERANCE}% tolerance)`,
+  };
+};
+
 /**
  * Compare metrics and report any regressions
  */
@@ -205,20 +271,6 @@ const checkForRegressions = (baseline: CoverageMetrics, current: CoverageMetrics
 
   const metricNames: (keyof CoverageMetrics)[] = ['statements', 'branches', 'functions', 'lines'];
 
-  // Literal property access for a fixed-shape metric, avoiding computed key indexing.
-  const readMetric = (source: CoverageMetrics, metric: keyof CoverageMetrics): number => {
-    switch (metric) {
-      case 'statements':
-        return source.statements;
-      case 'branches':
-        return source.branches;
-      case 'functions':
-        return source.functions;
-      case 'lines':
-        return source.lines;
-    }
-  };
-
   for (const metric of metricNames) {
     const baselineValue = readMetric(baseline, metric);
     const currentValue = readMetric(current, metric);
@@ -227,31 +279,14 @@ const checkForRegressions = (baseline: CoverageMetrics, current: CoverageMetrics
     const diffStr = diff >= 0 ? `+${diff.toFixed(2)}%` : `${diff.toFixed(2)}%`;
     const arrowStatus = diff < 0 ? '⬇️' : diff > 0 ? '⬆️' : '➡️';
 
-    let status: string;
-
-    if (currentValue < baselineValue) {
-      const decrease = baselineValue - currentValue;
-
-      // Check if decrease is within tolerance AND still above threshold
-      if (decrease <= ALLOWED_DECREASE_TOLERANCE && currentValue >= threshold) {
-        status = '⚠️ OK';
-        toleratedDecreases.push(
-          `${metric.charAt(0).toUpperCase() + metric.slice(1)}: ${baselineValue.toFixed(2)}% → ${currentValue.toFixed(2)}% (${diff.toFixed(2)}%, within tolerance)`
-        );
-      } else if (currentValue < threshold) {
-        status = '❌ FAIL';
-        regressions.push(
-          `${metric.charAt(0).toUpperCase() + metric.slice(1)}: ${baselineValue.toFixed(2)}% → ${currentValue.toFixed(2)}% (${diff.toFixed(2)}%, below threshold of ${threshold}%)`
-        );
-      } else {
-        status = '❌ FAIL';
-        regressions.push(
-          `${metric.charAt(0).toUpperCase() + metric.slice(1)}: ${baselineValue.toFixed(2)}% → ${currentValue.toFixed(2)}% (${diff.toFixed(2)}%, exceeds ${ALLOWED_DECREASE_TOLERANCE}% tolerance)`
-        );
-      }
-    } else {
-      status = '✅';
-    }
+    const { status, regression, toleratedDecrease } = evaluateMetric(
+      metric,
+      baselineValue,
+      currentValue,
+      threshold
+    );
+    if (regression) regressions.push(regression);
+    if (toleratedDecrease) toleratedDecreases.push(toleratedDecrease);
 
     const metricDisplay = metric.charAt(0).toUpperCase() + metric.slice(1);
     console.info(

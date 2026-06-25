@@ -11,14 +11,17 @@ import type {
   Artist,
   ArtistListFilters,
   ArtistListWithBio,
+  ArtistNameRecord,
   ArtistWithPublishedReleases,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import type { ImageRecord } from '@/lib/types/domain/image';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { loggers } from '@/lib/utils/logger';
 import { getS3Client } from '@/lib/utils/s3-client';
+import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
@@ -67,6 +70,78 @@ const generateS3Key = (artistId: string, fileName: string): string => {
 };
 
 /**
+ * Map a persisted image row to the public {@link ImageUploadResult} shape,
+ * applying the same `src`/`sortOrder` fallbacks the service has always used.
+ */
+const toImageUploadResult = (
+  image: ImageRecord,
+  fallbacks?: { src?: string; sortOrder?: number }
+): ImageUploadResult => ({
+  id: image.id,
+  src: image.src || (fallbacks?.src ?? ''),
+  caption: image.caption || undefined,
+  altText: image.altText || undefined,
+  sortOrder: image.sortOrder ?? fallbacks?.sortOrder ?? 0,
+});
+
+/**
+ * Upload an image buffer to S3 under `s3Key` and return the public URL for it
+ * (CDN domain when configured, otherwise the direct S3 URL). The artist id and
+ * original file name are stamped into the object metadata.
+ */
+const uploadImageToS3 = async (
+  s3Bucket: string,
+  s3Key: string,
+  artistId: string,
+  imageData: ImageUploadInput
+): Promise<string> => {
+  const s3Client = getS3Client();
+
+  // Use provided content type or fallback to application/octet-stream
+  const contentType = imageData.contentType || 'application/octet-stream';
+
+  const putCommand = new PutObjectCommand({
+    Bucket: s3Bucket,
+    Key: s3Key,
+    Body: imageData.file,
+    ContentType: contentType,
+    CacheControl: 'public, max-age=31536000, immutable',
+    Metadata: {
+      artistId,
+      originalFileName: imageData.fileName,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  await s3Client.send(putCommand);
+
+  // Construct the CDN URL (strip any protocol already on CDN_DOMAIN).
+  const cdnDomain = process.env.CDN_DOMAIN?.replace(/^https?:\/\//, '');
+  const awsRegion = process.env.AWS_REGION || 'us-east-1';
+  const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
+  return cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
+};
+
+/**
+ * Best-effort delete of a single S3 object for an artist image. Logs and
+ * swallows any S3 failure so the caller can continue with the DB delete — the
+ * orphaned object is reclaimed by lifecycle rules.
+ */
+const deleteImageFromS3 = async (s3Bucket: string, s3Key: string): Promise<void> => {
+  try {
+    const s3Client = getS3Client();
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: s3Bucket,
+      Key: s3Key,
+    });
+    await s3Client.send(deleteCommand);
+  } catch (s3Error) {
+    logger.error('S3 delete error (continuing with DB delete)', s3Error);
+    // Continue with database deletion even if S3 fails
+  }
+};
+
+/**
  * Sanitizes the rich-text bio fields (`bio`, `shortBio`, `altBio`) before they
  * are persisted. All three are authored in the Tiptap editor, so they are HTML;
  * `sanitizeBioHtml` enforces the allowlist (and link hardening) on write so
@@ -80,6 +155,62 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
     sanitized.shortBio = sanitizeBioHtml(sanitized.shortBio);
   if (typeof sanitized.altBio === 'string') sanitized.altBio = sanitizeBioHtml(sanitized.altBio);
   return sanitized;
+};
+
+/** Pre-computed lookup keys for the find-or-create-by-name search order. */
+interface ArtistNameLookup {
+  trimmed: string;
+  slug: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * Run the find-or-create-by-name search order and return the first matching
+ * artist, or `null` when none match:
+ *   1. Slug match (unique index, most reliable)
+ *   2. Case-insensitive displayName match
+ *   3. Case-insensitive firstName + surname match
+ */
+const findArtistByName = async (lookup: ArtistNameLookup): Promise<ArtistNameRecord | null> => {
+  const { trimmed, slug, firstName, lastName } = lookup;
+
+  if (slug) {
+    const bySlug = await ArtistRepository.findUniqueBySlug(slug);
+    if (bySlug) {
+      return bySlug;
+    }
+  }
+
+  const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed);
+  if (byDisplayName) {
+    return byDisplayName;
+  }
+
+  if (firstName) {
+    const byName = await ArtistRepository.findFirstByName(firstName, lastName);
+    if (byName) {
+      return byName;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Recover from a slug-collision (`DUPLICATE`) raised while creating an artist by
+ * re-reading the artist that now owns the slug. Returns a failure when the row
+ * still cannot be found.
+ */
+const recoverArtistFromDuplicate = async (
+  trimmed: string
+): Promise<ServiceResponse<ArtistNameRecord>> => {
+  const slug = generateSlug(trimmed);
+  const existing = await ArtistRepository.findUniqueBySlug(slug);
+  if (existing) {
+    return { success: true, data: existing };
+  }
+  return { success: false, error: 'Artist with this slug already exists' };
 };
 
 export class ArtistService {
@@ -245,42 +376,14 @@ export class ArtistService {
       }
 
       const s3Bucket = process.env.S3_BUCKET;
-      const cdnDomainRaw = process.env.CDN_DOMAIN;
-      // Strip any existing protocol from CDN domain to avoid double https://
-      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
 
       if (!s3Bucket) {
         return { success: false, error: 'S3 bucket not configured' };
       }
 
-      const s3Client = getS3Client();
-
-      // Generate unique S3 key
+      // Generate unique S3 key, upload the buffer, and derive its public URL.
       const s3Key = generateS3Key(artistId, imageData.fileName);
-
-      // Use provided content type or fallback to application/octet-stream
-      const contentType = imageData.contentType || 'application/octet-stream';
-
-      // Upload to S3
-      const putCommand = new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: s3Key,
-        Body: imageData.file,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: {
-          artistId,
-          originalFileName: imageData.fileName,
-          uploadedAt: new Date().toISOString(),
-        },
-      });
-
-      await s3Client.send(putCommand);
-
-      // Construct the CDN URL
-      const awsRegion = process.env.AWS_REGION || 'us-east-1';
-      const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
-      const imageUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
+      const imageUrl = await uploadImageToS3(s3Bucket, s3Key, artistId, imageData);
 
       // Get the next sort order for this artist
       const existingImages = await ImageRepository.findManyByOwner({ artistId });
@@ -297,13 +400,7 @@ export class ArtistService {
 
       return {
         success: true,
-        data: {
-          id: image.id,
-          src: image.src || imageUrl,
-          caption: image.caption || undefined,
-          altText: image.altText || undefined,
-          sortOrder: image.sortOrder ?? nextSortOrder,
-        },
+        data: toImageUploadResult(image, { src: imageUrl, sortOrder: nextSortOrder }),
       };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to upload image' });
@@ -360,40 +457,15 @@ export class ArtistService {
         return { success: false, error: 'Image not found' };
       }
 
-      // Extract S3 key from URL
+      // Extract S3 key from URL (CDN/S3 styles, honouring CDN_DOMAIN).
       const s3Bucket = process.env.S3_BUCKET;
-      const cdnDomainRaw = process.env.CDN_DOMAIN;
-      // Strip any existing protocol from CDN domain
-      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
 
       if (image.src && s3Bucket) {
-        let s3Key: string | null = null;
+        const s3Key = extractS3KeyFromUrl(image.src);
 
-        if (cdnDomain && image.src.includes(cdnDomain)) {
-          // Extract key from CDN URL (handles both correct and malformed URLs with double https://)
-          s3Key = image.src.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
-        } else if (image.src.includes('.s3.')) {
-          // Extract key from S3 URL
-          const urlParts = image.src.split('.s3.');
-          if (urlParts[1]) {
-            const keyPart = urlParts[1].split('/').slice(1).join('/');
-            s3Key = keyPart;
-          }
-        }
-
-        // Delete from S3 if we have the key
+        // Delete from S3 if we have the key (best-effort; DB delete always runs).
         if (s3Key) {
-          try {
-            const s3Client = getS3Client();
-            const deleteCommand = new DeleteObjectCommand({
-              Bucket: s3Bucket,
-              Key: s3Key,
-            });
-            await s3Client.send(deleteCommand);
-          } catch (s3Error) {
-            logger.error('S3 delete error (continuing with DB delete)', s3Error);
-            // Continue with database deletion even if S3 fails
-          }
+          await deleteImageFromS3(s3Bucket, s3Key);
         }
       }
 
@@ -598,26 +670,10 @@ export class ArtistService {
       const slug = generateSlug(trimmed);
       const { firstName, lastName } = splitFullName(trimmed);
 
-      // 1. Try slug match (unique index, most reliable)
-      if (slug) {
-        const bySlug = await ArtistRepository.findUniqueBySlug(slug);
-        if (bySlug) {
-          return { success: true, data: bySlug };
-        }
-      }
-
-      // 2. Try case-insensitive displayName match
-      const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed);
-      if (byDisplayName) {
-        return { success: true, data: byDisplayName };
-      }
-
-      // 3. Try case-insensitive firstName + surname match
-      if (firstName) {
-        const byName = await ArtistRepository.findFirstByName(firstName, lastName);
-        if (byName) {
-          return { success: true, data: byName };
-        }
+      // 1–3. Try slug, then displayName, then firstName + surname matches.
+      const found = await findArtistByName({ trimmed, slug, firstName, lastName });
+      if (found) {
+        return { success: true, data: found };
       }
 
       // 4. Create new artist
@@ -631,13 +687,8 @@ export class ArtistService {
       return { success: true, data: newArtist };
     } catch (error) {
       if (error instanceof DataError && error.code === 'DUPLICATE') {
-        // Slug collision — try to find the existing artist instead
-        const slug = generateSlug(trimmed);
-        const existing = await ArtistRepository.findUniqueBySlug(slug);
-        if (existing) {
-          return { success: true, data: existing };
-        }
-        return { success: false, error: 'Artist with this slug already exists' };
+        // Slug collision — try to find the existing artist instead.
+        return recoverArtistFromDuplicate(trimmed);
       }
 
       return failFromError(error, { UNKNOWN: 'Failed to find or create artist' });

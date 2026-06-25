@@ -5,8 +5,6 @@
 
 import 'server-only';
 
-import { revalidatePath } from 'next/cache';
-
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -19,6 +17,13 @@ import {
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
+
+import {
+  attemptRemoveFallback,
+  attemptSetTimeFallback,
+  getHeadlinerFallbackIds,
+  revalidateTourPaths,
+} from './tour-date-actions-helpers';
 
 import type { AdminActionResult } from './run-admin-entity-action';
 
@@ -89,9 +94,7 @@ export const createTourDateAction = async (
     formState.data = { tourDateId: tourDate.id };
 
     // Revalidate paths
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
   } catch {
     formState.success = false;
     setUnknownError(formState);
@@ -164,9 +167,7 @@ export const updateTourDateAction = async (
     formState.errors = undefined;
 
     // Revalidate paths
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
   } catch {
     formState.success = false;
     setUnknownError(formState);
@@ -201,9 +202,7 @@ export const deleteTourDateAction = async (tourDateId: string): Promise<AdminAct
     });
 
     // Revalidate paths
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
 
     return { success: true };
   } catch {
@@ -246,48 +245,23 @@ export const updateHeadlinerSetTimeAction = async (
       metadata: { headlinerId, setTime },
     });
 
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
 
     return { success: true };
   } catch (error) {
-    const isRecordNotFound =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code?: string }).code === 'P2025';
+    const fallbackIds = getHeadlinerFallbackIds(error, tourDateId, artistId);
 
     if (
-      isRecordNotFound &&
-      tourDateId &&
-      artistId &&
-      OBJECT_ID_REGEX.test(tourDateId) &&
-      OBJECT_ID_REGEX.test(artistId)
+      fallbackIds &&
+      (await attemptSetTimeFallback({
+        fallbackIds,
+        headlinerId,
+        setTime,
+        parsedSetTime,
+        userId: session.user.id,
+      }))
     ) {
-      try {
-        const fallbackUpdated = await TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist(
-          tourDateId,
-          artistId,
-          parsedSetTime
-        );
-
-        if (fallbackUpdated) {
-          logSecurityEvent({
-            event: 'tourDateHeadliner.setTimeUpdated',
-            userId: session.user.id,
-            metadata: { headlinerId, artistId, setTime, fallback: true },
-          });
-
-          revalidatePath('/admin/tours');
-          revalidatePath('/tours');
-          revalidatePath('/tours/[tourId]', 'page');
-
-          return { success: true };
-        }
-      } catch (fallbackError) {
-        logger.error('[updateHeadlinerSetTimeAction:fallback]', fallbackError);
-      }
+      return { success: true };
     }
 
     logger.error('[updateHeadlinerSetTimeAction]', error);
@@ -324,47 +298,17 @@ export const removeHeadlinerAction = async (
       metadata: { headlinerId },
     });
 
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
 
     return { success: true };
   } catch (error) {
-    const isRecordNotFound =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code?: string }).code === 'P2025';
+    const fallbackIds = getHeadlinerFallbackIds(error, tourDateId, artistId);
 
     if (
-      isRecordNotFound &&
-      tourDateId &&
-      artistId &&
-      OBJECT_ID_REGEX.test(tourDateId) &&
-      OBJECT_ID_REGEX.test(artistId)
+      fallbackIds &&
+      (await attemptRemoveFallback({ fallbackIds, headlinerId, userId: session.user.id }))
     ) {
-      try {
-        const fallbackRemoved = await TourDateRepository.removeHeadlinerByTourDateAndArtist(
-          tourDateId,
-          artistId
-        );
-
-        if (fallbackRemoved) {
-          logSecurityEvent({
-            event: 'tourDateHeadliner.removed',
-            userId: session.user.id,
-            metadata: { headlinerId, artistId, fallback: true },
-          });
-
-          revalidatePath('/admin/tours');
-          revalidatePath('/tours');
-          revalidatePath('/tours/[tourId]', 'page');
-
-          return { success: true };
-        }
-      } catch (fallbackError) {
-        logger.error('[removeHeadlinerAction:fallback]', fallbackError);
-      }
+      return { success: true };
     }
 
     logger.error('[removeHeadlinerAction]', error);
@@ -405,9 +349,7 @@ export const reorderHeadlinersAction = async (
       metadata: { tourDateId, headlinerIds },
     });
 
-    revalidatePath('/admin/tours');
-    revalidatePath('/tours');
-    revalidatePath('/tours/[tourId]', 'page');
+    revalidateTourPaths();
 
     return { success: true };
   } catch (error) {

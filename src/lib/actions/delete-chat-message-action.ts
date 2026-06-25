@@ -10,6 +10,8 @@ import { ChatMessageRepository } from '@/lib/repositories/chat-message-repositor
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
 import { CHAT_EVENTS, triggerChatEvent } from '@/lib/utils/pusher-server';
 
+import { validateDeleteChatRequest } from './delete-chat-message-action-helpers';
+
 export type DeleteChatMessageScope = 'message' | 'user';
 
 export type DeleteChatMessageActionResult =
@@ -31,21 +33,14 @@ export const deleteChatMessageAction = async (
   input: DeleteChatMessageInput
 ): Promise<DeleteChatMessageActionResult> => {
   const session = await auth();
-  if (!session?.user?.id) {
-    return { success: false, error: 'unauthorized' };
-  }
-  if ((session.user as { role?: string | null }).role !== 'admin') {
-    return { success: false, error: 'forbidden' };
+  const validation = validateDeleteChatRequest(session, input);
+  if (!validation.ok) {
+    return { success: false, error: validation.error };
   }
 
-  const messageId = input.messageId?.trim();
-  if (!messageId || (input.scope !== 'message' && input.scope !== 'user')) {
-    return { success: false, error: 'invalid' };
-  }
+  const { messageId, scope, adminId } = validation;
 
-  const adminId = session.user.id;
-
-  if (input.scope === 'message') {
+  if (scope === 'message') {
     await ChatAdminService.hideMessage({ messageId, adminId });
     await triggerChatEvent(CHAT_EVENTS.messageDeleted, { messageId });
     return { success: true, deletedIds: [messageId] };

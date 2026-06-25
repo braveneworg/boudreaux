@@ -9,17 +9,34 @@ import { useSession } from 'next-auth/react';
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+import type { Session } from 'next-auth';
+
+/** Resolves the best available display name from the session user. */
+const resolveDisplayName = (session: Session | null): string | null | undefined => {
+  const user = session?.user;
+  return user?.username || user?.name || user?.email;
+};
+
+/** Emits the development-only session diagnostics. */
+const logSignedInAsDebug = (
+  session: Session | null,
+  displayName: string | null | undefined
+): void => {
+  if (process.env.NODE_ENV !== 'development') {
+    return;
+  }
+  console.info('[SignedInAs] Session:', session);
+  console.info('[SignedInAs] User:', session?.user);
+  console.info('[SignedInAs] Display name:', displayName);
+};
+
 export const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const username = session?.user?.username;
-  const displayName = username || session?.user?.name || session?.user?.email;
+  const displayName = resolveDisplayName(session);
 
-  if (process.env.NODE_ENV === 'development') {
-    console.info('[SignedInAs] Session:', session);
-    console.info('[SignedInAs] User:', session?.user);
-    console.info('[SignedInAs] Display name:', displayName);
-  }
+  logSignedInAsDebug(session, displayName);
 
   if (!displayName) {
     console.warn('[SignedInAs] No display name found, returning null');

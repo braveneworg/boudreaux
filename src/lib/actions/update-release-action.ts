@@ -9,14 +9,157 @@ import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import type { FormState } from '@/lib/types/form-state';
 import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
+
+const PERMITTED_FIELD_NAMES = [
+  'title',
+  'releasedOn',
+  'coverArt',
+  'formats',
+  'artistIds',
+  'labels',
+  'catalogNumber',
+  'description',
+  'notes',
+  'executiveProducedBy',
+  'coProducedBy',
+  'masteredBy',
+  'mixedBy',
+  'recordedBy',
+  'artBy',
+  'designBy',
+  'photographyBy',
+  'linerNotesBy',
+  'publishedAt',
+  'featuredOn',
+  'featuredUntil',
+  'featuredDescription',
+  'suggestedPrice',
+];
+
+const parseToArray = (value: string | undefined): string[] =>
+  value
+    ? value
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
+    : [];
+
+const buildReleaseUpdateInput = (data: {
+  title: string;
+  releasedOn: string;
+  coverArt: string;
+  formats?: string[];
+  labels?: string;
+  catalogNumber?: string;
+  description?: string;
+  notes?: string;
+  executiveProducedBy?: string;
+  coProducedBy?: string;
+  masteredBy?: string;
+  mixedBy?: string;
+  recordedBy?: string;
+  artBy?: string;
+  designBy?: string;
+  photographyBy?: string;
+  linerNotesBy?: string;
+  publishedAt?: string;
+  featuredOn?: string;
+  featuredUntil?: string;
+  featuredDescription?: string;
+  suggestedPrice?: string;
+}): UpdateReleaseData => {
+  const suggestedPriceCents =
+    data.suggestedPrice && data.suggestedPrice !== ''
+      ? Math.round(parseFloat(data.suggestedPrice) * 100)
+      : null;
+
+  return {
+    title: data.title,
+    releasedOn: new Date(data.releasedOn),
+    coverArt: data.coverArt,
+    formats: (data.formats || ['DIGITAL']) as Format[],
+    labels: parseToArray(data.labels),
+    catalogNumber: data.catalogNumber || undefined,
+    description: data.description || undefined,
+    notes: parseToArray(data.notes),
+    executiveProducedBy: parseToArray(data.executiveProducedBy),
+    coProducedBy: parseToArray(data.coProducedBy),
+    masteredBy: parseToArray(data.masteredBy),
+    mixedBy: parseToArray(data.mixedBy),
+    recordedBy: parseToArray(data.recordedBy),
+    artBy: parseToArray(data.artBy),
+    designBy: parseToArray(data.designBy),
+    photographyBy: parseToArray(data.photographyBy),
+    linerNotesBy: parseToArray(data.linerNotesBy),
+    publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
+    featuredOn: data.featuredOn ? new Date(data.featuredOn) : undefined,
+    featuredUntil: data.featuredUntil ? new Date(data.featuredUntil) : undefined,
+    featuredDescription: data.featuredDescription || undefined,
+    suggestedPrice: suggestedPriceCents,
+  };
+};
+
+const syncArtistReleases = async (releaseId: string, artistIds: string[]): Promise<void> => {
+  const existingArtistReleases = await prisma.artistRelease.findMany({
+    where: { releaseId },
+    select: { id: true, artistId: true },
+  });
+
+  const existingArtistIds = new Set(
+    existingArtistReleases.map((ar: { id: string; artistId: string }) => ar.artistId)
+  );
+  const newArtistIds = new Set(artistIds);
+
+  const toDelete = existingArtistReleases.filter(
+    (ar: { id: string; artistId: string }) => !newArtistIds.has(ar.artistId)
+  );
+  const toCreate = artistIds.filter((artistId) => !existingArtistIds.has(artistId));
+
+  const ops: Promise<unknown>[] = [];
+  if (toDelete.length > 0) {
+    ops.push(
+      prisma.artistRelease.deleteMany({
+        where: { id: { in: toDelete.map((ar: { id: string; artistId: string }) => ar.id) } },
+      })
+    );
+  }
+  if (toCreate.length > 0) {
+    ops.push(
+      prisma.artistRelease.createMany({
+        data: toCreate.map((artistId) => ({ artistId, releaseId })),
+      })
+    );
+  }
+  await Promise.all(ops);
+};
+
+const mapReleaseServiceError = (errorMessage: string, formState: FormState): void => {
+  const msg = errorMessage.toLowerCase();
+  const isTitleError =
+    msg.includes('title') &&
+    (msg.includes('unique') || msg.includes('already exists') || msg.includes('duplicate'));
+
+  if (isTitleError) {
+    formState.errors = {
+      ...formState.errors,
+      title: ['This title is already in use. Please choose a different one.'],
+    };
+  } else if (msg.includes('not found')) {
+    formState.errors = { ...formState.errors, general: ['Release not found'] };
+  } else {
+    formState.errors = { general: ['Failed to update release'] };
+  }
+};
 
 export const updateReleaseAction = async (
   releaseId: string,
@@ -25,7 +168,6 @@ export const updateReleaseAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
-  // Validate releaseId format
   if (!OBJECT_ID_REGEX.test(releaseId)) {
     return {
       fields: {},
@@ -34,151 +176,24 @@ export const updateReleaseAction = async (
     };
   }
 
-  const permittedFieldNames = [
-    'title',
-    'releasedOn',
-    'coverArt',
-    'formats',
-    'artistIds',
-    'labels',
-    'catalogNumber',
-    'description',
-    'notes',
-    'executiveProducedBy',
-    'coProducedBy',
-    'masteredBy',
-    'mixedBy',
-    'recordedBy',
-    'artBy',
-    'designBy',
-    'photographyBy',
-    'linerNotesBy',
-    'publishedAt',
-    'featuredOn',
-    'featuredUntil',
-    'featuredDescription',
-    'suggestedPrice',
-  ];
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
+  const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, createReleaseSchema);
 
   if (!parsed.success) {
-    // Schema validation failed - add validation errors to formState
     formState.success = false;
-    // Add Zod validation errors
-    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
-    for (const error of parsed.error.issues) {
-      const field = error.path[0]?.toString() || 'general';
-      const messages = errors.get(field) ?? [];
-      messages.push(error.message);
-      errors.set(field, messages);
-    }
-    formState.errors = Object.fromEntries(errors);
+    applyZodIssuesToFormState(formState, parsed.error);
     return formState;
   }
 
   try {
-    const {
-      title,
-      releasedOn,
-      coverArt,
-      formats,
-      artistIds,
-      labels,
-      catalogNumber,
-      description,
-      notes,
-      executiveProducedBy,
-      coProducedBy,
-      masteredBy,
-      mixedBy,
-      recordedBy,
-      artBy,
-      designBy,
-      photographyBy,
-      linerNotesBy,
-      publishedAt,
-      featuredOn,
-      featuredUntil,
-      featuredDescription,
-      suggestedPrice,
-    } = parsed.data;
+    const response = await ReleaseService.updateRelease(
+      releaseId,
+      buildReleaseUpdateInput(parsed.data)
+    );
 
-    // Parse comma-separated strings to arrays
-    const parseToArray = (value: string | undefined): string[] =>
-      value
-        ? value
-            .split(',')
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : [];
-
-    const suggestedPriceCents =
-      suggestedPrice && suggestedPrice !== '' ? Math.round(parseFloat(suggestedPrice) * 100) : null;
-
-    // Update release in database
-    const response = await ReleaseService.updateRelease(releaseId, {
-      title,
-      releasedOn: new Date(releasedOn),
-      coverArt,
-      formats: (formats || ['DIGITAL']) as Format[],
-      labels: parseToArray(labels),
-      catalogNumber: catalogNumber || undefined,
-      description: description || undefined,
-      notes: parseToArray(notes),
-      executiveProducedBy: parseToArray(executiveProducedBy),
-      coProducedBy: parseToArray(coProducedBy),
-      masteredBy: parseToArray(masteredBy),
-      mixedBy: parseToArray(mixedBy),
-      recordedBy: parseToArray(recordedBy),
-      artBy: parseToArray(artBy),
-      designBy: parseToArray(designBy),
-      photographyBy: parseToArray(photographyBy),
-      linerNotesBy: parseToArray(linerNotesBy),
-      publishedAt: publishedAt ? new Date(publishedAt) : undefined,
-      featuredOn: featuredOn ? new Date(featuredOn) : undefined,
-      featuredUntil: featuredUntil ? new Date(featuredUntil) : undefined,
-      featuredDescription: featuredDescription || undefined,
-      suggestedPrice: suggestedPriceCents,
-    });
-
-    // Sync ArtistRelease associations if artistIds provided
-    if (response.success && artistIds) {
-      // Get current artist associations
-      const existingArtistReleases = await prisma.artistRelease.findMany({
-        where: { releaseId },
-        select: { id: true, artistId: true },
-      });
-
-      const existingArtistIds = new Set(
-        existingArtistReleases.map((ar: { id: string; artistId: string }) => ar.artistId)
-      );
-      const newArtistIds = new Set(artistIds);
-
-      // Delete removed and create new associations in parallel
-      const toDelete = existingArtistReleases.filter(
-        (ar: { id: string; artistId: string }) => !newArtistIds.has(ar.artistId)
-      );
-      const toCreate = artistIds.filter((id) => !existingArtistIds.has(id));
-
-      const ops: Promise<unknown>[] = [];
-      if (toDelete.length > 0) {
-        ops.push(
-          prisma.artistRelease.deleteMany({
-            where: { id: { in: toDelete.map((ar: { id: string; artistId: string }) => ar.id) } },
-          })
-        );
-      }
-      if (toCreate.length > 0) {
-        ops.push(
-          prisma.artistRelease.createMany({
-            data: toCreate.map((artistId) => ({ artistId, releaseId })),
-          })
-        );
-      }
-      await Promise.all(ops);
+    if (response.success && parsed.data.artistIds) {
+      await syncArtistReleases(releaseId, parsed.data.artistIds);
     }
 
-    // Log release update for security audit
     logSecurityEvent({
       event: 'media.release.updated',
       userId: session.user.id,
@@ -198,32 +213,14 @@ export const updateReleaseAction = async (
       if (!formState.errors) {
         formState.errors = {};
       }
-
       const errorMessage = response.error || 'Failed to update release';
-
-      // Check if error is related to title uniqueness
-      if (
-        errorMessage.toLowerCase().includes('title') &&
-        (errorMessage.toLowerCase().includes('unique') ||
-          errorMessage.toLowerCase().includes('already exists') ||
-          errorMessage.toLowerCase().includes('duplicate'))
-      ) {
-        formState.errors.title = ['This title is already in use. Please choose a different one.'];
-      } else if (errorMessage.toLowerCase().includes('not found')) {
-        formState.errors.general = ['Release not found'];
-      } else {
-        formState.errors = { general: ['Failed to update release'] };
-      }
+      mapReleaseServiceError(errorMessage, formState);
     }
 
     formState.success = response.success;
 
-    // Revalidate the release page to reflect updates
     revalidatePath(`/admin/releases/${releaseId}`);
 
-    // Propagate the edit to every public surface that renders this release:
-    // the cached listing, the listing page, the detail page, and any artist
-    // discography pages it appears on.
     if (response.success) {
       ReleaseService.invalidateCache();
       revalidatePath('/releases');

@@ -35,6 +35,93 @@ export type {
 const toPastTense = (verb: MutationVerb): string =>
   verb === 'publish' ? 'published' : verb === 'delete' ? 'deleted' : 'restored';
 
+/** Props for the internal {@link DataViewBody} list + refresh-overlay region. */
+interface DataViewBodyProps<T extends Record<string, unknown>> {
+  items: T[];
+  entity: DataViewProps<T>['entity'];
+  entityUrlPath: string;
+  entityDisplayLabel: string;
+  fieldsToShow: string[];
+  imageField?: string;
+  coverArtField?: string;
+  isPending: boolean;
+  supportsSoftDelete: boolean;
+  canRestore: boolean;
+  pagination?: DataViewProps<T>['pagination'];
+  showRefreshSkeleton: boolean;
+  resolveDisplayName: (item: T) => string;
+  onPublish: (item: T) => void;
+  onDelete: (item: T) => void;
+  onRestore: (item: T) => void;
+}
+
+/**
+ * The list region: renders entity cards (or an empty message), the optional
+ * load-more trigger, and the refresh overlay shown during a full refetch.
+ */
+const DataViewBody = <T extends Record<string, unknown>>({
+  items,
+  entity,
+  entityUrlPath,
+  entityDisplayLabel,
+  fieldsToShow,
+  imageField,
+  coverArtField,
+  isPending,
+  supportsSoftDelete,
+  canRestore,
+  pagination,
+  showRefreshSkeleton,
+  resolveDisplayName,
+  onPublish,
+  onDelete,
+  onRestore,
+}: DataViewBodyProps<T>): ReactElement => (
+  <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
+    {items.length > 0 ? (
+      <>
+        <ul>
+          {items.map((item) => (
+            <li key={item.id as string}>
+              <DataViewCard
+                item={item}
+                entity={entity}
+                entityUrlPath={entityUrlPath}
+                fieldsToShow={fieldsToShow}
+                imageField={imageField}
+                coverArtField={coverArtField}
+                isPending={isPending}
+                supportsSoftDelete={supportsSoftDelete}
+                canRestore={canRestore}
+                resolveDisplayName={resolveDisplayName}
+                onPublish={onPublish}
+                onDelete={onDelete}
+                onRestore={onRestore}
+              />
+            </li>
+          ))}
+        </ul>
+        {pagination?.fetchNextPage && <LoadMoreTrigger {...pagination} />}
+      </>
+    ) : (
+      <p>No data available</p>
+    )}
+    {showRefreshSkeleton && (
+      <div
+        data-testid="data-view-overlay"
+        role="status"
+        aria-label={`Loading ${entityDisplayLabel}s`}
+        className="bg-background/60 absolute inset-0 z-10 flex cursor-wait items-start justify-center pt-24 backdrop-blur-sm"
+      >
+        <div className="text-muted-foreground flex items-center gap-2">
+          <Spinner className="size-5" />
+          <span className="text-sm">{`Loading ${entityDisplayLabel}s...`}</span>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
 /**
  * A generic data view for displaying and managing admin entities: a searchable,
  * filterable, infinitely-scrolling list of cards with create, edit, view, publish,
@@ -125,13 +212,18 @@ export const DataView = <T extends Record<string, unknown>>({
   // but not while paging in more items — that keeps its own "Loading more..." spinner.
   const showRefreshSkeleton = isFetching && !pagination?.isFetchingNextPage;
 
+  const handleCreate = useCallback(
+    () => router?.push(`/admin/${entityUrlPath}/new`),
+    [router, entityUrlPath]
+  );
+
   return (
     <ImagePreviewProvider>
       <div className="mx-1">
         {canCreate && (
           <Button
             className="w-full"
-            onClick={() => router?.push(`/admin/${entityUrlPath}/new`)}
+            onClick={handleCreate}
           >{`Create ${entityDisplayLabel}`}</Button>
         )}
         {error && <div className="mb-2 text-red-600">{error}</div>}
@@ -140,49 +232,24 @@ export const DataView = <T extends Record<string, unknown>>({
           entityDisplayLabel={entityDisplayLabel}
           supportsSoftDelete={supportsSoftDelete}
         />
-        <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
-          {items.length > 0 ? (
-            <>
-              <ul>
-                {items.map((item) => (
-                  <li key={item.id as string}>
-                    <DataViewCard
-                      item={item}
-                      entity={entity}
-                      entityUrlPath={entityUrlPath}
-                      fieldsToShow={fieldsToShow}
-                      imageField={imageField}
-                      coverArtField={coverArtField}
-                      isPending={isPending}
-                      supportsSoftDelete={supportsSoftDelete}
-                      canRestore={!!mutations.restore}
-                      resolveDisplayName={resolveDisplayName}
-                      onPublish={handlePublish}
-                      onDelete={handleDelete}
-                      onRestore={handleRestore}
-                    />
-                  </li>
-                ))}
-              </ul>
-              {pagination?.fetchNextPage && <LoadMoreTrigger {...pagination} />}
-            </>
-          ) : (
-            <p>No data available</p>
-          )}
-          {showRefreshSkeleton && (
-            <div
-              data-testid="data-view-overlay"
-              role="status"
-              aria-label={`Loading ${entityDisplayLabel}s`}
-              className="bg-background/60 absolute inset-0 z-10 flex cursor-wait items-start justify-center pt-24 backdrop-blur-sm"
-            >
-              <div className="text-muted-foreground flex items-center gap-2">
-                <Spinner className="size-5" />
-                <span className="text-sm">{`Loading ${entityDisplayLabel}s...`}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <DataViewBody
+          items={items}
+          entity={entity}
+          entityUrlPath={entityUrlPath}
+          entityDisplayLabel={entityDisplayLabel}
+          fieldsToShow={fieldsToShow}
+          imageField={imageField}
+          coverArtField={coverArtField}
+          isPending={isPending}
+          supportsSoftDelete={supportsSoftDelete}
+          canRestore={!!mutations.restore}
+          pagination={pagination}
+          showRefreshSkeleton={showRefreshSkeleton}
+          resolveDisplayName={resolveDisplayName}
+          onPublish={handlePublish}
+          onDelete={handleDelete}
+          onRestore={handleRestore}
+        />
       </div>
     </ImagePreviewProvider>
   );

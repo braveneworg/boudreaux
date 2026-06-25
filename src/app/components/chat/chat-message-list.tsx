@@ -63,6 +63,76 @@ interface ChatMessageListProps {
 
 const SCROLL_BOTTOM_THRESHOLD_PX = 50;
 
+interface ScrollFlags {
+  firstId: string | undefined;
+  lastId: string | undefined;
+  isFirstPaint: boolean;
+  isPrepend: boolean;
+  isAppend: boolean;
+}
+
+/**
+ * Classify how the message array changed since the previous paint so the
+ * effect can decide whether to anchor to the bottom (first paint / tail
+ * append) or preserve the viewport (prepend on "Load more").
+ */
+const computeScrollFlags = (
+  messages: OptimisticChatMessage[],
+  prevFirstId: string | undefined,
+  prevLastId: string | undefined
+): ScrollFlags => {
+  const firstId = messages[0]?.id;
+  const lastId = messages[messages.length - 1]?.id;
+  const isFirstPaint = prevFirstId === undefined && prevLastId === undefined;
+  const isPrepend = !isFirstPaint && firstId !== prevFirstId;
+  const isAppend = !isFirstPaint && lastId !== prevLastId && firstId === prevFirstId;
+  return { firstId, lastId, isFirstPaint, isPrepend, isAppend };
+};
+
+/**
+ * On first paint, find the last DOM node mentioning the viewer's username so
+ * the list can deep-link to it instead of anchoring to the bottom. Returns
+ * null when there's nothing to anchor to (not first paint, no target, already
+ * resolved, or no matching node).
+ */
+const findMentionScrollTarget = (
+  el: HTMLElement,
+  targetUsername: string | undefined,
+  isFirstPaint: boolean,
+  alreadyDone: boolean
+): HTMLElement | null => {
+  if (!isFirstPaint || !targetUsername || alreadyDone) return null;
+  const nodes = el.querySelectorAll<HTMLElement>(
+    `[data-mention-username="${CSS.escape(targetUsername)}"]`
+  );
+  return nodes.length > 0 ? nodes[nodes.length - 1] : null;
+};
+
+interface ScrollAnchorState {
+  el: HTMLElement;
+  flags: ScrollFlags;
+  wasAtBottom: boolean;
+  prevScrollHeight: number;
+  newScrollHeight: number;
+}
+
+/** Apply the resolved scroll position for the current update. */
+const applyScrollAnchor = ({
+  el,
+  flags,
+  wasAtBottom,
+  prevScrollHeight,
+  newScrollHeight,
+}: ScrollAnchorState): void => {
+  if (flags.isFirstPaint) {
+    el.scrollTop = el.scrollHeight;
+  } else if (flags.isPrepend) {
+    el.scrollTop = el.scrollTop + (newScrollHeight - prevScrollHeight);
+  } else if (flags.isAppend && wasAtBottom) {
+    el.scrollTop = el.scrollHeight;
+  }
+};
+
 /**
  * Scrollable message list. Anchors to the bottom on first paint and on
  * new tail messages when the user was already at the bottom; preserves
@@ -107,46 +177,36 @@ export const ChatMessageList = ({
     if (!el || messages.length === 0) return;
 
     const newScrollHeight = el.scrollHeight;
-    const firstId = messages[0]?.id;
-    const lastId = messages[messages.length - 1]?.id;
-    const prevFirstId = prevFirstIdRef.current;
-    const prevLastId = prevLastIdRef.current;
+    const flags = computeScrollFlags(messages, prevFirstIdRef.current, prevLastIdRef.current);
 
-    const isFirstPaint = prevFirstId === undefined && prevLastId === undefined;
-    const isPrepend = !isFirstPaint && firstId !== prevFirstId;
-    const isAppend = !isFirstPaint && lastId !== prevLastId && firstId === prevFirstId;
+    const commitRefs = (): void => {
+      prevFirstIdRef.current = flags.firstId;
+      prevLastIdRef.current = flags.lastId;
+      prevScrollHeightRef.current = newScrollHeight;
+    };
 
     // Mention deep-link: on the first paint after messages load, anchor
     // to the most recent mention of the viewer's username instead of the
     // bottom. Falls back to bottom if no matching mention is found.
     const targetUsername = scrollToMentionUsername?.toLowerCase();
-    if (isFirstPaint && targetUsername && !mentionScrollDoneRef.current) {
-      const nodes = el.querySelectorAll<HTMLElement>(
-        `[data-mention-username="${CSS.escape(targetUsername)}"]`
-      );
-      const lastMention = nodes.length > 0 ? nodes[nodes.length - 1] : null;
+    if (flags.isFirstPaint && targetUsername && !mentionScrollDoneRef.current) {
+      const lastMention = findMentionScrollTarget(el, targetUsername, flags.isFirstPaint, false);
       mentionScrollDoneRef.current = true;
       if (lastMention) {
         lastMention.scrollIntoView({ block: 'center' });
-        prevFirstIdRef.current = firstId;
-        prevLastIdRef.current = lastId;
-        prevScrollHeightRef.current = newScrollHeight;
+        commitRefs();
         return;
       }
     }
 
-    if (isFirstPaint) {
-      el.scrollTop = el.scrollHeight;
-    } else if (isPrepend) {
-      const heightDelta = newScrollHeight - prevScrollHeightRef.current;
-      el.scrollTop = el.scrollTop + heightDelta;
-    } else if (isAppend && wasAtBottomRef.current) {
-      el.scrollTop = el.scrollHeight;
-    }
-
-    prevFirstIdRef.current = firstId;
-    prevLastIdRef.current = lastId;
-    prevScrollHeightRef.current = newScrollHeight;
+    applyScrollAnchor({
+      el,
+      flags,
+      wasAtBottom: wasAtBottomRef.current,
+      prevScrollHeight: prevScrollHeightRef.current,
+      newScrollHeight,
+    });
+    commitRefs();
   }, [messages, scrollToMentionUsername]);
 
   // Filter out pinned messages and pre-compute per-row alignment once per

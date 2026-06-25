@@ -216,13 +216,68 @@ interface ProcessResult {
   error?: string;
 }
 
-const processImage = async (
-  s3: S3Client,
-  bucket: string,
-  key: string,
-  existingKeys: Set<string>,
-  dryRun: boolean
-): Promise<ProcessResult> => {
+interface ProcessImageOptions {
+  s3: S3Client;
+  bucket: string;
+  key: string;
+  existingKeys: Set<string>;
+  dryRun: boolean;
+}
+
+interface WebpWidthContext {
+  s3: S3Client;
+  bucket: string;
+  key: string;
+  buffer: Buffer;
+  originalWidth: number;
+  existingKeys: Set<string>;
+  dryRun: boolean;
+}
+
+/** Generate (or dry-run/skip) the WebP variant for a single width into `result`. */
+const processWebpWidth = async (
+  ctx: WebpWidthContext,
+  targetWidth: number,
+  result: ProcessResult
+): Promise<void> => {
+  const webpKey = buildWebpVariantKey(ctx.key, targetWidth);
+
+  if (ctx.existingKeys.has(webpKey)) {
+    result.variantsSkipped++;
+    return;
+  }
+
+  if (ctx.dryRun) {
+    log(
+      `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpKey} (${targetWidth}px WebP from ${ctx.originalWidth}px)`,
+      'info'
+    );
+    result.variantsUploaded++;
+    return;
+  }
+
+  const webpBuffer = await sharp(ctx.buffer)
+    .resize(targetWidth, undefined, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: WEBP_QUALITY })
+    .toBuffer();
+
+  await uploadBuffer(ctx.s3, ctx.bucket, webpKey, webpBuffer);
+  result.variantsUploaded++;
+  result.uploadedVariantKeys.push(webpKey);
+
+  log(
+    `  ${colors.green}+${colors.reset} ${webpKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
+    'info'
+  );
+};
+
+const processImage = async ({
+  s3,
+  bucket,
+  key,
+  existingKeys,
+  dryRun,
+}: ProcessImageOptions): Promise<ProcessResult> => {
   const result: ProcessResult = {
     originalKey: key,
     variantsUploaded: 0,
@@ -251,36 +306,9 @@ const processImage = async (
     // sharp's output to original dims for sizes >= original, so the URL is
     // always live (browsers happily display a 500px image at a `_w1200`
     // filename — they trust the srcset width descriptor).
+    const ctx: WebpWidthContext = { s3, bucket, key, buffer, originalWidth, existingKeys, dryRun };
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
-      const webpKey = buildWebpVariantKey(key, targetWidth);
-
-      if (existingKeys.has(webpKey)) {
-        result.variantsSkipped++;
-        continue;
-      }
-
-      if (dryRun) {
-        log(
-          `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpKey} (${targetWidth}px WebP from ${originalWidth}px)`,
-          'info'
-        );
-        result.variantsUploaded++;
-        continue;
-      }
-
-      const webpBuffer = await sharp(buffer)
-        .resize(targetWidth, undefined, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: WEBP_QUALITY })
-        .toBuffer();
-
-      await uploadBuffer(s3, bucket, webpKey, webpBuffer);
-      result.variantsUploaded++;
-      result.uploadedVariantKeys.push(webpKey);
-
-      log(
-        `  ${colors.green}+${colors.reset} ${webpKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
-        'info'
-      );
+      await processWebpWidth(ctx, targetWidth, result);
     }
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Unknown error';
@@ -351,11 +379,7 @@ const parseArgs = (args: string[]): CliOptions => {
 // Main
 // ---------------------------------------------------------------------------
 
-const main = async (): Promise<void> => {
-  const args = process.argv.slice(2);
-
-  if (args.includes('--help') || args.includes('-h')) {
-    console.info(`
+const HELP_TEXT = `
 ${colors.cyan}Convert Existing Raster Images to WebP Variants${colors.reset}
 
 Back-fill _w{width}.webp siblings for cover art uploaded before the variant
@@ -377,7 +401,58 @@ ${colors.yellow}Environment Variables:${colors.reset}
   S3_BUCKET                    S3 bucket name (required)
   AWS_REGION                   AWS region (default: us-east-1)
   CLOUDFRONT_DISTRIBUTION_ID   CloudFront distribution ID (optional)
-`);
+`;
+
+interface RunSummary {
+  uploadedKeys: string[];
+  totalVariants: number;
+  totalSkipped: number;
+  totalErrors: number;
+}
+
+/** Aggregate per-image results into totals, logging errors as they surface. */
+const summarizeResults = (results: ProcessResult[], dryRun: boolean): RunSummary => {
+  const summary: RunSummary = {
+    uploadedKeys: [],
+    totalVariants: 0,
+    totalSkipped: 0,
+    totalErrors: 0,
+  };
+
+  for (const r of results) {
+    summary.totalVariants += r.variantsUploaded;
+    summary.totalSkipped += r.variantsSkipped;
+    if (r.error) {
+      summary.totalErrors++;
+      log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
+    }
+    if (!dryRun && r.uploadedVariantKeys.length > 0) {
+      summary.uploadedKeys.push(...r.uploadedVariantKeys);
+    }
+  }
+
+  return summary;
+};
+
+/** Invalidate CloudFront for uploaded keys, swallowing failures as warnings. */
+const maybeInvalidate = async (options: CliOptions, uploadedKeys: string[]): Promise<void> => {
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (options.dryRun || !options.invalidateCache || !distributionId || uploadedKeys.length === 0) {
+    return;
+  }
+  try {
+    await invalidateCloudFront(distributionId, uploadedKeys, AWS_REGION);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    log(`CloudFront invalidation failed: ${msg}`, 'warning');
+  }
+};
+
+const main = async (): Promise<void> => {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.info(HELP_TEXT);
     process.exit(0);
   }
 
@@ -406,37 +481,23 @@ ${colors.yellow}Environment Variables:${colors.reset}
     process.exit(0);
   }
 
-  const uploadedKeys: string[] = [];
-  let totalVariants = 0;
-  let totalSkipped = 0;
-  let totalErrors = 0;
-
   const results = await mapWithConcurrency(originals, CONCURRENCY, async (key) => {
     log(`Processing: ${key}`, 'info');
-    return processImage(s3, S3_BUCKET, key, allKeys, options.dryRun);
+    return processImage({
+      s3,
+      bucket: S3_BUCKET,
+      key,
+      existingKeys: allKeys,
+      dryRun: options.dryRun,
+    });
   });
 
-  for (const r of results) {
-    totalVariants += r.variantsUploaded;
-    totalSkipped += r.variantsSkipped;
-    if (r.error) {
-      totalErrors++;
-      log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
-    }
-    if (!options.dryRun && r.uploadedVariantKeys.length > 0) {
-      uploadedKeys.push(...r.uploadedVariantKeys);
-    }
-  }
+  const { uploadedKeys, totalVariants, totalSkipped, totalErrors } = summarizeResults(
+    results,
+    options.dryRun
+  );
 
-  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
-  if (!options.dryRun && options.invalidateCache && distributionId && uploadedKeys.length > 0) {
-    try {
-      await invalidateCloudFront(distributionId, uploadedKeys, AWS_REGION);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      log(`CloudFront invalidation failed: ${msg}`, 'warning');
-    }
-  }
+  await maybeInvalidate(options, uploadedKeys);
 
   console.info('\n' + '='.repeat(60));
   log(

@@ -3,42 +3,17 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import Image from 'next/image';
 
-import { Check, ChevronsUpDown, ImagePlus, Loader2, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { ImagePlus, Loader2, X } from 'lucide-react';
 
-import { Button } from '@/app/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/app/components/ui/command';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useArtistsQuery } from '@/app/hooks/use-artists-query';
-import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
-import { finalizeCoverArtUploadAction } from '@/lib/actions/finalize-cover-art-upload-action';
-import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
-import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { cn } from '@/lib/utils';
-import { uploadFileToS3 } from '@/lib/utils/direct-upload';
+
+import { CoverArtImageCombobox } from './cover-art-image-combobox';
+import { VALID_IMAGE_TYPES, useCoverArtUpload } from './use-cover-art-upload';
 
 import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
-
-interface ArtistImageOption {
-  id: string;
-  src: string;
-  artistId: string;
-  artistName: string;
-  caption?: string;
-  altText?: string;
-}
 
 interface CoverArtFieldProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -69,8 +44,110 @@ interface CoverArtFieldProps<
   onUploadComplete?: (cdnUrl: string) => Promise<void>;
 }
 
-const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+interface PreviewProps {
+  src: string;
+  isUploading: boolean;
+  disabled: boolean;
+  onRemove: () => void;
+}
+
+const CoverArtPreview = ({ src, isUploading, disabled, onRemove }: PreviewProps) => (
+  <div className="group relative h-40 w-40 overflow-hidden rounded-lg border">
+    {/* `unoptimized` bypasses the custom image loader, which would
+        otherwise rewrite the src to `_w{width}.webp`. Width variants
+        are generated asynchronously after upload (fire-and-forget),
+        and small originals never produce `_w750`+ variants — both
+        cause broken-image flashes in this admin preview. The 160×160
+        slot doesn't need variant resolution anyway. */}
+    <Image src={src} alt="Cover art" fill className="object-cover" sizes="160px" unoptimized />
+    {isUploading && (
+      <div className="bg-background/80 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-950" />
+      </div>
+    )}
+    {!isUploading && !disabled && (
+      <button
+        type="button"
+        onClick={onRemove}
+        className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+        aria-label="Remove cover art"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    )}
+  </div>
+);
+
+interface DropZoneProps {
+  isUploading: boolean;
+  isDragOver: boolean;
+  disabled: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+const CoverArtDropZone = ({
+  isUploading,
+  isDragOver,
+  disabled,
+  fileInputRef,
+  onDrop,
+  onDragOver,
+  onDragLeave,
+  onFileChange,
+}: DropZoneProps) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  };
+
+  return (
+    <div
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onClick={() => fileInputRef.current?.click()}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      className={cn(
+        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
+        isDragOver && 'border-primary bg-primary/5',
+        !isDragOver && 'border-muted-foreground/25 hover:border-muted-foreground/50',
+        (disabled || isUploading) && 'cursor-not-allowed opacity-50'
+      )}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={VALID_IMAGE_TYPES.join(',')}
+        onChange={onFileChange}
+        disabled={disabled || isUploading}
+        className="hidden"
+        aria-label="Upload cover art"
+      />
+      {isUploading ? (
+        <>
+          <Loader2 className="mb-2 h-8 w-8 animate-spin text-zinc-950" />
+          <p className="text-sm text-zinc-950">Uploading...</p>
+        </>
+      ) : (
+        <>
+          <ImagePlus className="mb-2 h-8 w-8 text-zinc-950" />
+          <p className="text-center text-sm">
+            <span className="text-foreground font-medium">Click to upload</span> or drag and drop
+          </p>
+          <p className="text-xs text-zinc-950">JPEG, PNG, WebP, GIF up to 50MB</p>
+        </>
+      )}
+    </div>
+  );
+};
 
 export const CoverArtField = <
   TFieldValues extends FieldValues = FieldValues,
@@ -85,279 +162,27 @@ export const CoverArtField = <
   entityId,
   onUploadComplete,
 }: CoverArtFieldProps<TFieldValues, TName>) => {
-  const [isUploading, setIsUploading] = useState(false);
-  const [localPreviewUrl, setLocalPreviewUrl] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    isUploading,
+    localPreviewUrl,
+    isDragOver,
+    fileInputRef,
+    handleFileSelect,
+    handleDrop,
+    handleDragOver,
+    handleDragLeave,
+    clearPreview,
+  } = useCoverArtUpload({ name, setValue, entityType, entityId, onUploadComplete });
 
-  // Raw image options fetched from the server action; their `artistName` is
-  // resolved reactively below from the artist-name query so resolving a name
-  // later never re-triggers the image fetch.
-  const [rawArtistImages, setRawArtistImages] = useState<ArtistImageOption[]>([]);
-  const [isLoadingArtistImages, setIsLoadingArtistImages] = useState(false);
-  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const handleSelectArtistImage = (src: string): void => {
+    setValue(name, src as TFieldValues[TName], { shouldDirty: true, shouldValidate: true });
+    clearPreview();
+  };
 
-  // Stable serialization of the selected artist IDs. Used both as a memo key
-  // for the query input and as the sole dependency of the images effect, so a
-  // new-but-equal `artistIds` array prop doesn't retrigger fetches.
-  const artistIdsKey = JSON.stringify([...artistIds].sort());
-
-  // A stable, sorted ID array derived from the key — `useArtistsQuery` spins up
-  // one query per ID, so feeding it a referentially stable array avoids
-  // re-subscribing on every render.
-  const sortedArtistIds = useMemo<string[]>(() => JSON.parse(artistIdsKey), [artistIdsKey]);
-
-  // Artist NAMES come from the shared by-id query cache (same cache entry as
-  // `useArtistQuery`); IMAGES still come from the `getArtistImagesAction`
-  // server action below.
-  const { artistsById } = useArtistsQuery(sortedArtistIds);
-
-  // Map each ID to its display name, memoized on the artist data. Iterating the
-  // record's entries (rather than indexing by a dynamic key) and storing into a
-  // `Map` keeps the lookup off plain-object sinks (object-injection safety).
-  const nameByArtistId = useMemo<Map<string, string>>(() => {
-    const map = new Map<string, string>();
-    for (const [id, artist] of Object.entries(artistsById)) {
-      map.set(
-        id,
-        artist
-          ? artist.displayName ||
-              [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
-              '(no name)'
-          : '(no name)'
-      );
-    }
-    return map;
-  }, [artistsById]);
-
-  // Final options shown in the combobox: raw images stamped with the live name
-  // for each owning artist. Names update reactively as the query resolves
-  // without re-fetching images.
-  const artistImages = useMemo<ArtistImageOption[]>(
-    () =>
-      rawArtistImages.map((img) => ({
-        ...img,
-        artistName: nameByArtistId.get(img.artistId) ?? '(no name)',
-      })),
-    [rawArtistImages, nameByArtistId]
-  );
-
-  useEffect(() => {
-    const parsedIds: string[] = JSON.parse(artistIdsKey);
-
-    if (parsedIds.length === 0) {
-      setRawArtistImages([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchArtistImages = async () => {
-      setIsLoadingArtistImages(true);
-      try {
-        const imageResults = await Promise.all(
-          parsedIds.map(async (artistId) => {
-            const imagesResult = await getArtistImagesAction(artistId);
-
-            if (imagesResult.success && imagesResult.data) {
-              return imagesResult.data.map<ArtistImageOption>((img) => ({
-                id: img.id,
-                src: img.src,
-                artistId,
-                // Resolved reactively in the `artistImages` memo above.
-                artistName: '(no name)',
-                caption: img.caption,
-                altText: img.altText,
-              }));
-            }
-
-            return [];
-          })
-        );
-
-        const allImages: ArtistImageOption[] = imageResults.flat();
-        if (!cancelled) {
-          setRawArtistImages(allImages);
-        }
-      } catch (err) {
-        console.error('Failed to fetch artist images:', err);
-      } finally {
-        if (!cancelled) {
-          setIsLoadingArtistImages(false);
-        }
-      }
-    };
-
-    fetchArtistImages();
-    return () => {
-      cancelled = true;
-    };
-  }, [artistIdsKey]);
-
-  // Clean up blob URL on unmount
-  useEffect(() => {
-    return () => {
-      if (localPreviewUrl) {
-        URL.revokeObjectURL(localPreviewUrl);
-      }
-    };
-  }, [localPreviewUrl]);
-
-  const processFile = useCallback(
-    async (file: File) => {
-      if (!VALID_IMAGE_TYPES.includes(file.type)) {
-        toast.error('Please select a valid image file (JPEG, PNG, WebP, or GIF)');
-        return;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        toast.error('Image must be less than 50MB');
-        return;
-      }
-
-      const blobUrl = URL.createObjectURL(file);
-      setLocalPreviewUrl(blobUrl);
-      setIsUploading(true);
-
-      try {
-        // When an `entityId` is provided we lock the upload to a single
-        // canonical key (`media/{entityType}/{entityId}/cover.{ext}`) so a
-        // re-upload overwrites the previous file. Without one we fall back
-        // to the legacy random-UUID + timestamp behavior.
-        const useStableKey = typeof entityId === 'string' && entityId.length > 0;
-        const targetEntityId = useStableKey ? entityId : crypto.randomUUID();
-
-        const inferredExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const stableS3Key = useStableKey
-          ? `media/${entityType}/${entityId}/cover.${inferredExtension}`
-          : undefined;
-
-        const presignedResult = await getPresignedUploadUrlsAction(entityType, targetEntityId, [
-          {
-            fileName: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-            ...(stableS3Key ? { existingS3Key: stableS3Key } : {}),
-          },
-        ]);
-
-        if (!presignedResult.success || !presignedResult.data?.[0]) {
-          throw new Error(presignedResult.error || 'Failed to get upload URL');
-        }
-
-        const uploadResult = await uploadFileToS3(file, presignedResult.data[0]);
-        if (!uploadResult.success) {
-          throw new Error(uploadResult.error || 'Upload failed');
-        }
-
-        setValue(name, uploadResult.cdnUrl as TFieldValues[TName], {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-
-        if (uploadResult.cdnUrl) {
-          if (onUploadComplete) {
-            // Caller wants the variants present + the URL persisted before we
-            // return. Block on both so the spinner reflects real progress and
-            // the parent can update its own DB row knowing the srcset variants
-            // are live on S3.
-            let variantsOk = true;
-            try {
-              const variantResult = await generateImageVariantsAction(uploadResult.cdnUrl);
-              if (!variantResult.success) {
-                variantsOk = false;
-                console.warn(
-                  '[Cover Art] Variant generation reported failure:',
-                  variantResult.error
-                );
-                toast.error(
-                  `Cover uploaded, but variant generation failed: ${variantResult.error ?? 'unknown error'}. Re-run \`pnpm run images:generate-variants\` to backfill.`
-                );
-              }
-            } catch (err) {
-              variantsOk = false;
-              const message = err instanceof Error ? err.message : 'Unknown error';
-              console.warn('[Cover Art] Variant generation threw:', err);
-              toast.error(`Cover uploaded, but variant generation threw: ${message}`);
-            }
-
-            // After variants exist, sweep cross-extension orphans (e.g. an old
-            // cover.png left behind when uploading cover.jpg) and invalidate
-            // the CloudFront cache for the entity prefix in one wildcard call.
-            // Skipped when no stable entity ID was used — there's no canonical
-            // prefix to safely scope the cleanup against.
-            if (useStableKey && entityId) {
-              const newKey = presignedResult.data[0].s3Key;
-              try {
-                const finalizeResult = await finalizeCoverArtUploadAction(
-                  entityType,
-                  entityId,
-                  newKey
-                );
-                if (!finalizeResult.success) {
-                  console.warn('[Cover Art] Finalize step reported failure:', finalizeResult.error);
-                }
-              } catch (err) {
-                console.warn('[Cover Art] Finalize step threw:', err);
-              }
-            }
-
-            try {
-              await onUploadComplete(uploadResult.cdnUrl);
-            } catch (err) {
-              const message = err instanceof Error ? err.message : 'Failed to save cover art';
-              toast.error(message);
-              return;
-            }
-
-            // Skip the trailing "Cover art uploaded" success toast when
-            // variants didn't fully succeed — the warning above is the
-            // accurate signal in that case.
-            URL.revokeObjectURL(blobUrl);
-            setLocalPreviewUrl('');
-            if (variantsOk) {
-              toast.success('Cover art uploaded');
-            }
-            return;
-          } else {
-            // Fire-and-forget — preserves the original behavior for callers
-            // that don't need the URL persisted immediately.
-            generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
-              console.warn('[Cover Art] Variant generation failed:', err);
-            });
-          }
-        }
-
-        URL.revokeObjectURL(blobUrl);
-        setLocalPreviewUrl('');
-        toast.success('Cover art uploaded');
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-        toast.error(errorMessage);
-      } finally {
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    },
-    [entityId, entityType, name, onUploadComplete, setValue]
-  );
-
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) processFile(file);
-    },
-    [processFile]
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      setIsDragOver(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) processFile(file);
-    },
-    [processFile]
-  );
+  const handleRemove = (): void => {
+    setValue(name, '' as TFieldValues[TName], { shouldDirty: true, shouldValidate: true });
+    clearPreview();
+  };
 
   return (
     <FormField
@@ -367,190 +192,35 @@ export const CoverArtField = <
         <FormItem>
           <FormLabel>Cover Art *</FormLabel>
 
-          {/* Preview */}
           {(field.value || localPreviewUrl) && (
-            <div className="group relative h-40 w-40 overflow-hidden rounded-lg border">
-              {/* `unoptimized` bypasses the custom image loader, which would
-                  otherwise rewrite the src to `_w{width}.webp`. Width variants
-                  are generated asynchronously after upload (fire-and-forget),
-                  and small originals never produce `_w750`+ variants — both
-                  cause broken-image flashes in this admin preview. The 160×160
-                  slot doesn't need variant resolution anyway. */}
-              <Image
-                src={localPreviewUrl || (field.value as string)}
-                alt="Cover art"
-                fill
-                className="object-cover"
-                sizes="160px"
-                unoptimized
-              />
-              {isUploading && (
-                <div className="bg-background/80 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
-                  <Loader2 className="h-8 w-8 animate-spin text-zinc-950" />
-                </div>
-              )}
-              {!isUploading && !disabled && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValue(name, '' as TFieldValues[TName], {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    });
-                    if (localPreviewUrl) {
-                      URL.revokeObjectURL(localPreviewUrl);
-                      setLocalPreviewUrl('');
-                    }
-                  }}
-                  className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
-                  aria-label="Remove cover art"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+            <CoverArtPreview
+              src={localPreviewUrl || (field.value as string)}
+              isUploading={isUploading}
+              disabled={disabled}
+              onRemove={handleRemove}
+            />
           )}
 
-          {/* Upload drop zone */}
           <FormControl>
-            <div
+            <CoverArtDropZone
+              isUploading={isUploading}
+              isDragOver={isDragOver}
+              disabled={disabled}
+              fileInputRef={fileInputRef}
               onDrop={handleDrop}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragOver(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setIsDragOver(false);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              className={cn(
-                'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
-                isDragOver && 'border-primary bg-primary/5',
-                !isDragOver && 'border-muted-foreground/25 hover:border-muted-foreground/50',
-                (disabled || isUploading) && 'cursor-not-allowed opacity-50'
-              )}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={VALID_IMAGE_TYPES.join(',')}
-                onChange={handleFileSelect}
-                disabled={disabled || isUploading}
-                className="hidden"
-                aria-label="Upload cover art"
-              />
-              {isUploading ? (
-                <>
-                  <Loader2 className="mb-2 h-8 w-8 animate-spin text-zinc-950" />
-                  <p className="text-sm text-zinc-950">Uploading...</p>
-                </>
-              ) : (
-                <>
-                  <ImagePlus className="mb-2 h-8 w-8 text-zinc-950" />
-                  <p className="text-center text-sm">
-                    <span className="text-foreground font-medium">Click to upload</span> or drag and
-                    drop
-                  </p>
-                  <p className="text-xs text-zinc-950">JPEG, PNG, WebP, GIF up to 50MB</p>
-                </>
-              )}
-            </div>
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onFileChange={handleFileSelect}
+            />
           </FormControl>
 
-          {/* Artist image combobox */}
-          {artistIds.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm text-zinc-950">Or select from artist images:</p>
-              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={comboboxOpen}
-                    className="w-full justify-between"
-                    disabled={disabled || isUploading || isLoadingArtistImages}
-                  >
-                    {(() => {
-                      if (isLoadingArtistImages) return 'Loading artist images...';
-                      const selectedImage = field.value
-                        ? artistImages.find((img) => img.src === field.value)
-                        : undefined;
-                      return selectedImage
-                        ? `${selectedImage.artistName} - image selected`
-                        : 'Choose from artist images...';
-                    })()}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput placeholder="Search artist images..." />
-                    <CommandEmpty>
-                      {isLoadingArtistImages
-                        ? 'Loading artist images...'
-                        : 'No artist images found.'}
-                    </CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {artistImages.map((img) => (
-                          <CommandItem
-                            key={img.id}
-                            value={img.id}
-                            onSelect={() => {
-                              setValue(name, img.src as TFieldValues[TName], {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              });
-                              if (localPreviewUrl) {
-                                URL.revokeObjectURL(localPreviewUrl);
-                                setLocalPreviewUrl('');
-                              }
-                              setComboboxOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4 shrink-0',
-                                field.value === img.src ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            <div className="relative mr-2 h-8 w-8 shrink-0 overflow-hidden rounded-sm">
-                              <Image
-                                src={img.src}
-                                alt={img.altText || img.caption || 'Artist image'}
-                                fill
-                                className="object-cover"
-                                sizes="32px"
-                                unoptimized
-                              />
-                            </div>
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate text-sm">{img.artistName}</span>
-                              {img.caption && (
-                                <span className="truncate text-xs text-zinc-950">
-                                  {img.caption}
-                                </span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
+          <CoverArtImageCombobox
+            artistIds={artistIds}
+            currentValue={field.value as string}
+            disabled={disabled}
+            isUploading={isUploading}
+            onSelect={handleSelectArtistImage}
+          />
 
           <FormMessage />
         </FormItem>

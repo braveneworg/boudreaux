@@ -20,6 +20,117 @@ interface ConfirmRequestBody {
   formats: string[];
 }
 
+type FormatsResult =
+  | { ok: true; formats: DigitalFormatType[] }
+  | { ok: false; response: NextResponse };
+
+interface LogEventsArgs {
+  repo: DownloadEventRepository;
+  userId: string;
+  releaseId: string;
+  formats: DigitalFormatType[];
+  ipAddress: string;
+  userAgent: string;
+}
+
+/** Enforces the rate limit; returns a 429 response if exceeded, null if allowed. */
+const applyRateLimit = async (ip: string): Promise<NextResponse | null> => {
+  if (process.env.E2E_MODE === 'true') return null;
+  try {
+    await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+    return null;
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429, headers: NO_STORE_HEADERS }
+    );
+  }
+};
+
+/**
+ * Parses and validates the request body, returning a tagged result with
+ * deduplicated valid DigitalFormatType values, or a 400 response on failure.
+ */
+const parseAndValidateFormats = async (request: Request): Promise<FormatsResult> => {
+  let body: ConfirmRequestBody;
+  try {
+    body = (await request.json()) as ConfirmRequestBody;
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: 'INVALID_BODY', message: 'Invalid JSON body.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  if (!Array.isArray(body.formats) || body.formats.length === 0) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_FORMATS',
+          message: 'At least one format is required.',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  const validFormats = Array.from(
+    new Set(
+      body.formats.filter((f): f is DigitalFormatType =>
+        VALID_FORMAT_TYPES.includes(f as DigitalFormatType)
+      )
+    )
+  );
+
+  if (validFormats.length === 0) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_FORMATS',
+          message: 'No valid format types provided.',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  return { ok: true, formats: validFormats };
+};
+
+/** Logs one download event per format concurrently. */
+const logDownloadEvents = async ({
+  repo,
+  userId,
+  releaseId,
+  formats,
+  ipAddress,
+  userAgent,
+}: LogEventsArgs): Promise<void> => {
+  await Promise.all(
+    formats.map((formatType) =>
+      repo.logDownloadEvent({
+        userId,
+        releaseId,
+        formatType,
+        success: true,
+        ipAddress,
+        userAgent,
+      })
+    )
+  );
+};
+
 /**
  * POST /api/releases/[id]/download/confirm
  *
@@ -34,25 +145,12 @@ export const POST = withAuth<{ id: string }>(async (request, context, session) =
     // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
     // matching the `withRateLimit` decorator on the sibling free-status route.
     const ip = extractClientIp(request);
-    if (process.env.E2E_MODE !== 'true') {
-      try {
-        await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-      } catch {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'RATE_LIMITED',
-            message: 'Too many requests. Please try again later.',
-          },
-          { status: 429, headers: NO_STORE_HEADERS }
-        );
-      }
-    }
+    const rateLimitResponse = await applyRateLimit(ip);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const userId = session.user.id;
     const { id: releaseId } = await context.params;
 
-    // Validate release ID
     if (!isValidObjectId(releaseId)) {
       return NextResponse.json(
         { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
@@ -60,84 +158,40 @@ export const POST = withAuth<{ id: string }>(async (request, context, session) =
       );
     }
 
-    // Step 2: Parse and validate request body
-    let body: ConfirmRequestBody;
-    try {
-      body = (await request.json()) as ConfirmRequestBody;
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'INVALID_BODY', message: 'Invalid JSON body.' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const formatsResult = await parseAndValidateFormats(request);
+    if (!formatsResult.ok) return formatsResult.response;
+    const { formats: validFormats } = formatsResult;
 
-    if (!Array.isArray(body.formats) || body.formats.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'INVALID_FORMATS',
-          message: 'At least one format is required.',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const validFormats = Array.from(
-      new Set(
-        body.formats.filter((f): f is DigitalFormatType =>
-          VALID_FORMAT_TYPES.includes(f as DigitalFormatType)
-        )
-      )
-    );
-
-    if (validFormats.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'INVALID_FORMATS',
-          message: 'No valid format types provided.',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Step 3: Verify purchase exists
     const access = await PurchaseService.getDownloadAccess({ kind: 'user', userId }, releaseId);
 
     if (!access.allowed) {
+      const isPurchaseRequired = access.reason === 'no_purchase';
       return NextResponse.json(
         {
           success: false,
-          error: access.reason === 'no_purchase' ? 'PURCHASE_REQUIRED' : 'DOWNLOAD_LIMIT',
-          message:
-            access.reason === 'no_purchase'
-              ? 'Purchase required to download.'
-              : 'Download limit reached.',
+          error: isPurchaseRequired ? 'PURCHASE_REQUIRED' : 'DOWNLOAD_LIMIT',
+          message: isPurchaseRequired
+            ? 'Purchase required to download.'
+            : 'Download limit reached.',
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
-    // Step 4: Increment download count once (not per format)
     await PurchaseRepository.upsertDownloadCount(userId, releaseId);
 
-    // Step 5: Log download events per format
     const downloadEventRepo = new DownloadEventRepository();
     const ipAddress = extractClientIp(request) ?? 'unknown';
     const userAgent = request.headers.get('user-agent') ?? 'unknown';
 
-    await Promise.all(
-      validFormats.map((formatType) =>
-        downloadEventRepo.logDownloadEvent({
-          userId,
-          releaseId,
-          formatType,
-          success: true,
-          ipAddress,
-          userAgent,
-        })
-      )
-    );
+    await logDownloadEvents({
+      repo: downloadEventRepo,
+      userId,
+      releaseId,
+      formats: validFormats,
+      ipAddress,
+      userAgent,
+    });
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {

@@ -31,7 +31,12 @@ test.describe('My Collection — purchased user', () => {
     await expect(userPage.getByRole('button', { name: 'Download E2E Album One' })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(userPage.getByText('E2E Artist')).toBeVisible();
+    // The row's artist name can momentarily appear twice while the page hydrates
+    // (server HTML + client render both briefly in the DOM), so wait for the
+    // count to settle to one before asserting visibility.
+    const artistName = userPage.getByText('E2E Artist');
+    await expect(artistName).toHaveCount(1);
+    await expect(artistName).toBeVisible();
   });
 
   test('opens the per-release download dialog with format options', async ({ userPage }) => {

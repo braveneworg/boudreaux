@@ -137,6 +137,37 @@ export const sanitizeTextField = (input: string): string => {
  * @returns Sanitized path that is safe to use within baseDir
  * @throws Error if path is invalid or attempts to traverse outside baseDir
  */
+/**
+ * Reject a path that contains a control character (code points < 32, excluding
+ * tab and newline). A regex literal with these chars trips core
+ * `no-control-regex`; a RegExp built from a string trips
+ * `security/detect-non-literal-regexp`, so we scan by code point.
+ */
+const assertNoControlCharacters = (path: string): void => {
+  for (const char of path) {
+    const code = char.charCodeAt(0);
+    const isControl =
+      code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f);
+    if (isControl) {
+      throw new Error('Path contains control characters');
+    }
+  }
+};
+
+/**
+ * Verify the normalized path, once resolved against `baseDir`, does not escape
+ * the base directory via `..` segments or an absolute path.
+ */
+const assertWithinBaseDir = (normalizedPath: string, baseDir: string): void => {
+  const resolvedBase = resolve(baseDir);
+  const resolvedPath = resolve(baseDir, normalizedPath);
+
+  const relativePath = relative(resolvedBase, resolvedPath);
+  if (relativePath.startsWith('..' + sep) || isAbsolute(relativePath)) {
+    throw new Error('Resolved path escapes base directory');
+  }
+};
+
 export const sanitizeFilePath = (pathKey: string, baseDir: string): string => {
   if (!pathKey) {
     throw new Error('Path key cannot be empty');
@@ -148,17 +179,7 @@ export const sanitizeFilePath = (pathKey: string, baseDir: string): string => {
     throw new Error('Path contains null bytes');
   }
 
-  // Check for control characters (code points < 32, excluding tab and newline) by code
-  // point. A regex literal with these chars trips core `no-control-regex`; a RegExp built
-  // from a string trips `security/detect-non-literal-regexp`.
-  for (const char of cleanPath) {
-    const code = char.charCodeAt(0);
-    const isControl =
-      code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f);
-    if (isControl) {
-      throw new Error('Path contains control characters');
-    }
-  }
+  assertNoControlCharacters(cleanPath);
 
   // Reject absolute paths
   if (isAbsolute(cleanPath)) {
@@ -173,15 +194,8 @@ export const sanitizeFilePath = (pathKey: string, baseDir: string): string => {
     throw new Error('Path traversal attempt detected (..)');
   }
 
-  // Resolve the full path within the base directory
-  const resolvedBase = resolve(baseDir);
-  const resolvedPath = resolve(baseDir, normalizedPath);
-
   // Verify the resolved path is within the base directory
-  const relativePath = relative(resolvedBase, resolvedPath);
-  if (relativePath.startsWith('..' + sep) || isAbsolute(relativePath)) {
-    throw new Error('Resolved path escapes base directory');
-  }
+  assertWithinBaseDir(normalizedPath, baseDir);
 
   return normalizedPath;
 };

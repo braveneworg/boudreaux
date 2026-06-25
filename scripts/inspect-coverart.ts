@@ -30,7 +30,23 @@ const extension = (value: string | null): string => {
   return dot === -1 ? '<no ext>' : cleaned.substring(dot).toLowerCase();
 };
 
-const main = async () => {
+/** Tally values into a `key → count` object using the given classifier. */
+const countBy = (
+  values: (string | null)[],
+  classifier: (value: string | null) => string
+): {
+  [key: string]: number;
+} => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const key = classifier(value);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Object.fromEntries(counts);
+};
+
+/** Print the Release/FeaturedArtist/Image sample sections. */
+const printSamples = async (): Promise<void> => {
   console.info('=== Release.coverArt sample (10) — FULL URLs ===');
   const releases = await prisma.release.findMany({
     select: { id: true, title: true, coverArt: true },
@@ -60,49 +76,66 @@ const main = async () => {
     console.info(`  ext=${extension(img.src)} owner=${owner}`);
     console.info(`    ${img.src ?? '<null>'}`);
   }
+};
 
+/** Print the extension-breakdown sections for Release.coverArt and Image.src. */
+const printExtensionBreakdowns = async (): Promise<void> => {
   console.info('\n=== Release.coverArt extension breakdown ===');
-  const extCounts = new Map<string, number>();
   const allReleasesForExt = await prisma.release.findMany({ select: { coverArt: true } });
-  for (const r of allReleasesForExt) {
-    const ext = extension(r.coverArt);
-    extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
-  }
-  console.info(' ', Object.fromEntries(extCounts));
+  console.info(
+    ' ',
+    countBy(
+      allReleasesForExt.map((r) => r.coverArt),
+      extension
+    )
+  );
 
   console.info('\n=== Image.src extension breakdown ===');
-  const imgExtCounts = new Map<string, number>();
   const allImgsForExt = await prisma.image.findMany({ select: { src: true } });
-  for (const img of allImgsForExt) {
-    const ext = extension(img.src);
-    imgExtCounts.set(ext, (imgExtCounts.get(ext) ?? 0) + 1);
-  }
-  console.info(' ', Object.fromEntries(imgExtCounts));
+  console.info(
+    ' ',
+    countBy(
+      allImgsForExt.map((img) => img.src),
+      extension
+    )
+  );
+};
 
+/** Print the classification-count sections across all three models. */
+const printClassificationCounts = async (): Promise<void> => {
   console.info('\n=== Counts by classification ===');
   const allImageSrcs = await prisma.image.findMany({ select: { src: true } });
-  const counts = new Map<string, number>();
-  for (const img of allImageSrcs) {
-    const k = classify(img.src);
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  console.info('  Image.src:', Object.fromEntries(counts));
+  console.info(
+    '  Image.src:',
+    countBy(
+      allImageSrcs.map((img) => img.src),
+      classify
+    )
+  );
 
   const allReleaseCovers = await prisma.release.findMany({ select: { coverArt: true } });
-  const releaseCounts = new Map<string, number>();
-  for (const r of allReleaseCovers) {
-    const k = classify(r.coverArt);
-    releaseCounts.set(k, (releaseCounts.get(k) ?? 0) + 1);
-  }
-  console.info('  Release.coverArt:', Object.fromEntries(releaseCounts));
+  console.info(
+    '  Release.coverArt:',
+    countBy(
+      allReleaseCovers.map((r) => r.coverArt),
+      classify
+    )
+  );
 
   const allFaCovers = await prisma.featuredArtist.findMany({ select: { coverArt: true } });
-  const faCounts = new Map<string, number>();
-  for (const fa of allFaCovers) {
-    const k = classify(fa.coverArt);
-    faCounts.set(k, (faCounts.get(k) ?? 0) + 1);
-  }
-  console.info('  FeaturedArtist.coverArt:', Object.fromEntries(faCounts));
+  console.info(
+    '  FeaturedArtist.coverArt:',
+    countBy(
+      allFaCovers.map((fa) => fa.coverArt),
+      classify
+    )
+  );
+};
+
+const main = async () => {
+  await printSamples();
+  await printExtensionBreakdowns();
+  await printClassificationCounts();
 };
 
 main()

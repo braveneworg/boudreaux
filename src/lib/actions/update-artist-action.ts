@@ -9,12 +9,77 @@ import { revalidatePath } from 'next/cache';
 
 import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
+import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
+
+const PERMITTED_FIELD_NAMES = [
+  'firstName',
+  'surname',
+  'slug',
+  'displayName',
+  'middleName',
+  'title',
+  'suffix',
+  'akaNames',
+  'bio',
+  'shortBio',
+  'altBio',
+  'genres',
+  'tags',
+  'bornOn',
+  'diedOn',
+  'formedOn',
+  'publishedOn',
+];
+
+type ParsedArtistData = ReturnType<typeof createArtistSchema.parse>;
+
+const toOptionalDate = (value: string | undefined): Date | undefined =>
+  value ? new Date(value) : undefined;
+
+const toOptionalString = (value: string | null | undefined): string | undefined =>
+  value || undefined;
+
+const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({
+  firstName: data.firstName || '',
+  surname: data.surname || '',
+  slug: data.slug,
+  middleName: toOptionalString(data.middleName),
+  displayName: toOptionalString(data.displayName),
+  title: toOptionalString(data.title),
+  suffix: toOptionalString(data.suffix),
+  akaNames: toOptionalString(data.akaNames),
+  bio: toOptionalString(data.bio),
+  shortBio: toOptionalString(data.shortBio),
+  altBio: toOptionalString(data.altBio),
+  genres: toOptionalString(data.genres),
+  tags: toOptionalString(data.tags),
+  bornOn: toOptionalDate(data.bornOn),
+  diedOn: toOptionalDate(data.diedOn),
+  formedOn: toOptionalDate(data.formedOn),
+  publishedOn: toOptionalDate(data.publishedOn),
+});
+
+const applyServiceErrorToFormState = (formState: FormState, errorMessage: string): void => {
+  if (!formState.errors) {
+    formState.errors = {};
+  }
+  const lower = errorMessage.toLowerCase();
+  const isSlugError =
+    lower.includes('slug') &&
+    (lower.includes('unique') || lower.includes('already exists') || lower.includes('duplicate'));
+  if (isSlugError) {
+    formState.errors.slug = ['This slug is already in use. Please choose a different one.'];
+  } else {
+    formState.errors = { general: [errorMessage] };
+  }
+};
 
 export const updateArtistAction = async (
   artistId: string,
@@ -26,85 +91,20 @@ export const updateArtistAction = async (
     throw new Error('Invalid admin session: missing user id for audit logging.');
   }
 
-  const permittedFieldNames = [
-    'firstName',
-    'surname',
-    'slug',
-    'displayName',
-    'middleName',
-    'title',
-    'suffix',
-    'akaNames',
-    'bio',
-    'shortBio',
-    'altBio',
-    'genres',
-    'tags',
-    'bornOn',
-    'diedOn',
-    'formedOn',
-    'publishedOn',
-  ];
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
+  const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, createArtistSchema);
 
   if (!parsed.success) {
-    // Schema validation failed - add validation errors to formState
     formState.success = false;
-    // Add Zod validation errors
-    const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
-    for (const error of parsed.error.issues) {
-      const field = error.path[0]?.toString() || 'general';
-      const messages = errors.get(field) ?? [];
-      messages.push(error.message);
-      errors.set(field, messages);
-    }
-    formState.errors = Object.fromEntries(errors);
+    applyZodIssuesToFormState(formState, parsed.error);
     return formState;
   }
 
   try {
-    const {
-      firstName,
-      surname,
-      slug,
-      middleName,
-      displayName,
-      title,
-      suffix,
-      akaNames,
-      bio,
-      shortBio,
-      altBio,
-      genres,
-      tags,
-      bornOn,
-      diedOn,
-      formedOn,
-      publishedOn,
-    } = parsed.data;
+    const response = await ArtistService.updateArtist(
+      artistId,
+      buildArtistUpdatePayload(parsed.data)
+    );
 
-    // Update artist in database
-    const response = await ArtistService.updateArtist(artistId, {
-      firstName: firstName || '',
-      surname: surname || '',
-      slug,
-      middleName: middleName || undefined,
-      displayName: displayName || undefined,
-      title: title || undefined,
-      suffix: suffix || undefined,
-      akaNames: akaNames || undefined,
-      bio: bio || undefined,
-      shortBio: shortBio || undefined,
-      altBio: altBio || undefined,
-      genres: genres || undefined,
-      tags: tags || undefined,
-      bornOn: bornOn ? new Date(bornOn) : undefined,
-      diedOn: diedOn ? new Date(diedOn) : undefined,
-      formedOn: formedOn ? new Date(formedOn) : undefined,
-      publishedOn: publishedOn ? new Date(publishedOn) : undefined,
-    });
-
-    // Log artist update for security audit
     logSecurityEvent({
       event: 'media.artist.updated',
       userId: session.user.id,
@@ -121,30 +121,14 @@ export const updateArtistAction = async (
       formState.errors = undefined;
       formState.data = { artistId: response.data?.id };
     } else {
-      if (!formState.errors) {
-        formState.errors = {};
-      }
-
-      const errorMessage = response.error || 'Failed to update artist';
-
-      // Check if error is related to slug uniqueness
-      if (
-        errorMessage.toLowerCase().includes('slug') &&
-        (errorMessage.toLowerCase().includes('unique') ||
-          errorMessage.toLowerCase().includes('already exists') ||
-          errorMessage.toLowerCase().includes('duplicate'))
-      ) {
-        formState.errors.slug = ['This slug is already in use. Please choose a different one.'];
-      } else {
-        formState.errors = { general: [errorMessage] };
-      }
+      applyServiceErrorToFormState(formState, response.error ?? 'Failed to update artist');
     }
 
     formState.success = response.success;
 
     // Revalidate the artist pages
     revalidatePath('/admin/artists');
-    revalidatePath(`/artists/${slug}`);
+    revalidatePath(`/artists/${parsed.data.slug}`);
 
     // The artist's display name renders on release cards/listings, so refresh
     // the public release surfaces too.

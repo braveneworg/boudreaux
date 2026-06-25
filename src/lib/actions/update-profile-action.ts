@@ -15,6 +15,8 @@ import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { profileSchema } from '@/lib/validation/profile-schema';
 
+import { setGeneralFormError } from './form-state-helpers';
+
 export const updateProfileAction = async (
   _initialState: FormState,
   payload: FormData
@@ -41,10 +43,7 @@ export const updateProfileAction = async (
 
       if (!session?.user?.id) {
         formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be logged in to update your profile'];
+        setGeneralFormError(formState, ['You must be logged in to update your profile']);
         return formState;
       }
 

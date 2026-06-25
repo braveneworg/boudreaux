@@ -15,6 +15,8 @@ import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
+import { applyCreateArtistFailure } from './create-artist-action-helpers';
+
 export const createArtistAction = async (
   _initialState: FormState,
   payload: FormData
@@ -65,23 +67,7 @@ export const createArtistAction = async (
         // Include the created artist ID in the response for image uploads
         formState.data = { artistId: response.data?.id };
       } else {
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-
-        const errorMessage = response.error || 'Failed to create artist';
-
-        // Check if error is related to slug uniqueness
-        if (
-          errorMessage.toLowerCase().includes('slug') &&
-          (errorMessage.toLowerCase().includes('unique') ||
-            errorMessage.toLowerCase().includes('already exists') ||
-            errorMessage.toLowerCase().includes('duplicate'))
-        ) {
-          formState.errors.slug = ['This slug is already in use. Please choose a different one.'];
-        } else {
-          formState.errors = { general: [errorMessage] };
-        }
+        applyCreateArtistFailure(formState, response.error);
       }
 
       formState.success = response.success;

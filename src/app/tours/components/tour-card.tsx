@@ -19,8 +19,16 @@ import type {
   TourScalars as Tour,
   VenueScalars as Venue,
 } from '@/lib/types/tours';
-import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
-import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
+import { formatTourTime } from '@/lib/utils/timezone';
+
+import {
+  getDateRange,
+  getHeadlinerNames,
+  getPrimaryImage,
+  getSortedTourDates,
+  getTicketInfo,
+  getVenueInfo,
+} from './tour-card-helpers';
 
 export interface TourCardProps {
   tour: Tour & {
@@ -38,62 +46,131 @@ export interface TourCardProps {
   };
 }
 
+type EnrichedTourDate = TourCardProps['tour']['tourDates'][number];
+
+interface TourCardVenueProps {
+  venueDisplay: string;
+  singleVenue: Venue | null;
+}
+
+/** The venue line: a directions link + city/state for a single venue, or static text. */
+const TourCardVenue = ({ venueDisplay, singleVenue }: TourCardVenueProps) => {
+  if (!venueDisplay) {
+    return null;
+  }
+  return (
+    <div className="flex items-start gap-2">
+      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
+      {singleVenue ? (
+        <>
+          <VenueDirectionsLink
+            destination={[
+              singleVenue.name,
+              singleVenue.address,
+              singleVenue.city,
+              singleVenue.state,
+              singleVenue.postalCode,
+              singleVenue.country,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            className="group/venue text-sm"
+          >
+            <span className="underline">{venueDisplay}</span>
+            <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
+            <span>&middot;</span>{' '}
+          </VenueDirectionsLink>
+          <span className="text-sm text-zinc-950">
+            {singleVenue.city}, {singleVenue.state}
+          </span>
+        </>
+      ) : (
+        <span className="line-clamp-1 text-sm">{venueDisplay}</span>
+      )}
+    </div>
+  );
+};
+
+interface TourCardDateTimeProps {
+  dateRange: string;
+  hasTourDates: boolean;
+  firstTourDate: EnrichedTourDate | undefined;
+  sortedTourDates: EnrichedTourDate[];
+}
+
+/** Builds the show-time line for a single date (with optional end time) or an "N shows" summary. */
+const formatShowTimeLine = (
+  firstTourDate: EnrichedTourDate,
+  sortedTourDates: EnrichedTourDate[]
+): string => {
+  if (sortedTourDates.length !== 1 || !firstTourDate.showStartTime) {
+    return `${sortedTourDates.length} shows`;
+  }
+  const start = formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone);
+  if (!firstTourDate.showEndTime) {
+    return start;
+  }
+  return `${start} - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}`;
+};
+
+/** The date + time block: announced date range, show time(s), and doors-open time. */
+const TourCardDateTime = ({
+  dateRange,
+  hasTourDates,
+  firstTourDate,
+  sortedTourDates,
+}: TourCardDateTimeProps) => (
+  <div className="flex items-start gap-2">
+    <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
+    <div className="text-sm">
+      <div>{dateRange}</div>
+      {hasTourDates && firstTourDate?.showStartTime && (
+        <>
+          <div className="text-zinc-950">{formatShowTimeLine(firstTourDate, sortedTourDates)}</div>
+          {sortedTourDates.length === 1 && firstTourDate?.doorsOpenAt && (
+            <div>
+              <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
+              {formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  </div>
+);
+
+/** The ticket-price line, shown only when the first date has prices. */
+const TourCardTicketPrice = ({
+  firstTourDate,
+}: {
+  firstTourDate: EnrichedTourDate | undefined;
+}) => {
+  if (!firstTourDate?.ticketPrices) {
+    return null;
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Ticket className="h-4 w-4 shrink-0 text-zinc-950" />
+      <span className="text-sm font-medium">{firstTourDate.ticketPrices}</span>
+    </div>
+  );
+};
+
 /**
  * Tour card component displaying tour summary with image, venue, dates, and headliners
  */
 export const TourCard = ({ tour }: TourCardProps) => {
-  const primaryImage = tour.images.find((img) => img.displayOrder === 0) || tour.images[0];
+  const primaryImage = getPrimaryImage(tour.images);
   const hasTourDates = tour.tourDates.length > 0;
 
-  const sortedTourDates = [...tour.tourDates].sort(
-    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-  );
+  const sortedTourDates = getSortedTourDates(tour.tourDates);
   const firstTourDate = sortedTourDates[0];
   const lastTourDate = sortedTourDates[sortedTourDates.length - 1];
 
-  const dateRange = !firstTourDate
-    ? 'No dates announced'
-    : !lastTourDate || firstTourDate.id === lastTourDate.id
-      ? formatTourDate(firstTourDate.startDate, firstTourDate.timeZone)
-      : `${formatTourDate(firstTourDate.startDate, firstTourDate.timeZone)} - ${formatTourDate(lastTourDate.startDate, lastTourDate.timeZone)}`;
-
-  const venueNames = Array.from(new Set(sortedTourDates.map((date) => date.venue.name)));
-  const isSingleVenue = venueNames.length === 1;
-  const singleVenue = isSingleVenue ? sortedTourDates[0].venue : null;
-  const venueDisplay =
-    venueNames.length === 0 ? '' : isSingleVenue ? venueNames[0] : `${venueNames.length} venues`;
-
-  const uniqueHeadliners = (() => {
-    const seen = new Set<string>();
-    return sortedTourDates
-      .flatMap((date) => date.headliners)
-      .sort((a, b) => {
-        const aTime = a.setTime ? new Date(a.setTime).getTime() : null;
-        const bTime = b.setTime ? new Date(b.setTime).getTime() : null;
-        if (aTime !== null && bTime !== null) return bTime - aTime;
-        if (aTime !== null) return -1;
-        if (bTime !== null) return 1;
-        return b.sortOrder - a.sortOrder;
-      })
-      .map((h) => getArtistDisplayNameForTour(h.artist))
-      .filter((name): name is string => {
-        if (!name || seen.has(name)) return false;
-        seen.add(name);
-        return true;
-      });
-  })();
-
-  const headlinerNames = uniqueHeadliners.length === 0 ? 'TBD' : uniqueHeadliners.join(', ');
-
-  const ticketLinks = Array.from(
-    new Set(
-      sortedTourDates.map((date) => date.ticketsUrl).filter((url): url is string => Boolean(url))
-    )
-  );
-  const primaryTicketUrl = ticketLinks[0];
-  const primaryTicketDate = primaryTicketUrl
-    ? sortedTourDates.find((date) => date.ticketsUrl === primaryTicketUrl)
-    : undefined;
+  const dateRange = getDateRange(firstTourDate, lastTourDate);
+  const { singleVenue, venueDisplay } = getVenueInfo(sortedTourDates);
+  const headlinerNames = getHeadlinerNames(sortedTourDates);
+  const { primaryTicketUrl, primaryTicketDate } = getTicketInfo(sortedTourDates);
 
   return (
     <Card
@@ -137,68 +214,18 @@ export const TourCard = ({ tour }: TourCardProps) => {
         )}
 
         {/* Venue */}
-        {venueDisplay && (
-          <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
-            {singleVenue ? (
-              <>
-                <VenueDirectionsLink
-                  destination={[
-                    singleVenue.name,
-                    singleVenue.address,
-                    singleVenue.city,
-                    singleVenue.state,
-                    singleVenue.postalCode,
-                    singleVenue.country,
-                  ]
-                    .filter(Boolean)
-                    .join(', ')}
-                  className="group/venue text-sm"
-                >
-                  <span className="underline">{venueDisplay}</span>
-                  <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
-                  <span>&middot;</span>{' '}
-                </VenueDirectionsLink>
-                <span className="text-sm text-zinc-950">
-                  {singleVenue.city}, {singleVenue.state}
-                </span>
-              </>
-            ) : (
-              <span className="line-clamp-1 text-sm">{venueDisplay}</span>
-            )}
-          </div>
-        )}
+        <TourCardVenue venueDisplay={venueDisplay} singleVenue={singleVenue} />
 
         {/* Date & Time */}
-        <div className="flex items-start gap-2">
-          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950" />
-          <div className="text-sm">
-            <div>{dateRange}</div>
-            {hasTourDates && firstTourDate?.showStartTime && (
-              <>
-                <div className="text-zinc-950">
-                  {sortedTourDates.length === 1
-                    ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
-                    : `${sortedTourDates.length} shows`}
-                </div>
-                {sortedTourDates.length === 1 && firstTourDate?.doorsOpenAt && (
-                  <div>
-                    <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
-                    {formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+        <TourCardDateTime
+          dateRange={dateRange}
+          hasTourDates={hasTourDates}
+          firstTourDate={firstTourDate}
+          sortedTourDates={sortedTourDates}
+        />
 
         {/* Ticket Price */}
-        {firstTourDate?.ticketPrices && (
-          <div className="flex items-center gap-2">
-            <Ticket className="h-4 w-4 shrink-0 text-zinc-950" />
-            <span className="text-sm font-medium">{firstTourDate.ticketPrices}</span>
-          </div>
-        )}
+        <TourCardTicketPrice firstTourDate={firstTourDate} />
       </CardContent>
 
       <CardFooter className="flex gap-2">

@@ -11,10 +11,32 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { submitAbuseReportAction } from '@/lib/actions/submit-abuse-report-action';
+import {
+  submitAbuseReportAction,
+  type SubmitAbuseReportActionResult,
+} from '@/lib/actions/submit-abuse-report-action';
 import { cn } from '@/lib/utils';
 
 type PopoverState = 'form' | 'confirmation';
+
+type AbuseReportFailure = Extract<SubmitAbuseReportActionResult, { success: false }>;
+
+/** Surface a user-facing toast for a failed abuse report, keyed on the error code. */
+const notifyAbuseReportFailure = (result: AbuseReportFailure): void => {
+  if (result.error === 'rate_limited') {
+    toast.error(
+      `You've reported recently — try again in ${result.retryAfterSeconds ?? 'a little while'} seconds.`
+    );
+  } else if (result.error === 'self_report') {
+    toast.error("You can't report your own account.");
+  } else if (result.error === 'unauthorized') {
+    toast.error('Please sign in to submit a report.');
+  } else if (result.error === 'invalid') {
+    toast.error(result.fieldErrors?.reportedUsername?.[0] ?? 'Please enter a valid username.');
+  } else {
+    toast.error('Could not submit your report. Please try again.');
+  }
+};
 
 /**
  * "Report abuse (anonymously)" sticky link + popover, rendered at the
@@ -68,21 +90,7 @@ export const ChatReportAbusePopover = () => {
           setState('confirmation');
           return;
         }
-        if (result.error === 'rate_limited') {
-          toast.error(
-            `You've reported recently — try again in ${result.retryAfterSeconds ?? 'a little while'} seconds.`
-          );
-        } else if (result.error === 'self_report') {
-          toast.error("You can't report your own account.");
-        } else if (result.error === 'unauthorized') {
-          toast.error('Please sign in to submit a report.');
-        } else if (result.error === 'invalid') {
-          toast.error(
-            result.fieldErrors?.reportedUsername?.[0] ?? 'Please enter a valid username.'
-          );
-        } else {
-          toast.error('Could not submit your report. Please try again.');
-        }
+        notifyAbuseReportFailure(result);
       } catch (error) {
         console.error('Abuse report submission failed', error);
         toast.error('Could not submit your report. Please try again.');

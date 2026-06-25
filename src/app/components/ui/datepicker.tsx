@@ -55,33 +55,43 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
     }
   };
 
+  const commitDate = (newDate: Date) => {
+    setDate(newDate);
+    setMonth(newDate);
+    onSelect?.(newDate.toISOString(), fieldName);
+  };
+
+  const handleYearKey = (key: 'ArrowUp' | 'ArrowDown') => {
+    const newDate = new Date(date ?? new Date());
+    const yearChange = key === 'ArrowUp' ? 1 : -1;
+    const newYear = newDate.getFullYear() + yearChange;
+    if (newYear < 1900 || newYear > 2099) {
+      return;
+    }
+    newDate.setFullYear(newYear);
+    commitDate(newDate);
+  };
+
+  const handleMonthKey = (currentDate: Date, key: 'ArrowLeft' | 'ArrowRight') => {
+    const newDate = new Date(currentDate);
+    const monthChange = key === 'ArrowRight' ? 1 : -1;
+    newDate.setMonth(newDate.getMonth() + monthChange);
+
+    // Check if new date is within bounds
+    if (newDate < startDate || newDate > endDate) {
+      return;
+    }
+
+    commitDate(newDate);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      const newDate = new Date(date ?? new Date());
-      const yearChange = e.key === 'ArrowUp' ? 1 : -1;
-      const newYear = newDate.getFullYear() + yearChange;
-      if (newYear < 1900 || newYear > 2099) {
-        return;
-      }
-      newDate.setFullYear(newYear);
-      setDate(newDate);
-      setMonth(newDate);
-      onSelect?.(newDate.toISOString(), fieldName);
+      handleYearKey(e.key);
     } else if (date && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
-      const newDate = new Date(date);
-      const monthChange = e.key === 'ArrowRight' ? 1 : -1;
-      newDate.setMonth(newDate.getMonth() + monthChange);
-
-      // Check if new date is within bounds
-      if (newDate < startDate || newDate > endDate) {
-        return;
-      }
-
-      setDate(newDate);
-      setMonth(newDate);
-      onSelect?.(newDate.toISOString(), fieldName);
+      handleMonthKey(date, e.key);
     }
   };
 

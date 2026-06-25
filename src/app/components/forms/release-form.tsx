@@ -12,89 +12,46 @@ import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { DownloadAnalyticsDashboard } from '@/app/components/download-analytics-dashboard';
-import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-accordion';
-import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
-import { TextField } from '@/app/components/forms/fields';
-import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
-import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
-import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-  FormDescription,
-} from '@/app/components/ui/form';
-import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
-import { Input } from '@/app/components/ui/input';
-import { Separator } from '@/app/components/ui/separator';
-import { Switch } from '@/app/components/ui/switch';
-import { Textarea } from '@/app/components/ui/textarea';
+import type {
+  ExistingFormat,
+  ExtractedAudioMetadata,
+  ReleaseAutoCreatedPayload,
+} from '@/app/components/forms/digital-formats/types';
+import { useImageOperations } from '@/app/components/forms/hooks/use-image-operations';
+import { ReleaseFormContent } from '@/app/components/forms/sections/release-form-content';
+import { ReleaseFormFooter } from '@/app/components/forms/sections/release-form-footer';
+import { ReleaseCardHeader } from '@/app/components/forms/sections/release-form-header';
+import { ReleaseFormSkeleton } from '@/app/components/forms/sections/release-form-skeleton';
+import { Card } from '@/app/components/ui/card';
+import { Form } from '@/app/components/ui/form';
+import { type ImageItem } from '@/app/components/ui/image-uploader';
 import {
   useCreateReleaseMutation,
   useDeleteReleaseMutation,
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/app/hooks/mutations/use-release-mutations';
-import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
-import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
+import { type ReleaseDetail, useReleaseDetailQuery } from '@/app/hooks/use-release-query';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
 import {
   deleteReleaseImageAction,
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
-import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
-import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
-import { FORMATS, type Format } from '@/lib/types/media-models';
+import { type DigitalFormatType } from '@/lib/constants/digital-formats';
+import { type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
-import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
-import { DatePicker } from '@/ui/datepicker';
+
+import type { UseFormReturn, UseFormSetValue } from 'react-hook-form';
 
 type FormFieldName = keyof ReleaseFormData;
 
 export interface ReleaseFormProps {
   releaseId?: string;
 }
-
-// Common formats grouped for easier selection (digital formats managed via accordion)
-const FORMAT_GROUPS = {
-  Vinyl: [
-    'VINYL',
-    'VINYL_7_INCH',
-    'VINYL_10_INCH',
-    'VINYL_12_INCH',
-    'VINYL_180G',
-    'VINYL_COLORED',
-    'VINYL_GATEFOLD',
-    'VINYL_DOUBLE_LP',
-  ] as Format[],
-  Physical: ['CD', 'CASSETTE'] as Format[],
-};
-
-const formatDisplayName = (format: string): string => {
-  return format
-    .replace(/_/g, ' ')
-    .replace(/KBPS/g, 'kbps')
-    .replace(/(\d+)G/g, '$1g')
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-};
 
 const ToastContent = ({ title }: { title: string }) => (
   <>
@@ -114,17 +71,321 @@ const PublishedToastContent = ({ title }: { title: string }) => (
   </>
 );
 
-export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) => {
+const formatDateForForm = (dateValue: string | Date | null | undefined): string => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+};
+
+/** Project a loaded release into the form's default values (pure mapping). */
+const mapReleaseToFormValues = (release: ReleaseDetail, userId?: string): ReleaseFormData => ({
+  title: release.title || '',
+  releasedOn: formatDateForForm(release.releasedOn),
+  coverArt: release.coverArt || '',
+  formats: release.formats.length > 0 ? release.formats : ['DIGITAL'],
+  artistIds: release.artistReleases.map((ar) => ar.artistId),
+  labels: release.labels.join(', '),
+  catalogNumber: release.catalogNumber || '',
+  description: release.description || '',
+  notes: release.notes.join(', '),
+  executiveProducedBy: release.executiveProducedBy.join(', '),
+  coProducedBy: release.coProducedBy.join(', '),
+  masteredBy: release.masteredBy.join(', '),
+  mixedBy: release.mixedBy.join(', '),
+  recordedBy: release.recordedBy.join(', '),
+  artBy: release.artBy.join(', '),
+  designBy: release.designBy.join(', '),
+  photographyBy: release.photographyBy.join(', '),
+  linerNotesBy: release.linerNotesBy.join(', '),
+  publishedAt: formatDateForForm(release.publishedAt),
+  featuredOn: formatDateForForm(release.featuredOn),
+  featuredUntil: formatDateForForm(release.featuredUntil),
+  featuredDescription: release.featuredDescription || '',
+  suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
+  createdBy: userId,
+});
+
+/** Map a loaded release's persisted images into uploader items. */
+const mapReleaseImages = (release: ReleaseDetail): ImageItem[] =>
+  release.images.map((img) => ({
+    id: img.id,
+    preview: img.src ?? '',
+    uploadedUrl: img.src ?? '',
+    caption: img.caption || '',
+    altText: img.altText || '',
+    sortOrder: img.sortOrder ?? 0,
+  }));
+
+/** Derive the accordion's existing-formats list from a loaded release. */
+const mapExistingFormats = (releaseData: ReleaseDetail | null | undefined): ExistingFormat[] =>
+  (releaseData?.digitalFormats ?? [])
+    .filter((df) => df.deletedAt == null)
+    .map((df) => ({
+      formatType: df.formatType as DigitalFormatType,
+      trackCount: df.trackCount ?? df.files.length,
+      totalFileSize: Number(df.totalFileSize ?? 0),
+      files: df.files.map((f) => ({
+        trackNumber: f.trackNumber,
+        title: f.title ?? null,
+        fileName: f.fileName,
+        fileSize: Number(f.fileSize),
+        duration: f.duration ?? null,
+      })),
+    }));
+
+/** Build the create-mode default form values (only `createdBy` is dynamic). */
+const buildReleaseDefaults = (userId: string | undefined): ReleaseFormData => ({
+  title: '',
+  releasedOn: '',
+  coverArt: '',
+  formats: ['DIGITAL'],
+  artistIds: [],
+  labels: '',
+  catalogNumber: '',
+  description: '',
+  notes: '',
+  executiveProducedBy: '',
+  coProducedBy: '',
+  masteredBy: '',
+  mixedBy: '',
+  recordedBy: '',
+  artBy: '',
+  designBy: '',
+  photographyBy: '',
+  linerNotesBy: '',
+  publishedAt: '',
+  featuredOn: '',
+  featuredUntil: '',
+  featuredDescription: '',
+  suggestedPrice: '',
+  createdBy: userId,
+});
+
+const formatValidationErrors = (errors: Record<string, { message?: string }>): string => {
+  const errorMessages = Object.entries(errors)
+    .map(([field, err]) => `${field}: ${err.message || 'Invalid'}`)
+    .join(', ');
+  return errorMessages || 'Please check the form for errors.';
+};
+
+/** Pre-populate release fields from audio metadata extracted on first upload. */
+const applyExtractedMetadata = (
+  metadata: ExtractedAudioMetadata,
+  setValue: UseFormSetValue<ReleaseFormData>
+): void => {
+  if (metadata.album) {
+    setValue('title', metadata.album, { shouldDirty: true });
+  }
+  if (metadata.year) {
+    setValue('releasedOn', `${metadata.year}-01-01`, { shouldDirty: true });
+  }
+  if (metadata.label) {
+    setValue('labels', metadata.label, { shouldDirty: true });
+  }
+  if (metadata.coverArt) {
+    setValue('coverArt', metadata.coverArt, { shouldDirty: true });
+  }
+  const detectedArtist = metadata.albumArtist ?? metadata.artist;
+  if (detectedArtist) {
+    toast.success(`Artist "${detectedArtist}" auto-connected to this release.`);
+  }
+};
+
+interface ImageUploadHandle {
+  images: ImageItem[];
+  uploadImages: (imagesToUpload: ImageItem[], targetId: string, title: string) => Promise<void>;
+  resetImagesReordered: () => void;
+}
+
+interface SubmitReleaseDeps {
+  releaseForm: UseFormReturn<ReleaseFormData>;
+  imageHandle: ImageUploadHandle;
+  isPublished: boolean;
+  setIsPublished: (value: boolean) => void;
+  setReleaseId: (id: string) => void;
+  router: ReturnType<typeof useRouter>;
+  preGeneratedId: string;
+  createReleaseAsync: ReturnType<typeof useCreateReleaseMutation>['createReleaseAsync'];
+  updateReleaseAsync: ReturnType<typeof useUpdateReleaseMutation>['updateReleaseAsync'];
+}
+
+const pendingImages = (images: ImageItem[]): ImageItem[] =>
+  images.filter((img) => img.file && !img.uploadedUrl);
+
+interface SubmittingState {
+  isCreatingRelease: boolean;
+  isUpdatingRelease: boolean;
+  isTransitionPending: boolean;
+  isUploadingImages: boolean;
+}
+
+const computeIsSubmitting = ({
+  isCreatingRelease,
+  isUpdatingRelease,
+  isTransitionPending,
+  isUploadingImages,
+}: SubmittingState): boolean =>
+  isCreatingRelease || isUpdatingRelease || isTransitionPending || isUploadingImages;
+
+const computeIsDirty = (
+  formIsDirty: boolean,
+  imagesReordered: boolean,
+  hasPendingImages: boolean
+): boolean => formIsDirty || imagesReordered || hasPendingImages;
+
+const submitReleaseUpdate = async (
+  releaseId: string,
+  data: ReleaseFormData,
+  deps: SubmitReleaseDeps
+): Promise<void> => {
+  const { releaseForm, imageHandle, isPublished, setIsPublished, updateReleaseAsync } = deps;
+  const title = data.title;
+
+  const newFormState = await updateReleaseAsync({ id: releaseId, values: data });
+  if (!newFormState.success) {
+    toast.error('Failed to update release. Please check the form for errors.');
+    return;
+  }
+
+  const imagesToUpload = pendingImages(imageHandle.images);
+  if (imagesToUpload.length > 0) {
+    await imageHandle.uploadImages(imagesToUpload, releaseId, title);
+  }
+
+  if (data.publishedAt && !isPublished) {
+    setIsPublished(true);
+    toast.success(<PublishedToastContent title={title} />);
+  } else {
+    toast.success(<UpdatedToastContent title={title} />);
+  }
+  releaseForm.reset(data);
+  imageHandle.resetImagesReordered();
+};
+
+const submitReleaseCreate = async (
+  data: ReleaseFormData,
+  deps: SubmitReleaseDeps
+): Promise<void> => {
+  const { releaseForm, imageHandle, setIsPublished, setReleaseId, router, preGeneratedId } = deps;
+  const title = data.title;
+
+  const newFormState = await deps.createReleaseAsync({ ...data, preGeneratedId });
+  if (!newFormState.success) {
+    toast.error('Failed to create release. Please check the form for errors.');
+    return;
+  }
+
+  const createdReleaseId = newFormState.data?.releaseId as string | undefined;
+  if (!createdReleaseId) {
+    toast.success(<ToastContent title={title} />);
+    return;
+  }
+
+  setReleaseId(createdReleaseId);
+  router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
+  if (data.publishedAt) {
+    setIsPublished(true);
+  }
+
+  const imagesToUpload = pendingImages(imageHandle.images);
+  if (imagesToUpload.length > 0) {
+    await imageHandle.uploadImages(imagesToUpload, createdReleaseId, title);
+  } else {
+    toast.success(<ToastContent title={title} />);
+  }
+
+  releaseForm.reset(data);
+  imageHandle.resetImagesReordered();
+};
+
+/** Guard the form ref then dispatch to the create/update submit path. */
+const runReleaseSubmit = async (
+  formEl: HTMLFormElement | null,
+  releaseId: string | null,
+  data: ReleaseFormData,
+  deps: SubmitReleaseDeps
+): Promise<void> => {
+  if (!formEl) {
+    error('ReleaseForm: Form reference is null on submit.');
+    toast.error('Please refresh the page and try again, or check back later.');
+    return;
+  }
+
+  if (releaseId) {
+    await submitReleaseUpdate(releaseId, data, deps);
+  } else {
+    await submitReleaseCreate(data, deps);
+  }
+};
+
+/** Toggle a format in the list, falling back to DIGITAL when none remain. */
+const computeNextFormats = (
+  current: string[] | undefined,
+  format: Format,
+  checked: boolean
+): string[] => {
+  const currentFormats = current ?? [];
+  const newFormats = checked
+    ? [...currentFormats, format]
+    : currentFormats.filter((f) => f !== format);
+  return newFormats.length === 0 ? ['DIGITAL'] : newFormats;
+};
+
+const SavedWithImagesToast = ({ title, count }: { title: string; count: number }) => (
+  <>
+    Release <b>{title}</b> saved with {count} image{count !== 1 ? 's' : ''}.
+  </>
+);
+
+/**
+ * Edit mode only: persist the new cover art to the release row immediately
+ * (after S3 upload + variant generation). Avoids losing the cover if the user
+ * navigates away before submitting the full form. For new releases there's no
+ * row to update yet — the create flow saves it on form submit.
+ */
+const persistReleaseCoverArt = async (
+  releaseId: string | null,
+  cdnUrl: string,
+  updateCoverArt: ReturnType<typeof useUpdateReleaseCoverArtMutation>['updateReleaseCoverArtAsync']
+): Promise<void> => {
+  if (!releaseId) return;
+  const result = await updateCoverArt({ releaseId, coverArt: cdnUrl });
+  if (!result.success) {
+    throw new Error(result.error ?? 'Failed to save cover art');
+  }
+};
+
+interface ApplyLoadedReleaseTarget {
+  releaseForm: UseFormReturn<ReleaseFormData>;
+  userId: string | undefined;
+  setIsPublished: (value: boolean) => void;
+  setImages: (images: ImageItem[]) => void;
+}
+
+/** Project a loaded release into form/image/publish state (edit mode load). */
+const applyLoadedRelease = (
+  releaseData: ReleaseDetail,
+  { releaseForm, userId, setIsPublished, setImages }: ApplyLoadedReleaseTarget
+): void => {
+  releaseForm.reset(mapReleaseToFormValues(releaseData, userId));
+  if (releaseData.publishedAt) {
+    setIsPublished(true);
+  }
+  if (releaseData.images.length > 0) {
+    setImages(mapReleaseImages(releaseData));
+  }
+};
+
+export const ReleaseForm = ({
+  releaseId: initialReleaseId,
+}: ReleaseFormProps): React.ReactElement => {
   const [isTransitionPending, startTransition] = useTransition();
   const { createReleaseAsync, isCreatingRelease } = useCreateReleaseMutation();
   const { updateReleaseAsync, isUpdatingRelease } = useUpdateReleaseMutation();
   const { updateReleaseCoverArtAsync } = useUpdateReleaseCoverArtMutation();
   const { deleteReleaseAsync } = useDeleteReleaseMutation();
-  const [images, setImages] = useState<ImageItem[]>([]);
-  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
-  const [imagesReordered, setImagesReordered] = useState(false);
   const isEditMode = releaseId !== null;
 
   // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
@@ -137,36 +398,18 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   const user = session?.user;
   const formRef = useRef<HTMLFormElement>(null);
 
+  const images = useImageOperations({
+    entityType: 'releases',
+    entityId: releaseId,
+    reorderAction: reorderReleaseImagesAction,
+    deleteAction: deleteReleaseImageAction,
+  });
+
   const releaseForm = useForm<ReleaseFormData>({
     resolver: zodResolver(createReleaseSchema),
-    defaultValues: {
-      title: '',
-      releasedOn: '',
-      coverArt: '',
-      formats: ['DIGITAL'],
-      artistIds: [],
-      labels: '',
-      catalogNumber: '',
-      description: '',
-      notes: '',
-      executiveProducedBy: '',
-      coProducedBy: '',
-      masteredBy: '',
-      mixedBy: '',
-      recordedBy: '',
-      artBy: '',
-      designBy: '',
-      photographyBy: '',
-      linerNotesBy: '',
-      publishedAt: '',
-      featuredOn: '',
-      featuredUntil: '',
-      featuredDescription: '',
-      suggestedPrice: '',
-      createdBy: user?.id,
-    },
+    defaultValues: buildReleaseDefaults(user?.id),
   });
-  const { control } = releaseForm;
+  const { control, setValue } = releaseForm;
 
   // Fetch release data when initialReleaseId is provided. The gated hook owns
   // the request lifecycle; the effects below project its data/error into form
@@ -190,83 +433,13 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
   // the loading gate opens. Setting it in an effect would populate it one render
   // late, after the accordion has already mounted empty, and the "uploaded"
   // checkmarks would never appear.
-  const existingFormats = useMemo(
-    () =>
-      (releaseData?.digitalFormats ?? [])
-        .filter((df) => df.deletedAt == null)
-        .map((df) => ({
-          formatType: df.formatType as DigitalFormatType,
-          trackCount: df.trackCount ?? df.files.length,
-          totalFileSize: Number(df.totalFileSize ?? 0),
-          files: df.files.map((f) => ({
-            trackNumber: f.trackNumber,
-            title: f.title ?? null,
-            fileName: f.fileName,
-            fileSize: Number(f.fileSize),
-            duration: f.duration ?? null,
-          })),
-        })),
-    [releaseData]
-  );
+  const existingFormats = useMemo(() => mapExistingFormats(releaseData), [releaseData]);
 
+  const { setImages } = images;
   useEffect(() => {
     if (!initialReleaseId || !releaseData) return;
-
-    const release = releaseData;
-
-    // Format dates for the form (YYYY-MM-DD format)
-    const formatDate = (dateValue: string | Date | null | undefined): string => {
-      if (!dateValue) return '';
-      const date = new Date(dateValue);
-      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-    };
-
-    // Reset form with fetched data
-    releaseForm.reset({
-      title: release.title || '',
-      releasedOn: formatDate(release.releasedOn),
-      coverArt: release.coverArt || '',
-      formats: release.formats.length > 0 ? release.formats : ['DIGITAL'],
-      artistIds: release.artistReleases.map((ar) => ar.artistId),
-      labels: release.labels.join(', '),
-      catalogNumber: release.catalogNumber || '',
-      description: release.description || '',
-      notes: release.notes.join(', '),
-      executiveProducedBy: release.executiveProducedBy.join(', '),
-      coProducedBy: release.coProducedBy.join(', '),
-      masteredBy: release.masteredBy.join(', '),
-      mixedBy: release.mixedBy.join(', '),
-      recordedBy: release.recordedBy.join(', '),
-      artBy: release.artBy.join(', '),
-      designBy: release.designBy.join(', '),
-      photographyBy: release.photographyBy.join(', '),
-      linerNotesBy: release.linerNotesBy.join(', '),
-      publishedAt: formatDate(release.publishedAt),
-      featuredOn: formatDate(release.featuredOn),
-      featuredUntil: formatDate(release.featuredUntil),
-      featuredDescription: release.featuredDescription || '',
-      suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
-      createdBy: user?.id,
-    });
-
-    // Set published state
-    if (release.publishedAt) {
-      setIsPublished(true);
-    }
-
-    // Load existing images if any
-    if (release.images.length > 0) {
-      const existingImages: ImageItem[] = release.images.map((img) => ({
-        id: img.id,
-        preview: img.src ?? '',
-        uploadedUrl: img.src ?? '',
-        caption: img.caption || '',
-        altText: img.altText || '',
-        sortOrder: img.sortOrder ?? 0,
-      }));
-      setImages(existingImages);
-    }
-  }, [initialReleaseId, releaseData, releaseForm, user?.id]);
+    applyLoadedRelease(releaseData, { releaseForm, userId: user?.id, setIsPublished, setImages });
+  }, [initialReleaseId, releaseData, releaseForm, user?.id, setImages]);
 
   // Surface a load failure (edit mode only) without unmounting the form.
   useEffect(() => {
@@ -276,148 +449,39 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     }
   }, [initialReleaseId, isReleaseError, releaseError]);
 
-  const handleImagesChange = useCallback((newImages: ImageItem[]) => {
-    setImages(newImages);
-  }, []);
-
-  const handleReorder = useCallback(
-    async (imageIds: string[]) => {
-      setImagesReordered(true);
-
-      if (!releaseId) {
-        return;
-      }
-
-      const result = await reorderReleaseImagesAction(releaseId, imageIds);
-
-      if (!result.success) {
-        toast.error(result.error || 'Failed to save image order');
-      }
-    },
-    [releaseId]
-  );
-
-  const handleDeleteImage = useCallback(
-    async (imageId: string): Promise<{ success: boolean; error?: string }> => {
-      const result = await deleteReleaseImageAction(imageId);
-
-      if (!result.success) {
-        toast.error(result.error || 'Failed to delete image');
-      }
-
-      return result;
-    },
-    []
-  );
-
-  const handleReleaseAutoCreated = useCallback(
-    (_result: {
-      releaseId: string;
-      releaseTitle: string;
-      metadata: { album?: string; artist?: string; year?: number; label?: string };
-    }) => {
-      router.replace(`/admin/releases/${_result.releaseId}`, { scroll: false });
-    },
-    [router]
-  );
-
-  const handleMetadataExtracted = useCallback(
-    (metadata: {
-      album?: string;
-      artist?: string;
-      albumArtist?: string;
-      year?: number;
-      label?: string;
-      coverArt?: string;
-    }) => {
-      if (metadata.album) {
-        releaseForm.setValue('title', metadata.album, { shouldDirty: true });
-      }
-      if (metadata.year) {
-        releaseForm.setValue('releasedOn', `${metadata.year}-01-01`, { shouldDirty: true });
-      }
-      if (metadata.label) {
-        releaseForm.setValue('labels', metadata.label, { shouldDirty: true });
-      }
-      if (metadata.coverArt) {
-        releaseForm.setValue('coverArt', metadata.coverArt, { shouldDirty: true });
-      }
-      const detectedArtist = metadata.albumArtist ?? metadata.artist;
-      if (detectedArtist) {
-        toast.success(`Artist "${detectedArtist}" auto-connected to this release.`);
-      }
-    },
-    [releaseForm]
+  const uploadImages = useCallback(
+    (imagesToUpload: ImageItem[], targetReleaseId: string, title: string): Promise<void> =>
+      images.uploadImages(imagesToUpload, targetReleaseId, {
+        register: registerReleaseImagesAction,
+        onSuccess: (uploaded) =>
+          toast.success(<SavedWithImagesToast title={title} count={uploaded.length} />),
+      }),
+    [images]
   );
 
   const onSubmitReleaseForm = useCallback(
-    async (data: ReleaseFormData) => {
-      startTransition(async () => {
-        if (formRef.current) {
-          const title = data.title;
-
-          if (releaseId) {
-            // Update existing release
-            const newFormState = await updateReleaseAsync({ id: releaseId, values: data });
-            if (newFormState.success) {
-              // Upload any pending images
-              const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
-              if (imagesToUpload.length > 0) {
-                await uploadImages(imagesToUpload, releaseId, title);
-              }
-
-              // Check if this was a publish action
-              if (data.publishedAt && !isPublished) {
-                setIsPublished(true);
-                toast.success(<PublishedToastContent title={title} />);
-              } else {
-                toast.success(<UpdatedToastContent title={title} />);
-              }
-              releaseForm.reset(data);
-              setImagesReordered(false);
-            } else {
-              toast.error('Failed to update release. Please check the form for errors.');
-            }
-          } else {
-            // Create new release
-            const newFormState = await createReleaseAsync({ ...data, preGeneratedId });
-            if (newFormState.success) {
-              const createdReleaseId = newFormState.data?.releaseId as string | undefined;
-
-              if (createdReleaseId) {
-                setReleaseId(createdReleaseId);
-
-                router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
-
-                if (data.publishedAt) {
-                  setIsPublished(true);
-                }
-
-                // Upload images if any were added
-                const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
-                if (imagesToUpload.length > 0) {
-                  await uploadImages(imagesToUpload, createdReleaseId, title);
-                } else {
-                  toast.success(<ToastContent title={title} />);
-                }
-
-                releaseForm.reset(data);
-                setImagesReordered(false);
-              } else {
-                toast.success(<ToastContent title={title} />);
-              }
-            } else {
-              toast.error('Failed to create release. Please check the form for errors.');
-            }
-          }
-        } else {
-          error('ReleaseForm: Form reference is null on submit.');
-          toast.error('Please refresh the page and try again, or check back later.');
-        }
-      });
+    async (data: ReleaseFormData): Promise<void> => {
+      const deps: SubmitReleaseDeps = {
+        releaseForm,
+        imageHandle: {
+          images: images.images,
+          uploadImages,
+          resetImagesReordered: images.resetImagesReordered,
+        },
+        isPublished,
+        setIsPublished,
+        setReleaseId,
+        router,
+        preGeneratedId,
+        createReleaseAsync,
+        updateReleaseAsync,
+      };
+      startTransition(() => runReleaseSubmit(formRef.current, releaseId, data, deps));
     },
     [
-      images,
+      images.images,
+      images.resetImagesReordered,
+      uploadImages,
       releaseId,
       isPublished,
       releaseForm,
@@ -428,176 +492,78 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     ]
   );
 
-  const uploadImages = async (
-    imagesToUpload: ImageItem[],
-    targetReleaseId: string,
-    title: string
-  ) => {
-    setIsUploadingImages(true);
-    setImages((prev) =>
-      prev.map((img) => (img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img))
-    );
+  const isSubmitting = computeIsSubmitting({
+    isCreatingRelease,
+    isUpdatingRelease,
+    isTransitionPending,
+    isUploadingImages: images.isUploadingImages,
+  });
 
-    try {
-      const imagesWithFiles = imagesToUpload.filter(
-        (img): img is ImageItem & { file: File } => img.file instanceof File
-      );
-
-      const fileInfos = imagesWithFiles.map((img) => ({
-        fileName: img.file.name,
-        contentType: img.file.type,
-        fileSize: img.file.size,
-      }));
-
-      const presignedResult = await getPresignedUploadUrlsAction(
-        'releases',
-        targetReleaseId,
-        fileInfos
-      );
-
-      if (!presignedResult.success || !presignedResult.data) {
-        throw Error(presignedResult.error || 'Failed to get upload URLs');
-      }
-
-      const files = imagesWithFiles.map((img) => img.file);
-      const uploadResults = await uploadFilesToS3(files, presignedResult.data);
-
-      const failedUploads = uploadResults.filter((r) => !r.success);
-      if (failedUploads.length > 0) {
-        throw Error(`Failed to upload ${failedUploads.length} image(s)`);
-      }
-
-      const imageInfos = presignedResult.data.map((presigned, index) => {
-        const imageToUpload = imagesToUpload.at(index);
-        return {
-          s3Key: presigned.s3Key,
-          cdnUrl: presigned.cdnUrl,
-          caption: imageToUpload?.caption || '',
-          altText: imageToUpload?.altText || '',
-        };
-      });
-
-      const registerResult = await registerReleaseImagesAction(targetReleaseId, imageInfos);
-
-      if (registerResult.success && registerResult.data) {
-        setImages((prev) => {
-          const uploadedData = registerResult.data || [];
-          let uploadIndex = 0;
-          return prev.map((img) => {
-            const uploaded = uploadedData.at(uploadIndex);
-            if (img.file && !img.uploadedUrl && uploaded) {
-              uploadIndex++;
-              return {
-                ...img,
-                id: uploaded.id,
-                uploadedUrl: uploaded.src,
-                isUploading: false,
-                sortOrder: uploaded.sortOrder,
-              };
-            }
-            return { ...img, isUploading: false };
-          });
-        });
-        toast.success(
-          <>
-            Release <b>{title}</b> saved with {registerResult.data.length} image
-            {registerResult.data.length !== 1 ? 's' : ''}.
-          </>
-        );
-      } else {
-        throw Error(registerResult.error || 'Failed to register images');
-      }
-    } catch (uploadError) {
-      error('Image upload error:', uploadError);
-      const errorMessage = uploadError instanceof Error ? uploadError.message : 'Upload failed';
-      setImages((prev) =>
-        prev.map((img) =>
-          img.file && !img.uploadedUrl ? { ...img, isUploading: false, error: errorMessage } : img
-        )
-      );
-      toast.error(errorMessage);
-    } finally {
-      setIsUploadingImages(false);
-    }
-  };
-
-  const isSubmitting =
-    isCreatingRelease || isUpdatingRelease || isTransitionPending || isUploadingImages;
-
-  const _title = useWatch({ control, name: 'title' });
   const formats = useWatch({ control, name: 'formats' });
   const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
 
-  const handleSelectDate = (dateString: string, fieldName: string): void => {
-    releaseForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
-  };
+  const handleSelectDate = useCallback(
+    (dateString: string, fieldName: string): void => {
+      releaseForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
+    },
+    [releaseForm]
+  );
 
-  const formatValidationErrors = useCallback((errors: Record<string, { message?: string }>) => {
-    const errorMessages = Object.entries(errors)
-      .map(([field, err]) => `${field}: ${err.message || 'Invalid'}`)
-      .join(', ');
-    return errorMessages || 'Please check the form for errors.';
+  const handleReleaseAutoCreated = useCallback(
+    (result: ReleaseAutoCreatedPayload): void => {
+      router.replace(`/admin/releases/${result.releaseId}`, { scroll: false });
+    },
+    [router]
+  );
+
+  const handleMetadataExtracted = useCallback(
+    (metadata: ExtractedAudioMetadata): void => applyExtractedMetadata(metadata, setValue),
+    [setValue]
+  );
+
+  const onInvalidSubmit = useCallback((errors: Record<string, { message?: string }>): void => {
+    console.error('Form validation errors:', errors);
+    toast.error(formatValidationErrors(errors));
   }, []);
+
+  const submitForm = releaseForm.handleSubmit(onSubmitReleaseForm, onInvalidSubmit);
 
   const handleClickPublishButton = useCallback(() => {
     releaseForm.setValue('publishedAt', new Date().toISOString(), { shouldDirty: true });
-    releaseForm.handleSubmit(onSubmitReleaseForm, (errors) => {
-      console.error('Form validation errors:', errors);
-      toast.error(formatValidationErrors(errors));
-    })();
-  }, [releaseForm, onSubmitReleaseForm, formatValidationErrors]);
+    releaseForm.handleSubmit(onSubmitReleaseForm, onInvalidSubmit)();
+  }, [releaseForm, onSubmitReleaseForm, onInvalidSubmit]);
 
   const handleFormatChange = useCallback(
     (format: Format, checked: boolean) => {
-      const currentFormats = (formats || []) as string[];
-      let newFormats: string[];
-
-      if (checked) {
-        newFormats = [...currentFormats, format];
-      } else {
-        newFormats = currentFormats.filter((f) => f !== format);
-      }
-
-      // Ensure at least one format is selected
-      if (newFormats.length === 0) {
-        newFormats = ['DIGITAL'];
-      }
-
-      releaseForm.setValue('formats', newFormats, { shouldDirty: true });
+      releaseForm.setValue('formats', computeNextFormats(formats, format, checked), {
+        shouldDirty: true,
+      });
     },
     [formats, releaseForm]
   );
 
-  const hasPendingImages = images.some((img) => img.file && !img.uploadedUrl);
-  const isDirty = releaseForm.formState.isDirty || imagesReordered || hasPendingImages;
+  const persistCoverArt = useCallback(
+    (cdnUrl: string): Promise<void> =>
+      persistReleaseCoverArt(releaseId, cdnUrl, updateReleaseCoverArtAsync),
+    [releaseId, updateReleaseCoverArtAsync]
+  );
+  const onCoverArtUploadComplete = releaseId ? persistCoverArt : undefined;
 
-  if (!releaseForm || !control || isLoadingRelease) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>{initialReleaseId ? 'Edit Release' : 'Create New Release'}</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const isDirty = computeIsDirty(
+    releaseForm.formState.isDirty,
+    images.imagesReordered,
+    images.hasPendingImages
+  );
+
+  if (isLoadingRelease) {
+    return <ReleaseFormSkeleton isEditMode={!!initialReleaseId} />;
   }
 
   return (
     <>
       <BreadcrumbMenu
         items={[
-          {
-            anchorText: 'Admin',
-            url: '/admin',
-            isActive: false,
-          },
+          { anchorText: 'Admin', url: '/admin', isActive: false },
           {
             anchorText: isEditMode ? 'Edit Release' : 'Create Release',
             url: '/admin/releases',
@@ -606,403 +572,40 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
         ]}
       />
       <Card className="w-full border-none px-0 pb-0">
-        <CardHeader>
-          <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
-          <CardDescription className="text-sm">
-            {isEditMode
-              ? 'Update release information. Changes are saved when you click Save.'
-              : `Upload ${FORMAT_CONFIGS[0].label} first. Creates the release upon upload.`}
-          </CardDescription>
-        </CardHeader>
+        <ReleaseCardHeader isEditMode={isEditMode} />
         <Form {...releaseForm}>
-          <form
-            ref={formRef}
-            onSubmit={releaseForm.handleSubmit(onSubmitReleaseForm, (errors) => {
-              console.error('Form validation errors:', errors);
-              toast.error(formatValidationErrors(errors));
-            })}
-            noValidate
-          >
-            <CardContent className="space-y-6">
-              {/* Digital Formats Section - Always visible */}
-              <section className="space-y-4">
-                <DigitalFormatsAccordion
-                  releaseId={preGeneratedId}
-                  existingFormats={existingFormats}
-                  onReleaseAutoCreated={!isEditMode ? handleReleaseAutoCreated : undefined}
-                  onMetadataExtracted={handleMetadataExtracted}
-                />
-              </section>
+          <form ref={formRef} onSubmit={submitForm} noValidate>
+            <ReleaseFormContent
+              control={control}
+              setValue={setValue}
+              isSubmitting={isSubmitting}
+              isEditMode={isEditMode}
+              initialReleaseId={initialReleaseId}
+              releaseId={releaseId}
+              preGeneratedId={preGeneratedId}
+              existingFormats={existingFormats}
+              formats={formats}
+              watchedArtistIds={watchedArtistIds}
+              images={images.images}
+              onSelectDate={handleSelectDate}
+              onCoverArtUploadComplete={onCoverArtUploadComplete}
+              onFormatChange={handleFormatChange}
+              onReleaseAutoCreated={handleReleaseAutoCreated}
+              onMetadataExtracted={handleMetadataExtracted}
+              onImagesChange={images.handleImagesChange}
+              onReorder={images.handleReorder}
+              onDelete={images.handleDeleteImage}
+            />
 
-              <Separator />
-              {/* Basic Information Section */}
-              <section className="space-y-4 pt-0">
-                <h2 className="font-semibold">Basic Information</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="title"
-                    label="Title *"
-                    placeholder="Release title"
-                  />
-                  <TextField
-                    control={control}
-                    name="catalogNumber"
-                    label="Catalog Number"
-                    placeholder="e.g., CAT-001"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <FormField
-                    control={control}
-                    name="suggestedPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Suggested Price (USD)</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="e.g., 7.99"
-                            className="w-32"
-                            aria-label="Suggested price in dollars"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Optional pay-what-you-want suggested price
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <FormField
-                    control={control}
-                    name="releasedOn"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Release Date *</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            fieldName={field.name}
-                            onSelect={handleSelectDate}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <TextField
-                    control={control}
-                    name="labels"
-                    label="Labels"
-                    placeholder="Label names (comma-separated)"
-                  />
-                </div>
-                <ArtistMultiSelect
-                  control={control}
-                  name="artistIds"
-                  label="Artists"
-                  placeholder="Select artists..."
-                  searchPlaceholder="Search artists..."
-                  emptyMessage="No artists found."
-                  setValue={releaseForm.setValue}
-                  releaseId={releaseId}
-                  disabled={isSubmitting}
-                />
-                <CoverArtField
-                  control={control}
-                  name="coverArt"
-                  setValue={releaseForm.setValue}
-                  artistIds={watchedArtistIds || []}
-                  disabled={isSubmitting}
-                  entityId={preGeneratedId}
-                  onUploadComplete={
-                    releaseId
-                      ? async (cdnUrl) => {
-                          // Edit mode only: persist the new cover art to the
-                          // release row immediately (after S3 upload + variant
-                          // generation). Avoids losing the cover if the user
-                          // navigates away before submitting the full form.
-                          // For new releases there's no row to update yet —
-                          // the create flow will save it on form submit.
-                          const result = await updateReleaseCoverArtAsync({
-                            releaseId,
-                            coverArt: cdnUrl,
-                          });
-                          if (!result.success) {
-                            throw new Error(result.error ?? 'Failed to save cover art');
-                          }
-                        }
-                      : undefined
-                  }
-                />
-                <FormField
-                  control={control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Release description"
-                          className="min-h-24"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </section>
-
-              <Separator />
-
-              {/* Formats Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Formats *</h2>
-                <FormDescription>Select all formats this release is available in.</FormDescription>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  {Object.entries(FORMAT_GROUPS).map(([groupName, groupFormats]) => (
-                    <div key={groupName} className="space-y-3">
-                      <h3 className="text-foreground text-2xl font-medium">{groupName}</h3>
-                      <div className="space-y-4">
-                        {groupFormats.map((format) => (
-                          <div key={format} className="flex items-center justify-between">
-                            <label
-                              htmlFor={`format-${format}`}
-                              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {formatDisplayName(format)}
-                            </label>
-                            <Switch
-                              id={`format-${format}`}
-                              checked={formats?.includes(format) || false}
-                              onCheckedChange={(checked) =>
-                                handleFormatChange(format, checked as boolean)
-                              }
-                              disabled={isSubmitting}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Show all other formats in a collapsible section */}
-                <details className="mt-4">
-                  <summary className="hover:text-foreground cursor-pointer text-sm text-zinc-950">
-                    Show all formats ({Object.keys(FORMATS).length} total)
-                  </summary>
-                  <div className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-                    {Object.values(FORMATS)
-                      .filter(
-                        (format) =>
-                          !VALID_FORMAT_TYPES.includes(
-                            format as (typeof VALID_FORMAT_TYPES)[number]
-                          ) &&
-                          format !== 'DIGITAL' &&
-                          !FORMAT_GROUPS.Vinyl.includes(format as Format) &&
-                          !FORMAT_GROUPS.Physical.includes(format as Format)
-                      )
-                      .map((format) => (
-                        <div key={format} className="flex items-center justify-between">
-                          <label
-                            htmlFor={`format-${format}`}
-                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {formatDisplayName(format)}
-                          </label>
-                          <Switch
-                            id={`format-${format}`}
-                            checked={formats?.includes(format) || false}
-                            onCheckedChange={(checked) =>
-                              handleFormatChange(format as Format, checked as boolean)
-                            }
-                            disabled={isSubmitting}
-                          />
-                        </div>
-                      ))}
-                  </div>
-                </details>
-              </section>
-
-              <Separator />
-
-              {/* Images Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-zinc-950">
-                  Add images for this release. You can drag to reorder them. Images will be uploaded
-                  after the release is created or updated.
-                </p>
-                <ImageUploader
-                  images={images}
-                  onImagesChange={handleImagesChange}
-                  onReorder={handleReorder}
-                  onDelete={handleDeleteImage}
-                  maxImages={20}
-                  disabled={isSubmitting}
-                  label="Upload release images"
-                />
-              </section>
-
-              <Separator />
-
-              {/* Credits Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Credits</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="executiveProducedBy"
-                    label="Executive Produced By"
-                    placeholder="Names (comma-separated)"
-                  />
-                  <TextField
-                    control={control}
-                    name="coProducedBy"
-                    label="Co-Produced By"
-                    placeholder="Names (comma-separated)"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="masteredBy"
-                    label="Mastered By"
-                    placeholder="Names (comma-separated)"
-                  />
-                  <TextField
-                    control={control}
-                    name="mixedBy"
-                    label="Mixed By"
-                    placeholder="Names (comma-separated)"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="recordedBy"
-                    label="Recorded By"
-                    placeholder="Names (comma-separated)"
-                  />
-                  <TextField
-                    control={control}
-                    name="linerNotesBy"
-                    label="Liner Notes By"
-                    placeholder="Names (comma-separated)"
-                  />
-                </div>
-              </section>
-
-              <Separator />
-
-              {/* Artwork Credits Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Artwork Credits</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <TextField
-                    control={control}
-                    name="artBy"
-                    label="Art By"
-                    placeholder="Names (comma-separated)"
-                  />
-                  <TextField
-                    control={control}
-                    name="designBy"
-                    label="Design By"
-                    placeholder="Names (comma-separated)"
-                  />
-                </div>
-                <TextField
-                  control={control}
-                  name="photographyBy"
-                  label="Photography By"
-                  placeholder="Names (comma-separated)"
-                />
-              </section>
-
-              <Separator />
-
-              {/* Notes Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Notes</h2>
-                <FormField
-                  control={control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Release Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Additional notes (comma-separated for multiple)"
-                          className="min-h-20"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </section>
-
-              <Separator />
-
-              {isEditMode && initialReleaseId && (
-                <>
-                  <Separator />
-
-                  {/* Download Analytics Section - Edit mode only */}
-                  <section className="space-y-4">
-                    <DownloadAnalyticsDashboard releaseId={initialReleaseId} />
-                  </section>
-                </>
-              )}
-            </CardContent>
-
-            <CardFooter className="flex justify-end gap-4">
-              {isEditMode ? (
-                <>
-                  {releaseId && (
-                    <EntityDeleteButton
-                      label="Delete Release"
-                      title="Delete this release?"
-                      description="This permanently removes the release and its files (digital formats and images) and cannot be undone."
-                      successMessage="Release deleted successfully"
-                      failureMessage="Failed to delete release"
-                      redirectTo="/admin/releases"
-                      disabled={isSubmitting}
-                      onDelete={() => deleteReleaseAsync({ releaseId })}
-                    />
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting || isPublished}
-                    onClick={handleClickPublishButton}
-                  >
-                    {isPublished ? 'Published' : 'Publish'}
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting || !isDirty}>
-                    {isSubmitting ? 'Saving...' : 'Save'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button type="button" disabled={isSubmitting} onClick={handleClickPublishButton}>
-                    Create &amp; Publish
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : 'Create'}
-                  </Button>
-                </>
-              )}
-            </CardFooter>
+            <ReleaseFormFooter
+              isEditMode={isEditMode}
+              releaseId={releaseId}
+              isPublished={isPublished}
+              isSubmitting={isSubmitting}
+              isDirty={isDirty}
+              onPublish={handleClickPublishButton}
+              onDelete={() => deleteReleaseAsync({ releaseId: releaseId ?? '' })}
+            />
           </form>
         </Form>
       </Card>

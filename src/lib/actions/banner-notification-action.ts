@@ -22,6 +22,51 @@ import type { Session } from 'next-auth';
 
 const logger = loggers.notifications;
 
+/** Converts Zod validation issues into a failed FormState, keying by full dot-joined path. */
+const buildBannerFieldErrors = (
+  issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }>
+): FormState => {
+  const fieldErrors = new Map<string, string[]>();
+  for (const issue of issues) {
+    const key = issue.path.join('.');
+    const messages = fieldErrors.get(key) ?? [];
+    messages.push(issue.message);
+    fieldErrors.set(key, messages);
+  }
+  return { fields: {}, success: false, errors: Object.fromEntries(fieldErrors) };
+};
+
+/** Sanitizes content, calls the upsert service, revalidates on success, and returns FormState. */
+const executeBannerUpsert = async (
+  slotNumber: number,
+  data: {
+    content: string | null | undefined;
+    textColor: string | null | undefined;
+    backgroundColor: string | null | undefined;
+    displayFrom: Date | null | undefined;
+    displayUntil: Date | null | undefined;
+    repostedFromId: string | null | undefined;
+  },
+  userId: string
+): Promise<FormState> => {
+  const sanitizedContent = data.content ? sanitizeBannerHtmlServer(data.content) : null;
+  const result = await BannerNotificationService.upsertNotification(slotNumber, {
+    content: sanitizedContent,
+    textColor: data.textColor ?? null,
+    backgroundColor: data.backgroundColor ?? null,
+    displayFrom: data.displayFrom ?? null,
+    displayUntil: data.displayUntil ?? null,
+    repostedFromId: data.repostedFromId ?? null,
+    addedById: userId,
+  });
+  if (!result.success) {
+    return { fields: {}, success: false, errors: { _form: [result.error] } };
+  }
+  revalidatePath('/');
+  revalidatePath('/admin/notifications');
+  return { fields: {}, success: true, data: { notificationId: result.data.id } };
+};
+
 /**
  * Upsert a banner notification for a given slot.
  * Used with `useActionState` in the admin form.
@@ -54,18 +99,7 @@ export const createOrUpdateBannerNotificationAction = async (
   const parsed = bannerNotificationSchema.safeParse(raw);
 
   if (!parsed.success) {
-    const fieldErrors = new Map<string, string[]>();
-    for (const issue of parsed.error.issues) {
-      const key = issue.path.join('.');
-      const messages = fieldErrors.get(key) ?? [];
-      messages.push(issue.message);
-      fieldErrors.set(key, messages);
-    }
-    return {
-      fields: {},
-      success: false,
-      errors: Object.fromEntries(fieldErrors),
-    };
+    return buildBannerFieldErrors(parsed.error.issues);
   }
 
   const {
@@ -87,34 +121,11 @@ export const createOrUpdateBannerNotificationAction = async (
   // Defense-in-depth: re-sanitize with a proper HTML parser before persisting.
   // The Zod transform runs a regex sanitizer (shared with the client preview);
   // this second pass uses sanitize-html so malformed input cannot bypass.
-  const sanitizedContent = content ? sanitizeBannerHtmlServer(content) : null;
-
-  const result = await BannerNotificationService.upsertNotification(slotNumber, {
-    content: sanitizedContent,
-    textColor: textColor ?? null,
-    backgroundColor: backgroundColor ?? null,
-    displayFrom: displayFrom ?? null,
-    displayUntil: displayUntil ?? null,
-    repostedFromId: repostedFromId ?? null,
-    addedById: session.user.id,
-  });
-
-  if (!result.success) {
-    return {
-      fields: {},
-      success: false,
-      errors: { _form: [result.error] },
-    };
-  }
-
-  revalidatePath('/');
-  revalidatePath('/admin/notifications');
-
-  return {
-    fields: {},
-    success: true,
-    data: { notificationId: result.data.id },
-  };
+  return executeBannerUpsert(
+    slotNumber,
+    { content, textColor, backgroundColor, displayFrom, displayUntil, repostedFromId },
+    session.user.id
+  );
 };
 
 /**

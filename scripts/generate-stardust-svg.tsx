@@ -128,83 +128,52 @@ ${particleElements}
 </svg>`;
 };
 
+// A value-consuming flag: reads the next argv token and writes it onto config.
+type ValueSetter = (config: Config, value: string) => void;
+
+// Map each value-consuming flag (and its aliases) to its setter. Keeping this
+// as a lookup table — rather than a long switch — keeps parseArgs flat and well
+// under the cyclomatic-complexity ceiling while preserving identical behavior.
+const valueSetters = new Map<string, ValueSetter>([
+  ['--width', (config, value) => (config.width = parseInt(value))],
+  ['--height', (config, value) => (config.height = parseInt(value))],
+  ['--bg-color', (config, value) => (config.bgColor = value)],
+  ['--output', (config, value) => (config.output = value)],
+  ['-o', (config, value) => (config.output = value)],
+  ['--dots', (config, value) => (config.particleCounts.dot = parseInt(value))],
+  ['--diamonds', (config, value) => (config.particleCounts.diamond = parseInt(value))],
+  ['--triangles', (config, value) => (config.particleCounts.triangle = parseInt(value))],
+  ['--wedges', (config, value) => (config.particleCounts.wedge = parseInt(value))],
+  ['--crescents', (config, value) => (config.particleCounts.crescent = parseInt(value))],
+  ['--arcs', (config, value) => (config.particleCounts.arc = parseInt(value))],
+  ['--brightness-min', (config, value) => (config.brightnessMin = parseFloat(value))],
+  ['--brightness-max', (config, value) => (config.brightnessMax = parseFloat(value))],
+  ['--scale-min', (config, value) => (config.scaleMin = parseFloat(value))],
+  ['--scale-max', (config, value) => (config.scaleMax = parseFloat(value))],
+]);
+
 // Parse command line arguments
 const parseArgs = (args: string[]): Config => {
   const config = { ...defaultConfig, particleCounts: { ...defaultConfig.particleCounts } };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args.at(i);
-    const value = args[i + 1];
 
-    switch (arg) {
-      case '--width':
-        config.width = parseInt(value);
-        i++;
-        break;
-      case '--height':
-        config.height = parseInt(value);
-        i++;
-        break;
-      case '--bg-color':
-        config.bgColor = value;
-        i++;
-        break;
-      case '--output':
-      case '-o':
-        config.output = value;
-        i++;
-        break;
-      case '--dots':
-        config.particleCounts.dot = parseInt(value);
-        i++;
-        break;
-      case '--diamonds':
-        config.particleCounts.diamond = parseInt(value);
-        i++;
-        break;
-      case '--triangles':
-        config.particleCounts.triangle = parseInt(value);
-        i++;
-        break;
-      case '--wedges':
-        config.particleCounts.wedge = parseInt(value);
-        i++;
-        break;
-      case '--crescents':
-        config.particleCounts.crescent = parseInt(value);
-        i++;
-        break;
-      case '--arcs':
-        config.particleCounts.arc = parseInt(value);
-        i++;
-        break;
-      case '--brightness-min':
-        config.brightnessMin = parseFloat(value);
-        i++;
-        break;
-      case '--brightness-max':
-        config.brightnessMax = parseFloat(value);
-        i++;
-        break;
-      case '--scale-min':
-        config.scaleMin = parseFloat(value);
-        i++;
-        break;
-      case '--scale-max':
-        config.scaleMax = parseFloat(value);
-        i++;
-        break;
-      case '--help':
-      // falls through
-      case '-h':
-        printHelp();
-        process.exit(0);
-        break;
-      default:
-        if (arg?.startsWith('--')) {
-          console.error(`Unknown option: ${arg}`);
-          process.exit(1);
-        }
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+
+    const setter = arg === undefined ? undefined : valueSetters.get(arg);
+    if (setter) {
+      setter(config, args[i + 1]);
+      i++;
+      continue;
+    }
+
+    if (arg?.startsWith('--')) {
+      console.error(`Unknown option: ${arg}`);
+      process.exit(1);
     }
   }
 

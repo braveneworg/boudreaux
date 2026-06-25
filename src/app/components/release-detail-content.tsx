@@ -21,6 +21,13 @@ interface ReleaseDetailContentProps {
   autoPlay: boolean;
 }
 
+/** The resolved (non-null) release payload returned by {@link useReleaseQuery}. */
+type ReleaseData = NonNullable<ReturnType<typeof useReleaseQuery>['data']>;
+
+/** The primary (first) artist on a release, if any. */
+const getPrimaryArtist = (release: ReleaseData | null | undefined) =>
+  release?.artistReleases?.[0]?.artist ?? null;
+
 /**
  * Client content wrapper for the release detail page.
  * Orchestrates multiple TanStack Query hooks (hydrated from SSR prefetch).
@@ -33,7 +40,7 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
   useReleaseUserStatusQuery(releaseId);
   useReleaseDigitalFormatsQuery(releaseId);
 
-  const primaryArtistId = release?.artistReleases?.[0]?.artist?.id ?? null;
+  const primaryArtistId = getPrimaryArtist(release)?.id ?? null;
   const { data: relatedData } = useReleaseRelatedQuery(releaseId, primaryArtistId);
 
   if (releasePending) {
@@ -57,7 +64,7 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
     );
   }
 
-  const primaryArtist = release.artistReleases?.[0]?.artist;
+  const primaryArtist = getPrimaryArtist(release);
   const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
   const otherReleases = relatedData?.releases ?? [];

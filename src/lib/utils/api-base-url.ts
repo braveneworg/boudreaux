@@ -12,35 +12,32 @@
  *
  * We never return http for production to avoid mixed content warnings.
  */
-export const getApiBaseUrl = (): string => {
-  const isDev = process.env.NODE_ENV === 'development';
-
-  // Server-side context
-  if (typeof window === 'undefined') {
-    if (isDev) {
-      return 'http://localhost:3000';
-    }
-    // Production server: use configured AUTH_URL if provided; otherwise synthesize https://fakefourrecords.com
-    const envUrl = process.env.AUTH_URL?.trim();
-    if (envUrl) {
-      // Normalize any accidental http to https
-      return envUrl.startsWith('http://') ? envUrl.replace('http://', 'https://') : envUrl;
-    }
-    // Fallback: hard-code domain with https to avoid downgrades
-    return 'https://fakefourrecords.com';
+const getServerBaseUrl = (isDev: boolean): string => {
+  if (isDev) {
+    return 'http://localhost:3000';
   }
+  // Production server: use configured AUTH_URL if provided; otherwise synthesize https://fakefourrecords.com
+  const envUrl = process.env.AUTH_URL?.trim();
+  if (envUrl) {
+    // Normalize any accidental http to https
+    return envUrl.startsWith('http://') ? envUrl.replace('http://', 'https://') : envUrl;
+  }
+  // Fallback: hard-code domain with https to avoid downgrades
+  return 'https://fakefourrecords.com';
+};
 
-  // Client-side context
+const isLocalLikeHostname = (hostname: string, isDev: boolean): boolean =>
+  hostname === 'localhost' ||
+  hostname === '127.0.0.1' ||
+  hostname.endsWith('.local') ||
+  hostname.startsWith('192.168.') ||
+  hostname.startsWith('10.') ||
+  isDev;
+
+const getClientBaseUrl = (isDev: boolean): string => {
   const { hostname, port, protocol } = window.location;
-  const localLike =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.local') ||
-    hostname.startsWith('192.168.') ||
-    hostname.startsWith('10.') ||
-    isDev;
 
-  if (localLike) {
+  if (isLocalLikeHostname(hostname, isDev)) {
     return `http://${hostname}${port ? `:${port}` : ''}`;
   }
 
@@ -49,4 +46,16 @@ export const getApiBaseUrl = (): string => {
     return `https://${hostname}${port ? `:${port}` : ''}`;
   }
   return window.location.origin;
+};
+
+export const getApiBaseUrl = (): string => {
+  const isDev = process.env.NODE_ENV === 'development';
+
+  // Server-side context
+  if (typeof window === 'undefined') {
+    return getServerBaseUrl(isDev);
+  }
+
+  // Client-side context
+  return getClientBaseUrl(isDev);
 };

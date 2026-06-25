@@ -20,6 +20,8 @@ import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
 import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
 
+import type { Session } from 'next-auth';
+
 interface ContactEntry {
   role: string;
   name: string;
@@ -33,6 +35,16 @@ const CONTACTS: readonly ContactEntry[] = [
   { role: 'Media and Fan Support', name: 'Niki', email: 'nikianarchy@gmail.com' },
   { role: 'Customer Service', name: 'Mo Niklz', email: 'djmoniklz@gmail.com' },
 ];
+
+/** Builds the contact form's default values, prefilling from the session user when present. */
+const buildContactDefaults = (user: Session['user'] | undefined): ContactFormSchemaType => ({
+  reason: '',
+  firstName: user?.firstName || '',
+  lastName: user?.lastName || '',
+  email: user?.email || '',
+  phone: user?.phone || '',
+  message: '',
+});
 
 const ContactPage = () => {
   const { data: session } = useSession();
@@ -48,14 +60,7 @@ const ContactPage = () => {
   });
 
   const form = useForm<ContactFormSchemaType>({
-    defaultValues: {
-      reason: '',
-      firstName: session?.user?.firstName || '',
-      lastName: session?.user?.lastName || '',
-      email: session?.user?.email || '',
-      phone: session?.user?.phone || '',
-      message: '',
-    },
+    defaultValues: buildContactDefaults(session?.user),
     resolver: zodResolver(contactSchema),
   });
 

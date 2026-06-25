@@ -4,7 +4,6 @@
 'use server';
 
 import 'server-only';
-import { headers } from 'next/headers';
 
 import { SendEmailCommand } from '@aws-sdk/client-ses';
 
@@ -13,11 +12,16 @@ import { buildContactEmailText } from '@/lib/email/contact-email-text';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { loggers } from '@/lib/utils/logger';
+import { checkPublicFormGuards } from '@/lib/utils/public-form-guards';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { sesClient } from '@/lib/utils/ses-client';
-import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
-import { contactSchema, CONTACT_REASONS } from '@/lib/validation/contact-schema';
+import {
+  contactSchema,
+  CONTACT_REASONS,
+  type ContactFormSchemaType,
+} from '@/lib/validation/contact-schema';
 
 // Rate limiter: 3 contact submissions per minute per IP
 const limiter = rateLimit({
@@ -25,71 +29,18 @@ const limiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 
-export const contactAction = async (
-  _initialState: FormState,
-  payload: FormData
+/**
+ * Build the SES message from validated contact data and send it, recording the
+ * outcome on `formState`. Mirrors the original inline flow: a missing
+ * EMAIL_FROM/CONTACT_EMAIL config or a send failure surfaces a generic error
+ * via {@link setUnknownError} rather than leaking details to the submitter.
+ */
+const dispatchContactEmail = async (
+  data: ContactFormSchemaType,
+  formState: FormState
 ): Promise<FormState> => {
-  // Get IP address for rate limiting
-  const headersList = await headers();
-  const ip =
-    headersList.get('x-real-ip') ||
-    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'anonymous';
-
-  // Check rate limit
   try {
-    await limiter.check(3, ip);
-  } catch {
-    return {
-      success: false,
-      errors: { general: ['Too many submissions. Please try again later.'] },
-      fields: {},
-    };
-  }
-
-  // Verify Turnstile token
-  const turnstileToken = payload.get('cf-turnstile-response') as string | null;
-  if (!turnstileToken) {
-    return {
-      success: false,
-      errors: { general: ['CAPTCHA verification required. Please complete the verification.'] },
-      fields: {},
-    };
-  }
-
-  const turnstileResult = await verifyTurnstile(turnstileToken, ip);
-  if (!turnstileResult.success) {
-    return {
-      success: false,
-      errors: {
-        general: [turnstileResult.error || 'CAPTCHA verification failed. Please try again.'],
-      },
-      fields: {},
-    };
-  }
-
-  const permittedFieldNames = ['reason', 'firstName', 'lastName', 'email', 'phone', 'message'];
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, contactSchema);
-
-  if (!parsed.success) {
-    // Map Zod validation errors to formState
-    if (parsed.error) {
-      // Seed from any pre-existing errors so new issues append rather than replace.
-      const errors = new Map<string, string[]>(Object.entries(formState.errors ?? {}));
-      for (const issue of parsed.error.issues) {
-        const fieldName = issue.path[0]?.toString() || 'general';
-        const messages = errors.get(fieldName) ?? [];
-        messages.push(issue.message);
-        errors.set(fieldName, messages);
-      }
-      formState.errors = Object.fromEntries(errors);
-    }
-    return formState;
-  }
-
-  // Build and send email
-  try {
-    const { reason, firstName, lastName, email, phone, message } = parsed.data;
+    const { reason, firstName, lastName, email, phone, message } = data;
 
     const reasonLabel = CONTACT_REASONS.find((r) => r.value === reason)?.label || reason;
     const timestamp = new Date().toLocaleString('en-US', {
@@ -150,4 +101,30 @@ export const contactAction = async (
   }
 
   return formState;
+};
+
+export const contactAction = async (
+  _initialState: FormState,
+  payload: FormData
+): Promise<FormState> => {
+  const guardError = await checkPublicFormGuards({
+    payload,
+    limiter,
+    maxRequests: 3,
+    rateLimitMessage: 'Too many submissions. Please try again later.',
+  });
+  if (guardError) return guardError;
+
+  const permittedFieldNames = ['reason', 'firstName', 'lastName', 'email', 'phone', 'message'];
+  const { formState, parsed } = getActionState(payload, permittedFieldNames, contactSchema);
+
+  if (!parsed.success) {
+    // Map Zod validation errors to formState (no-op when there is no error object).
+    if (parsed.error) {
+      applyZodIssuesToFormState(formState, parsed.error);
+    }
+    return formState;
+  }
+
+  return dispatchContactEmail(parsed.data, formState);
 };

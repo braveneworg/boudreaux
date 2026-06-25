@@ -18,6 +18,17 @@ import {
   SUPPORTED_IMAGE_TYPES,
 } from '@/lib/validation/tours/image-schema';
 
+import {
+  markImageError,
+  markImagesUploading,
+  markImageUploaded,
+  setImageProgress,
+  uploadImageToS3,
+} from './image-upload-helpers';
+
+/** Narrows a File's MIME type to the supported image union expected by the actions. */
+type SupportedMimeType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+
 /**
  * Local interface matching Prisma TourImage model.
  * Client components do not import the generated Prisma client types directly.
@@ -80,96 +91,36 @@ export const TourImageUpload = ({
   const handleUpload = useCallback(
     async (imagesToUpload: ImageItem[]) => {
       // Update images to show uploading state
-      setImages((prev) =>
-        prev.map((img) =>
-          imagesToUpload.find((i) => i.id === img.id)
-            ? { ...img, isUploading: true, uploadProgress: 0 }
-            : img
-        )
-      );
+      setImages((prev) => markImagesUploading(prev, imagesToUpload));
 
       for (const imageItem of imagesToUpload) {
         if (!imageItem.file) continue;
 
         try {
-          // Step 1: Get presigned URL from server
-          const urlResult = await generateUploadUrlAction({
-            tourId,
-            fileName: imageItem.file.name,
-            fileSize: imageItem.file.size,
-            mimeType: imageItem.file.type as
-              | 'image/jpeg'
-              | 'image/png'
-              | 'image/gif'
-              | 'image/webp',
+          const uploaded = await uploadImageToS3({
+            imageItem,
+            generateUrl: (file) =>
+              generateUploadUrlAction({
+                tourId,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type as SupportedMimeType,
+              }),
+            confirmUpload: (s3Key, s3Bucket, file) =>
+              confirmUploadAction({
+                tourId,
+                s3Key,
+                s3Bucket,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type as SupportedMimeType,
+              }),
+            // Update progress to 50% after S3 upload
+            onS3Uploaded: () => setImages((prev) => setImageProgress(prev, imageItem.id, 50)),
           });
-
-          if (!urlResult.success || !urlResult.data) {
-            throw new Error(urlResult.error || 'Failed to generate upload URL');
-          }
-
-          const { uploadUrl, s3Key, s3Bucket } = urlResult.data;
-
-          // Step 2: Upload directly to S3
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: imageItem.file,
-            headers: {
-              'Content-Type': imageItem.file.type,
-            },
-          });
-
-          if (!uploadResponse.ok) {
-            throw new Error(`S3 upload failed: ${uploadResponse.statusText}`);
-          }
-
-          // Update progress to 50% after S3 upload
-          setImages((prev) =>
-            prev.map((img) => (img.id === imageItem.id ? { ...img, uploadProgress: 50 } : img))
-          );
-
-          // Step 3: Confirm upload with server to create database record
-          const confirmResult = await confirmUploadAction({
-            tourId,
-            s3Key,
-            s3Bucket,
-            fileName: imageItem.file.name,
-            fileSize: imageItem.file.size,
-            mimeType: imageItem.file.type as
-              | 'image/jpeg'
-              | 'image/png'
-              | 'image/gif'
-              | 'image/webp',
-          });
-
-          if (!confirmResult.success || !confirmResult.data) {
-            throw new Error(confirmResult.error || 'Failed to confirm upload');
-          }
-
-          // Ensure id is present (it will be after database insert)
-          const uploadedId = confirmResult.data.id;
-          if (!uploadedId) {
-            throw new Error('Server did not return image ID');
-          }
-
-          const uploadedS3Url = confirmResult.data.s3Url;
 
           // Update to completed state with server-provided URL
-          setImages((prev) =>
-            prev.map((img) =>
-              img.id === imageItem.id
-                ? {
-                    ...img,
-                    id: uploadedId,
-                    isUploading: false,
-                    uploadProgress: 100,
-                    uploadedUrl: uploadedS3Url,
-                    preview: uploadedS3Url,
-                    error: undefined,
-                  }
-                : img
-            )
-          );
+          setImages((prev) => markImageUploaded(prev, imageItem.id, uploaded));
 
           // Revoke blob URL after successful upload
           if (imageItem.preview.startsWith('blob:')) {
@@ -180,11 +131,7 @@ export const TourImageUpload = ({
           console.error('Upload error:', error);
 
           // Update to error state
-          setImages((prev) =>
-            prev.map((img) =>
-              img.id === imageItem.id ? { ...img, isUploading: false, error: errorMessage } : img
-            )
-          );
+          setImages((prev) => markImageError(prev, imageItem.id, errorMessage));
         }
       }
 

@@ -81,37 +81,48 @@ interface InlineMatch {
   consumed: number;
 }
 
+/**
+ * Find the index of the `]` that closes the `[` at `open`, honouring nested
+ * brackets. Returns -1 if no balanced close is found before a newline or the
+ * end of `body` (a stray `[` must not greedily swallow a later line).
+ */
+const findLinkLabelClose = (body: string, open: number): number => {
+  let depth = 1;
+  for (let j = open + 1; j < body.length; j++) {
+    const ch = body.charAt(j);
+    if (ch === '\n') return -1;
+    if (ch === '[') depth += 1;
+    else if (ch === ']') {
+      depth -= 1;
+      if (depth === 0) return j;
+    }
+  }
+  return -1;
+};
+
+/**
+ * Find the index of the `)` that closes the href starting at `start`. Returns
+ * -1 if a newline or the end of `body` is reached first.
+ */
+const findHrefClose = (body: string, start: number): number => {
+  for (let j = start; j < body.length; j++) {
+    const ch = body.charAt(j);
+    if (ch === '\n') return -1;
+    if (ch === ')') return j;
+  }
+  return -1;
+};
+
 const tryLink = (body: string, i: number, siteHost: string | undefined): InlineMatch | null => {
   if (body.charAt(i) !== '[') return null;
   // Scan for the matching `]` that's followed immediately by `(`. Bail
   // out at newlines so a stray `[` near the end of one line can't
   // greedily swallow content from a later line.
-  let depth = 1;
-  let close = -1;
-  for (let j = i + 1; j < body.length; j++) {
-    const ch = body.charAt(j);
-    if (ch === '\n') return null;
-    if (ch === '[') depth += 1;
-    else if (ch === ']') {
-      depth -= 1;
-      if (depth === 0) {
-        close = j;
-        break;
-      }
-    }
-  }
+  const close = findLinkLabelClose(body, i);
   if (close === -1 || body.charAt(close + 1) !== '(') return null;
 
   const hrefStart = close + 2;
-  let hrefEnd = -1;
-  for (let j = hrefStart; j < body.length; j++) {
-    const ch = body.charAt(j);
-    if (ch === '\n') return null;
-    if (ch === ')') {
-      hrefEnd = j;
-      break;
-    }
-  }
+  const hrefEnd = findHrefClose(body, hrefStart);
   if (hrefEnd === -1) return null;
 
   const text = body.slice(i + 1, close);

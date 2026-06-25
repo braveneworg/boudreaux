@@ -52,40 +52,65 @@ const activeYears = (facts: ArtistFacts): string => {
   return `Active: ${facts.beginDate}–${end}`;
 };
 
-const buildUserPrompt = (facts: ArtistFacts): string => {
-  const sourceUrls = facts.sourceUrls?.length
+/** Reference URLs the model may inline, derived from explicit sources or links. */
+const referenceUrls = (facts: ArtistFacts): string[] =>
+  facts.sourceUrls?.length
     ? facts.sourceUrls
     : [facts.wikipediaUrl, facts.officialUrl].filter((url): url is string => Boolean(url));
 
+/** The available-images line listing 0-indexed image titles, if any. */
+const imagesLine = (facts: ArtistFacts): string =>
+  facts.imageTitles.length
+    ? `Available images (0-indexed): ${facts.imageTitles.map((t, i) => `${i}=${t}`).join('; ')}`
+    : '';
+
+/** A `Label: value` line, or an empty string when the value is absent. */
+const labeledLine = (label: string, value: string | undefined): string =>
+  value ? `${label}: ${value}` : '';
+
+/** The key-value fact summary lines (blank entries are filtered out by the caller). */
+const factLines = (facts: ArtistFacts): string[] => [
+  `Artist display name: ${facts.displayName}`,
+  labeledLine('Real name', facts.realName),
+  labeledLine('Also known as', facts.akaNames),
+  labeledLine('Type', facts.artistType),
+  labeledLine('Origin', facts.area),
+  activeYears(facts),
+  labeledLine('Known genres', facts.existingGenres),
+  labeledLine('MusicBrainz tags', facts.tags?.length ? facts.tags.join(', ') : undefined),
+  labeledLine('MusicBrainz id', facts.musicBrainzId),
+  labeledLine('Wikipedia', facts.wikipediaUrl),
+  labeledLine('Official site', facts.officialUrl),
+  labeledLine('Editor notes', facts.description),
+  imagesLine(facts),
+];
+
+/** The long-form source-material block, or a notice that none was found. */
+const sourceMaterialLine = (facts: ArtistFacts): string =>
+  facts.sourceText
+    ? [
+        'SOURCE MATERIAL (rewrite in your own words — do NOT copy phrasing):',
+        '"""',
+        facts.sourceText,
+        '"""',
+      ].join('\n')
+    : 'No long-form source material was found; write only what the facts above support.';
+
+/** The reference-URLs line, or a notice that no links are available. */
+const referenceUrlsLine = (sourceUrls: string[]): string =>
+  sourceUrls.length
+    ? `Reference URLs available for inline links (use ONLY these, verbatim): ${sourceUrls.join(', ')}`
+    : 'No reference URLs are available; do not add any links.';
+
+const buildUserPrompt = (facts: ArtistFacts): string => {
+  const sourceUrls = referenceUrls(facts);
+
   const lines: string[] = [
-    `Artist display name: ${facts.displayName}`,
-    facts.realName ? `Real name: ${facts.realName}` : '',
-    facts.akaNames ? `Also known as: ${facts.akaNames}` : '',
-    facts.artistType ? `Type: ${facts.artistType}` : '',
-    facts.area ? `Origin: ${facts.area}` : '',
-    activeYears(facts),
-    facts.existingGenres ? `Known genres: ${facts.existingGenres}` : '',
-    facts.tags?.length ? `MusicBrainz tags: ${facts.tags.join(', ')}` : '',
-    facts.musicBrainzId ? `MusicBrainz id: ${facts.musicBrainzId}` : '',
-    facts.wikipediaUrl ? `Wikipedia: ${facts.wikipediaUrl}` : '',
-    facts.officialUrl ? `Official site: ${facts.officialUrl}` : '',
-    facts.description ? `Editor notes: ${facts.description}` : '',
-    facts.imageTitles.length
-      ? `Available images (0-indexed): ${facts.imageTitles.map((t, i) => `${i}=${t}`).join('; ')}`
-      : '',
+    ...factLines(facts),
     '',
-    facts.sourceText
-      ? [
-          'SOURCE MATERIAL (rewrite in your own words — do NOT copy phrasing):',
-          '"""',
-          facts.sourceText,
-          '"""',
-        ].join('\n')
-      : 'No long-form source material was found; write only what the facts above support.',
+    sourceMaterialLine(facts),
     '',
-    sourceUrls.length
-      ? `Reference URLs available for inline links (use ONLY these, verbatim): ${sourceUrls.join(', ')}`
-      : 'No reference URLs are available; do not add any links.',
+    referenceUrlsLine(sourceUrls),
     '',
     'shortBio: a rich, engaging biography of AT LEAST 200 words written as flowing HTML prose',
     'in one or more <p> paragraphs. Requirements:',
@@ -120,6 +145,26 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
     '}',
   ];
   return lines.filter(Boolean).join('\n');
+};
+
+/**
+ * Pulls the JSON completion out of a Gemini response and validates it against
+ * {@link bioProseSchema}. Throws on an empty completion or non-JSON content.
+ */
+const parseProse = (body: GeminiResponse): BioProse => {
+  const content = body.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) {
+    throw new Error('Gemini returned an empty completion');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error('Gemini returned non-JSON content');
+  }
+
+  return bioProseSchema.parse(parsed);
 };
 
 /**
@@ -163,17 +208,5 @@ export const generateProse = async (
   }
 
   const body = (await response.json()) as GeminiResponse;
-  const content = body.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!content) {
-    throw new Error('Gemini returned an empty completion');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error('Gemini returned non-JSON content');
-  }
-
-  return bioProseSchema.parse(parsed);
+  return parseProse(body);
 };

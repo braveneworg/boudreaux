@@ -3,18 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-
+import { TourDateArtistsSection } from '@/app/admin/tours/components/tour-date-artists-section';
+import { TourDateDatetimeSection } from '@/app/admin/tours/components/tour-date-datetime-section';
 import { TourDateImageUpload } from '@/app/admin/tours/components/tour-date-image-upload';
-import { VenueSelect } from '@/app/admin/tours/components/venue-select';
-import { TextField } from '@/app/components/forms/fields';
-import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
+import { TourDateTicketingSection } from '@/app/admin/tours/components/tour-date-ticketing-section';
+import {
+  type TourDateWithHeadliners,
+  useTourDateForm,
+} from '@/app/admin/tours/components/use-tour-date-form';
 import { Button } from '@/app/components/ui/button';
-import { DatePicker } from '@/app/components/ui/datepicker';
 import {
   Dialog,
   DialogContent,
@@ -34,273 +31,28 @@ import {
 } from '@/app/components/ui/form';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
-import { TimePicker } from '@/app/components/ui/timepicker';
-import { TimezoneSelect } from '@/app/components/ui/timezone-select';
-import {
-  useCreateTourDateMutation,
-  useUpdateTourDateMutation,
-} from '@/app/hooks/mutations/use-tour-date-mutations';
-import { useTourDateImagesQuery } from '@/app/hooks/use-tour-date-images-query';
-import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
-import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
-import {
-  tourDateCreateSchema,
-  tourDateUpdateSchema,
-  type TourDateCreateInput,
-  type TourDateUpdateInput,
-} from '@/lib/validation/tours/tour-date-schema';
-
-/**
- * Local interfaces matching Prisma model shapes.
- * Client components do not import the generated Prisma client types directly.
- */
-interface ArtistFields {
-  id: string;
-  firstName: string;
-  surname: string;
-  displayName: string | null;
-  [key: string]: unknown;
-}
-
-interface TourDateFields {
-  id: string;
-  tourId: string;
-  startDate: Date;
-  endDate: Date | null;
-  showStartTime: Date;
-  showEndTime: Date | null;
-  doorsOpenAt: Date | null;
-  venueId: string;
-  timeZone?: string | null;
-  utcOffset?: number | null;
-  ticketsUrl: string | null;
-  ticketIconUrl: string | null;
-  ticketPrices: string | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface TourDateImageFields {
-  id: string;
-  tourDateId: string;
-  s3Key: string;
-  s3Url: string;
-  s3Bucket: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  displayOrder: number;
-  altText: string | null;
-  createdAt: Date;
-  uploadedBy: string | null;
-}
 
 interface TourDateFormProps {
   tourId: string;
-  tourDate?: TourDateFields & {
-    headliners: Array<{ artistId: string | null; artist?: ArtistFields | null }>;
-  };
+  tourDate?: TourDateWithHeadliners;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export const TourDateForm = ({
-  tourId,
-  tourDate,
-  open,
-  onOpenChange,
-  onSuccess,
-}: TourDateFormProps) => {
-  const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
-  const isEditMode = !!tourDate;
-  const { createTourDateAsync, isCreatingTourDate } = useCreateTourDateMutation();
-  const { updateTourDateAsync, isUpdatingTourDate } = useUpdateTourDateMutation();
-  const isSaving = isCreatingTourDate || isUpdatingTourDate;
-
-  const form = useForm({
-    resolver: zodResolver(isEditMode ? tourDateUpdateSchema : tourDateCreateSchema),
-    defaultValues: {
-      tourId,
-      startDate: '',
-      endDate: '',
-      showStartTime: '',
-      showEndTime: '',
-      doorsOpenAt: '',
-      venueId: '',
-      ticketsUrl: '',
-      ticketIconUrl: '',
-      ticketPrices: '',
-      notes: '',
-      headlinerIds: [],
-      timeZone: null as string | null,
-      utcOffset: null as string | null,
-    },
-  });
-
-  const { control, handleSubmit, reset, setError } = form;
-  const _watchedValues = form.watch() as Record<string, unknown>;
-  const watchedTimeZone = String(_watchedValues.timeZone ?? '');
-  const watchedStartDate = String(_watchedValues.startDate ?? '');
-
-  // Load tour date data in edit mode
-  useEffect(() => {
-    if (tourDate) {
-      const storedTimeZone = tourDate.timeZone;
-      const storedUtcOffset = tourDate.utcOffset;
-
-      const formatDateTime = (date: string | Date) => {
-        if (!date) return '';
-        const d = new Date(date as string);
-        // Prefer IANA timezone for exact DST-aware conversion.
-        if (storedTimeZone) {
-          return toLocalDateTimeString(d, storedTimeZone);
-        }
-        // Fall back to a raw UTC offset if no IANA timezone is stored.
-        if (storedUtcOffset != null) {
-          const localMs = d.getTime() + storedUtcOffset * 60_000;
-          return new Date(localMs).toISOString().slice(0, 16);
-        }
-        // No timezone info — display as UTC.
-        return d.toISOString().slice(0, 16);
-      };
-
-      const formatDate = (date: string | Date) => {
-        if (!date) return '';
-        const d = new Date(date);
-        return d.toISOString().split('T')[0]; // YYYY-MM-DD
-      };
-
-      reset({
-        tourId,
-        startDate: formatDate(tourDate.startDate),
-        endDate: tourDate.endDate ? formatDate(tourDate.endDate) : '',
-        showStartTime: formatDateTime(tourDate.showStartTime),
-        showEndTime: tourDate.showEndTime ? formatDateTime(tourDate.showEndTime) : '',
-        doorsOpenAt: tourDate.doorsOpenAt ? formatDateTime(tourDate.doorsOpenAt) : '',
-        venueId: tourDate.venueId || '',
-        ticketsUrl: tourDate.ticketsUrl || '',
-        ticketIconUrl: tourDate.ticketIconUrl || '',
-        ticketPrices: tourDate.ticketPrices || '',
-        notes: tourDate.notes || '',
-        headlinerIds:
-          tourDate.headliners?.map((h) => h.artistId).filter((id): id is string => id !== null) ||
-          [],
-        timeZone: tourDate.timeZone ?? null,
-        utcOffset: tourDate.utcOffset != null ? String(tourDate.utcOffset) : null,
-      });
-    } else {
-      // Reset form for new tour date
-      reset({
-        tourId,
-        startDate: '',
-        endDate: '',
-        showStartTime: '',
-        showEndTime: '',
-        doorsOpenAt: '',
-        venueId: '',
-        ticketsUrl: '',
-        ticketIconUrl: '',
-        ticketPrices: '',
-        notes: '',
-        headlinerIds: [],
-        timeZone: null,
-        utcOffset: null,
-      });
-    }
-  }, [tourDate, tourId, reset]);
-
-  // Fetch tour date images in edit mode. The gated query owns the request
-  // (only while the dialog is open for an existing tour date); the effect
-  // below projects its result into local state, and `refetch` re-pulls after
-  // an upload completes.
-  const { data: tourDateImagesData, refetch: refetchTourDateImages } = useTourDateImagesQuery(
-    tourId,
-    tourDate?.id ?? '',
-    { enabled: isEditMode && open && !!tourDate?.id }
-  );
-
-  useEffect(() => {
-    if (tourDateImagesData) {
-      setTourDateImages(tourDateImagesData.images);
-    }
-  }, [tourDateImagesData]);
-
-  // Auto-compute utcOffset when timeZone or startDate changes
-  useEffect(() => {
-    if (!watchedTimeZone) return;
-    const refDate = watchedStartDate ? new Date(watchedStartDate) : new Date();
-    const offset = getTimezoneOffsetMinutes(watchedTimeZone, refDate);
-    form.setValue('utcOffset', String(offset), { shouldDirty: false });
-  }, [watchedTimeZone, watchedStartDate, form]);
-
-  const handleVenueSelect = useCallback(
-    (venue: { timeZone?: string | null }) => {
-      if (venue.timeZone) {
-        form.setValue('timeZone', venue.timeZone, { shouldDirty: true });
-      }
-    },
-    [form]
-  );
-
-  const handleImageUploadComplete = useCallback(() => {
-    refetchTourDateImages();
-  }, [refetchTourDateImages]);
-
-  const onSubmit = async (data: Record<string, unknown>) => {
-    try {
-      // Normalize values, omitting empties (optional fields stay absent). zodResolver
-      // coerces z.coerce.date() fields into Date objects, so emit ISO strings the
-      // server can reparse; arrays are passed through for the hook to JSON-encode.
-      // A Map keeps dynamic string keys off a plain object (avoids object-injection sinks).
-      const values = new Map<string, unknown>();
-      Object.entries(data).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === '') {
-          return;
-        }
-        values.set(key, value instanceof Date ? value.toISOString() : value);
-      });
-
-      // If a timezone is set, override time entries with correctly-converted UTC values.
-      // The raw form strings are "YYYY-MM-DDTHH:mm" representing local venue time.
-      // localToUTC converts them to the true UTC equivalent for the given IANA zone.
-      const rawValues = form.getValues();
-      const tz = rawValues['timeZone'] as string | undefined;
-      if (tz) {
-        const timeKeys = ['showStartTime', 'showEndTime', 'doorsOpenAt'] as const;
-        for (const key of timeKeys) {
-          const raw = rawValues[key as keyof typeof rawValues] as string | undefined;
-          if (raw && typeof raw === 'string' && raw.includes('T')) {
-            values.set(key, localToUTC(raw.slice(0, 16), tz).toISOString());
-          }
-        }
-      }
-
-      const payload = Object.fromEntries(values);
-      const result =
-        isEditMode && tourDate?.id
-          ? await updateTourDateAsync({ id: tourDate.id, values: payload as TourDateUpdateInput })
-          : await createTourDateAsync(payload as TourDateCreateInput);
-
-      if (result.success) {
-        toast.success(
-          isEditMode ? 'Tour date updated successfully' : 'Tour date created successfully'
-        );
-        onOpenChange(false);
-        if (onSuccess) {
-          onSuccess();
-        }
-        return;
-      }
-
-      const { generalError } = setFormErrors(setError, result);
-      toast.error(generalError ?? 'Please fix the form errors');
-    } catch (err) {
-      console.error('Form submission error:', err);
-      toast.error('An unexpected error occurred');
-    }
-  };
+export const TourDateForm = (props: TourDateFormProps) => {
+  const { tourDate, open, onOpenChange } = props;
+  const {
+    form,
+    control,
+    handleSubmit,
+    isSaving,
+    isEditMode,
+    tourDateImages,
+    handleVenueSelect,
+    handleImageUploadComplete,
+    onSubmit,
+  } = useTourDateForm(props);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -326,301 +78,21 @@ export const TourDateForm = ({
             }}
             className="min-w-0 space-y-6"
           >
-            {/* Artists Section */}
-            <section className="space-y-4">
-              <h4 className="text-sm font-semibold">Headliners</h4>
-              <ArtistMultiSelect
-                control={control}
-                name="headlinerIds"
-                label="Headlining Artists"
-                placeholder="Select artists"
-                initialArtists={
-                  tourDate?.headliners
-                    ?.filter(
-                      (h): h is typeof h & { artist: ArtistFields; artistId: string } =>
-                        h.artist != null && h.artistId != null
-                    )
-                    .map((h) => ({
-                      id: h.artistId,
-                      displayName: h.artist.displayName ?? '',
-                      firstName: h.artist.firstName,
-                      surname: h.artist.surname,
-                    })) ?? []
-                }
-              />
-            </section>
+            <TourDateArtistsSection control={control} tourDate={tourDate} />
 
             <Separator />
 
-            {/* Dates and Times Section */}
-            <section className="space-y-4">
-              <h4 className="text-sm font-semibold">Dates and Times</h4>
-
-              <VenueSelect
-                control={control}
-                name="venueId"
-                label="Venue"
-                placeholder="Select a venue"
-                description="Choose an existing venue or create a new one"
-                onVenueSelect={handleVenueSelect}
-              />
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
-                  control={control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Date *</FormLabel>
-                      <FormControl>
-                        <DatePicker
-                          fieldName="startDate"
-                          value={String(field.value || '')}
-                          onSelect={(dateString) => {
-                            if (!dateString) {
-                              field.onChange('');
-                            } else {
-                              const d = new Date(dateString);
-                              const dateStr = d.toISOString().split('T')[0];
-                              field.onChange(dateStr);
-                              // Auto-populate showStartTime to 8 PM if the user has
-                              // not yet chosen a time — prevents a required-field
-                              // validation error for users who skip the TimePicker.
-                              const currentShowStartTime = form.getValues('showStartTime');
-                              if (!currentShowStartTime) {
-                                form.setValue('showStartTime', `${dateStr}T20:00`);
-                              }
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Date</FormLabel>
-                      <FormControl>
-                        <DatePicker
-                          fieldName="endDate"
-                          value={String(field.value || '')}
-                          onSelect={(dateString) => {
-                            if (!dateString) {
-                              field.onChange('');
-                            } else {
-                              const d = new Date(dateString);
-                              field.onChange(d.toISOString().split('T')[0]);
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>Leave blank if single-day event</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Timezone */}
-                <FormField
-                  control={control}
-                  name={'timeZone' as never}
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Timezone</FormLabel>
-                      <FormControl>
-                        <TimezoneSelect
-                          value={(field.value as string) || null}
-                          onChange={field.onChange}
-                          disabled={isSaving}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* UTC Offset */}
-                <FormField
-                  control={control}
-                  name={'utcOffset' as never}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>UTC Offset (minutes)</FormLabel>
-                      <FormControl>
-                        <input
-                          {...field}
-                          value={(field.value as string) || ''}
-                          type="number"
-                          placeholder="e.g. -300"
-                          className="border-input focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-800 focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                      </FormControl>
-                      <p className="text-xs text-zinc-950">
-                        Minutes from UTC. Auto-filled when a timezone is selected.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
-                  control={control}
-                  name="showStartTime"
-                  render={({ field }) => {
-                    // Extract HH:mm from stored YYYY-MM-DDTHH:mm for the picker
-                    const raw = String(field.value || '');
-                    const timeOnly = raw.includes('T') ? raw.split('T')[1]?.slice(0, 5) : '';
-                    return (
-                      <FormItem>
-                        <FormLabel>Show Start Time *</FormLabel>
-                        <FormControl>
-                          <TimePicker
-                            value={timeOnly}
-                            placeholder="Select start time"
-                            onSelect={(time) => {
-                              if (!time) {
-                                field.onChange('');
-                                return;
-                              }
-                              // Combine with startDate if available, else today
-                              const startDate = form.getValues('startDate');
-                              const datePrefix = startDate
-                                ? String(startDate).slice(0, 10)
-                                : new Date().toISOString().slice(0, 10);
-                              field.onChange(`${datePrefix}T${time}`);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-
-                <FormField
-                  control={control}
-                  name="showEndTime"
-                  render={({ field }) => {
-                    const raw = String(field.value || '');
-                    const timeOnly = raw.includes('T') ? raw.split('T')[1]?.slice(0, 5) : '';
-                    return (
-                      <FormItem>
-                        <FormLabel>Show End Time</FormLabel>
-                        <FormControl>
-                          <TimePicker
-                            value={timeOnly}
-                            placeholder="Select end time"
-                            onSelect={(time) => {
-                              if (!time) {
-                                field.onChange('');
-                                return;
-                              }
-                              const startDate = form.getValues('startDate');
-                              const datePrefix = startDate
-                                ? String(startDate).slice(0, 10)
-                                : new Date().toISOString().slice(0, 10);
-                              field.onChange(`${datePrefix}T${time}`);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-              </div>
-
-              <FormField
-                control={control}
-                name="doorsOpenAt"
-                render={({ field }) => {
-                  const raw = String(field.value || '');
-                  const timeOnly = raw.includes('T') ? raw.split('T')[1]?.slice(0, 5) : '';
-                  return (
-                    <FormItem>
-                      <FormLabel>Doors Open At</FormLabel>
-                      <FormControl>
-                        <TimePicker
-                          value={timeOnly}
-                          placeholder="Select doors open time"
-                          onSelect={(time) => {
-                            if (!time) {
-                              field.onChange('');
-                              return;
-                            }
-                            const startDate = form.getValues('startDate');
-                            const datePrefix = startDate
-                              ? String(startDate).slice(0, 10)
-                              : new Date().toISOString().slice(0, 10);
-                            field.onChange(`${datePrefix}T${time}`);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Time when doors open for entry (before the show starts)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-            </section>
+            <TourDateDatetimeSection
+              control={control}
+              isSaving={isSaving}
+              getValues={form.getValues}
+              setValue={form.setValue}
+              onVenueSelect={handleVenueSelect}
+            />
 
             <Separator />
 
-            {/* Ticketing Section */}
-            <section className="space-y-4">
-              <h4 className="text-sm font-semibold">Ticketing</h4>
-
-              <TextField
-                control={control}
-                name="ticketsUrl"
-                label="Tickets URL"
-                placeholder="https://example.com/tickets"
-                type="text"
-              />
-
-              <TextField
-                control={control}
-                name="ticketPrices"
-                label="Ticket Price"
-                placeholder="$25 - $100"
-              />
-
-              <FormField
-                control={control}
-                name="ticketIconUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ticket Icon URL</FormLabel>
-                    <FormControl>
-                      <input
-                        {...field}
-                        value={field.value || ''}
-                        type="text"
-                        placeholder="https://cdn.example.com/icons/provider-icon.png"
-                        className="border-input focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-800 focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Optional. Upload a custom icon to S3 and paste the URL here. If left blank,
-                      the icon is auto-detected from the ticket URL domain (Bandsintown, Eventbrite,
-                      StubHub, Ticketmaster).
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </section>
+            <TourDateTicketingSection control={control} />
 
             <Separator />
 

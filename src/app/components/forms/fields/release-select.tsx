@@ -39,6 +39,20 @@ export interface ReleaseOption {
   }[];
 }
 
+/**
+ * Build the release-list query params from the debounced search term and the
+ * optional artist filter. An empty search or empty artist list collapses to
+ * `undefined` so the query omits that filter.
+ */
+const buildReleaseListParams = (
+  debouncedSearch: string,
+  artistIds: string[] | undefined
+): { search: string | undefined; artistIds: string[] | undefined; take: number } => ({
+  search: debouncedSearch || undefined,
+  artistIds: artistIds?.length ? artistIds : undefined,
+  take: 50,
+});
+
 interface ReleaseSelectProps<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
@@ -82,16 +96,8 @@ export const ReleaseSelect = <
     isPending: isLoading,
     error: fetchError,
     data,
-  } = useReleaseListQuery(
-    {
-      search: debouncedSearch || undefined,
-      artistIds: artistIds?.length ? artistIds : undefined,
-      take: 50,
-    },
-    { enabled: open }
-  );
+  } = useReleaseListQuery(buildReleaseListParams(debouncedSearch, artistIds), { enabled: open });
   const releases = data ?? [];
-  const error = fetchError?.message ?? null;
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
@@ -115,6 +121,7 @@ export const ReleaseSelect = <
       render={({ field }) => {
         const selectedId = field.value as string | undefined;
         const selectedRelease = releases.find((r) => r.id === selectedId);
+        const error = fetchError?.message ?? null;
 
         const handleSelect = (releaseId: string) => {
           // If already selected, just close — use the X button to clear

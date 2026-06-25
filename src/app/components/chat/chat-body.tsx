@@ -5,9 +5,9 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import md5 from 'crypto-js/md5';
-import { Loader2, Pin, SmilePlus, Trash2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useChatChannel } from '@/hooks/use-chat-channel';
@@ -28,14 +28,118 @@ import type { ChatMessageDto } from '@/lib/services/chat-service';
 
 import { ChatDeleteMessageDialog } from './chat-delete-message-dialog';
 import { ChatDisabledState } from './chat-disabled-state';
-import { ChatEmojiPicker } from './chat-emoji-picker';
 import { ChatInput } from './chat-input';
+import { ChatMessagePinIndicator, ChatMessageReactionBar } from './chat-message-action-buttons';
 import { ChatMessageList } from './chat-message-list';
-import { ChatReactionBar } from './chat-reaction-bar';
 import { ChatReportAbusePopover } from './chat-report-abuse-popover';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 
 import type { Session } from 'next-auth';
+
+interface SessionUser {
+  id: string;
+  username: string | null;
+  email: string;
+  role: string | null;
+}
+
+const extractSessionUser = (session: Session): SessionUser => {
+  const user = session.user as
+    | { id?: string; name?: string | null; email?: string | null; role?: string | null }
+    | undefined;
+  return {
+    id: user?.id ?? '',
+    username: user?.name ?? null,
+    email: user?.email ?? '',
+    role: user?.role ?? null,
+  };
+};
+
+const getIsBlocked = (meStatus: { blocked?: boolean } | undefined): boolean =>
+  meStatus !== undefined && meStatus.blocked === true;
+
+const applyPinChangeToCache = (
+  updated: ChatMessageDto,
+  updateMessage: (msg: ChatMessageDto) => void,
+  queryClient: QueryClient
+): void => {
+  updateMessage(updated);
+  queryClient.setQueryData<ChatMessageDto[]>(queryKeys.chat.pinned(), (prev) => {
+    const list = prev ?? [];
+    const without = list.filter((m) => m.id !== updated.id);
+    if (!updated.pinnedAt) return without;
+    return [updated, ...without];
+  });
+};
+
+const toastReactionError = (error: string): void => {
+  switch (error) {
+    case 'disabled':
+      toast.error('Chat access has been disabled for your account.');
+      break;
+    case 'unauthorized':
+      toast.error('Please sign in to react.');
+      break;
+    case 'not_found':
+      toast.error('Message no longer exists.');
+      break;
+    default:
+      toast.error('Could not update reaction.');
+  }
+};
+
+const toastPinError = (error: string, limit?: number): void => {
+  if (error === 'limit_reached') {
+    toast.error(
+      `You can only pin ${limit ?? 3} messages at a time. Unpin one before pinning another.`
+    );
+  } else if (error === 'unauthorized') {
+    toast.error('Please sign in to pin messages.');
+  } else if (error === 'forbidden') {
+    toast.error('Only moderators can pin messages.');
+  } else if (error === 'not_found') {
+    toast.error('Message no longer exists.');
+  } else {
+    toast.error('Could not update pin.');
+  }
+};
+
+const toastDeleteError = (error: string): void => {
+  if (error === 'unauthorized') {
+    toast.error('Please sign in to delete messages.');
+  } else if (error === 'forbidden') {
+    toast.error('Only moderators can delete messages.');
+  } else if (error === 'not_found') {
+    toast.error('Message no longer exists.');
+  } else {
+    toast.error('Could not delete message.');
+  }
+};
+
+interface PendingDelete {
+  messageId: string;
+  authorUsername: string | null;
+}
+
+const confirmDelete = async (
+  scope: DeleteChatMessageScope,
+  target: PendingDelete | null,
+  removeMessage: (id: string) => void
+): Promise<boolean> => {
+  if (!target) return true;
+  if (scope === 'message') {
+    removeMessage(target.messageId);
+  }
+  const result = await deleteChatMessageAction({ messageId: target.messageId, scope });
+  if (!result.success) {
+    toastDeleteError(result.error);
+    return false;
+  }
+  if (scope === 'user') {
+    for (const id of result.deletedIds) removeMessage(id);
+  }
+  return true;
+};
 
 interface ChatBodyProps {
   session: Session;
@@ -51,7 +155,8 @@ interface ChatBodyProps {
 export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBodyProps) => {
   const { fingerprint } = useFingerprint();
   const { data: meStatus } = useChatMeQuery({ enabled });
-  const isBlocked = meStatus?.blocked ?? false;
+  const isBlocked = getIsBlocked(meStatus);
+  const enabledWithAccess = enabled && !isBlocked;
   const {
     messages: baseMessages,
     isPending,
@@ -59,7 +164,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useInfiniteChatMessagesQuery({ enabled: enabled && !isBlocked });
+  } = useInfiniteChatMessagesQuery({ enabled: enabledWithAccess });
 
   const {
     messages,
@@ -72,29 +177,16 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
 
   const queryClient = useQueryClient();
   const { data: pinnedMessages = [] } = useChatPinnedMessagesQuery({
-    enabled: enabled && !isBlocked,
+    enabled: enabledWithAccess,
   });
 
-  /**
-   * Apply a pin/unpin event to both caches: patch `pinnedAt` on the row
-   * in the messages infinite query AND add/remove it from the pinned
-   * strip cache. Runs for the actor (after a successful action call) and
-   * for everyone else (via the `messagePinChanged` Pusher broadcast).
-   */
+  // Applies a pin/unpin broadcast to both caches (infinite list + pinned strip).
   const applyPinChange = useCallback(
-    (updated: ChatMessageDto) => {
-      updateMessage(updated);
-      queryClient.setQueryData<ChatMessageDto[]>(queryKeys.chat.pinned(), (prev) => {
-        const list = prev ?? [];
-        const without = list.filter((m) => m.id !== updated.id);
-        if (!updated.pinnedAt) return without;
-        return [updated, ...without];
-      });
-    },
+    (updated: ChatMessageDto) => applyPinChangeToCache(updated, updateMessage, queryClient),
     [queryClient, updateMessage]
   );
 
-  const currentUserId = session.user?.id ?? '';
+  const { id: currentUserId, username, role, email } = extractSessionUser(session);
   const { activeTypers, noteTyping } = useChatTyping(currentUserId);
 
   const { sendTyping } = useChatChannel({
@@ -106,39 +198,27 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     onTyping: noteTyping,
   });
 
-  const isAdmin = (session.user as { role?: string | null })?.role === 'admin';
+  const isAdmin = role === 'admin';
 
-  const currentUser = useMemo(() => {
-    const email = session.user?.email ?? '';
-    return {
+  const currentUser = useMemo(
+    () => ({
       id: currentUserId,
-      username: session.user?.name ?? null,
+      username,
       gravatarHash: email ? md5(email.trim().toLowerCase()).toString() : '',
-      role: (session.user as { role?: string | null })?.role ?? null,
-    };
-  }, [currentUserId, session.user]);
+      role,
+    }),
+    [currentUserId, username, email, role]
+  );
 
   const handleSendTyping = useCallback(() => {
-    sendTyping({ userId: currentUserId, username: session.user?.name ?? null });
-  }, [sendTyping, currentUserId, session.user?.name]);
+    sendTyping({ userId: currentUserId, username });
+  }, [sendTyping, currentUserId, username]);
 
   const handleToggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
       const result = await toggleChatReactionAction({ messageId, emoji });
       if (!result.success) {
-        switch (result.error) {
-          case 'disabled':
-            toast.error('Chat access has been disabled for your account.');
-            break;
-          case 'unauthorized':
-            toast.error('Please sign in to react.');
-            break;
-          case 'not_found':
-            toast.error('Message no longer exists.');
-            break;
-          default:
-            toast.error('Could not update reaction.');
-        }
+        toastReactionError(result.error);
         return;
       }
       // The Pusher broadcast will land via onReactionUpdated; apply
@@ -152,20 +232,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     async (messageId: string) => {
       const result = await togglePinChatMessageAction({ messageId });
       if (!result.success) {
-        if (result.error === 'limit_reached') {
-          const limit = result.limit ?? 3;
-          toast.error(
-            `You can only pin ${limit} messages at a time. Unpin one before pinning another.`
-          );
-        } else if (result.error === 'unauthorized') {
-          toast.error('Please sign in to pin messages.');
-        } else if (result.error === 'forbidden') {
-          toast.error('Only moderators can pin messages.');
-        } else if (result.error === 'not_found') {
-          toast.error('Message no longer exists.');
-        } else {
-          toast.error('Could not update pin.');
-        }
+        toastPinError(result.error, result.limit);
         return;
       }
       applyPinChange(result.data);
@@ -182,120 +249,46 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     async (scope: DeleteChatMessageScope) => {
       const target = pendingDelete;
       setPendingDelete(null);
-      if (!target) return;
-
-      if (scope === 'message') {
-        removeMessage(target.messageId);
-      }
-
-      const result = await deleteChatMessageAction({ messageId: target.messageId, scope });
-      if (!result.success) {
-        if (result.error === 'unauthorized') {
-          toast.error('Please sign in to delete messages.');
-        } else if (result.error === 'forbidden') {
-          toast.error('Only moderators can delete messages.');
-        } else if (result.error === 'not_found') {
-          toast.error('Message no longer exists.');
-        } else {
-          toast.error('Could not delete message.');
-        }
-        return;
-      }
-
-      // For scope: 'user' we apply locally on success — the action returns
-      // every id that was hidden. Pusher echoes will arrive shortly after
-      // and `removeMessage` is idempotent.
-      if (scope === 'user') {
-        for (const id of result.deletedIds) removeMessage(id);
-      }
+      // confirmDelete applies optimistic removal, calls the action, and
+      // handles any scoped bulk-removal on success (scope === 'user').
+      await confirmDelete(scope, target, removeMessage);
     },
     [pendingDelete, removeMessage]
   );
 
+  const handleRequestDelete = useCallback(
+    (messageId: string, authorUsername: string | null) =>
+      setPendingDelete({ messageId, authorUsername }),
+    []
+  );
+
   const renderReactionBar = useCallback(
-    (message: OptimisticChatMessage) => {
-      if (message.tempId) return null; // no reactions on unsaved messages
-      return (
-        <>
-          <ChatReactionBar
-            reactions={message.reactions}
-            currentUserId={currentUserId}
-            onToggle={(emoji) => void handleToggleReaction(message.id, emoji)}
-          />
-          <ChatEmojiPicker
-            trigger={
-              <button
-                type="button"
-                aria-label="Add reaction"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md p-1 transition-colors"
-              >
-                <SmilePlus aria-hidden="true" className="size-4" />
-              </button>
-            }
-            onSelect={(emoji) => void handleToggleReaction(message.id, emoji)}
-          />
-          {isAdmin && (
-            <button
-              type="button"
-              aria-label="Delete message"
-              data-testid="chat-delete-message"
-              onClick={() =>
-                setPendingDelete({
-                  messageId: message.id,
-                  authorUsername: message.user.username,
-                })
-              }
-              className="text-muted-foreground hover:text-destructive inline-flex items-center justify-center rounded-md p-1 transition-colors"
-            >
-              <Trash2 aria-hidden="true" className="size-4" />
-            </button>
-          )}
-          {isAdmin && message.user.role === 'admin' && !message.pinnedAt && (
-            <button
-              type="button"
-              aria-label="Pin message"
-              data-testid="chat-pin-message"
-              onClick={() => void handleTogglePin(message.id)}
-              className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md p-1 transition-colors"
-            >
-              <Pin aria-hidden="true" className="size-4" />
-            </button>
-          )}
-        </>
-      );
-    },
-    [currentUserId, handleToggleReaction, isAdmin, handleTogglePin]
+    (message: OptimisticChatMessage) => (
+      <ChatMessageReactionBar
+        message={message}
+        currentUserId={currentUserId}
+        isAdmin={isAdmin}
+        onToggleReaction={(id, emoji) => void handleToggleReaction(id, emoji)}
+        onRequestDelete={handleRequestDelete}
+        onTogglePin={(id) => void handleTogglePin(id)}
+      />
+    ),
+    [currentUserId, isAdmin, handleToggleReaction, handleRequestDelete, handleTogglePin]
   );
 
   const renderPinIndicator = useCallback(
-    (message: OptimisticChatMessage) => {
-      // Admins get an interactive unpin button; everyone else sees the
-      // red pin glyph as a non-interactive marker so it's still clear the
-      // row is pinned.
-      if (isAdmin) {
-        return (
-          <button
-            type="button"
-            aria-label="Unpin message"
-            data-testid="chat-unpin-message"
-            onClick={() => void handleTogglePin(message.id)}
-            className="inline-flex items-center justify-center rounded-md p-1 text-red-600 transition-colors hover:bg-red-50"
-          >
-            <Pin aria-hidden="true" className="size-4 fill-current" />
-          </button>
-        );
-      }
-      return (
-        <span
-          aria-label="Pinned message"
-          className="inline-flex items-center justify-center p-1 text-red-600"
-        >
-          <Pin aria-hidden="true" className="size-4 fill-current" />
-        </span>
-      );
-    },
+    (message: OptimisticChatMessage) => (
+      <ChatMessagePinIndicator
+        message={message}
+        isAdmin={isAdmin}
+        onTogglePin={(id) => void handleTogglePin(id)}
+      />
+    ),
     [isAdmin, handleTogglePin]
   );
+
+  const scrollToMentionUsername = scrollToMention ? username : null;
+  const pendingDeleteUsername = pendingDelete ? pendingDelete.authorUsername : null;
 
   if (isBlocked) {
     return <ChatDisabledState />;
@@ -331,7 +324,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
         onLoadMore={() => void fetchNextPage()}
         renderReactionBar={renderReactionBar}
         renderPinIndicator={renderPinIndicator}
-        scrollToMentionUsername={scrollToMention ? (session.user?.name ?? null) : null}
+        scrollToMentionUsername={scrollToMentionUsername}
       />
       <ChatTypingIndicator typers={activeTypers} />
       <ChatDeleteMessageDialog
@@ -339,7 +332,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null);
         }}
-        authorUsername={pendingDelete?.authorUsername ?? null}
+        authorUsername={pendingDeleteUsername}
         onConfirm={(scope) => void handleDeleteConfirmed(scope)}
       />
       <ChatInput

@@ -1,9 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { ResponseValidationError } from '@/hooks/fetch-and-parse';
 import { reportClientError } from '@/utils/report-client-error';
-
-import { ResponseValidationError } from './fetch-and-parse';
 
 /**
  * Global TanStack Query `QueryCache` error handler that reports ONLY
