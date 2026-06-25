@@ -54,6 +54,16 @@ Register the exact URL in each provider's developer console. With
 > `BETTER_AUTH_URL`). Do not introduce the `BETTER_AUTH_*` names — they are not
 > read anywhere.
 
+## Optional config (NOT secrets)
+
+Plain feature flags read by `auth.ts`. **Do not store these as GitHub Actions
+secrets** — set them (if at all) as ordinary environment variables in the
+deployment environment.
+
+| Name                  | Purpose                                                                                                                                                                                                                              | Default                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| `AUTH_DISABLE_SIGNUP` | Operational kill switch for new signups. When `"true"`, the magic-link verify step refuses unknown emails (`new_user_signup_disabled`) so new users must go through `/signup`. Read at startup — toggling requires a server restart. | Unset = signups **open** |
+
 ## Social OAuth providers (set per provider you enable)
 
 | Name                          | Purpose                                                                                                                                                                                                                            | NEW vs reused                                                                  |

@@ -109,6 +109,41 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
 
     expect(created.data.username).toEqual(expect.any(String));
   });
+
+  it('passes disableSignUp: true to magicLink when AUTH_DISABLE_SIGNUP is "true"', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_DISABLE_SIGNUP', 'true');
+
+    await import('./auth');
+
+    const { magicLink } = await import('better-auth/plugins');
+    const calls = (magicLink as ReturnType<typeof vi.fn>).mock.calls;
+    const options = calls[calls.length - 1][0];
+
+    // The operational kill switch: AUTH_DISABLE_SIGNUP=true makes the magic-link
+    // verify step refuse unknown emails instead of auto-creating an account.
+    expect(options.disableSignUp).toBe(true);
+  });
+
+  it('defaults disableSignUp to false when AUTH_DISABLE_SIGNUP is unset', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_DISABLE_SIGNUP', '');
+
+    await import('./auth');
+
+    const { magicLink } = await import('better-auth/plugins');
+    const calls = (magicLink as ReturnType<typeof vi.fn>).mock.calls;
+    const options = calls[calls.length - 1][0];
+
+    // Default posture: signups stay open unless the flag is explicitly 'true'.
+    expect(options.disableSignUp).toBe(false);
+  });
 });
 
 describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {

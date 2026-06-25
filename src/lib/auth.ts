@@ -33,6 +33,14 @@ const SESSION_COOKIE_CACHE_MAX_AGE_SECONDS = 60 * 5;
 const isProductionRuntime =
   process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
 
+// Operational kill switch for new signups. When AUTH_DISABLE_SIGNUP === 'true',
+// the magic-link verify step refuses unknown emails (`new_user_signup_disabled`)
+// instead of auto-creating an account, funneling new users through /signup
+// (which enforces the disposable-email check + terms capture). Unset/anything
+// else keeps signups open (default = prior behavior). Read at startup —
+// toggling takes effect on the next server restart.
+const DISABLE_MAGIC_LINK_SIGNUP = process.env.AUTH_DISABLE_SIGNUP === 'true';
+
 // Validate AUTH_SECRET exists and is sufficiently long. Skipped during build
 // when SKIP_ENV_VALIDATION is set (mirrors the previous Auth.js guard).
 if (process.env.SKIP_ENV_VALIDATION !== 'true') {
@@ -149,6 +157,10 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
+      // Env-driven kill switch (see DISABLE_MAGIC_LINK_SIGNUP above). Default
+      // false keeps signups open; OAuth first sign-ins are unaffected and still
+      // get a backfilled username via the user.create hook.
+      disableSignUp: DISABLE_MAGIC_LINK_SIGNUP,
       sendMagicLink: async ({ email, url }) => {
         await sendMagicLinkEmail({ email, url });
       },
