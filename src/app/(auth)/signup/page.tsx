@@ -143,9 +143,14 @@ const SignupPage = () => {
             priority
           />
         )}
-        <div className="mt-3 flex flex-col">
+        <div className="mt-6 flex flex-col items-center">
           <FormProvider {...form}>
-            <form noValidate onSubmit={form.handleSubmit(handleSubmit)} autoComplete="on">
+            <form
+              noValidate
+              onSubmit={form.handleSubmit(handleSubmit)}
+              autoComplete="on"
+              className="w-full max-w-md"
+            >
               <SignupSigninForm
                 control={form.control}
                 isPending={isSubmitting}
@@ -154,6 +159,7 @@ const SignupPage = () => {
                 onTurnstileToken={setTurnstileToken}
                 state={state}
                 hasTermsAndConditions={isSignupPath}
+                callbackURL="/"
               />
             </form>
           </FormProvider>
