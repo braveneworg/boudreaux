@@ -6,15 +6,10 @@
 import { GenerateUsernameButton } from '@/app/components/auth/generate-username-button';
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
+import { Card, CardContent } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import type { ChangeUsernameFormData } from '@/lib/types/form-data';
+import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -44,11 +39,18 @@ export const ProfileUsernameSection = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Username</CardTitle>
-        <CardDescription>Update your username</CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="p-6 sm:p-8">
+        <div className="mb-1 flex items-center gap-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            Account
+          </p>
+        </div>
+
+        <h2 className="mb-4 text-xl font-bold tracking-tight">Username</h2>
+
+        <Separator className="mb-4" />
+
+        <p className="text-muted-foreground mb-6 text-sm">Update your username</p>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="form">
             <TextField

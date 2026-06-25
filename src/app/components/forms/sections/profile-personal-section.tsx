@@ -7,16 +7,11 @@ import { Controller } from 'react-hook-form';
 
 import { StateField, TextField, CountryField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
+import { Card, CardContent } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import { ImageHeading } from '@/components/ui/image-heading';
 import type { ProfileFormData } from '@/lib/types/form-data';
+import { Separator } from '@/ui/separator';
 import { Switch } from '@/ui/switch';
 
 import type { UseFormReturn } from 'react-hook-form';
@@ -39,15 +34,23 @@ export const ProfilePersonalSection = ({
 
   return (
     <Card>
-      <CardContent>
+      <CardContent className="p-6 sm:p-8">
         <ImageHeading src="/media/headings/PROFILE.webp" alt="profile" imageHeight={480} priority />
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
-            Update your personal details. This will not be shared publicly with anyone. They&apos;re
-            only used to enhance your experience.
-          </CardDescription>
-        </CardHeader>
+
+        <div className="mb-1 flex items-center gap-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            Profile
+          </p>
+        </div>
+
+        <h2 className="mb-4 text-xl font-bold tracking-tight">Personal Information</h2>
+
+        <Separator className="mb-4" />
+
+        <p className="text-muted-foreground mb-6 text-sm">
+          Update your personal details. This will not be shared publicly with anyone. They&apos;re
+          only used to enhance your experience.
+        </p>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
