@@ -18,7 +18,7 @@ Versions track `package.json` — update this block when they change.
 - **Runtime**: TypeScript 6 (strict), Node 24, pnpm 11; use Node from `.nvmrc` (never a global install) and `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) for the correct version/environment.
 - **Framework**: Next.js 16 (App Router, Turbopack dev, webpack build), React 19
 - **Data**: Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min upload)
-- **Auth**: Auth.js (next-auth v5 beta) · **Payments**: Stripe 21 (payment-mode checkout, PWYW) · **Email**: AWS SES
+- **Auth**: better-auth (magic-link + social OAuth, admin plugin) · **Payments**: Stripe 21 (payment-mode checkout, PWYW) · **Email**: AWS SES
 - **UI**: shadcn/ui (Radix primitives), Tailwind v4, lucide-react, Jost font
 - **Forms/Validation**: React Hook Form 7 + Zod 4 · **Client data**: TanStack Query 5
 - **Testing**: Vitest 4, @testing-library/react, Playwright (E2E)
