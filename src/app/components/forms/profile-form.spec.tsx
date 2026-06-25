@@ -100,6 +100,17 @@ vi.mock('@/ui/switch', () => ({
   Switch: (props: { id: string }) => <button type="button" id={props.id} aria-pressed={false} />,
 }));
 
+vi.mock('@/app/hooks/use-connected-accounts', () => ({
+  useConnectedAccounts: () => ({ accounts: [], isLoading: false, error: null, refetch: vi.fn() }),
+}));
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    linkSocial: vi.fn(),
+    unlinkAccount: vi.fn(),
+  },
+}));
+
 const buildUser = (overrides: Record<string, unknown> = {}) => ({
   firstName: 'John',
   lastName: 'Doe',

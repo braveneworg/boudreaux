@@ -10,6 +10,7 @@ import { Separator } from '@radix-ui/react-separator';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { ConnectedAccountsSection } from '@/app/components/forms/connected-accounts-section';
 import { useMatchingFieldErrorClear } from '@/app/components/forms/hooks/use-form-state-sync';
 import { ProfileEmailSection } from '@/app/components/forms/sections/profile-email-section';
 import { ProfilePersonalSection } from '@/app/components/forms/sections/profile-personal-section';
@@ -435,6 +436,10 @@ export const ProfileForm = (): React.ReactElement => {
         wasSuccessful={usernameFormState.success}
         onEditToggle={handleEditFieldButtonClick}
       />
+
+      <Separator />
+
+      <ConnectedAccountsSection />
     </>
   );
 };
