@@ -88,6 +88,27 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
       input: false,
     });
   });
+
+  it('wires a user.create hook that backfills a placeholder username', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+
+    await import('./auth');
+
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    const config = calls[calls.length - 1][0];
+
+    // `username` is `@unique`; better-auth's own create paths (magic-link
+    // auto-create for an unknown email, OAuth first sign-in) set none, which
+    // would collide on the second such user. The `user.create.before` hook
+    // backfills a placeholder (detailed behavior in backfill-username-hook.spec).
+    const created = await config.databaseHooks.user.create.before({ email: 'new@example.com' });
+
+    expect(created.data.username).toEqual(expect.any(String));
+  });
 });
 
 describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {

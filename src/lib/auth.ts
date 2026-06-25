@@ -8,6 +8,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
 import { admin, magicLink } from 'better-auth/plugins';
 
+import { backfillUsername } from '@/lib/auth/backfill-username-hook';
 import { assertNotBanEvading } from '@/lib/auth/ban-evasion-hook';
 import { purchaseSessionPlugin } from '@/lib/auth/purchase-session-plugin';
 import {
@@ -120,6 +121,17 @@ export const auth = betterAuth({
     database: { generateId: false },
   },
   databaseHooks: {
+    user: {
+      create: {
+        // Backfill a placeholder username for users better-auth creates on its
+        // own paths (magic-link auto-create for an unknown email at /signin,
+        // OAuth first sign-in). `username` is `@unique`, so a null/absent value
+        // collides on the second such create — the prior Auth.js adapter
+        // backfilled one for exactly this reason. The signup action sets its own
+        // username, which is preserved.
+        before: async (user) => backfillUsername(user),
+      },
+    },
     session: {
       create: {
         // Ban-evasion gate (010-chat-abuse-reporting): reject session creation
