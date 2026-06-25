@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 
 import { SignedInAs } from './signed-in-as';
 
-// Mock next-auth
+// Mock the client session hook
 const mockUseSession = vi.fn();
 vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),

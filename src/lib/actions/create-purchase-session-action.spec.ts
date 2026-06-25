@@ -13,7 +13,7 @@ vi.mock('@/auth', () => ({
 }));
 
 // The action now mints the session via the better-auth server-only endpoint
-// (`auth.api.createPurchaseSession`) instead of encoding a next-auth JWT.
+// (`auth.api.createPurchaseSession`) instead of encoding a legacy JWT session.
 vi.mock('@/lib/auth', () => ({
   auth: {
     api: { createPurchaseSession: (...args: unknown[]) => mockCreatePurchaseSession(...args) },

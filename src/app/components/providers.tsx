@@ -37,7 +37,7 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
   );
 
   // better-auth's `useSession` reads from its own nanostore and needs no
-  // React context provider, so the old next-auth `SessionProvider` is gone.
+  // React context provider, so the legacy `SessionProvider` wrapper is gone.
   return (
     <QueryClientProvider client={client}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>

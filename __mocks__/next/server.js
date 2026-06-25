@@ -1,8 +1,8 @@
-// Mock for next/server to resolve ESM import issues in tests
-// This file allows next-auth to import 'next/server' without .js extension
-// Provides minimal implementation that satisfies next-auth's internal usage
+// Mock for next/server to resolve ESM import issues in tests.
+// Many route/decorator specs import 'next/server' without a .js extension;
+// this provides a minimal implementation that satisfies that usage under Vitest.
 
-// NextRequest class that next-auth uses in lib/env.js
+// Minimal NextRequest stand-in used by the route/middleware specs.
 export class NextRequest {
   constructor(url, options = {}) {
     this.url = url;

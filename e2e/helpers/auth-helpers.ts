@@ -7,7 +7,7 @@ import { getCookies } from 'better-auth/cookies';
 
 /**
  * Shape of a deterministic E2E test user, in the **better-auth** schema (was the
- * Auth.js shape under next-auth). `emailVerified` is a Boolean flag (not a
+ * legacy Auth.js shape). `emailVerified` is a Boolean flag (not a
  * DateTime), and the admin plugin owns `role` + native ban fields.
  *
  * The `sessionToken` is the opaque better-auth session-row token. The seed

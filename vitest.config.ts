@@ -38,11 +38,6 @@ export default defineConfig((): ViteUserConfig => {
     // Cache directory for faster subsequent builds
     cacheDir: 'node_modules/.vite',
 
-    // SSR configuration to handle Node.js module resolution
-    ssr: {
-      noExternal: ['next-auth'],
-    },
-
     // Optimize build for faster test startup
     esbuild: {
       target: 'node24', // Use latest Node.js target for faster builds in test environment

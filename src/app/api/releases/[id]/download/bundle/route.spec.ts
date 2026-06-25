@@ -31,7 +31,7 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   DOWNLOAD_LIMIT: 10,
 }));
 
-// Bundle download auth now reads the better-auth session (no next-auth JWT).
+// Bundle download auth now reads the better-auth session (no legacy JWT).
 // `mockGetSession` returns `{ user: { id } } | null`, matching `auth.api.getSession`.
 const mockGetSession = vi.fn();
 vi.mock('@/lib/auth', () => ({

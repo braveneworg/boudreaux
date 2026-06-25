@@ -7,7 +7,20 @@ import { CONSTANTS } from '@/lib/constants';
 
 import { AuthToolbar } from './auth-toolbar';
 
-import type { Session } from 'next-auth';
+/**
+ * Minimal session shape the toolbar tests construct. The component only reads
+ * `data.user`; `expires` is carried so the existing fixtures/overrides type-check
+ * without depending on the legacy auth library's `Session` type.
+ */
+interface Session {
+  user: {
+    id: string;
+    email: string;
+    username?: string;
+    role?: string;
+  };
+  expires: string;
+}
 
 // Mock next/navigation
 const mockUsePathname = vi.fn(() => '/');
@@ -15,7 +28,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
-// Mock next-auth
+// Mock the client session hook
 const mockUseSession = vi.fn();
 vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),

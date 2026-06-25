@@ -5,7 +5,7 @@
 
 import { authClient } from '@/lib/auth-client';
 
-/** Auth status, mirroring the legacy next-auth `useSession().status` values. */
+/** Auth status, mirroring the legacy `useSession().status` values. */
 export type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
 
 /** The user shape exposed on the client session (better-auth user + our fields). */
@@ -36,13 +36,13 @@ export interface ClientSessionData {
   user: SessionUser;
 }
 
-/** Return value of {@link useSession}, matching the legacy next-auth hook surface. */
+/** Return value of {@link useSession}, matching the legacy hook surface. */
 export interface UseSessionResult {
   data: ClientSessionData | null;
   status: SessionStatus;
   /**
    * Force a fresh session fetch (bypassing the cookie cache). Mirrors the legacy
-   * next-auth `useSession().update()` used to re-sync the session after a
+   * `useSession().update()` used to re-sync the session after a
    * profile/email/username change.
    */
   update: () => Promise<unknown>;

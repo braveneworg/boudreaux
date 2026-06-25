@@ -25,7 +25,8 @@ export const createMockRouter = () => ({
 });
 
 /**
- * Mock for next-auth/react hooks session
+ * Builds a mock client session object shaped like the data the better-auth
+ * `useSession()` hook (via `@/app/hooks/use-session`) exposes as `data`.
  */
 export const createMockSession = (
   overrides?: Partial<{
