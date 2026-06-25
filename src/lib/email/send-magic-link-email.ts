@@ -67,8 +67,14 @@ const resolveIsNewUser = async (email: string): Promise<boolean> => {
  * Send a branded magic-link sign-in email via Nodemailer for better-auth.
  *
  * Reuses the existing HTML/text templates and the Fake Four Inc. hand-logo
- * inline attachment, and enforces the per-recipient rate limit (5 / 10 min,
- * skipped under E2E).
+ * inline attachment, and enforces the per-recipient rate limit (5 / 10 min).
+ *
+ * Under E2E (`E2E_MODE === 'true'`) the delivery is skipped entirely: the E2E
+ * web server and CI provide no SMTP/`EMAIL_FROM` config, so an attempted send
+ * would throw and break the sign-in success redirect the tests assert. The
+ * limiter is skipped too (shards share one IP). better-auth still creates the
+ * verification token — only delivery is bypassed. Safe because `auth.ts`
+ * refuses to start with `E2E_MODE` enabled in production.
  *
  * @throws If the recipient is rate-limited, EMAIL_FROM is missing, or the
  *   underlying SMTP send fails (better-auth surfaces the error to the caller).
@@ -77,17 +83,22 @@ export const sendMagicLinkEmail = async ({
   email,
   url,
 }: SendMagicLinkEmailInput): Promise<void> => {
+  if (process.env.E2E_MODE === 'true') {
+    loggers.auth.info(
+      `[sendMagicLinkEmail] Skipping magic-link email send for ${email} (E2E mode)`
+    );
+    return;
+  }
+
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     throw new Error('[sendMagicLinkEmail] EMAIL_FROM is not configured');
   }
 
-  if (process.env.E2E_MODE !== 'true') {
-    try {
-      await verificationEmailLimiter.check(VERIFICATION_EMAILS_PER_INTERVAL, email.toLowerCase());
-    } catch {
-      throw new Error('Too many sign-in emails requested. Please try again later.');
-    }
+  try {
+    await verificationEmailLimiter.check(VERIFICATION_EMAILS_PER_INTERVAL, email.toLowerCase());
+  } catch {
+    throw new Error('Too many sign-in emails requested. Please try again later.');
   }
 
   const isNewUser = await resolveIsNewUser(email);

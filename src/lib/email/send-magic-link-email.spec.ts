@@ -90,7 +90,24 @@ describe('sendMagicLinkEmail', () => {
       await sendMagicLinkEmail(validInput);
 
       expect(limiterCheckMock).not.toHaveBeenCalled();
-      expect(mockSendMail).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('E2E mode', () => {
+    it('skips the SMTP send entirely so the success redirect is exercised', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+
+      await sendMagicLinkEmail(validInput);
+
+      expect(mockSendMail).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when EMAIL_FROM is unset (no email config in CI)', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      vi.stubEnv('EMAIL_FROM', '');
+
+      await expect(sendMagicLinkEmail(validInput)).resolves.toBeUndefined();
+      expect(mockSendMail).not.toHaveBeenCalled();
     });
   });
 
