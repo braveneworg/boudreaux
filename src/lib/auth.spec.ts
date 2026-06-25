@@ -38,6 +38,10 @@ const FAKE_TEST_SECRET = `test-secret-${'x'.repeat(32)}`;
 // call args.
 // ---------------------------------------------------------------------------
 describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('calls betterAuth with socialProviders and account.accountLinking', async () => {
     vi.resetModules();
     vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
@@ -59,8 +63,6 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
     expect(config.account.accountLinking.trustedProviders).toContain('apple');
     expect(config.account.accountLinking.trustedProviders).toContain('facebook');
     expect(config.account.accountLinking.trustedProviders).not.toContain('twitter');
-
-    vi.unstubAllEnvs();
   });
 });
 
