@@ -238,9 +238,13 @@ export class ChatAdminService {
       reason: reason ?? null,
     });
 
-    // Account-ban via the better-auth admin plugin: blocks sign-in + revokes
-    // existing sessions. Skipped when there is no userId (email/fingerprint-only
-    // ban — no account to target).
+    // BannedIdentity (evasion record) is written first so fingerprint/email
+    // matching is active from this point. Then the account ban is applied via
+    // the admin plugin. If auth.api.banUser throws, the error surfaces to the
+    // admin (who can retry) and is intentionally NOT swallowed — a silent catch
+    // here would make a failed account-ban look like success.
+    // Skipped when there is no userId (email/fingerprint-only ban — no account
+    // to target).
     if (userId) {
       await auth.api.banUser({
         body: {

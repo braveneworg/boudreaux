@@ -412,6 +412,20 @@ describe('ChatAdminService.banIdentity', () => {
       reason: null,
     });
   });
+
+  it('rejects (does not swallow) when the admin plugin banUser call throws', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+    banUserMock.mockRejectedValue(new Error('ban-user-api-failure'));
+
+    await expect(
+      ChatAdminService.banIdentity({
+        userId: 'user-1',
+        email: 'baduser@example.com',
+        adminId: 'admin-7',
+        adminHeaders: new Headers({ cookie: 'session=abc' }),
+      })
+    ).rejects.toThrow('ban-user-api-failure');
+  });
 });
 
 describe('ChatAdminService.unbanIdentity', () => {
