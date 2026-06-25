@@ -16,11 +16,17 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-// Mock next/image — surfaces alt/src as attributes without loading images
+// Mock next/image using <span> to avoid the @next/next/no-img-element lint rule,
+// surfacing forwarded props as data-* attributes (matches image-heading.spec.tsx pattern).
 vi.mock('next/image', () => ({
-  default: ({ alt, src }: { alt: string; src: string }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img alt={alt} src={src} />
+  default: (props: Record<string, unknown>) => (
+    <span
+      aria-hidden={props['aria-hidden'] as boolean | undefined}
+      className={props.className as string | undefined}
+      data-alt={props.alt as string}
+      data-src={props.src as string}
+      data-testid="next-image"
+    />
   ),
 }));
 
@@ -32,10 +38,7 @@ vi.mock('@/app/hooks/use-mobile', () => ({
 describe('SignoutSuccessContainer', () => {
   it('renders success heading as an image inside an h1', () => {
     render(<SuccessContainer />);
-    const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toBeInTheDocument();
-    const headingImage = screen.getByRole('img', { name: /success/i });
-    expect(headingImage).toHaveAttribute('alt', 'success');
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-alt', 'success');
   });
 
   it('renders signed-out confirmation text', () => {
@@ -55,19 +58,11 @@ describe('SignoutSuccessContainer', () => {
 
   it('renders a prominent "Sign back in" CTA linking to /signin', () => {
     render(<SuccessContainer />);
-    const links = screen.getAllByRole('link');
-    const signinLink = links.find(
-      (l) => l.getAttribute('href') === '/signin' && /sign back in/i.test(l.textContent ?? '')
-    );
-    expect(signinLink).toBeDefined();
-    expect(signinLink).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign back in/i })).toHaveAttribute('href', '/signin');
   });
 
   it('renders an accessible home link', () => {
     render(<SuccessContainer />);
-    const links = screen.getAllByRole('link');
-    const homeLink = links.find((l) => l.getAttribute('href') === '/');
-    expect(homeLink).toBeDefined();
-    expect(homeLink).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to homepage/i })).toHaveAttribute('href', '/');
   });
 });

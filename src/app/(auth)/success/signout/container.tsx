@@ -5,10 +5,10 @@ import Link from 'next/link';
 
 import { LogOut } from 'lucide-react';
 
-import { Button } from '@/app/components/ui/button';
-import { Card, CardContent } from '@/app/components/ui/card';
-import { ImageHeading } from '@/app/components/ui/image-heading';
-import { Separator } from '@/app/components/ui/separator';
+import { ImageHeading } from '@/components/ui/image-heading';
+import { Button } from '@/ui/button';
+import { Card, CardContent } from '@/ui/card';
+import { Separator } from '@/ui/separator';
 
 export const SuccessContainer = (): React.ReactElement => (
   <div className="flex flex-col items-center">
