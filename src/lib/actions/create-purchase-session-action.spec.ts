@@ -7,32 +7,27 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 vi.mock('server-only', () => ({}));
 
 const mockAuth = vi.fn();
+const mockCreatePurchaseSession = vi.fn();
 vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 
-const mockEncode = vi.fn();
-vi.mock('@auth/core/jwt', () => ({
-  encode: (...args: unknown[]) => mockEncode(...args),
+// The action now mints the session via the better-auth server-only endpoint
+// (`auth.api.createPurchaseSession`) instead of encoding a next-auth JWT.
+vi.mock('@/lib/auth', () => ({
+  auth: {
+    api: { createPurchaseSession: (...args: unknown[]) => mockCreatePurchaseSession(...args) },
+  },
 }));
 
-const mockCookiesSet = vi.fn();
+const requestHeaders = new Headers({ 'x-real-ip': '203.0.113.7' });
 vi.mock('next/headers', () => ({
-  cookies: () => Promise.resolve({ set: mockCookiesSet }),
-  headers: () => Promise.resolve(new Headers({ 'x-real-ip': '203.0.113.7' })),
+  headers: () => Promise.resolve(requestHeaders),
 }));
 
 const limiterCheckMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: () => ({ check: limiterCheckMock }),
-}));
-
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-    },
-  },
 }));
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
@@ -43,27 +38,6 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 
 // Must import after mocks are set up
 const { createPurchaseSessionAction } = await import('./create-purchase-session-action');
-const { prisma } = await import('@/lib/prisma');
-
-const mockUser = {
-  id: 'user-123',
-  email: 'buyer@example.com',
-  name: 'Buyer',
-  username: 'buyer',
-  role: 'user',
-  image: null,
-  emailVerified: new Date('2026-01-01'),
-  firstName: null,
-  lastName: null,
-  phone: null,
-  addressLine1: null,
-  addressLine2: null,
-  city: null,
-  state: null,
-  zipCode: null,
-  country: null,
-  allowSmsNotifications: false,
-};
 
 const mockPurchase = {
   id: 'purchase-1',
@@ -80,10 +54,9 @@ const mockPurchase = {
 
 describe('createPurchaseSessionAction', () => {
   beforeEach(() => {
-    vi.stubEnv('AUTH_SECRET', 'test-secret-that-is-long-enough-for-encryption');
     vi.stubEnv('NODE_ENV', 'development');
-    mockEncode.mockResolvedValue('encrypted-jwt-token');
     limiterCheckMock.mockResolvedValue(undefined);
+    mockCreatePurchaseSession.mockResolvedValue({ status: true });
   });
 
   afterEach(() => {
@@ -97,7 +70,7 @@ describe('createPurchaseSessionAction', () => {
 
     expect(result).toEqual({ success: true });
     expect(PurchaseRepository.findBySessionId).not.toHaveBeenCalled();
-    expect(mockCookiesSet).not.toHaveBeenCalled();
+    expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
   });
 
   it('returns rate_limited for unauthenticated callers over the limit', async () => {
@@ -128,6 +101,7 @@ describe('createPurchaseSessionAction', () => {
     const result = await createPurchaseSessionAction({ sessionId: 'invalid_id' });
 
     expect(result).toEqual({ success: false, error: 'invalid_session_id' });
+    expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
   });
 
   it('rejects empty session IDs', async () => {
@@ -143,116 +117,51 @@ describe('createPurchaseSessionAction', () => {
       mockAuth.mockResolvedValue(null);
     });
 
-    it('creates session cookie for a purchase found by session ID', async () => {
+    it('resolves the userId from the purchase trust anchor (Stripe session id)', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
 
       expect(result).toEqual({ success: true });
       expect(PurchaseRepository.findBySessionId).toHaveBeenCalledWith('cs_test_123');
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { id: 'user-123' },
-        select: expect.objectContaining({ id: true, email: true, role: true }),
-      });
-      expect(mockEncode).toHaveBeenCalledWith({
-        token: { sub: 'user-123', user: mockUser },
-        secret: 'test-secret-that-is-long-enough-for-encryption',
-        salt: 'next-auth.session-token',
-        maxAge: 30 * 24 * 60 * 60,
-      });
-      expect(mockCookiesSet).toHaveBeenCalledWith(
-        'next-auth.session-token',
-        'encrypted-jwt-token',
-        expect.objectContaining({
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/',
-          secure: false,
-        })
-      );
     });
 
-    it('returns user_not_found when no purchase exists for the session', async () => {
+    it('mints a better-auth session for the resolved userId with the request headers', async () => {
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
+
+      await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
+
+      expect(mockCreatePurchaseSession).toHaveBeenCalledWith({
+        body: { userId: 'user-123' },
+        headers: requestHeaders,
+      });
+    });
+
+    it('returns user_not_found and mints NO session when no purchase exists', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_missing' });
 
       expect(result).toEqual({ success: false, error: 'user_not_found' });
-      expect(prisma.user.findUnique).not.toHaveBeenCalled();
-      expect(mockCookiesSet).not.toHaveBeenCalled();
-    });
-
-    it('returns user_not_found when user record is missing for the purchase', async () => {
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
-
-      expect(result).toEqual({ success: false, error: 'user_not_found' });
-      expect(mockCookiesSet).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('cookie configuration', () => {
-    beforeEach(() => {
-      mockAuth.mockResolvedValue(null);
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
-    });
-
-    it('uses non-secure cookie name in development', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-
-      await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
-
-      expect(mockCookiesSet).toHaveBeenCalledWith(
-        'next-auth.session-token',
-        expect.any(String),
-        expect.objectContaining({ secure: false })
-      );
-    });
-
-    it('uses secure cookie name in production', async () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('E2E_MODE', '');
-
-      await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
-
-      expect(mockCookiesSet).toHaveBeenCalledWith(
-        '__Secure-next-auth.session-token',
-        expect.any(String),
-        expect.objectContaining({ secure: true })
-      );
-    });
-
-    it('uses non-secure cookie name in production with E2E_MODE', async () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('E2E_MODE', 'true');
-
-      await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
-
-      expect(mockCookiesSet).toHaveBeenCalledWith(
-        'next-auth.session-token',
-        expect.any(String),
-        expect.objectContaining({ secure: false })
-      );
+      expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
     });
   });
 
   describe('error handling', () => {
-    it('returns server_error when AUTH_SECRET is missing', async () => {
+    beforeEach(() => {
       mockAuth.mockResolvedValue(null);
-      vi.stubEnv('AUTH_SECRET', '');
-      delete process.env.AUTH_SECRET;
+    });
+
+    it('returns server_error when session creation throws (e.g. ban gate or missing user)', async () => {
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
+      mockCreatePurchaseSession.mockRejectedValue(new Error('FORBIDDEN'));
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
 
       expect(result).toEqual({ success: false, error: 'server_error' });
     });
 
-    it('returns server_error when an unexpected exception occurs', async () => {
-      mockAuth.mockResolvedValue(null);
+    it('returns server_error when the purchase lookup throws', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockRejectedValue(new Error('DB down'));
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
@@ -261,7 +170,6 @@ describe('createPurchaseSessionAction', () => {
     });
 
     it('returns server_error when an unexpected non-Error value is thrown', async () => {
-      mockAuth.mockResolvedValue(null);
       vi.mocked(PurchaseRepository.findBySessionId).mockRejectedValue('string-thrown');
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
