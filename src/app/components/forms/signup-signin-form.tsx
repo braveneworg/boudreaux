@@ -10,6 +10,7 @@ import {
   SocialProviderButtons,
   type SocialProvider,
 } from '@/app/components/auth/social-provider-buttons';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
@@ -18,6 +19,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
+import { useSignupStatusQuery } from '@/app/hooks/use-signup-status-query';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
 import { Skeleton } from '@/ui/skeleton';
@@ -148,18 +150,20 @@ const VerifiedFields = ({
 interface FormSubmitRowProps {
   isPending: boolean;
   isVerified: boolean;
+  signupsPaused: boolean;
   state: FormState;
 }
 
 const FormSubmitRow = ({
   isPending,
   isVerified,
+  signupsPaused,
   state,
 }: FormSubmitRowProps): React.ReactElement => (
   <div className="mt-4 flex items-center gap-3">
     {!isVerified && <Skeleton className="h-10 w-24" />}
     {isVerified && (
-      <Button type="submit" disabled={isPending} size="lg">
+      <Button type="submit" disabled={isPending || signupsPaused} size="lg">
         Email me a sign-in link
       </Button>
     )}
@@ -248,10 +252,20 @@ export const SignupSigninForm = ({
 }: SignupSigninFormProps): React.ReactElement => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin';
+  const { data: signupStatus } = useSignupStatusQuery({ enabled: hasTermsAndConditions });
+  const signupsPaused = hasTermsAndConditions && signupStatus?.paused === true;
 
   return (
     <Card className="mx-auto w-full max-w-md p-0">
       <CardContent className="p-6 sm:p-8">
+        {/* Signups-paused notice — shown only on the signup path when paused */}
+        {signupsPaused && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              Signups are temporarily paused. Please try again later.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Social sign-in — rendered first, always visible */}
         <SocialProviderButtons callbackURL={callbackURL} className="mb-2" onError={onSocialError} />
 
@@ -279,7 +293,12 @@ export const SignupSigninForm = ({
           setIsVerified={setIsVerified}
           onToken={onTurnstileToken}
         />
-        <FormSubmitRow isPending={isPending} isVerified={isVerified} state={state} />
+        <FormSubmitRow
+          isPending={isPending}
+          isVerified={isVerified}
+          signupsPaused={signupsPaused}
+          state={state}
+        />
         <FormStatusMessages state={state} />
 
         {/* Mode switch */}

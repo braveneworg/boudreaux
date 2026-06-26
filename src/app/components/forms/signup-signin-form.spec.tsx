@@ -196,6 +196,17 @@ vi.mock('@/app/components/auth/social-provider-buttons', () => ({
   },
 }));
 
+vi.mock('@/app/components/ui/alert', () => ({
+  Alert: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="alert" className={className}>
+      {children}
+    </div>
+  ),
+  AlertDescription: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="alert-description">{children}</div>
+  ),
+}));
+
 vi.mock('@/app/components/ui/card', () => ({
   Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="card" className={className}>
@@ -244,6 +255,14 @@ interface TurnstileWidgetProps {
   setIsVerified?: (verified: boolean) => void;
   [key: string]: unknown;
 }
+
+// Mock useSignupStatusQuery
+const mockUseSignupStatusQuery = vi.fn<() => { data: { paused: boolean } | undefined }>(() => ({
+  data: undefined,
+}));
+vi.mock('@/app/hooks/use-signup-status-query', () => ({
+  useSignupStatusQuery: () => mockUseSignupStatusQuery(),
+}));
 
 // Mock next/link
 vi.mock('next/link', () => ({
@@ -762,6 +781,51 @@ describe('SignupSigninForm', () => {
     it('renders social provider buttons on signin path', () => {
       render(<SignupSigninForm {...defaultProps} />);
       expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
+    });
+  });
+
+  describe('signups-paused notice', () => {
+    const signupProps = () => ({ ...defaultProps, hasTermsAndConditions: true });
+    const signinProps = () => ({ ...defaultProps, hasTermsAndConditions: false });
+
+    beforeEach(() => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: undefined });
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    afterEach(() => {
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('shows the paused notice and disables submit on the signup path when paused', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByText(/signups are temporarily paused/i)).toBeInTheDocument();
+    });
+
+    it('does not show the notice on the signin path', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      mockUsePathname.mockReturnValue('/signin');
+      render(<SignupSigninForm {...signinProps()} />);
+      expect(screen.queryByText(/signups are temporarily paused/i)).not.toBeInTheDocument();
+    });
+
+    it('disables the submit button when signups are paused on the signup path', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByTestId('submit-button')).toBeDisabled();
+    });
+
+    it('does not disable the submit button when signups are not paused', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: false } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByTestId('submit-button')).not.toBeDisabled();
+    });
+
+    it('does not show the notice when signupStatus data is undefined', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: undefined });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.queryByText(/signups are temporarily paused/i)).not.toBeInTheDocument();
     });
   });
 
