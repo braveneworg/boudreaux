@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 
 import { DesktopAuthMenu } from './desktop-auth-menu';
 
@@ -42,6 +44,51 @@ describe('DesktopAuthMenu', () => {
     it('renders nothing while the session resolves', () => {
       const { container } = render(<DesktopAuthMenu />);
       expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  // Regression: better-auth resolves the session from an async fetch that can
+  // land before React hydrates this node. The server can only ever render the
+  // pending branch (null), so the first client render must also be null —
+  // otherwise the resolved <nav> diverges from the server HTML and trips a
+  // hydration mismatch. renderToString never runs effects, so it stands in for
+  // the server / first-paint render here.
+  describe('hydration safety', () => {
+    it('renders nothing on the server even when the session has already resolved', () => {
+      mockUseSession.mockReturnValue({
+        data: { user: { username: 'bob', email: 'bob@example.com', role: 'user' } },
+        status: 'authenticated',
+      });
+      expect(renderToString(<DesktopAuthMenu />)).toBe('');
+    });
+
+    it('renders nothing on the server for a resolved unauthenticated session', () => {
+      mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+      expect(renderToString(<DesktopAuthMenu />)).toBe('');
+    });
+
+    it('hydrates without a mismatch when the session resolves before hydration', async () => {
+      // Server emits the pending branch (null) — all it can ever know.
+      mockUseSession.mockReturnValue({ data: null, status: 'loading' });
+      const container = document.createElement('div');
+      container.innerHTML = renderToString(<DesktopAuthMenu />);
+
+      // ...but the async session has already resolved by the time the client
+      // hydrates this node (the production race that caused the mismatch).
+      mockUseSession.mockReturnValue({
+        data: { user: { username: 'bob', email: 'bob@example.com', role: 'user' } },
+        status: 'authenticated',
+      });
+
+      const recoverableErrors: string[] = [];
+      const root = await act(async () =>
+        hydrateRoot(container, <DesktopAuthMenu />, {
+          onRecoverableError: (error) => recoverableErrors.push(String(error)),
+        })
+      );
+
+      expect(recoverableErrors).toEqual([]);
+      act(() => root.unmount());
     });
   });
 

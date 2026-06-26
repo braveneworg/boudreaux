@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useEffect, useState } from 'react';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -39,8 +41,22 @@ export const DesktopAuthMenu = () => {
   const router = useRouter();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
 
-  // Avoid flashing the wrong state in the corner while the session resolves.
-  if (status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
+  // Defer the auth-dependent markup until after the client has mounted.
+  // `useSession` is backed by better-auth's nanostore, which resolves the
+  // session from an async fetch (kicked off on mount) that can land *before*
+  // React hydrates this node. The server can only ever render the pending
+  // branch (null), so without this gate the resolved <nav> would diverge from
+  // the server HTML and trip a hydration mismatch. Gating on mount guarantees
+  // the first client render matches the server; the real state renders on the
+  // commit that follows.
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  // Avoid flashing the wrong state in the corner before the client has mounted
+  // or while the session resolves.
+  if (!hasMounted || status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
     return null;
   }
 
