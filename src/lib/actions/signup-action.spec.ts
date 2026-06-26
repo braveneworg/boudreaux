@@ -160,7 +160,7 @@ describe('signupAction', () => {
 
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'test@example.com', callbackURL: '/' },
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
 
@@ -428,7 +428,7 @@ describe('signupAction', () => {
       // Magic-link flow should be triggered for the duplicate email too
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'test@example.com', callbackURL: '/' },
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
       // Should redirect to the same success page as a new signup

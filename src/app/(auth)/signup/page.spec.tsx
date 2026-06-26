@@ -297,6 +297,30 @@ describe('SignupPage', () => {
     });
   });
 
+  describe('magic-link error rendering', () => {
+    it('renders the friendly message when error=new_user_signup_disabled is in the URL', () => {
+      useSearchParamsMock.mockReturnValue({
+        get: (key: string) => (key === 'error' ? 'new_user_signup_disabled' : null),
+      });
+      render(<SignupPage />);
+      expect(screen.getByText('Signups are temporarily paused.')).toBeInTheDocument();
+    });
+
+    it('renders nothing for an unknown error code', () => {
+      useSearchParamsMock.mockReturnValue({
+        get: (key: string) => (key === 'error' ? 'failed_to_create_user' : null),
+      });
+      render(<SignupPage />);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('renders nothing when no error param is present', () => {
+      useSearchParamsMock.mockReturnValue({ get: () => null });
+      render(<SignupPage />);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
   describe('social sign-in error handling', () => {
     it('passes onSocialError to SignupSigninForm', () => {
       render(<SignupPage />);

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 import type { SocialProvider } from '@/app/components/auth/social-provider-buttons';
 import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
@@ -21,6 +22,7 @@ import { useSession } from '@/hooks/use-session';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
+import { magicLinkErrorMessage } from '@/lib/utils/auth/magic-link-error-messages';
 import { reportClientError } from '@/lib/utils/report-client-error';
 import {
   signinSchema,
@@ -43,6 +45,7 @@ const SignupPage = () => {
   const searchParams = useSearchParams();
   const { status } = useSession();
   const isSignupPath = path === '/signup';
+  const magicLinkError = magicLinkErrorMessage(searchParams.get('error'));
 
   // If the user is already signed in (e.g. clicked a chat-mention email
   // link in a tab that already has a session), bounce them to the
@@ -161,6 +164,11 @@ const SignupPage = () => {
           />
         )}
         <div className="mt-6 flex flex-col items-center">
+          {magicLinkError !== null && (
+            <Alert variant="destructive" className="mb-4 w-full max-w-md">
+              <AlertDescription>{magicLinkError}</AlertDescription>
+            </Alert>
+          )}
           <FormProvider {...form}>
             <form
               noValidate

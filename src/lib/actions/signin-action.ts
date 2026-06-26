@@ -74,7 +74,7 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
       // landing page. The redirect happens below — `next` throws if you redirect
       // inside a try/catch.
       await auth.api.signInMagicLink({
-        body: { email: email as string, callbackURL: '/' },
+        body: { email: email as string, callbackURL: '/', errorCallbackURL: '/signin' },
         headers: headersList,
       });
 

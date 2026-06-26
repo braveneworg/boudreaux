@@ -35,7 +35,7 @@ const limiter = rateLimit({
 const sendMagicLink = async (email: string): Promise<void> => {
   const headersList = await headers();
   await auth.api.signInMagicLink({
-    body: { email, callbackURL: '/' },
+    body: { email, callbackURL: '/', errorCallbackURL: '/signin' },
     headers: headersList,
   });
 };

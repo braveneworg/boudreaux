@@ -111,7 +111,7 @@ describe('signinAction', () => {
 
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'test@example.com', callbackURL: '/' },
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
 
@@ -146,7 +146,7 @@ describe('signinAction', () => {
 
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'user@test.com', callbackURL: '/' },
+          body: { email: 'user@test.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
     });
@@ -179,7 +179,7 @@ describe('signinAction', () => {
 
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'test@example.com', callbackURL: '/' },
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
     });
@@ -324,7 +324,7 @@ describe('signinAction', () => {
       expect(result.success).toBe(false);
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { email: 'test@example.com', callbackURL: '/' },
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
         })
       );
     });
