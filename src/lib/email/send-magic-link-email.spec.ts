@@ -29,6 +29,24 @@ vi.mock('nodemailer', () => ({
   },
 }));
 
+const mockSesClientSend = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/utils/ses-client', () => ({
+  sesClient: { send: mockSesClientSend },
+}));
+
+const mockSendRawEmailParams = vi.hoisted(() => vi.fn());
+
+vi.mock('@aws-sdk/client-ses', () => ({
+  SendRawEmailCommand: class MockSendRawEmailCommand {
+    input: unknown;
+    constructor(params: unknown) {
+      mockSendRawEmailParams(params);
+      this.input = params;
+    }
+  },
+}));
+
 const limiterCheckMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/utils/rate-limit', () => ({
@@ -51,13 +69,10 @@ describe('sendMagicLinkEmail', () => {
 
   beforeEach(() => {
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    vi.stubEnv('EMAIL_SERVER_HOST', 'smtp.example.com');
-    vi.stubEnv('EMAIL_SERVER_PORT', '587');
-    vi.stubEnv('EMAIL_SERVER_USER', 'user');
-    vi.stubEnv('EMAIL_SERVER_PASSWORD', 'pass');
     mockFindUnique.mockResolvedValue({ id: 'user-1' });
-    mockSendMail.mockResolvedValue({});
+    mockSendMail.mockResolvedValue({ message: Buffer.from('raw-mime-message') });
     mockCreateTransport.mockReturnValue({ sendMail: mockSendMail });
+    mockSesClientSend.mockResolvedValue({});
     limiterCheckMock.mockResolvedValue(undefined);
     vi.mocked(buildLoginVerificationEmailHtml).mockReturnValue('<html>login</html>');
     vi.mocked(buildLoginVerificationEmailText).mockReturnValue('login text');
@@ -94,12 +109,13 @@ describe('sendMagicLinkEmail', () => {
   });
 
   describe('E2E mode', () => {
-    it('skips the SMTP send entirely so the success redirect is exercised', async () => {
+    it('skips the email send entirely so the success redirect is exercised', async () => {
       vi.stubEnv('E2E_MODE', 'true');
 
       await sendMagicLinkEmail(validInput);
 
       expect(mockSendMail).not.toHaveBeenCalled();
+      expect(mockSesClientSend).not.toHaveBeenCalled();
     });
 
     it('does not throw when EMAIL_FROM is unset (no email config in CI)', async () => {
@@ -172,19 +188,33 @@ describe('sendMagicLinkEmail', () => {
   });
 
   describe('email send', () => {
-    it('creates a nodemailer transport from the EMAIL_SERVER_* env vars', async () => {
+    it('builds the MIME message with an in-memory stream transport (no SMTP connection)', async () => {
       await sendMagicLinkEmail(validInput);
 
       expect(mockCreateTransport).toHaveBeenCalledWith(
+        expect.objectContaining({ streamTransport: true, buffer: true })
+      );
+    });
+
+    it('delivers the raw message through the SES client (not SMTP)', async () => {
+      await sendMagicLinkEmail(validInput);
+
+      expect(mockSesClientSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends the built raw MIME to the recipient via SES', async () => {
+      await sendMagicLinkEmail(validInput);
+
+      expect(mockSendRawEmailParams).toHaveBeenCalledWith(
         expect.objectContaining({
-          host: 'smtp.example.com',
-          port: 587,
-          auth: { user: 'user', pass: 'pass' },
+          Source: 'noreply@fakefourrecords.com',
+          Destinations: ['fan@example.com'],
+          RawMessage: { Data: expect.any(Buffer) },
         })
       );
     });
 
-    it('sends to the recipient address', async () => {
+    it('addresses the MIME message to the recipient', async () => {
       await sendMagicLinkEmail(validInput);
 
       expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'fan@example.com' }));
@@ -256,10 +286,16 @@ describe('sendMagicLinkEmail', () => {
   });
 
   describe('error handling', () => {
-    it('re-throws when sendMail fails', async () => {
-      mockSendMail.mockRejectedValue(new Error('SMTP failure'));
+    it('re-throws when the MIME build fails', async () => {
+      mockSendMail.mockRejectedValue(new Error('mime build failure'));
 
-      await expect(sendMagicLinkEmail(validInput)).rejects.toThrow('SMTP failure');
+      await expect(sendMagicLinkEmail(validInput)).rejects.toThrow('mime build failure');
+    });
+
+    it('re-throws when the SES send fails', async () => {
+      mockSesClientSend.mockRejectedValue(new Error('SES failure'));
+
+      await expect(sendMagicLinkEmail(validInput)).rejects.toThrow('SES failure');
     });
   });
 });

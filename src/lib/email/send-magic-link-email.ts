@@ -5,11 +5,13 @@ import 'server-only';
 
 import path from 'path';
 
+import { SendRawEmailCommand } from '@aws-sdk/client-ses';
 import nodemailer from 'nodemailer';
 
 import { prisma } from '@/lib/prisma';
 import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
+import { sesClient } from '@/lib/utils/ses-client';
 
 import { buildLoginVerificationEmailHtml } from './login-verification-email-html';
 import { buildLoginVerificationEmailText } from './login-verification-email-text';
@@ -33,19 +35,6 @@ export interface SendMagicLinkEmailInput {
 }
 
 /**
- * Build the Nodemailer SMTP transport options from the EMAIL_SERVER_* env vars.
- * Mirrors the configuration the Auth.js Nodemailer provider used previously.
- */
-const buildSmtpOptions = () => ({
-  host: process.env.EMAIL_SERVER_HOST,
-  port: Number(process.env.EMAIL_SERVER_PORT ?? 25),
-  auth: {
-    user: process.env.EMAIL_SERVER_USER,
-    pass: process.env.EMAIL_SERVER_PASSWORD,
-  },
-});
-
-/**
  * Determine whether this is a first-time user, for the conditional greeting.
  * Falls back to treating the user as returning if the lookup fails, so the
  * email still sends without blocking sign-in.
@@ -64,20 +53,23 @@ const resolveIsNewUser = async (email: string): Promise<boolean> => {
 };
 
 /**
- * Send a branded magic-link sign-in email via Nodemailer for better-auth.
+ * Send a branded magic-link sign-in email via AWS SES for better-auth.
  *
  * Reuses the existing HTML/text templates and the Fake Four Inc. hand-logo
  * inline attachment, and enforces the per-recipient rate limit (5 / 10 min).
+ * Delivery goes through the SES SDK (`SendRawEmailCommand`) — the same path the
+ * other transactional emails use — rather than an outbound SMTP socket, whose
+ * port (25/587) is firewalled in the deploy environment and times out.
  *
  * Under E2E (`E2E_MODE === 'true'`) the delivery is skipped entirely: the E2E
- * web server and CI provide no SMTP/`EMAIL_FROM` config, so an attempted send
+ * web server and CI provide no SES/`EMAIL_FROM` config, so an attempted send
  * would throw and break the sign-in success redirect the tests assert. The
  * limiter is skipped too (shards share one IP). better-auth still creates the
  * verification token — only delivery is bypassed. Safe because `auth.ts`
  * refuses to start with `E2E_MODE` enabled in production.
  *
  * @throws If the recipient is rate-limited, EMAIL_FROM is missing, or the
- *   underlying SMTP send fails (better-auth surfaces the error to the caller).
+ *   underlying SES send fails (better-auth surfaces the error to the caller).
  */
 export const sendMagicLinkEmail = async ({
   email,
@@ -106,11 +98,16 @@ export const sendMagicLinkEmail = async ({
 
   const logoPath = path.join(process.cwd(), 'public', 'fake-four-inc-black-hand-logo.svg');
 
-  const transport = nodemailer.createTransport(
-    buildSmtpOptions() as Parameters<typeof nodemailer.createTransport>[0]
-  );
+  // Build a multipart/related MIME message in-memory (no SMTP connection) so
+  // the logo embeds as a CID inline attachment, then hand the raw message to
+  // SES — matching `send-purchase-confirmation` and the other senders.
+  const transport = nodemailer.createTransport({
+    streamTransport: true,
+    newline: 'unix',
+    buffer: true,
+  });
 
-  await transport.sendMail({
+  const info = await transport.sendMail({
     from: fromAddress,
     to: email,
     subject: isNewUser
@@ -127,6 +124,16 @@ export const sendMagicLinkEmail = async ({
       },
     ],
   });
+
+  const rawMessage = (info as { message: Buffer }).message;
+
+  await sesClient.send(
+    new SendRawEmailCommand({
+      Source: fromAddress,
+      Destinations: [email],
+      RawMessage: { Data: rawMessage },
+    })
+  );
 
   loggers.auth.info(`[sendMagicLinkEmail] Magic-link email sent to ${email}`);
 };
