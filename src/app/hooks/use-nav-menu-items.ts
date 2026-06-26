@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useSession } from '@/hooks/use-session';
 
@@ -110,7 +110,18 @@ const MERCH_COLOR =
  */
 export const useNavMenuItems = (): NavMenuItem[] => {
   const { status } = useSession();
-  const isAuthenticated = status === 'authenticated';
+
+  // Defer the auth-dependent menu shape until after the client has mounted.
+  // `useSession` resolves from better-auth's async session fetch, which can land
+  // before React hydrates the header; treating the user as authenticated then
+  // would insert "My Collection" / flip bullets and diverge from the server's
+  // pending render, tripping a hydration mismatch. Holding `isAuthenticated`
+  // false until mount keeps the first client render identical to the server.
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+  const isAuthenticated = hasMounted && status === 'authenticated';
 
   return useMemo(() => {
     const videos: NavMenuItem = {
