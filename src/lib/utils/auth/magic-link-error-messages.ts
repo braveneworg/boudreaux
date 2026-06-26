@@ -14,5 +14,5 @@ type MagicLinkErrorCode = keyof typeof MAGIC_LINK_ERROR_MESSAGES;
  */
 export const magicLinkErrorMessage = (code: string | null | undefined): string | null => {
   if (!code) return null;
-  return (MAGIC_LINK_ERROR_MESSAGES as Record<string, string>)[code as MagicLinkErrorCode] ?? null;
+  return MAGIC_LINK_ERROR_MESSAGES[code as MagicLinkErrorCode] ?? null;
 };

@@ -121,6 +121,16 @@ Existing users signing in never hit a create path, so they are unaffected.
   The `(auth)` signin/signup page reads the `?error=` search param and renders the mapped
   copy. Unmapped/generic codes (e.g. a real `failed_to_create_user`) are **not** relabeled.
 
+  > **Known benign edge — DB-toggle path:** When signups are paused via the admin DB toggle
+  > (not `AUTH_DISABLE_SIGNUP`), an unknown email requesting a `/signin` magic link reaches
+  > better-auth's `createUser`; the `user.create.before` hook returns `false` to abort, and
+  > better-auth redirects with the generic `failed_to_create_user` code — which is
+  > intentionally left unmapped so that code produces the generic error page rather than the
+  > friendly "Signups are temporarily paused." copy (that copy is reserved for the env path's
+  > clean `new_user_signup_disabled` code). This divergence is accepted: requesting a sign-in
+  > link for a non-existent account is an unusual flow, no account is created, and nothing is
+  > leaked (the response is non-enumerating).
+
 ## Caching & E2E
 
 - `getCacheTtlSeconds()` → 0 in dev/E2E, 300s in prod. TTL 0 keeps the admin toggle
