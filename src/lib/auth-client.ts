@@ -5,6 +5,7 @@ import { adminClient, inferAdditionalFields, magicLinkClient } from 'better-auth
 import { createAuthClient } from 'better-auth/react';
 
 import type { auth } from '@/lib/auth';
+import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 
 /**
  * Browser-side better-auth client. Drives `useSession`, magic-link sign-in, and
@@ -12,11 +13,17 @@ import type { auth } from '@/lib/auth';
  * surfaces the server-defined `role` / `termsAcceptedAt` fields on the client
  * session type so call sites can read `data.user.role`.
  *
- * `baseURL` is read from the public app URL so the client targets the same
- * origin the catch-all `/api/auth/[...all]` route is mounted on.
+ * `baseURL` targets the *served* origin (`getApiBaseUrl()` returns
+ * `location.origin` in the browser) rather than a fixed public URL, so the
+ * catch-all `/api/auth/[...all]` request stays same-origin no matter which host
+ * served the page — apex, `www`, or a preview. Same-origin keeps the request
+ * under CSP `connect-src 'self'` and the host-only session cookie first-party;
+ * a fixed apex `baseURL` would be cross-origin (and CSP-blocked) when the page
+ * is served from `www`. The server mirrors this with a dynamic `baseURL` (see
+ * `auth.ts`).
  */
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_BASE_URL,
+  baseURL: getApiBaseUrl(),
   plugins: [magicLinkClient(), adminClient(), inferAdditionalFields<typeof auth>()],
 });
 

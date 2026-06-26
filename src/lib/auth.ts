@@ -19,6 +19,8 @@ import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
 import { prisma } from '@/lib/prisma';
 import { UserRepository } from '@/lib/repositories/user-repository';
 
+import type { BetterAuthOptions } from 'better-auth';
+
 // Magic-link lifetime — adopt better-auth's 5-minute default (the old Auth.js
 // flow used 24h). Kept as a named constant so the email copy stays in sync.
 const MAGIC_LINK_EXPIRES_IN_SECONDS = 60 * 5;
@@ -59,6 +61,41 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
 }
 
 /**
+ * Resolve better-auth's base URL as a dynamic, per-request config so auth works
+ * same-origin whether the app is served from the apex or the `www` subdomain
+ * (host-only session cookies — no `crossSubDomainCookies` — require auth to stay
+ * first-party). better-auth resolves the base URL from the served host (via the
+ * proxy's `x-forwarded-host`, trusted by default for dynamic configs) when it
+ * matches `allowedHosts`, and trusts those origins for CSRF. The allowlist —
+ * the apex and any subdomain of it, derived from `AUTH_URL` — is what keeps an
+ * injected host header from impersonating another origin; any other host
+ * (localhost in dev/E2E, an unlisted preview) falls back to `AUTH_URL`,
+ * preserving the previous static behavior there. Mirrors `auth-client.ts`,
+ * which targets the served origin on the client.
+ */
+const buildAuthBaseURL = (): BetterAuthOptions['baseURL'] => {
+  const authUrl = process.env.AUTH_URL;
+  if (!authUrl) {
+    return undefined;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(authUrl);
+  } catch {
+    // Malformed AUTH_URL — hand it back unchanged (static string baseURL).
+    return authUrl;
+  }
+
+  const apexHost = parsed.host.replace(/^www\./, '');
+  return {
+    allowedHosts: [apexHost, `*.${apexHost}`],
+    protocol: parsed.protocol === 'http:' ? 'http' : 'https',
+    fallback: authUrl,
+  };
+};
+
+/**
  * Resolve the email for a userId so the ban-evasion gate can match on both
  * signals (the better-auth `session.create.before` hook only carries `userId`).
  * Failures are non-fatal — the gate still checks the userId.
@@ -84,9 +121,11 @@ const resolveEmailForUser = async (userId: string): Promise<string | null> => {
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'mongodb' }),
   secret: process.env.AUTH_SECRET,
-  baseURL: process.env.AUTH_URL,
-  // Trust the proxy (NGINX) host header — required behind a reverse proxy.
-  trustedOrigins: process.env.AUTH_URL ? [process.env.AUTH_URL] : [],
+  // Per-request base URL (apex + subdomains) so auth stays same-origin behind
+  // the NGINX proxy; see `buildAuthBaseURL`. The dynamic config also derives the
+  // trusted origins (the allowlisted hosts + the `AUTH_URL` fallback), so no
+  // separate `trustedOrigins` is needed.
+  baseURL: buildAuthBaseURL(),
   emailAndPassword: {
     // Passwordless: no username/password login, now or ever.
     enabled: false,

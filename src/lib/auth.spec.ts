@@ -152,6 +152,92 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
   });
 });
 
+describe('src/lib/auth — multi-origin baseURL', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const loadConfig = async (): Promise<Record<string, unknown>> => {
+    await import('./auth');
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    return calls[calls.length - 1][0];
+  };
+
+  it('configures a dynamic baseURL trusting the apex and its subdomains', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_URL', 'https://fakefourrecords.com');
+
+    const config = await loadConfig();
+
+    // Dynamic config lets better-auth resolve the base URL from the served host
+    // (apex or any subdomain) so auth stays same-origin and host-only cookies
+    // are set first-party; the allowlist is what keeps it injection-safe.
+    expect(config.baseURL).toEqual({
+      allowedHosts: ['fakefourrecords.com', '*.fakefourrecords.com'],
+      protocol: 'https',
+      fallback: 'https://fakefourrecords.com',
+    });
+  });
+
+  it('strips a www prefix so the apex and www resolve to the same allowlist', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_URL', 'https://www.fakefourrecords.com');
+
+    const config = await loadConfig();
+
+    expect(config.baseURL).toMatchObject({
+      allowedHosts: ['fakefourrecords.com', '*.fakefourrecords.com'],
+      fallback: 'https://www.fakefourrecords.com',
+    });
+  });
+
+  it('keeps http for a localhost AUTH_URL so dev and E2E stay on http', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_URL', 'http://localhost:3000');
+
+    const config = await loadConfig();
+
+    expect(config.baseURL).toMatchObject({
+      allowedHosts: ['localhost:3000', '*.localhost:3000'],
+      protocol: 'http',
+    });
+  });
+
+  it('falls back to no baseURL when AUTH_URL is unset', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_URL', '');
+
+    const config = await loadConfig();
+
+    expect(config.baseURL).toBeUndefined();
+  });
+
+  it('passes a malformed AUTH_URL through unchanged as a static base URL', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('AUTH_URL', 'not-a-valid-url');
+
+    const config = await loadConfig();
+
+    expect(config.baseURL).toBe('not-a-valid-url');
+  });
+});
+
 describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
