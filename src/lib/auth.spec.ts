@@ -29,6 +29,11 @@ vi.mock('@/lib/services/signup-settings-service', () => ({
     isEnvForced: vi.fn(() => false),
   },
 }));
+// The create hook reads the consent cookie (next/headers) — stub it to "no
+// consent" so this node-env wiring test exercises only the username backfill.
+vi.mock('@/lib/auth/signup-consent', () => ({
+  readAndClearSignupConsent: vi.fn(async () => null),
+}));
 
 // A clearly-fake placeholder secret that is ≥32 chars (the validation
 // threshold). Built from a repeated filler so it carries no real entropy and

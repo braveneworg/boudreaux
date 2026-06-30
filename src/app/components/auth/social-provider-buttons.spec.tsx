@@ -260,4 +260,42 @@ describe('SocialProviderButtons', () => {
       expect(mockReportClientError).not.toHaveBeenCalled();
     });
   });
+
+  describe('disabled gating', () => {
+    it('disables every button when disabled is true', () => {
+      render(<SocialProviderButtons callbackURL="/" disabled />);
+
+      expect(screen.getByRole('button', { name: /continue with apple/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /continue with google/i })).toBeDisabled();
+    });
+
+    it('enables the buttons when disabled is false', () => {
+      render(<SocialProviderButtons callbackURL="/" disabled={false} />);
+
+      expect(screen.getByRole('button', { name: /continue with apple/i })).toBeEnabled();
+    });
+  });
+
+  describe('beforeSignIn gate', () => {
+    it('runs beforeSignIn and proceeds to sign-in when it resolves true', async () => {
+      mockSignInSocial.mockResolvedValue({ data: { session: {} }, error: null });
+      const beforeSignIn = vi.fn().mockResolvedValue(true);
+
+      render(<SocialProviderButtons callbackURL="/" beforeSignIn={beforeSignIn} />);
+      await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
+
+      expect(beforeSignIn).toHaveBeenCalledWith('apple');
+      expect(mockSignInSocial).toHaveBeenCalledWith({ provider: 'apple', callbackURL: '/' });
+    });
+
+    it('aborts sign-in when beforeSignIn resolves false', async () => {
+      const beforeSignIn = vi.fn().mockResolvedValue(false);
+
+      render(<SocialProviderButtons callbackURL="/" beforeSignIn={beforeSignIn} />);
+      await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
+
+      expect(beforeSignIn).toHaveBeenCalledWith('apple');
+      expect(mockSignInSocial).not.toHaveBeenCalled();
+    });
+  });
 });

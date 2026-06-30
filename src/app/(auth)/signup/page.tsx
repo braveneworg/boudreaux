@@ -21,6 +21,7 @@ import { PageContainer } from '@/app/components/ui/page-container';
 import { useSession } from '@/hooks/use-session';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
+import { stashSignupConsent } from '@/lib/actions/stash-signup-consent-action';
 import type { FormState } from '@/lib/types/form-state';
 import { magicLinkErrorMessage } from '@/lib/utils/auth/magic-link-error-messages';
 import { reportClientError } from '@/lib/utils/report-client-error';
@@ -90,6 +91,28 @@ const SignupPage = () => {
     const err = error instanceof Error ? error : new Error(String(error));
     reportClientError(err, 'route');
   }, []);
+
+  // Gate social sign-in on the signup path: terms must be accepted and Turnstile
+  // verified, matching the magic-link gate. (Signin has no terms, so it is
+  // ungated as before.)
+  const termsAccepted = form.watch('termsAndConditions') === true;
+  const socialDisabled = isSignupPath ? !(termsAccepted && isVerified) : false;
+
+  // Before a social redirect on signup, verify Turnstile + stash the chosen
+  // opt-ins in a cookie so the user.create.before hook persists them onto the
+  // new OAuth user — the same agreements the magic-link path records.
+  const handleBeforeSocialSignIn = useCallback(async (): Promise<boolean> => {
+    const result = await stashSignupConsent({
+      turnstileToken,
+      allowSmsNotifications: form.getValues('allowSmsNotifications') ?? false,
+      allowEmailNotifications: form.getValues('allowEmailNotifications') ?? false,
+    });
+    if (!result.success) {
+      toast.error(result.error ?? 'Verification failed. Please try again.');
+      return false;
+    }
+    return true;
+  }, [turnstileToken, form]);
 
   const handleSubmit = useCallback(
     async (data: CombinedFormSchema) => {
@@ -177,6 +200,8 @@ const SignupPage = () => {
                 hasTermsAndConditions={isSignupPath}
                 callbackURL="/"
                 onSocialError={handleSocialError}
+                socialDisabled={socialDisabled}
+                onBeforeSocialSignIn={isSignupPath ? handleBeforeSocialSignIn : undefined}
                 heading={
                   <ImageHeading
                     src={

@@ -148,21 +148,28 @@ vi.mock('@/app/components/ui/separator', () => ({
 const mockSignInSocial = vi.fn();
 type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 let capturedSocialOnError: ((provider: SocialProvider, error: unknown) => void) | undefined;
+let capturedSocialBeforeSignIn: ((provider: SocialProvider) => Promise<boolean>) | undefined;
 vi.mock('@/app/components/auth/social-provider-buttons', () => ({
   SocialProviderButtons: ({
     callbackURL,
     className,
     onError,
+    disabled,
+    beforeSignIn,
   }: {
     callbackURL: string;
     className?: string;
     onError?: (provider: SocialProvider, error: unknown) => void;
+    disabled?: boolean;
+    beforeSignIn?: (provider: SocialProvider) => Promise<boolean>;
   }) => {
     capturedSocialOnError = onError;
+    capturedSocialBeforeSignIn = beforeSignIn;
     return (
       <div
         data-testid="social-provider-buttons"
         data-callback-url={callbackURL}
+        data-disabled={disabled ? 'true' : 'false'}
         className={className}
       >
         <button
@@ -583,6 +590,33 @@ describe('SignupSigninForm', () => {
     });
   });
 
+  describe('social gating wiring', () => {
+    it('forwards socialDisabled to the social buttons', () => {
+      render(<SignupSigninForm {...defaultProps} socialDisabled />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toHaveAttribute(
+        'data-disabled',
+        'true'
+      );
+    });
+
+    it('enables the social buttons when socialDisabled is false', () => {
+      render(<SignupSigninForm {...defaultProps} socialDisabled={false} />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toHaveAttribute(
+        'data-disabled',
+        'false'
+      );
+    });
+
+    it('forwards onBeforeSocialSignIn to the social buttons', () => {
+      const onBeforeSocialSignIn = vi.fn().mockResolvedValue(true);
+      render(<SignupSigninForm {...defaultProps} onBeforeSocialSignIn={onBeforeSocialSignIn} />);
+
+      expect(capturedSocialBeforeSignIn).toBe(onBeforeSocialSignIn);
+    });
+  });
+
   describe('turnstile widget', () => {
     it('should render turnstile widget', () => {
       render(<SignupSigninForm {...defaultProps} />);
@@ -726,7 +760,11 @@ describe('SignupSigninForm', () => {
     it('should have proper labels for form fields', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      const emailLabel = screen.getAllByTestId('form-label')[0]; // Get the first label (email)
+      // The agreements toggles render above the email field, so find the email
+      // label by its `for` rather than assuming it is the first one.
+      const emailLabel = screen
+        .getAllByTestId('form-label')
+        .find((label) => label.getAttribute('for') === 'email');
       expect(emailLabel).toHaveAttribute('for', 'email');
       expect(emailLabel).toHaveClass('sr-only'); // Screen reader only
     });

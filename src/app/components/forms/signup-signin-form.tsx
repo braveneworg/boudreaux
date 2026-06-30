@@ -56,6 +56,18 @@ interface SignupSigninFormProps {
    * flyer. The page owns the image so this component stays presentation-only.
    */
   heading?: React.ReactNode;
+  /**
+   * Disables the social buttons. The signup page passes
+   * `!(termsAccepted && isVerified)` so social sign-in is gated on the same
+   * agreements + Turnstile check the magic-link path enforces.
+   */
+  socialDisabled?: boolean;
+  /**
+   * Async gate run before social sign-in (forwarded to SocialProviderButtons).
+   * The signup page stashes the opt-in consent + verifies Turnstile here so the
+   * choices persist across the OAuth redirect.
+   */
+  onBeforeSocialSignIn?: (provider: SocialProvider) => Promise<boolean>;
 }
 
 interface EmailFieldProps {
@@ -194,29 +206,78 @@ const EmailOptInField = ({ control }: EmailOptInFieldProps): React.ReactElement 
   />
 );
 
-interface VerifiedFieldsProps {
+interface AgreementsBlockProps {
   control: Control<BaseFormSchema>;
-  hasTermsAndConditions: boolean;
-  isSigningIn: boolean;
   isVerified: boolean;
+  setIsVerified: (isVerified: boolean) => void;
+  onTurnstileToken?: (token: string) => void;
+  showOptIns: boolean;
   state: FormState;
 }
 
-const VerifiedFields = ({
+/**
+ * The agreements + verification block that sits beneath the heading and gates
+ * every signup path. On signup it carries the terms / SMS / email toggles; the
+ * Turnstile widget renders on both pages. A thick black rule closes the block.
+ */
+const AgreementsBlock = ({
   control,
-  hasTermsAndConditions,
-  isSigningIn,
   isVerified,
+  setIsVerified,
+  onTurnstileToken,
+  showOptIns,
   state,
-}: VerifiedFieldsProps): React.ReactElement => (
-  <>
-    <EmailField control={control} isSigningIn={isSigningIn} isVerified={isVerified} state={state} />
-    {hasTermsAndConditions && !isSigningIn && (
+}: AgreementsBlockProps): React.ReactElement => (
+  <div className="mb-2">
+    {showOptIns && (
       <>
         <TermsField control={control} state={state} />
         <SmsOptInField control={control} />
         <EmailOptInField control={control} />
       </>
+    )}
+    {/* Thick accent frame around the Turnstile widget — pink on sign-in, teal on
+        sign-up, via the shared --card-accent token. */}
+    <div className="mt-3 border-4 border-[var(--card-accent)] p-2">
+      <TurnstileWidget
+        isVerified={isVerified}
+        setIsVerified={setIsVerified}
+        onToken={onTurnstileToken}
+      />
+    </div>
+    {/* Black divider closing the block (echoes the OR-rule style) */}
+    <Separator className="mt-6 h-0.5 bg-black" />
+  </div>
+);
+
+interface MagicLinkSectionProps {
+  control: Control<BaseFormSchema>;
+  isSigningIn: boolean;
+  isVerified: boolean;
+  state: FormState;
+}
+
+/** The "magic link" heading + the Turnstile-gated email field. */
+const MagicLinkSection = ({
+  control,
+  isSigningIn,
+  isVerified,
+  state,
+}: MagicLinkSectionProps): React.ReactElement => (
+  <>
+    <p className="mb-4">
+      <span className="font-fake-four-cutout bg-menu-item-yellow-200 px-1.5 text-xl tracking-wide text-black uppercase">
+        Magic link
+      </span>
+    </p>
+    {!isVerified && <Skeleton className="mx-auto h-10 w-full" />}
+    {isVerified && (
+      <EmailField
+        control={control}
+        isSigningIn={isSigningIn}
+        isVerified={isVerified}
+        state={state}
+      />
     )}
   </>
 );
@@ -329,6 +390,8 @@ export const SignupSigninForm = ({
   callbackURL = '/',
   onSocialError,
   heading,
+  socialDisabled,
+  onBeforeSocialSignIn,
 }: SignupSigninFormProps): React.ReactElement => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin';
@@ -358,39 +421,36 @@ export const SignupSigninForm = ({
             </AlertDescription>
           </Alert>
         )}
-        {/* Social sign-in — rendered first, always visible */}
-        <SocialProviderButtons callbackURL={callbackURL} className="mb-2" onError={onSocialError} />
+        {/* Agreements + Turnstile, gating every signup path — beneath the
+            heading, closed by a black divider. Opt-in toggles on signup only. */}
+        <AgreementsBlock
+          control={control}
+          isVerified={isVerified}
+          setIsVerified={setIsVerified}
+          onTurnstileToken={onTurnstileToken}
+          showOptIns={hasTermsAndConditions && !isSigningIn}
+          state={state}
+        />
+
+        {/* Social sign-in — gated on terms + Turnstile via socialDisabled */}
+        <SocialProviderButtons
+          callbackURL={callbackURL}
+          className="mb-2"
+          onError={onSocialError}
+          disabled={socialDisabled}
+          beforeSignIn={onBeforeSocialSignIn}
+        />
 
         {/* Divider */}
         <OrDivider label="or continue with email" />
 
-        {/* Email section heading */}
-        <p className="mb-4">
-          <span className="font-fake-four-cutout bg-menu-item-yellow-200 px-1.5 text-xl tracking-wide text-black uppercase">
-            Magic link
-          </span>
-        </p>
-
-        {/* Turnstile-gated email fields */}
-        {!isVerified && <Skeleton className="mx-auto h-10 w-full" />}
-        {isVerified && (
-          <VerifiedFields
-            control={control}
-            hasTermsAndConditions={hasTermsAndConditions}
-            isSigningIn={isSigningIn}
-            isVerified={isVerified}
-            state={state}
-          />
-        )}
-        {/* Thick accent frame around the Turnstile widget — pink on sign-in,
-            teal on sign-up, via the shared --card-accent token. */}
-        <div className="mt-3 border-4 border-[var(--card-accent)] p-2">
-          <TurnstileWidget
-            isVerified={isVerified}
-            setIsVerified={setIsVerified}
-            onToken={onTurnstileToken}
-          />
-        </div>
+        {/* Magic-link heading + Turnstile-gated email field */}
+        <MagicLinkSection
+          control={control}
+          isSigningIn={isSigningIn}
+          isVerified={isVerified}
+          state={state}
+        />
         <FormSubmitRow
           isPending={isPending}
           isVerified={isVerified}

@@ -44,6 +44,17 @@ interface SocialProviderButtonsProps {
    * component falls back to fire-and-forget client error reporting.
    */
   onError?: (provider: SocialProvider, error: unknown) => void;
+  /**
+   * Disables every button (in addition to the internal pending state). The
+   * signup page uses this to gate social sign-in on terms acceptance + Turnstile.
+   */
+  disabled?: boolean;
+  /**
+   * Optional async gate run before `signIn.social`. Resolve `true` to proceed,
+   * `false` to abort (e.g. the signup page stashes consent + verifies Turnstile
+   * here, and skips sign-in if that fails).
+   */
+  beforeSignIn?: (provider: SocialProvider) => Promise<boolean>;
 }
 
 /**
@@ -59,12 +70,18 @@ export const SocialProviderButtons = ({
   callbackURL,
   className,
   onError,
+  disabled = false,
+  beforeSignIn,
 }: SocialProviderButtonsProps): React.ReactElement => {
   const [isPending, setIsPending] = useState(false);
 
   const handleSignIn = async (provider: SocialProvider): Promise<void> => {
     setIsPending(true);
     try {
+      // Optional gate (e.g. stash consent + verify Turnstile). Abort on failure.
+      if (beforeSignIn && !(await beforeSignIn(provider))) {
+        return;
+      }
       const { error } = await authClient.signIn.social({ provider, callbackURL });
       if (error !== null && error !== undefined) {
         const err = error instanceof Error ? error : new Error(String(error));
@@ -95,7 +112,7 @@ export const SocialProviderButtons = ({
           variant="punk"
           aria-label={label}
           className="h-12 justify-center gap-2.5 text-sm tracking-[0.12em] uppercase"
-          disabled={isPending}
+          disabled={isPending || disabled}
           onClick={() => handleSignIn(provider)}
         >
           <Icon className="size-5" />
