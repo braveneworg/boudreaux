@@ -2,11 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { fetchWithRetry, sleep } from './lib/http.js';
+import { logEvent } from './lib/log.js';
 import { USER_AGENT } from './types.js';
 
+import type { FetchRetryOptions } from './lib/http.js';
 import type { BioLink } from './types.js';
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
+
+/** MusicBrainz asks for ≤1 request/second per IP; space the search + lookup. */
+const MB_RATE_LIMIT_MS = 1100;
 
 /** Subset of the MusicBrainz artist search response we rely on. */
 interface MbSearchResponse {
@@ -47,11 +53,14 @@ const topTags = (tags: MbLookupResponse['tags']): string[] =>
 
 type FetchFn = typeof fetch;
 
-const request = async <T>(url: string, fetchFn: FetchFn): Promise<T> => {
-  const response = await fetchFn(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-  });
+const request = async <T>(url: string, options: FetchRetryOptions): Promise<T> => {
+  const response = await fetchWithRetry(
+    url,
+    { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } },
+    options
+  );
   if (!response.ok) {
+    logEvent('warn', 'musicbrainz_request_failed', { url, status: response.status });
     throw new Error(`MusicBrainz request failed (${response.status}) for ${url}`);
   }
   return (await response.json()) as T;
@@ -108,17 +117,22 @@ const collectRelations = (
  */
 export const lookupArtist = async (
   name: string,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
 ): Promise<MusicBrainzMatch | null> => {
+  const requestOptions: FetchRetryOptions = { ...options, fetchFn };
   const searchUrl = `${MB_BASE}/artist?query=${encodeURIComponent(name)}&fmt=json&limit=1`;
-  const search = await request<MbSearchResponse>(searchUrl, fetchFn);
+  const search = await request<MbSearchResponse>(searchUrl, requestOptions);
   const top = search.artists?.[0];
   if (!top) {
     return null;
   }
 
+  // Respect the per-IP rate limit between the search and the lookup call.
+  await (options.sleep ?? sleep)(MB_RATE_LIMIT_MS);
+
   const relUrl = `${MB_BASE}/artist/${top.id}?inc=url-rels+tags&fmt=json`;
-  const relData = await request<MbLookupResponse>(relUrl, fetchFn);
+  const relData = await request<MbLookupResponse>(relUrl, requestOptions);
 
   const { wikidataId, links } = collectRelations(relData.relations);
 

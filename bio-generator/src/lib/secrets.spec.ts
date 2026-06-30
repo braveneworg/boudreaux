@@ -54,11 +54,15 @@ describe('getScrapeApiKey', () => {
     delete process.env.SSM_PATH_JINA_API_KEY;
   });
 
-  it('returns null when the SSM path env var is unset', async () => {
+  it('returns null and logs when the SSM path env var is unset', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     const result = await getScrapeApiKey();
 
     expect(result).toBeNull();
     expect(send).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('returns the decrypted parameter value when configured', async () => {

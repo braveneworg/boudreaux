@@ -4,6 +4,8 @@
 
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
+import { logEvent, toErrorMessage } from './log.js';
+
 const ssmClient = new SSMClient({});
 
 /** Cached once per cold start — the Gemini key does not change between invokes. */
@@ -60,6 +62,7 @@ export const getScrapeApiKey = async (): Promise<string | null> => {
 
   const path = process.env.SSM_PATH_JINA_API_KEY;
   if (!path) {
+    logEvent('warn', 'jina_key_unset', { hint: 'set SSM_PATH_JINA_API_KEY; scraping keyless' });
     return null;
   }
 
@@ -67,7 +70,7 @@ export const getScrapeApiKey = async (): Promise<string | null> => {
     cachedScrapeApiKey = await fetchSsmParameter(path);
     return cachedScrapeApiKey;
   } catch (err) {
-    console.warn('Jina API key unavailable; scraping unauthenticated:', err);
+    logEvent('warn', 'jina_key_unavailable', { error: toErrorMessage(err) });
     return null;
   }
 };

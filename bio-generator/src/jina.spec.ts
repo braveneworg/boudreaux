@@ -16,6 +16,9 @@ const jinaReaderResponse = (content: string): Response =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+/** No-op sleep so retries never wait in tests. */
+const noSleep = async (): Promise<void> => {};
+
 describe('searchArtistSources', () => {
   it('assembles source text and provenance URLs from the results', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
@@ -88,20 +91,40 @@ describe('searchArtistSources', () => {
     expect(result && result.sourceText.length).toBeLessThan(huge.length);
   });
 
-  it('returns null (degrades) when Jina responds non-OK', async () => {
+  it('returns null (degrades) and logs when Jina responds non-OK', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchFn = vi.fn().mockResolvedValue(new Response('rate limited', { status: 429 }));
 
-    const result = await searchArtistSources('Artist', 'k', fetchFn);
+    const result = await searchArtistSources('Artist', 'k', fetchFn, { sleep: noSleep });
 
     expect(result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
-  it('returns null when the request throws', async () => {
+  it('retries a transient 503 then returns the eventual results', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+      .mockResolvedValueOnce(
+        jinaSearchResponse([{ url: 'https://a.example', content: 'Recovered content.' }])
+      );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn, { sleep: noSleep });
+
+    expect(result?.sourceText).toContain('Recovered content');
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns null and logs when the request throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchFn = vi.fn().mockRejectedValue(new Error('network'));
 
     const result = await searchArtistSources('Artist', 'k', fetchFn);
 
     expect(result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 
@@ -124,19 +147,25 @@ describe('readUrl', () => {
     expect(result && result.length).toBeLessThan(huge.length);
   });
 
-  it('returns null when the reader responds non-OK', async () => {
+  it('returns null and logs when the reader responds non-OK', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 404 }));
 
-    const result = await readUrl('https://x', 'k', fetchFn);
+    const result = await readUrl('https://x', 'k', fetchFn, { sleep: noSleep });
 
     expect(result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
-  it('returns null when the request throws', async () => {
+  it('returns null and logs when the request throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchFn = vi.fn().mockRejectedValue(new Error('network'));
 
     const result = await readUrl('https://x', 'k', fetchFn);
 
     expect(result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

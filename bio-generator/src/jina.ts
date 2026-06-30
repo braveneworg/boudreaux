@@ -2,6 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { fetchWithRetry } from './lib/http.js';
+import { logEvent, toErrorMessage } from './lib/log.js';
+
+import type { FetchRetryOptions } from './lib/http.js';
+
 type FetchFn = typeof fetch;
 
 /** Jina AI search — returns ranked results with clean, readable page content. */
@@ -55,15 +60,25 @@ const jinaHeaders = (apiKey?: string | null): Record<string, string> => {
 export const searchArtistSources = async (
   artistName: string,
   apiKey?: string | null,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
 ): Promise<WebSearchSources | null> => {
   try {
     const query = `${artistName} musician biography career discography`;
-    const response = await fetchFn(`${JINA_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`, {
-      headers: jinaHeaders(apiKey),
-    });
+    const response = await fetchWithRetry(
+      `${JINA_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`,
+      { headers: jinaHeaders(apiKey) },
+      { ...options, fetchFn }
+    );
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logEvent('warn', 'jina_search_failed', {
+        artist: artistName,
+        status: response.status,
+        keyed: Boolean(apiKey),
+      });
+      return null;
+    }
 
     const body = (await response.json()) as JinaSearchResponse;
     const results = (body.data ?? [])
@@ -76,7 +91,10 @@ export const searchArtistSources = async (
         Boolean(result.url && result.text)
       );
 
-    if (!results.length) return null;
+    if (!results.length) {
+      logEvent('warn', 'jina_search_empty', { artist: artistName });
+      return null;
+    }
 
     const sourceText = results
       .map((result) => result.text)
@@ -86,7 +104,8 @@ export const searchArtistSources = async (
     const sourceUrls = [...new Set(results.map((result) => result.url))];
 
     return { sourceText, sourceUrls };
-  } catch {
+  } catch (err) {
+    logEvent('warn', 'jina_search_error', { artist: artistName, error: toErrorMessage(err) });
     return null;
   }
 };
@@ -104,18 +123,29 @@ export const searchArtistSources = async (
 export const readUrl = async (
   url: string,
   apiKey?: string | null,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
 ): Promise<string | null> => {
   try {
-    const response = await fetchFn(`${JINA_READER_ENDPOINT}${url}`, {
-      headers: jinaHeaders(apiKey),
-    });
-    if (!response.ok) return null;
+    const response = await fetchWithRetry(
+      `${JINA_READER_ENDPOINT}${url}`,
+      { headers: jinaHeaders(apiKey) },
+      { ...options, fetchFn }
+    );
+    if (!response.ok) {
+      logEvent('warn', 'jina_read_failed', {
+        url,
+        status: response.status,
+        keyed: Boolean(apiKey),
+      });
+      return null;
+    }
 
     const body = (await response.json()) as JinaReaderResponse;
     const content = body.data?.content?.trim();
     return content ? content.slice(0, MAX_READER_CHARS) : null;
-  } catch {
+  } catch (err) {
+    logEvent('warn', 'jina_read_error', { url, error: toErrorMessage(err) });
     return null;
   }
 };

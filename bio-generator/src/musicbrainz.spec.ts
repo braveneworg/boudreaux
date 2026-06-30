@@ -10,11 +10,14 @@ const jsonResponse = (body: unknown): Response =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+/** No-op sleep so the rate-limit spacing + retries never wait in tests. */
+const noSleep = async (): Promise<void> => {};
+
 describe('lookupArtist', () => {
   it('returns null when no artist matches', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ artists: [] }));
 
-    const result = await lookupArtist('Nonexistent Local Act', fetchFn);
+    const result = await lookupArtist('Nonexistent Local Act', fetchFn, { sleep: noSleep });
 
     expect(result).toBeNull();
   });
@@ -31,7 +34,7 @@ describe('lookupArtist', () => {
         })
       );
 
-    const result = await lookupArtist('Radiohead', fetchFn);
+    const result = await lookupArtist('Radiohead', fetchFn, { sleep: noSleep });
 
     expect(result?.wikidataId).toBe('Q11649');
   });
@@ -50,7 +53,7 @@ describe('lookupArtist', () => {
         })
       );
 
-    const result = await lookupArtist('Artist', fetchFn);
+    const result = await lookupArtist('Artist', fetchFn, { sleep: noSleep });
 
     expect(result?.links.map((l) => l.kind)).toEqual([
       'official',
@@ -77,7 +80,7 @@ describe('lookupArtist', () => {
         })
       );
 
-    const result = await lookupArtist('Radiohead', fetchFn);
+    const result = await lookupArtist('Radiohead', fetchFn, { sleep: noSleep });
 
     expect(result?.artistType).toBe('Group');
     expect(result?.area).toBe('United Kingdom');
@@ -92,7 +95,7 @@ describe('lookupArtist', () => {
       .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-5', name: 'Artist' }] }))
       .mockResolvedValueOnce(jsonResponse({ tags: manyTags, relations: [] }));
 
-    const result = await lookupArtist('Artist', fetchFn);
+    const result = await lookupArtist('Artist', fetchFn, { sleep: noSleep });
 
     expect(result?.tags).toHaveLength(8);
     expect(result?.tags[0]).toBe('tag-11');
@@ -104,7 +107,7 @@ describe('lookupArtist', () => {
       .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-6', name: 'Artist' }] }))
       .mockResolvedValueOnce(jsonResponse({ relations: [] }));
 
-    await lookupArtist('Artist', fetchFn);
+    await lookupArtist('Artist', fetchFn, { sleep: noSleep });
 
     expect(fetchFn.mock.calls[1][0]).toContain('inc=url-rels+tags');
   });
@@ -115,15 +118,42 @@ describe('lookupArtist', () => {
       .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-3', name: 'Artist' }] }))
       .mockResolvedValueOnce(jsonResponse({ relations: [] }));
 
-    await lookupArtist('Artist', fetchFn);
+    await lookupArtist('Artist', fetchFn, { sleep: noSleep });
 
     const headers = fetchFn.mock.calls[0][1].headers;
     expect(headers['User-Agent']).toContain('FakeFourRecords-BioGenerator');
   });
 
-  it('throws when MusicBrainz returns a non-OK status', async () => {
+  it('spaces the search and lookup calls to respect the rate limit', async () => {
+    const sleepFn = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-7', name: 'Artist' }] }))
+      .mockResolvedValueOnce(jsonResponse({ relations: [] }));
+
+    await lookupArtist('Artist', fetchFn, { sleep: sleepFn });
+
+    expect(sleepFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a transient 503 on the search call before resolving the match', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 503 }))
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-8', name: 'Artist' }] }))
+      .mockResolvedValueOnce(jsonResponse({ relations: [] }));
+
+    const result = await lookupArtist('Artist', fetchFn, { sleep: noSleep });
+
+    expect(result?.mbid).toBe('mbid-8');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws after exhausting retries on a persistent non-OK status', async () => {
     const fetchFn = vi.fn().mockResolvedValue(new Response('rate limited', { status: 503 }));
 
-    await expect(lookupArtist('Artist', fetchFn)).rejects.toThrow('MusicBrainz request failed');
+    await expect(lookupArtist('Artist', fetchFn, { sleep: noSleep })).rejects.toThrow(
+      'MusicBrainz request failed'
+    );
   });
 });
