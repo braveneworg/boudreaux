@@ -93,7 +93,7 @@ interface DiscoveredLinksProps {
 }
 
 const DiscoveredLinks = ({ links }: DiscoveredLinksProps) => (
-  <div className="space-y-2">
+  <div role="group" aria-label="Discovered links" className="space-y-2">
     <h3 className="text-sm font-semibold">Discovered links</h3>
     <ul className="space-y-1">
       {links.map((link) => (
