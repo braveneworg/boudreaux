@@ -30,7 +30,11 @@ import {
 } from '@/lib/validation/signin-schema';
 import { signupSchema } from '@/lib/validation/signup-schema';
 
-type CombinedFormSchema = SigninSchemaType & { termsAndConditions?: boolean };
+type CombinedFormSchema = SigninSchemaType & {
+  termsAndConditions?: boolean;
+  allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
+};
 
 const getSocialProviderDisplayName = (provider: SocialProvider): string => {
   if (provider === 'apple') return 'Apple';
@@ -73,6 +77,8 @@ const SignupPage = () => {
   const form = useForm<CombinedFormSchema>({
     defaultValues: {
       email: '',
+      allowSmsNotifications: false,
+      allowEmailNotifications: false,
       ...state?.fields,
     },
     resolver: zodResolver(isSignupPath ? signupSchema : signinSchema),

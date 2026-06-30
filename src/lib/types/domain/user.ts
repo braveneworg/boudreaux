@@ -44,6 +44,7 @@ export type UserScalars = {
   zipCode: string | null;
   country: string | null;
   allowSmsNotifications: boolean | null;
+  allowEmailNotifications: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -138,6 +139,8 @@ export interface CreateUserData {
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
+  allowSmsNotifications?: boolean | null;
+  allowEmailNotifications?: boolean | null;
 }
 
 /**

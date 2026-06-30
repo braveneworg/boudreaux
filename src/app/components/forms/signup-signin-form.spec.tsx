@@ -16,6 +16,8 @@ type BaseFormSchema = {
   email: string;
   general?: string;
   termsAndConditions?: boolean;
+  allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
 };
 
 // Mock all dependencies
@@ -534,6 +536,53 @@ describe('SignupSigninForm', () => {
     });
   });
 
+  describe('SMS opt-in field', () => {
+    it('should render the SMS opt-in toggle when hasTermsAndConditions is true', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByTestId('switch-allow-sms-notifications')).toBeInTheDocument();
+    });
+
+    it('should render the opt-in label', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByText(/text me sms updates/i)).toBeInTheDocument();
+    });
+
+    it('should explain how to opt out anytime from the profile', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      // SMS-specific copy (the email opt-in below also mentions opting out).
+      expect(screen.getByText(/hamburger sheet on mobile/i)).toBeInTheDocument();
+    });
+
+    it('should not render the SMS opt-in toggle when hasTermsAndConditions is false', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.queryByTestId('switch-allow-sms-notifications')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('email updates opt-in field', () => {
+    it('should render the email opt-in toggle when hasTermsAndConditions is true', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByTestId('switch-allow-email-notifications')).toBeInTheDocument();
+    });
+
+    it('should render the opt-in label', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByText(/email me updates/i)).toBeInTheDocument();
+    });
+
+    it('should not render the email opt-in toggle when hasTermsAndConditions is false', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.queryByTestId('switch-allow-email-notifications')).not.toBeInTheDocument();
+    });
+  });
+
   describe('turnstile widget', () => {
     it('should render turnstile widget', () => {
       render(<SignupSigninForm {...defaultProps} />);
@@ -658,8 +707,8 @@ describe('SignupSigninForm', () => {
     it('should apply correct CSS classes to form container', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      // Check for presence of form structure elements — email + terms
-      expect(screen.getAllByTestId('form-item')).toHaveLength(2);
+      // Check for form structure elements — email + terms + SMS + email opt-in
+      expect(screen.getAllByTestId('form-item')).toHaveLength(4);
     });
 
     it('should position elements correctly', () => {

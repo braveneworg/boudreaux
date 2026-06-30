@@ -31,6 +31,8 @@ type BaseFormSchema = {
   email: string;
   general?: string;
   termsAndConditions?: boolean;
+  allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
 };
 
 interface SignupSigninFormProps {
@@ -133,6 +135,65 @@ const TermsField = ({ control, state }: TermsFieldProps): React.ReactElement => 
   />
 );
 
+interface SmsOptInFieldProps {
+  control: Control<BaseFormSchema>;
+}
+
+const SmsOptInField = ({ control }: SmsOptInFieldProps): React.ReactElement => (
+  <FormField
+    control={control}
+    name="allowSmsNotifications"
+    render={({ field }) => (
+      <FormItem className="mt-4 mb-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <FormControl>
+            <Switch
+              name="allowSmsNotifications"
+              id="allow-sms-notifications"
+              checked={!!field.value || false}
+              onCheckedChange={field.onChange}
+            />
+          </FormControl>
+          <FormLabel htmlFor="allow-sms-notifications">Text me SMS updates</FormLabel>
+        </div>
+        <p className="text-muted-foreground mt-2 text-xs">
+          Optional. You can opt out anytime from your profile — open it from your username in the
+          menu (the hamburger sheet on mobile, or the upper-right corner on desktop).
+        </p>
+      </FormItem>
+    )}
+  />
+);
+
+interface EmailOptInFieldProps {
+  control: Control<BaseFormSchema>;
+}
+
+const EmailOptInField = ({ control }: EmailOptInFieldProps): React.ReactElement => (
+  <FormField
+    control={control}
+    name="allowEmailNotifications"
+    render={({ field }) => (
+      <FormItem className="mt-4 mb-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <FormControl>
+            <Switch
+              name="allowEmailNotifications"
+              id="allow-email-notifications"
+              checked={!!field.value || false}
+              onCheckedChange={field.onChange}
+            />
+          </FormControl>
+          <FormLabel htmlFor="allow-email-notifications">Email me updates</FormLabel>
+        </div>
+        <p className="text-muted-foreground mt-2 text-xs">
+          Optional. Opt out anytime from your profile, reachable from your username in the menu.
+        </p>
+      </FormItem>
+    )}
+  />
+);
+
 interface VerifiedFieldsProps {
   control: Control<BaseFormSchema>;
   hasTermsAndConditions: boolean;
@@ -150,7 +211,13 @@ const VerifiedFields = ({
 }: VerifiedFieldsProps): React.ReactElement => (
   <>
     <EmailField control={control} isSigningIn={isSigningIn} isVerified={isVerified} state={state} />
-    {hasTermsAndConditions && !isSigningIn && <TermsField control={control} state={state} />}
+    {hasTermsAndConditions && !isSigningIn && (
+      <>
+        <TermsField control={control} state={state} />
+        <SmsOptInField control={control} />
+        <EmailOptInField control={control} />
+      </>
+    )}
   </>
 );
 

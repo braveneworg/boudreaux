@@ -97,7 +97,13 @@ export const signupAction = async (
   });
   if (guardResult !== null) return guardResult;
 
-  const permittedFieldNames = ['email', 'termsAndConditions', 'username'];
+  const permittedFieldNames = [
+    'email',
+    'termsAndConditions',
+    'allowSmsNotifications',
+    'allowEmailNotifications',
+    'username',
+  ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signupSchema);
 
   if (parsed.success) {
@@ -133,6 +139,10 @@ export const signupAction = async (
         name: null,
         image: null,
         username: generateUsername('', 4),
+        // Persist the SMS / email opt-ins chosen at signup (default off). Users
+        // can change them anytime from their profile.
+        allowSmsNotifications: parsed.data.allowSmsNotifications ?? false,
+        allowEmailNotifications: parsed.data.allowEmailNotifications ?? false,
       });
 
       // Log successful user creation

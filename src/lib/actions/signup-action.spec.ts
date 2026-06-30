@@ -156,6 +156,9 @@ describe('signupAction', () => {
         name: null,
         image: null,
         username: 'test-user-1234',
+        // Opt-ins default to false when absent from parsed data.
+        allowSmsNotifications: false,
+        allowEmailNotifications: false,
       });
 
       expect(mockSignInMagicLink).toHaveBeenCalledWith(
@@ -199,6 +202,84 @@ describe('signupAction', () => {
       expect(mockCreateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           username: 'test-user-1234',
+        })
+      );
+    });
+
+    it('should persist allowSmsNotifications when the user opts in', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowSmsNotifications: true,
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com', termsAndConditions: true, allowSmsNotifications: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockCreateUser.mockResolvedValue({ id: '1' });
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowSmsNotifications: true,
+        })
+      );
+    });
+
+    it('should persist allowEmailNotifications when the user opts in', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowEmailNotifications: true,
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowEmailNotifications: true,
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockCreateUser.mockResolvedValue({ id: '1' });
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowEmailNotifications: true,
         })
       );
     });

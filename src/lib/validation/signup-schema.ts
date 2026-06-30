@@ -16,6 +16,10 @@ export const signupSchema = z.object({
     .refine((val) => val === true, {
       message: termsAndConditionsMessage,
     }),
+  // Optional SMS / email opt-ins captured at signup. Default off; users change
+  // them anytime from their profile.
+  allowSmsNotifications: z.boolean().optional(),
+  allowEmailNotifications: z.boolean().optional(),
   general: z.string().optional(),
 });
 
