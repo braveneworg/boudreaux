@@ -51,6 +51,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   generateProse: vi.fn().mockResolvedValue({
     shortBio: 'Short teaser.',
     longBio: '<p>Long bio.</p>',
+    altBio: 'Punchy promo blurb.',
     genres: 'alternative rock',
     primaryImageIndexes: [0],
   }),
@@ -70,9 +71,20 @@ describe('runBioGeneration', () => {
 
     expect(result.shortBio).toBe('Short teaser.');
     expect(result.longBio).toBe('<p>Long bio.</p>');
+    expect(result.altBio).toBe('Punchy promo blurb.');
     expect(result.genres).toBe('alternative rock');
     expect(result.images).toHaveLength(2);
     expect(result.links.some((l) => l.kind === 'wikipedia')).toBe(true);
+  });
+
+  it('falls back to an empty alt bio when the model omits it', async () => {
+    const deps = makeDeps({
+      generateProse: vi.fn().mockResolvedValue({ shortBio: 's', longBio: 'l' }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.altBio).toBe('');
   });
 
   it('generates with the Gemini model and resolved key', async () => {
@@ -268,6 +280,43 @@ describe('runBioGeneration', () => {
 
     expect(result.images).toEqual([]);
     expect(result.longBio).toBe('<p>Long bio.</p>');
+  });
+
+  it('keeps the other Commons images when one image fetch fails', async () => {
+    const deps = makeDeps({
+      getCommonsImage: vi.fn().mockImplementation(async (fileName: string) => {
+        if (fileName === 'b.jpg') throw new Error('Commons 503');
+        return image({ title: fileName, url: `https://upload.wikimedia.org/${fileName}` });
+      }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].title).toBe('a.jpg');
+  });
+
+  it('keeps the MusicBrainz links when the Wikidata lookup fails', async () => {
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockRejectedValue(new Error('Wikidata 500')),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.links.some((l) => l.kind === 'musicbrainz')).toBe(true);
+    expect(result.images).toEqual([]);
+  });
+
+  it('logs a structured enrichment_complete event with image and link counts', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, makeDeps());
+
+    const events = info.mock.calls.map((call) => JSON.parse(call[0] as string));
+    const complete = events.find((e) => e.event === 'enrichment_complete');
+    expect(complete).toBeDefined();
+    expect(complete.images).toBe(2);
+    info.mockRestore();
   });
 
   it('falls back to existing genres when the model returns none', async () => {
