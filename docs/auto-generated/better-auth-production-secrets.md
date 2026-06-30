@@ -9,13 +9,19 @@ better-auth stack (magic-link + social OAuth + admin plugin) works in
 production. Derived entirely from the application code, not from any `.env`
 file.
 
+> For the full end-to-end setup (services to provision, setup steps, the
+> `emailVerified` migration, the NGINX same-origin requirement) see the
+> canonical [`better-auth-setup-guide.md`](./better-auth-setup-guide.md). This
+> doc is the secrets-focused companion.
+
 Source of truth in code:
 
-- `src/lib/auth.ts` — `betterAuth({...})` config (reads `AUTH_SECRET`, `AUTH_URL`)
+- `src/lib/auth.ts` — `betterAuth({...})` config (reads `AUTH_SECRET`, `AUTH_URL`; dynamic per-request `baseURL`)
 - `src/lib/auth/social-providers-config.ts` — conditional social providers
 - `src/lib/auth/apple-client-secret.ts` — Apple ES256 client-secret JWT generator
-- `src/lib/email/send-magic-link-email.ts` — SMTP magic-link delivery
-- `src/lib/auth-client.ts` — browser client (reads `NEXT_PUBLIC_BASE_URL`)
+- `src/lib/email/send-magic-link-email.ts` — **AWS SES SDK** magic-link delivery (`SendRawEmailCommand`)
+- `src/lib/utils/ses-client.ts` — SES client (reads `AWS_REGION` + standard AWS credential chain)
+- `src/lib/auth-client.ts` — browser client (`baseURL` from `getApiBaseUrl()` — the served origin)
 
 ## How provider enabling works
 
@@ -44,15 +50,20 @@ Register the exact URL in each provider's developer console. With
 
 ## Core auth secrets (required)
 
-| Name                   | Purpose                                                                                                                                                                                                        | NEW vs reused                                                                                                                                                             |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_SECRET`          | better-auth signing/encryption secret (session cookies, magic-link tokens). Must be ≥ 32 chars; `auth.ts` throws otherwise.                                                                                    | **Reused** — same name/value the previous Auth.js deployment used. No rotation required by the migration, though rotating is always safe (invalidates existing sessions). |
-| `AUTH_URL`             | Canonical base URL. Used as `baseURL` + sole `trustedOrigins` entry; also the prefix for every OAuth callback URL.                                                                                             | **Reused** — same name the previous deployment used.                                                                                                                      |
-| `NEXT_PUBLIC_BASE_URL` | Browser-side `baseURL` for `authClient` so the client targets the same origin as the `/api/auth/[...all]` route. Public (inlined into the client bundle) — not a secret, but must be set at build/deploy time. | **Reused** — already used elsewhere in the app (e.g. purchase email links).                                                                                               |
+| Name          | Purpose                                                                                                                                                                                                                                                                                            | NEW vs reused                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_SECRET` | better-auth signing/encryption secret (session cookies, magic-link tokens). Must be ≥ 32 chars; `auth.ts` throws otherwise.                                                                                                                                                                        | **Reused** — same name/value the previous Auth.js deployment used. No rotation required by the migration, though rotating is always safe (invalidates existing sessions). |
+| `AUTH_URL`    | Canonical base URL. `buildAuthBaseURL()` derives a dynamic per-request `baseURL` from it — an allowlist of the apex host and its subdomains (apex + `*.apex`), which also serves as the trusted origins, so no separate `trustedOrigins` is needed. Still the prefix for every OAuth callback URL. | **Reused** — same name the previous deployment used.                                                                                                                      |
 
 > Note: the code reads `AUTH_SECRET` / `AUTH_URL` (not `BETTER_AUTH_SECRET` /
-> `BETTER_AUTH_URL`). Do not introduce the `BETTER_AUTH_*` names — they are not
-> read anywhere.
+> `BETTER_AUTH_URL`, and not the old Auth.js `NEXTAUTH_URL`). Do not introduce
+> those names — they are not read anywhere.
+>
+> The browser `authClient` no longer reads `NEXT_PUBLIC_BASE_URL`; its `baseURL`
+> now comes from `getApiBaseUrl()` (the served origin) so the auth request stays
+> same-origin regardless of whether the page was served from the apex or `www`.
+> `NEXT_PUBLIC_BASE_URL` may still be used elsewhere (e.g. purchase email links),
+> but it is no longer part of the auth wiring.
 
 ## Optional config (NOT secrets)
 
@@ -96,31 +107,39 @@ regenerate the JWT every ≤ 6 months:
 > cannot auto-link to an existing account by email — users link manually from
 > their profile. No extra secret is required for this behavior.
 
-## Magic-link email (SMTP) — required in production
+## Magic-link email (AWS SES) — required in production
 
-`sendMagicLinkEmail` builds a Nodemailer SMTP transport from these vars and
-throws if `EMAIL_FROM` is missing. **All are required in production** for
-passwordless sign-in to deliver.
+`sendMagicLinkEmail` delivers via the **AWS SES SDK** (`SendRawEmailCommand`),
+**not** an outbound SMTP socket (SMTP ports 25/587 are firewalled in the deploy
+environment and time out — this was the cause of the old sign-in `ETIMEDOUT`).
+It throws if `EMAIL_FROM` is missing, and the SES client uses the standard AWS
+credential chain.
 
-| Name                    | Purpose                                                      | NEW vs reused                                               |
-| ----------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
-| `EMAIL_FROM`            | From address for the magic-link email. Send throws if unset. | **Reused** — same SMTP `from` the previous email flow used. |
-| `EMAIL_SERVER_HOST`     | SMTP host.                                                   | **Reused**.                                                 |
-| `EMAIL_SERVER_PORT`     | SMTP port (defaults to `25` if unset).                       | **Reused**.                                                 |
-| `EMAIL_SERVER_USER`     | SMTP auth username.                                          | **Reused**.                                                 |
-| `EMAIL_SERVER_PASSWORD` | SMTP auth password. **Secret.**                              | **Reused**.                                                 |
+| Name                    | Purpose                                                                | NEW vs reused                       |
+| ----------------------- | ---------------------------------------------------------------------- | ----------------------------------- |
+| `EMAIL_FROM`            | From address — must be an SES-verified identity. Send throws if unset. | **Reused**.                         |
+| `AWS_ACCESS_KEY_ID`     | AWS credentials for the SES (and S3) clients.                          | **Reused** (S3 already used these). |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials. **Secret.**                                           | **Reused**.                         |
+| `AWS_REGION`            | SES region. Defaults to `us-east-1` if unset.                          | **Reused**.                         |
+
+> ✅ **No SMTP vars.** The old SMTP config (`EMAIL_SERVER_HOST` /
+> `EMAIL_SERVER_USER` / `EMAIL_SERVER_PASSWORD` / `EMAIL_SERVER_PORT`) has been
+> removed from `env-validation.ts` and is no longer read or required anywhere.
+> Do not set them.
 
 ### ⚠️ E2E vs production divergence (important)
 
-Real CI's E2E job injects **no** `EMAIL_FROM` / `EMAIL_SERVER_*`. This is **by
+Real CI's E2E job injects **no** `EMAIL_FROM` / SES config. This is **by
 design**: `sendMagicLinkEmail` short-circuits and skips delivery entirely when
 `E2E_MODE === 'true'` (better-auth still mints the verification token; only the
-SMTP send is bypassed, so the sign-in success redirect the E2E tests assert is
+SES send is bypassed, so the sign-in success redirect the E2E tests assert is
 not broken). Consequently:
 
-- E2E passing does **not** prove SMTP is configured.
-- **Production must set all five email vars** above, or magic-link sign-in will
-  throw (`EMAIL_FROM is not configured`) and users cannot sign in.
+- E2E passing does **not** prove SES is configured.
+- **Production must set `EMAIL_FROM` + the AWS credentials/region** above (and a
+  verified SES identity), or magic-link sign-in throws
+  (`EMAIL_FROM is not configured`, or an SES send error) and users cannot sign
+  in.
 
 ## CAPTCHA (Turnstile) — required for the gated flows
 
@@ -139,9 +158,8 @@ not a production secret.)
 
 Required, always:
 
-- `AUTH_SECRET` (≥ 32 chars), `AUTH_URL`, `NEXT_PUBLIC_BASE_URL`
-- `EMAIL_FROM`, `EMAIL_SERVER_HOST`, `EMAIL_SERVER_PORT`, `EMAIL_SERVER_USER`,
-  `EMAIL_SERVER_PASSWORD`
+- `AUTH_SECRET` (≥ 32 chars), `AUTH_URL`, `DATABASE_URL`
+- `EMAIL_FROM`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (SES delivery)
 - `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY`, `CLOUDFLARE_SECRET`
 
 Required per enabled OAuth provider (omit a provider to disable it):
