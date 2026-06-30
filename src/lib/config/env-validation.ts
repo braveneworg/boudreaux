@@ -40,16 +40,6 @@ const warnOnNonMongoDatabaseUrl = (): void => {
   }
 };
 
-/** Throw if EMAIL_SERVER_PORT is set but is not a valid port number. */
-const assertValidEmailPort = (): void => {
-  if (process.env.EMAIL_SERVER_PORT) {
-    const port = Number(process.env.EMAIL_SERVER_PORT);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      throw Error('EMAIL_SERVER_PORT must be a valid port number (1-65535)');
-    }
-  }
-};
-
 export const validateEnvironment = () => {
   // Skip validation during build phase (secrets not available in Docker build)
   // or when explicitly disabled (e.g. E2E test runs that inject stub env vars).
@@ -64,9 +54,6 @@ export const validateEnvironment = () => {
     'DATABASE_URL',
     'AUTH_SECRET',
     'CLOUDFLARE_SECRET',
-    'EMAIL_SERVER_HOST',
-    'EMAIL_SERVER_USER',
-    'EMAIL_SERVER_PASSWORD',
     'EMAIL_FROM',
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
@@ -94,9 +81,6 @@ export const validateEnvironment = () => {
 
   // Validate DATABASE_URL format (basic check)
   warnOnNonMongoDatabaseUrl();
-
-  // Validate email configuration
-  assertValidEmailPort();
 
   console.info('✅ Environment validation passed');
 };
