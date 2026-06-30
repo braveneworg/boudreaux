@@ -70,6 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.161.0] - 2026-06-30
+
+### Added
+
+- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n
+
 ## [4.160.0] - 2026-06-30
 
 ### Added
