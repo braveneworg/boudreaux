@@ -44,6 +44,7 @@ const okResult: BioGenerationResult = {
   data: {
     shortBio: 'short',
     longBio: '<p>long</p>',
+    altBio: '<p>alt</p>',
     genres: 'rock',
     images: [],
     links: [],
@@ -151,6 +152,7 @@ describe('BioGenerationService.generateForArtist', () => {
     data: {
       shortBio: '<b>Short</b> teaser',
       longBio: '<p>Long</p><a href="javascript:alert(1)">x</a><script>evil()</script>',
+      altBio: '<p>Punchy <strong>promo</strong></p><script>evil()</script>',
       genres: 'art rock',
       images: [
         {
@@ -208,6 +210,33 @@ describe('BioGenerationService.generateForArtist', () => {
     // <b> is now preserved by the bio allowlist (no emphasis is stripped).
     expect(result.data.shortBio).toBe('<b>Short</b> teaser');
     expect(result.slug).toBe('radiohead');
+  });
+
+  it('sanitizes the alt bio and persists it via the repository', async () => {
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.altBio).toContain('<strong>promo</strong>');
+    expect(content.altBio).not.toContain('<script>');
+  });
+
+  it('rewrites an inline image:N placeholder in the alt bio to the CDN url', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        altBio: '<p>Promo <img src="image:0" alt="x"></p>',
+      },
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.altBio).toContain(
+      'src="https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg"'
+    );
+    expect(result.data.altBio).not.toContain('image:0');
   });
 
   it('persists re-hosted images (CDN url, no attribution) via the repository', async () => {
@@ -583,6 +612,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
     slug: 'x',
     shortBio: null,
     bio: null,
+    altBio: null,
     genres: null,
     bioModel: null,
     bioImages: [],
@@ -652,11 +682,22 @@ describe('BioGenerationService.getGenerationStatus', () => {
     expect(result?.content).toEqual({
       shortBio: '',
       longBio: '',
+      altBio: '',
       genres: null,
       images: [],
       links: [],
       model: '',
     });
+  });
+
+  it('returns the persisted alt bio when the job has succeeded', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'succeeded', altBio: '<p>Punchy promo</p>' })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.content?.altBio).toBe('<p>Punchy promo</p>');
   });
 
   it('normalises a missing bioStatus to null', async () => {

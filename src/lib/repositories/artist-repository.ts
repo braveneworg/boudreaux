@@ -398,15 +398,17 @@ export class ArtistRepository {
 
   /**
    * Replace an artist's AI-generated bio content in a single transaction:
-   * overwrite the short/long bio, genres, and provenance fields, then delete
+   * overwrite the short/long/alt bio, genres, and provenance fields, then delete
    * and recreate the discovered images/links. Deleting first means a
-   * regeneration never leaves stale rows behind.
+   * regeneration never leaves stale rows behind. Note: `altBio` is now
+   * AI-generated, so regeneration overwrites any hand-authored alt bio.
    */
   static async replaceBioContent(
     artistId: string,
     content: {
       shortBio: string;
       bio: string;
+      altBio: string;
       genres: string | null;
       bioModel: string;
       images: Array<{
@@ -433,6 +435,7 @@ export class ArtistRepository {
           data: {
             shortBio: content.shortBio,
             bio: content.bio,
+            altBio: content.altBio,
             genres: content.genres,
             bioModel: content.bioModel,
             bioGeneratedAt: new Date(),
@@ -478,6 +481,7 @@ export class ArtistRepository {
     slug: string;
     shortBio: string | null;
     bio: string | null;
+    altBio: string | null;
     genres: string | null;
     bioModel: string | null;
     bioImages: Array<{
@@ -502,6 +506,7 @@ export class ArtistRepository {
           slug: true,
           shortBio: true,
           bio: true,
+          altBio: true,
           genres: true,
           bioModel: true,
           bioImages: {

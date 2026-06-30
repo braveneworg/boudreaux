@@ -435,6 +435,7 @@ describe('ArtistRepository', () => {
       expect(result).toEqual({ bioStatus: 'succeeded' });
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.where).toEqual({ id: 'a1' });
+      expect(arg?.select?.altBio).toBe(true);
       expect(arg?.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
       expect(arg?.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
     });

@@ -51,6 +51,7 @@ vi.mock('sonner', () => ({
 const content: GeneratedBioContent = {
   shortBio: 'A boundary-pushing artist.',
   longBio: '<p>Long bio.</p>',
+  altBio: '<p>Punchy promo blurb.</p>',
   genres: 'experimental',
   images: [
     {

@@ -176,11 +176,12 @@ const assembleContent = ({
   persistedLinks,
   genres,
 }: AssembleContentInput): GeneratedBioContent => ({
-  // Short bio is rich HTML too (it may carry a single inline link); the
-  // sanitizer strips anything outside the allowlist. Consumers that need
-  // plain text (cards, meta descriptions) strip tags with sanitizeBioText.
-  shortBio: sanitizeBioHtml(data.shortBio),
+  // Every bio is rich HTML that may carry inline links and a single inline
+  // image:N placeholder, so resolve placeholders then sanitize each the same
+  // way. Consumers needing plain text (cards, meta) strip tags with sanitizeBioText.
+  shortBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.shortBio, imageUrlByIndex)),
   longBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.longBio, imageUrlByIndex)),
+  altBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.altBio, imageUrlByIndex)),
   genres,
   images: persistedImages.map(
     ({ width: _width, height: _height, sortOrder: _sortOrder, ...rest }) => rest
@@ -323,6 +324,7 @@ export class BioGenerationService {
     await ArtistRepository.replaceBioContent(artist.id, {
       shortBio: content.shortBio,
       bio: content.longBio,
+      altBio: content.altBio,
       genres: content.genres,
       bioModel: content.model,
       images: persistedImages,
@@ -382,6 +384,7 @@ export class BioGenerationService {
         ? {
             shortBio: state.shortBio ?? '',
             longBio: state.bio ?? '',
+            altBio: state.altBio ?? '',
             genres: state.genres ?? null,
             images: state.bioImages,
             links: state.bioLinks,
