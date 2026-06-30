@@ -69,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.160.0] - 2026-06-30
+
+### Added
+
+- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n
+
 ## [4.159.0] - 2026-06-30
 
 ### Added
