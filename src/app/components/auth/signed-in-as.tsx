@@ -4,22 +4,21 @@
 import Link from 'next/link';
 
 import { EditIcon } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
+import { useSession } from '@/app/hooks/use-session';
+import type { ClientSessionData } from '@/app/hooks/use-session';
 import { cn } from '@/lib/utils';
 
-import type { Session } from 'next-auth';
-
 /** Resolves the best available display name from the session user. */
-const resolveDisplayName = (session: Session | null): string | null | undefined => {
+const resolveDisplayName = (session: ClientSessionData | null): string | null | undefined => {
   const user = session?.user;
   return user?.username || user?.name || user?.email;
 };
 
 /** Emits the development-only session diagnostics. */
 const logSignedInAsDebug = (
-  session: Session | null,
+  session: ClientSessionData | null,
   displayName: string | null | undefined
 ): void => {
   if (process.env.NODE_ENV !== 'development') {

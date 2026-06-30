@@ -43,9 +43,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password123',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -57,9 +54,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: undefined,
         AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -73,9 +67,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: undefined,
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -89,9 +80,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: undefined,
         AUTH_SECRET: undefined,
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -105,9 +93,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'short',
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -121,10 +106,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -136,10 +117,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(64),
-        NEXTAUTH_SECRET: 'b'.repeat(64),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -153,9 +130,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'postgresql://localhost:5432/test',
         AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -178,62 +152,6 @@ describe('Environment Validation', () => {
           ...process.env,
           DATABASE_URL: url,
           AUTH_SECRET: 'a'.repeat(32),
-          EMAIL_SERVER_HOST: 'smtp.example.com',
-          EMAIL_SERVER_USER: 'user@example.com',
-          EMAIL_SERVER_PASSWORD: 'password',
-          EMAIL_FROM: 'noreply@example.com',
-        };
-
-        expect(() => validateEnvironment()).not.toThrow();
-      });
-    });
-
-    it('should throw error for invalid EMAIL_SERVER_PORT', () => {
-      process.env = {
-        ...process.env,
-        DATABASE_URL: 'mongodb://localhost:27017/test',
-        AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_PORT: '99999',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
-        EMAIL_FROM: 'noreply@example.com',
-      };
-
-      expect(() => validateEnvironment()).toThrow(
-        'EMAIL_SERVER_PORT must be a valid port number (1-65535)'
-      );
-    });
-
-    it('should throw error for non-numeric EMAIL_SERVER_PORT', () => {
-      process.env = {
-        ...process.env,
-        DATABASE_URL: 'mongodb://localhost:27017/test',
-        AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_PORT: 'not-a-number',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
-        EMAIL_FROM: 'noreply@example.com',
-      };
-
-      expect(() => validateEnvironment()).toThrow(
-        'EMAIL_SERVER_PORT must be a valid port number (1-65535)'
-      );
-    });
-
-    it('should accept valid EMAIL_SERVER_PORT values', () => {
-      const validPorts = ['25', '587', '465', '2525'];
-
-      validPorts.forEach((port) => {
-        process.env = {
-          ...process.env,
-          DATABASE_URL: 'mongodb://localhost:27017/test',
-          AUTH_SECRET: 'a'.repeat(32),
-          EMAIL_SERVER_HOST: 'smtp.example.com',
-          EMAIL_SERVER_PORT: port,
-          EMAIL_SERVER_USER: 'user@example.com',
-          EMAIL_SERVER_PASSWORD: 'password',
           EMAIL_FROM: 'noreply@example.com',
         };
 
@@ -248,9 +166,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
       };
 
@@ -302,9 +217,6 @@ describe('Environment Validation', () => {
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
         CLOUDFLARE_SECRET: 'test-cloudflare-secret',
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
         AWS_ACCESS_KEY_ID: 'test-access-key-id',
         AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',

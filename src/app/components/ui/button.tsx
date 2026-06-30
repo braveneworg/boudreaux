@@ -18,6 +18,10 @@ const buttonVariants = cva(
           'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40  disabled:bg-destructive/60',
         outline:
           'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+        // DIY zine "stamp": hard black border, paper fill, misregistered offset
+        // shadow in the tape-pink accent. Inverts to ink-on-paper on hover and
+        // presses into its shadow on active — the tactile flyer/cassette look.
+        punk: 'rounded-none border-2 border-black bg-background text-foreground font-semibold shadow-[3px_3px_0_0_var(--card-accent)] transition-[transform,box-shadow,background-color,color] hover:-translate-x-px hover:-translate-y-px hover:bg-foreground hover:text-background hover:shadow-[4px_4px_0_0_var(--color-menu-item-yellow-300)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',

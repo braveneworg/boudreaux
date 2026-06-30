@@ -91,10 +91,13 @@ test.describe('Desktop header — auth menu', () => {
     );
   });
 
-  test('signs out from the desktop auth menu', async ({ userPage }) => {
-    await userPage.goto('/');
+  // Uses the dedicated disposable sign-out session (NOT the shared regular
+  // session): better-auth deletes the session row on sign-out, so this must own
+  // a session no other spec depends on.
+  test('signs out from the desktop auth menu', async ({ signOutPage }) => {
+    await signOutPage.goto('/');
 
-    const authMenu = userPage.getByRole('navigation', { name: 'Authentication' });
+    const authMenu = signOutPage.getByRole('navigation', { name: 'Authentication' });
     const signOut = authMenu.getByRole('button', { name: 'sign out' });
     await expect(signOut).toBeVisible({ timeout: 10_000 });
 

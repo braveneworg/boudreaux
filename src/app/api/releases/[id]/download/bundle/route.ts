@@ -10,8 +10,8 @@ import type { NextRequest } from 'next/server';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
-import { getToken } from 'next-auth/jwt';
 
+import { auth } from '@/lib/auth';
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import {
@@ -1405,14 +1405,11 @@ const authenticateBundleRequest = async (
     }
   }
 
-  // Step 1: Authentication (deferred for mode='free' — guest flow)
-  const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    cookieName: secureCookie ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
-    secureCookie,
-  });
+  // Step 1: Authentication (deferred for mode='free' — guest flow). Read the
+  // better-auth session from the request cookies; better-auth owns cookie
+  // naming/secure-prefix selection internally, so we only forward the headers.
+  const session = await auth.api.getSession({ headers: request.headers });
+  const userId = session?.user?.id ?? null;
 
   const { id: releaseId } = await context.params;
 
@@ -1427,7 +1424,7 @@ const authenticateBundleRequest = async (
     };
   }
 
-  return parseBundleQuery(request, releaseId, token?.sub ?? null);
+  return parseBundleQuery(request, releaseId, userId);
 };
 
 /**

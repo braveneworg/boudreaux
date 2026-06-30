@@ -1,0 +1,158 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+// ---------------------------------------------------------------------------
+// socialProvidersConfig / accountLinkingConfig — unit tests
+//
+// These tests assert that:
+//   1. All four providers (google, facebook, twitter, apple) are wired when
+//      their env vars are set.
+//   2. Providers are omitted when their env vars are absent (dev-guard).
+//   3. accountLinkingConfig has enabled=true with the correct trustedProviders.
+//   4. Twitter is NOT in trustedProviders (no reliable email from X/Twitter).
+// ---------------------------------------------------------------------------
+
+import { buildSocialProvidersConfig, accountLinkingConfig } from './social-providers-config';
+
+vi.mock('server-only', () => ({}));
+
+const GOOGLE_VARS = {
+  GOOGLE_CLIENT_ID: 'google-id',
+  GOOGLE_CLIENT_SECRET: 'google-secret',
+};
+const FACEBOOK_VARS = {
+  FACEBOOK_CLIENT_ID: 'fb-id',
+  FACEBOOK_CLIENT_SECRET: 'fb-secret',
+};
+const TWITTER_VARS = {
+  TWITTER_CLIENT_ID: 'tw-id',
+  TWITTER_CLIENT_SECRET: 'tw-secret',
+};
+const APPLE_VARS = {
+  APPLE_CLIENT_ID: 'apple-id',
+  APPLE_CLIENT_SECRET: 'apple-secret',
+  APPLE_APP_BUNDLE_IDENTIFIER: 'com.example.boudreaux',
+};
+
+const ALL_VARS = { ...GOOGLE_VARS, ...FACEBOOK_VARS, ...TWITTER_VARS, ...APPLE_VARS };
+
+describe('buildSocialProvidersConfig', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('includes all four providers when all env vars are set', () => {
+    for (const [key, value] of Object.entries(ALL_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = buildSocialProvidersConfig();
+    expect(config).toHaveProperty('google');
+    expect(config).toHaveProperty('facebook');
+    expect(config).toHaveProperty('twitter');
+    expect(config).toHaveProperty('apple');
+  });
+
+  it('passes correct clientId/clientSecret to google', () => {
+    for (const [key, value] of Object.entries(GOOGLE_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = buildSocialProvidersConfig();
+    expect(config.google).toMatchObject({
+      clientId: 'google-id',
+      clientSecret: 'google-secret',
+    });
+  });
+
+  it('passes correct clientId/clientSecret to facebook', () => {
+    for (const [key, value] of Object.entries(FACEBOOK_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = buildSocialProvidersConfig();
+    expect(config.facebook).toMatchObject({
+      clientId: 'fb-id',
+      clientSecret: 'fb-secret',
+    });
+  });
+
+  it('passes correct clientId/clientSecret to twitter', () => {
+    for (const [key, value] of Object.entries(TWITTER_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = buildSocialProvidersConfig();
+    expect(config.twitter).toMatchObject({
+      clientId: 'tw-id',
+      clientSecret: 'tw-secret',
+    });
+  });
+
+  it('passes correct clientId, clientSecret, and appBundleIdentifier to apple', () => {
+    for (const [key, value] of Object.entries(APPLE_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = buildSocialProvidersConfig();
+    expect(config.apple).toMatchObject({
+      clientId: 'apple-id',
+      clientSecret: 'apple-secret',
+      appBundleIdentifier: 'com.example.boudreaux',
+    });
+  });
+
+  it('omits google when GOOGLE_CLIENT_ID is absent', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', '');
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', 'google-secret');
+
+    const config = buildSocialProvidersConfig();
+    expect(config).not.toHaveProperty('google');
+  });
+
+  it('omits facebook when FACEBOOK_CLIENT_SECRET is absent', () => {
+    vi.stubEnv('FACEBOOK_CLIENT_ID', 'fb-id');
+    vi.stubEnv('FACEBOOK_CLIENT_SECRET', '');
+
+    const config = buildSocialProvidersConfig();
+    expect(config).not.toHaveProperty('facebook');
+  });
+
+  it('omits twitter when TWITTER_CLIENT_ID is absent', () => {
+    vi.stubEnv('TWITTER_CLIENT_ID', '');
+    vi.stubEnv('TWITTER_CLIENT_SECRET', 'tw-secret');
+
+    const config = buildSocialProvidersConfig();
+    expect(config).not.toHaveProperty('twitter');
+  });
+
+  it('omits apple when APPLE_CLIENT_ID is absent', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', '');
+    vi.stubEnv('APPLE_CLIENT_SECRET', 'apple-secret');
+
+    const config = buildSocialProvidersConfig();
+    expect(config).not.toHaveProperty('apple');
+  });
+
+  it('returns an empty object when no provider env vars are set', () => {
+    const config = buildSocialProvidersConfig();
+    expect(Object.keys(config)).toHaveLength(0);
+  });
+});
+
+describe('accountLinkingConfig', () => {
+  it('has enabled set to true', () => {
+    expect(accountLinkingConfig.enabled).toBe(true);
+  });
+
+  it('includes google, apple, and facebook in trustedProviders', () => {
+    expect(accountLinkingConfig.trustedProviders).toContain('google');
+    expect(accountLinkingConfig.trustedProviders).toContain('apple');
+    expect(accountLinkingConfig.trustedProviders).toContain('facebook');
+  });
+
+  it('does NOT include twitter in trustedProviders', () => {
+    expect(accountLinkingConfig.trustedProviders).not.toContain('twitter');
+  });
+});

@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
@@ -47,12 +48,15 @@ export const banIdentityAction = async (
   const adminId = session.user.id;
   if (!adminId) return { success: false, error: 'unauthorized' };
 
+  const adminHeaders = await headers();
+
   const ban = await ChatAdminService.banIdentity({
     userId: parsed.data.userId ?? null,
     email: parsed.data.email,
     fingerprintHash: parsed.data.fingerprintHash ?? null,
     adminId,
     reason: parsed.data.reason,
+    adminHeaders,
   });
 
   logger.info('Identity banned', {

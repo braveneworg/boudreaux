@@ -5,12 +5,14 @@
 
 import 'server-only';
 
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { generateUsername } from 'unique-username-generator';
 
-import { signIn } from '@/auth';
+import { auth } from '@/lib/auth';
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { SignupSettingsService } from '@/lib/services/signup-settings-service';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -28,6 +30,15 @@ const limiter = rateLimit({
   interval: 60 * 1000, // 60 seconds
   uniqueTokenPerInterval: 500,
 });
+
+/** Trigger better-auth's magic-link send for the given email. */
+const sendMagicLink = async (email: string): Promise<void> => {
+  const headersList = await headers();
+  await auth.api.signInMagicLink({
+    body: { email, callbackURL: '/', errorCallbackURL: '/signin' },
+    headers: headersList,
+  });
+};
 
 /**
  * Handles the catch-block error for the signup try/catch. Mutates formState
@@ -57,11 +68,7 @@ const applySignupError = async (
     // as a brand-new signup. An attacker probing for registered emails
     // cannot distinguish the two cases.
     try {
-      await signIn('nodemailer', {
-        email,
-        redirect: false,
-        redirectTo: '/',
-      });
+      await sendMagicLink(email);
     } catch (sendError) {
       // Log but do not surface — we must not reveal duplicate-email state.
       loggers.auth.error('Failed to send sign-in magic link on duplicate email', sendError);
@@ -90,7 +97,13 @@ export const signupAction = async (
   });
   if (guardResult !== null) return guardResult;
 
-  const permittedFieldNames = ['email', 'termsAndConditions', 'username'];
+  const permittedFieldNames = [
+    'email',
+    'termsAndConditions',
+    'allowSmsNotifications',
+    'allowEmailNotifications',
+    'username',
+  ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signupSchema);
 
   if (parsed.success) {
@@ -104,17 +117,32 @@ export const signupAction = async (
       };
     }
 
+    if (await SignupSettingsService.areSignupsPaused()) {
+      return {
+        success: false,
+        errors: { general: ['Signups are temporarily paused. Please try again later.'] },
+        fields: formState.fields,
+      };
+    }
+
     try {
-      const { email } = formState.fields;
+      const { email } = parsed.data;
 
       formState.hasTimeout = false;
 
       const newUser = await UserRepository.create({
         email: parsed.data.email,
-        emailVerified: null,
+        // better-auth: users start unverified; the magic-link click flips this.
+        emailVerified: false,
+        // The signup schema requires terms acceptance, so capture the moment.
+        termsAcceptedAt: new Date(),
         name: null,
         image: null,
         username: generateUsername('', 4),
+        // Persist the SMS / email opt-ins chosen at signup (default off). Users
+        // can change them anytime from their profile.
+        allowSmsNotifications: parsed.data.allowSmsNotifications ?? false,
+        allowEmailNotifications: parsed.data.allowEmailNotifications ?? false,
       });
 
       // Log successful user creation
@@ -127,9 +155,9 @@ export const signupAction = async (
         },
       });
 
-      // Redirect happens way below because next throws an error if you redirect inside a try/catch
-      // The property redirectTo is responsible for the magic link callback URL
-      await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
+      // Trigger better-auth's magic-link send. Redirect happens below — `next`
+      // throws if you redirect inside a try/catch.
+      await sendMagicLink(email);
       formState.success = true;
     } catch (error: unknown) {
       await applySignupError(error, formState, parsed.data.email);

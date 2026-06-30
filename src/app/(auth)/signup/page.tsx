@@ -8,24 +8,41 @@ import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSession } from 'next-auth/react';
 import { useForm, FormProvider } from 'react-hook-form';
+import { toast } from 'sonner';
 
+import type { SocialProvider } from '@/app/components/auth/social-provider-buttons';
 import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { useSession } from '@/hooks/use-session';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
+import { stashSignupConsent } from '@/lib/actions/stash-signup-consent-action';
 import type { FormState } from '@/lib/types/form-state';
+import { magicLinkErrorMessage } from '@/lib/utils/auth/magic-link-error-messages';
+import { reportClientError } from '@/lib/utils/report-client-error';
 import {
   signinSchema,
   type FormSchemaType as SigninSchemaType,
 } from '@/lib/validation/signin-schema';
 import { signupSchema } from '@/lib/validation/signup-schema';
 
-type CombinedFormSchema = SigninSchemaType & { termsAndConditions?: boolean };
+type CombinedFormSchema = SigninSchemaType & {
+  termsAndConditions?: boolean;
+  allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
+};
+
+const getSocialProviderDisplayName = (provider: SocialProvider): string => {
+  if (provider === 'apple') return 'Apple';
+  if (provider === 'google') return 'Google';
+  if (provider === 'facebook') return 'Facebook';
+  return 'X (Twitter)';
+};
 
 const SignupPage = () => {
   const path = usePathname();
@@ -33,6 +50,7 @@ const SignupPage = () => {
   const searchParams = useSearchParams();
   const { status } = useSession();
   const isSignupPath = path === '/signup';
+  const magicLinkError = magicLinkErrorMessage(searchParams.get('error'));
 
   // If the user is already signed in (e.g. clicked a chat-mention email
   // link in a tab that already has a session), bounce them to the
@@ -60,10 +78,41 @@ const SignupPage = () => {
   const form = useForm<CombinedFormSchema>({
     defaultValues: {
       email: '',
+      allowSmsNotifications: false,
+      allowEmailNotifications: false,
       ...state?.fields,
     },
     resolver: zodResolver(isSignupPath ? signupSchema : signinSchema),
   });
+
+  const handleSocialError = useCallback((provider: SocialProvider, error: unknown): void => {
+    const providerName = getSocialProviderDisplayName(provider);
+    toast.error(`Couldn't start sign-in with ${providerName}. Please try again.`);
+    const err = error instanceof Error ? error : new Error(String(error));
+    reportClientError(err, 'route');
+  }, []);
+
+  // Gate social sign-in on the signup path: terms must be accepted and Turnstile
+  // verified, matching the magic-link gate. (Signin has no terms, so it is
+  // ungated as before.)
+  const termsAccepted = form.watch('termsAndConditions') === true;
+  const socialDisabled = isSignupPath ? !(termsAccepted && isVerified) : false;
+
+  // Before a social redirect on signup, verify Turnstile + stash the chosen
+  // opt-ins in a cookie so the user.create.before hook persists them onto the
+  // new OAuth user — the same agreements the magic-link path records.
+  const handleBeforeSocialSignIn = useCallback(async (): Promise<boolean> => {
+    const result = await stashSignupConsent({
+      turnstileToken,
+      allowSmsNotifications: form.getValues('allowSmsNotifications') ?? false,
+      allowEmailNotifications: form.getValues('allowEmailNotifications') ?? false,
+    });
+    if (!result.success) {
+      toast.error(result.error ?? 'Verification failed. Please try again.');
+      return false;
+    }
+    return true;
+  }, [turnstileToken, form]);
 
   const handleSubmit = useCallback(
     async (data: CombinedFormSchema) => {
@@ -128,24 +177,19 @@ const SignupPage = () => {
         items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
       />
       <ContentContainer>
-        {isSignupPath ? (
-          <ImageHeading
-            src="/media/headings/SIGN-UP.webp"
-            alt="sign up"
-            imageHeight={480}
-            priority
-          />
-        ) : (
-          <ImageHeading
-            src="/media/headings/SIGN-IN.webp"
-            alt="sign in"
-            imageHeight={480}
-            priority
-          />
-        )}
-        <div className="mt-3 flex flex-col">
+        <div className="mt-6 flex flex-col items-center">
+          {magicLinkError !== null && (
+            <Alert variant="destructive" className="mb-4 w-full max-w-lg">
+              <AlertDescription>{magicLinkError}</AlertDescription>
+            </Alert>
+          )}
           <FormProvider {...form}>
-            <form noValidate onSubmit={form.handleSubmit(handleSubmit)} autoComplete="on">
+            <form
+              noValidate
+              onSubmit={form.handleSubmit(handleSubmit)}
+              autoComplete="on"
+              className="w-full max-w-lg"
+            >
               <SignupSigninForm
                 control={form.control}
                 isPending={isSubmitting}
@@ -154,6 +198,21 @@ const SignupPage = () => {
                 onTurnstileToken={setTurnstileToken}
                 state={state}
                 hasTermsAndConditions={isSignupPath}
+                callbackURL="/"
+                onSocialError={handleSocialError}
+                socialDisabled={socialDisabled}
+                onBeforeSocialSignIn={isSignupPath ? handleBeforeSocialSignIn : undefined}
+                heading={
+                  <ImageHeading
+                    src={
+                      isSignupPath ? '/media/headings/SIGN-UP.webp' : '/media/headings/SIGN-IN.webp'
+                    }
+                    alt={isSignupPath ? 'sign up' : 'sign in'}
+                    imageHeight={480}
+                    imageClassName="w-full"
+                    priority
+                  />
+                }
               />
             </form>
           </FormProvider>

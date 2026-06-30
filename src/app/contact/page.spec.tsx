@@ -26,7 +26,7 @@ const resolvedFormData = vi.hoisted(() => ({
   message: 'I have a question about your releases.',
 }));
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: mockUseSession,
 }));
 

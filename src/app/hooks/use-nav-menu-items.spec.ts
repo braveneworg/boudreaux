@@ -2,15 +2,30 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
+import { createElement } from 'react';
+
 import { renderHook } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 
 import { useNavMenuItems } from './use-nav-menu-items';
 
 const mockUseSession = vi.hoisted(() => vi.fn());
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: mockUseSession,
 }));
+
+// Renders the resolved nav item names into a single string. renderToString
+// never runs effects, so it reflects the server / first-paint (pre-mount)
+// render of the hook.
+const NavNamesProbe = (): React.ReactElement =>
+  createElement(
+    'span',
+    null,
+    useNavMenuItems()
+      .map((item) => item.name)
+      .join('|')
+  );
 
 describe('useNavMenuItems', () => {
   describe('unauthenticated', () => {
@@ -120,6 +135,26 @@ describe('useNavMenuItems', () => {
       expect(collection?.color).toBe(
         'aria-[current=page]:text-menu-item-green-400 aria-[current=page]:decoration-menu-item-green-400 hover:text-menu-item-green-400 hover:decoration-menu-item-green-400'
       );
+    });
+  });
+
+  // Regression: better-auth resolves the session asynchronously and can win the
+  // race against hydration. The desktop/mobile nav lives in the SSR header, so
+  // the server can only render the pending (treated-as-unauthenticated) menu —
+  // the first client render must match it, or the authenticated menu (extra
+  // "My Collection", flipped bullets) diverges from the server HTML and trips a
+  // hydration mismatch.
+  describe('hydration safety', () => {
+    beforeEach(() => {
+      mockUseSession.mockReturnValue({ status: 'authenticated' });
+    });
+
+    it('omits My Collection on the server even when authenticated', () => {
+      expect(renderToString(createElement(NavNamesProbe))).not.toContain('My Collection');
+    });
+
+    it('keeps Videos directly after Releases on the server (no item spliced in)', () => {
+      expect(renderToString(createElement(NavNamesProbe))).toContain('Releases|Videos');
     });
   });
 });

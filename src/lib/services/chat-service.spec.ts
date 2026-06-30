@@ -160,6 +160,21 @@ describe('ChatService.sendMessage', () => {
     expect(triggerChatEvent).not.toHaveBeenCalled();
   });
 
+  it('returns disabled when the user has an account ban (banned: true)', async () => {
+    const result = await ChatService.sendMessage({
+      userId: 'user-1',
+      email: 'octo@example.com',
+      body: 'hi',
+      fingerprint: 'fp-abc',
+      ip: '203.0.113.5',
+      banned: true,
+    });
+
+    expect(result).toEqual({ success: false, error: 'disabled' });
+    expect(ChatMessageRepository.create).not.toHaveBeenCalled();
+    expect(triggerChatEvent).not.toHaveBeenCalled();
+  });
+
   it('logs a breach and returns rate_limited when the limiter rejects', async () => {
     vi.mocked(checkChatRateLimit).mockResolvedValue({
       success: false,

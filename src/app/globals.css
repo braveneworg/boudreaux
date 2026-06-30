@@ -68,6 +68,13 @@
 
 :root {
   --radius: 0.625rem;
+  /* Punk "tape" accent for the auth flyer card — drives the offset shadows,
+     divider chip, submit stamp, input focus ring and social-button shadows from
+     one token so a page can recolor the whole card to match its heading image.
+     Defaults to pink (the SIGN-IN ransom tape); the signup page overrides to
+     teal via `.signup-accent`. */
+  --card-accent: var(--color-menu-item-pink-300);
+  --card-accent-soft: var(--color-menu-item-pink-200);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(0.94 0 0);
@@ -219,6 +226,19 @@
       color: var(--color-zinc-950);
     }
   }
+}
+
+/* Auth flyer accent overrides — recolor the whole card from its heading image.
+   `--card-accent` (300 shade) drives offset shadows + decorations; the soft
+   200 shade backs the divider chip. */
+@utility signin-accent {
+  --card-accent: var(--color-menu-item-pink-300);
+  --card-accent-soft: var(--color-menu-item-pink-200);
+}
+
+@utility signup-accent {
+  --card-accent: var(--color-menu-item-teal-300);
+  --card-accent-soft: var(--color-menu-item-teal-200);
 }
 
 /* Banner notification strip — link color variants */

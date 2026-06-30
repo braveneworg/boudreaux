@@ -7,8 +7,10 @@ vi.mock('server-only', () => ({}));
 
 const requireRoleMock = vi.fn();
 const banMock = vi.fn();
+const headersMock = vi.fn().mockResolvedValue(new Headers());
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('next/headers', () => ({ headers: headersMock }));
 
 vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
 
@@ -53,13 +55,15 @@ describe('banIdentityAction', () => {
     });
 
     expect(result).toEqual({ success: true, banId: 'ban-1' });
-    expect(banMock).toHaveBeenCalledWith({
-      userId: null,
-      email: 'bad@example.com',
-      fingerprintHash: 'fp',
-      adminId: 'admin-1',
-      reason: 'repeat abuse',
-    });
+    expect(banMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: null,
+        email: 'bad@example.com',
+        fingerprintHash: 'fp',
+        adminId: 'admin-1',
+        reason: 'repeat abuse',
+      })
+    );
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {

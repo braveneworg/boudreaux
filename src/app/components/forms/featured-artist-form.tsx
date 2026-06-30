@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -22,6 +21,7 @@ import {
   useDeleteFeaturedArtistMutation,
   useUpdateFeaturedArtistCoverArtMutation,
 } from '@/app/hooks/mutations/use-featured-artist-mutations';
+import { useSession } from '@/hooks/use-session';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { generateObjectId } from '@/lib/utils/generate-object-id';

@@ -1,8 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { ServerSession } from '@/lib/auth/get-server-session';
+
 import type { DeleteChatMessageScope } from './delete-chat-message-action';
-import type { Session } from 'next-auth';
 
 interface DeleteChatRequestInput {
   messageId: string;
@@ -30,13 +31,13 @@ type DeleteChatRequestValidation = ValidatedDeleteChatRequest | RejectedDeleteCh
  * `forbidden`, blank id or unknown scope → `invalid`.
  */
 export const validateDeleteChatRequest = (
-  session: Session | null,
+  session: ServerSession | null,
   input: DeleteChatRequestInput
 ): DeleteChatRequestValidation => {
   if (!session?.user?.id) {
     return { ok: false, error: 'unauthorized' };
   }
-  if ((session.user as { role?: string | null }).role !== 'admin') {
+  if (session.user.role !== 'admin') {
     return { ok: false, error: 'forbidden' };
   }
 

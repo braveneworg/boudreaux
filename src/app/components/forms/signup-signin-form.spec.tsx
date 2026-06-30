@@ -16,6 +16,8 @@ type BaseFormSchema = {
   email: string;
   general?: string;
   termsAndConditions?: boolean;
+  allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
 };
 
 // Mock all dependencies
@@ -100,8 +102,8 @@ vi.mock('@/app/components/ui/switch', () => ({
 }));
 
 vi.mock('@/app/components/ui/button', () => ({
-  Button: ({ children, disabled, size, ...props }: ButtonProps) => (
-    <button disabled={disabled} data-testid="submit-button" data-size={size} {...props}>
+  Button: ({ children, disabled, size, type, ...props }: ButtonProps) => (
+    <button disabled={disabled} data-testid="submit-button" data-size={size} type={type} {...props}>
       {children}
     </button>
   ),
@@ -136,6 +138,97 @@ vi.mock('@/app/components/ui/status-indicator', () => ({
   ),
 }));
 
+vi.mock('@/app/components/ui/separator', () => ({
+  Separator: ({ className }: { className?: string }) => (
+    <hr data-testid="separator" className={className} />
+  ),
+}));
+
+// Mock SocialProviderButtons so we can test the form independently of its inner workings
+const mockSignInSocial = vi.fn();
+type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
+let capturedSocialOnError: ((provider: SocialProvider, error: unknown) => void) | undefined;
+let capturedSocialBeforeSignIn: ((provider: SocialProvider) => Promise<boolean>) | undefined;
+vi.mock('@/app/components/auth/social-provider-buttons', () => ({
+  SocialProviderButtons: ({
+    callbackURL,
+    className,
+    onError,
+    disabled,
+    beforeSignIn,
+  }: {
+    callbackURL: string;
+    className?: string;
+    onError?: (provider: SocialProvider, error: unknown) => void;
+    disabled?: boolean;
+    beforeSignIn?: (provider: SocialProvider) => Promise<boolean>;
+  }) => {
+    capturedSocialOnError = onError;
+    capturedSocialBeforeSignIn = beforeSignIn;
+    return (
+      <div
+        data-testid="social-provider-buttons"
+        data-callback-url={callbackURL}
+        data-disabled={disabled ? 'true' : 'false'}
+        className={className}
+      >
+        <button
+          type="button"
+          data-testid="social-apple-btn"
+          onClick={() => mockSignInSocial({ provider: 'apple', callbackURL })}
+        >
+          Continue with Apple
+        </button>
+        <button
+          type="button"
+          data-testid="social-google-btn"
+          onClick={() => mockSignInSocial({ provider: 'google', callbackURL })}
+        >
+          Continue with Google
+        </button>
+        <button
+          type="button"
+          data-testid="social-facebook-btn"
+          onClick={() => mockSignInSocial({ provider: 'facebook', callbackURL })}
+        >
+          Continue with Facebook
+        </button>
+        <button
+          type="button"
+          data-testid="social-twitter-btn"
+          onClick={() => mockSignInSocial({ provider: 'twitter', callbackURL })}
+        >
+          Continue with X (Twitter)
+        </button>
+      </div>
+    );
+  },
+}));
+
+vi.mock('@/app/components/ui/alert', () => ({
+  Alert: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="alert" className={className}>
+      {children}
+    </div>
+  ),
+  AlertDescription: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="alert-description">{children}</div>
+  ),
+}));
+
+vi.mock('@/app/components/ui/card', () => ({
+  Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="card" className={className}>
+      {children}
+    </div>
+  ),
+  CardContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="card-content" className={className}>
+      {children}
+    </div>
+  ),
+}));
+
 interface FormInputProps {
   id: string;
   placeholder: string;
@@ -155,6 +248,8 @@ interface ButtonProps {
   children: React.ReactNode;
   disabled?: boolean;
   size?: string;
+  type?: 'button' | 'submit' | 'reset';
+  [key: string]: unknown;
 }
 
 interface SwitchProps {
@@ -169,6 +264,14 @@ interface TurnstileWidgetProps {
   setIsVerified?: (verified: boolean) => void;
   [key: string]: unknown;
 }
+
+// Mock useSignupStatusQuery
+const mockUseSignupStatusQuery = vi.fn<() => { data: { paused: boolean } | undefined }>(() => ({
+  data: undefined,
+}));
+vi.mock('@/app/hooks/use-signup-status-query', () => ({
+  useSignupStatusQuery: () => mockUseSignupStatusQuery(),
+}));
 
 // Mock next/link
 vi.mock('next/link', () => ({
@@ -220,6 +323,113 @@ describe('SignupSigninForm', () => {
       success: false,
     } as FormState,
   };
+
+  describe('social provider buttons', () => {
+    it('renders the social provider buttons block', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
+    });
+
+    it('renders Apple social button', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-apple-btn')).toBeInTheDocument();
+    });
+
+    it('renders Google social button', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-google-btn')).toBeInTheDocument();
+    });
+
+    it('renders Facebook social button', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-facebook-btn')).toBeInTheDocument();
+    });
+
+    it('renders X (Twitter) social button', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-twitter-btn')).toBeInTheDocument();
+    });
+
+    it('clicking Apple button calls signIn.social with apple provider', async () => {
+      mockSignInSocial.mockClear();
+      render(<SignupSigninForm {...defaultProps} />);
+      await userEvent.click(screen.getByTestId('social-apple-btn'));
+      expect(mockSignInSocial).toHaveBeenCalledWith(expect.objectContaining({ provider: 'apple' }));
+    });
+
+    it('clicking Google button calls signIn.social with google provider', async () => {
+      mockSignInSocial.mockClear();
+      render(<SignupSigninForm {...defaultProps} />);
+      await userEvent.click(screen.getByTestId('social-google-btn'));
+      expect(mockSignInSocial).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'google' })
+      );
+    });
+
+    it('clicking Facebook button calls signIn.social with facebook provider', async () => {
+      mockSignInSocial.mockClear();
+      render(<SignupSigninForm {...defaultProps} />);
+      await userEvent.click(screen.getByTestId('social-facebook-btn'));
+      expect(mockSignInSocial).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'facebook' })
+      );
+    });
+
+    it('clicking X button calls signIn.social with twitter provider', async () => {
+      mockSignInSocial.mockClear();
+      render(<SignupSigninForm {...defaultProps} />);
+      await userEvent.click(screen.getByTestId('social-twitter-btn'));
+      expect(mockSignInSocial).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'twitter' })
+      );
+    });
+
+    it('passes callbackURL "/" to SocialProviderButtons by default', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      const socialBlock = screen.getByTestId('social-provider-buttons');
+      expect(socialBlock).toHaveAttribute('data-callback-url', '/');
+    });
+
+    it('passes custom callbackURL when provided', () => {
+      render(<SignupSigninForm {...defaultProps} callbackURL="/collection" />);
+      const socialBlock = screen.getByTestId('social-provider-buttons');
+      expect(socialBlock).toHaveAttribute('data-callback-url', '/collection');
+    });
+
+    it('renders social buttons on the signin path too', () => {
+      mockUsePathname.mockReturnValue('/signin');
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+      expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('forwards onSocialError to SocialProviderButtons as onError', () => {
+      const onSocialError = vi.fn();
+      capturedSocialOnError = undefined;
+      render(<SignupSigninForm {...defaultProps} onSocialError={onSocialError} />);
+      expect(capturedSocialOnError).toBe(onSocialError);
+    });
+
+    it('does not forward onSocialError when prop is omitted', () => {
+      capturedSocialOnError = undefined;
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(capturedSocialOnError).toBeUndefined();
+    });
+  });
+
+  describe('divider between social and email sections', () => {
+    it('renders a separator between social buttons and email section', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      // OrDivider renders two Separator elements (left + right of label)
+      expect(screen.getAllByTestId('separator').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders "or continue with email" label near the separator', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByText(/or continue with email/i)).toBeInTheDocument();
+    });
+  });
+
   describe('email field', () => {
     it('should render email input field', () => {
       render(<SignupSigninForm {...defaultProps} />);
@@ -287,7 +497,8 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
 
       expect(screen.getByTestId('switch-terms-and-conditions')).toBeInTheDocument();
-      expect(screen.getByTestId('next-link')).toBeInTheDocument();
+      // Multiple next-links may be rendered (terms + mode switch); verify at least one exists
+      expect(screen.getAllByTestId('next-link').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Accept terms and conditions?')).toBeInTheDocument();
     });
 
@@ -317,8 +528,11 @@ describe('SignupSigninForm', () => {
     it('should link to terms and conditions page', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      const link = screen.getByTestId('next-link');
-      expect(link).toHaveAttribute('href', '/legal/terms-and-conditions');
+      // Multiple next-links may exist; find the terms-and-conditions one by href
+      const links = screen.getAllByTestId('next-link');
+      const termsLink = links.find((l) => l.getAttribute('href') === '/legal/terms-and-conditions');
+      expect(termsLink).toBeDefined();
+      expect(termsLink).toBeInTheDocument();
     });
 
     it('should mark terms switch as required', () => {
@@ -326,6 +540,80 @@ describe('SignupSigninForm', () => {
 
       const termsSwitch = screen.getByTestId('switch-terms-and-conditions');
       expect(termsSwitch).toHaveAttribute('required');
+    });
+  });
+
+  describe('SMS opt-in field', () => {
+    it('should render the SMS opt-in toggle when hasTermsAndConditions is true', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByTestId('switch-allow-sms-notifications')).toBeInTheDocument();
+    });
+
+    it('should render the opt-in label', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByText(/text me sms updates/i)).toBeInTheDocument();
+    });
+
+    it('should explain how to opt out anytime from the profile', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      // SMS-specific copy (the email opt-in below also mentions opting out).
+      expect(screen.getByText(/hamburger sheet on mobile/i)).toBeInTheDocument();
+    });
+
+    it('should not render the SMS opt-in toggle when hasTermsAndConditions is false', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.queryByTestId('switch-allow-sms-notifications')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('email updates opt-in field', () => {
+    it('should render the email opt-in toggle when hasTermsAndConditions is true', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByTestId('switch-allow-email-notifications')).toBeInTheDocument();
+    });
+
+    it('should render the opt-in label', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.getByText(/email me updates/i)).toBeInTheDocument();
+    });
+
+    it('should not render the email opt-in toggle when hasTermsAndConditions is false', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.queryByTestId('switch-allow-email-notifications')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('social gating wiring', () => {
+    it('forwards socialDisabled to the social buttons', () => {
+      render(<SignupSigninForm {...defaultProps} socialDisabled />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toHaveAttribute(
+        'data-disabled',
+        'true'
+      );
+    });
+
+    it('enables the social buttons when socialDisabled is false', () => {
+      render(<SignupSigninForm {...defaultProps} socialDisabled={false} />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toHaveAttribute(
+        'data-disabled',
+        'false'
+      );
+    });
+
+    it('forwards onBeforeSocialSignIn to the social buttons', () => {
+      const onBeforeSocialSignIn = vi.fn().mockResolvedValue(true);
+      render(<SignupSigninForm {...defaultProps} onBeforeSocialSignIn={onBeforeSocialSignIn} />);
+
+      expect(capturedSocialBeforeSignIn).toBe(onBeforeSocialSignIn);
     });
   });
 
@@ -349,13 +637,19 @@ describe('SignupSigninForm', () => {
   });
 
   describe('submit button and status', () => {
-    it('should render submit button', () => {
+    it('renders submit button with email sign-in label', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
       const submitButton = screen.getByTestId('submit-button');
       expect(submitButton).toBeInTheDocument();
-      expect(submitButton).toHaveTextContent('Submit');
-      expect(submitButton).toHaveAttribute('data-size', 'lg');
+      expect(submitButton).toHaveTextContent(/email me a sign-in link/i);
+    });
+
+    it('submit button has type="submit" for explicit submit semantics', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+
+      const submitButton = screen.getByTestId('submit-button');
+      expect(submitButton).toHaveAttribute('type', 'submit');
     });
 
     it('should disable submit button when pending', () => {
@@ -438,12 +732,17 @@ describe('SignupSigninForm', () => {
     });
   });
 
-  describe('form layout and styling', () => {
+  describe('form layout and structure', () => {
+    it('renders the card container', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('card')).toBeInTheDocument();
+    });
+
     it('should apply correct CSS classes to form container', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      // Check for presence of form structure elements
-      expect(screen.getAllByTestId('form-item')).toHaveLength(2); // email + terms
+      // Check for form structure elements — email + terms + SMS + email opt-in
+      expect(screen.getAllByTestId('form-item')).toHaveLength(4);
     });
 
     it('should position elements correctly', () => {
@@ -461,7 +760,11 @@ describe('SignupSigninForm', () => {
     it('should have proper labels for form fields', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
-      const emailLabel = screen.getAllByTestId('form-label')[0]; // Get the first label (email)
+      // The agreements toggles render above the email field, so find the email
+      // label by its `for` rather than assuming it is the first one.
+      const emailLabel = screen
+        .getAllByTestId('form-label')
+        .find((label) => label.getAttribute('for') === 'email');
       expect(emailLabel).toHaveAttribute('for', 'email');
       expect(emailLabel).toHaveClass('sr-only'); // Screen reader only
     });
@@ -476,6 +779,21 @@ describe('SignupSigninForm', () => {
 
       expect(termsLabel).toBeDefined();
       expect(termsLabel).toBeInTheDocument();
+    });
+  });
+
+  describe('mode switch link', () => {
+    it('shows a link to signup when on the signin path', () => {
+      mockUsePathname.mockReturnValue('/signin');
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+      expect(screen.getByRole('link', { name: /create an account/i })).toBeInTheDocument();
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('shows a link to signin when on the signup path', () => {
+      mockUsePathname.mockReturnValue('/signup');
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
     });
   });
 
@@ -508,6 +826,8 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
       // Verify all major components are present
+      expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
+      expect(screen.getAllByTestId('separator').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByTestId('form-input-email')).toBeInTheDocument();
       expect(screen.getByTestId('switch-terms-and-conditions')).toBeInTheDocument();
       expect(screen.getByTestId('turnstile-widget')).toBeInTheDocument();
@@ -544,6 +864,56 @@ describe('SignupSigninForm', () => {
       expect(screen.getByTestId('submit-button')).toBeInTheDocument();
       expect(screen.getByTestId('status-indicator')).toBeInTheDocument();
     });
+
+    it('renders social provider buttons on signin path', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+      expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
+    });
+  });
+
+  describe('signups-paused notice', () => {
+    const signupProps = () => ({ ...defaultProps, hasTermsAndConditions: true });
+    const signinProps = () => ({ ...defaultProps, hasTermsAndConditions: false });
+
+    beforeEach(() => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: undefined });
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    afterEach(() => {
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('shows the paused notice and disables submit on the signup path when paused', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByText(/signups are temporarily paused/i)).toBeInTheDocument();
+    });
+
+    it('does not show the notice on the signin path', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      mockUsePathname.mockReturnValue('/signin');
+      render(<SignupSigninForm {...signinProps()} />);
+      expect(screen.queryByText(/signups are temporarily paused/i)).not.toBeInTheDocument();
+    });
+
+    it('disables the submit button when signups are paused on the signup path', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: true } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByTestId('submit-button')).toBeDisabled();
+    });
+
+    it('does not disable the submit button when signups are not paused', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: { paused: false } });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.getByTestId('submit-button')).not.toBeDisabled();
+    });
+
+    it('does not show the notice when signupStatus data is undefined', () => {
+      mockUseSignupStatusQuery.mockReturnValue({ data: undefined });
+      render(<SignupSigninForm {...signupProps()} />);
+      expect(screen.queryByText(/signups are temporarily paused/i)).not.toBeInTheDocument();
+    });
   });
 
   describe('unverified state', () => {
@@ -570,6 +940,12 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} isVerified={false} />);
 
       expect(screen.getByTestId('turnstile-widget')).toBeInTheDocument();
+    });
+
+    it('still renders social provider buttons when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toBeInTheDocument();
     });
   });
 });

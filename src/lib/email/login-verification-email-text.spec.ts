@@ -48,7 +48,7 @@ describe('buildLoginVerificationEmailText', () => {
 
     it('should include the expiry notice', () => {
       const text = buildLoginVerificationEmailText(baseInput);
-      expect(text).toContain('expires in 24 hours');
+      expect(text).toContain('expires in 5 minutes');
     });
 
     it('should include the security note about ignoring unexpected emails', () => {

@@ -6,17 +6,17 @@
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Separator } from '@radix-ui/react-separator';
-import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { ConnectedAccountsSection } from '@/app/components/forms/connected-accounts-section';
 import { useMatchingFieldErrorClear } from '@/app/components/forms/hooks/use-form-state-sync';
 import { ProfileEmailSection } from '@/app/components/forms/sections/profile-email-section';
 import { ProfilePersonalSection } from '@/app/components/forms/sections/profile-personal-section';
 import { ProfileUsernameSection } from '@/app/components/forms/sections/profile-username-section';
 import { Card, CardContent, CardHeader } from '@/app/components/ui/card';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
 import { updateProfileAction } from '@/lib/actions/update-profile-action';
@@ -30,6 +30,7 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 import { changeUsernameSchema as usernameSchema } from '@/lib/validation/change-username-schema';
 import { profileSchema } from '@/lib/validation/profile-schema';
+import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -435,6 +436,10 @@ export const ProfileForm = (): React.ReactElement => {
         wasSuccessful={usernameFormState.success}
         onEditToggle={handleEditFieldButtonClick}
       />
+
+      <Separator />
+
+      <ConnectedAccountsSection />
     </>
   );
 };

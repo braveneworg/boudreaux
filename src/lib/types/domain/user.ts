@@ -21,15 +21,19 @@
 export type UserScalars = {
   id: string;
   name: string | null;
+  // better-auth: boolean verification flag (was DateTime? under Auth.js).
+  emailVerified: boolean;
   email: string;
-  emailVerified: Date | null;
   previousEmail: string | null;
   image: string | null;
   termsAndConditions: boolean;
+  termsAcceptedAt: Date | null;
   username: string | null;
   role: string | null;
-  failedLoginAttempts: number;
-  lockedUntil: Date | null;
+  // better-auth admin plugin fields.
+  banned: boolean | null;
+  banReason: string | null;
+  banExpires: Date | null;
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
@@ -40,34 +44,37 @@ export type UserScalars = {
   zipCode: string | null;
   country: string | null;
   allowSmsNotifications: boolean | null;
+  allowEmailNotifications: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-/** Scalar fields of the Prisma `Account` model (`accounts: true`). */
+/** Scalar fields of the Prisma `Account` model (`accounts: true`). better-auth shape. */
 export type AccountRecord = {
   id: string;
   userId: string;
-  type: string;
-  provider: string;
-  providerAccountId: string;
-  refresh_token: string | null;
-  access_token: string | null;
-  expires_at: number | null;
-  token_type: string | null;
+  providerId: string;
+  accountId: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  idToken: string | null;
+  accessTokenExpiresAt: Date | null;
+  refreshTokenExpiresAt: Date | null;
   scope: string | null;
-  id_token: string | null;
-  session_state: string | null;
+  password: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-/** Scalar fields of the Prisma `Session` model (`sessions: true`). */
+/** Scalar fields of the Prisma `Session` model (`sessions: true`). better-auth shape. */
 export type SessionRecord = {
   id: string;
-  sessionToken: string;
+  token: string;
   userId: string;
-  expires: Date;
+  expiresAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  impersonatedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -124,13 +131,16 @@ export interface UserAdminRecord {
 export interface CreateUserData {
   email: string;
   name?: string | null;
-  emailVerified?: Date | null;
+  emailVerified?: boolean;
+  termsAcceptedAt?: Date | null;
   image?: string | null;
   username?: string | null;
   role?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
+  allowSmsNotifications?: boolean | null;
+  allowEmailNotifications?: boolean | null;
 }
 
 /**

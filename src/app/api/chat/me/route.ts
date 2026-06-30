@@ -41,7 +41,12 @@ export const GET = withAuth(async (request: NextRequest, _ctx, session): Promise
     }),
   ]);
 
-  const blocked = Boolean(chatUser?.disabled) || ban.banned;
+  // Defense-in-depth: treat a better-auth account ban as blocked, in addition
+  // to ChatUser.disabled and the fingerprint/evasion ban check. A full account
+  // ban already revokes sessions, but this covers temporary-ban edge cases and
+  // provides layered enforcement for coherence.
+  const accountBanned = session.user.banned === true;
+  const blocked = Boolean(chatUser?.disabled) || ban.banned || accountBanned;
   const body: ChatMeResponse = { blocked };
   return NextResponse.json(body);
 });

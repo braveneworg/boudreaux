@@ -7,7 +7,6 @@ import { Fragment, useState, useCallback, useEffect } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -15,12 +14,12 @@ import { ContactForm } from '@/app/components/forms/contact-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { useSession } from '@/app/hooks/use-session';
+import type { SessionUser } from '@/app/hooks/use-session';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
 import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
-
-import type { Session } from 'next-auth';
 
 interface ContactEntry {
   role: string;
@@ -37,7 +36,7 @@ const CONTACTS: readonly ContactEntry[] = [
 ];
 
 /** Builds the contact form's default values, prefilling from the session user when present. */
-const buildContactDefaults = (user: Session['user'] | undefined): ContactFormSchemaType => ({
+const buildContactDefaults = (user: SessionUser | undefined): ContactFormSchemaType => ({
   reason: '',
   firstName: user?.firstName || '',
   lastName: user?.lastName || '',

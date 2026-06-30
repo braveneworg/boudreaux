@@ -5,51 +5,78 @@ import { test, expect } from '@playwright/test';
 
 import { mockTurnstile, waitForTurnstileVerification } from '../../helpers/turnstile-mock';
 
+// The redesigned (better-auth) sign-in screen leads with four social provider
+// buttons, then an "or continue with email" divider gating a magic-link field.
+// The page heading is an ImageHeading (an <img alt="sign in">), and the submit
+// CTA reads "Email me a sign-in link".
+const SUBMIT_LABEL = 'Email me a sign-in link';
+
 test.describe('Signin Flow', () => {
   test.beforeEach(async ({ page }) => {
     await mockTurnstile(page);
   });
 
-  test('should display the signin form without terms toggle', async ({ page }) => {
+  test('renders the sign-in heading', async ({ page }) => {
     await page.goto('/signin');
-    await waitForTurnstileVerification(page);
-
-    await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible();
-    await expect(page.locator('input[id="email"]')).toBeVisible();
-    // Terms and conditions should not be visible on signin
-    await expect(page.locator('#terms-and-conditions')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'sign in' })).toBeVisible();
   });
 
-  test('should show validation error for invalid email', async ({ page }) => {
+  test('offers all four social provider buttons', async ({ page }) => {
+    await page.goto('/signin');
+
+    await expect(page.getByRole('button', { name: 'Continue with Apple' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Facebook' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with X (Twitter)' })).toBeVisible();
+  });
+
+  test('reveals the magic-link email field after Turnstile verifies', async ({ page }) => {
     await page.goto('/signin');
     await waitForTurnstileVerification(page);
 
-    await page.locator('input[id="email"]').fill('not-an-email');
-    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.locator('input#email')).toBeVisible();
+  });
 
-    // Expect email validation error
+  test('does not render the terms toggle on sign-in', async ({ page }) => {
+    await page.goto('/signin');
+    await waitForTurnstileVerification(page);
+
+    await expect(page.locator('#terms-and-conditions')).toHaveCount(0);
+  });
+
+  test('shows the magic-link submit button', async ({ page }) => {
+    await page.goto('/signin');
+    await waitForTurnstileVerification(page);
+
+    await expect(page.getByRole('button', { name: SUBMIT_LABEL })).toBeVisible();
+  });
+
+  test('shows a validation error for an invalid email', async ({ page }) => {
+    await page.goto('/signin');
+    await waitForTurnstileVerification(page);
+
+    await page.locator('input#email').fill('not-an-email');
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
+
     await expect(page.locator('[data-slot="form-message"]').first()).toBeVisible();
   });
 
-  test('should show validation error for empty email', async ({ page }) => {
+  test('shows a validation error for an empty email', async ({ page }) => {
     await page.goto('/signin');
     await waitForTurnstileVerification(page);
 
-    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // Expect validation error
     await expect(page.locator('[data-slot="form-message"]').first()).toBeVisible();
   });
 
-  test('should submit signin form with valid email', async ({ page }) => {
+  test('redirects to the success page after a valid magic-link request', async ({ page }) => {
     await page.goto('/signin');
     await waitForTurnstileVerification(page);
 
-    await page.locator('input[id="email"]').fill('testuser@example.com');
-    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.locator('input#email').fill('testuser@example.com');
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // Should navigate to success/verify page
     await expect(page).toHaveURL(/success/, { timeout: 15_000 });
   });
 });

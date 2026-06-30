@@ -164,7 +164,20 @@ export class ChatService {
     ip: string;
     /** Client-supplied placeholder id; echoed back on the DTO + broadcast. */
     tempId?: string;
+    /**
+     * Defense-in-depth: set to `true` when the caller knows the user has an
+     * active account ban (better-auth admin plugin `banned` flag). A full
+     * account ban already revokes sessions, but this gate handles the
+     * temporary-ban edge case and provides layered enforcement.
+     */
+    banned?: boolean;
   }): Promise<SendChatMessageResult> {
+    // Defense-in-depth: block account-banned users even when a session is
+    // still technically valid (e.g. temporary ban with a recent cookie cache).
+    if (params.banned) {
+      return { success: false, error: 'disabled' };
+    }
+
     const existing = await ChatUserRepository.findByUserId(params.userId);
     if (existing?.disabled) {
       return { success: false, error: 'disabled' };

@@ -59,6 +59,11 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     primary: '—',
     secondary: 'adjust the runtime log level',
   },
+  '/admin/settings': {
+    href: '/admin/settings',
+    primary: '—',
+    secondary: 'site-wide settings',
+  },
 });
 
 export default async function AdminDashboardPage() {

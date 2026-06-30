@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { ADMIN_NAV_ITEMS } from '@/app/admin/components/admin-nav-items';
+
 import { expect, test } from '../fixtures/auth.fixture';
 
 import type { Page } from '@playwright/test';
@@ -10,19 +12,12 @@ import type { Page } from '@playwright/test';
  *
  * The nav lives in the admin layout, so it must render on the dashboard and on
  * every section page/subpage, in importance order with the current section
- * marked. Links are ordered: Releases, Featured Artists, Artists, Notifications,
- * Chat, Tours, Logging.
+ * marked. The expected labels are derived from `ADMIN_NAV_ITEMS` — the single
+ * source of truth shared by the nav, dashboard tiles, and tests — so adding a
+ * section can't drift this list out of sync (as the Settings section once did).
  */
 
-const NAV_ORDER = [
-  'Releases',
-  'Featured Artists',
-  'Artists',
-  'Notifications',
-  'Chat',
-  'Tours',
-  'Logging',
-];
+const NAV_ORDER = ADMIN_NAV_ITEMS.map((item) => item.label);
 
 const adminNav = (adminPage: Page) =>
   adminPage.getByRole('navigation', { name: /admin sections/i });

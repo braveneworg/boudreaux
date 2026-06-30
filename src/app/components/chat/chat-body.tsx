@@ -10,6 +10,7 @@ import md5 from 'crypto-js/md5';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import type { ClientSessionData } from '@/app/hooks/use-session';
 import { useChatChannel } from '@/hooks/use-chat-channel';
 import { useChatMeQuery } from '@/hooks/use-chat-me-query';
 import { useChatPinnedMessagesQuery } from '@/hooks/use-chat-pinned-messages-query';
@@ -34,8 +35,6 @@ import { ChatMessageList } from './chat-message-list';
 import { ChatReportAbusePopover } from './chat-report-abuse-popover';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 
-import type { Session } from 'next-auth';
-
 interface SessionUser {
   id: string;
   username: string | null;
@@ -43,7 +42,7 @@ interface SessionUser {
   role: string | null;
 }
 
-const extractSessionUser = (session: Session): SessionUser => {
+const extractSessionUser = (session: ClientSessionData): SessionUser => {
   const user = session.user as
     | { id?: string; name?: string | null; email?: string | null; role?: string | null }
     | undefined;
@@ -142,7 +141,7 @@ const confirmDelete = async (
 };
 
 interface ChatBodyProps {
-  session: Session;
+  session: ClientSessionData;
   /** When false, defers the network/Pusher/fingerprint work until the drawer is open. */
   enabled: boolean;
   /**

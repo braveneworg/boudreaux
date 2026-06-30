@@ -10,7 +10,7 @@ import { loggers } from '@/lib/utils/logger';
 import type { Mock } from 'vitest';
 
 const mockCreateUser = vi.hoisted(() => vi.fn());
-const mockSignIn = vi.hoisted(() => vi.fn());
+const mockSignInMagicLink = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
@@ -22,6 +22,7 @@ const mockHeaders = vi.hoisted(() =>
 );
 const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
 const mockLimiterCheck = vi.hoisted(() => vi.fn());
+const mockAreSignupsPaused = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -55,10 +56,9 @@ vi.mock('@/lib/utils/audit-log', () => ({
   logSecurityEvent: vi.fn(),
 }));
 
-// Mock dependencies
-// Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  signIn: mockSignIn,
+// Mock the better-auth instance — signup triggers magic-link via its API.
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { signInMagicLink: mockSignInMagicLink } },
 }));
 
 vi.mock('@/lib/repositories/user-repository', () => ({
@@ -89,6 +89,12 @@ vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
 
 vi.mock('@/lib/validation/signup-schema');
 
+vi.mock('@/lib/services/signup-settings-service', () => ({
+  SignupSettingsService: {
+    areSignupsPaused: mockAreSignupsPaused,
+  },
+}));
+
 describe('signupAction', () => {
   const mockFormData = new FormData();
   const mockInitialState: FormState = {
@@ -107,6 +113,8 @@ describe('signupAction', () => {
     mockVerifyTurnstile.mockResolvedValue({ success: true });
     // Default to passing the rate limit (clearMocks resets the impl each test).
     mockLimiterCheck.mockResolvedValue(undefined);
+    // Default to signups NOT paused so existing tests are unaffected.
+    mockAreSignupsPaused.mockResolvedValue(false);
   });
 
   describe('successful signup flow', () => {
@@ -128,7 +136,7 @@ describe('signupAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockCreateUser.mockResolvedValue({
         id: '1',
         email: 'test@example.com',
@@ -143,17 +151,21 @@ describe('signupAction', () => {
 
       expect(mockCreateUser).toHaveBeenCalledWith({
         email: 'test@example.com',
-        emailVerified: null,
+        emailVerified: false,
+        termsAcceptedAt: expect.any(Date),
         name: null,
         image: null,
         username: 'test-user-1234',
+        // Opt-ins default to false when absent from parsed data.
+        allowSmsNotifications: false,
+        allowEmailNotifications: false,
       });
 
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
+        })
+      );
 
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
@@ -177,7 +189,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1' });
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -190,6 +202,84 @@ describe('signupAction', () => {
       expect(mockCreateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           username: 'test-user-1234',
+        })
+      );
+    });
+
+    it('should persist allowSmsNotifications when the user opts in', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowSmsNotifications: true,
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com', termsAndConditions: true, allowSmsNotifications: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockCreateUser.mockResolvedValue({ id: '1' });
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowSmsNotifications: true,
+        })
+      );
+    });
+
+    it('should persist allowEmailNotifications when the user opts in', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowEmailNotifications: true,
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowEmailNotifications: true,
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockCreateUser.mockResolvedValue({ id: '1' });
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowEmailNotifications: true,
         })
       );
     });
@@ -270,7 +360,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw Error('NEXT_REDIRECT');
       });
@@ -318,7 +408,7 @@ describe('signupAction', () => {
 
       expect(result).toEqual(mockFormState);
       expect(mockCreateUser).not.toHaveBeenCalled();
-      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
 
     it('should return error when email security validation fails', async () => {
@@ -409,7 +499,7 @@ describe('signupAction', () => {
       const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
       mockCreateUser.mockRejectedValue(duplicateEmailError);
-      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      vi.mocked(mockSignInMagicLink).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
       });
@@ -417,11 +507,11 @@ describe('signupAction', () => {
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       // Magic-link flow should be triggered for the duplicate email too
-      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-        email: 'test@example.com',
-        redirect: false,
-        redirectTo: '/',
-      });
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { email: 'test@example.com', callbackURL: '/', errorCallbackURL: '/signin' },
+        })
+      );
       // Should redirect to the same success page as a new signup
       expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
@@ -433,7 +523,7 @@ describe('signupAction', () => {
       const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
 
       mockCreateUser.mockRejectedValue(duplicateEmailError);
-      vi.mocked(mockSignIn).mockRejectedValue(new Error('SES send failed'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(new Error('SES send failed'));
       const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
       mockRedirect.mockImplementation(() => {
         throw new Error('NEXT_REDIRECT');
@@ -565,7 +655,7 @@ describe('signupAction', () => {
       });
 
       mockCreateUser.mockResolvedValue({ id: '1' });
-      vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
+      vi.mocked(mockSignInMagicLink).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {
@@ -624,6 +714,45 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', 'anonymous');
+    });
+  });
+
+  describe('signups paused', () => {
+    const validSignupFormData = (): FormData => {
+      const fd = new FormData();
+      fd.set('email', 'test@example.com');
+      fd.set('termsAndConditions', 'true');
+      fd.set('cf-turnstile-response', 'test-turnstile-token');
+      return fd;
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: {
+          fields: { email: 'test@example.com', termsAndConditions: true },
+          success: false,
+          hasTimeout: false,
+          errors: {},
+        },
+        parsed: {
+          success: true,
+          data: { email: 'test@example.com', termsAndConditions: true },
+        },
+      });
+    });
+
+    it('returns the paused message and creates no user when signups are paused', async () => {
+      mockAreSignupsPaused.mockResolvedValue(true);
+      const result = await signupAction(mockInitialState, validSignupFormData());
+      expect(result.errors?.general?.[0]).toBe(
+        'Signups are temporarily paused. Please try again later.'
+      );
+    });
+
+    it('does not create a user when signups are paused', async () => {
+      mockAreSignupsPaused.mockResolvedValue(true);
+      await signupAction(mockInitialState, validSignupFormData());
+      expect(mockCreateUser).not.toHaveBeenCalled();
     });
   });
 

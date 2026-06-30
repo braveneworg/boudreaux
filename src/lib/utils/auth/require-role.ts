@@ -4,10 +4,9 @@
 import 'server-only';
 
 import { auth } from '@/auth';
+import type { ServerSession } from '@/lib/auth/get-server-session';
 
-import type { Session } from 'next-auth';
-
-export const requireRole = async (role: string): Promise<Session> => {
+export const requireRole = async (role: string): Promise<ServerSession> => {
   const session = await auth();
 
   if (!session?.user?.role || session.user.role !== role) {

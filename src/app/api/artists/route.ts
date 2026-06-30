@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
+import type { ServerSession } from '@/lib/auth/get-server-session';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { CreateArtistData } from '@/lib/types/domain/artist';
@@ -12,8 +13,6 @@ import { computeNextSkip } from '@/lib/types/pagination';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
-
-import type { Session } from 'next-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +38,7 @@ const errorStatus = (error: string | undefined): number =>
   error === 'Database unavailable' ? 503 : 500;
 
 /** Return a 401 response unless the session belongs to an authenticated admin. */
-const requireAdmin = (session: Session | null): NextResponse | null =>
+const requireAdmin = (session: ServerSession | null): NextResponse | null =>
   !session?.user?.id || session.user?.role !== 'admin'
     ? NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     : null;

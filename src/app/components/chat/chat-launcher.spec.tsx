@@ -14,7 +14,7 @@ const usePathnameMock = vi.hoisted(() => vi.fn());
 const searchParamsMock = vi.hoisted(() => vi.fn());
 const disconnectPusherClientMock = vi.hoisted(() => vi.fn());
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => useSessionMock(),
 }));
 

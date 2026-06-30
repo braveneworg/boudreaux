@@ -10,7 +10,15 @@ import { requireRole } from '@/utils/auth/require-role';
 
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
 
-import type { Session } from 'next-auth';
+/**
+ * Minimal session shape these tests mock `auth()` with. The action only reads
+ * `session.user.id` and `session.user.role`; this stand-in keeps the fixtures
+ * type-safe without depending on the legacy auth library's `Session` type.
+ */
+interface Session {
+  user: { id: string; role: string; name?: string; email?: string };
+  expires: string;
+}
 
 vi.mock('server-only', () => ({}));
 

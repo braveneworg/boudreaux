@@ -97,7 +97,7 @@ describe('buildLoginVerificationEmailHtml', () => {
 
     it('should include the expiry notice', () => {
       const html = buildLoginVerificationEmailHtml(baseInput);
-      expect(html).toContain('expires in 24 hours');
+      expect(html).toContain('expires in 5 minutes');
     });
 
     it('should include the Fake Four Inc. footer', () => {

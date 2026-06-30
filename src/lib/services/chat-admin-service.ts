@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { auth } from '@/lib/auth';
 import {
   AbuseReportRepository,
   type ReportedUserSummary,
@@ -10,6 +11,9 @@ import {
 import { BannedIdentityRepository } from '@/lib/repositories/banned-identity-repository';
 import { ChatMessageRepository } from '@/lib/repositories/chat-message-repository';
 import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
+import { loggers } from '@/lib/utils/logger';
+
+const logger = loggers.chat;
 
 export interface ChatUserAdminDto {
   id: string;
@@ -198,27 +202,68 @@ export class ChatAdminService {
     return ChatMessageRepository.findByUserIdForAdmin({ userId, skip, take });
   }
 
-  /** Add a ban record (used after disabling repeat offenders). */
+  /**
+   * Ban an identity — creates a {@link BannedIdentity} evasion record AND, when a
+   * `userId` is present, calls the better-auth admin plugin to block sign-in and
+   * revoke existing sessions. When only email/fingerprint are known (no account to
+   * target), the account-ban step is skipped and only the evasion record is stored.
+   *
+   * @param banDurationSeconds - Optional temporary ban duration in seconds.
+   *   Omitted = permanent. Forwarded as `banExpiresIn` to the admin plugin.
+   * @param adminHeaders - The admin's request headers, required by the
+   *   better-auth admin API to authenticate the caller.
+   */
   static async banIdentity({
     userId,
     email,
     fingerprintHash,
     adminId,
     reason,
+    banDurationSeconds,
+    adminHeaders,
   }: {
     userId?: string | null;
     email: string;
     fingerprintHash?: string | null;
     adminId: string;
     reason?: string;
+    banDurationSeconds?: number;
+    adminHeaders: Headers;
   }) {
-    return BannedIdentityRepository.create({
+    const ban = await BannedIdentityRepository.create({
       userId: userId ?? null,
       email,
       fingerprintHash: fingerprintHash ?? null,
       bannedByAdminId: adminId,
       reason: reason ?? null,
     });
+
+    // BannedIdentity (evasion record) is written first so fingerprint/email
+    // matching is active from this point. Then the account ban is applied via
+    // the admin plugin. If auth.api.banUser throws, the error surfaces to the
+    // admin (who can retry) and is intentionally NOT swallowed — a silent catch
+    // here would make a failed account-ban look like success.
+    // Skipped when there is no userId (email/fingerprint-only ban — no account
+    // to target).
+    if (userId) {
+      await auth.api.banUser({
+        body: {
+          userId,
+          banReason: reason,
+          ...(banDurationSeconds !== undefined ? { banExpiresIn: banDurationSeconds } : {}),
+        },
+        headers: adminHeaders,
+      });
+      logger.info('Account ban applied via admin plugin', {
+        module: 'CHAT',
+        operation: 'banIdentity',
+        userId,
+        adminId,
+        banDurationSeconds,
+      });
+    }
+
+    return ban;
   }
 
   /** Lift a ban. */

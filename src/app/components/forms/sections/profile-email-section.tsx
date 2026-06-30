@@ -5,15 +5,10 @@
 
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/app/components/ui/card';
+import { Card, CardContent } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import type { ChangeEmailFormData } from '@/lib/types/form-data';
+import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -39,14 +34,21 @@ export const ProfileEmailSection = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Email Address</CardTitle>
-        <CardDescription>
+      <CardContent className="p-6 sm:p-8">
+        <div className="mb-1 flex items-center gap-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            Account
+          </p>
+        </div>
+
+        <h2 className="mb-4 text-xl font-bold tracking-tight">Email Address</h2>
+
+        <Separator className="mb-4" />
+
+        <p className="text-muted-foreground mb-6 text-sm">
           Manage your email address. This will not be shared publicly with anyone. We may contact
           you from time to time to keep you up-to-date.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}

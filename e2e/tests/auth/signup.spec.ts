@@ -5,73 +5,79 @@ import { test, expect } from '@playwright/test';
 
 import { mockTurnstile, waitForTurnstileVerification } from '../../helpers/turnstile-mock';
 
+// Sign-up shares the redesigned form with sign-in but additionally renders the
+// terms-and-conditions switch (required before the magic link is requested).
+const SUBMIT_LABEL = 'Email me a sign-in link';
+
 test.describe('Signup Flow', () => {
   test.beforeEach(async ({ page }) => {
-    // Mock Turnstile as a fallback in case the test site key doesn't load
+    // Mock Turnstile as a fallback in case the test site key doesn't load.
     await mockTurnstile(page);
   });
 
-  test('should display the signup form with required fields', async ({ page }) => {
+  test('renders the sign-up heading', async ({ page }) => {
     await page.goto('/signup');
-    await waitForTurnstileVerification(page);
-
-    await expect(page.getByRole('heading', { name: 'Sign Up' })).toBeVisible();
-    await expect(page.locator('input[id="email"]')).toBeVisible();
-    await expect(page.locator('#terms-and-conditions')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'sign up' })).toBeVisible();
   });
 
-  test('should show validation error for empty email submission', async ({ page }) => {
+  test('offers all four social provider buttons', async ({ page }) => {
+    await page.goto('/signup');
+
+    await expect(page.getByRole('button', { name: 'Continue with Apple' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Facebook' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with X (Twitter)' })).toBeVisible();
+  });
+
+  test('renders the terms toggle on sign-up', async ({ page }) => {
     await page.goto('/signup');
     await waitForTurnstileVerification(page);
 
-    // Toggle terms and conditions on
+    await expect(page.locator('#terms-and-conditions')).toBeVisible();
+  });
+
+  test('shows a validation error for an empty email', async ({ page }) => {
+    await page.goto('/signup');
+    await waitForTurnstileVerification(page);
+
     await page.locator('#terms-and-conditions').click();
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // Submit without entering email
-    await page.getByRole('button', { name: 'Submit' }).click();
-
-    // Expect validation error message
     await expect(page.locator('[data-slot="form-message"]').first()).toBeVisible();
   });
 
-  test('should show validation error when terms not accepted', async ({ page }) => {
+  test('shows a validation error when terms are not accepted', async ({ page }) => {
     await page.goto('/signup');
     await waitForTurnstileVerification(page);
 
-    await page.locator('input[id="email"]').fill('test@example.com');
+    await page.locator('input#email').fill('test@example.com');
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // Submit without accepting terms
-    await page.getByRole('button', { name: 'Submit' }).click();
-
-    // Terms validation error should appear (use specific error text to avoid
-    // matching the switch label or footer link which also contain "terms")
+    // Use the specific message so it cannot match the switch label or footer
+    // link, which also contain the word "terms".
     await expect(page.getByText('You must accept the terms and conditions')).toBeVisible();
   });
 
-  test('should show validation error for invalid email format', async ({ page }) => {
+  test('shows a validation error for an invalid email format', async ({ page }) => {
     await page.goto('/signup');
     await waitForTurnstileVerification(page);
 
-    await page.locator('input[id="email"]').fill('not-an-email');
+    await page.locator('input#email').fill('not-an-email');
     await page.locator('#terms-and-conditions').click();
-    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // Expect email validation error
     await expect(page.locator('[data-slot="form-message"]').first()).toBeVisible();
   });
 
-  test('should submit signup form with valid data', async ({ page }) => {
+  test('redirects to the success page after a valid sign-up request', async ({ page }) => {
     await page.goto('/signup');
     await waitForTurnstileVerification(page);
 
-    await page.locator('input[id="email"]').fill('newuser@example.com');
+    await page.locator('input#email').fill('newuser@example.com');
     await page.locator('#terms-and-conditions').click();
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    await page.getByRole('button', { name: 'Submit' }).click();
-
-    // After valid submission, should navigate to success page or show success indicator
-    // The action calls redirect() on success, so we wait for navigation
+    // The action calls redirect() on success, so we wait for navigation.
     await expect(page).toHaveURL(/success/, { timeout: 15_000 });
   });
 });

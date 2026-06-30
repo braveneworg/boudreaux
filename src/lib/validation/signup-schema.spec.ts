@@ -116,6 +116,88 @@ describe('signup-schema', () => {
     });
   });
 
+  describe('allowSmsNotifications validation', () => {
+    it('should accept true', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+        allowSmsNotifications: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept false', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+        allowSmsNotifications: false,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept a missing value (optional)', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-boolean values', () => {
+      const invalidValues = ['true', 'yes', 1, {}, []];
+
+      invalidValues.forEach((value) => {
+        const result = signupSchema.safeParse({
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowSmsNotifications: value,
+        });
+        expect(result.success).toBe(false);
+      });
+    });
+  });
+
+  describe('allowEmailNotifications validation', () => {
+    it('should accept true', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+        allowEmailNotifications: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept false', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+        allowEmailNotifications: false,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept a missing value (optional)', () => {
+      const result = signupSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-boolean values', () => {
+      const invalidValues = ['true', 'yes', 1, {}, []];
+
+      invalidValues.forEach((value) => {
+        const result = signupSchema.safeParse({
+          email: 'test@example.com',
+          termsAndConditions: true,
+          allowEmailNotifications: value,
+        });
+        expect(result.success).toBe(false);
+      });
+    });
+  });
+
   describe('general field validation', () => {
     it('should accept optional general field', () => {
       const result = signupSchema.safeParse({

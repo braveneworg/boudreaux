@@ -4,21 +4,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { getToken } from 'next-auth/jwt';
+import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
-import type { JWT } from 'next-auth/jwt';
+// Must match `advanced.cookiePrefix` in src/lib/auth.ts.
+const COOKIE_PREFIX = 'boudreaux';
 
-type TokenUser = { role?: string };
-type AuthToken = JWT | null;
+// Production uses secure cookies, except under E2E where the standalone server
+// runs over plain HTTP. Must match `advanced.useSecureCookies` in src/lib/auth.ts.
+const isSecureRuntime = (): boolean =>
+  process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
   /^\/$/, // Exact match for '/'
-  /^\/signin/, // /login and sub-routes
-  /^\/signup/, // /register and sub-routes
+  /^\/signin/, // /signin and sub-routes
+  /^\/signup/, // /signup and sub-routes
   /^\/signout/,
   /^\/success\/.*/, // /success/* with wildcard
-  /^\/api\/auth/, // NextAuth.js API routes
+  /^\/api\/auth/, // better-auth API routes
   /^\/api\/health/, // Health check endpoint should be public
 ];
 
@@ -31,15 +34,6 @@ const isPublicRoute = (pathname: string): boolean =>
 
 const isPrivateRoute = (pathname: string): boolean =>
   PRIVATE_ROUTES.some((route) => route.test(pathname));
-
-/**
- * Resolve the session-token cookie name. Production uses the `__Secure-`
- * prefixed cookie, except under E2E where the insecure dev cookie is used.
- */
-const resolveCookieName = (): string =>
-  process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true'
-    ? '__Secure-next-auth.session-token'
-    : 'next-auth.session-token';
 
 /**
  * Same-origin guard for the `callbackUrl` redirect to prevent open-redirect
@@ -63,50 +57,64 @@ const buildSigninRedirect = (request: NextRequest, pathname: string): NextRespon
  */
 const buildCallbackRedirect = (
   request: NextRequest,
-  token: AuthToken,
+  hasSession: boolean,
   callbackUrl: string | null,
   pathname: string
 ): NextResponse | null => {
-  if (!token || !callbackUrl || callbackUrl === pathname || !isSafeCallbackUrl(callbackUrl)) {
+  if (!hasSession || !callbackUrl || callbackUrl === pathname || !isSafeCallbackUrl(callbackUrl)) {
     return null;
   }
   return NextResponse.redirect(new URL(callbackUrl, request.url));
 };
 
 /**
- * Role-based authorization for `/admin` routes. Returns a response when the
- * request must be short-circuited (redirect/403), or `null` to allow it.
+ * Read the cached session role from the better-auth cookie cache for the
+ * optimistic edge gate. Returns `undefined` when there is no cache or it cannot
+ * be read. Authoritative role enforcement stays server-side in `withAdmin`.
  */
-const handleAdminAuthorization = (
-  request: NextRequest,
-  token: AuthToken,
-  pathname: string
-): NextResponse | null => {
-  /* v8 ignore start -- defensive: an unauthenticated /admin request is already
-     redirected to /signin by the `!token && !isPublicRoute` guard above, so this
-     branch is unreachable. Kept as defense-in-depth for the admin role check. */
-  if (!token) {
-    return NextResponse.redirect(new URL('/signin', request.url));
-  }
-  /* v8 ignore stop */
+const resolveCachedRole = async (request: NextRequest): Promise<string | undefined> => {
+  const cached = await getCookieCache(request, {
+    cookiePrefix: COOKIE_PREFIX,
+    isSecure: isSecureRuntime(),
+    secret: process.env.AUTH_SECRET,
+  });
+  // `user` carries our additional fields via the adapter's `Record<string, any>`.
+  const role = cached?.user?.role;
+  return typeof role === 'string' ? role : undefined;
+};
 
-  const userRole = (token.user as TokenUser | null | undefined)?.role;
-  if (userRole === 'admin') {
+/**
+ * Role-based authorization for `/admin` routes. Returns a response when the
+ * request must be short-circuited (403), or `null` to allow it. Assumes a
+ * session cookie is already present (the unauth case is handled earlier).
+ *
+ * This is an OPTIMISTIC edge gate: it only blocks when the cookie cache yields a
+ * definitive non-admin role. On a cache miss (`undefined` — cache expired,
+ * absent, or unreadable) it falls through and lets the authoritative
+ * server-side `withAdmin` check decide, so a valid admin is never hard-denied at
+ * the edge just because the cache wasn't populated.
+ */
+const handleAdminAuthorization = async (
+  request: NextRequest,
+  pathname: string
+): Promise<NextResponse | null> => {
+  const userRole = await resolveCachedRole(request);
+  // Admin via cache, or cache miss → allow through (authoritative check follows).
+  if (userRole === 'admin' || userRole === undefined) {
     return null;
   }
 
-  // Log unauthorized access attempt (dynamic import for edge runtime compatibility)
-  // Note: In production, integrate with your logging service
+  // Log unauthorized access attempt. Note: In production, integrate with your
+  // logging service (the edge runtime keeps this minimal).
   console.warn('Unauthorized admin access attempt:', {
-    userId: token.sub,
     attemptedPath: pathname,
-    userRole: userRole ?? 'none',
+    userRole,
     ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
     timestamp: new Date().toISOString(),
   });
 
-  // Return 403 Forbidden instead of redirecting to signin
-  // This prevents revealing the existence of admin routes
+  // Return 403 Forbidden instead of redirecting to signin. This prevents
+  // revealing the existence of admin routes.
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 };
 
@@ -114,16 +122,13 @@ export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    cookieName: resolveCookieName(),
-  });
+  // Presence-only check at the edge — cheap, no DB hit.
+  const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX }));
 
   const isPublic = isPublicRoute(pathname);
 
   // Redirect unauthenticated users trying to access private routes
-  if (isPrivateRoute(pathname) && !token) {
+  if (isPrivateRoute(pathname) && !hasSession) {
     return buildSigninRedirect(request, pathname);
   }
 
@@ -132,20 +137,21 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect to private callback url route if user is authenticated and has an explicit callbackUrl
-  const callbackRedirect = buildCallbackRedirect(request, token, callbackUrl, pathname);
+  // Redirect authenticated users to an explicit same-origin callbackUrl
+  const callbackRedirect = buildCallbackRedirect(request, hasSession, callbackUrl, pathname);
   if (callbackRedirect) {
     return callbackRedirect;
   }
 
   // Redirect unauthenticated users to signin page
-  if (!token) {
+  if (!hasSession) {
     return buildSigninRedirect(request, pathname);
   }
 
-  // Role-based authorization for admin routes
+  // Role-based authorization for admin routes (optimistic; authoritative check
+  // is server-side in withAdmin).
   if (pathname.startsWith('/admin')) {
-    const adminResponse = handleAdminAuthorization(request, token, pathname);
+    const adminResponse = await handleAdminAuthorization(request, pathname);
     if (adminResponse) {
       return adminResponse;
     }

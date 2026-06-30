@@ -4,17 +4,11 @@
 'use client';
 
 import { render, screen } from '@testing-library/react';
-import { useSession } from 'next-auth/react';
 
 import { Providers } from './providers';
 
-vi.mock('next-auth/react', () => ({
-  SessionProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useSession: vi.fn(),
-}));
-
 describe('Providers', () => {
-  it('renders children within SessionProvider', () => {
+  it('renders its children', () => {
     render(
       <Providers>
         <div>Test Child</div>
@@ -24,20 +18,14 @@ describe('Providers', () => {
     expect(screen.getByText('Test Child')).toBeInTheDocument();
   });
 
-  it('provides session context to children', () => {
-    const TestComponent = () => {
-      useSession();
-      return <div>Component with session</div>;
-    };
-
+  it('renders nested children (theme + query providers compose)', () => {
     render(
       <Providers>
-        <TestComponent />
+        <div>Nested Child</div>
       </Providers>
     );
 
-    expect(screen.getByText('Component with session')).toBeInTheDocument();
-    expect(useSession).toHaveBeenCalled();
+    expect(screen.getByText('Nested Child')).toBeInTheDocument();
   });
 
   it('renders with cache disabled when NEXT_PUBLIC_DISABLE_QUERY_CACHE is true', async () => {

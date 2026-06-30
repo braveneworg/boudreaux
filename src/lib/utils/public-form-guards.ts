@@ -25,6 +25,9 @@ interface PublicFormGuardOptions {
  * contact, …): resolves the client IP, enforces the rate limit, and verifies the
  * Cloudflare Turnstile token. Returns an error `FormState` for the caller to
  * return immediately, or `null` when every check passes.
+ *
+ * The rate limit is skipped under E2E (shards share one IP, same opt-out as
+ * `withRateLimit`) so the suite isn't tripped by the per-IP limit.
  */
 export const checkPublicFormGuards = async ({
   payload,
@@ -35,10 +38,12 @@ export const checkPublicFormGuards = async ({
   const headersList = await headers();
   const ip = extractClientIpFromHeaders(headersList);
 
-  try {
-    await limiter.check(maxRequests, ip);
-  } catch {
-    return { success: false, errors: { general: [rateLimitMessage] }, fields: {} };
+  if (process.env.E2E_MODE !== 'true') {
+    try {
+      await limiter.check(maxRequests, ip);
+    } catch {
+      return { success: false, errors: { general: [rateLimitMessage] }, fields: {} };
+    }
   }
 
   const turnstileToken = payload.get('cf-turnstile-response') as string | null;

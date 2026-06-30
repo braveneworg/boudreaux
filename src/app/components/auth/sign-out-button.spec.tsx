@@ -6,8 +6,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SignOutButton } from './sign-out-button';
 
 const mockSignOut = vi.fn();
-vi.mock('next-auth/react', () => ({
-  signOut: (options?: { redirect?: boolean; callbackUrl?: string }) => mockSignOut(options),
+vi.mock('@/lib/auth-client', () => ({
+  signOut: () => mockSignOut(),
 }));
 
 const mockPush = vi.fn();
@@ -59,21 +59,21 @@ describe('SignOutButton', () => {
     expect(button).toHaveAttribute('data-variant', 'link:narrow');
   });
 
-  it('calls signOut with redirect false and navigates to returned URL on click', async () => {
-    mockSignOut.mockResolvedValue({ url: '/signed-out' });
+  it('signs out and navigates home on click', async () => {
+    mockSignOut.mockResolvedValue(undefined);
     render(<SignOutButton />);
 
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
 
     await vi.waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
-      expect(mockPush).toHaveBeenCalledWith('/signed-out');
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith('/');
     });
   });
 
   it('calls onNavigate before signing out', async () => {
     const onNavigate = vi.fn();
-    mockSignOut.mockResolvedValue({ url: '/' });
+    mockSignOut.mockResolvedValue(undefined);
     render(<SignOutButton onNavigate={onNavigate} />);
 
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
@@ -86,7 +86,7 @@ describe('SignOutButton', () => {
   });
 
   it('does not call onNavigate when not provided', async () => {
-    mockSignOut.mockResolvedValue({ url: '/' });
+    mockSignOut.mockResolvedValue(undefined);
     render(<SignOutButton />);
 
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }));

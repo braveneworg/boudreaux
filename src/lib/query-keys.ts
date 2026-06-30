@@ -118,6 +118,10 @@ export const queryKeys = {
     all: ['health'] as const,
     status: () => [...queryKeys.health.all, 'status'] as const,
   },
+  signupStatus: {
+    all: ['signupStatus'] as const,
+    status: () => [...queryKeys.signupStatus.all, 'status'] as const,
+  },
   venues: {
     all: ['venues'] as const,
     search: (query: string) => [...queryKeys.venues.all, 'search', query] as const,

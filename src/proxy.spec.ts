@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { getToken } from 'next-auth/jwt';
+import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
 import middleware, { config } from './proxy';
 
@@ -20,8 +20,9 @@ vi.mock('next/server', () => ({
   },
 }));
 
-vi.mock('next-auth/jwt', () => ({
-  getToken: vi.fn(),
+vi.mock('better-auth/cookies', () => ({
+  getSessionCookie: vi.fn(),
+  getCookieCache: vi.fn(),
 }));
 
 interface MockNextUrl {
@@ -61,9 +62,29 @@ const createMockRequest = (
   };
 };
 
+/** Simulate a present (truthy) session cookie. */
+const signedIn = (): void => {
+  vi.mocked(getSessionCookie).mockReturnValue('signed-in-cookie-value');
+};
+
+/** Simulate no session cookie present. */
+const signedOut = (): void => {
+  vi.mocked(getSessionCookie).mockReturnValue(null);
+};
+
+type CachedSessionValue = Awaited<ReturnType<typeof getCookieCache>>;
+
+/** Stub the optimistic role read from the cookie cache. */
+const withCachedRole = (role: string | undefined): void => {
+  // Only `user.role` is read by the middleware; cast past the full session shape.
+  const value = (role === undefined ? { user: {} } : { user: { role } }) as unknown;
+  vi.mocked(getCookieCache).mockResolvedValue(value as CachedSessionValue);
+};
+
 describe('proxy middleware', () => {
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(getCookieCache).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -72,7 +93,7 @@ describe('proxy middleware', () => {
 
   describe('public routes', () => {
     it('allows access to root path without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -82,7 +103,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to signin page without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/signin');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -92,7 +113,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to signin sub-routes without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/signin/callback');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -102,7 +123,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to signup page without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/signup');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -112,7 +133,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to signout page without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/signout');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -122,7 +143,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to success routes without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/success/registration');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -132,7 +153,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to api/auth routes without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/api/auth/session');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -142,7 +163,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows access to health check endpoint without authentication', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/api/health');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -154,7 +175,7 @@ describe('proxy middleware', () => {
 
   describe('private routes', () => {
     it('redirects unauthenticated users from profile to signin', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/profile');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -167,7 +188,7 @@ describe('proxy middleware', () => {
     });
 
     it('redirects unauthenticated users from profile sub-routes to signin', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/profile/settings');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -180,10 +201,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows authenticated users to access profile', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/profile');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -195,10 +213,7 @@ describe('proxy middleware', () => {
 
   describe('callback URL handling', () => {
     it('redirects authenticated users to callbackUrl when provided', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/some-page', '/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -210,10 +225,7 @@ describe('proxy middleware', () => {
     });
 
     it('does not redirect when callbackUrl matches current pathname', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/dashboard', '/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -223,7 +235,7 @@ describe('proxy middleware', () => {
     });
 
     it('does not redirect unauthenticated users with callbackUrl on public routes', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/signin', '/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -235,10 +247,7 @@ describe('proxy middleware', () => {
     // ─── Security: open redirect prevention ───
 
     it('should redirect when callbackUrl is a valid same-origin path', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/some-page', '/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -250,10 +259,7 @@ describe('proxy middleware', () => {
     });
 
     it('should NOT redirect when callbackUrl is an absolute URL', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/some-page', 'https://evil.com/steal');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -264,10 +270,7 @@ describe('proxy middleware', () => {
     });
 
     it('should NOT redirect when callbackUrl starts with // (protocol-relative URL)', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/some-page', '//evil.com/steal');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -280,7 +283,7 @@ describe('proxy middleware', () => {
 
   describe('admin routes', () => {
     it('redirects unauthenticated users from admin to signin', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/admin');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -292,7 +295,7 @@ describe('proxy middleware', () => {
     });
 
     it('redirects unauthenticated users from admin sub-routes to signin', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/admin/users');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -304,10 +307,8 @@ describe('proxy middleware', () => {
     });
 
     it('returns 403 for non-admin users accessing admin routes', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
+      withCachedRole('user');
       const request = createMockRequest('/admin');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -318,10 +319,8 @@ describe('proxy middleware', () => {
 
     it('logs unauthorized admin access attempts', async () => {
       const consoleSpy = vi.spyOn(console, 'warn');
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
+      withCachedRole('user');
       const request = createMockRequest('/admin/dashboard', null, {
         'x-forwarded-for': '192.168.1.1',
       });
@@ -331,7 +330,6 @@ describe('proxy middleware', () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         'Unauthorized admin access attempt:',
         expect.objectContaining({
-          userId: 'user-123',
           attemptedPath: '/admin/dashboard',
           userRole: 'user',
           ip: '192.168.1.1',
@@ -341,10 +339,8 @@ describe('proxy middleware', () => {
 
     it('logs unauthorized access with x-real-ip header', async () => {
       const consoleSpy = vi.spyOn(console, 'warn');
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
+      withCachedRole('user');
       const request = createMockRequest('/admin', null, {
         'x-real-ip': '10.0.0.1',
       });
@@ -361,10 +357,8 @@ describe('proxy middleware', () => {
 
     it('logs unauthorized access with null IP when no headers present', async () => {
       const consoleSpy = vi.spyOn(console, 'warn');
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
+      withCachedRole('user');
       const request = createMockRequest('/admin');
 
       await middleware(request as unknown as NextRequest);
@@ -377,29 +371,22 @@ describe('proxy middleware', () => {
       );
     });
 
-    it('logs unauthorized access with "none" role when user has no role', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn');
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: {},
-      });
+    it('falls through (optimistic) when the cache yields no role', async () => {
+      // Cache miss must not hard-deny a possibly-valid admin at the edge; the
+      // authoritative withAdmin check decides server-side.
+      signedIn();
+      withCachedRole(undefined);
       const request = createMockRequest('/admin');
 
-      await middleware(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Unauthorized admin access attempt:',
-        expect.objectContaining({
-          userRole: 'none',
-        })
-      );
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
     });
 
     it('allows admin users to access admin routes', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'admin-123',
-        user: { role: 'admin' },
-      });
+      signedIn();
+      withCachedRole('admin');
       const request = createMockRequest('/admin');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -409,11 +396,21 @@ describe('proxy middleware', () => {
     });
 
     it('allows admin users to access admin sub-routes', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'admin-123',
-        user: { role: 'admin' },
-      });
+      signedIn();
+      withCachedRole('admin');
       const request = createMockRequest('/admin/users/edit');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('falls through (optimistic) when the cookie cache cannot be read', async () => {
+      // A null cache must not lock a real admin out at the edge.
+      signedIn();
+      vi.mocked(getCookieCache).mockResolvedValue(null);
+      const request = createMockRequest('/admin');
 
       const result = await middleware(request as unknown as NextRequest);
 
@@ -424,7 +421,7 @@ describe('proxy middleware', () => {
 
   describe('unauthenticated routes (non-public, non-private)', () => {
     it('redirects unauthenticated users to signin for non-public routes', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
+      signedOut();
       const request = createMockRequest('/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -437,10 +434,7 @@ describe('proxy middleware', () => {
     });
 
     it('allows authenticated users to access general routes', async () => {
-      vi.mocked(getToken).mockResolvedValue({
-        sub: 'user-123',
-        user: { role: 'user' },
-      });
+      signedIn();
       const request = createMockRequest('/dashboard');
 
       const result = await middleware(request as unknown as NextRequest);
@@ -450,49 +444,29 @@ describe('proxy middleware', () => {
     });
   });
 
-  describe('token retrieval', () => {
-    it('uses production cookie name in production environment', async () => {
-      vi.stubEnv('NODE_ENV', 'production');
-
-      vi.mocked(getToken).mockResolvedValue(null);
+  describe('session cookie presence', () => {
+    it('reads the better-auth session cookie with the boudreaux prefix', async () => {
+      signedOut();
       const request = createMockRequest('/');
 
       await middleware(request as unknown as NextRequest);
 
-      expect(getToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cookieName: '__Secure-next-auth.session-token',
-        })
-      );
-
-      vi.unstubAllEnvs();
-    });
-
-    it('uses development cookie name in non-production environment', async () => {
-      vi.mocked(getToken).mockResolvedValue(null);
-      const request = createMockRequest('/');
-
-      await middleware(request as unknown as NextRequest);
-
-      expect(getToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cookieName: 'next-auth.session-token',
-        })
+      expect(getSessionCookie).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({ cookiePrefix: 'boudreaux' })
       );
     });
 
-    it('passes AUTH_SECRET to getToken', async () => {
-      vi.stubEnv('AUTH_SECRET', 'test-secret');
-
-      vi.mocked(getToken).mockResolvedValue(null);
-      const request = createMockRequest('/');
+    it('reads the optimistic role from the cookie cache for admin routes', async () => {
+      signedIn();
+      withCachedRole('admin');
+      const request = createMockRequest('/admin');
 
       await middleware(request as unknown as NextRequest);
 
-      expect(getToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          secret: 'test-secret',
-        })
+      expect(getCookieCache).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({ cookiePrefix: 'boudreaux' })
       );
     });
   });

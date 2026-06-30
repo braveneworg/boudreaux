@@ -24,6 +24,8 @@ interface Session {
     email: string;
     name: string;
     role: string;
+    /** better-auth admin plugin: set to `true` when the account is banned. */
+    banned?: boolean | null;
   };
 }
 

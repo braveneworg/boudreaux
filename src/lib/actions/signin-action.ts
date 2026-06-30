@@ -7,7 +7,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { signIn } from '@/auth';
+import { auth } from '@/lib/auth';
 import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -28,15 +28,18 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   const headersList = await headers();
   const ip = resolveClientIp(headersList);
 
-  // Check rate limit
-  try {
-    await limiter.check(5, ip); // 5 requests per minute per IP
-  } catch {
-    return {
-      success: false,
-      errors: { general: ['Too many signin attempts. Please try again later.'] },
-      fields: {},
-    };
+  // Check rate limit. Skipped under E2E (shards share one IP, same opt-out as
+  // `withRateLimit`) so the suite isn't tripped by the 5/min/IP limit.
+  if (process.env.E2E_MODE !== 'true') {
+    try {
+      await limiter.check(5, ip); // 5 requests per minute per IP
+    } catch {
+      return {
+        success: false,
+        errors: { general: ['Too many signin attempts. Please try again later.'] },
+        fields: {},
+      };
+    }
   }
 
   // Verify Turnstile token
@@ -67,9 +70,13 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     try {
       const { email } = formState.fields;
 
-      // Redirect happens below because next throws an error if you redirect inside a try/catch
-      // The property redirectTo is responsible for the magic link callback URL
-      await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
+      // Trigger better-auth's magic-link send. `callbackURL` is the post-verify
+      // landing page. The redirect happens below — `next` throws if you redirect
+      // inside a try/catch.
+      await auth.api.signInMagicLink({
+        body: { email: email as string, callbackURL: '/', errorCallbackURL: '/signin' },
+        headers: headersList,
+      });
 
       formState.success = true;
     } catch (error) {

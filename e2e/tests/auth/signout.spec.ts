@@ -10,14 +10,17 @@ import { test, expect } from '../../fixtures/base.fixture';
 test.use({ ...devices['Pixel 5'] });
 
 test.describe('Signout Flow', () => {
-  test('should sign out successfully when clicking sign out button', async ({ userPage }) => {
-    await userPage.goto('/');
+  // Uses the dedicated disposable sign-out session (NOT the shared regular
+  // session): better-auth deletes the session row on sign-out, so this must own
+  // a session no other spec depends on.
+  test('should sign out successfully when clicking sign out button', async ({ signOutPage }) => {
+    await signOutPage.goto('/');
 
     // Open the hamburger menu to access auth controls
-    await userPage.getByRole('button', { name: /open menu/i }).click();
+    await signOutPage.getByRole('button', { name: /open menu/i }).click();
 
     // The signed-in toolbar shows a "Sign Out" button inside the sheet
-    const signOutButton = userPage.getByRole('button', { name: /sign out/i });
+    const signOutButton = signOutPage.getByRole('button', { name: /sign out/i });
     await expect(signOutButton).toBeVisible({ timeout: 10_000 });
 
     await signOutButton.click();
@@ -34,9 +37,9 @@ test.describe('Signout Flow', () => {
     // compound so a sheet lost to the remount just gets reopened.
     await expect(async () => {
       // Close any half-open sheet from a previous attempt before clicking.
-      await userPage.keyboard.press('Escape');
-      await userPage.getByRole('button', { name: /open menu/i }).click({ timeout: 2_000 });
-      await expect(userPage.getByRole('link', { name: /sign in/i })).toBeVisible({
+      await signOutPage.keyboard.press('Escape');
+      await signOutPage.getByRole('button', { name: /open menu/i }).click({ timeout: 2_000 });
+      await expect(signOutPage.getByRole('link', { name: /sign in/i })).toBeVisible({
         timeout: 2_000,
       });
     }).toPass({ timeout: 15_000 });
@@ -65,5 +68,34 @@ test.describe('Signout Flow', () => {
     await expect(adminPage.getByRole('link', { name: 'Admin', exact: true })).toBeVisible({
       timeout: 10_000,
     });
+  });
+});
+
+// The signout success page (/success/signout) is a static public page. It is
+// not auto-navigated to by the Sign Out button (that pushes "/"), but it is
+// linked from emails / direct navigation, so cover its redesigned copy + CTAs.
+// It is fully responsive; the file-level Pixel 5 viewport is fine here.
+test.describe('Signout success page', () => {
+  test('renders the signed-out confirmation heading', async ({ page }) => {
+    await page.goto('/success/signout');
+    await expect(page.getByRole('heading', { name: "You're signed out." })).toBeVisible();
+  });
+
+  test('explains the session ended', async ({ page }) => {
+    await page.goto('/success/signout');
+    await expect(page.getByText('You have been successfully signed out.')).toBeVisible();
+  });
+
+  test('offers a sign-back-in CTA pointing at /signin', async ({ page }) => {
+    await page.goto('/success/signout');
+    await expect(page.getByRole('link', { name: 'Sign back in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+  });
+
+  test('offers a homepage link', async ({ page }) => {
+    await page.goto('/success/signout');
+    await expect(page.getByRole('link', { name: 'Go to homepage' })).toHaveAttribute('href', '/');
   });
 });

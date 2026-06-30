@@ -1,7 +1,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Bell, CalendarDays, Disc, MessageSquare, ScrollText, Star, Users } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  Disc,
+  MessageSquare,
+  ScrollText,
+  Settings,
+  Star,
+  Users,
+} from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
 
@@ -60,5 +69,11 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: '/admin/logging',
     icon: ScrollText,
     help: 'Temporarily change the runtime log level for diagnostics.',
+  },
+  {
+    label: 'Settings',
+    href: '/admin/settings',
+    icon: Settings,
+    help: 'Manage site-wide settings such as pausing new signups.',
   },
 ] as const;

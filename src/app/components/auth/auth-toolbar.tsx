@@ -5,8 +5,8 @@
 
 import { usePathname } from 'next/navigation';
 
-import { useSession } from 'next-auth/react';
-
+import { useSession } from '@/app/hooks/use-session';
+import type { ClientSessionData } from '@/app/hooks/use-session';
 import { CONSTANTS } from '@/lib/constants';
 import { log } from '@/lib/utils/console-logger';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -17,12 +17,10 @@ import { SignInLink } from './signin-link';
 import { SignedInToolbar } from './signout-button';
 import { SignUpLink } from './signup-link';
 
-import type { Session } from 'next-auth';
-
 const LOGGING_PREFIX = '[AuthToolbar]';
 
 /** Emits the development-only session diagnostics for the toolbar. */
-const logToolbarSession = (session: Session | null, status: string): void => {
+const logToolbarSession = (session: ClientSessionData | null, status: string): void => {
   log(LOGGING_PREFIX, 'Session status:', status);
   log(LOGGING_PREFIX, 'Session data:', session);
   log(LOGGING_PREFIX, 'User data:', session?.user);
@@ -30,7 +28,7 @@ const logToolbarSession = (session: Session | null, status: string): void => {
 };
 
 /** Logs the resolved admin role (or N/A) for an authenticated admin in development. */
-const logAdminRole = (session: Session): void => {
+const logAdminRole = (session: ClientSessionData): void => {
   log(LOGGING_PREFIX, 'User role:', session.user.role || CONSTANTS.NA);
 };
 

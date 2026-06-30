@@ -1,11 +1,17 @@
 # Production Environment Variables Setup Guide
 
+> **Canonical reference:** for the authoritative, code-derived list of auth env
+> vars + services + setup steps, see
+> [`better-auth-setup-guide.md`](./better-auth-setup-guide.md). This doc focuses
+> on the **deployment mechanics** (GitHub Secrets → EC2). Auth specifics here
+> have been reconciled with the better-auth + AWS SES migration.
+
 ## Problem
 
 The application fails in production with:
 
 ```
-Error: Missing required environment variables: DATABASE_URL, AUTH_SECRET, EMAIL_SERVER_HOST, EMAIL_SERVER_USER, EMAIL_SERVER_PASSWORD, EMAIL_FROM
+Error: Missing required environment variables: DATABASE_URL, AUTH_SECRET, CLOUDFLARE_SECRET, EMAIL_FROM, AWS_ACCESS_KEY_ID, ...
 ```
 
 ## Solution Overview
@@ -26,20 +32,29 @@ Add the following secrets:
 | ----------------------- | ------------------------------------ | ---------------------------------------------------------------------------- |
 | `DATABASE_URL`          | MongoDB connection string            | `mongodb+srv://user:pass@cluster.mongodb.net/db?retryWrites=true&w=majority` |
 | `AUTH_SECRET`           | 32+ character random string for auth | Generate with: `openssl rand -base64 32`                                     |
-| `NEXTAUTH_URL`          | Your production URL                  | `https://yourdomain.com`                                                     |
-| `EMAIL_SERVER_HOST`     | SMTP server hostname                 | `smtp.sendgrid.net` or `smtp.gmail.com`                                      |
-| `EMAIL_SERVER_USER`     | SMTP username                        | `apikey` (SendGrid) or your email                                            |
-| `EMAIL_SERVER_PASSWORD` | SMTP password                        | Your SMTP password or API key                                                |
-| `EMAIL_FROM`            | From email address                   | `noreply@yourdomain.com`                                                     |
+| `AUTH_URL`              | Your production URL (better-auth)    | `https://fakefourrecords.com`                                                |
+| `EMAIL_FROM`            | SES-verified from address            | `noreply@fakefourrecords.com`                                                |
+| `AWS_ACCESS_KEY_ID`     | AWS creds for SES + S3 (runtime)     | `AKIA…`                                                                      |
+| `AWS_SECRET_ACCESS_KEY` | AWS creds for SES + S3 (runtime)     | `<secret>`                                                                   |
+| `AWS_REGION`            | SES region                           | `us-east-1`                                                                  |
+
+> **Magic-link delivery is AWS SES, not SMTP.** The app sends via the SES SDK
+> (`SendRawEmailCommand`), so the AWS credentials above are what matter for
+> sign-in email. The old `EMAIL_SERVER_*` SMTP vars have been removed — do not
+> set them.
 
 #### Optional Secrets
 
-| Secret Name                       | Description              | Default |
-| --------------------------------- | ------------------------ | ------- |
-| `EMAIL_SERVER_PORT`               | SMTP port                | `587`   |
-| `GOOGLE_CLIENT_ID`                | Google OAuth client ID   | -       |
-| `GOOGLE_CLIENT_SECRET`            | Google OAuth secret      | -       |
-| `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` | Cloudflare Turnstile key | -       |
+| Secret Name                       | Description                                | Default |
+| --------------------------------- | ------------------------------------------ | ------- |
+| `AUTH_DISABLE_SIGNUP`             | `"true"` pauses new signups (env override) | open    |
+| `GOOGLE_CLIENT_ID`                | Google OAuth client ID                     | -       |
+| `GOOGLE_CLIENT_SECRET`            | Google OAuth secret                        | -       |
+| `FACEBOOK_CLIENT_ID` / `_SECRET`  | Facebook OAuth                             | -       |
+| `TWITTER_CLIENT_ID` / `_SECRET`   | X/Twitter OAuth                            | -       |
+| `APPLE_CLIENT_ID` / `_SECRET`     | Apple OAuth (`_SECRET` is a generated JWT) | -       |
+| `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` | Cloudflare Turnstile key                   | -       |
+| `CLOUDFLARE_SECRET`               | Turnstile server-side verify secret        | -       |
 
 ### 2. Generate Strong AUTH_SECRET
 
@@ -55,43 +70,28 @@ Or use Node.js:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-### 3. Email Provider Setup
+### 3. Email Delivery Setup — AWS SES
 
-#### Option A: SendGrid (Recommended for production)
+Transactional email (including the magic-link sign-in email) is sent through the
+**AWS SES SDK**, not SMTP. There is no SMTP host/user/password to configure for
+delivery — only AWS credentials, a region, and a verified `EMAIL_FROM`.
 
-1. Sign up at [sendgrid.com](https://sendgrid.com)
-2. Create an API key in Settings → API Keys
-3. Use these values:
+1. In the AWS console, open **SES** in your target region.
+2. **Verify the sender identity** — verify the `EMAIL_FROM` domain (set up DKIM)
+   or at minimum the individual address.
+3. **Request production access** — a new SES account is sandboxed and can only
+   send to verified recipients. Request a sending-limit increase before launch.
+4. Create an **IAM user/role** with `ses:SendRawEmail` (and the S3 permissions
+   the app already needs for presigned URLs), and use its credentials:
    ```
-   EMAIL_SERVER_HOST=smtp.sendgrid.net
-   EMAIL_SERVER_PORT=587
-   EMAIL_SERVER_USER=apikey
-   EMAIL_SERVER_PASSWORD=<your_sendgrid_api_key>
-   EMAIL_FROM=noreply@yourdomain.com
-   ```
-
-#### Option B: Gmail (For testing)
-
-1. Enable 2-factor authentication on your Google account
-2. Generate an App Password: [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-3. Use these values:
-   ```
-   EMAIL_SERVER_HOST=smtp.gmail.com
-   EMAIL_SERVER_PORT=587
-   EMAIL_SERVER_USER=your.email@gmail.com
-   EMAIL_SERVER_PASSWORD=<app_password>
-   EMAIL_FROM=your.email@gmail.com
+   AWS_ACCESS_KEY_ID=<access_key>
+   AWS_SECRET_ACCESS_KEY=<secret_key>
+   AWS_REGION=us-east-1
+   EMAIL_FROM=noreply@fakefourrecords.com
    ```
 
-#### Option C: AWS SES
-
-```
-EMAIL_SERVER_HOST=email-smtp.us-east-1.amazonaws.com
-EMAIL_SERVER_PORT=587
-EMAIL_SERVER_USER=<your_smtp_username>
-EMAIL_SERVER_PASSWORD=<your_smtp_password>
-EMAIL_FROM=verified@yourdomain.com
-```
+> The old `EMAIL_SERVER_*` SMTP vars are gone — not used for delivery and no
+> longer required at boot. Do not set them.
 
 ### 4. Verify GitHub Actions Workflow
 
@@ -192,16 +192,19 @@ docker exec website env | grep AUTH_SECRET
 - Special characters in password must be URL-encoded
 - Format: `mongodb+srv://username:password@host/database?options`
 
-### Error: SMTP Authentication failed
+### Error: magic-link email not sending
 
-**Cause**: Wrong email credentials or server
+**Cause**: SES misconfiguration (delivery is SES, not SMTP)
 
 **Fix**:
 
-- Verify EMAIL_SERVER_HOST is correct
-- For Gmail, ensure you're using an App Password (not your regular password)
-- For SendGrid, username should be literally "apikey"
-- Check firewall allows outbound SMTP connections (port 587 or 465)
+- Ensure `EMAIL_FROM` is set **and** verified in SES for the configured region.
+- Verify `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` are present
+  and the IAM identity has `ses:SendRawEmail`.
+- If still sandboxed, SES only delivers to verified recipients — request
+  production access.
+- `EMAIL_FROM is not configured` in logs ⇒ `EMAIL_FROM` is unset.
+- Do **not** chase SMTP ports/firewall — no SMTP socket is used.
 
 ### Container starts but environment variables are missing
 
@@ -226,27 +229,30 @@ Complete list of all environment variables the application uses:
 
 - `DATABASE_URL` - MongoDB connection string
 - `AUTH_SECRET` - Authentication secret (32+ chars)
-- `EMAIL_SERVER_HOST` - SMTP server
-- `EMAIL_SERVER_USER` - SMTP username
-- `EMAIL_SERVER_PASSWORD` - SMTP password
-- `EMAIL_FROM` - Sender email address
+- `EMAIL_FROM` - SES-verified sender address
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` - SES + S3
+- (see `env-validation.ts` for the full required list: Stripe, Pusher, Upstash,
+  Cloudflare, bio-generator Lambda, etc.)
 
 ### Optional (Has defaults or gracefully degrades)
 
 - `NODE_ENV` - Environment (`production`, `development`) - Default: `development`
-- `NEXTAUTH_URL` - Application URL - Default: `http://localhost:3000`
-- `EMAIL_SERVER_PORT` - SMTP port - Default: `587`
-- `GOOGLE_CLIENT_ID` - Google OAuth (optional)
-- `GOOGLE_CLIENT_SECRET` - Google OAuth (optional)
-- `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` - Turnstile CAPTCHA (optional)
+- `AUTH_URL` - Canonical app URL for better-auth (base URL + OAuth callbacks)
+- `AUTH_DISABLE_SIGNUP` - `"true"` pauses new signups - Default: open
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth (per provider)
+- `FACEBOOK_*` / `TWITTER_*` / `APPLE_*` - other OAuth providers (per provider)
+- `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` / `CLOUDFLARE_SECRET` - Turnstile CAPTCHA
 - `NEXT_TELEMETRY_DISABLED` - Disable Next.js telemetry - Default: `1`
 
-### AWS/CDN (Used by scripts, not runtime)
+### AWS/CDN (Used at runtime AND by scripts)
+
+AWS credentials are now used **at runtime** (SES email delivery + S3 presigned
+URLs), not only by scripts.
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
-- `S3_BUCKET`
+- `AWS_S3_BUCKET_NAME` (runtime; `S3_BUCKET` is used by some scripts)
 - `CDN_DOMAIN`
 - `CLOUDFRONT_DISTRIBUTION_ID`
 
@@ -273,4 +279,4 @@ Then fill in your local development values. Never commit `.env.local` to git.
 - `docker-compose.yml` - Local development configuration
 - `docker-compose.prod.yml` - Production configuration
 - `.github/workflows/deploy.yml` - CI/CD pipeline
-- `src/app/lib/config/env-validation.ts` - Environment validation logic
+- `src/lib/config/env-validation.ts` - Environment validation logic

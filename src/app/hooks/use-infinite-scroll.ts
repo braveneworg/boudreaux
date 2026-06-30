@@ -50,6 +50,9 @@ export const useInfiniteScroll = (
 
     const observer = new IntersectionObserver(
       (entries) => {
+        // Don't trigger if the sentinel is not visible (e.g., scrolled out of view).
+        if (entries[0]?.intersectionRatio <= 0) return;
+
         if (entries[0]?.isIntersecting) {
           fetchNextPage();
         }

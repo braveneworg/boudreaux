@@ -50,7 +50,7 @@ export const UserService = {
         email,
         name: 'Admin',
         role,
-        emailVerified: new Date(),
+        emailVerified: true,
       });
       loggers.auth.info(`✅ Admin user, ${email}, created.`);
     } else {
@@ -102,7 +102,7 @@ export const UserService = {
     try {
       const newUser = await UserRepository.createGuest({
         email,
-        emailVerified: new Date(),
+        emailVerified: true,
         username: placeholderUsername,
       });
       return { id: newUser.id, created: true };

@@ -40,12 +40,12 @@ vi.mock('./logo', () => ({
   ),
 }));
 
-// Mock DesktopMenu component (it depends on next-auth's useSession)
+// Mock DesktopMenu component (it depends on the client session hook)
 vi.mock('../desktop-menu', () => ({
   DesktopMenu: () => <div data-testid="desktop-menu">DesktopMenu</div>,
 }));
 
-// Mock DesktopAuthMenu component (it depends on next-auth's useSession)
+// Mock DesktopAuthMenu component (it depends on the client session hook)
 vi.mock('../desktop-auth-menu', () => ({
   DesktopAuthMenu: () => <div data-testid="desktop-auth-menu">DesktopAuthMenu</div>,
 }));

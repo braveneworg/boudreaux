@@ -7,6 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import type { ServerSession } from '@/lib/auth/get-server-session';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 import type { FormState } from '@/lib/types/form-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
@@ -18,7 +19,6 @@ import {
 } from '@/lib/validation/banner-notification-schema';
 
 import type { AdminActionResult } from './run-admin-entity-action';
-import type { Session } from 'next-auth';
 
 const logger = loggers.notifications;
 
@@ -75,7 +75,7 @@ export const createOrUpdateBannerNotificationAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  let session: Session;
+  let session: ServerSession;
   try {
     session = await requireRole('admin');
   } catch {

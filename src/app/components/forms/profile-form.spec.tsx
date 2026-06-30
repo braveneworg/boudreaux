@@ -57,7 +57,7 @@ vi.mock('@/lib/validation/profile-schema', () => ({ profileSchema: 'profile' }))
 vi.mock('@/lib/validation/change-email-schema', () => ({ changeEmailSchema: 'email' }));
 vi.mock('@/lib/validation/change-username-schema', () => ({ changeUsernameSchema: 'username' }));
 
-vi.mock('next-auth/react', () => ({
+vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => useSessionMock(),
 }));
 
@@ -98,6 +98,17 @@ vi.mock('@/app/components/auth/generate-username-button', () => ({
 
 vi.mock('@/ui/switch', () => ({
   Switch: (props: { id: string }) => <button type="button" id={props.id} aria-pressed={false} />,
+}));
+
+vi.mock('@/app/hooks/use-connected-accounts', () => ({
+  useConnectedAccounts: () => ({ accounts: [], isLoading: false, error: null, refetch: vi.fn() }),
+}));
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    linkSocial: vi.fn(),
+    unlinkAccount: vi.fn(),
+  },
 }));
 
 const buildUser = (overrides: Record<string, unknown> = {}) => ({
