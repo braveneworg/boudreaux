@@ -31,7 +31,7 @@ type BreadcrumbMenuProps = {
 export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
   <div
     data-slot="breadcrumb-menu"
-    className={cn('relative left-5 mt-1 flex items-center gap-2 text-sm', className)}
+    className={cn('relative left-5 mt-1 mb-2 flex items-center gap-2 text-sm', className)}
   >
     <Link href="/" className="hover:text-foreground text-zinc-950 transition-colors">
       <Home className="size-5" />
