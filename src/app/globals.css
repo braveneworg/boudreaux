@@ -248,14 +248,27 @@
   --card-accent-soft: oklch(0.63 0.04 73);
 }
 
-/* Punk-zine text inputs inside profile cards — hard black borders + square
-   corners matching the sign-in/up email field. Unlayered so it overrides the
-   shadcn Input's default utilities (rounded-md / border-input). */
-.profile-accent input[data-slot='input'] {
+/* Punk-zine form controls inside profile cards — hard black borders + square
+   corners matching the sign-in/up email field. Covers text inputs, textareas,
+   combobox triggers (State/Country) and Select triggers. Keyed off tag/role
+   (FormControl's Radix Slot rewrites `data-slot` on inputs); unlayered + the
+   descendant selectors outrank the shadcn Input/Button utilities. The toggle
+   switches are intentionally excluded so they keep their pill shape. */
+.profile-accent input,
+.profile-accent textarea,
+.profile-accent [role='combobox'],
+.profile-accent [data-slot='select-trigger'] {
   border-radius: 0;
   border-width: 2px;
   border-color: #000;
   background-color: var(--color-zinc-50);
+}
+
+.profile-accent input:focus-visible,
+.profile-accent textarea:focus-visible,
+.profile-accent [role='combobox']:focus-visible,
+.profile-accent [data-slot='select-trigger']:focus-visible {
+  --tw-ring-color: var(--card-accent);
 }
 
 /* Banner notification strip — link color variants */
