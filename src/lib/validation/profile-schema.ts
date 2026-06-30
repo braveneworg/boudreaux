@@ -65,6 +65,7 @@ export const profileSchema = z.object({
     .optional()
     .or(z.literal('')),
   allowSmsNotifications: z.boolean().optional(),
+  allowEmailNotifications: z.boolean().optional(),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;

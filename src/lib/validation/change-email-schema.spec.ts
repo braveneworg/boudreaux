@@ -108,5 +108,14 @@ describe('changeEmailSchema', () => {
       const result = changeEmailSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
     });
+
+    it('should accept an optional allowEmailNotifications boolean', () => {
+      const result = changeEmailSchema.safeParse({
+        email: 'test@example.com',
+        confirmEmail: 'test@example.com',
+        allowEmailNotifications: true,
+      });
+      expect(result.success).toBe(true);
+    });
   });
 });

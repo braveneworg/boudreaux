@@ -13,6 +13,9 @@ export const changeEmailSchema = z
     email: emailRegex,
     confirmEmail: emailRegex,
     previousEmail: z.string().optional(),
+    // Email opt-in is surfaced next to the change-email controls so this form
+    // can persist it too (the profile Save persists it as well).
+    allowEmailNotifications: z.boolean().optional(),
   })
   .refine((data) => data.email === data.confirmEmail, {
     message: 'Email addresses do not match',

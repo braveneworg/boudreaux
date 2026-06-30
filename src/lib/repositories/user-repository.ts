@@ -107,11 +107,20 @@ export class UserRepository {
    * downstream flows (audit, re-verification) can reference it. Returns the full
    * user payload.
    */
-  static async updateEmail(id: string, email: string, previousEmail: string): Promise<User> {
+  static async updateEmail(
+    id: string,
+    email: string,
+    previousEmail: string,
+    allowEmailNotifications?: boolean
+  ): Promise<User> {
     return runQuery(() =>
       prisma.user.update({
         where: { id },
-        data: { email, previousEmail },
+        data: {
+          email,
+          previousEmail,
+          ...(allowEmailNotifications === undefined ? {} : { allowEmailNotifications }),
+        },
         include: userFullInclude,
       })
     ) as Promise<User>;

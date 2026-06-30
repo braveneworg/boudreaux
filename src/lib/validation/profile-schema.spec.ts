@@ -339,5 +339,30 @@ describe('profile-schema', () => {
         expect(result.success).toBe(true);
       });
     });
+
+    describe('allowEmailNotifications validation', () => {
+      it('should accept a boolean value', () => {
+        const result = profileSchema.safeParse({
+          firstName: 'John',
+          lastName: 'Doe',
+          allowEmailNotifications: true,
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should allow undefined allowEmailNotifications', () => {
+        const result = profileSchema.safeParse({ firstName: 'John', lastName: 'Doe' });
+        expect(result.success).toBe(true);
+      });
+
+      it('should reject a non-boolean value', () => {
+        const result = profileSchema.safeParse({
+          firstName: 'John',
+          lastName: 'Doe',
+          allowEmailNotifications: 'yes',
+        });
+        expect(result.success).toBe(false);
+      });
+    });
   });
 });

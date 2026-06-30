@@ -118,12 +118,46 @@ describe('changeEmailAction', () => {
       expect(mockUpdateEmail).toHaveBeenCalledWith(
         'user-123',
         'newemail@example.com',
-        'oldemail@example.com'
+        'oldemail@example.com',
+        undefined
       );
 
       expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
       expect(mockRedirect).toHaveBeenCalledWith(
         '/success/change-email?email=newemail%40example.com'
+      );
+    });
+
+    it('persists the email opt-in alongside the email change', async () => {
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: { fields: {}, success: false, hasTimeout: false, errors: {} },
+        parsed: {
+          success: true,
+          data: {
+            email: 'newemail@example.com',
+            confirmEmail: 'newemail@example.com',
+            previousEmail: 'oldemail@example.com',
+            allowEmailNotifications: true,
+          },
+        },
+      });
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123', email: 'oldemail@example.com' },
+      });
+      vi.mocked(mockUpdateEmail).mockResolvedValue({ id: 'user-123' });
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      await expect(changeEmailAction(mockInitialState, mockFormData)).rejects.toThrow(
+        'NEXT_REDIRECT'
+      );
+
+      expect(mockUpdateEmail).toHaveBeenCalledWith(
+        'user-123',
+        'newemail@example.com',
+        'oldemail@example.com',
+        true
       );
     });
 
@@ -172,7 +206,8 @@ describe('changeEmailAction', () => {
       expect(mockUpdateEmail).toHaveBeenCalledWith(
         'user-123',
         'newemail@example.com',
-        'session@example.com'
+        'session@example.com',
+        undefined
       );
     });
 
@@ -218,7 +253,12 @@ describe('changeEmailAction', () => {
         'NEXT_REDIRECT'
       );
 
-      expect(mockUpdateEmail).toHaveBeenCalledWith('user-123', 'newemail@example.com', '');
+      expect(mockUpdateEmail).toHaveBeenCalledWith(
+        'user-123',
+        'newemail@example.com',
+        '',
+        undefined
+      );
     });
 
     it('should set hasTimeout to false on successful update', async () => {

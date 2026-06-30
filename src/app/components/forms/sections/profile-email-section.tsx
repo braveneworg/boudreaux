@@ -19,6 +19,8 @@ interface ProfileEmailSectionProps {
   isPending: boolean;
   isTransitionPending: boolean;
   onEditToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Email opt-in toggle, rendered just above the Edit/Save buttons. */
+  emailOptIn?: React.ReactNode;
 }
 
 export const ProfileEmailSection = ({
@@ -28,6 +30,7 @@ export const ProfileEmailSection = ({
   isPending,
   isTransitionPending,
   onEditToggle,
+  emailOptIn,
 }: ProfileEmailSectionProps): React.ReactElement => {
   const isDirty = form.formState.isDirty;
   const isSaving = isPending || isTransitionPending;
@@ -76,6 +79,7 @@ export const ProfileEmailSection = ({
                 <input type="hidden" {...form.register('previousEmail')} />
               </>
             )}
+            {emailOptIn}
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={onEditToggle} data-field="email">
                 {isEditing ? 'Cancel' : 'Edit Email'}
