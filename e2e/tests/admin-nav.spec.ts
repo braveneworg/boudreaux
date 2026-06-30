@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
  * The nav lives in the admin layout, so it must render on the dashboard and on
  * every section page/subpage, in importance order with the current section
  * marked. Links are ordered: Releases, Featured Artists, Artists, Notifications,
- * Chat, Tours, Logging.
+ * Chat, Tours, Logging, Settings.
  */
 
 const NAV_ORDER = [
@@ -22,6 +22,7 @@ const NAV_ORDER = [
   'Chat',
   'Tours',
   'Logging',
+  'Settings',
 ];
 
 const adminNav = (adminPage: Page) =>
