@@ -31,7 +31,6 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 import { changeUsernameSchema as usernameSchema } from '@/lib/validation/change-username-schema';
 import { profileSchema } from '@/lib/validation/profile-schema';
-import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -445,15 +444,15 @@ export const ProfileForm = (): React.ReactElement => {
   );
 
   return (
-    <>
+    // Tan accent (matches the PROFILE kraft heading); the punk-styled section
+    // cards self-separate, so no rules between them.
+    <div className="profile-accent space-y-10">
       <ProfilePersonalSection
         form={personalProfileForm}
         onSubmit={onSubmitPersonalProfileForm}
         isPending={isPending}
         isTransitionPending={isTransitionPending}
       />
-
-      <Separator />
 
       <ProfileEmailSection
         form={changeEmailForm}
@@ -465,8 +464,6 @@ export const ProfileForm = (): React.ReactElement => {
         emailOptIn={emailOptInToggle}
       />
 
-      <Separator />
-
       <ProfileUsernameSection
         form={changeUsernameForm}
         onSubmit={onSubmitEditUsername}
@@ -477,9 +474,7 @@ export const ProfileForm = (): React.ReactElement => {
         onEditToggle={handleEditFieldButtonClick}
       />
 
-      <Separator />
-
       <ConnectedAccountsSection />
-    </>
+    </div>
   );
 };

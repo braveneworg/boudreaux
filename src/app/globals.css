@@ -241,6 +241,23 @@
   --card-accent-soft: var(--color-menu-item-teal-200);
 }
 
+/* Profile cards — kraft/cardboard brown to match the PROFILE ransom heading's
+   paper (darker than the tan palette goes, so set explicitly). */
+@utility profile-accent {
+  --card-accent: oklch(0.53 0.035 73);
+  --card-accent-soft: oklch(0.63 0.04 73);
+}
+
+/* Punk-zine text inputs inside profile cards — hard black borders + square
+   corners matching the sign-in/up email field. Unlayered so it overrides the
+   shadcn Input's default utilities (rounded-md / border-input). */
+.profile-accent input[data-slot='input'] {
+  border-radius: 0;
+  border-width: 2px;
+  border-color: #000;
+  background-color: var(--color-zinc-50);
+}
+
 /* Banner notification strip — link color variants */
 
 @utility banner-strip-dark {

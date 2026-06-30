@@ -38,15 +38,11 @@ export const ProfileUsernameSection = ({
   const isSaving = isPending || isTransitionPending;
 
   return (
-    <Card>
+    <Card className="bg-menu-item-tan-100 relative rounded-none border-2 border-black shadow-[6px_6px_0_0_var(--card-accent)]">
       <CardContent className="p-6 sm:p-8">
-        <div className="mb-1 flex items-center gap-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-            Account
-          </p>
-        </div>
-
-        <h2 className="mb-4 text-xl font-bold tracking-tight">Username</h2>
+        <h2 className="font-fake-four-cutout mb-4 text-2xl tracking-wide text-black uppercase">
+          Username
+        </h2>
 
         <Separator className="mb-4" />
 
