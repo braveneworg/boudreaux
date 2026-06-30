@@ -22,8 +22,12 @@ interface GeminiResponse {
 const ALLOWED_TAGS =
   '<p>, <strong>, <b>, <em>, <i>, <ul>, <ol>, <li>, <a>, <img>, <h2>, <h3>, <h4>';
 
-/** Upper bound on completion length so an extensive, image-rich bio is not truncated. */
-const MAX_OUTPUT_TOKENS = 8192;
+/**
+ * Upper bound on completion length. Three bios (a ~2000–3500-word image-rich long
+ * bio plus the short and promotional alt bios) need far more headroom than the
+ * old 8192; this stays well within the Gemini Flash output ceiling.
+ */
+const MAX_OUTPUT_TOKENS = 16384;
 
 /** Combines real and display names for the research persona line. */
 const artistFullName = (facts: ArtistFacts): string =>
@@ -117,11 +121,13 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
     '- Weave SEVERAL inline <a href="..."> links to informative sources from the reference URLs,',
     "  each with VARIED, descriptive anchor text (e.g. the artist's official site, a Wikipedia",
     '  article) — never reuse one phrase and never write "click here".',
+    '- Optionally embed ONE inline <img src="image:N" alt="..."> from the Available images list',
+    '  above, where N is its 0-indexed position; the app swaps the placeholder for the hosted URL.',
     '- Use <strong>/<em> emphasis where it helps; keep it to prose, never a list of links.',
     '- Do NOT add a "Discovered Links"/"Sources"/"References" section and do NOT link to any',
     '  streaming/listening service.',
     '',
-    'longBio: an extensive, in-depth biography of roughly 800–1500 words. Requirements:',
+    'longBio: an extensive, in-depth biography of roughly 2000–3500 words. Requirements:',
     '- Organize into several <h2> sections (e.g. Background, Career, Musical style, Notable works,',
     '  Collaborations, Legacy), each with <h3> subheadings where the material warrants it.',
     '- Use rich formatting throughout: <strong> for key names/terms, <em> for emphasis, and',
@@ -134,12 +140,21 @@ const buildUserPrompt = (facts: ArtistFacts): string => {
     '- Do NOT add a "Sources", "References", or "Discovered Links" list, do NOT tell the reader to',
     '  visit a link, and do NOT link to any streaming/listening service.',
     '- Scale length down gracefully when sources are thin; never pad with invented detail.',
+    '',
+    'altBio: a punchy, high-energy PROMOTIONAL blurb of roughly 60–100 words — the kind of copy',
+    'used on a release page or press one-sheet. Requirements:',
+    '- A distinct, confident marketing voice, NOT the neutral tone of the short bio; lead with what',
+    '  makes the artist compelling. One or two short <p> paragraphs with <strong>/<em> for punch.',
+    '- Weave in ONE inline <a href="..."> link to an informative source from the reference URLs.',
+    '- Optionally embed ONE inline <img src="image:N" alt="..."> if a fitting image is available.',
+    '- Do NOT link to any streaming/listening service and do NOT add a links/sources section.',
     `Use only these HTML tags: ${ALLOWED_TAGS}.`,
     '',
     'Return JSON with this exact shape:',
     '{',
     '  "shortBio": "the 200+ word rich-HTML short bio with several inline informative links",',
     '  "longBio": "the extensive, image-rich HTML article described above",',
+    '  "altBio": "the punchy ~60-100 word promotional blurb described above",',
     '  "genres": "comma-separated genres or empty string",',
     '  "primaryImageIndexes": [indexes of the 2-3 images that best identify the artist]',
     '}',

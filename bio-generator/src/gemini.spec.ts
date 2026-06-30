@@ -110,14 +110,59 @@ describe('generateProse', () => {
     expect(userMessage).toContain('<ul>/<ol> lists');
   });
 
-  it('caps the completion length so an extensive bio is not truncated', async () => {
+  it('caps the completion length high enough for three image-rich bios', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, fetchFn);
 
     expect(
       JSON.parse(fetchFn.mock.calls[0][1].body).generationConfig.maxOutputTokens
-    ).toBeGreaterThan(2000);
+    ).toBeGreaterThanOrEqual(16384);
+  });
+
+  it('targets an extended long bio of roughly 2000-3500 words', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(userMessage).toContain('2000–3500 words');
+  });
+
+  it('instructs a punchy promotional alt bio and includes it in the JSON shape', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(userMessage).toContain('altBio:');
+    expect(userMessage).toContain('PROMOTIONAL');
+    expect(userMessage).toContain('"altBio"');
+  });
+
+  it('allows an inline image in the short bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const shortBioSection = userMessage.slice(
+      userMessage.indexOf('shortBio:'),
+      userMessage.indexOf('longBio:')
+    );
+    expect(shortBioSection).toContain('<img src="image:N"');
+  });
+
+  it('validates and returns an alt bio when present', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(
+        geminiResponse({ shortBio: 's', longBio: 'l', altBio: 'Punchy promo blurb.' })
+      );
+
+    const result = await generateProse(facts, 'k', undefined, fetchFn);
+
+    expect(result.altBio).toBe('Punchy promo blurb.');
   });
 
   it('uses the research persona naming the artist in the system prompt', async () => {

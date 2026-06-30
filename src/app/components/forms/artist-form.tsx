@@ -517,6 +517,7 @@ export const ArtistForm = ({
     (content: GeneratedBioContent): void => {
       setValue('shortBio', content.shortBio, { shouldDirty: true });
       setValue('bio', content.longBio, { shouldDirty: true });
+      setValue('altBio', content.altBio, { shouldDirty: true });
       if (content.genres) {
         setValue('genres', content.genres, { shouldDirty: true });
       }

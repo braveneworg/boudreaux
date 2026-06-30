@@ -37,16 +37,17 @@ test.describe('Admin AI bio generation', () => {
     // text content rather than a form value.
     const regenerate = adminPage.getByRole('button', { name: /regenerate bios/i });
     await expect(regenerate).toBeVisible({ timeout: 30_000 });
-    // `exact` disambiguates the discovered-links "Wikipedia" entry from the
-    // inline "their Wikipedia page" link Tiptap renders inside the bio editor.
-    await expect(adminPage.getByRole('link', { name: 'Wikipedia', exact: true })).toBeVisible();
+    // Scope to the discovered-links group so the assertion is unambiguous — other
+    // bio editors (long bio, alt bio) also render inline "Wikipedia" links.
+    const discoveredLinks = adminPage.getByRole('group', { name: 'Discovered links' });
+    await expect(discoveredLinks.getByRole('link', { name: 'Wikipedia' })).toBeVisible();
     await expect(adminPage.getByRole('textbox', { name: 'Short Bio' })).toContainText(
       /boundary-pushing artist on the roster/
     );
 
     // Regenerate replaces the preview (also async — poll again).
     await regenerate.click();
-    await expect(adminPage.getByRole('link', { name: 'Wikipedia', exact: true })).toBeVisible({
+    await expect(discoveredLinks.getByRole('link', { name: 'Wikipedia' })).toBeVisible({
       timeout: 30_000,
     });
 

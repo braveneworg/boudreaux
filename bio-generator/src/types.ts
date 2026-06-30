@@ -59,6 +59,7 @@ export type BioLink = z.infer<typeof bioLinkSchema>;
 export const bioGenerationDataSchema = z.object({
   shortBio: z.string(),
   longBio: z.string(),
+  altBio: z.string(),
   genres: z.string().nullable().optional(),
   images: z.array(bioImageSchema),
   links: z.array(bioLinkSchema),
@@ -79,6 +80,8 @@ export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 export const bioProseSchema = z.object({
   shortBio: z.string().min(1),
   longBio: z.string().min(1),
+  /** Optional so a model omission degrades to an empty alt bio, not a failure. */
+  altBio: z.string().optional(),
   genres: z.string().optional(),
   primaryImageIndexes: z.array(z.number().int().nonnegative()).optional(),
 });

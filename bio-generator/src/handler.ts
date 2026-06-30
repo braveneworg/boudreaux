@@ -4,6 +4,7 @@
 
 import { generateProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
+import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { lookupArtist } from './musicbrainz.js';
@@ -126,9 +127,18 @@ const resolveWikidataSourceText = async (
  * after ranking so PD/CC0 images survive over attribution-required ones.
  */
 const resolveImages = async (fileNames: string[], deps: BioGeneratorDeps): Promise<BioImage[]> => {
-  const candidates = (
-    await Promise.all(fileNames.map((fileName) => deps.getCommonsImage(fileName)))
-  ).filter((image): image is BioImage => image !== null);
+  const resolved = await Promise.all(
+    fileNames.map(async (fileName) => {
+      try {
+        return await deps.getCommonsImage(fileName);
+      } catch (err) {
+        // One bad Commons file must not zero out the whole image set.
+        logEvent('warn', 'commons_image_failed', { fileName, error: toErrorMessage(err) });
+        return null;
+      }
+    })
+  );
+  const candidates = resolved.filter((image): image is BioImage => image !== null);
   candidates.sort(
     (a, b) => Number(isAttributionFree(b.license)) - Number(isAttributionFree(a.license))
   );
@@ -153,7 +163,15 @@ const applyWikidataFacts = async (
   scrapeKey: string | null,
   deps: BioGeneratorDeps
 ): Promise<void> => {
-  const wd = await deps.getWikidataData(wikidataId);
+  let wd: Awaited<ReturnType<BioGeneratorDeps['getWikidataData']>>;
+  try {
+    wd = await deps.getWikidataData(wikidataId);
+  } catch (err) {
+    // Isolate Wikidata so its failure keeps the MusicBrainz links already gathered.
+    logEvent('warn', 'wikidata_failed', { wikidataId, error: toErrorMessage(err) });
+    return;
+  }
+
   acc.facts.wikipediaUrl = wd.wikipediaUrl;
   acc.facts.officialUrl = wd.officialUrl;
   acc.links.push(...wikidataLinks(wd.wikipediaUrl, wd.officialUrl));
@@ -166,7 +184,13 @@ const applyWikidataFacts = async (
   );
   if (sourceText) acc.facts.sourceText = sourceText;
 
-  acc.images.push(...(await resolveImages(wd.imageFileNames, deps)));
+  const images = await resolveImages(wd.imageFileNames, deps);
+  acc.images.push(...images);
+  logEvent('info', 'wikidata_images', {
+    wikidataId,
+    candidates: wd.imageFileNames.length,
+    resolved: images.length,
+  });
 };
 
 /** Enriches the accumulator with a found MusicBrainz match and its Wikidata data. */
@@ -202,7 +226,14 @@ const applyWebSearch = async (
   deps: BioGeneratorDeps
 ): Promise<void> => {
   const found = await deps.searchArtistSources(searchNameFor(input), scrapeKey);
-  if (!found) return;
+  if (!found) {
+    logEvent('info', 'web_search_empty', { artist: searchNameFor(input) });
+    return;
+  }
+  logEvent('info', 'web_search_results', {
+    artist: searchNameFor(input),
+    urls: found.sourceUrls.length,
+  });
 
   acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
   acc.facts.sourceUrls = [
@@ -262,19 +293,35 @@ const gatherMetadata = async (
 
   // Jina works keyless (lower rate limit); the key just raises the limit, so we
   // resolve it once and always attempt scraping regardless of whether it is set.
+  const artist = searchNameFor(input);
   const scrapeKey = await deps.getScrapeApiKey();
+  logEvent('info', 'enrichment_start', { artist, jinaKey: Boolean(scrapeKey) });
 
   try {
     const match = await lookupMatch(input, deps);
     if (match) {
+      logEvent('info', 'musicbrainz_match', {
+        mbid: match.mbid,
+        wikidataId: match.wikidataId ?? null,
+        links: match.links.length,
+      });
       await applyMatch(acc, match, scrapeKey, deps);
+    } else {
+      logEvent('info', 'musicbrainz_no_match', { artist });
     }
   } catch (err) {
-    console.warn('Bio metadata gathering degraded:', err);
+    logEvent('warn', 'musicbrainz_failed', { artist, error: toErrorMessage(err) });
   }
 
   await applyWebSearch(acc, input, scrapeKey, deps);
   finalizeMetadata(acc, input);
+
+  logEvent('info', 'enrichment_complete', {
+    artist,
+    images: acc.images.length,
+    links: acc.links.length,
+    hasSourceText: Boolean(acc.facts.sourceText),
+  });
 
   return { images: acc.images, links: acc.links, facts: acc.facts };
 };
@@ -316,6 +363,7 @@ export const runBioGeneration = async (
   return {
     shortBio: prose.shortBio,
     longBio: prose.longBio,
+    altBio: prose.altBio ?? '',
     genres,
     images: rankedImages,
     links,
@@ -341,7 +389,7 @@ export const lambdaHandler = async (event: unknown): Promise<BioGenerationResult
     const data = await runBioGeneration(parsed.data);
     return { ok: true, data };
   } catch (err) {
-    console.error('Bio generation failed:', err);
+    logEvent('warn', 'bio_generation_failed', { error: toErrorMessage(err) });
     return { ok: false, error: err instanceof Error ? err.message : 'Bio generation failed' };
   }
 };

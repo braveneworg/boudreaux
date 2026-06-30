@@ -51,6 +51,7 @@ export const bioGenerationLinkSchema = z.object({
 export const bioGenerationDataSchema = z.object({
   shortBio: z.string(),
   longBio: z.string(),
+  altBio: z.string(),
   genres: z.string().nullable().optional(),
   images: z.array(bioGenerationImageSchema),
   links: z.array(bioGenerationLinkSchema),
@@ -70,6 +71,7 @@ export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 export interface GeneratedBioContent {
   shortBio: string;
   longBio: string;
+  altBio: string;
   genres: string | null;
   images: Array<{
     url: string;
@@ -117,6 +119,7 @@ export const bioGenerationStatusResponseSchema = z.object({
     .object({
       shortBio: z.string(),
       longBio: z.string(),
+      altBio: z.string(),
       genres: z.string().nullable(),
       images: z.array(
         z.object({

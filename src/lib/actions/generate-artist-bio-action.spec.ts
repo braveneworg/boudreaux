@@ -60,6 +60,7 @@ const VALID_ID = 'a'.repeat(24);
 const content: GeneratedBioContent = {
   shortBio: 'Short teaser',
   longBio: '<p>Long</p>',
+  altBio: '<p>Punchy promo</p>',
   genres: 'art rock',
   images: [],
   links: [],

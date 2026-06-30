@@ -274,8 +274,8 @@ model Artist {
   country               String? // internal only; country
   bio                   String? // Markdown supported post-MVP, for now just plain text blurb
   shortBio              String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
-  altBio                String? // Ditto md support; An alternative bio for special use cases
-  bioGeneratedAt        DateTime? // When the short/long bio was last AI-generated; null = hand-authored only
+  altBio                String? // Punchy promotional blurb; AI-generated alongside short/long bio (overwritten on regeneration)
+  bioGeneratedAt        DateTime? // When the short/long/alt bio was last AI-generated; null = hand-authored only
   bioModel              String? // AI model id used to generate the bio, e.g. "gemini-3-flash"
   bioStatus             String? // Async AI bio generation state: pending | processing | succeeded | failed (null = never generated)
   bioError              String? // Error message from the last failed bio generation, if any

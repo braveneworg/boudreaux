@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type {
@@ -51,6 +51,7 @@ vi.mock('sonner', () => ({
 const content: GeneratedBioContent = {
   shortBio: 'A boundary-pushing artist.',
   longBio: '<p>Long bio.</p>',
+  altBio: '<p>Punchy promo blurb.</p>',
   genres: 'experimental',
   images: [
     {
@@ -222,6 +223,13 @@ describe('ArtistBioGenerationSection', () => {
       'https://en.wikipedia.org/wiki/x'
     );
     expect(screen.getByText('wikipedia')).toBeInTheDocument();
+    // The discovered-links section is an addressable group so tests can scope to
+    // it unambiguously (other bio editors may also contain a "Wikipedia" link).
+    expect(
+      within(screen.getByRole('group', { name: 'Discovered links' })).getByRole('link', {
+        name: 'Wikipedia',
+      })
+    ).toBeInTheDocument();
   });
 
   it('marks a primary discovered image with a star', async () => {

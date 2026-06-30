@@ -31,6 +31,7 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
       `<p><strong>${input.displayName}</strong> builds immersive soundscapes that blur genre lines.</p>` +
       `<p>Read more on <a href="https://en.wikipedia.org/wiki/Music">their Wikipedia page</a>.</p>` +
       `<a href="javascript:alert(1)">unsafe</a>`,
+    altBio: `<p><strong>${input.displayName}</strong> — essential listening. Dive in on <a href="https://en.wikipedia.org/wiki/Music">Wikipedia</a>.</p>`,
     genres: input.existingGenres?.trim() || 'experimental, electronic',
     images: [
       {
