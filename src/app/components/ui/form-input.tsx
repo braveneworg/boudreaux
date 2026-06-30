@@ -6,6 +6,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Ref } from 'react';
 
+import { cn } from '@/lib/utils/tailwind-utils';
+
 import { Input } from './input';
 
 interface FormInputProperties {
@@ -14,6 +16,8 @@ interface FormInputProperties {
   type: string;
   value: string;
   autoComplete?: string;
+  /** Extra classes merged onto the underlying input (after the base sizing). */
+  className?: string;
   /**
    * Forwarded ref (e.g. from React Hook Form's `field.ref`). It is merged with
    * the internal focus ref so both consumers keep working.
@@ -33,6 +37,7 @@ export const FormInput = ({
   type,
   autoComplete,
   autoFocusOnMount,
+  className,
   ref,
   ...properties
 }: FormInputProperties) => {
@@ -56,7 +61,7 @@ export const FormInput = ({
   return (
     <Input
       ref={setRef}
-      className="h-12 text-lg"
+      className={cn('h-12 text-lg', className)}
       id={id}
       placeholder={placeholder}
       type={type}

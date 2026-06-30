@@ -148,24 +148,9 @@ const SignupPage = () => {
         items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
       />
       <ContentContainer>
-        {isSignupPath ? (
-          <ImageHeading
-            src="/media/headings/SIGN-UP.webp"
-            alt="sign up"
-            imageHeight={480}
-            priority
-          />
-        ) : (
-          <ImageHeading
-            src="/media/headings/SIGN-IN.webp"
-            alt="sign in"
-            imageHeight={480}
-            priority
-          />
-        )}
         <div className="mt-6 flex flex-col items-center">
           {magicLinkError !== null && (
-            <Alert variant="destructive" className="mb-4 w-full max-w-md">
+            <Alert variant="destructive" className="mb-4 w-full max-w-lg">
               <AlertDescription>{magicLinkError}</AlertDescription>
             </Alert>
           )}
@@ -174,7 +159,7 @@ const SignupPage = () => {
               noValidate
               onSubmit={form.handleSubmit(handleSubmit)}
               autoComplete="on"
-              className="w-full max-w-md"
+              className="w-full max-w-lg"
             >
               <SignupSigninForm
                 control={form.control}
@@ -186,6 +171,17 @@ const SignupPage = () => {
                 hasTermsAndConditions={isSignupPath}
                 callbackURL="/"
                 onSocialError={handleSocialError}
+                heading={
+                  <ImageHeading
+                    src={
+                      isSignupPath ? '/media/headings/SIGN-UP.webp' : '/media/headings/SIGN-IN.webp'
+                    }
+                    alt={isSignupPath ? 'sign up' : 'sign in'}
+                    imageHeight={480}
+                    imageClassName="w-full"
+                    priority
+                  />
+                }
               />
             </form>
           </FormProvider>

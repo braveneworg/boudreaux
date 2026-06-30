@@ -15,14 +15,20 @@ export type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 
 interface SocialProviderConfig {
   provider: SocialProvider;
+  /** Full phrase used as the button's accessible name (`aria-label`). */
   label: string;
+  /**
+   * Short word rendered beside the icon so the 2-up grid never overflows.
+   * Omitted for X, whose logo is already its wordmark — the icon alone reads.
+   */
+  short?: string;
   Icon: ({ className }: { className?: string }) => React.ReactElement;
 }
 
 const PROVIDERS: SocialProviderConfig[] = [
-  { provider: 'apple', label: 'Continue with Apple', Icon: AppleIcon },
-  { provider: 'google', label: 'Continue with Google', Icon: GoogleIcon },
-  { provider: 'facebook', label: 'Continue with Facebook', Icon: FacebookIcon },
+  { provider: 'apple', label: 'Continue with Apple', short: 'Apple', Icon: AppleIcon },
+  { provider: 'google', label: 'Continue with Google', short: 'Google', Icon: GoogleIcon },
+  { provider: 'facebook', label: 'Continue with Facebook', short: 'Facebook', Icon: FacebookIcon },
   { provider: 'twitter', label: 'Continue with X (Twitter)', Icon: XIcon },
 ];
 
@@ -82,17 +88,18 @@ export const SocialProviderButtons = ({
 
   return (
     <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', className)}>
-      {PROVIDERS.map(({ provider, label, Icon }) => (
+      {PROVIDERS.map(({ provider, label, short, Icon }) => (
         <Button
           key={provider}
           type="button"
-          variant="outline"
-          className="h-11 gap-2.5 font-medium tracking-wide"
+          variant="punk"
+          aria-label={label}
+          className="h-12 justify-center gap-2.5 text-sm tracking-[0.12em] uppercase"
           disabled={isPending}
           onClick={() => handleSignIn(provider)}
         >
-          <Icon className="size-4 shrink-0" />
-          <span>{label}</span>
+          <Icon className="size-5" />
+          {short && <span>{short}</span>}
         </Button>
       ))}
     </div>

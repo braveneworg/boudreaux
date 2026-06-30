@@ -48,6 +48,12 @@ interface SignupSigninFormProps {
    * Wire this at the page level to show a toast and log the error.
    */
   onSocialError?: (provider: SocialProvider, error: unknown) => void;
+  /**
+   * Optional heading (e.g. the SIGN-IN / SIGN-UP wordmark image) rendered at the
+   * top of the card, above the social buttons, so the whole flow lives in one
+   * flyer. The page owns the image so this component stays presentation-only.
+   */
+  heading?: React.ReactNode;
 }
 
 interface EmailFieldProps {
@@ -78,6 +84,7 @@ const EmailField = ({
               placeholder="Email address"
               type="email"
               autoComplete="email"
+              className="rounded-none border-2 border-black bg-zinc-50 focus-visible:ring-[var(--card-accent)]"
               {...field}
               autoFocusOnMount
             />
@@ -163,7 +170,12 @@ const FormSubmitRow = ({
   <div className="mt-4 flex items-center gap-3">
     {!isVerified && <Skeleton className="h-10 w-24" />}
     {isVerified && (
-      <Button type="submit" disabled={isPending || signupsPaused} size="lg">
+      <Button
+        type="submit"
+        disabled={isPending || signupsPaused}
+        size="lg"
+        className="rounded-none border-2 border-black font-bold tracking-[0.1em] uppercase shadow-[4px_4px_0_0_var(--card-accent)] transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0_0_var(--card-accent)]"
+      >
         Email me a sign-in link
       </Button>
     )}
@@ -200,12 +212,12 @@ interface OrDividerProps {
 }
 
 const OrDivider = ({ label }: OrDividerProps): React.ReactElement => (
-  <div className="relative my-6 flex items-center">
-    <Separator className="flex-1" />
-    <span className="text-muted-foreground mx-4 shrink-0 text-xs font-semibold tracking-widest uppercase">
+  <div className="relative my-7 flex items-center gap-3">
+    <Separator className="h-0.5 flex-1 bg-black" />
+    <span className="shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase shadow-[2px_2px_0_0_#000]">
       {label}
     </span>
-    <Separator className="flex-1" />
+    <Separator className="h-0.5 flex-1 bg-black" />
   </div>
 );
 
@@ -220,7 +232,7 @@ const ModeSwitchLink = ({ isSigningIn }: ModeSwitchLinkProps): React.ReactElemen
         New here?{' '}
         <Link
           href="/signup"
-          className="font-semibold underline underline-offset-4 hover:no-underline"
+          className="font-semibold underline decoration-[var(--card-accent)] decoration-2 underline-offset-4 hover:no-underline"
         >
           Create an account
         </Link>
@@ -230,7 +242,7 @@ const ModeSwitchLink = ({ isSigningIn }: ModeSwitchLinkProps): React.ReactElemen
         Already have an account?{' '}
         <Link
           href="/signin"
-          className="font-semibold underline underline-offset-4 hover:no-underline"
+          className="font-semibold underline decoration-[var(--card-accent)] decoration-2 underline-offset-4 hover:no-underline"
         >
           Sign in
         </Link>
@@ -249,6 +261,7 @@ export const SignupSigninForm = ({
   state,
   callbackURL = '/',
   onSocialError,
+  heading,
 }: SignupSigninFormProps): React.ReactElement => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin';
@@ -256,8 +269,20 @@ export const SignupSigninForm = ({
   const signupsPaused = hasTermsAndConditions && signupStatus?.paused === true;
 
   return (
-    <Card className="mx-auto w-full max-w-md p-0">
-      <CardContent className="p-6 sm:p-8">
+    <Card
+      className={cn(
+        'bg-menu-item-tan-100 relative mx-auto w-full max-w-lg overflow-visible rounded-none border-2 border-black p-0 shadow-[6px_6px_0_0_var(--card-accent)]',
+        isSigningIn ? 'signin-accent' : 'signup-accent'
+      )}
+    >
+      {/* Decorative "washi tape" holding the flyer to the wall */}
+      <span
+        aria-hidden="true"
+        className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-28 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
+      />
+      <CardContent className="relative z-10 p-6 sm:p-8">
+        {/* Heading wordmark — lives inside the flyer, above the social buttons */}
+        {heading && <div className="mb-6">{heading}</div>}
         {/* Signups-paused notice — shown only on the signup path when paused */}
         {signupsPaused && (
           <Alert className="mb-4">
@@ -273,8 +298,10 @@ export const SignupSigninForm = ({
         <OrDivider label="or continue with email" />
 
         {/* Email section heading */}
-        <p className="text-muted-foreground mb-4 text-xs font-semibold tracking-widest uppercase">
-          Magic link
+        <p className="mb-4">
+          <span className="font-fake-four-cutout bg-menu-item-yellow-200 px-1.5 text-xl tracking-wide text-black uppercase">
+            Magic link
+          </span>
         </p>
 
         {/* Turnstile-gated email fields */}
@@ -288,11 +315,15 @@ export const SignupSigninForm = ({
             state={state}
           />
         )}
-        <TurnstileWidget
-          isVerified={isVerified}
-          setIsVerified={setIsVerified}
-          onToken={onTurnstileToken}
-        />
+        {/* Thick accent frame around the Turnstile widget — pink on sign-in,
+            teal on sign-up, via the shared --card-accent token. */}
+        <div className="mt-3 border-4 border-[var(--card-accent)] p-2">
+          <TurnstileWidget
+            isVerified={isVerified}
+            setIsVerified={setIsVerified}
+            onToken={onTurnstileToken}
+          />
+        </div>
         <FormSubmitRow
           isPending={isPending}
           isVerified={isVerified}

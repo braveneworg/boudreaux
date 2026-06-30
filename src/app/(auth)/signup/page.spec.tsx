@@ -90,12 +90,15 @@ vi.mock('@/app/components/forms/signup-signin-form', () => ({
     setIsVerified: (v: boolean) => void;
     onTurnstileToken?: (t: string) => void;
     onSocialError?: (provider: SocialProvider, error: unknown) => void;
+    heading?: React.ReactNode;
   }) => {
     capturedSetIsVerified = props.setIsVerified;
     capturedOnToken = props.onTurnstileToken ?? null;
     capturedOnSocialError = props.onSocialError;
     return (
       <div data-testid="signup-signin-form">
+        {/* The page now renders the heading wordmark inside the card via this prop. */}
+        {props.heading}
         <button type="submit">Submit</button>
       </div>
     );
