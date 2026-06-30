@@ -218,7 +218,7 @@ interface AgreementsBlockProps {
 /**
  * The agreements + verification block that sits beneath the heading and gates
  * every signup path. On signup it carries the terms / SMS / email toggles; the
- * Turnstile widget renders on both pages. A thick black rule closes the block.
+ * Turnstile widget renders on both pages.
  */
 const AgreementsBlock = ({
   control,
@@ -228,7 +228,7 @@ const AgreementsBlock = ({
   showOptIns,
   state,
 }: AgreementsBlockProps): React.ReactElement => (
-  <div className="mb-2">
+  <div className="mb-6">
     {showOptIns && (
       <>
         <TermsField control={control} state={state} />
@@ -245,8 +245,6 @@ const AgreementsBlock = ({
         onToken={onTurnstileToken}
       />
     </div>
-    {/* Black divider closing the block (echoes the OR-rule style) */}
-    <Separator className="mt-6 h-0.5 bg-black" />
   </div>
 );
 
