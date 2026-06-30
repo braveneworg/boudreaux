@@ -160,4 +160,5 @@ export interface UpdateUserProfileData {
   zipCode?: string;
   country?: string;
   allowSmsNotifications?: boolean;
+  allowEmailNotifications?: boolean;
 }

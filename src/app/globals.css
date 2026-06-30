@@ -241,6 +241,36 @@
   --card-accent-soft: var(--color-menu-item-teal-200);
 }
 
+/* Profile cards — kraft/cardboard brown to match the PROFILE ransom heading's
+   paper (darker than the tan palette goes, so set explicitly). */
+@utility profile-accent {
+  --card-accent: oklch(0.53 0.035 73);
+  --card-accent-soft: oklch(0.63 0.04 73);
+}
+
+/* Punk-zine form controls inside profile cards — hard black borders + square
+   corners matching the sign-in/up email field. Covers text inputs, textareas,
+   combobox triggers (State/Country) and Select triggers. Keyed off tag/role
+   (FormControl's Radix Slot rewrites `data-slot` on inputs); unlayered + the
+   descendant selectors outrank the shadcn Input/Button utilities. The toggle
+   switches are intentionally excluded so they keep their pill shape. */
+.profile-accent input,
+.profile-accent textarea,
+.profile-accent [role='combobox'],
+.profile-accent [data-slot='select-trigger'] {
+  border-radius: 0;
+  border-width: 2px;
+  border-color: #000;
+  background-color: var(--color-zinc-50);
+}
+
+.profile-accent input:focus-visible,
+.profile-accent textarea:focus-visible,
+.profile-accent [role='combobox']:focus-visible,
+.profile-accent [data-slot='select-trigger']:focus-visible {
+  --tw-ring-color: var(--card-accent);
+}
+
 /* Banner notification strip — link color variants */
 
 @utility banner-strip-dark {

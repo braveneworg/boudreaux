@@ -132,7 +132,9 @@ const makeForm = (values: Record<string, unknown>): FormMock => {
     reset: vi.fn(),
     setValue: vi.fn(),
     clearErrors: vi.fn(),
-    getValues: vi.fn(() => form._values),
+    getValues: vi.fn((name?: string) =>
+      name ? new Map(Object.entries(form._values)).get(name) : form._values
+    ),
     formState: { isDirty: true, dirtyFields: {} },
     _values: values,
   };
@@ -152,6 +154,7 @@ const resetForms = () => {
       zipCode: '',
       country: '',
       allowSmsNotifications: false,
+      allowEmailNotifications: false,
     }),
     email: makeForm({
       email: 'new@example.com',
@@ -315,6 +318,7 @@ describe('ProfileForm', () => {
       const fd = updateProfileActionMock.mock.calls[0][1] as FormData;
       expect(fd.get('firstName')).toBe('John');
       expect(fd.get('allowSmsNotifications')).toBe('false');
+      expect(fd.get('allowEmailNotifications')).toBe('false');
       expect(update).toHaveBeenCalled();
     });
 
@@ -382,6 +386,8 @@ describe('ProfileForm', () => {
       const fd = changeEmailActionMock.mock.calls[0][1] as FormData;
       expect(fd.get('email')).toBe('new@example.com');
       expect(fd.get('previousEmail')).toBe('john@example.com');
+      // Save Email also carries the email opt-in selection.
+      expect(fd.get('allowEmailNotifications')).toBe('false');
     });
   });
 

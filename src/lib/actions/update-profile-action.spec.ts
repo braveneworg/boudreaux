@@ -143,6 +143,25 @@ describe('updateProfileAction', () => {
       expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
     });
 
+    it('persists the email opt-in selection', async () => {
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: {} },
+        parsed: {
+          success: true,
+          data: { firstName: 'John', lastName: 'Doe', allowEmailNotifications: true },
+        },
+      });
+      vi.mocked(mockAuth).mockResolvedValue({ user: { id: 'user-123' } });
+      vi.mocked(mockUpdateProfile).mockResolvedValue({});
+
+      await updateProfileAction(mockInitialState, mockFormData);
+
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({ allowEmailNotifications: true })
+      );
+    });
+
     it('should combine first and last name into fullName', async () => {
       const mockFormState: FormState = {
         fields: {
@@ -904,6 +923,7 @@ describe('updateProfileAction', () => {
           'zipCode',
           'country',
           'allowSmsNotifications',
+          'allowEmailNotifications',
         ],
         expect.anything()
       );

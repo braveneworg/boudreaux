@@ -6,7 +6,7 @@
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { ConnectedAccountsSection } from '@/app/components/forms/connected-accounts-section';
@@ -16,6 +16,7 @@ import { ProfilePersonalSection } from '@/app/components/forms/sections/profile-
 import { ProfileUsernameSection } from '@/app/components/forms/sections/profile-username-section';
 import { Card, CardContent, CardHeader } from '@/app/components/ui/card';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { Switch } from '@/app/components/ui/switch';
 import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
@@ -30,7 +31,6 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 import { changeUsernameSchema as usernameSchema } from '@/lib/validation/change-username-schema';
 import { profileSchema } from '@/lib/validation/profile-schema';
-import { Separator } from '@/ui/separator';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -52,6 +52,7 @@ const EMPTY_PROFILE_DEFAULTS: ProfileFormData = {
   zipCode: '',
   country: '',
   allowSmsNotifications: false,
+  allowEmailNotifications: false,
 };
 
 const buildAddressDefaults = (
@@ -75,6 +76,8 @@ const buildProfileDefaults = (user: SessionUser | undefined): ProfileFormData =>
     firstName: user.firstName ?? '',
     lastName: user.lastName ?? '',
     allowSmsNotifications: user.allowSmsNotifications ?? false,
+    // Default the email opt-in to whatever the user chose at signup.
+    allowEmailNotifications: user.allowEmailNotifications ?? false,
     ...buildAddressDefaults(user),
   };
 };
@@ -102,6 +105,7 @@ const buildProfileFormData = (data: ProfileFormData): FormData => {
   formData.append('zipCode', data.zipCode || '');
   formData.append('country', data.country || '');
   formData.append('allowSmsNotifications', String(data.allowSmsNotifications));
+  formData.append('allowEmailNotifications', String(data.allowEmailNotifications));
   return formData;
 };
 
@@ -243,6 +247,12 @@ export const ProfileForm = (): React.ReactElement => {
       formData.append('email', data.email);
       formData.append('confirmEmail', data.confirmEmail);
       formData.append('previousEmail', data.previousEmail ?? '');
+      // The email opt-in toggle lives in this section but is bound to the
+      // personal form, so the "Save Email" button persists its current value too.
+      formData.append(
+        'allowEmailNotifications',
+        String(personalProfileForm.getValues('allowEmailNotifications'))
+      );
 
       startTransition(() => {
         // Reset the handled flag right before the action to ensure toast shows on this submission
@@ -250,7 +260,7 @@ export const ProfileForm = (): React.ReactElement => {
         emailFormAction(formData);
       });
     },
-    [emailFormAction, startTransition]
+    [emailFormAction, startTransition, personalProfileForm]
   );
 
   const onSubmitEditUsername = useCallback(
@@ -405,16 +415,44 @@ export const ProfileForm = (): React.ReactElement => {
     return <ProfileFormSkeleton />;
   }
 
+  // Email opt-in toggle — rendered in the Email section above the buttons, but
+  // bound to the personal form so both "Save Changes" and "Save Email" persist
+  // it. Defaults to the choice made at signup.
+  const emailOptInToggle = (
+    <div>
+      <div className="flex items-center gap-3">
+        <Controller
+          name="allowEmailNotifications"
+          control={personalProfileForm.control}
+          render={({ field }) => (
+            <Switch
+              id="allowEmailNotifications"
+              checked={!!field.value}
+              onCheckedChange={field.onChange}
+            />
+          )}
+        />
+        <label htmlFor="allowEmailNotifications" className="text-sm font-medium">
+          Email me updates
+        </label>
+      </div>
+      <p className="text-muted-foreground mt-2 text-xs">
+        Opt out of update emails anytime. This doesn&apos;t affect the sign-in links we email you to
+        authenticate.
+      </p>
+    </div>
+  );
+
   return (
-    <>
+    // Tan accent (matches the PROFILE kraft heading); the punk-styled section
+    // cards self-separate, so no rules between them.
+    <div className="profile-accent space-y-10">
       <ProfilePersonalSection
         form={personalProfileForm}
         onSubmit={onSubmitPersonalProfileForm}
         isPending={isPending}
         isTransitionPending={isTransitionPending}
       />
-
-      <Separator />
 
       <ProfileEmailSection
         form={changeEmailForm}
@@ -423,9 +461,8 @@ export const ProfileForm = (): React.ReactElement => {
         isPending={isEmailPending}
         isTransitionPending={isTransitionPending}
         onEditToggle={handleEditFieldButtonClick}
+        emailOptIn={emailOptInToggle}
       />
-
-      <Separator />
 
       <ProfileUsernameSection
         form={changeUsernameForm}
@@ -437,9 +474,7 @@ export const ProfileForm = (): React.ReactElement => {
         onEditToggle={handleEditFieldButtonClick}
       />
 
-      <Separator />
-
       <ConnectedAccountsSection />
-    </>
+    </div>
   );
 };

@@ -20,7 +20,7 @@ export const changeEmailAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const permittedFieldNames = ['email', 'confirmEmail', 'previousEmail'];
+  const permittedFieldNames = ['email', 'confirmEmail', 'previousEmail', 'allowEmailNotifications'];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
 
   if (parsed.success) {
@@ -39,7 +39,12 @@ export const changeEmailAction = async (
 
       formState.hasTimeout = false;
 
-      await UserRepository.updateEmail(session.user.id, parsed.data.email, previousEmail);
+      await UserRepository.updateEmail(
+        session.user.id,
+        parsed.data.email,
+        previousEmail,
+        parsed.data.allowEmailNotifications
+      );
 
       // Log email change for security audit
       await logSecurityEvent({

@@ -26,6 +26,7 @@ export interface SessionUser {
   zipCode?: string | null;
   country?: string | null;
   allowSmsNotifications?: boolean | null;
+  allowEmailNotifications?: boolean | null;
   // Allow extra better-auth fields (e.g. emailVerified, banned) to ride along
   // without forcing every consumer to enumerate them.
   [key: string]: unknown;

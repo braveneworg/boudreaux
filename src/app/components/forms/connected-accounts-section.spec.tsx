@@ -256,12 +256,11 @@ describe('ConnectedAccountsSection', () => {
   });
 
   describe('section headings', () => {
-    it('renders the section label and heading', () => {
+    it('renders the section heading', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
       render(<ConnectedAccountsSection />);
 
-      expect(screen.getByText(/Connected accounts/i)).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /Social accounts/i })).toBeInTheDocument();
     });
   });

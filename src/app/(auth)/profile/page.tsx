@@ -11,6 +11,7 @@ export default async function ProfilePage() {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu
+          className="mt-2 mb-4"
           items={[
             {
               anchorText: 'Profile',

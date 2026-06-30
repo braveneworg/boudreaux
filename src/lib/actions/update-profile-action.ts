@@ -32,6 +32,7 @@ export const updateProfileAction = async (
     'zipCode',
     'country',
     'allowSmsNotifications',
+    'allowEmailNotifications',
   ];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);
@@ -58,6 +59,7 @@ export const updateProfileAction = async (
         zipCode,
         country,
         allowSmsNotifications,
+        allowEmailNotifications,
       } = parsed.data;
       // Combine first and last name into the 'name' field for backward compatibility
       const fullName = `${firstName} ${lastName}`.trim();
@@ -75,6 +77,7 @@ export const updateProfileAction = async (
         zipCode,
         country,
         allowSmsNotifications,
+        allowEmailNotifications,
       });
 
       // Log profile update for security audit
