@@ -71,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.162.0] - 2026-07-01
+
+### Added
+
+- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n
+
 ## [4.161.0] - 2026-06-30
 
 ### Added
