@@ -120,9 +120,15 @@ test.describe.serial('Signups pause toggle', () => {
     });
     await page.getByRole('button', { name: SUBMIT_LABEL }).click();
 
-    // The server action returns the friendly error; the form renders it
+    // The server action returns the friendly error; the form renders it as a
+    // field-level form message. Scope to `data-slot="form-message"` so the
+    // assertion targets the server response, not the always-present paused
+    // banner Alert (which carries the same copy) — otherwise the shared text
+    // matches two elements and trips Playwright strict mode.
     await expect(
-      page.getByText('Signups are temporarily paused. Please try again later.')
+      page.locator('[data-slot="form-message"]', {
+        hasText: 'Signups are temporarily paused. Please try again later.',
+      })
     ).toBeVisible({ timeout: 10_000 });
   });
 

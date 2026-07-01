@@ -30,7 +30,7 @@ describe('generateProse', () => {
       })
     );
 
-    const result = await generateProse(facts, 'test-key', 'gemini-3-flash', fetchFn);
+    const result = await generateProse(facts, 'test-key', 'gemini-2.5-pro', fetchFn);
 
     expect(result.shortBio).toBe('A short teaser.');
     expect(result.primaryImageIndexes).toEqual([0]);
@@ -50,9 +50,18 @@ describe('generateProse', () => {
   it('targets the requested model in the endpoint URL', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', 'gemini-3-flash', fetchFn);
+    await generateProse(facts, 'k', 'gemini-2.5-pro', fetchFn);
 
-    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-3-flash:generateContent');
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
+  });
+
+  it('defaults to a valid GA model id (bare gemini-3-flash 404s)', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    // No model arg → uses DEFAULT_GEMINI_MODEL; must be a real, current id.
+    await generateProse(facts, 'k', undefined, fetchFn);
+
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
   });
 
   it('embeds the source material and reference URLs in the user prompt', async () => {
