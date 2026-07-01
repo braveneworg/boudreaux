@@ -72,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.163.0] - 2026-07-01
+
+### Added
+
+- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n
+
 ## [4.162.0] - 2026-07-01
 
 ### Added
