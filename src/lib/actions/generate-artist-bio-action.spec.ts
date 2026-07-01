@@ -64,7 +64,7 @@ const content: GeneratedBioContent = {
   genres: 'art rock',
   images: [],
   links: [],
-  model: 'gemini-2.5-pro',
+  model: 'gemini-flash-latest',
 };
 
 beforeEach(() => {

@@ -166,12 +166,12 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 
 ### Lambda config (no app/CI secret)
 
-| Where                  | Name                                     | Purpose                                       |
-| ---------------------- | ---------------------------------------- | --------------------------------------------- |
-| AWS SSM (SecureString) | `/fakefour/gemini/api-key`               | Gemini key — **Lambda-only**, read at runtime |
-| Web app IAM identity   | `lambda:InvokeFunction` on the function  | Lets the app invoke it                        |
-| SAM param              | `GeminiModel` (default `gemini-2.5-pro`) | Prose model                                   |
-| SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`) | Error-alarm SNS subscription                  |
+| Where                  | Name                                          | Purpose                                       |
+| ---------------------- | --------------------------------------------- | --------------------------------------------- |
+| AWS SSM (SecureString) | `/fakefour/gemini/api-key`                    | Gemini key — **Lambda-only**, read at runtime |
+| Web app IAM identity   | `lambda:InvokeFunction` on the function       | Lets the app invoke it                        |
+| SAM param              | `GeminiModel` (default `gemini-flash-latest`) | Prose model                                   |
+| SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`)      | Error-alarm SNS subscription                  |
 
 ---
 
@@ -250,7 +250,7 @@ Expected envelope:
     "genres": "...",
     "images": [{ "url": "...", "attribution": "...", "isPrimary": true }],
     "links": [{ "label": "Wikipedia", "url": "...", "kind": "wikipedia" }],
-    "model": "gemini-2.5-pro",
+    "model": "gemini-flash-latest",
   },
 }
 ```

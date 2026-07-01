@@ -30,7 +30,7 @@ describe('generateProse', () => {
       })
     );
 
-    const result = await generateProse(facts, 'test-key', 'gemini-2.5-pro', fetchFn);
+    const result = await generateProse(facts, 'test-key', 'gemini-flash-latest', fetchFn);
 
     expect(result.shortBio).toBe('A short teaser.');
     expect(result.primaryImageIndexes).toEqual([0]);
@@ -50,9 +50,9 @@ describe('generateProse', () => {
   it('targets the requested model in the endpoint URL', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', 'gemini-2.5-pro', fetchFn);
+    await generateProse(facts, 'k', 'gemini-flash-latest', fetchFn);
 
-    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-flash-latest:generateContent');
   });
 
   it('defaults to a valid GA model id (bare gemini-3-flash 404s)', async () => {
@@ -61,7 +61,7 @@ describe('generateProse', () => {
     // No model arg → uses DEFAULT_GEMINI_MODEL; must be a real, current id.
     await generateProse(facts, 'k', undefined, fetchFn);
 
-    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-flash-latest:generateContent');
   });
 
   it('embeds the source material and reference URLs in the user prompt', async () => {
@@ -189,12 +189,19 @@ describe('generateProse', () => {
     expect(systemMessage).toContain('Thomas Yorke (Thom Yorke)');
   });
 
-  it('throws when Gemini returns a non-OK status', async () => {
-    const fetchFn = vi.fn().mockResolvedValue(new Response('quota', { status: 429 }));
-
-    await expect(generateProse(facts, 'k', undefined, fetchFn)).rejects.toThrow(
-      'Gemini request failed'
+  it('surfaces the status and response body when Gemini returns non-OK', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response('{"error":{"message":"models/x is not found for API version v1beta"}}', {
+        status: 404,
+      })
     );
+
+    // The thrown error must carry Google's diagnostic body, not just the status,
+    // so a 404 (wrong/unavailable model) is actionable from the logs.
+    const error = await generateProse(facts, 'k', undefined, fetchFn).catch((e: Error) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('Gemini request failed (404)');
+    expect((error as Error).message).toContain('is not found for API version v1beta');
   });
 
   it('throws when the completion content is not valid JSON', async () => {

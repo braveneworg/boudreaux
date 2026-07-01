@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { logEvent } from './lib/log.js';
 import { bioProseSchema, DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { ArtistFacts, BioProse } from './types.js';
@@ -219,7 +220,16 @@ export const generateProse = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Gemini request failed (${response.status})`);
+    // Surface Google's diagnostic body (e.g. "models/… is not found for API
+    // version v1beta") so a wrong/unavailable model id is actionable from logs
+    // instead of an opaque status code.
+    const detail = await response.text().catch(() => '');
+    logEvent('warn', 'gemini_request_failed', {
+      status: response.status,
+      model,
+      detail: detail.slice(0, 500),
+    });
+    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 300)}`);
   }
 
   const body = (await response.json()) as GeminiResponse;

@@ -24,7 +24,7 @@ Parameters:
     AllowedValues: [production, staging]
   GeminiModel:
     Type: String
-    Default: gemini-2.5-pro
+    Default: gemini-flash-latest
     Description: Gemini model id used to write bio prose
   AlarmEmail:
     Type: String

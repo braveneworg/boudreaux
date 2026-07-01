@@ -48,7 +48,7 @@ const okResult: BioGenerationResult = {
     genres: 'rock',
     images: [],
     links: [],
-    model: 'gemini-2.5-pro',
+    model: 'gemini-flash-latest',
   },
 };
 
@@ -170,7 +170,7 @@ describe('BioGenerationService.generateForArtist', () => {
       links: [
         { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead', kind: 'wikipedia' },
       ],
-      model: 'gemini-2.5-pro',
+      model: 'gemini-flash-latest',
     },
   };
 
@@ -251,7 +251,7 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(content.images[0].attribution).toBeNull();
     expect(content.images[0].sortOrder).toBe(0);
     expect(content.images[0].isPrimary).toBe(true);
-    expect(content.bioModel).toBe('gemini-2.5-pro');
+    expect(content.bioModel).toBe('gemini-flash-latest');
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
@@ -554,7 +554,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     genres: null,
     images: [],
     links: [],
-    model: 'gemini-2.5-pro',
+    model: 'gemini-flash-latest',
   };
 
   it('flips to processing then succeeded (clearing the error) on success', async () => {
@@ -633,7 +633,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
         shortBio: 's',
         bio: '<p>l</p>',
         genres: 'rock',
-        bioModel: 'gemini-2.5-pro',
+        bioModel: 'gemini-flash-latest',
         bioImages: [
           {
             url: 'u',
