@@ -33,7 +33,7 @@ MusicBrainz match is found or a metadata call fails, and returns a discriminated
 { "ok": true, "data": { "shortBio": "...", "longBio": "<p>...</p>", "genres": "...",
                         "images": [{ "url": "...", "attribution": "...", "isPrimary": true }],
                         "links": [{ "label": "Wikipedia", "url": "...", "kind": "wikipedia" }],
-                        "model": "gemini-3-flash" } }
+                        "model": "gemini-2.5-pro" } }
 // failure
 { "ok": false, "error": "..." }
 ```

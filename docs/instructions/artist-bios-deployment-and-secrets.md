@@ -96,7 +96,7 @@ aws ssm put-parameter \
 > grants the function `ssm:GetParameter` on this one path plus `kms:Decrypt` on `alias/aws/ssm`.
 
 Model choice (optional): the Gemini model id is the SAM parameter `GeminiModel`
-(default `gemini-3-flash`). Override at deploy with
+(default `gemini-2.5-pro`). Override at deploy with
 `--parameter-overrides GeminiModel=<id>`.
 
 ### 4.2 GitHub Actions secrets (for automated Lambda deploys)
