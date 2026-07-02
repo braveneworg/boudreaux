@@ -45,7 +45,7 @@ export const bioGenerationImageSchema = z.object({
 export const bioGenerationLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'other']).optional(),
+  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
 });
 
 export const bioGenerationDataSchema = z.object({

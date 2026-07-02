@@ -12,6 +12,9 @@ export interface BioGenerationLambdaInput {
   links?: string[];
   description?: string;
   existingGenres?: string;
+  bornOn?: string;
+  diedOn?: string;
+  formedOn?: string;
 }
 
 /**

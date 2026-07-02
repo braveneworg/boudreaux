@@ -45,15 +45,21 @@ const getLambdaClient = (): LambdaClient => {
 /** Derive a public real name for the metadata lookup (skip if pseudonymous). */
 const deriveRealName = (artist: {
   firstName: string;
+  middleName: string | null;
   surname: string;
   isPseudonymous: boolean;
 }): string | undefined => {
-  if (artist.isPseudonymous) {
-    return undefined;
-  }
-  const realName = `${artist.firstName} ${artist.surname}`.trim();
+  if (artist.isPseudonymous) return undefined;
+  const realName = [artist.firstName, artist.middleName, artist.surname]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join(' ')
+    .trim();
   return realName || undefined;
 };
+
+/** YYYY-MM-DD for the Lambda's ISO-date fields, or undefined. */
+const toIsoDate = (value: Date | null | undefined): string | undefined =>
+  value ? value.toISOString().slice(0, 10) : undefined;
 
 /** Resolve the best display name to ground the generation on. */
 const deriveDisplayName = (artist: {
@@ -287,6 +293,9 @@ export class BioGenerationService {
       links: opts.links,
       description: opts.description,
       existingGenres: artist.genres ?? undefined,
+      bornOn: toIsoDate(artist.bornOn),
+      diedOn: toIsoDate(artist.diedOn),
+      formedOn: toIsoDate(artist.formedOn),
     });
 
     if (!result.ok) {

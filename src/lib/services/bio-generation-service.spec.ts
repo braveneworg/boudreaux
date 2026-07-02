@@ -6,6 +6,8 @@ import type { BioGenerationResult } from '@/lib/validation/bio-generation-schema
 
 import { BioGenerationService } from './bio-generation-service';
 
+import type { BioGenerationLambdaInput } from './bio-generation-fixture';
+
 vi.mock('server-only', () => ({}));
 
 const sendMock = vi.fn();
@@ -533,6 +535,35 @@ describe('BioGenerationService.generateForArtist', () => {
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.links[0].kind).toBeNull();
+  });
+
+  it('derives the real name including the middle name', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      firstName: 'Julio',
+      middleName: 'Francisco',
+      surname: 'Ramos',
+      isPseudonymous: false,
+      bornOn: new Date('1982-05-01'),
+      displayName: 'Julio Ramos',
+    });
+
+    await BioGenerationService.generateForArtist('id1');
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ realName: 'Julio Francisco Ramos', bornOn: '1982-05-01' })
+    );
+  });
+
+  it('omits dates the artist record does not have', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, bornOn: null, diedOn: null, formedOn: null });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const callArg = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+    expect(callArg.bornOn).toBeUndefined();
+    expect(callArg.diedOn).toBeUndefined();
+    expect(callArg.formedOn).toBeUndefined();
   });
 });
 
