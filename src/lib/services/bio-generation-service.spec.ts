@@ -33,13 +33,14 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
   },
 }));
 
-const rehostMock = vi.fn();
+const rehostThumbnailMock = vi.fn();
+const rehostWithVariantsMock = vi.fn();
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
-      rehostMock(url, artistId, index),
+      rehostWithVariantsMock(url, artistId, index),
     rehostThumbnail: (url: string, artistId: string, index: number) =>
-      rehostMock(url, artistId, index),
+      rehostThumbnailMock(url, artistId, index),
   },
 }));
 
@@ -183,7 +184,12 @@ describe('BioGenerationService.generateForArtist', () => {
   beforeEach(() => {
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
-    rehostMock.mockResolvedValue({
+    rehostThumbnailMock.mockResolvedValue({
+      url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
+      width: 1200,
+      height: 800,
+    });
+    rehostWithVariantsMock.mockResolvedValue({
       url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
       width: 1200,
       height: 800,
@@ -246,7 +252,11 @@ describe('BioGenerationService.generateForArtist', () => {
   it('persists re-hosted images with attribution via the repository', async () => {
     await BioGenerationService.generateForArtist(artist.id, { links: ['https://example.com'] });
 
-    expect(rehostMock).toHaveBeenCalledWith('https://upload.wikimedia.org/a.jpg', artist.id, 0);
+    expect(rehostThumbnailMock).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/a.jpg',
+      artist.id,
+      0
+    );
     expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.images[0].url).toBe(
@@ -286,9 +296,12 @@ describe('BioGenerationService.generateForArtist', () => {
   it('re-hosts via rehostThumbnail, not rehostWithVariants, at generation time', async () => {
     await BioGenerationService.generateForArtist(artist.id);
 
-    const [, content] = replaceBioContentMock.mock.calls[0];
-    // thumbnailUrl equals url only when rehostThumbnail sets it (PR 2 upgrades on save)
-    expect(content.images[0].thumbnailUrl).toBe(content.images[0].url);
+    expect(rehostThumbnailMock).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/a.jpg',
+      artist.id,
+      0
+    );
+    expect(rehostWithVariantsMock).not.toHaveBeenCalled();
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
@@ -311,7 +324,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an inline image:N placeholder that has no re-hosted url', async () => {
-    rehostMock.mockRejectedValueOnce(new Error('fetch failed'));
+    rehostThumbnailMock.mockRejectedValueOnce(new Error('fetch failed'));
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: { ...generateResult.data, longBio: '<p>Intro</p><img src="image:0" alt="x">' },
@@ -374,7 +387,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an image whose re-host fails without aborting generation', async () => {
-    rehostMock.mockRejectedValueOnce(new Error('fetch failed'));
+    rehostThumbnailMock.mockRejectedValueOnce(new Error('fetch failed'));
 
     const result = await BioGenerationService.generateForArtist(artist.id);
 
@@ -503,7 +516,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('falls back to the original image dimensions and null title when re-host omits them', async () => {
-    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    rehostThumbnailMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -533,7 +546,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('persists null dimensions when neither re-host nor source supply them', async () => {
-    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    rehostThumbnailMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
