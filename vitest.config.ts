@@ -24,7 +24,7 @@ const htmlDomParserClient = require.resolve('html-dom-parser/lib/client/html-to-
 // can't redirect html-dom-parser to its jsdom-friendly client build and the
 // CJS→ESM (`domhandler`) boundary crashes. Keep this list tight — every other
 // `.spec.tsx` stays on the faster `vmThreads` pool.
-const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx'];
+const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx', '**/rich-text-editor.spec.tsx'];
 
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {
