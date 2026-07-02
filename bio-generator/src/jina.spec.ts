@@ -270,6 +270,20 @@ describe('searchArtistSources', () => {
     expect(decodeURIComponent(url)).toContain('Artist musician interview review');
     expect(decodeURIComponent(url)).not.toContain('biography career discography');
   });
+
+  it('does not truncate beyond the new cap of 20 images per call', async () => {
+    const images: Record<string, string> = {};
+    for (let i = 0; i < 21; i++) {
+      images[`Image ${i}: Photo ${i}`] = `https://a.example/photo-${i}.jpg`;
+    }
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([{ url: 'https://a.example/bio', content: 'bio text', images }])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toHaveLength(20);
+  });
 });
 
 describe('readUrl', () => {

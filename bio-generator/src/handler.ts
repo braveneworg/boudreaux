@@ -54,7 +54,7 @@ const defaultDeps: BioGeneratorDeps = {
   readUrl,
 };
 
-const MAX_IMAGES = 6;
+const MAX_IMAGES = 30;
 const MAX_PRIMARY = 3;
 const MAX_LINKS = 50;
 
@@ -308,22 +308,27 @@ const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
 });
 
 /**
- * Fills `acc.images` from the web-scraped candidates when Commons produced
- * nothing — licensed Commons images always win, but an artist with no Wikidata
- * entry still gets pictures from the pages that ground their bio. Alt-titled
- * candidates rank first: a named image is likelier to actually depict the
- * artist, and the title is the model's only signal when picking which to embed.
+ * Merges web-scraped candidates AFTER the licensed Commons images (which always
+ * rank first), deduped by URL, up to MAX_IMAGES. Alt-titled candidates rank
+ * before untitled ones — a named image is likelier to actually depict the
+ * artist.
  */
-const applyScrapedImageFallback = (acc: MetadataAccumulator): void => {
-  if (acc.images.length || !acc.scrapedImages.length) return;
-
+const applyScrapedImages = (acc: MetadataAccumulator): void => {
+  if (!acc.scrapedImages.length) return;
+  const seen = new Set(acc.images.map((image) => image.url.toLowerCase()));
   const ranked = [...acc.scrapedImages].sort(
     (a, b) => Number(Boolean(b.alt)) - Number(Boolean(a.alt))
   );
-  acc.images.push(...ranked.slice(0, MAX_IMAGES).map(toScrapedBioImage));
-  logEvent('info', 'scraped_images_fallback', {
+  for (const candidate of ranked) {
+    if (acc.images.length >= MAX_IMAGES) break;
+    const key = candidate.url.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    acc.images.push(toScrapedBioImage(candidate));
+  }
+  logEvent('info', 'scraped_images_merged', {
     candidates: acc.scrapedImages.length,
-    used: acc.images.length,
+    total: acc.images.length,
   });
 };
 
@@ -331,8 +336,8 @@ const applyScrapedImageFallback = (acc: MetadataAccumulator): void => {
  * Finalizes the accumulator: appends admin links (last, so curated entries
  * survive dedupe), drops junk-host links (search engines, share widgets),
  * classifies any remaining streaming-service links as `kind: 'streaming'`,
- * caps the link list at {@link MAX_LINKS}, fills the scraped-image fallback,
- * and derives the image-title list for the prompt.
+ * caps the link list at {@link MAX_LINKS}, merges scraped images after any
+ * licensed Commons images, and derives the image-title list for the prompt.
  */
 const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
   for (const url of input.links ?? []) {
@@ -345,8 +350,10 @@ const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): 
       isListeningServiceUrl(link.url) ? { ...link, kind: 'streaming' as const } : link
     )
     .slice(0, MAX_LINKS);
-  applyScrapedImageFallback(acc);
-  acc.facts.imageTitles = acc.images.map((image) => image.title ?? '');
+  applyScrapedImages(acc);
+  acc.facts.imageTitles = acc.images.map(
+    (image) => image.title?.trim() || `Photo of ${input.displayName}`
+  );
 };
 
 /**

@@ -22,7 +22,7 @@ const MAX_SOURCE_CHARS = 14_000;
 /** Upper bound on a single reader (e.g. official site) extract. */
 const MAX_READER_CHARS = 12_000;
 /** Upper bound on scraped image candidates returned per call. */
-const MAX_SCRAPED_IMAGES = 12;
+const MAX_SCRAPED_IMAGES = 20;
 
 /** An images-summary map: `"Image N[,M][: alt]"` keys to absolute image URLs. */
 type JinaImagesSummary = Record<string, string>;

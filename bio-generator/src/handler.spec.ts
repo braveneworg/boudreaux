@@ -389,7 +389,7 @@ describe('runBioGeneration', () => {
     expect(factsArg(deps).imageTitles).toEqual(['Artist in 2015']);
   });
 
-  it('keeps Commons images and ignores scraped ones when Commons resolves', async () => {
+  it('includes Commons images first then scraped images when both are available', async () => {
     const deps = makeDeps({
       searchArtistSources: vi
         .fn()
@@ -410,11 +410,14 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
-    expect(result.images).toHaveLength(2);
-    expect(result.images.every((img) => img.url.includes('upload.wikimedia.org'))).toBe(true);
+    // 2 Commons + 1 scraped
+    expect(result.images).toHaveLength(3);
+    expect(result.images[0].url).toContain('upload.wikimedia.org');
+    expect(result.images[1].url).toContain('upload.wikimedia.org');
+    expect(result.images[2].url).toBe('https://a.example/artist.jpg');
   });
 
-  it('ranks alt-titled scraped images first and caps the fallback at six', async () => {
+  it('ranks alt-titled scraped images first; all 8 candidates fit under the new cap of 30', async () => {
     const scraped = Array.from({ length: 8 }, (_, i) => ({
       url: `https://a.example/photo-${i}.jpg`,
       alt: i % 2 === 0 ? null : `Photo ${i}`,
@@ -435,7 +438,7 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(result.images).toHaveLength(6);
+    expect(result.images).toHaveLength(8);
     expect(result.images.slice(0, 4).map((img) => img.title)).toEqual([
       'Photo 1',
       'Photo 3',
@@ -470,7 +473,7 @@ describe('runBioGeneration', () => {
     expect(result.images[0].attribution).toBe('radiohead.com');
   });
 
-  it('logs a scraped_images_fallback event with candidate and used counts', async () => {
+  it('logs a scraped_images_merged event with candidate and total counts', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -494,9 +497,88 @@ describe('runBioGeneration', () => {
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
     const events = info.mock.calls.map((call) => JSON.parse(call[0] as string));
-    const fallback = events.find((e) => e.event === 'scraped_images_fallback');
-    expect(fallback).toMatchObject({ candidates: 1, used: 1 });
+    const merged = events.find((e) => e.event === 'scraped_images_merged');
+    expect(merged).toMatchObject({ candidates: 1, total: 1 });
     info.mockRestore();
+  });
+
+  it('merges scraped images after Commons — 2 Commons + 5 scraped = 7, alt-titled scraped first', async () => {
+    const scraped = [
+      { url: 'https://a.example/photo-0.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
+      { url: 'https://a.example/photo-1.jpg', alt: 'Artist live', sourceUrl: 'https://a.example/bio' },
+      { url: 'https://a.example/photo-2.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
+      { url: 'https://a.example/photo-3.jpg', alt: 'Portrait', sourceUrl: 'https://a.example/bio' },
+      { url: 'https://a.example/photo-4.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
+    ];
+    const deps = makeDeps({
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: scraped,
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images).toHaveLength(7);
+    expect(result.images[0].url).toContain('upload.wikimedia.org');
+    expect(result.images[1].url).toContain('upload.wikimedia.org');
+    expect(result.images[2].title).toBe('Artist live');
+    expect(result.images[3].title).toBe('Portrait');
+  });
+
+  it('caps total images at 30 when many scraped candidates exist', async () => {
+    const manyScraped = Array.from({ length: 40 }, (_, i) => ({
+      url: `https://a.example/photo-${i}.jpg`,
+      alt: `Photo ${i}`,
+      sourceUrl: 'https://a.example/bio',
+    }));
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: manyScraped,
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Many Images' }, deps);
+
+    expect(result.images).toHaveLength(30);
+  });
+
+  it('fills facts.imageTitles entries with Photo of {displayName} when title is absent', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: [
+            { url: 'https://a.example/photo-0.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
+            { url: 'https://a.example/photo-1.jpg', alt: 'Live shot', sourceUrl: 'https://a.example/bio' },
+          ],
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Test Artist' }, deps);
+
+    const imageTitles = factsArg(deps).imageTitles as string[];
+    // alt-titled image is ranked first → index 0 = 'Live shot', index 1 = fallback
+    expect(imageTitles[0]).toBe('Live shot');
+    expect(imageTitles[1]).toBe('Photo of Test Artist');
+    expect(imageTitles.every((t) => t.length > 0)).toBe(true);
   });
 
   it('logs a structured enrichment_complete event with image and link counts', async () => {
