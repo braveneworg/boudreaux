@@ -95,9 +95,12 @@ aws ssm put-parameter \
 > the web app — the Lambda fetches and caches it per cold start. The IAM policy in `template.yaml`
 > grants the function `ssm:GetParameter` on this one path plus `kms:Decrypt` on `alias/aws/ssm`.
 
-Model choice (optional): the Gemini model id is the SAM parameter `GeminiModel`
-(default `gemini-2.5-pro`). Override at deploy with
-`--parameter-overrides GeminiModel=<id>`.
+Model choice: the Gemini model id ships in code as `DEFAULT_GEMINI_MODEL`
+(`bio-generator/src/types.ts`, currently `gemini-2.5-pro`) — change it there and
+redeploy. It is deliberately **not** a SAM parameter: CloudFormation reuses a
+parameter's previous value across deploys, which once left a retired model id
+pinned in production. The `GEMINI_MODEL` env var remains honored by the handler
+as a temporary, console-set emergency override only.
 
 ### 4.2 GitHub Actions secrets (for automated Lambda deploys)
 

@@ -429,6 +429,8 @@ const eslintConfig = [
       // `*` (not the literal `[id]`/`[formatType]`) — minimatch reads `[...]` as a char class.
       'src/app/api/releases/*/upload/*/route.ts',
       'src/lib/audio-metadata/ffmpeg.ts',
+      // Reads the adjacent SAM template (compile-time constant URL) to lint its wiring.
+      'bio-generator/src/template.spec.ts',
     ],
     rules: {
       'security/detect-non-literal-fs-filename': 'off',
