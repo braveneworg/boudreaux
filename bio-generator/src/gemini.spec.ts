@@ -30,7 +30,7 @@ describe('generateProse', () => {
       })
     );
 
-    const result = await generateProse(facts, 'test-key', 'gemini-2.5-pro', fetchFn);
+    const result = await generateProse(facts, 'test-key', 'gemini-2.5-pro', { fetchFn });
 
     expect(result.shortBio).toBe('A short teaser.');
     expect(result.primaryImageIndexes).toEqual([0]);
@@ -39,7 +39,7 @@ describe('generateProse', () => {
   it('sends the x-goog-api-key header and JSON responseMimeType', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'secret-key', undefined, fetchFn);
+    await generateProse(facts, 'secret-key', undefined, { fetchFn });
 
     const [url, init] = fetchFn.mock.calls[0];
     expect(url).toContain(':generateContent');
@@ -50,7 +50,7 @@ describe('generateProse', () => {
   it('targets the requested model in the endpoint URL', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', 'gemini-2.5-pro', fetchFn);
+    await generateProse(facts, 'k', 'gemini-2.5-pro', { fetchFn });
 
     expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
   });
@@ -59,7 +59,7 @@ describe('generateProse', () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     // No model arg → uses DEFAULT_GEMINI_MODEL; must be a real, current id.
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
   });
@@ -72,7 +72,7 @@ describe('generateProse', () => {
       sourceUrls: ['https://en.wikipedia.org/wiki/Radiohead'],
     };
 
-    await generateProse(grounded, 'k', undefined, fetchFn);
+    await generateProse(grounded, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('Radiohead formed in Abingdon in 1985.');
@@ -82,7 +82,7 @@ describe('generateProse', () => {
   it('requires a 200+ word short bio with several informative inline links', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('AT LEAST 200 words');
@@ -92,7 +92,7 @@ describe('generateProse', () => {
   it('forbids listening-service links and link-list sections in the system prompt', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0].text;
     expect(systemMessage).toContain('NEVER link to streaming or listening services');
@@ -102,7 +102,7 @@ describe('generateProse', () => {
   it('instructs an extensive, sectioned article without a sources list', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('<h2>');
@@ -112,7 +112,7 @@ describe('generateProse', () => {
   it('instructs rich formatting (lists + emphasis) and inline images in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('<img src="image:N"');
@@ -122,7 +122,7 @@ describe('generateProse', () => {
   it('caps the completion length high enough for three image-rich bios', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     expect(
       JSON.parse(fetchFn.mock.calls[0][1].body).generationConfig.maxOutputTokens
@@ -132,7 +132,7 @@ describe('generateProse', () => {
   it('targets an extended long bio of roughly 2000-3500 words', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('2000–3500 words');
@@ -141,7 +141,7 @@ describe('generateProse', () => {
   it('instructs a punchy promotional alt bio and includes it in the JSON shape', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('altBio:');
@@ -152,7 +152,7 @@ describe('generateProse', () => {
   it('allows an inline image in the short bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    await generateProse(facts, 'k', undefined, fetchFn);
+    await generateProse(facts, 'k', undefined, { fetchFn });
 
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     const shortBioSection = userMessage.slice(
@@ -169,7 +169,7 @@ describe('generateProse', () => {
         geminiResponse({ shortBio: 's', longBio: 'l', altBio: 'Punchy promo blurb.' })
       );
 
-    const result = await generateProse(facts, 'k', undefined, fetchFn);
+    const result = await generateProse(facts, 'k', undefined, { fetchFn });
 
     expect(result.altBio).toBe('Punchy promo blurb.');
   });
@@ -181,7 +181,7 @@ describe('generateProse', () => {
       { ...facts, realName: 'Thomas Yorke', displayName: 'Thom Yorke' },
       'k',
       undefined,
-      fetchFn
+      { fetchFn }
     );
 
     const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0].text;
@@ -190,10 +190,20 @@ describe('generateProse', () => {
   });
 
   it('throws when Gemini returns a non-OK status', async () => {
-    const fetchFn = vi.fn().mockResolvedValue(new Response('quota', { status: 429 }));
+    const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 400 }));
 
-    await expect(generateProse(facts, 'k', undefined, fetchFn)).rejects.toThrow(
+    await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow(
       'Gemini request failed'
+    );
+  });
+
+  it('includes a response-body snippet in the failure message', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(new Response('{"error":{"message":"key expired"}}', { status: 400 }));
+
+    await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow(
+      'Gemini request failed (400): {"error":{"message":"key expired"}}'
     );
   });
 
@@ -207,7 +217,7 @@ describe('generateProse', () => {
         )
       );
 
-    await expect(generateProse(facts, 'k', undefined, fetchFn)).rejects.toThrow(
+    await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow(
       'Gemini returned non-JSON content'
     );
   });
@@ -215,7 +225,61 @@ describe('generateProse', () => {
   it('throws when the prose fails schema validation', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: '' }));
 
-    await expect(generateProse(facts, 'k', undefined, fetchFn)).rejects.toThrow();
+    await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow();
+  });
+
+  describe('429 retry pacing', () => {
+    // Factory, not a shared instance — a Response body is single-read.
+    const prose = (): Response => geminiResponse({ shortBio: 's', longBio: 'l' });
+    const rateLimited = (headers?: HeadersInit): Response =>
+      new Response('{"error":{"status":"RESOURCE_EXHAUSTED"}}', { status: 429, headers });
+
+    it('pauses 30s then retries a rate-limited request', async () => {
+      const fetchFn = vi.fn().mockResolvedValueOnce(rateLimited()).mockResolvedValue(prose());
+      const sleep = vi.fn().mockResolvedValue(undefined);
+
+      const result = await generateProse(facts, 'k', undefined, { fetchFn, sleep });
+
+      expect(result.shortBio).toBe('s');
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(sleep).toHaveBeenCalledWith(30000);
+    });
+
+    it('backs off 30s then 60s across consecutive 429s', async () => {
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce(rateLimited())
+        .mockResolvedValueOnce(rateLimited())
+        .mockResolvedValue(prose());
+      const sleep = vi.fn().mockResolvedValue(undefined);
+
+      await generateProse(facts, 'k', undefined, { fetchFn, sleep });
+
+      expect(sleep).toHaveBeenNthCalledWith(1, 30000);
+      expect(sleep).toHaveBeenNthCalledWith(2, 60000);
+    });
+
+    it('prefers a server-provided Retry-After over the 30s default', async () => {
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce(rateLimited({ 'retry-after': '45' }))
+        .mockResolvedValue(prose());
+      const sleep = vi.fn().mockResolvedValue(undefined);
+
+      await generateProse(facts, 'k', undefined, { fetchFn, sleep });
+
+      expect(sleep).toHaveBeenCalledWith(45000);
+    });
+
+    it('throws the quota detail once retries are exhausted', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(rateLimited());
+      const sleep = vi.fn().mockResolvedValue(undefined);
+
+      await expect(generateProse(facts, 'k', undefined, { fetchFn, sleep })).rejects.toThrow(
+        'Gemini request failed (429): {"error":{"status":"RESOURCE_EXHAUSTED"}}'
+      );
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
   });
 
   it('throws when Gemini returns no candidates', async () => {
@@ -223,7 +287,7 @@ describe('generateProse', () => {
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ candidates: [] }), { status: 200 }));
 
-    await expect(generateProse(facts, 'k', undefined, fetchFn)).rejects.toThrow(
+    await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow(
       'Gemini returned an empty completion'
     );
   });
