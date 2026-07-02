@@ -73,6 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.164.0] - 2026-07-02
+
+### Added
+
+- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n
+
 ## [4.163.0] - 2026-07-01
 
 ### Added
