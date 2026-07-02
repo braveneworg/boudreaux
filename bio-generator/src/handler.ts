@@ -13,6 +13,7 @@ import { getWikidataData } from './wikidata.js';
 import { getCommonsImage } from './wikimedia.js';
 import { getWikipediaExtract } from './wikipedia.js';
 
+import type { ScrapedImage } from './jina.js';
 import type {
   ArtistFacts,
   BioGenerationData,
@@ -85,6 +86,8 @@ interface MetadataAccumulator {
   images: BioImage[];
   links: BioLink[];
   facts: ArtistFacts;
+  /** Web-page image candidates, used only when Commons yields no images. */
+  scrapedImages: ScrapedImage[];
 }
 
 /** The display/real name used to drive both the MusicBrainz and web searches. */
@@ -101,25 +104,30 @@ const lookupMatch = async (
 
 /**
  * Builds the combined long-form grounding text from the Wikipedia article body
- * (primary source) merged with the official site read via Jina Reader. Either
- * being absent/failed simply contributes nothing (best-effort).
+ * (primary source) merged with the official site read via Jina Reader, plus any
+ * image candidates scraped from the official site. Either source being
+ * absent/failed simply contributes nothing (best-effort).
  */
 const resolveWikidataSourceText = async (
   wikipediaUrl: string | undefined,
   officialUrl: string | undefined,
   scrapeKey: string | null,
   deps: BioGeneratorDeps
-): Promise<string | undefined> => {
+): Promise<{ sourceText: string | undefined; scrapedImages: ScrapedImage[] }> => {
   let sourceText: string | undefined;
+  const scrapedImages: ScrapedImage[] = [];
   if (wikipediaUrl) {
     const article = await deps.getWikipediaExtract(wikipediaUrl);
     if (article) sourceText = article.extract;
   }
   if (officialUrl) {
     const official = await deps.readUrl(officialUrl, scrapeKey);
-    if (official) sourceText = appendSourceText(sourceText, official);
+    if (official) {
+      sourceText = appendSourceText(sourceText, official.content);
+      scrapedImages.push(...official.images);
+    }
   }
-  return sourceText;
+  return { sourceText, scrapedImages };
 };
 
 /**
@@ -177,13 +185,14 @@ const applyWikidataFacts = async (
   acc.facts.officialUrl = wd.officialUrl;
   acc.links.push(...wikidataLinks(wd.wikipediaUrl, wd.officialUrl));
 
-  const sourceText = await resolveWikidataSourceText(
+  const { sourceText, scrapedImages } = await resolveWikidataSourceText(
     wd.wikipediaUrl,
     wd.officialUrl,
     scrapeKey,
     deps
   );
   if (sourceText) acc.facts.sourceText = sourceText;
+  acc.scrapedImages.push(...scrapedImages);
 
   const images = await resolveImages(wd.imageFileNames, deps);
   acc.images.push(...images);
@@ -237,6 +246,7 @@ const applyWebSearch = async (
   });
 
   acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
+  acc.scrapedImages.push(...found.images);
   acc.facts.sourceUrls = [
     ...new Set(
       [
@@ -252,11 +262,53 @@ const applyWebSearch = async (
   }
 };
 
+/** The registrable host of a scraped image's source page, for attribution. */
+const attributionHost = (sourceUrl: string): string => {
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return 'web';
+  }
+};
+
+/** Maps a scraped page image onto the {@link BioImage} shape Commons images use. */
+const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
+  url: image.url,
+  thumbnailUrl: null,
+  title: image.alt,
+  attribution: attributionHost(image.sourceUrl),
+  license: null,
+  sourceUrl: image.sourceUrl,
+  width: null,
+  height: null,
+  isPrimary: false,
+});
+
+/**
+ * Fills `acc.images` from the web-scraped candidates when Commons produced
+ * nothing — licensed Commons images always win, but an artist with no Wikidata
+ * entry still gets pictures from the pages that ground their bio. Alt-titled
+ * candidates rank first: a named image is likelier to actually depict the
+ * artist, and the title is the model's only signal when picking which to embed.
+ */
+const applyScrapedImageFallback = (acc: MetadataAccumulator): void => {
+  if (acc.images.length || !acc.scrapedImages.length) return;
+
+  const ranked = [...acc.scrapedImages].sort(
+    (a, b) => Number(Boolean(b.alt)) - Number(Boolean(a.alt))
+  );
+  acc.images.push(...ranked.slice(0, MAX_IMAGES).map(toScrapedBioImage));
+  logEvent('info', 'scraped_images_fallback', {
+    candidates: acc.scrapedImages.length,
+    used: acc.images.length,
+  });
+};
+
 /**
  * Finalizes the accumulator: appends admin links (last, so curated entries
  * survive dedupe), then drops every streaming/listening service from both the
- * discovered links and the reference URLs so none can reach the output, and
- * derives the image-title list for the prompt.
+ * discovered links and the reference URLs so none can reach the output, fills
+ * the scraped-image fallback, and derives the image-title list for the prompt.
  */
 const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
   for (const url of input.links ?? []) {
@@ -267,6 +319,7 @@ const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): 
   if (acc.facts.sourceUrls) {
     acc.facts.sourceUrls = acc.facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
   }
+  applyScrapedImageFallback(acc);
   acc.facts.imageTitles = acc.images.map((image) => image.title ?? '');
 };
 
@@ -282,6 +335,7 @@ const gatherMetadata = async (
   const acc: MetadataAccumulator = {
     images: [],
     links: [],
+    scrapedImages: [],
     facts: {
       displayName: input.displayName,
       realName: input.realName,

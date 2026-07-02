@@ -107,7 +107,9 @@ describe('runBioGeneration', () => {
   it('reads the official site via Jina Reader and merges it into source text', async () => {
     const deps = makeDeps({
       getWikipediaExtract: vi.fn().mockResolvedValue(null),
-      readUrl: vi.fn().mockResolvedValue('Official site copy about the band.'),
+      readUrl: vi
+        .fn()
+        .mockResolvedValue({ content: 'Official site copy about the band.', images: [] }),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -153,6 +155,7 @@ describe('runBioGeneration', () => {
     const searchArtistSources = vi.fn().mockResolvedValue({
       sourceText: 'Web-sourced bio text.',
       sourceUrls: ['https://x.example'],
+      images: [],
     });
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -170,9 +173,11 @@ describe('runBioGeneration', () => {
   });
 
   it('merges web search context with the Wikipedia extract when both exist', async () => {
-    const searchArtistSources = vi
-      .fn()
-      .mockResolvedValue({ sourceText: 'Extra web context.', sourceUrls: ['https://x.example'] });
+    const searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'Extra web context.',
+      sourceUrls: ['https://x.example'],
+      images: [],
+    });
     const deps = makeDeps({ searchArtistSources });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -188,6 +193,7 @@ describe('runBioGeneration', () => {
     const searchArtistSources = vi.fn().mockResolvedValue({
       sourceText: 'Web context.',
       sourceUrls: ['https://genius.com/radiohead', 'https://open.spotify.com/artist/x'],
+      images: [],
     });
     const deps = makeDeps({ searchArtistSources });
 
@@ -305,6 +311,138 @@ describe('runBioGeneration', () => {
 
     expect(result.links.some((l) => l.kind === 'musicbrainz')).toBe(true);
     expect(result.images).toEqual([]);
+  });
+
+  it('falls back to web-scraped images when Commons yields none', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: 'Web-sourced bio text.',
+        sourceUrls: ['https://a.example/bio'],
+        images: [
+          {
+            url: 'https://a.example/artist.jpg',
+            alt: 'Artist in 2015',
+            sourceUrl: 'https://a.example/bio',
+          },
+        ],
+      }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(result.images).toEqual([
+      {
+        url: 'https://a.example/artist.jpg',
+        thumbnailUrl: null,
+        title: 'Artist in 2015',
+        attribution: 'a.example',
+        license: null,
+        sourceUrl: 'https://a.example/bio',
+        width: null,
+        height: null,
+        isPrimary: true,
+      },
+    ]);
+    expect(factsArg(deps).imageTitles).toEqual(['Artist in 2015']);
+  });
+
+  it('keeps Commons images and ignores scraped ones when Commons resolves', async () => {
+    const deps = makeDeps({
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://a.example/bio'],
+        images: [
+          {
+            url: 'https://a.example/artist.jpg',
+            alt: 'Artist',
+            sourceUrl: 'https://a.example/bio',
+          },
+        ],
+      }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images).toHaveLength(2);
+    expect(result.images.every((img) => img.url.includes('upload.wikimedia.org'))).toBe(true);
+  });
+
+  it('ranks alt-titled scraped images first and caps the fallback at six', async () => {
+    const scraped = Array.from({ length: 8 }, (_, i) => ({
+      url: `https://a.example/photo-${i}.jpg`,
+      alt: i % 2 === 0 ? null : `Photo ${i}`,
+      sourceUrl: 'https://a.example/bio',
+    }));
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://a.example/bio'],
+        images: scraped,
+      }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(result.images).toHaveLength(6);
+    expect(result.images.slice(0, 4).map((img) => img.title)).toEqual([
+      'Photo 1',
+      'Photo 3',
+      'Photo 5',
+      'Photo 7',
+    ]);
+  });
+
+  it('uses official-site page images in the scraped fallback', async () => {
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: [],
+        officialUrl: 'https://radiohead.com',
+        wikipediaUrl: 'https://en.wikipedia.org/wiki/Radiohead',
+      }),
+      readUrl: vi.fn().mockResolvedValue({
+        content: 'Official site copy.',
+        images: [
+          {
+            url: 'https://radiohead.com/band.jpg',
+            alt: 'Band photo',
+            sourceUrl: 'https://radiohead.com',
+          },
+        ],
+      }),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].url).toBe('https://radiohead.com/band.jpg');
+    expect(result.images[0].attribution).toBe('radiohead.com');
+  });
+
+  it('logs a scraped_images_fallback event with candidate and used counts', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://a.example/bio'],
+        images: [
+          {
+            url: 'https://a.example/artist.jpg',
+            alt: 'Artist',
+            sourceUrl: 'https://a.example/bio',
+          },
+        ],
+      }),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    const events = info.mock.calls.map((call) => JSON.parse(call[0] as string));
+    const fallback = events.find((e) => e.event === 'scraped_images_fallback');
+    expect(fallback).toMatchObject({ candidates: 1, used: 1 });
+    info.mockRestore();
   });
 
   it('logs a structured enrichment_complete event with image and link counts', async () => {

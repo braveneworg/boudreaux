@@ -10,8 +10,8 @@ const jinaSearchResponse = (data: unknown[]): Response =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-const jinaReaderResponse = (content: string): Response =>
-  new Response(JSON.stringify({ data: { url: 'https://x', content } }), {
+const jinaReaderResponse = (content: string, images?: Record<string, string>): Response =>
+  new Response(JSON.stringify({ data: { url: 'https://x', content, images } }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -126,6 +126,124 @@ describe('searchArtistSources', () => {
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it('requests an images summary for each result page', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jinaSearchResponse([]));
+
+    await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(fetchFn.mock.calls[0][1].headers['X-With-Images-Summary']).toBe('true');
+  });
+
+  it('collects scraped images with alt text and the source page URL', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: {
+            'Image 4,1: Artist in 2015': 'https://a.example/photos/artist-2015.png',
+            'Image 5,2': 'https://a.example/photos/live.jpg',
+          },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toEqual([
+      {
+        url: 'https://a.example/photos/artist-2015.png',
+        alt: 'Artist in 2015',
+        sourceUrl: 'https://a.example/bio',
+      },
+      { url: 'https://a.example/photos/live.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
+    ]);
+  });
+
+  it('filters non-photo and junk image URLs', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: {
+            'Image 1': 'https://a.example/static/site-logo.svg',
+            'Image 2: Wikipedia wordmark': 'https://a.example/wordmark.png',
+            'Image 3': 'https://a.example/favicon.ico',
+            'Image 4': 'https://a.example/anim.gif',
+            'Image 5': 'relative/path.jpg',
+            'Image 6': "https://a.example/artist/this.src='https://cdn.example/x.jpg",
+            'Image 7: Artist portrait': 'https://a.example/portrait.jpg',
+          },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toEqual([
+      {
+        url: 'https://a.example/portrait.jpg',
+        alt: 'Artist portrait',
+        sourceUrl: 'https://a.example/bio',
+      },
+    ]);
+  });
+
+  it('skips images from listening-service result pages', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://open.spotify.com/artist/x',
+          content: 'Streaming page.',
+          images: { 'Image 1': 'https://i.scdn.co/image/cover.jpg' },
+        },
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: { 'Image 1: Artist': 'https://a.example/artist.jpg' },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toEqual([
+      { url: 'https://a.example/artist.jpg', alt: 'Artist', sourceUrl: 'https://a.example/bio' },
+    ]);
+  });
+
+  it('dedupes scraped image URLs across results', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: { 'Image 1: Artist': 'https://cdn.example/artist.jpg' },
+        },
+        {
+          url: 'https://b.example/profile',
+          content: 'Profile text.',
+          images: { 'Image 1': 'https://cdn.example/artist.jpg' },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toHaveLength(1);
+  });
+
+  it('returns an empty images list when results carry no images', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jinaSearchResponse([{ url: 'https://a.example', content: 'text' }]));
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toEqual([]);
+  });
 });
 
 describe('readUrl', () => {
@@ -134,8 +252,36 @@ describe('readUrl', () => {
 
     const result = await readUrl('https://radiohead.com', 'k', fetchFn);
 
-    expect(result).toBe('Official site copy.');
+    expect(result?.content).toBe('Official site copy.');
     expect(fetchFn.mock.calls[0][0]).toBe('https://r.jina.ai/https://radiohead.com');
+  });
+
+  it('requests an images summary and returns filtered page images', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaReaderResponse('Official site copy.', {
+        'Image 1: Band photo': 'https://radiohead.com/band.jpg',
+        'Image 2': 'https://radiohead.com/nav-icon.png',
+      })
+    );
+
+    const result = await readUrl('https://radiohead.com', 'k', fetchFn);
+
+    expect(fetchFn.mock.calls[0][1].headers['X-With-Images-Summary']).toBe('true');
+    expect(result?.images).toEqual([
+      {
+        url: 'https://radiohead.com/band.jpg',
+        alt: 'Band photo',
+        sourceUrl: 'https://radiohead.com',
+      },
+    ]);
+  });
+
+  it('returns an empty images list when the page has none', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jinaReaderResponse('Copy.'));
+
+    const result = await readUrl('https://x', 'k', fetchFn);
+
+    expect(result?.images).toEqual([]);
   });
 
   it('caps the reader content length', async () => {
@@ -144,7 +290,7 @@ describe('readUrl', () => {
 
     const result = await readUrl('https://x', 'k', fetchFn);
 
-    expect(result && result.length).toBeLessThan(huge.length);
+    expect(result && result.content.length).toBeLessThan(huge.length);
   });
 
   it('returns null and logs when the reader responds non-OK', async () => {
