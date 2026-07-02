@@ -2,13 +2,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { fetchWithRetry } from './lib/http.js';
 import { bioProseSchema, DEFAULT_GEMINI_MODEL } from './types.js';
 
+import type { FetchRetryOptions } from './lib/http.js';
 import type { ArtistFacts, BioProse } from './types.js';
 
-type FetchFn = typeof fetch;
-
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+/**
+ * Backoff between rate-limited attempts: 30s, doubling to 60s — the free-tier
+ * Gemini quota window recovers on that scale, and a server `Retry-After` still
+ * takes precedence. Two retries keep the worst case (three generations plus
+ * 90s of waits) inside the Lambda's 600s timeout.
+ */
+const GEMINI_RETRY_BASE_DELAY_MS = 30_000;
+const GEMINI_RETRIES = 2;
+
+/** Cap on the response-body excerpt echoed into failure messages. */
+const ERROR_BODY_SNIPPET_LENGTH = 300;
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -183,43 +195,59 @@ const parseProse = (body: GeminiResponse): BioProse => {
 };
 
 /**
+ * Builds the non-OK failure message, appending a bounded excerpt of the response
+ * body — Google's 429/4xx bodies name the exact quota or key problem, and
+ * discarding them made two production incidents needlessly hard to diagnose.
+ */
+const failureMessage = async (response: Response): Promise<string> => {
+  const base = `Gemini request failed (${response.status})`;
+  const body = (await response.text().catch(() => '')).replace(/\s+/g, ' ').trim();
+  return body ? `${base}: ${body.slice(0, ERROR_BODY_SNIPPET_LENGTH)}` : base;
+};
+
+/**
  * Generates short + long bio prose with the Gemini `generateContent` API in JSON
  * mode. The model writes prose only; it is given the real facts gathered from
  * MusicBrainz/Wikidata/web so the text stays grounded, and it never produces the
  * image/link URLs the caller ultimately returns. Gemini's 1M-token context means
- * the full source material fits without trimming.
+ * the full source material fits without trimming. Rate-limited (429) attempts
+ * are retried after a 30s → 60s pause (or the server's `Retry-After`).
  *
  * @param facts - Grounding facts assembled by the handler.
  * @param apiKey - Gemini API key (resolved from SSM), sent via `x-goog-api-key`.
  * @param model - Gemini model id; defaults to {@link DEFAULT_GEMINI_MODEL}.
- * @param fetchFn - Injectable fetch (defaults to global) for testability.
+ * @param options - Injectable fetch/sleep and retry tuning for testability.
  * @returns Validated prose plus the model's image ranking.
  */
 export const generateProse = async (
   facts: ArtistFacts,
   apiKey: string,
   model: string = DEFAULT_GEMINI_MODEL,
-  fetchFn: FetchFn = fetch
+  options: FetchRetryOptions = {}
 ): Promise<BioProse> => {
-  const response = await fetchFn(`${GEMINI_API_BASE}/${model}:generateContent`, {
-    method: 'POST',
-    headers: {
-      'x-goog-api-key': apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildSystemPrompt(facts) }] },
-      contents: [{ role: 'user', parts: [{ text: buildUserPrompt(facts) }] }],
-      generationConfig: {
-        temperature: 0.6,
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-        responseMimeType: 'application/json',
+  const response = await fetchWithRetry(
+    `${GEMINI_API_BASE}/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: buildSystemPrompt(facts) }] },
+        contents: [{ role: 'user', parts: [{ text: buildUserPrompt(facts) }] }],
+        generationConfig: {
+          temperature: 0.6,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          responseMimeType: 'application/json',
+        },
+      }),
+    },
+    { baseDelayMs: GEMINI_RETRY_BASE_DELAY_MS, retries: GEMINI_RETRIES, ...options }
+  );
 
   if (!response.ok) {
-    throw new Error(`Gemini request failed (${response.status})`);
+    throw new Error(await failureMessage(response));
   }
 
   const body = (await response.json()) as GeminiResponse;
