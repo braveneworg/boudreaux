@@ -273,6 +273,49 @@ describe('searchArtistSources', () => {
     expect(decodeURIComponent(url)).not.toContain('biography career discography');
   });
 
+  it('drops scraped images whose alt matches junk keywords', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: {
+            'Image 1: flag': 'https://a.example/flag.jpg',
+            'Image 2: Help AllMusic with a subscription': 'https://a.example/sub.jpg',
+            'Image 3: Default profile photo': 'https://a.example/default.jpg',
+            'Image 4: Ceschi performing in 2015': 'https://a.example/ceschi.jpg',
+            'Image 5': 'https://a.example/noalt.jpg',
+          },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toHaveLength(2);
+    const urls = result?.images.map((i) => i.url) ?? [];
+    expect(urls).toContain('https://a.example/ceschi.jpg');
+    expect(urls).toContain('https://a.example/noalt.jpg');
+  });
+
+  it('does not drop images whose alt contains "mDecks Music – Piano & Harmony Tutor"', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        {
+          url: 'https://a.example/bio',
+          content: 'Bio text.',
+          images: {
+            'Image 1: mDecks Music – Piano & Harmony Tutor': 'https://a.example/mdeck.jpg',
+          },
+        },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.images).toHaveLength(1);
+  });
+
   it('does not truncate beyond the new cap of 20 images per call', async () => {
     const images: Record<string, string> = {};
     for (let i = 0; i < 21; i++) {
