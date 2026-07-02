@@ -117,8 +117,15 @@ const altFromImageKey = (key: string): string | null => {
 };
 
 /**
+ * Alt texts that mark page chrome or ads rather than artist photography
+ * (logos, icons, flags, avatars, banners, subscription prompts, ads).
+ */
+const JUNK_IMAGE_ALT_PATTERN =
+  /\b(logo|icon|flag|avatar|banner|badge|button|sprite|placeholder|thumbnail|advert(isement)?|ad|sponsor(ed)?|subscription|subscribe|sign[ -]?(up|in)|default profile|profile photo missing|cookie|tracking pixel)\b/i;
+
+/**
  * Maps a page's images summary to filtered {@link ScrapedImage} candidates,
- * dropping site chrome and non-photo formats.
+ * dropping site chrome (by URL), non-photo formats, and page-chrome alt text.
  */
 const collectPageImages = (
   images: JinaImagesSummary | undefined,
@@ -126,7 +133,8 @@ const collectPageImages = (
 ): ScrapedImage[] =>
   Object.entries(images ?? {})
     .filter(([, url]) => isPlausiblePhotoUrl(url))
-    .map(([key, url]) => ({ url, alt: altFromImageKey(key), sourceUrl }));
+    .map(([key, url]) => ({ url, alt: altFromImageKey(key), sourceUrl }))
+    .filter(({ alt }) => alt === null || !JUNK_IMAGE_ALT_PATTERN.test(alt));
 
 /** Dedupes scraped images by URL, keeping first occurrence, capped. */
 const dedupeScrapedImages = (images: ScrapedImage[]): ScrapedImage[] => {

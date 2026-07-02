@@ -77,6 +77,42 @@ const BIO_TEXT_OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
 };
 
+/** Short bio allowlist — same as the long bio but with `img` removed.
+ *  The short bio is a one-paragraph teaser rendered in listing cards and
+ *  meta descriptions; inline images in that context break layout and are
+ *  semantically wrong.  This also acts as a write-time guard so a manually
+ *  pasted image in the admin editor cannot re-introduce the bug.
+ */
+const BIO_HTML_NO_IMAGES_OPTIONS: sanitizeHtml.IOptions = {
+  ...BIO_HTML_OPTIONS,
+  // Explicitly enumerate tags without `img` to stay type-safe — IOptions types
+  // allowedTags as `string[] | false`, so filtering it risks a runtime `.filter`
+  // on `false`.
+  allowedTags: [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'ul',
+    'ol',
+    'li',
+    'a',
+    'span',
+    'h2',
+    'h3',
+    'h4',
+  ],
+  allowedAttributes: {
+    a: ['href', 'rel', 'target'],
+    span: ['style'],
+  },
+  allowedSchemesByTag: {
+    a: ['http', 'https'],
+  },
+};
+
 /**
  * Sanitizes the long bio HTML for safe redisplay in the admin view and on the
  * public bio page. This is the authoritative pass run before the value is
@@ -87,6 +123,21 @@ const BIO_TEXT_OPTIONS: sanitizeHtml.IOptions = {
  */
 export const sanitizeBioHtml = (html: string): string =>
   sanitizeHtml(html, BIO_HTML_OPTIONS).trim();
+
+/**
+ * Sanitizes the short bio HTML, stripping `<img>` tags entirely.
+ * The short bio is a one-paragraph teaser; inline images break layout and
+ * are never appropriate there. All other bio allowlist rules (links, emphasis,
+ * etc.) apply unchanged.
+ *
+ * Use this wherever a shortBio is sanitized — at AI generation time and at
+ * admin-save time — so no image can enter the field from either path.
+ *
+ * @param html - Untrusted HTML (editor or LLM output).
+ * @returns Sanitized HTML with images removed, links hardened.
+ */
+export const sanitizeBioHtmlNoImages = (html: string): string =>
+  sanitizeHtml(html, BIO_HTML_NO_IMAGES_OPTIONS).trim();
 
 /**
  * Sanitizes a short bio / attribution / label to plain text, discarding any

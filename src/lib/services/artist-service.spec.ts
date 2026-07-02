@@ -381,6 +381,19 @@ describe('ArtistService', () => {
       expect(persisted?.altBio).not.toContain('javascript:');
     });
 
+    it('strips <img> from shortBio on admin save regardless of the image source', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', {
+        shortBio: '<p>Intro. <img src="https://cdn.example/a.webp" alt="a"> Outro.</p>',
+      });
+
+      const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
+      expect(persisted?.shortBio).not.toContain('<img');
+      expect(persisted?.shortBio).toContain('Intro.');
+      expect(persisted?.shortBio).toContain('Outro.');
+    });
+
     it('should return error when artist not found', async () => {
       const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);

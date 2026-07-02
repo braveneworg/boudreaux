@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { sanitizeBioHtml, sanitizeBioText } from './sanitize-bio-html';
+import { sanitizeBioHtml, sanitizeBioHtmlNoImages, sanitizeBioText } from './sanitize-bio-html';
 
 vi.mock('server-only', () => ({}));
 
@@ -117,6 +117,36 @@ describe('sanitizeBioHtml', () => {
     const result = sanitizeBioHtml('<p onclick="evil()">text</p>');
 
     expect(result).not.toContain('onclick');
+  });
+});
+
+describe('sanitizeBioHtmlNoImages', () => {
+  it('strips <img> tags from the short bio while keeping surrounding prose', () => {
+    const result = sanitizeBioHtmlNoImages(
+      '<p>A great artist. <img src="https://cdn.example/x.webp" alt="x"> Known worldwide.</p>'
+    );
+
+    expect(result).not.toContain('<img');
+    expect(result).toContain('A great artist.');
+    expect(result).toContain('Known worldwide.');
+  });
+
+  it('keeps all non-image html tags allowed in the long bio', () => {
+    const result = sanitizeBioHtmlNoImages(
+      '<p><strong>Bold</strong> and <a href="https://example.com">linked</a></p>'
+    );
+
+    expect(result).toContain('<strong>Bold</strong>');
+    expect(result).toContain('href="https://example.com"');
+  });
+
+  it('does not strip images from the long bio (sanitizeBioHtml keeps them)', () => {
+    const result = sanitizeBioHtml(
+      '<p>Bio text. <img src="https://cdn.example/a.webp" alt="a" width="400" height="300"></p>'
+    );
+
+    expect(result).toContain('<img');
+    expect(result).toContain('src="https://cdn.example/a.webp"');
   });
 });
 

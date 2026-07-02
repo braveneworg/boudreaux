@@ -58,4 +58,16 @@ describe('buildCdnImageVariantUrl', () => {
       'https://cdn.fakefourrecords.com/media/cover_w800.webp'
     );
   });
+
+  it('returns a bio/thumbs CDN URL byte-identical regardless of requested width', () => {
+    const thumbUrl = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/0-3bbd1cf1.webp';
+    expect(buildCdnImageVariantUrl(thumbUrl, 640)).toBe(thumbUrl);
+    expect(buildCdnImageVariantUrl(thumbUrl, 1200)).toBe(thumbUrl);
+  });
+
+  it('still appends a width suffix for normal media URLs', () => {
+    expect(buildCdnImageVariantUrl('https://cdn.fakefourrecords.com/media/cover.jpg', 800)).toBe(
+      'https://cdn.fakefourrecords.com/media/cover_w800.webp'
+    );
+  });
 });
