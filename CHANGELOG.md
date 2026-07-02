@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.168.0] - 2026-07-02
+
+### Added
+
+- feat(bio-generator): scraped-image fallback + prompt fixes (#546)\n- feat(bio-generator): scraped-image fallback + prompt fixes (#546)\n
+
 ## [4.167.0] - 2026-07-02
 
 ### Added
