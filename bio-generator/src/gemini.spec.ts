@@ -323,7 +323,29 @@ describe('generateProse', () => {
     expect(userMessage).toContain('"altBio"');
   });
 
-  it('allows an inline image in the short bio', async () => {
+  it('bans <img> tags in short bio of generate and synthesize prompts', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockImplementation(async () => geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+    await synthesizeProse(
+      { facts, drafts: [{ shortBio: 's', longBio: 'l' }], apiKey: 'k' },
+      { fetchFn }
+    );
+
+    for (const call of fetchFn.mock.calls) {
+      const userMessage = JSON.parse(call[1].body as string).contents[0].parts[0].text as string;
+      const shortBioSection = userMessage.slice(
+        userMessage.indexOf('shortBio:'),
+        userMessage.indexOf('longBio:')
+      );
+      expect(shortBioSection).toContain('Do NOT embed any <img> tags in the short bio');
+      expect(shortBioSection).not.toContain('Optionally embed ONE inline <img');
+    }
+  });
+
+  it('bans images from the short bio — it renders as a text-only lede', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -333,7 +355,8 @@ describe('generateProse', () => {
       userMessage.indexOf('shortBio:'),
       userMessage.indexOf('longBio:')
     );
-    expect(shortBioSection).toContain('<img src="image:N"');
+    expect(shortBioSection).not.toContain('<img src="image:N"');
+    expect(shortBioSection).toContain('Do NOT embed any <img> tags in the short bio');
   });
 
   it('validates and returns an alt bio when present', async () => {
