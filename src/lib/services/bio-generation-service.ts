@@ -10,7 +10,11 @@ import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
-import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
+import {
+  sanitizeBioHtml,
+  sanitizeBioHtmlNoImages,
+  sanitizeBioText,
+} from '@/lib/utils/sanitize-bio-html';
 import {
   bioGenerationResultSchema,
   type BioGenerationData,
@@ -186,9 +190,10 @@ const assembleContent = ({
   genres,
 }: AssembleContentInput): GeneratedBioContent => ({
   // Every bio is rich HTML that may carry inline links and a single inline
-  // image:N placeholder, so resolve placeholders then sanitize each the same
-  // way. Consumers needing plain text (cards, meta) strip tags with sanitizeBioText.
-  shortBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.shortBio, imageUrlByIndex)),
+  // image:N placeholder, so resolve placeholders first.  The short bio then
+  // uses the no-image sanitizer (inline images break layout in listing cards
+  // and meta descriptions); long bio and altBio keep their images.
+  shortBio: sanitizeBioHtmlNoImages(replaceBioImagePlaceholders(data.shortBio, imageUrlByIndex)),
   longBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.longBio, imageUrlByIndex)),
   altBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.altBio, imageUrlByIndex)),
   genres,

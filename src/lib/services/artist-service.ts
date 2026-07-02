@@ -22,7 +22,11 @@ import { generateSlug } from '@/lib/utils/generate-slug';
 import { loggers } from '@/lib/utils/logger';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
-import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
+import {
+  sanitizeBioHtml,
+  sanitizeBioHtmlNoImages,
+  sanitizeBioText,
+} from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import { failFromError } from './_internal/map-data-error';
@@ -151,8 +155,10 @@ const deleteImageFromS3 = async (s3Bucket: string, s3Key: string): Promise<void>
 const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(data: T): T => {
   const sanitized = { ...data };
   if (typeof sanitized.bio === 'string') sanitized.bio = sanitizeBioHtml(sanitized.bio);
+  // The short bio is a one-paragraph teaser; strip <img> at write time so a
+  // manually pasted image in the admin editor cannot persist in the field.
   if (typeof sanitized.shortBio === 'string')
-    sanitized.shortBio = sanitizeBioHtml(sanitized.shortBio);
+    sanitized.shortBio = sanitizeBioHtmlNoImages(sanitized.shortBio);
   if (typeof sanitized.altBio === 'string') sanitized.altBio = sanitizeBioHtml(sanitized.altBio);
   return sanitized;
 };

@@ -222,6 +222,26 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result.slug).toBe('radiohead');
   });
 
+  it('strips <img> from the short bio even when the long bio keeps its images', async () => {
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        shortBio: '<p>Teaser. <img src="https://cdn.example/x.webp" alt="x"> The end.</p>',
+        longBio: '<p>Full bio. <img src="https://cdn.example/x.webp" alt="x"></p>',
+      },
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.shortBio).not.toContain('<img');
+    expect(result.data.shortBio).toContain('Teaser.');
+    expect(result.data.shortBio).toContain('The end.');
+    expect(result.data.longBio).toContain('<img');
+  });
+
   it('sanitizes the alt bio and persists it via the repository', async () => {
     await BioGenerationService.generateForArtist(artist.id);
 

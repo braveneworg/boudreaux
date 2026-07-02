@@ -77,6 +77,23 @@ const BIO_TEXT_OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
 };
 
+/** Short bio allowlist — same as the long bio but with `img` removed.
+ *  The short bio is a one-paragraph teaser rendered in listing cards and
+ *  meta descriptions; inline images in that context break layout and are
+ *  semantically wrong.  This also acts as a write-time guard so a manually
+ *  pasted image in the admin editor cannot re-introduce the bug.
+ */
+const BIO_HTML_NO_IMAGES_OPTIONS: sanitizeHtml.IOptions = {
+  ...BIO_HTML_OPTIONS,
+  allowedTags: (BIO_HTML_OPTIONS.allowedTags ?? []).filter((tag) => tag !== 'img'),
+  allowedAttributes: Object.fromEntries(
+    Object.entries(BIO_HTML_OPTIONS.allowedAttributes ?? {}).filter(([key]) => key !== 'img')
+  ),
+  allowedSchemesByTag: Object.fromEntries(
+    Object.entries(BIO_HTML_OPTIONS.allowedSchemesByTag ?? {}).filter(([key]) => key !== 'img')
+  ),
+};
+
 /**
  * Sanitizes the long bio HTML for safe redisplay in the admin view and on the
  * public bio page. This is the authoritative pass run before the value is
@@ -87,6 +104,21 @@ const BIO_TEXT_OPTIONS: sanitizeHtml.IOptions = {
  */
 export const sanitizeBioHtml = (html: string): string =>
   sanitizeHtml(html, BIO_HTML_OPTIONS).trim();
+
+/**
+ * Sanitizes the short bio HTML, stripping `<img>` tags entirely.
+ * The short bio is a one-paragraph teaser; inline images break layout and
+ * are never appropriate there. All other bio allowlist rules (links, emphasis,
+ * etc.) apply unchanged.
+ *
+ * Use this wherever a shortBio is sanitized — at AI generation time and at
+ * admin-save time — so no image can enter the field from either path.
+ *
+ * @param html - Untrusted HTML (editor or LLM output).
+ * @returns Sanitized HTML with images removed, links hardened.
+ */
+export const sanitizeBioHtmlNoImages = (html: string): string =>
+  sanitizeHtml(html, BIO_HTML_NO_IMAGES_OPTIONS).trim();
 
 /**
  * Sanitizes a short bio / attribution / label to plain text, discarding any
