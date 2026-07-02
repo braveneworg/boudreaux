@@ -38,6 +38,8 @@ vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
       rehostMock(url, artistId, index),
+    rehostThumbnail: (url: string, artistId: string, index: number) =>
+      rehostMock(url, artistId, index),
   },
 }));
 
@@ -241,7 +243,7 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result.data.altBio).not.toContain('image:0');
   });
 
-  it('persists re-hosted images (CDN url, no attribution) via the repository', async () => {
+  it('persists re-hosted images with attribution via the repository', async () => {
     await BioGenerationService.generateForArtist(artist.id, { links: ['https://example.com'] });
 
     expect(rehostMock).toHaveBeenCalledWith('https://upload.wikimedia.org/a.jpg', artist.id, 0);
@@ -250,10 +252,43 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(content.images[0].url).toBe(
       'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
     );
-    expect(content.images[0].attribution).toBeNull();
+    expect(content.images[0].attribution).toBe('Photographer');
+    expect(content.images[0].license).toBe('CC BY-SA 4.0');
+    expect(content.images[0].sourceUrl).toBe('https://commons.wikimedia.org/wiki/File:a.jpg');
+    expect(content.images[0].thumbnailUrl).toBe(
+      'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
+    );
+    expect(content.images[0].originalUrl).toBe('https://upload.wikimedia.org/a.jpg');
     expect(content.images[0].sortOrder).toBe(0);
     expect(content.images[0].isPrimary).toBe(true);
     expect(content.bioModel).toBe('gemini-2.5-pro');
+  });
+
+  it('persists attribution, license, sourceUrl and originalUrl from the lambda result', async () => {
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(replaceBioContentMock).toHaveBeenCalledWith(
+      artist.id,
+      expect.objectContaining({
+        images: [
+          expect.objectContaining({
+            attribution: 'Photographer',
+            license: 'CC BY-SA 4.0',
+            sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
+            originalUrl: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: expect.stringContaining('cdn'),
+          }),
+        ],
+      })
+    );
+  });
+
+  it('re-hosts via rehostThumbnail, not rehostWithVariants, at generation time', async () => {
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    // thumbnailUrl equals url only when rehostThumbnail sets it (PR 2 upgrades on save)
+    expect(content.images[0].thumbnailUrl).toBe(content.images[0].url);
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {

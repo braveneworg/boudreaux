@@ -75,11 +75,12 @@ const deriveDisplayName = (artist: {
 /** Re-hosted image record before `sortOrder` is assigned; width/height may be null. */
 type RehostedImage = {
   url: string;
-  thumbnailUrl: null;
+  thumbnailUrl: string | null;
   title: string | null;
-  attribution: null;
-  license: null;
-  sourceUrl: null;
+  attribution: string | null;
+  license: string | null;
+  sourceUrl: string | null;
+  originalUrl: string | null;
   width: number | null;
   height: number | null;
   isPrimary: boolean;
@@ -97,9 +98,10 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 // ---------------------------------------------------------------------------
 
 /**
- * Re-hosts each discovered image into S3 via {@link BioImageService}. Best-effort:
- * an image that fails to re-host is represented as `null` so it can be dropped
- * later without aborting the entire generation.
+ * Re-hosts each discovered image into S3 via a cheap single-thumbnail pass so
+ * it is CDN-served without paying for full variants on images the admin may
+ * dismiss. Attribution metadata is kept through re-host (PR #547). Best-effort:
+ * failures are dropped, not fatal.
  */
 const rehostImages = async (
   images: BioGenerationData['images'],
@@ -108,18 +110,19 @@ const rehostImages = async (
   Promise.all(
     images.map(async (image, index) => {
       try {
-        const { url, width, height } = await BioImageService.rehostWithVariants(
+        const { url, width, height } = await BioImageService.rehostThumbnail(
           image.url,
           artistId,
           index
         );
         return {
           url,
-          thumbnailUrl: null,
+          thumbnailUrl: url,
           title: image.title ? sanitizeBioText(image.title) : null,
-          attribution: null,
-          license: null,
-          sourceUrl: null,
+          attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
+          license: image.license ?? null,
+          sourceUrl: image.sourceUrl ?? null,
+          originalUrl: image.url,
           width: width ?? image.width ?? null,
           height: height ?? image.height ?? null,
           isPrimary: image.isPrimary,
@@ -303,8 +306,8 @@ export class BioGenerationService {
 
     const genres = result.data.genres ? sanitizeBioText(result.data.genres) || null : null;
 
-    // Re-host each discovered image into our S3 (with `sharp` variants) so it
-    // is CDN-served and not hotlinked. Best-effort: failures are dropped, not fatal.
+    // Re-host each discovered image into S3 via a cheap thumbnail so it is
+    // CDN-served. Full variant re-hosting moves to save-time in PR 2.
     const rehosted = await rehostImages(result.data.images, artist.id);
 
     // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
