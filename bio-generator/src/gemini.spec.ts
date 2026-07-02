@@ -492,6 +492,20 @@ describe('generateProse', () => {
 
       expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-flash:generateContent');
     });
+
+    it('carries the authoritative birth-date constraint into the synthesis system prompt', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse(
+        { facts: baseFacts({ bornOn: '1982-05-01' }), drafts, apiKey: 'k' },
+        { fetchFn }
+      );
+
+      const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0]
+        .text;
+      expect(systemMessage).toContain('born 1982-05-01');
+      expect(systemMessage).toMatch(/never state or imply.*before/i);
+    });
   });
 
   describe('draftAndSynthesizeProse', () => {

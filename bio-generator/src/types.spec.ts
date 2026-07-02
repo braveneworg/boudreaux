@@ -14,19 +14,16 @@ describe('bioGenerationInputSchema', () => {
   });
 
   it('parses valid input with all three optional date fields', () => {
-    const result = bioGenerationInputSchema.safeParse({
+    const data = bioGenerationInputSchema.parse({
       artistId: 'a1',
       displayName: 'Test Artist',
       bornOn: '1965-03-15',
       diedOn: '2020-11-01',
       formedOn: '1990-06-01',
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.bornOn).toBe('1965-03-15');
-      expect(result.data.diedOn).toBe('2020-11-01');
-      expect(result.data.formedOn).toBe('1990-06-01');
-    }
+    expect(data.bornOn).toBe('1965-03-15');
+    expect(data.diedOn).toBe('2020-11-01');
+    expect(data.formedOn).toBe('1990-06-01');
   });
 
   it('rejects bornOn with a year-only value (not YYYY-MM-DD)', () => {
