@@ -109,15 +109,15 @@ interface MetadataAccumulator {
 
 /** The display/real name used to drive both the MusicBrainz and web searches. */
 const searchNameFor = (input: BioGenerationInput): string =>
-  input.realName?.trim() || input.displayName;
+  input.displayName.trim() || input.realName?.trim() || input.displayName;
 
-/** Two-attempt MusicBrainz lookup: real name first, then display name. */
+/** Two-attempt MusicBrainz lookup: display name first, then real name. */
 const lookupMatch = async (
   input: BioGenerationInput,
   deps: BioGeneratorDeps
 ): Promise<Awaited<ReturnType<BioGeneratorDeps['lookupArtist']>>> =>
-  (await deps.lookupArtist(searchNameFor(input))) ??
-  (input.realName ? await deps.lookupArtist(input.displayName) : null);
+  (await deps.lookupArtist(input.displayName)) ??
+  (input.realName ? await deps.lookupArtist(input.realName) : null);
 
 /**
  * Builds the combined long-form grounding text from the Wikipedia article body

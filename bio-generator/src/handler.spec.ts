@@ -721,6 +721,51 @@ describe('runBioGeneration', () => {
     expect(result.links.some((l) => l.url.includes('google.com'))).toBe(false);
   });
 
+  it('searches web and MusicBrainz by displayName when both names are present', async () => {
+    const lookupArtist = vi.fn().mockResolvedValue(null);
+    const searchArtistSources = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({ lookupArtist, searchArtistSources });
+
+    await runBioGeneration(
+      { artistId: 'a1', displayName: 'Ceschi', realName: 'Julio Francisco Ramos' },
+      deps
+    );
+
+    expect(lookupArtist).toHaveBeenCalledWith('Ceschi');
+    expect(searchArtistSources).toHaveBeenCalledWith('Ceschi', null, undefined, {
+      query: undefined,
+    });
+  });
+
+  it('falls back to realName for MusicBrainz when displayName lookup misses', async () => {
+    const lookupArtist = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({
+        mbid: 'mbid-real',
+        name: 'Ceschi',
+        wikidataId: null,
+        artistType: 'Person' as const,
+        area: 'USA',
+        beginDate: '1990',
+        endDate: undefined,
+        tags: [],
+        links: [],
+      });
+    const deps = makeDeps({
+      lookupArtist,
+      getWikidataData: vi.fn().mockRejectedValue(new Error('no wikidata')),
+    });
+
+    await runBioGeneration(
+      { artistId: 'a1', displayName: 'Ceschi', realName: 'Julio Francisco Ramos' },
+      deps
+    );
+
+    expect(lookupArtist).toHaveBeenNthCalledWith(1, 'Ceschi');
+    expect(lookupArtist).toHaveBeenNthCalledWith(2, 'Julio Francisco Ramos');
+  });
+
   it('caps links at 50 when many candidates exist', async () => {
     const manyRefs = Array.from({ length: 60 }, (_, i) => ({
       url: `https://source-${i}.example/page`,
