@@ -75,6 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.166.0] - 2026-07-02
+
+### Added
+
+- fix(bio-generator): gemini-2.5-flash + draft-and-synthesize ensemble (#544)\n- fix(bio-generator): gemini-2.5-flash + draft-and-synthesize ensemble (#544)\n
+
 ## [4.165.0] - 2026-07-02
 
 ### Added
