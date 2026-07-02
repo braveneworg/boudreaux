@@ -4,10 +4,10 @@
 
 import { fetchWithRetry } from './lib/http.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
-import { bioProseSchema, DEFAULT_GEMINI_MODEL } from './types.js';
+import { bioCritiqueSchema, bioProseSchema, DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { FetchRetryOptions } from './lib/http.js';
-import type { ArtistFacts, BioProse } from './types.js';
+import type { ArtistFacts, BioCritique, BioCritiqueViolation, BioProse } from './types.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -64,14 +64,24 @@ const artistFullName = (facts: ArtistFacts): string =>
 
 /** Output constraints every prose call must obey, drafts and synthesis alike. */
 const SHARED_CONSTRAINT_LINES = [
-  'NEVER link to streaming or listening services (Spotify, Apple Music, SoundCloud, Bandcamp,',
-  'YouTube Music, Tidal, Deezer, Amazon Music, or any other) — link only to INFORMATIVE sources',
-  'such as the official site, Wikipedia, press, interviews, or the label.',
   'NEVER output a "Discovered Links", "Sources", "References", or link-list section anywhere.',
   'NEVER emit an <img> tag unless an Available images list is provided in the facts — reference',
   'images only as <img src="image:N"> with N taken from that list; with no list, write no images.',
   'Respond with a single JSON object and nothing else.',
 ];
+
+/**
+ * When an authoritative birth date is known, appends a hard constraint that
+ * outranks any other source and forbids implying activity before that date.
+ * Returns an empty string when `bornOn` is absent so `.filter(Boolean)` drops it.
+ */
+const authoritativeDateLine = (facts: ArtistFacts): string => {
+  if (!facts.bornOn) return '';
+  return (
+    `AUTHORITATIVE FACT: the artist was born ${facts.bornOn}. This outranks any other source. ` +
+    'NEVER state or imply the artist was active, performing, recording, or releasing work before this date.'
+  );
+};
 
 const buildSystemPrompt = (facts: ArtistFacts): string =>
   [
@@ -81,7 +91,10 @@ const buildSystemPrompt = (facts: ArtistFacts): string =>
     'dates, awards, members, labels, or URLs, and omit anything unknown rather than guessing.',
     'Rewrite all source material in your own original words — never copy sentences or distinctive phrasing.',
     ...SHARED_CONSTRAINT_LINES,
-  ].join(' ');
+    authoritativeDateLine(facts),
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 /** Formats the active-years line from MusicBrainz life-span data, if present. */
 const activeYears = (facts: ArtistFacts): string => {
@@ -114,6 +127,9 @@ const factLines = (facts: ArtistFacts): string[] => [
   labeledLine('Type', facts.artistType),
   labeledLine('Origin', facts.area),
   activeYears(facts),
+  labeledLine('Born', facts.bornOn),
+  labeledLine('Died', facts.diedOn),
+  labeledLine('Formed', facts.formedOn),
   labeledLine('Known genres', facts.existingGenres),
   labeledLine('MusicBrainz tags', facts.tags?.length ? facts.tags.join(', ') : undefined),
   labeledLine('MusicBrainz id', facts.musicBrainzId),
@@ -154,8 +170,7 @@ const OUTPUT_SPEC_LINES = [
   '- Optionally embed ONE inline <img src="image:N" alt="..."> from the Available images list',
   '  above, where N is its 0-indexed position; the app swaps the placeholder for the hosted URL.',
   '- Use <strong>/<em> emphasis where it helps; keep it to prose, never a list of links.',
-  '- Do NOT add a "Discovered Links"/"Sources"/"References" section and do NOT link to any',
-  '  streaming/listening service.',
+  '- Do NOT add a "Discovered Links"/"Sources"/"References" section.',
   '',
   'longBio: an extensive, in-depth biography of roughly 2000–3500 words. Requirements:',
   '- Organize into several <h2> sections (e.g. Background, Career, Musical style, Notable works,',
@@ -164,15 +179,17 @@ const OUTPUT_SPEC_LINES = [
   '  EVERY <h2> section. Reference URLs may be reused across sections with different anchor',
   '  text; VARY the wording around each link and never reuse one phrase.',
   '- Prefer links over bold: when a key name or term is covered by a reference URL, make it an',
-  '  inline link instead of bolding it. Still DO bold 2–4 pivotal names or terms with <strong>',
-  '  across the article (use it SPARINGLY — never every name), with <em> for emphasis and',
-  '  <ul>/<ol> lists where appropriate (e.g. notable releases, collaborators, influences).',
+  '  inline link instead of bolding it. ADDITIONALLY bold the pivotal unlinkable facts — key',
+  '  dates, release titles, collaborators, and turning points — with <strong> so they stand out',
+  '  when scanning, and italicize album/song/work titles with <em> wherever they appear.',
+  '- Chunk enumerable content into <ul>/<ol> lists for web readability: discographies, timelines,',
+  '  collaborator rosters, and similar runs of items belong in lists, not comma prose. Include at',
+  '  least one list in the long bio whenever the material supports it.',
   '- Embed 2–3 inline images of the artist using <img src="image:N" alt="...">, where N is the',
   '  0-indexed position from the Available images list above. Place each sparingly and',
   '  tastefully: at most one per major section, between paragraphs near the relevant text, and',
   '  never place two images adjacent. The app swaps each placeholder for the hosted image URL.',
-  '- Do NOT add a "Sources", "References", or "Discovered Links" list, do NOT tell the reader to',
-  '  visit a link, and do NOT link to any streaming/listening service.',
+  '- Do NOT add a "Sources", "References", or "Discovered Links" list or tell the reader to visit a link.',
   '- Scale length down gracefully when sources are thin; never pad with invented detail.',
   '',
   'altBio: a punchy, high-energy PROMOTIONAL blurb of roughly 60–100 words — the kind of copy',
@@ -181,7 +198,7 @@ const OUTPUT_SPEC_LINES = [
   '  makes the artist compelling. One or two short <p> paragraphs with <strong>/<em> for punch.',
   '- Weave in ONE inline <a href="..."> link to an informative source from the reference URLs.',
   '- Optionally embed ONE inline <img src="image:N" alt="..."> if a fitting image is available.',
-  '- Do NOT link to any streaming/listening service and do NOT add a links/sources section.',
+  '- Do NOT add a links/sources section.',
   `Use only these HTML tags: ${ALLOWED_TAGS}.`,
   '',
   'Return JSON with this exact shape:',
@@ -208,23 +225,20 @@ const buildUserPrompt = (facts: ArtistFacts): string =>
     .join('\n');
 
 /**
- * Pulls the JSON completion out of a Gemini response and validates it against
- * {@link bioProseSchema}. Throws on an empty completion or non-JSON content.
+ * Pulls the raw JSON string out of a Gemini response and parses it.
+ * Throws on an empty completion or non-JSON content; the caller is
+ * responsible for schema validation.
  */
-const parseProse = (body: GeminiResponse): BioProse => {
+const parseJsonContent = (body: GeminiResponse): unknown => {
   const content = body.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!content) {
     throw new Error('Gemini returned an empty completion');
   }
-
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    return JSON.parse(content);
   } catch {
     throw new Error('Gemini returned non-JSON content');
   }
-
-  return bioProseSchema.parse(parsed);
 };
 
 /**
@@ -248,15 +262,16 @@ interface ProseRequest {
 }
 
 /**
- * Shared single-call core: posts a system + user prompt pair to Gemini in JSON
- * mode (with 429/503 retry) and validates the completion into {@link BioProse}.
- * Both ensemble drafts and the synthesis pass go through here so the endpoint,
- * auth, retry pacing, and parsing can never diverge between the two.
+ * Schema-generic single-call core: posts a system + user prompt pair to Gemini
+ * in JSON mode (with 429/503 retry) and validates the completion against the
+ * supplied Zod schema. All prose and critique calls route through here so the
+ * endpoint, auth, retry pacing, and JSON parsing can never diverge.
  */
-const requestProse = async (
+const requestJson = async <T>(
+  schema: { parse: (value: unknown) => T },
   { systemPrompt, userPrompt, apiKey, model, temperature }: ProseRequest,
   options: FetchRetryOptions = {}
-): Promise<BioProse> => {
+): Promise<T> => {
   const response = await fetchWithRetry(
     `${GEMINI_API_BASE}/${model}:generateContent`,
     {
@@ -282,9 +297,15 @@ const requestProse = async (
     throw new Error(await failureMessage(response));
   }
 
-  const body = (await response.json()) as GeminiResponse;
-  return parseProse(body);
+  return schema.parse(parseJsonContent((await response.json()) as GeminiResponse));
 };
+
+/**
+ * Thin wrapper that locks {@link requestJson} to the bio-prose schema so
+ * call sites inside this module never need to supply the schema explicitly.
+ */
+const requestProse = (request: ProseRequest, options: FetchRetryOptions = {}): Promise<BioProse> =>
+  requestJson(bioProseSchema, request, options);
 
 /**
  * Generates short + long bio prose with the Gemini `generateContent` API in JSON
@@ -335,7 +356,10 @@ const buildSynthesisSystemPrompt = (facts: ArtistFacts, draftCount: number): str
     'dates, awards, members, labels, or URLs that appear in none of them, and omit anything',
     'unknown rather than guessing.',
     ...SHARED_CONSTRAINT_LINES,
-  ].join(' ');
+    authoritativeDateLine(facts),
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 const buildSynthesisUserPrompt = (facts: ArtistFacts, drafts: BioProse[]): string =>
   [
@@ -386,6 +410,134 @@ export const synthesizeProse = async (
       temperature: SYNTHESIS_TEMPERATURE,
     },
     options
+  );
+
+/** Sampling temperature for the fact-checker critic pass — low for determinism. */
+const CRITIC_TEMPERATURE = 0.2;
+
+/** Sampling temperature for the repair/revision pass — slightly higher for fresh phrasing. */
+const REVISE_TEMPERATURE = 0.4;
+
+/**
+ * Quality passes use only one retry — they must not blow the Lambda timeout in
+ * the worst case where the main ensemble already consumed most of the budget.
+ * Callers may override via the `options` argument.
+ */
+const QUALITY_PASS_RETRIES = 1;
+
+/** Inputs for {@link critiqueProse}, destructured to keep the call site readable. */
+export interface CritiqueProseArgs {
+  facts: ArtistFacts;
+  prose: BioProse;
+  suspectYears: number[];
+  apiKey: string;
+  model?: string;
+}
+
+/**
+ * Fact-checker pass: posts the generated bios plus authoritative facts to
+ * Gemini and asks it to report any concrete violations. Returns a
+ * {@link BioCritique} with zero or more violations — an empty array is the
+ * correct answer for clean bios.
+ *
+ * @param args - Facts, prose, suspect years, API key, and optional model id.
+ * @param options - Injectable fetch/sleep and retry tuning for testability.
+ */
+export const critiqueProse = (
+  { facts, prose, suspectYears, apiKey, model = DEFAULT_GEMINI_MODEL }: CritiqueProseArgs,
+  options: FetchRetryOptions = {}
+): Promise<BioCritique> =>
+  requestJson(
+    bioCritiqueSchema,
+    {
+      systemPrompt: [
+        'You are a meticulous fact-checker for artist biographies. Compare the bios against the',
+        'verified facts and source material. Report ONLY concrete violations: claims contradicted',
+        'by the facts, dates preceding the authoritative birth/formation dates, or claims with no',
+        'support in the source material. An empty violations array is the correct answer for clean',
+        'bios. Respond with a single JSON object and nothing else.',
+      ].join(' '),
+      userPrompt: [
+        ...factLines(facts),
+        '',
+        sourceMaterialLine(facts),
+        '',
+        suspectYears.length
+          ? `SUSPECT YEARS (earlier than the artist's authoritative birth date — verify each): ${suspectYears.join(', ')}`
+          : '',
+        `BIOS (JSON): ${JSON.stringify(prose)}`,
+        '',
+        'Return JSON: {"violations": [{"location": "shortBio"|"longBio"|"altBio", "quote": "exact offending text", "issue": "why it is wrong"}]}',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      apiKey,
+      model,
+      temperature: CRITIC_TEMPERATURE,
+    },
+    { retries: QUALITY_PASS_RETRIES, ...options }
+  );
+
+/** Inputs for {@link reviseProse}, destructured to keep the call site readable. */
+export interface ReviseProseArgs {
+  facts: ArtistFacts;
+  prose: BioProse;
+  violations: BioCritiqueViolation[];
+  plagiarizedSegments: Array<{ text: string }>;
+  apiKey: string;
+  model?: string;
+}
+
+/**
+ * Repair pass: given a set of fact violations and/or plagiarized segments,
+ * rewrites only the affected sentences while keeping everything else verbatim.
+ * Returns the full corrected {@link BioProse} ready for downstream assembly.
+ *
+ * @param args - Facts, current prose, violations, plagiarised segments, API key, and model.
+ * @param options - Injectable fetch/sleep and retry tuning for testability.
+ */
+export const reviseProse = (
+  {
+    facts,
+    prose,
+    violations,
+    plagiarizedSegments,
+    apiKey,
+    model = DEFAULT_GEMINI_MODEL,
+  }: ReviseProseArgs,
+  options: FetchRetryOptions = {}
+): Promise<BioProse> =>
+  requestJson(
+    bioProseSchema,
+    {
+      systemPrompt: [
+        buildSystemPrompt(facts),
+        'You are repairing existing bios, not writing new ones.',
+      ].join(' '),
+      userPrompt: [
+        ...factLines(facts),
+        '',
+        referenceUrlsLine(referenceUrls(facts)),
+        '',
+        `CURRENT BIOS (JSON): ${JSON.stringify(prose)}`,
+        violations.length
+          ? `FACT VIOLATIONS to fix:\n${violations.map((v) => `- [${v.location}] "${v.quote}" — ${v.issue}`).join('\n')}`
+          : '',
+        plagiarizedSegments.length
+          ? `PLAGIARIZED PHRASING to reword in fresh words:\n${plagiarizedSegments.map((s) => `- "${s.text}"`).join('\n')}`
+          : '',
+        'Rewrite ONLY the affected sentences; keep everything else verbatim, including every inline',
+        '<a> link and <img src="image:N"> placeholder. Return the FULL corrected JSON.',
+        '',
+        ...OUTPUT_SPEC_LINES,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      apiKey,
+      model,
+      temperature: REVISE_TEMPERATURE,
+    },
+    { retries: QUALITY_PASS_RETRIES, ...options }
   );
 
 /**

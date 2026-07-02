@@ -10,6 +10,12 @@ import type { FetchRetryOptions } from './lib/http.js';
 
 type FetchFn = typeof fetch;
 
+/** Options for {@link searchArtistSources}: retry tuning plus an optional custom query string. */
+export interface SearchArtistOptions extends FetchRetryOptions {
+  /** Custom search query; defaults to `"<name> musician biography career discography"`. */
+  query?: string;
+}
+
 /** Jina AI search — returns ranked results with clean, readable page content. */
 const JINA_SEARCH_ENDPOINT = 'https://s.jina.ai/';
 /** Jina AI Reader — returns a single URL rendered to clean markdown. */
@@ -22,7 +28,7 @@ const MAX_SOURCE_CHARS = 14_000;
 /** Upper bound on a single reader (e.g. official site) extract. */
 const MAX_READER_CHARS = 12_000;
 /** Upper bound on scraped image candidates returned per call. */
-const MAX_SCRAPED_IMAGES = 12;
+const MAX_SCRAPED_IMAGES = 20;
 
 /** An images-summary map: `"Image N[,M][: alt]"` keys to absolute image URLs. */
 type JinaImagesSummary = Record<string, string>;
@@ -59,6 +65,8 @@ export interface WebSearchSources {
   sourceUrls: string[];
   /** Filtered artist-image candidates scraped from the result pages. */
   images: ScrapedImage[];
+  /** Each result's URL and page title for labeling discovered links. */
+  references: Array<{ url: string; title: string | null }>;
 }
 
 /** The reader result: cleaned page content plus any scraped page images. */
@@ -149,14 +157,15 @@ export const searchArtistSources = async (
   artistName: string,
   apiKey?: string | null,
   fetchFn: FetchFn = fetch,
-  options: FetchRetryOptions = {}
+  options: SearchArtistOptions = {}
 ): Promise<WebSearchSources | null> => {
+  const { query = `${artistName} musician biography career discography`, ...retryOptions } =
+    options;
   try {
-    const query = `${artistName} musician biography career discography`;
     const response = await fetchWithRetry(
       `${JINA_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`,
       { headers: jinaHeaders(apiKey) },
-      { ...options, fetchFn }
+      { ...retryOptions, fetchFn }
     );
 
     if (!response.ok) {
@@ -173,12 +182,19 @@ export const searchArtistSources = async (
       .slice(0, MAX_RESULTS)
       .map((result) => ({
         url: result.url,
+        title: result.title,
         text: (result.content || result.description || '').trim(),
         images: result.images,
       }))
       .filter(
-        (result): result is { url: string; text: string; images: JinaImagesSummary | undefined } =>
-          Boolean(result.url && result.text)
+        (
+          result
+        ): result is {
+          url: string;
+          title: string | undefined;
+          text: string;
+          images: JinaImagesSummary | undefined;
+        } => Boolean(result.url && result.text)
       );
 
     if (!results.length) {
@@ -192,6 +208,10 @@ export const searchArtistSources = async (
       .slice(0, MAX_SOURCE_CHARS)
       .trim();
     const sourceUrls = [...new Set(results.map((result) => result.url))];
+    const references = results.map((result) => ({
+      url: result.url,
+      title: result.title?.trim() || null,
+    }));
     // Streaming pages flood the summary with album art, never artist photos.
     const images = dedupeScrapedImages(
       results
@@ -199,7 +219,7 @@ export const searchArtistSources = async (
         .flatMap((result) => collectPageImages(result.images, result.url))
     );
 
-    return { sourceText, sourceUrls, images };
+    return { sourceText, sourceUrls, references, images };
   } catch (err) {
     logEvent('warn', 'jina_search_error', { artist: artistName, error: toErrorMessage(err) });
     return null;

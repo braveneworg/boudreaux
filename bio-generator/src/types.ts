@@ -18,6 +18,9 @@ export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourre
  */
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
+/** ISO calendar-date string in the form YYYY-MM-DD. */
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
 /**
  * Input the web app sends to the Lambda. Names drive the metadata lookup;
  * `links` and `description` are optional admin-supplied context. The LLM only
@@ -31,6 +34,9 @@ export const bioGenerationInputSchema = z.object({
   links: z.array(z.string().url()).max(20).optional(),
   description: z.string().max(2000).optional(),
   existingGenres: z.string().optional(),
+  bornOn: isoDate.optional(),
+  diedOn: isoDate.optional(),
+  formedOn: isoDate.optional(),
 });
 
 export type BioGenerationInput = z.infer<typeof bioGenerationInputSchema>;
@@ -50,11 +56,11 @@ export const bioImageSchema = z.object({
 
 export type BioImage = z.infer<typeof bioImageSchema>;
 
-/** A discovered external link (Wikipedia, official site, MusicBrainz, social). */
+/** A discovered external link (Wikipedia, official site, MusicBrainz, social, streaming). */
 export const bioLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'other']).optional(),
+  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
 });
 
 export type BioLink = z.infer<typeof bioLinkSchema>;
@@ -79,6 +85,18 @@ export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
 ]);
 
 export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
+
+/** A single fact-check violation flagged by the critic pass. */
+export const bioCritiqueViolationSchema = z.object({
+  location: z.enum(['shortBio', 'longBio', 'altBio']),
+  quote: z.string().min(1),
+  issue: z.string().min(1),
+});
+export type BioCritiqueViolation = z.infer<typeof bioCritiqueViolationSchema>;
+
+/** The full critic result: zero or more violations detected in the bios. */
+export const bioCritiqueSchema = z.object({ violations: z.array(bioCritiqueViolationSchema) });
+export type BioCritique = z.infer<typeof bioCritiqueSchema>;
 
 /** Just the prose the LLM is responsible for — validated before assembly. */
 export const bioProseSchema = z.object({
@@ -109,6 +127,13 @@ export interface ArtistFacts {
   beginDate?: string;
   endDate?: string;
   tags?: string[];
+  /**
+   * Authoritative dates from the label's own database — they outrank MusicBrainz
+   * life-span. Tasks 4 and 10 rely on `bornOn` for the fact-check pass.
+   */
+  bornOn?: string;
+  diedOn?: string;
+  formedOn?: string;
   /**
    * Long-form source material (Wikipedia article body and/or web-search
    * content) the LLM rewrites into an original bio. The single biggest driver

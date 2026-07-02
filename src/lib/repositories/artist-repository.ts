@@ -418,6 +418,7 @@ export class ArtistRepository {
         attribution: string | null;
         license: string | null;
         sourceUrl: string | null;
+        originalUrl: string | null;
         width: number | null;
         height: number | null;
         isPrimary: boolean;
@@ -491,6 +492,7 @@ export class ArtistRepository {
       attribution: string | null;
       license: string | null;
       sourceUrl: string | null;
+      originalUrl: string | null;
       isPrimary: boolean;
     }>;
     bioLinks: Array<{ label: string; url: string; kind: string | null }>;
@@ -518,6 +520,7 @@ export class ArtistRepository {
               attribution: true,
               license: true,
               sourceUrl: true,
+              originalUrl: true,
               isPrimary: true,
             },
           },

@@ -8,7 +8,6 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
-import { isListeningServiceUrl } from '@/lib/utils/is-listening-service-url';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
@@ -45,15 +44,21 @@ const getLambdaClient = (): LambdaClient => {
 /** Derive a public real name for the metadata lookup (skip if pseudonymous). */
 const deriveRealName = (artist: {
   firstName: string;
+  middleName: string | null;
   surname: string;
   isPseudonymous: boolean;
 }): string | undefined => {
-  if (artist.isPseudonymous) {
-    return undefined;
-  }
-  const realName = `${artist.firstName} ${artist.surname}`.trim();
+  if (artist.isPseudonymous) return undefined;
+  const realName = [artist.firstName, artist.middleName, artist.surname]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join(' ')
+    .trim();
   return realName || undefined;
 };
+
+/** YYYY-MM-DD for the Lambda's ISO-date fields, or undefined. */
+const toIsoDate = (value: Date | null | undefined): string | undefined =>
+  value ? value.toISOString().slice(0, 10) : undefined;
 
 /** Resolve the best display name to ground the generation on. */
 const deriveDisplayName = (artist: {
@@ -70,11 +75,12 @@ const deriveDisplayName = (artist: {
 /** Re-hosted image record before `sortOrder` is assigned; width/height may be null. */
 type RehostedImage = {
   url: string;
-  thumbnailUrl: null;
+  thumbnailUrl: string | null;
   title: string | null;
-  attribution: null;
-  license: null;
-  sourceUrl: null;
+  attribution: string | null;
+  license: string | null;
+  sourceUrl: string | null;
+  originalUrl: string | null;
   width: number | null;
   height: number | null;
   isPrimary: boolean;
@@ -92,9 +98,10 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 // ---------------------------------------------------------------------------
 
 /**
- * Re-hosts each discovered image into S3 via {@link BioImageService}. Best-effort:
- * an image that fails to re-host is represented as `null` so it can be dropped
- * later without aborting the entire generation.
+ * Re-hosts each discovered image into S3 via a cheap single-thumbnail pass so
+ * it is CDN-served without paying for full variants on images the admin may
+ * dismiss. Attribution metadata is kept through re-host (PR #547). Best-effort:
+ * failures are dropped, not fatal.
  */
 const rehostImages = async (
   images: BioGenerationData['images'],
@@ -103,18 +110,19 @@ const rehostImages = async (
   Promise.all(
     images.map(async (image, index) => {
       try {
-        const { url, width, height } = await BioImageService.rehostWithVariants(
+        const { url, width, height } = await BioImageService.rehostThumbnail(
           image.url,
           artistId,
           index
         );
         return {
           url,
-          thumbnailUrl: null,
+          thumbnailUrl: url,
           title: image.title ? sanitizeBioText(image.title) : null,
-          attribution: null,
-          license: null,
-          sourceUrl: null,
+          attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
+          license: image.license ?? null,
+          sourceUrl: image.sourceUrl ?? null,
+          originalUrl: image.url,
           width: width ?? image.width ?? null,
           height: height ?? image.height ?? null,
           isPrimary: image.isPrimary,
@@ -141,13 +149,13 @@ const buildImageUrlIndex = (rehosted: Array<RehostedImage | null>): Map<number, 
 
 /**
  * Filters and sanitizes Lambda-returned links. Drops any link whose URL is not
- * http(s) (e.g. `javascript:` / `data:`) or that resolves to a listening service
- * (Spotify, Bandcamp, …). Assigns a stable `sortOrder` based on the filtered array.
+ * http(s) (e.g. `javascript:` / `data:`). Assigns a stable `sortOrder` based on
+ * the filtered array. Streaming/listening-service links are kept as of 2026-07.
  */
 const sanitizeLinks = (links: BioGenerationData['links']): PersistedLink[] =>
   links.reduce<PersistedLink[]>((acc, link) => {
     const url = sanitizeUrl(link.url);
-    if (!url || isListeningServiceUrl(url)) return acc;
+    if (!url) return acc;
     acc.push({
       label: sanitizeBioText(link.label),
       url,
@@ -287,6 +295,9 @@ export class BioGenerationService {
       links: opts.links,
       description: opts.description,
       existingGenres: artist.genres ?? undefined,
+      bornOn: toIsoDate(artist.bornOn),
+      diedOn: toIsoDate(artist.diedOn),
+      formedOn: toIsoDate(artist.formedOn),
     });
 
     if (!result.ok) {
@@ -295,8 +306,8 @@ export class BioGenerationService {
 
     const genres = result.data.genres ? sanitizeBioText(result.data.genres) || null : null;
 
-    // Re-host each discovered image into our S3 (with `sharp` variants) so it
-    // is CDN-served and not hotlinked. Best-effort: failures are dropped, not fatal.
+    // Re-host each discovered image into S3 via a cheap thumbnail so it is
+    // CDN-served. Full variant re-hosting moves to save-time in PR 2.
     const rehosted = await rehostImages(result.data.images, artist.id);
 
     // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
@@ -311,7 +322,7 @@ export class BioGenerationService {
       .filter((image): image is RehostedImage => image !== null)
       .map((image, index) => ({ ...image, sortOrder: index }));
 
-    // Drop any link whose URL is not http(s) or resolves to a listening service.
+    // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
     const persistedLinks = sanitizeLinks(result.data.links);
 
     const content = assembleContent({

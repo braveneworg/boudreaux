@@ -12,6 +12,9 @@ export interface BioGenerationLambdaInput {
   links?: string[];
   description?: string;
   existingGenres?: string;
+  bornOn?: string;
+  diedOn?: string;
+  formedOn?: string;
 }
 
 /**
@@ -38,7 +41,7 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
         url: 'https://picsum.photos/seed/e2e-bio/1200/800',
         thumbnailUrl: 'https://picsum.photos/seed/e2e-bio/400/300',
         title: `${input.displayName} portrait`,
-        // Lambda returns attribution metadata; the app drops it on re-host.
+        // Attribution metadata is kept through re-host (PR #547).
         attribution: 'Public domain',
         license: 'Public domain',
         sourceUrl: null,

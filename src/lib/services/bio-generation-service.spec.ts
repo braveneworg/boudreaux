@@ -6,6 +6,8 @@ import type { BioGenerationResult } from '@/lib/validation/bio-generation-schema
 
 import { BioGenerationService } from './bio-generation-service';
 
+import type { BioGenerationLambdaInput } from './bio-generation-fixture';
+
 vi.mock('server-only', () => ({}));
 
 const sendMock = vi.fn();
@@ -31,11 +33,14 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
   },
 }));
 
-const rehostMock = vi.fn();
+const rehostThumbnailMock = vi.fn();
+const rehostWithVariantsMock = vi.fn();
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
-      rehostMock(url, artistId, index),
+      rehostWithVariantsMock(url, artistId, index),
+    rehostThumbnail: (url: string, artistId: string, index: number) =>
+      rehostThumbnailMock(url, artistId, index),
   },
 }));
 
@@ -179,7 +184,12 @@ describe('BioGenerationService.generateForArtist', () => {
   beforeEach(() => {
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
-    rehostMock.mockResolvedValue({
+    rehostThumbnailMock.mockResolvedValue({
+      url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
+      width: 1200,
+      height: 800,
+    });
+    rehostWithVariantsMock.mockResolvedValue({
       url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
       width: 1200,
       height: 800,
@@ -239,19 +249,59 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result.data.altBio).not.toContain('image:0');
   });
 
-  it('persists re-hosted images (CDN url, no attribution) via the repository', async () => {
+  it('persists re-hosted images with attribution via the repository', async () => {
     await BioGenerationService.generateForArtist(artist.id, { links: ['https://example.com'] });
 
-    expect(rehostMock).toHaveBeenCalledWith('https://upload.wikimedia.org/a.jpg', artist.id, 0);
+    expect(rehostThumbnailMock).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/a.jpg',
+      artist.id,
+      0
+    );
     expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.images[0].url).toBe(
       'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
     );
-    expect(content.images[0].attribution).toBeNull();
+    expect(content.images[0].attribution).toBe('Photographer');
+    expect(content.images[0].license).toBe('CC BY-SA 4.0');
+    expect(content.images[0].sourceUrl).toBe('https://commons.wikimedia.org/wiki/File:a.jpg');
+    expect(content.images[0].thumbnailUrl).toBe(
+      'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
+    );
+    expect(content.images[0].originalUrl).toBe('https://upload.wikimedia.org/a.jpg');
     expect(content.images[0].sortOrder).toBe(0);
     expect(content.images[0].isPrimary).toBe(true);
     expect(content.bioModel).toBe('gemini-2.5-pro');
+  });
+
+  it('persists attribution, license, sourceUrl and originalUrl from the lambda result', async () => {
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(replaceBioContentMock).toHaveBeenCalledWith(
+      artist.id,
+      expect.objectContaining({
+        images: [
+          expect.objectContaining({
+            attribution: 'Photographer',
+            license: 'CC BY-SA 4.0',
+            sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
+            originalUrl: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: expect.stringContaining('cdn'),
+          }),
+        ],
+      })
+    );
+  });
+
+  it('re-hosts via rehostThumbnail, not rehostWithVariants, at generation time', async () => {
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(rehostThumbnailMock).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/a.jpg',
+      artist.id,
+      0
+    );
+    expect(rehostWithVariantsMock).not.toHaveBeenCalled();
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
@@ -274,7 +324,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an inline image:N placeholder that has no re-hosted url', async () => {
-    rehostMock.mockRejectedValueOnce(new Error('fetch failed'));
+    rehostThumbnailMock.mockRejectedValueOnce(new Error('fetch failed'));
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: { ...generateResult.data, longBio: '<p>Intro</p><img src="image:0" alt="x">' },
@@ -288,7 +338,7 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result.data.longBio).not.toContain('image:0');
   });
 
-  it('drops a discovered link to a listening service', async () => {
+  it('keeps streaming-service links (Spotify, Bandcamp) — product rule reversed 2026-07', async () => {
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -298,9 +348,9 @@ describe('BioGenerationService.generateForArtist', () => {
           {
             label: 'Spotify',
             url: 'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb',
-            kind: 'other',
+            kind: 'streaming',
           },
-          { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'other' },
+          { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'streaming' },
         ],
       },
     });
@@ -308,8 +358,10 @@ describe('BioGenerationService.generateForArtist', () => {
     await BioGenerationService.generateForArtist(artist.id);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
-    expect(content.links).toHaveLength(1);
+    expect(content.links).toHaveLength(3);
     expect(content.links[0].url).toBe('https://en.wikipedia.org/wiki/Radiohead');
+    expect(content.links[1].url).toBe('https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb');
+    expect(content.links[2].url).toBe('https://radiohead.bandcamp.com/');
   });
 
   it('drops a discovered link whose URL is not http(s)', async () => {
@@ -335,7 +387,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an image whose re-host fails without aborting generation', async () => {
-    rehostMock.mockRejectedValueOnce(new Error('fetch failed'));
+    rehostThumbnailMock.mockRejectedValueOnce(new Error('fetch failed'));
 
     const result = await BioGenerationService.generateForArtist(artist.id);
 
@@ -464,7 +516,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('falls back to the original image dimensions and null title when re-host omits them', async () => {
-    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    rehostThumbnailMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -494,7 +546,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('persists null dimensions when neither re-host nor source supply them', async () => {
-    rehostMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
+    rehostThumbnailMock.mockResolvedValue({ url: 'https://cdn.example.com/x.jpg' });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -533,6 +585,35 @@ describe('BioGenerationService.generateForArtist', () => {
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.links[0].kind).toBeNull();
+  });
+
+  it('derives the real name including the middle name', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      firstName: 'Julio',
+      middleName: 'Francisco',
+      surname: 'Ramos',
+      isPseudonymous: false,
+      bornOn: new Date('1982-05-01'),
+      displayName: 'Julio Ramos',
+    });
+
+    await BioGenerationService.generateForArtist('id1');
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ realName: 'Julio Francisco Ramos', bornOn: '1982-05-01' })
+    );
+  });
+
+  it('omits dates the artist record does not have', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, bornOn: null, diedOn: null, formedOn: null });
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const callArg = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+    expect(callArg.bornOn).toBeUndefined();
+    expect(callArg.diedOn).toBeUndefined();
+    expect(callArg.formedOn).toBeUndefined();
   });
 });
 

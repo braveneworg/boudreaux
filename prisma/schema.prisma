@@ -416,6 +416,9 @@ model ArtistBioImage {
   attribution  String? // Optional source attribution (unused for re-hosted images)
   license      String? // e.g. "CC BY-SA 4.0"
   sourceUrl    String? // Original page the image came from
+  /// Original external image URL, kept so save-time re-hosting can fetch the
+  /// full-resolution source after the generation-time thumbnail pass.
+  originalUrl  String?
   width        Int?
   height       Int?
   isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images

@@ -49,11 +49,12 @@ describe('sanitizeBioHtml', () => {
     expect(result).not.toContain('javascript:');
   });
 
-  it('strips the href from listening-service links, keeping the anchor text', () => {
-    const result = sanitizeBioHtml('<a href="https://open.spotify.com/artist/1">listen</a>');
+  it('keeps listening-service hrefs (product rule reversed 2026-07)', () => {
+    const result = sanitizeBioHtml('<a href="https://open.spotify.com/artist/x">Spotify</a>');
 
-    expect(result).not.toContain('spotify.com');
-    expect(result).toContain('listen');
+    expect(result).toBe(
+      '<a href="https://open.spotify.com/artist/x" rel="nofollow noopener noreferrer" target="_blank">Spotify</a>'
+    );
   });
 
   it('keeps the href on informative links', () => {

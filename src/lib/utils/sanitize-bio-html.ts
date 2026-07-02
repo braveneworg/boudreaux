@@ -5,8 +5,6 @@ import 'server-only';
 
 import sanitizeHtml from 'sanitize-html';
 
-import { isListeningServiceUrl } from './is-listening-service-url';
-
 /**
  * Rich-text allowlist for the long bio (Tiptap editor output + AI prose).
  * Section headings (`<h2>`–`<h4>`) are permitted so extensive, encyclopedic
@@ -63,20 +61,12 @@ const BIO_HTML_OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
   allowedSchemesAppliedToAttributes: ['href', 'src'],
   transformTags: {
-    // Harden every link, and neutralise links to streaming/listening services:
-    // dropping the href leaves the anchor text in place (BioHtml renders an
-    // hrefless <a> as plain text), so a bio never links out to another listening
-    // experience while its prose stays intact.
-    a: (tagName, attribs) => {
-      if (attribs.href && isListeningServiceUrl(attribs.href)) {
-        const { href: _href, ...rest } = attribs;
-        return { tagName, attribs: rest };
-      }
-      return {
-        tagName,
-        attribs: { ...attribs, rel: 'nofollow noopener noreferrer', target: '_blank' },
-      };
-    },
+    // Harden every link for the untrusted-content context; PR 2 branches this
+    // by origin (internal links keep same-tab, no rel restrictions).
+    a: (tagName, attribs) => ({
+      tagName,
+      attribs: { ...attribs, rel: 'nofollow noopener noreferrer', target: '_blank' },
+    }),
   },
 };
 

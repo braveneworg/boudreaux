@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Hostnames of streaming/listening services. A generated bio links out to
- * *informative* sources only — never to a place that drops the reader into
- * another listening experience. Mirrored in the web app
+ * Hostnames of streaming/listening services. Used to classify discovered links
+ * as `kind: 'streaming'` and to gate scraped-image collection (streaming pages
+ * flood the summary with album art, not artist photos). Mirrored in the web app
  * (`src/lib/utils/is-listening-service-url.ts`); the two projects cannot share a
  * module. `bandcamp.com` is a registrable-domain entry so per-artist subdomains
  * (`artist.bandcamp.com`) are caught.

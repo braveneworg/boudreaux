@@ -2,9 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { draftAndSynthesizeProse, generateProse, synthesizeProse } from './gemini.js';
+import {
+  critiqueProse,
+  draftAndSynthesizeProse,
+  generateProse,
+  reviseProse,
+  synthesizeProse,
+} from './gemini.js';
 
-import type { ArtistFacts, BioProse } from './types.js';
+import type { ArtistFacts, BioCritiqueViolation, BioProse } from './types.js';
 
 const facts: ArtistFacts = {
   displayName: 'Radiohead',
@@ -18,6 +24,31 @@ const geminiResponse = (content: unknown): Response =>
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
+
+const baseFacts = (overrides: Partial<ArtistFacts> = {}): ArtistFacts => ({
+  displayName: 'Test Artist',
+  imageTitles: [],
+  ...overrides,
+});
+
+const fakeProse: BioProse = { shortBio: 'Short bio.', longBio: 'Long bio.' };
+const sampleViolation: BioCritiqueViolation = {
+  location: 'longBio',
+  quote: 'some text',
+  issue: 'some issue',
+};
+
+const capturePrompts = async (
+  factInput: ArtistFacts
+): Promise<{ systemPrompt: string; userPrompt: string }> => {
+  const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+  await generateProse(factInput, 'k', undefined, { fetchFn });
+  const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+  return {
+    systemPrompt: body.systemInstruction.parts[0].text,
+    userPrompt: body.contents[0].parts[0].text,
+  };
+};
 
 describe('generateProse', () => {
   it('returns validated prose and the image ranking', async () => {
@@ -80,6 +111,15 @@ describe('generateProse', () => {
     expect(userMessage).toContain('https://en.wikipedia.org/wiki/Radiohead');
   });
 
+  it('includes authoritative birth/formed dates and the never-before-birth rule', async () => {
+    const factInput = baseFacts({ bornOn: '1982-05-01', formedOn: '2004-01-01' });
+    const { systemPrompt, userPrompt } = await capturePrompts(factInput);
+    expect(userPrompt).toContain('Born: 1982-05-01');
+    expect(userPrompt).toContain('Formed: 2004-01-01');
+    expect(systemPrompt).toContain('born 1982-05-01');
+    expect(systemPrompt).toMatch(/never state or imply.*before/i);
+  });
+
   it('requires a 200+ word short bio with several informative inline links', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
@@ -90,13 +130,13 @@ describe('generateProse', () => {
     expect(userMessage).toContain('SEVERAL inline');
   });
 
-  it('forbids listening-service links and link-list sections in the system prompt', async () => {
+  it('forbids link-list sections in the system prompt but not streaming links', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
 
     const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0].text;
-    expect(systemMessage).toContain('NEVER link to streaming or listening services');
+    expect(systemMessage).not.toContain('NEVER link to streaming or listening services');
     expect(systemMessage).toContain('Discovered Links');
   });
 
@@ -120,7 +160,7 @@ describe('generateProse', () => {
     expect(userMessage).toContain('<ul>/<ol> lists');
   });
 
-  it('prefers links over bold and keeps <strong> sparing in the long bio', async () => {
+  it('prefers links over bold in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -131,10 +171,9 @@ describe('generateProse', () => {
       userMessage.indexOf('altBio:')
     );
     expect(longBioSection).toContain('Prefer links over bold');
-    expect(longBioSection).toContain('SPARINGLY');
   });
 
-  it('still requires a few bolded pivotal terms in the long bio', async () => {
+  it('bolds pivotal unlinkable facts in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -144,7 +183,70 @@ describe('generateProse', () => {
       userMessage.indexOf('longBio:'),
       userMessage.indexOf('altBio:')
     );
-    expect(longBioSection).toContain('DO bold 2–4 pivotal');
+    expect(longBioSection).toContain('ADDITIONALLY bold');
+  });
+
+  it('instructs italicizing work titles with <em> in the long bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('italicize');
+    expect(longBioSection).toContain('work titles');
+  });
+
+  it('requires at least one list in the long bio when the material supports it', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('least one list in the long bio');
+  });
+
+  it('has no streaming/listening service ban in the short bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const shortBioSection = userMessage.slice(
+      userMessage.indexOf('shortBio:'),
+      userMessage.indexOf('longBio:')
+    );
+    expect(shortBioSection).not.toContain('streaming');
+  });
+
+  it('has no streaming/listening service ban in the long bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).not.toContain('streaming');
+  });
+
+  it('has no streaming/listening service ban in the alt bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const altBioSection = userMessage.slice(userMessage.indexOf('altBio:'));
+    expect(altBioSection).not.toContain('streaming');
   });
 
   it('forbids <img> tags when no images are available, in every call', async () => {
@@ -402,7 +504,8 @@ describe('generateProse', () => {
         .text;
       expect(systemMessage).toContain('editor');
       expect(systemMessage).toContain('Radiohead');
-      expect(systemMessage).toContain('NEVER link to streaming or listening services');
+      expect(systemMessage).not.toContain('NEVER link to streaming or listening services');
+      expect(systemMessage).toContain('Discovered Links');
     });
 
     it('embeds every draft plus the images and reference URLs in the user prompt', async () => {
@@ -464,6 +567,56 @@ describe('generateProse', () => {
       );
 
       expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-flash:generateContent');
+    });
+
+    it('carries the authoritative birth-date constraint into the synthesis system prompt', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse(
+        { facts: baseFacts({ bornOn: '1982-05-01' }), drafts, apiKey: 'k' },
+        { fetchFn }
+      );
+
+      const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0]
+        .text;
+      expect(systemMessage).toContain('born 1982-05-01');
+      expect(systemMessage).toMatch(/never state or imply.*before/i);
+    });
+
+    it('requires at least one list in the long bio when the material supports it', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('least one list in the long bio');
+    });
+
+    it('instructs bolding pivotal unlinkable facts in the long bio', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('ADDITIONALLY bold');
+    });
+
+    it('instructs italicizing work titles with <em> in the long bio', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('italicize');
+    });
+
+    it('has no streaming/listening service ban in the synthesis user-prompt', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).not.toContain('streaming');
     });
   });
 
@@ -570,5 +723,89 @@ describe('generateProse', () => {
     await expect(generateProse(facts, 'k', undefined, { fetchFn })).rejects.toThrow(
       'Gemini returned an empty completion'
     );
+  });
+});
+
+describe('critiqueProse', () => {
+  it('posts bios + suspect years and validates the violations JSON', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        violations: [
+          { location: 'longBio', quote: 'began in 1949', issue: 'precedes birth (1982)' },
+        ],
+      })
+    );
+    const result = await critiqueProse(
+      {
+        facts: baseFacts({ bornOn: '1982-05-01' }),
+        prose: fakeProse,
+        suspectYears: [1949],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(result.violations).toHaveLength(1);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.contents[0].parts[0].text).toContain('1949');
+    expect(body.generationConfig.temperature).toBe(0.2);
+  });
+
+  it('returns an empty violations array for clean bios', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ violations: [] }));
+    const result = await critiqueProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        suspectYears: [],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(result.violations).toHaveLength(0);
+    const text = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(text).not.toContain('SUSPECT YEARS');
+  });
+});
+
+describe('reviseProse', () => {
+  it('posts violations + plagiarized segments and returns full prose', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
+    const revised = await reviseProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        violations: [sampleViolation],
+        plagiarizedSegments: [{ text: 'copied run here' }],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(revised.longBio).toBe(fakeProse.longBio);
+    const text = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(text).toContain('copied run here');
+    expect(text).toMatch(/rewrite only/i);
+  });
+
+  it('uses temperature 0.4 for the revise call', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
+    await reviseProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        violations: [],
+        plagiarizedSegments: [],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.generationConfig.temperature).toBe(0.4);
+    const text = body.contents[0].parts[0].text;
+    expect(text).not.toContain('FACT VIOLATIONS');
+    expect(text).not.toContain('PLAGIARIZED PHRASING');
   });
 });

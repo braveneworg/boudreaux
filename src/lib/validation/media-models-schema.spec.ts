@@ -241,6 +241,7 @@ const artistWithPublishedReleases = {
       attribution: 'Wikimedia Commons',
       license: 'CC BY-SA 4.0',
       sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
+      originalUrl: null,
       width: 1200,
       height: 800,
       isPrimary: true,

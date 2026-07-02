@@ -66,17 +66,48 @@ const request = async <T>(url: string, options: FetchRetryOptions): Promise<T> =
   return (await response.json()) as T;
 };
 
+/** MusicBrainz relation types that map to streaming/purchasing services. */
+const STREAMING_RELATION_TYPES = new Set(['streaming', 'free streaming', 'purchase for download']);
+
 /** Maps a MusicBrainz relation type to our link taxonomy. */
 const classifyRelation = (type: string): BioLink['kind'] => {
   if (type === 'wikipedia') return 'wikipedia';
   if (type === 'official homepage') return 'official';
   if (type === 'social network') return 'social';
+  if (STREAMING_RELATION_TYPES.has(type)) return 'streaming';
   return 'other';
 };
 
 const extractWikidataId = (resource: string): string | undefined => {
   const match = resource.match(/wikidata\.org\/(?:wiki|entity)\/(Q\d+)/i);
   return match?.[1];
+};
+
+/** Returns the hostname from a URL string, or `null` if the URL is unparseable. */
+const hostnameFromUrl = (resource: string): string | null => {
+  try {
+    return new URL(resource).hostname;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Maps a single MusicBrainz url-relation to a {@link BioLink}, or `null` when
+ * the relation type is not surfaced in the UI (e.g. purchase links, other).
+ * Streaming links use the hostname as the label instead of the raw type string.
+ */
+const relationToLink = (type: string, resource: string): BioLink | null => {
+  const kind = classifyRelation(type);
+  if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
+    return { label: type, url: resource, kind };
+  }
+  if (kind === 'streaming') {
+    const hostname = hostnameFromUrl(resource);
+    if (!hostname) return null;
+    return { label: hostname.replace(/^www\./, ''), url: resource, kind };
+  }
+  return null;
 };
 
 /**
@@ -97,10 +128,8 @@ const collectRelations = (
       wikidataId = extractWikidataId(resource);
     }
 
-    const kind = classifyRelation(relation.type);
-    if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
-      links.push({ label: relation.type, url: resource, kind });
-    }
+    const link = relationToLink(relation.type, resource);
+    if (link) links.push(link);
   }
 
   return { wikidataId, links };

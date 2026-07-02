@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { draftAndSynthesizeProse } from './gemini.js';
+import { runQualityPasses } from './factcheck.js';
+import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
@@ -31,6 +32,8 @@ export interface BioGeneratorDeps {
   getCommonsImage: typeof getCommonsImage;
   /** Prose generator — the draft-and-synthesize ensemble in production. */
   generateProse: typeof draftAndSynthesizeProse;
+  critiqueProse: typeof critiqueProse;
+  reviseProse: typeof reviseProse;
   getGeminiApiKey: () => Promise<string>;
   getScrapeApiKey: typeof getScrapeApiKey;
   searchArtistSources: typeof searchArtistSources;
@@ -43,14 +46,28 @@ const defaultDeps: BioGeneratorDeps = {
   getWikipediaExtract,
   getCommonsImage,
   generateProse: draftAndSynthesizeProse,
+  critiqueProse,
+  reviseProse,
   getGeminiApiKey,
   getScrapeApiKey,
   searchArtistSources,
   readUrl,
 };
 
-const MAX_IMAGES = 6;
+const MAX_IMAGES = 30;
 const MAX_PRIMARY = 3;
+const MAX_LINKS = 50;
+
+/** Search-engine result pages and share widgets — never useful bio links. */
+const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
+const isJunkLinkUrl = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return JUNK_LINK_HOSTS.some((junk) => host === junk || host.endsWith(`.${junk}`));
+  } catch {
+    return true;
+  }
+};
 
 /**
  * True when a Commons license is public-domain or CC0 — safe to re-host without
@@ -227,7 +244,8 @@ const applyMatch = async (
  * Web search (Jina) as additional grounding *context*, not just a fallback:
  * always gathered and MERGED with any Wikipedia/official-site material so both
  * the extensive long bio and the informed short bio draw on the fullest
- * possible material. Optional + best-effort (never throws).
+ * possible material. Runs two searches (biography query + press/interview query)
+ * and merges results. Optional + best-effort (never throws).
  */
 const applyWebSearch = async (
   acc: MetadataAccumulator,
@@ -235,30 +253,35 @@ const applyWebSearch = async (
   scrapeKey: string | null,
   deps: BioGeneratorDeps
 ): Promise<void> => {
-  const found = await deps.searchArtistSources(searchNameFor(input), scrapeKey);
-  if (!found) {
-    logEvent('info', 'web_search_empty', { artist: searchNameFor(input) });
-    return;
-  }
-  logEvent('info', 'web_search_results', {
-    artist: searchNameFor(input),
-    urls: found.sourceUrls.length,
-  });
-
-  acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
-  acc.scrapedImages.push(...found.images);
-  acc.facts.sourceUrls = [
-    ...new Set(
-      [
-        acc.facts.wikipediaUrl,
-        acc.facts.officialUrl,
-        ...(acc.facts.sourceUrls ?? []),
-        ...found.sourceUrls,
-      ].filter((url): url is string => Boolean(url))
-    ),
+  const artist = searchNameFor(input);
+  const queries: Array<string | undefined> = [
+    undefined,
+    `${artist} musician interview review press`,
   ];
-  for (const url of found.sourceUrls) {
-    acc.links.push({ label: 'Reference', url, kind: 'other' });
+
+  for (const query of queries) {
+    const found = await deps.searchArtistSources(artist, scrapeKey, undefined, { query });
+    if (!found) {
+      logEvent('info', 'web_search_empty', { artist });
+      continue;
+    }
+    logEvent('info', 'web_search_results', { artist, urls: found.sourceUrls.length });
+
+    acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
+    acc.scrapedImages.push(...found.images);
+    acc.facts.sourceUrls = [
+      ...new Set(
+        [
+          acc.facts.wikipediaUrl,
+          acc.facts.officialUrl,
+          ...(acc.facts.sourceUrls ?? []),
+          ...found.sourceUrls,
+        ].filter((url): url is string => Boolean(url))
+      ),
+    ];
+    for (const ref of found.references) {
+      acc.links.push({ label: ref.title ?? 'Reference', url: ref.url, kind: 'other' });
+    }
   }
 };
 
@@ -285,42 +308,52 @@ const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
 });
 
 /**
- * Fills `acc.images` from the web-scraped candidates when Commons produced
- * nothing — licensed Commons images always win, but an artist with no Wikidata
- * entry still gets pictures from the pages that ground their bio. Alt-titled
- * candidates rank first: a named image is likelier to actually depict the
- * artist, and the title is the model's only signal when picking which to embed.
+ * Merges web-scraped candidates AFTER the licensed Commons images (which always
+ * rank first), deduped by URL, up to MAX_IMAGES. Alt-titled candidates rank
+ * before untitled ones — a named image is likelier to actually depict the
+ * artist.
  */
-const applyScrapedImageFallback = (acc: MetadataAccumulator): void => {
-  if (acc.images.length || !acc.scrapedImages.length) return;
-
+const applyScrapedImages = (acc: MetadataAccumulator): void => {
+  if (!acc.scrapedImages.length) return;
+  const seen = new Set(acc.images.map((image) => image.url.toLowerCase()));
   const ranked = [...acc.scrapedImages].sort(
     (a, b) => Number(Boolean(b.alt)) - Number(Boolean(a.alt))
   );
-  acc.images.push(...ranked.slice(0, MAX_IMAGES).map(toScrapedBioImage));
-  logEvent('info', 'scraped_images_fallback', {
+  for (const candidate of ranked) {
+    if (acc.images.length >= MAX_IMAGES) break;
+    const key = candidate.url.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    acc.images.push(toScrapedBioImage(candidate));
+  }
+  logEvent('info', 'scraped_images_merged', {
     candidates: acc.scrapedImages.length,
-    used: acc.images.length,
+    total: acc.images.length,
   });
 };
 
 /**
  * Finalizes the accumulator: appends admin links (last, so curated entries
- * survive dedupe), then drops every streaming/listening service from both the
- * discovered links and the reference URLs so none can reach the output, fills
- * the scraped-image fallback, and derives the image-title list for the prompt.
+ * survive dedupe), drops junk-host links (search engines, share widgets),
+ * classifies any remaining streaming-service links as `kind: 'streaming'`,
+ * caps the link list at {@link MAX_LINKS}, merges scraped images after any
+ * licensed Commons images, and derives the image-title list for the prompt.
  */
 const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
   for (const url of input.links ?? []) {
     acc.links.push({ label: 'Reference', url, kind: 'other' });
   }
 
-  acc.links = dedupeLinks(acc.links).filter((link) => !isListeningServiceUrl(link.url));
-  if (acc.facts.sourceUrls) {
-    acc.facts.sourceUrls = acc.facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
-  }
-  applyScrapedImageFallback(acc);
-  acc.facts.imageTitles = acc.images.map((image) => image.title ?? '');
+  acc.links = dedupeLinks(acc.links)
+    .filter((link) => !isJunkLinkUrl(link.url))
+    .map((link) =>
+      isListeningServiceUrl(link.url) ? { ...link, kind: 'streaming' as const } : link
+    )
+    .slice(0, MAX_LINKS);
+  applyScrapedImages(acc);
+  acc.facts.imageTitles = acc.images.map(
+    (image) => image.title?.trim() || `Photo of ${input.displayName}`
+  );
 };
 
 /**
@@ -342,6 +375,9 @@ const gatherMetadata = async (
       akaNames: input.akaNames,
       description: input.description,
       existingGenres: input.existingGenres,
+      bornOn: input.bornOn,
+      diedOn: input.diedOn,
+      formedOn: input.formedOn,
       imageTitles: [],
     },
   };
@@ -406,19 +442,23 @@ export const runBioGeneration = async (
 
   const apiKey = await deps.getGeminiApiKey();
   const prose = await deps.generateProse(facts, apiKey, model);
+  const checked = await runQualityPasses(
+    { prose, facts, apiKey, model },
+    { critiqueProse: deps.critiqueProse, reviseProse: deps.reviseProse }
+  );
 
   // applyImageRanking already caps the COUNT of primaries to MAX_PRIMARY via the
   // selected indexes; the primaries can sit at any position, so we must NOT
   // re-cap by array index here — that would zero out a primary the model picked
   // at index >= MAX_PRIMARY, leaving the artist with no primary image.
-  const rankedImages = applyImageRanking(images, prose.primaryImageIndexes);
+  const rankedImages = applyImageRanking(images, checked.primaryImageIndexes);
 
-  const genres = prose.genres?.trim() || input.existingGenres?.trim() || null;
+  const genres = checked.genres?.trim() || input.existingGenres?.trim() || null;
 
   return {
-    shortBio: prose.shortBio,
-    longBio: prose.longBio,
-    altBio: prose.altBio ?? '',
+    shortBio: checked.shortBio,
+    longBio: checked.longBio,
+    altBio: checked.altBio ?? '',
     genres,
     images: rankedImages,
     links,
