@@ -8,7 +8,6 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
-import { isListeningServiceUrl } from '@/lib/utils/is-listening-service-url';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioHtml, sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
@@ -147,13 +146,13 @@ const buildImageUrlIndex = (rehosted: Array<RehostedImage | null>): Map<number, 
 
 /**
  * Filters and sanitizes Lambda-returned links. Drops any link whose URL is not
- * http(s) (e.g. `javascript:` / `data:`) or that resolves to a listening service
- * (Spotify, Bandcamp, …). Assigns a stable `sortOrder` based on the filtered array.
+ * http(s) (e.g. `javascript:` / `data:`). Assigns a stable `sortOrder` based on
+ * the filtered array. Streaming/listening-service links are kept as of 2026-07.
  */
 const sanitizeLinks = (links: BioGenerationData['links']): PersistedLink[] =>
   links.reduce<PersistedLink[]>((acc, link) => {
     const url = sanitizeUrl(link.url);
-    if (!url || isListeningServiceUrl(url)) return acc;
+    if (!url) return acc;
     acc.push({
       label: sanitizeBioText(link.label),
       url,
@@ -320,7 +319,7 @@ export class BioGenerationService {
       .filter((image): image is RehostedImage => image !== null)
       .map((image, index) => ({ ...image, sortOrder: index }));
 
-    // Drop any link whose URL is not http(s) or resolves to a listening service.
+    // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
     const persistedLinks = sanitizeLinks(result.data.links);
 
     const content = assembleContent({

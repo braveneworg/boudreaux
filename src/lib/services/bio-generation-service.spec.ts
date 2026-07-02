@@ -290,7 +290,7 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(result.data.longBio).not.toContain('image:0');
   });
 
-  it('drops a discovered link to a listening service', async () => {
+  it('keeps streaming-service links (Spotify, Bandcamp) — product rule reversed 2026-07', async () => {
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -300,9 +300,9 @@ describe('BioGenerationService.generateForArtist', () => {
           {
             label: 'Spotify',
             url: 'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb',
-            kind: 'other',
+            kind: 'streaming',
           },
-          { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'other' },
+          { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'streaming' },
         ],
       },
     });
@@ -310,8 +310,10 @@ describe('BioGenerationService.generateForArtist', () => {
     await BioGenerationService.generateForArtist(artist.id);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
-    expect(content.links).toHaveLength(1);
+    expect(content.links).toHaveLength(3);
     expect(content.links[0].url).toBe('https://en.wikipedia.org/wiki/Radiohead');
+    expect(content.links[1].url).toBe('https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb');
+    expect(content.links[2].url).toBe('https://radiohead.bandcamp.com/');
   });
 
   it('drops a discovered link whose URL is not http(s)', async () => {
