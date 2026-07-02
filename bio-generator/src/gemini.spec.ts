@@ -154,7 +154,7 @@ describe('generateProse', () => {
     expect(userMessage).toContain('<ul>/<ol> lists');
   });
 
-  it('prefers links over bold and keeps <strong> sparing in the long bio', async () => {
+  it('prefers links over bold in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -165,10 +165,9 @@ describe('generateProse', () => {
       userMessage.indexOf('altBio:')
     );
     expect(longBioSection).toContain('Prefer links over bold');
-    expect(longBioSection).toContain('SPARINGLY');
   });
 
-  it('still requires a few bolded pivotal terms in the long bio', async () => {
+  it('bolds pivotal unlinkable facts in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -178,7 +177,70 @@ describe('generateProse', () => {
       userMessage.indexOf('longBio:'),
       userMessage.indexOf('altBio:')
     );
-    expect(longBioSection).toContain('DO bold 2–4 pivotal');
+    expect(longBioSection).toContain('ADDITIONALLY bold');
+  });
+
+  it('instructs italicizing work titles with <em> in the long bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('italicize');
+    expect(longBioSection).toContain('work titles');
+  });
+
+  it('requires at least one list in the long bio when the material supports it', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('least one list in the long bio');
+  });
+
+  it('has no streaming/listening service ban in the short bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const shortBioSection = userMessage.slice(
+      userMessage.indexOf('shortBio:'),
+      userMessage.indexOf('longBio:')
+    );
+    expect(shortBioSection).not.toContain('streaming');
+  });
+
+  it('has no streaming/listening service ban in the long bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).not.toContain('streaming');
+  });
+
+  it('has no streaming/listening service ban in the alt bio user-prompt section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const altBioSection = userMessage.slice(userMessage.indexOf('altBio:'));
+    expect(altBioSection).not.toContain('streaming');
   });
 
   it('forbids <img> tags when no images are available, in every call', async () => {
