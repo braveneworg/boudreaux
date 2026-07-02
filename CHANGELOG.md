@@ -74,6 +74,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.165.0] - 2026-07-02
+
+### Added
+
+- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n
+
 ## [4.164.0] - 2026-07-02
 
 ### Added
