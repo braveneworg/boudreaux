@@ -505,6 +505,38 @@ describe('ReleaseRepository', () => {
     });
   });
 
+  describe('findPublishedByArtist', () => {
+    it('returns id and title of published releases for the artist, newest first', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([
+        { id: 'r2', title: 'Second' },
+        { id: 'r1', title: 'First' },
+      ] as never);
+
+      const result = await ReleaseRepository.findPublishedByArtist('artist-1');
+
+      expect(result).toEqual([
+        { id: 'r2', title: 'Second' },
+        { id: 'r1', title: 'First' },
+      ]);
+    });
+
+    it('queries with the correct where/select/orderBy shape', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findPublishedByArtist('artist-1');
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith({
+        where: {
+          artistReleases: { some: { artistId: 'artist-1' } },
+          publishedAt: { not: null },
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        orderBy: { releasedOn: 'desc' },
+        select: { id: true, title: true },
+      });
+    });
+  });
+
   describe('findByTitleInsensitive', () => {
     it('queries case-insensitively and projects id/title/publishedAt/deletedOn', async () => {
       const found = { id: 'r-1', title: 'Test', publishedAt: null, deletedOn: null };
