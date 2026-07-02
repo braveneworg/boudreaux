@@ -55,6 +55,8 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
     genres: 'alternative rock',
     primaryImageIndexes: [0],
   }),
+  critiqueProse: vi.fn().mockResolvedValue({ violations: [] }),
+  reviseProse: vi.fn(),
   getGeminiApiKey: vi.fn().mockResolvedValue('test-key'),
   getScrapeApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
@@ -488,6 +490,28 @@ describe('runBioGeneration', () => {
     );
 
     expect(result.genres).toBe('rock');
+  });
+
+  it('runs the quality pass on generated prose and returns the revised bios', async () => {
+    const revised = {
+      shortBio: 'Revised short.',
+      longBio: '<p>Revised long.</p>',
+      altBio: 'Revised alt.',
+      genres: 'indie rock',
+      primaryImageIndexes: [0],
+    };
+    const deps = makeDeps({
+      critiqueProse: vi.fn().mockResolvedValue({
+        violations: [{ location: 'shortBio', quote: 'Short teaser.', issue: 'test violation' }],
+      }),
+      reviseProse: vi.fn().mockResolvedValue(revised),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.shortBio).toBe('Revised short.');
+    expect(result.longBio).toBe('<p>Revised long.</p>');
+    expect(result.altBio).toBe('Revised alt.');
   });
 });
 

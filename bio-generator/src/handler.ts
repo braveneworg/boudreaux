@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { draftAndSynthesizeProse } from './gemini.js';
+import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
+import { runQualityPasses } from './factcheck.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
@@ -31,6 +32,8 @@ export interface BioGeneratorDeps {
   getCommonsImage: typeof getCommonsImage;
   /** Prose generator — the draft-and-synthesize ensemble in production. */
   generateProse: typeof draftAndSynthesizeProse;
+  critiqueProse: typeof critiqueProse;
+  reviseProse: typeof reviseProse;
   getGeminiApiKey: () => Promise<string>;
   getScrapeApiKey: typeof getScrapeApiKey;
   searchArtistSources: typeof searchArtistSources;
@@ -43,6 +46,8 @@ const defaultDeps: BioGeneratorDeps = {
   getWikipediaExtract,
   getCommonsImage,
   generateProse: draftAndSynthesizeProse,
+  critiqueProse,
+  reviseProse,
   getGeminiApiKey,
   getScrapeApiKey,
   searchArtistSources,
@@ -409,19 +414,23 @@ export const runBioGeneration = async (
 
   const apiKey = await deps.getGeminiApiKey();
   const prose = await deps.generateProse(facts, apiKey, model);
+  const checked = await runQualityPasses(
+    { prose, facts, apiKey, model },
+    { critiqueProse: deps.critiqueProse, reviseProse: deps.reviseProse }
+  );
 
   // applyImageRanking already caps the COUNT of primaries to MAX_PRIMARY via the
   // selected indexes; the primaries can sit at any position, so we must NOT
   // re-cap by array index here — that would zero out a primary the model picked
   // at index >= MAX_PRIMARY, leaving the artist with no primary image.
-  const rankedImages = applyImageRanking(images, prose.primaryImageIndexes);
+  const rankedImages = applyImageRanking(images, checked.primaryImageIndexes);
 
-  const genres = prose.genres?.trim() || input.existingGenres?.trim() || null;
+  const genres = checked.genres?.trim() || input.existingGenres?.trim() || null;
 
   return {
-    shortBio: prose.shortBio,
-    longBio: prose.longBio,
-    altBio: prose.altBio ?? '',
+    shortBio: checked.shortBio,
+    longBio: checked.longBio,
+    altBio: checked.altBio ?? '',
     genres,
     images: rankedImages,
     links,
