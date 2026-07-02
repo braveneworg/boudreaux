@@ -509,9 +509,11 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
+    expect(deps.reviseProse).toHaveBeenCalled();
     expect(result.shortBio).toBe('Revised short.');
     expect(result.longBio).toBe('<p>Revised long.</p>');
     expect(result.altBio).toBe('Revised alt.');
+    expect(result.genres).toBe('indie rock');
   });
 });
 

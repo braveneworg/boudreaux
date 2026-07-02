@@ -92,7 +92,30 @@ describe('runQualityPasses', () => {
     expect(result).toBe(revised);
   });
 
-  it('returns original prose when critic throws', async () => {
+  it('still revises when critic throws but plagiarism is detected', async () => {
+    // sourceText shares the 8-word shingle 'artist born in 1990 released debut in 2010'
+    // with prose.shortBio — the plagiarism gate fires even though the critic threw.
+    const sourceText = 'Artist born in 1990 released debut in 2010 and continued from there.';
+    const facts: ArtistFacts = { ...factsBase, sourceText };
+    const revised: BioProse = {
+      shortBio: 'Distinct revised short.',
+      longBio: '<p>Distinct revised long.</p>',
+    };
+    const deps = {
+      critiqueProse: vi.fn().mockRejectedValue(new Error('Gemini down')),
+      reviseProse: vi.fn().mockResolvedValue(revised),
+    };
+
+    const result = await runQualityPasses(
+      { prose, facts, apiKey: 'k', model: 'm' },
+      deps
+    );
+
+    expect(deps.reviseProse).toHaveBeenCalled();
+    expect(result).toBe(revised);
+  });
+
+  it('returns original prose when critic throws and no plagiarism is detected', async () => {
     const deps = {
       critiqueProse: vi.fn().mockRejectedValue(new Error('Gemini down')),
       reviseProse: vi.fn(),
