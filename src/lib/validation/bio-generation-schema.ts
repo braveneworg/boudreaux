@@ -62,7 +62,10 @@ const bioStatusLinkUrlSchema = z
   );
 
 /** Persisted bio image row as returned by the status endpoint (DB row id included). */
-export const bioStatusImageSchema = bioGenerationImageSchema.extend({ id: z.string() });
+export const bioStatusImageSchema = bioGenerationImageSchema.extend({
+  id: z.string(),
+  attribution: z.string().nullable(),
+});
 
 /** Persisted bio link row as returned by the status endpoint (DB row id included). */
 export const bioStatusLinkSchema = z.object({

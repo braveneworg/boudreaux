@@ -84,4 +84,37 @@ describe('bioGenerationStatusResponseSchema content rows', () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it('accepts an image with null attribution', () => {
+    const parsed = bioGenerationStatusResponseSchema.safeParse({
+      status: 'succeeded',
+      error: null,
+      content: {
+        ...baseContent,
+        images: [
+          {
+            id: '665f1f77bcf86cd799439016',
+            url: 'https://cdn.example/b.webp',
+            attribution: null,
+            isPrimary: false,
+          },
+        ],
+        links: [],
+      },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a protocol-relative status link url', () => {
+    const parsed = bioGenerationStatusResponseSchema.safeParse({
+      status: 'succeeded',
+      error: null,
+      content: {
+        ...baseContent,
+        images: [],
+        links: [{ id: '665f1f77bcf86cd799439017', label: 'Evil', url: '//evil.com/x' }],
+      },
+    });
+    expect(parsed.success).toBe(false);
+  });
 });
