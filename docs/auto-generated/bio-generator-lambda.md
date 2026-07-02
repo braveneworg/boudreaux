@@ -26,6 +26,9 @@ Given an artist's name(s) plus optional reference links and an editor descriptio
    text, pushing the final prose further from any source phrasing. All calls are grounded on
    the facts gathered above so the model does not invent discography/dates, and the ensemble
    degrades gracefully (a failed draft is dropped; a failed synthesis ships the first draft).
+   The long bio is links-first: every section carries at least one inline link to a reference
+   URL, names covered by a reference URL are linked rather than bolded (`<strong>` is kept
+   sparing), and 2–3 inline `image:N` images are placed tastefully between paragraphs.
    The model also ranks which 2–3 images best identify the artist. **The LLM never produces
    image or link URLs** — those come only from the real sources above, which is why nothing
    404s.

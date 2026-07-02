@@ -14,6 +14,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Link2Off } from 'lucide-react';
 
+import { BioHtml } from '@/app/components/bio-html';
 import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
@@ -100,8 +101,11 @@ const INACTIVE_TOOLBAR: ToolbarState = {
 
 /**
  * Minimal Tiptap rich-text editor for the artist bio fields. Toolbar: bold,
- * italic, font-size, link, insert-image (from the artist's images), and new
- * paragraph. Output HTML is sanitized again on save (`sanitizeBioHtml`).
+ * italic, font-size, link, insert-image (from the artist's images), new
+ * paragraph, and a preview toggle that swaps the editing surface for the
+ * public-site renderer (`BioHtml`) so admins see the bio exactly as visitors
+ * will — real links and CDN images. Output HTML is sanitized again on save
+ * (`sanitizeBioHtml`).
  *
  * Load via `next/dynamic` with `ssr: false` — it is admin-only and never ships
  * to public pages.
@@ -121,6 +125,7 @@ export const RichTextEditor = ({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [imageOpen, setImageOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   // The last HTML this editor emitted, so the value-sync effect can recognize
   // its own change echoing back through the controlled `value` and skip the
   // expensive full-document getHTML() serialization on every keystroke.
@@ -213,9 +218,25 @@ export const RichTextEditor = ({
         images={images}
         onOpenLink={openLinkDialog}
         onOpenImage={() => setImageOpen(true)}
+        isPreview={previewOpen}
+        onTogglePreview={() => setPreviewOpen((open) => !open)}
       />
 
-      <EditorContent editor={editor} />
+      {/* Keep the editor mounted (state, undo history) while previewing — just
+          hide it and render the same component the public site uses. */}
+      <div hidden={previewOpen}>
+        <EditorContent editor={editor} />
+      </div>
+      {/* Mirrors the public bio page's article styling (artist-bio-content) so
+          the preview matches what visitors will see. */}
+      {previewOpen && (
+        <div role="region" aria-label={`${ariaLabel ?? 'Bio editor'} preview`}>
+          <BioHtml
+            html={value}
+            className="min-h-40 max-w-none px-3 py-2 [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6"
+          />
+        </div>
+      )}
 
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent>

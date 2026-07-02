@@ -7,6 +7,7 @@ import type { JSX } from 'react';
 
 import {
   Bold,
+  Eye,
   Heading2,
   Heading3,
   ImageIcon,
@@ -54,6 +55,9 @@ interface RichTextEditorToolbarProps {
   images: RichTextEditorImage[];
   onOpenLink: () => void;
   onOpenImage: () => void;
+  /** Whether the editor is showing the rendered preview instead of the editing surface. */
+  isPreview: boolean;
+  onTogglePreview: () => void;
 }
 
 /** Returns 'secondary' when active, 'ghost' otherwise — keeps JSX ternary-free. */
@@ -61,7 +65,9 @@ const activeVariant = (active: boolean): 'secondary' | 'ghost' => (active ? 'sec
 
 /**
  * Formatting toolbar for the RichTextEditor. Renders bold, italic, headings,
- * lists, font-size dropdown, link, image, and new-paragraph controls.
+ * lists, font-size dropdown, link, image, and new-paragraph controls, plus a
+ * preview toggle. While previewing, the formatting controls are disabled (the
+ * editing surface is hidden) via the wrapping fieldset.
  */
 export const RichTextEditorToolbar = ({
   editor,
@@ -69,122 +75,138 @@ export const RichTextEditorToolbar = ({
   images,
   onOpenLink,
   onOpenImage,
+  isPreview,
+  onTogglePreview,
 }: RichTextEditorToolbarProps): JSX.Element => (
   <div className="border-input flex flex-wrap items-center gap-1 border-b p-1" role="toolbar">
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isBold)}
-      aria-label="Bold"
-      aria-pressed={toolbarState.isBold}
-      onClick={() => editor.chain().focus().toggleBold().run()}
-    >
-      <Bold className="size-4" aria-hidden />
-    </Button>
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isItalic)}
-      aria-label="Italic"
-      aria-pressed={toolbarState.isItalic}
-      onClick={() => editor.chain().focus().toggleItalic().run()}
-    >
-      <Italic className="size-4" aria-hidden />
-    </Button>
+    <fieldset disabled={isPreview} className="contents">
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isBold)}
+        aria-label="Bold"
+        aria-pressed={toolbarState.isBold}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <Bold className="size-4" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isItalic)}
+        aria-label="Italic"
+        aria-pressed={toolbarState.isItalic}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <Italic className="size-4" aria-hidden />
+      </Button>
 
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isHeading2)}
-      aria-label="Heading 2"
-      aria-pressed={toolbarState.isHeading2}
-      onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-    >
-      <Heading2 className="size-4" aria-hidden />
-    </Button>
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isHeading3)}
-      aria-label="Heading 3"
-      aria-pressed={toolbarState.isHeading3}
-      onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-    >
-      <Heading3 className="size-4" aria-hidden />
-    </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isHeading2)}
+        aria-label="Heading 2"
+        aria-pressed={toolbarState.isHeading2}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      >
+        <Heading2 className="size-4" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isHeading3)}
+        aria-label="Heading 3"
+        aria-pressed={toolbarState.isHeading3}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+      >
+        <Heading3 className="size-4" aria-hidden />
+      </Button>
 
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isBulletList)}
-      aria-label="Bulleted list"
-      aria-pressed={toolbarState.isBulletList}
-      onClick={() => editor.chain().focus().toggleBulletList().run()}
-    >
-      <List className="size-4" aria-hidden />
-    </Button>
-    <Button
-      type="button"
-      size="icon"
-      variant={activeVariant(toolbarState.isOrderedList)}
-      aria-label="Numbered list"
-      aria-pressed={toolbarState.isOrderedList}
-      onClick={() => editor.chain().focus().toggleOrderedList().run()}
-    >
-      <ListOrdered className="size-4" aria-hidden />
-    </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isBulletList)}
+        aria-label="Bulleted list"
+        aria-pressed={toolbarState.isBulletList}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        <List className="size-4" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isOrderedList)}
+        aria-label="Numbered list"
+        aria-pressed={toolbarState.isOrderedList}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        <ListOrdered className="size-4" aria-hidden />
+      </Button>
 
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" size="icon" variant="ghost" aria-label="Font size">
-          <Type className="size-4" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {FONT_SIZES.map((size) => (
-          <DropdownMenuItem
-            key={size.value}
-            onSelect={() => editor.chain().focus().setFontSize(size.value).run()}
-          >
-            {size.label}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" size="icon" variant="ghost" aria-label="Font size">
+            <Type className="size-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {FONT_SIZES.map((size) => (
+            <DropdownMenuItem
+              key={size.value}
+              onSelect={() => editor.chain().focus().setFontSize(size.value).run()}
+            >
+              {size.label}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuItem onSelect={() => editor.chain().focus().unsetFontSize().run()}>
+            Reset
           </DropdownMenuItem>
-        ))}
-        <DropdownMenuItem onSelect={() => editor.chain().focus().unsetFontSize().run()}>
-          Reset
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isLink)}
+        aria-label="Link"
+        aria-pressed={toolbarState.isLink}
+        onClick={onOpenLink}
+      >
+        <Link2 className="size-4" aria-hidden />
+      </Button>
+
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        aria-label="Insert image"
+        disabled={images.length === 0}
+        onClick={onOpenImage}
+      >
+        <ImageIcon className="size-4" aria-hidden />
+      </Button>
+
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        aria-label="New paragraph"
+        onClick={() => editor.chain().focus().insertContent('<p></p>').run()}
+      >
+        <Pilcrow className="size-4" aria-hidden />
+      </Button>
+    </fieldset>
 
     <Button
       type="button"
       size="icon"
-      variant={activeVariant(toolbarState.isLink)}
-      aria-label="Link"
-      aria-pressed={toolbarState.isLink}
-      onClick={onOpenLink}
+      variant={activeVariant(isPreview)}
+      aria-label="Preview"
+      aria-pressed={isPreview}
+      className="ml-auto"
+      onClick={onTogglePreview}
     >
-      <Link2 className="size-4" aria-hidden />
-    </Button>
-
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      aria-label="Insert image"
-      disabled={images.length === 0}
-      onClick={onOpenImage}
-    >
-      <ImageIcon className="size-4" aria-hidden />
-    </Button>
-
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      aria-label="New paragraph"
-      onClick={() => editor.chain().focus().insertContent('<p></p>').run()}
-    >
-      <Pilcrow className="size-4" aria-hidden />
+      <Eye className="size-4" aria-hidden />
     </Button>
   </div>
 );

@@ -558,6 +558,69 @@ describe('RichTextEditor image attributes and picker', () => {
   });
 });
 
+describe('RichTextEditor preview mode', () => {
+  const RICH_VALUE =
+    '<p>Visit <a href="https://example.com">the official site</a></p>' +
+    '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="Portrait" width="800" height="600">';
+
+  const PreviewHarness = () => {
+    const [value, setValue] = useState(RICH_VALUE);
+    return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
+  };
+
+  it('renders an unpressed Preview toggle in the toolbar', async () => {
+    render(<PreviewHarness />);
+    await waitForEditor();
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('shows the rendered output with real links and images when toggled on', async () => {
+    render(<PreviewHarness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    const preview = screen.getByRole('region', { name: 'Bio preview' });
+    expect(within(preview).getByRole('link', { name: 'the official site' })).toHaveAttribute(
+      'href',
+      'https://example.com'
+    );
+    expect(within(preview).getByTestId('picker-image')).toHaveAttribute(
+      'data-src',
+      'https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg'
+    );
+  });
+
+  it('hides the editing surface while previewing and restores it when toggled off', async () => {
+    render(<PreviewHarness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    // The hidden editing surface drops out of the accessibility tree entirely;
+    // `hidden: true` lets the query reach it to assert it is not visible.
+    expect(screen.getByRole('textbox', { name: 'Bio', hidden: true })).not.toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByRole('textbox', { name: 'Bio' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Bio preview' })).not.toBeInTheDocument();
+  });
+
+  it('disables the formatting controls while previewing', async () => {
+    render(<PreviewHarness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled();
+  });
+});
+
 // ProseMirror's coordsAtPos (reached via scrollToSelection on insert) builds a
 // Range and calls getClientRects() on it. jsdom leaves both Range rect methods
 // undefined, so the editor throws "target.getClientRects is not a function"
