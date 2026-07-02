@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.167.0] - 2026-07-02
+
+### Added
+
+- feat: bio links over bold, tasteful images, editor preview (#545)\n- feat: bio links over bold, tasteful images, editor preview (#545)\n
+
 ## [4.166.0] - 2026-07-02
 
 ### Added
