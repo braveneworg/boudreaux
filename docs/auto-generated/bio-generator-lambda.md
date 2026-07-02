@@ -20,7 +20,13 @@ Given an artist's name(s) plus optional reference links and an editor descriptio
    website, and English Wikipedia sitelink.
 3. **Wikimedia Commons** (`src/wikimedia.ts`) — resolves each image file name to a real,
    hotlinkable image URL with the **attribution + license** required to display it.
-4. **Gemini** (`src/gemini.ts`) — writes the bio prose in JSON mode via a draft-and-synthesize
+4. **Scraped-image fallback** (`src/jina.ts` + `src/handler.ts`) — every Jina search/read also
+   requests the page's images summary (`X-With-Images-Summary`). When Commons yields **zero**
+   images (e.g. the MusicBrainz entry has no Wikidata link), up to six images scraped from the
+   same pages that ground the prose are used instead — filtered of site chrome (logos, icons,
+   svg/gif/ico), skipping listening-service pages, alt-titled candidates first, attributed to
+   the source page's host. Licensed Commons images always win when available.
+5. **Gemini** (`src/gemini.ts`) — writes the bio prose in JSON mode via a draft-and-synthesize
    ensemble: two parallel drafts (a precision-leaning pass and a higher-temperature narrative
    pass) are merged by an editor pass that sees the drafts and facts but not the raw source
    text, pushing the final prose further from any source phrasing. All calls are grounded on

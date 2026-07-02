@@ -68,6 +68,8 @@ const SHARED_CONSTRAINT_LINES = [
   'YouTube Music, Tidal, Deezer, Amazon Music, or any other) — link only to INFORMATIVE sources',
   'such as the official site, Wikipedia, press, interviews, or the label.',
   'NEVER output a "Discovered Links", "Sources", "References", or link-list section anywhere.',
+  'NEVER emit an <img> tag unless an Available images list is provided in the facts — reference',
+  'images only as <img src="image:N"> with N taken from that list; with no list, write no images.',
   'Respond with a single JSON object and nothing else.',
 ];
 
@@ -162,9 +164,9 @@ const OUTPUT_SPEC_LINES = [
   '  EVERY <h2> section. Reference URLs may be reused across sections with different anchor',
   '  text; VARY the wording around each link and never reuse one phrase.',
   '- Prefer links over bold: when a key name or term is covered by a reference URL, make it an',
-  '  inline link instead of bolding it. Use <strong> SPARINGLY — only a few pivotal names or',
-  '  terms in the whole article — with <em> for emphasis and <ul>/<ol> lists where appropriate',
-  '  (e.g. notable releases, collaborators, influences).',
+  '  inline link instead of bolding it. Still DO bold 2–4 pivotal names or terms with <strong>',
+  '  across the article (use it SPARINGLY — never every name), with <em> for emphasis and',
+  '  <ul>/<ol> lists where appropriate (e.g. notable releases, collaborators, influences).',
   '- Embed 2–3 inline images of the artist using <img src="image:N" alt="...">, where N is the',
   '  0-indexed position from the Available images list above. Place each sparingly and',
   '  tastefully: at most one per major section, between paragraphs near the relevant text, and',

@@ -4,6 +4,7 @@
 
 import { fetchWithRetry } from './lib/http.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
+import { isListeningServiceUrl } from './listening-services.js';
 
 import type { FetchRetryOptions } from './lib/http.js';
 
@@ -20,15 +21,35 @@ const MAX_RESULTS = 5;
 const MAX_SOURCE_CHARS = 14_000;
 /** Upper bound on a single reader (e.g. official site) extract. */
 const MAX_READER_CHARS = 12_000;
+/** Upper bound on scraped image candidates returned per call. */
+const MAX_SCRAPED_IMAGES = 12;
+
+/** An images-summary map: `"Image N[,M][: alt]"` keys to absolute image URLs. */
+type JinaImagesSummary = Record<string, string>;
 
 /** Subset of the Jina search response we read (`s.jina.ai`, JSON mode). */
 interface JinaSearchResponse {
-  data?: Array<{ title?: string; url?: string; content?: string; description?: string }>;
+  data?: Array<{
+    title?: string;
+    url?: string;
+    content?: string;
+    description?: string;
+    images?: JinaImagesSummary;
+  }>;
 }
 
 /** Subset of the Jina reader response we read (`r.jina.ai`, JSON mode). */
 interface JinaReaderResponse {
-  data?: { title?: string; url?: string; content?: string };
+  data?: { title?: string; url?: string; content?: string; images?: JinaImagesSummary };
+}
+
+/** An image scraped from a grounding page, kept with its provenance. */
+export interface ScrapedImage {
+  url: string;
+  /** Alt/caption text from the page, when the page named the image. */
+  alt: string | null;
+  /** The page the image was found on. */
+  sourceUrl: string;
 }
 
 export interface WebSearchSources {
@@ -36,13 +57,80 @@ export interface WebSearchSources {
   sourceText: string;
   /** Provenance URLs, for the LLM to weave in as inline links. */
   sourceUrls: string[];
+  /** Filtered artist-image candidates scraped from the result pages. */
+  images: ScrapedImage[];
 }
 
-/** JSON Accept + optional bearer auth (Jina works keyless at a lower rate limit). */
+/** The reader result: cleaned page content plus any scraped page images. */
+export interface ReadUrlResult {
+  content: string;
+  images: ScrapedImage[];
+}
+
+/**
+ * JSON Accept + optional bearer auth (Jina works keyless at a lower rate limit).
+ * Every call also asks for the page's images summary so artist photos can be
+ * scraped from the same pages that ground the prose.
+ */
 const jinaHeaders = (apiKey?: string | null): Record<string, string> => {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'X-With-Images-Summary': 'true',
+  };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   return headers;
+};
+
+/**
+ * URL fragments that mark site chrome rather than photos (logos, favicons,
+ * wordmarks, decorative sprites, commenter avatars).
+ */
+const JUNK_IMAGE_URL_PATTERN =
+  /logo|icon|sprite|badge|wordmark|tagline|emoji|spacer|avatar|placeholder/i;
+
+/** Non-photographic extensions (vector art, animations, favicons). */
+const NON_PHOTO_EXTENSION_PATTERN = /\.(svg|gif|ico)$/i;
+
+/** True when the URL plausibly points at a hosted photograph. */
+const isPlausiblePhotoUrl = (url: string): boolean => {
+  if (!/^https?:\/\//i.test(url)) return false;
+  // Quotes/whitespace mark scraping artifacts (e.g. an onerror handler's
+  // `this.src='…'` captured mid-attribute), never a real image URL.
+  if (/["'\s]/.test(url)) return false;
+  if (JUNK_IMAGE_URL_PATTERN.test(url)) return false;
+  const path = url.split(/[?#]/)[0];
+  return !NON_PHOTO_EXTENSION_PATTERN.test(path);
+};
+
+/** Extracts the alt text from an images-summary key like `"Image 4,1: Alt"`. */
+const altFromImageKey = (key: string): string | null => {
+  const alt = key.replace(/^Image [\d,\s]+:?\s*/, '').trim();
+  return alt || null;
+};
+
+/**
+ * Maps a page's images summary to filtered {@link ScrapedImage} candidates,
+ * dropping site chrome and non-photo formats.
+ */
+const collectPageImages = (
+  images: JinaImagesSummary | undefined,
+  sourceUrl: string
+): ScrapedImage[] =>
+  Object.entries(images ?? {})
+    .filter(([, url]) => isPlausiblePhotoUrl(url))
+    .map(([key, url]) => ({ url, alt: altFromImageKey(key), sourceUrl }));
+
+/** Dedupes scraped images by URL, keeping first occurrence, capped. */
+const dedupeScrapedImages = (images: ScrapedImage[]): ScrapedImage[] => {
+  const seen = new Set<string>();
+  return images
+    .filter((image) => {
+      const key = image.url.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_SCRAPED_IMAGES);
 };
 
 /**
@@ -86,9 +174,11 @@ export const searchArtistSources = async (
       .map((result) => ({
         url: result.url,
         text: (result.content || result.description || '').trim(),
+        images: result.images,
       }))
-      .filter((result): result is { url: string; text: string } =>
-        Boolean(result.url && result.text)
+      .filter(
+        (result): result is { url: string; text: string; images: JinaImagesSummary | undefined } =>
+          Boolean(result.url && result.text)
       );
 
     if (!results.length) {
@@ -102,8 +192,14 @@ export const searchArtistSources = async (
       .slice(0, MAX_SOURCE_CHARS)
       .trim();
     const sourceUrls = [...new Set(results.map((result) => result.url))];
+    // Streaming pages flood the summary with album art, never artist photos.
+    const images = dedupeScrapedImages(
+      results
+        .filter((result) => !isListeningServiceUrl(result.url))
+        .flatMap((result) => collectPageImages(result.images, result.url))
+    );
 
-    return { sourceText, sourceUrls };
+    return { sourceText, sourceUrls, images };
   } catch (err) {
     logEvent('warn', 'jina_search_error', { artist: artistName, error: toErrorMessage(err) });
     return null;
@@ -118,14 +214,14 @@ export const searchArtistSources = async (
  * @param url - The page to read.
  * @param apiKey - Optional Jina API key (resolved from SSM); higher rate limit.
  * @param fetchFn - Injectable fetch (defaults to global) for testability.
- * @returns The cleaned content (capped), or `null` when unavailable.
+ * @returns The cleaned content (capped) plus scraped page images, or `null`.
  */
 export const readUrl = async (
   url: string,
   apiKey?: string | null,
   fetchFn: FetchFn = fetch,
   options: FetchRetryOptions = {}
-): Promise<string | null> => {
+): Promise<ReadUrlResult | null> => {
   try {
     const response = await fetchWithRetry(
       `${JINA_READER_ENDPOINT}${url}`,
@@ -143,7 +239,11 @@ export const readUrl = async (
 
     const body = (await response.json()) as JinaReaderResponse;
     const content = body.data?.content?.trim();
-    return content ? content.slice(0, MAX_READER_CHARS) : null;
+    if (!content) return null;
+    return {
+      content: content.slice(0, MAX_READER_CHARS),
+      images: dedupeScrapedImages(collectPageImages(body.data?.images, url)),
+    };
   } catch (err) {
     logEvent('warn', 'jina_read_error', { url, error: toErrorMessage(err) });
     return null;
