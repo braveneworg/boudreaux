@@ -85,13 +85,32 @@ const BIO_TEXT_OPTIONS: sanitizeHtml.IOptions = {
  */
 const BIO_HTML_NO_IMAGES_OPTIONS: sanitizeHtml.IOptions = {
   ...BIO_HTML_OPTIONS,
-  allowedTags: (BIO_HTML_OPTIONS.allowedTags ?? []).filter((tag) => tag !== 'img'),
-  allowedAttributes: Object.fromEntries(
-    Object.entries(BIO_HTML_OPTIONS.allowedAttributes ?? {}).filter(([key]) => key !== 'img')
-  ),
-  allowedSchemesByTag: Object.fromEntries(
-    Object.entries(BIO_HTML_OPTIONS.allowedSchemesByTag ?? {}).filter(([key]) => key !== 'img')
-  ),
+  // Explicitly enumerate tags without `img` to stay type-safe — IOptions types
+  // allowedTags as `string[] | false`, so filtering it risks a runtime `.filter`
+  // on `false`.
+  allowedTags: [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'ul',
+    'ol',
+    'li',
+    'a',
+    'span',
+    'h2',
+    'h3',
+    'h4',
+  ],
+  allowedAttributes: {
+    a: ['href', 'rel', 'target'],
+    span: ['style'],
+  },
+  allowedSchemesByTag: {
+    a: ['http', 'https'],
+  },
 };
 
 /**
