@@ -619,83 +619,88 @@ describe('generateProse', () => {
       'Gemini returned an empty completion'
     );
   });
+});
 
-  describe('critiqueProse', () => {
-    it('posts bios + suspect years and validates the violations JSON', async () => {
-      const fetchFn = vi.fn().mockResolvedValue(
-        geminiResponse({
-          violations: [
-            { location: 'longBio', quote: 'began in 1949', issue: 'precedes birth (1982)' },
-          ],
-        })
-      );
-      const result = await critiqueProse(
-        {
-          facts: baseFacts({ bornOn: '1982-05-01' }),
-          prose: fakeProse,
-          suspectYears: [1949],
-          apiKey: 'k',
-          model: 'm',
-        },
-        { fetchFn }
-      );
-      expect(result.violations).toHaveLength(1);
-      const body = JSON.parse(fetchFn.mock.calls[0][1].body);
-      expect(body.contents[0].parts[0].text).toContain('1949');
-      expect(body.generationConfig.temperature).toBe(0.2);
-    });
-
-    it('returns an empty violations array for clean bios', async () => {
-      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ violations: [] }));
-      const result = await critiqueProse(
-        {
-          facts: baseFacts({}),
-          prose: fakeProse,
-          suspectYears: [],
-          apiKey: 'k',
-          model: 'm',
-        },
-        { fetchFn }
-      );
-      expect(result.violations).toHaveLength(0);
-    });
+describe('critiqueProse', () => {
+  it('posts bios + suspect years and validates the violations JSON', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        violations: [
+          { location: 'longBio', quote: 'began in 1949', issue: 'precedes birth (1982)' },
+        ],
+      })
+    );
+    const result = await critiqueProse(
+      {
+        facts: baseFacts({ bornOn: '1982-05-01' }),
+        prose: fakeProse,
+        suspectYears: [1949],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(result.violations).toHaveLength(1);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.contents[0].parts[0].text).toContain('1949');
+    expect(body.generationConfig.temperature).toBe(0.2);
   });
 
-  describe('reviseProse', () => {
-    it('posts violations + plagiarized segments and returns full prose', async () => {
-      const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
-      const revised = await reviseProse(
-        {
-          facts: baseFacts({}),
-          prose: fakeProse,
-          violations: [sampleViolation],
-          plagiarizedSegments: [{ text: 'copied run here' }],
-          apiKey: 'k',
-          model: 'm',
-        },
-        { fetchFn }
-      );
-      expect(revised.longBio).toBe(fakeProse.longBio);
-      const text = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
-      expect(text).toContain('copied run here');
-      expect(text).toMatch(/rewrite only/i);
-    });
+  it('returns an empty violations array for clean bios', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ violations: [] }));
+    const result = await critiqueProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        suspectYears: [],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(result.violations).toHaveLength(0);
+    const text = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(text).not.toContain('SUSPECT YEARS');
+  });
+});
 
-    it('uses temperature 0.4 for the revise call', async () => {
-      const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
-      await reviseProse(
-        {
-          facts: baseFacts({}),
-          prose: fakeProse,
-          violations: [],
-          plagiarizedSegments: [],
-          apiKey: 'k',
-          model: 'm',
-        },
-        { fetchFn }
-      );
-      const body = JSON.parse(fetchFn.mock.calls[0][1].body);
-      expect(body.generationConfig.temperature).toBe(0.4);
-    });
+describe('reviseProse', () => {
+  it('posts violations + plagiarized segments and returns full prose', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
+    const revised = await reviseProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        violations: [sampleViolation],
+        plagiarizedSegments: [{ text: 'copied run here' }],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    expect(revised.longBio).toBe(fakeProse.longBio);
+    const text = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(text).toContain('copied run here');
+    expect(text).toMatch(/rewrite only/i);
+  });
+
+  it('uses temperature 0.4 for the revise call', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
+    await reviseProse(
+      {
+        facts: baseFacts({}),
+        prose: fakeProse,
+        violations: [],
+        plagiarizedSegments: [],
+        apiKey: 'k',
+        model: 'm',
+      },
+      { fetchFn }
+    );
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.generationConfig.temperature).toBe(0.4);
+    const text = body.contents[0].parts[0].text;
+    expect(text).not.toContain('FACT VIOLATIONS');
+    expect(text).not.toContain('PLAGIARIZED PHRASING');
   });
 });
