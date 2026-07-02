@@ -101,42 +101,49 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 // methods without being part of the public API.
 // ---------------------------------------------------------------------------
 
+/** Raw re-host result from {@link BioImageService.rehostImages}. */
+type RehostResult = { url: string; width: number | null; height: number | null };
+
 /**
- * Re-hosts each discovered image into S3 via a cheap single-thumbnail pass so
- * it is CDN-served without paying for full variants on images the admin may
- * dismiss. Attribution metadata is kept through re-host (PR #547). Best-effort:
- * failures are dropped, not fatal.
+ * Builds the rich {@link RehostedImage} record from a raw re-host result and
+ * the original image metadata returned by the Lambda. Extracted to keep
+ * {@link rehostImages} under the cyclomatic-complexity limit.
+ */
+const buildRehostedRecord = (
+  result: RehostResult,
+  image: BioGenerationData['images'][number]
+): RehostedImage => ({
+  url: result.url,
+  thumbnailUrl: result.url,
+  title: image.title ? sanitizeBioText(image.title) : null,
+  attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
+  license: image.license ?? null,
+  sourceUrl: image.sourceUrl ?? null,
+  originalUrl: image.url,
+  width: result.width ?? image.width ?? null,
+  height: result.height ?? image.height ?? null,
+  isPrimary: image.isPrimary,
+});
+
+/**
+ * Re-hosts each discovered image into S3 via a cheap single-thumbnail pass,
+ * deduplicating by content hash so the same photo appearing under different
+ * URLs is only uploaded once. Attribution metadata is kept through re-host
+ * (PR #547). Failures and duplicates are returned as `null` — best-effort.
  */
 const rehostImages = async (
   images: BioGenerationData['images'],
   artistId: string
-): Promise<Array<RehostedImage | null>> =>
-  Promise.all(
-    images.map(async (image, index) => {
-      try {
-        const { url, width, height } = await BioImageService.rehostThumbnail(
-          image.url,
-          artistId,
-          index
-        );
-        return {
-          url,
-          thumbnailUrl: url,
-          title: image.title ? sanitizeBioText(image.title) : null,
-          attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
-          license: image.license ?? null,
-          sourceUrl: image.sourceUrl ?? null,
-          originalUrl: image.url,
-          width: width ?? image.width ?? null,
-          height: height ?? image.height ?? null,
-          isPrimary: image.isPrimary,
-        };
-      } catch (error) {
-        loggers.media.warn('Bio image re-host failed; dropping image', { error });
-        return null;
-      }
-    })
-  );
+): Promise<Array<RehostedImage | null>> => {
+  const urlsWithIndices = images.map((img, index) => ({ url: img.url, index }));
+  const rehosted = await BioImageService.rehostImages(urlsWithIndices, artistId);
+  // Use .at(i) rather than [i] so the ESLint security rule does not flag the
+  // correlated array lookup as a potential object-injection sink.
+  return images.map((image, i) => {
+    const result = rehosted.at(i);
+    return result ? buildRehostedRecord(result, image) : null;
+  });
+};
 
 /**
  * Builds a Map from each ORIGINAL image index to its re-hosted CDN URL so that

@@ -212,6 +212,111 @@ describe('BioImageService.rehostWithVariants', () => {
   });
 });
 
+describe('BioImageService.rehostImages', () => {
+  beforeEach(() => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+  });
+
+  it('uploads both images when their buffers are distinct', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([4, 5, 6]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+    );
+
+    const result = await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/b.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(2);
+    expect(result[0]).not.toBeNull();
+    expect(result[1]).not.toBeNull();
+  });
+
+  it('skips the duplicate when two images have identical content', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([9, 8, 7]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([9, 8, 7]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+    );
+
+    const result = await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/b.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(result[0]).not.toBeNull();
+    expect(result[1]).toBeNull();
+  });
+
+  it('returns null for an image whose fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 404 })));
+
+    const result = await BioImageService.rehostImages(
+      [{ url: 'https://x/a.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(result).toEqual([null]);
+  });
+
+  it('returns source urls without deduplication in skip-rehost mode', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/a.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      { url: 'https://x/a.jpg', width: null, height: null },
+      { url: 'https://x/a.jpg', width: null, height: null },
+    ]);
+  });
+});
+
 describe('BioImageService.rehostThumbnail', () => {
   it('uploads a single 384px webp and returns its CDN URL', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', '');

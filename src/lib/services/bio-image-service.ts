@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import mime from 'mime';
@@ -11,10 +11,12 @@ import sharp from 'sharp';
 
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
+import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const THUMBNAIL_WIDTH = 384;
+const logger = loggers.media;
 
 export interface RehostedImage {
   url: string;
@@ -58,6 +60,34 @@ const fetchImageBuffer = async (
   const arrayBuffer = await response.arrayBuffer();
   if (arrayBuffer.byteLength > MAX_BYTES) throw new Error('Source image exceeds the 50MB limit');
   return { buffer: Buffer.from(arrayBuffer), contentType };
+};
+
+/**
+ * Resize `buffer` to a 384px webp thumbnail and upload it to S3 under the
+ * `media/artists/{artistId}/bio/thumbs/` prefix. Shared between
+ * {@link BioImageService.rehostThumbnail} and {@link BioImageService.rehostImages}.
+ */
+const processThumbnail = async (
+  buffer: Buffer,
+  artistId: string,
+  index: number
+): Promise<RehostedImage> => {
+  const { data, info } = await sharp(buffer)
+    .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toBuffer({ resolveWithObject: true });
+
+  const s3Key = `media/artists/${artistId}/bio/thumbs/${index}-${randomUUID().slice(0, 8)}.webp`;
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: getS3BucketName(),
+      Key: s3Key,
+      Body: data,
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000, immutable',
+    })
+  );
+  return { url: buildCdnUrl(s3Key), width: info.width, height: info.height };
 };
 
 /**
@@ -125,21 +155,48 @@ export class BioImageService {
       return { url: sourceUrl, width: null, height: null };
     }
     const { buffer } = await fetchImageBuffer(sourceUrl);
-    const { data, info } = await sharp(buffer)
-      .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer({ resolveWithObject: true });
+    return processThumbnail(buffer, artistId, index);
+  }
 
-    const s3Key = `media/artists/${artistId}/bio/thumbs/${index}-${randomUUID().slice(0, 8)}.webp`;
-    await getS3Client().send(
-      new PutObjectCommand({
-        Bucket: getS3BucketName(),
-        Key: s3Key,
-        Body: data,
-        ContentType: 'image/webp',
-        CacheControl: 'public, max-age=31536000, immutable',
+  /**
+   * Re-hosts a batch of images as thumbnails, deduplicating by SHA-256 content
+   * hash so the same photo appearing under two different URLs (e.g. a Commons
+   * image and a scraped copy) is only uploaded once. The returned array is
+   * position-preserving: `null` means the image at that index was either a
+   * duplicate or failed to fetch, so downstream logic (sortOrder assignment,
+   * persistence) can safely filter it out. In skip-rehost mode there are no
+   * buffers to hash, so every image passes through as-is with no deduplication.
+   *
+   * @param images - Source URLs paired with their original indices.
+   * @param artistId - The owning artist id (for the S3 key namespace).
+   * @returns A position-preserving array: `RehostedImage` on success, `null` on
+   *   failure or duplicate.
+   */
+  static async rehostImages(
+    images: ReadonlyArray<{ url: string; index: number }>,
+    artistId: string
+  ): Promise<Array<RehostedImage | null>> {
+    if (shouldSkipRehost()) {
+      return images.map(({ url }) => ({ url, width: null, height: null }));
+    }
+
+    const seenHashes = new Set<string>();
+    return Promise.all(
+      images.map(async ({ url, index }) => {
+        try {
+          const { buffer } = await fetchImageBuffer(url);
+          const hash = createHash('sha256').update(buffer).digest('hex');
+          if (seenHashes.has(hash)) {
+            logger.warn('bio_image_duplicate_skipped', { index });
+            return null;
+          }
+          seenHashes.add(hash);
+          return await processThumbnail(buffer, artistId, index);
+        } catch (error) {
+          logger.warn('Bio image fetch or upload failed', { error });
+          return null;
+        }
       })
     );
-    return { url: buildCdnUrl(s3Key), width: info.width, height: info.height };
   }
 }
