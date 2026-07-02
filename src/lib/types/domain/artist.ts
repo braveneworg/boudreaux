@@ -95,6 +95,8 @@ export interface ArtistBioImageRecord {
   attribution: string | null;
   license: string | null;
   sourceUrl: string | null;
+  /** Original external image URL kept so save-time re-hosting can fetch the full-resolution source. */
+  originalUrl: string | null;
   width: number | null;
   height: number | null;
   isPrimary: boolean;
