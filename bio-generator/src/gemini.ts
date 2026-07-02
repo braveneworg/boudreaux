@@ -510,9 +510,10 @@ export const reviseProse = (
   requestJson(
     bioProseSchema,
     {
-      systemPrompt: [buildSystemPrompt(facts), 'You are repairing existing bios, not writing new ones.'].join(
-        ' '
-      ),
+      systemPrompt: [
+        buildSystemPrompt(facts),
+        'You are repairing existing bios, not writing new ones.',
+      ].join(' '),
       userPrompt: [
         ...factLines(facts),
         '',

@@ -66,9 +66,7 @@ describe('runQualityPasses', () => {
       deps
     );
 
-    expect(deps.reviseProse).toHaveBeenCalledWith(
-      expect.objectContaining({ violations, prose })
-    );
+    expect(deps.reviseProse).toHaveBeenCalledWith(expect.objectContaining({ violations, prose }));
     expect(result).toBe(revised);
   });
 
@@ -83,10 +81,7 @@ describe('runQualityPasses', () => {
       reviseProse: vi.fn().mockResolvedValue(revised),
     };
 
-    const result = await runQualityPasses(
-      { prose, facts, apiKey: 'k', model: 'm' },
-      deps
-    );
+    const result = await runQualityPasses({ prose, facts, apiKey: 'k', model: 'm' }, deps);
 
     expect(deps.reviseProse).toHaveBeenCalled();
     expect(result).toBe(revised);
@@ -106,10 +101,7 @@ describe('runQualityPasses', () => {
       reviseProse: vi.fn().mockResolvedValue(revised),
     };
 
-    const result = await runQualityPasses(
-      { prose, facts, apiKey: 'k', model: 'm' },
-      deps
-    );
+    const result = await runQualityPasses({ prose, facts, apiKey: 'k', model: 'm' }, deps);
 
     expect(deps.reviseProse).toHaveBeenCalled();
     expect(result).toBe(revised);
