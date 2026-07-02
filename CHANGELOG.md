@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.170.0] - 2026-07-02
+
+### Added
+
+- fix(bio): image quality, thumbs 403, name search (#548)\n- fix(bio): image quality, thumbs 403, name search (#548)\n
+
 ## [4.169.0] - 2026-07-02
 
 ### Added
