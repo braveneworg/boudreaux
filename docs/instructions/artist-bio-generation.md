@@ -170,7 +170,7 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 | ---------------------- | ---------------------------------------- | --------------------------------------------- |
 | AWS SSM (SecureString) | `/fakefour/gemini/api-key`               | Gemini key — **Lambda-only**, read at runtime |
 | Web app IAM identity   | `lambda:InvokeFunction` on the function  | Lets the app invoke it                        |
-| SAM param              | `GeminiModel` (default `gemini-2.5-pro`) | Prose model                                   |
+| Code constant          | `DEFAULT_GEMINI_MODEL` (`src/types.ts`)  | Prose model (`gemini-2.5-pro`)                |
 | SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`) | Error-alarm SNS subscription                  |
 
 ---
