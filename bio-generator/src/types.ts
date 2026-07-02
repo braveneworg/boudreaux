@@ -86,6 +86,18 @@ export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
 
 export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 
+/** A single fact-check violation flagged by the critic pass. */
+export const bioCritiqueViolationSchema = z.object({
+  location: z.enum(['shortBio', 'longBio', 'altBio']),
+  quote: z.string().min(1),
+  issue: z.string().min(1),
+});
+export type BioCritiqueViolation = z.infer<typeof bioCritiqueViolationSchema>;
+
+/** The full critic result: zero or more violations detected in the bios. */
+export const bioCritiqueSchema = z.object({ violations: z.array(bioCritiqueViolationSchema) });
+export type BioCritique = z.infer<typeof bioCritiqueSchema>;
+
 /** Just the prose the LLM is responsible for — validated before assembly. */
 export const bioProseSchema = z.object({
   shortBio: z.string().min(1),
