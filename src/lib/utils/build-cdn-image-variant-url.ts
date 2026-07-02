@@ -18,6 +18,13 @@ const CDN_DOMAIN =
 const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 
 /**
+ * Path marker for generation-time bio thumbnails, which are uploaded as a
+ * single webp with no `_w{width}` variants — requesting a variant 403s on
+ * the CDN, so these URLs must pass through unchanged.
+ */
+const SINGLE_VARIANT_PATH_MARKER = '/bio/thumbs/';
+
+/**
  * Matches an existing `_w{number}` suffix at the end of a filename's base
  * (extension already stripped), e.g. `cover_w1200`. We strip this before
  * re-applying a new width so stored URLs that already encode a variant width
@@ -34,6 +41,10 @@ const EXISTING_WIDTH_SUFFIX_REGEX = /_w\d+$/;
 const WEBP_TRANSCODE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']);
 
 const appendWidthSuffix = (pathname: string, width: number): string => {
+  if (pathname.includes(SINGLE_VARIANT_PATH_MARKER)) {
+    return pathname;
+  }
+
   const lastDot = pathname.lastIndexOf('.');
 
   if (lastDot === -1) {
