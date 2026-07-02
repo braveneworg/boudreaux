@@ -42,12 +42,12 @@ editor** rather than a plain textarea.
 
 | File                                                                                                       | Purpose                                                                                                                                 |
 | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `template.yaml`                                                                                            | SAM template: `BioGeneratorFunction` (Node 24, arm64, 29s/512MB), SSM/KMS read policy, error CloudWatch alarm + SNS topic               |
+| `template.yaml`                                                                                            | SAM template: `BioGeneratorFunction` (Node 24, arm64, 900s/512MB), SSM/KMS read policy, error CloudWatch alarm + SNS topic              |
 | `src/handler.ts`                                                                                           | Orchestrates MusicBrainz → Wikidata → Wikimedia → Gemini; graceful prose-only degradation; returns discriminated `{ ok, ... }` envelope |
 | `src/musicbrainz.ts`                                                                                       | Resolve artist by name → Wikidata id + external relations                                                                               |
 | `src/wikidata.ts`                                                                                          | Read `P18` image file names, `P856` official site, English Wikipedia sitelink                                                           |
 | `src/wikimedia.ts`                                                                                         | Resolve Commons file names to hotlinkable URLs + attribution/license                                                                    |
-| `src/gemini.ts`                                                                                            | Write short/long bio prose in JSON mode, grounded on the gathered facts                                                                 |
+| `src/gemini.ts`                                                                                            | Draft-and-synthesize ensemble: two parallel grounded drafts (varied temperature/angle) merged by an editor pass, all in JSON mode       |
 | `src/types.ts`                                                                                             | **Contract**: request/response Zod schemas + `USER_AGENT`, `DEFAULT_GEMINI_MODEL`                                                       |
 | `src/lib/secrets.ts`                                                                                       | Read the Gemini API key from SSM Parameter Store at runtime                                                                             |
 | `events/sample.json`                                                                                       | Sample event for `sam local invoke`                                                                                                     |
@@ -170,7 +170,7 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 | ---------------------- | ---------------------------------------- | --------------------------------------------- |
 | AWS SSM (SecureString) | `/fakefour/gemini/api-key`               | Gemini key — **Lambda-only**, read at runtime |
 | Web app IAM identity   | `lambda:InvokeFunction` on the function  | Lets the app invoke it                        |
-| Code constant          | `DEFAULT_GEMINI_MODEL` (`src/types.ts`)  | Prose model (`gemini-2.5-pro`)                |
+| Code constant          | `DEFAULT_GEMINI_MODEL` (`src/types.ts`)  | Prose model (`gemini-2.5-flash`)              |
 | SAM param              | `AlarmEmail` (CI: `secrets.ALERT_EMAIL`) | Error-alarm SNS subscription                  |
 
 ---
@@ -250,7 +250,7 @@ Expected envelope:
     "genres": "...",
     "images": [{ "url": "...", "attribution": "...", "isPrimary": true }],
     "links": [{ "label": "Wikipedia", "url": "...", "kind": "wikipedia" }],
-    "model": "gemini-2.5-pro",
+    "model": "gemini-2.5-flash",
   },
 }
 ```

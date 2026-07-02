@@ -8,14 +8,15 @@ import { z } from 'zod';
 export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourrecords.com )';
 
 /**
- * Default Gemini model — Gemini 2.5 Pro: a current, GA model id (the bare
- * `gemini-3-flash` is not a valid id and 404s on generateContent). Chosen for
- * higher-quality long-form bio prose on the free tier (lower daily quota than
- * Flash, but bios are generated infrequently), with a 1M-token context window
- * (so source material never needs trimming) and native JSON output. Overridable
- * per environment via `GEMINI_MODEL` (e.g. `gemini-2.5-flash` for more quota).
+ * Default Gemini model — Gemini 2.5 Flash: a current, GA model id (the bare
+ * `gemini-3-flash` is not a valid id and 404s on generateContent) that the
+ * free tier can actually call — the free tier grants ZERO `gemini-2.5-pro`
+ * quota (`limit: 0` on every metric), so Pro 429s on every request without
+ * billing enabled. Flash keeps the 1M-token context window (so source material
+ * never needs trimming) and native JSON output. Overridable per environment
+ * via `GEMINI_MODEL` (e.g. `gemini-2.5-pro` once the project is billed).
  */
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 /**
  * Input the web app sends to the Lambda. Names drive the metadata lookup;

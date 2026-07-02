@@ -708,3 +708,11 @@ describe('BioGenerationService.getGenerationStatus', () => {
     expect(result).toEqual({ status: null, error: null, content: null });
   });
 });
+
+describe('INVOKE_REQUEST_TIMEOUT_MS', () => {
+  it('out-waits the Lambda function timeout (900s) so invokes are never aborted early', async () => {
+    const { INVOKE_REQUEST_TIMEOUT_MS } = await import('./bio-generation-service');
+
+    expect(INVOKE_REQUEST_TIMEOUT_MS).toBeGreaterThan(900_000);
+  });
+});
