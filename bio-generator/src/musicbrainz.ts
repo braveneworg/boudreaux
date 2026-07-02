@@ -93,6 +93,24 @@ const hostnameFromUrl = (resource: string): string | null => {
 };
 
 /**
+ * Maps a single MusicBrainz url-relation to a {@link BioLink}, or `null` when
+ * the relation type is not surfaced in the UI (e.g. purchase links, other).
+ * Streaming links use the hostname as the label instead of the raw type string.
+ */
+const relationToLink = (type: string, resource: string): BioLink | null => {
+  const kind = classifyRelation(type);
+  if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
+    return { label: type, url: resource, kind };
+  }
+  if (kind === 'streaming') {
+    const hostname = hostnameFromUrl(resource);
+    if (!hostname) return null;
+    return { label: hostname.replace(/^www\./, ''), url: resource, kind };
+  }
+  return null;
+};
+
+/**
  * Walks the artist's url-relations once, collecting the Wikidata id and the
  * Wikipedia/official/social links (other kinds are dropped).
  */
@@ -110,18 +128,8 @@ const collectRelations = (
       wikidataId = extractWikidataId(resource);
     }
 
-    const kind = classifyRelation(relation.type);
-    if (kind === 'wikipedia' || kind === 'official' || kind === 'social' || kind === 'streaming') {
-      if (kind === 'streaming') {
-        // Streaming links: label by hostname so the UI shows "open.spotify.com", not "streaming".
-        // Skip the relation entirely when the resource URL is unparseable.
-        const hostname = hostnameFromUrl(resource);
-        if (!hostname) continue;
-        links.push({ label: hostname.replace(/^www\./, ''), url: resource, kind });
-      } else {
-        links.push({ label: relation.type, url: resource, kind });
-      }
-    }
+    const link = relationToLink(relation.type, resource);
+    if (link) links.push(link);
   }
 
   return { wikidataId, links };

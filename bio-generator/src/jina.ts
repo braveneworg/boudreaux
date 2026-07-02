@@ -10,6 +10,12 @@ import type { FetchRetryOptions } from './lib/http.js';
 
 type FetchFn = typeof fetch;
 
+/** Options for {@link searchArtistSources}: retry tuning plus an optional custom query string. */
+export interface SearchArtistOptions extends FetchRetryOptions {
+  /** Custom search query; defaults to `"<name> musician biography career discography"`. */
+  query?: string;
+}
+
 /** Jina AI search — returns ranked results with clean, readable page content. */
 const JINA_SEARCH_ENDPOINT = 'https://s.jina.ai/';
 /** Jina AI Reader — returns a single URL rendered to clean markdown. */
@@ -151,14 +157,15 @@ export const searchArtistSources = async (
   artistName: string,
   apiKey?: string | null,
   fetchFn: FetchFn = fetch,
-  options: FetchRetryOptions = {},
-  query: string = `${artistName} musician biography career discography`
+  options: SearchArtistOptions = {}
 ): Promise<WebSearchSources | null> => {
+  const { query = `${artistName} musician biography career discography`, ...retryOptions } =
+    options;
   try {
     const response = await fetchWithRetry(
       `${JINA_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`,
       { headers: jinaHeaders(apiKey) },
-      { ...options, fetchFn }
+      { ...retryOptions, fetchFn }
     );
 
     if (!response.ok) {
@@ -180,7 +187,9 @@ export const searchArtistSources = async (
         images: result.images,
       }))
       .filter(
-        (result): result is {
+        (
+          result
+        ): result is {
           url: string;
           title: string | undefined;
           text: string;

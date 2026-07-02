@@ -24,6 +24,18 @@ const normalizeWords = (text: string): string[] =>
 const shingleAt = (words: string[], start: number, size: number): string =>
   words.slice(start, start + size).join(' ');
 
+/** Builds the set of all `shingleSize`-word n-grams from every source text. */
+const buildShingleSet = (sources: string[], shingleSize: number): Set<string> => {
+  const set = new Set<string>();
+  for (const source of sources) {
+    const words = normalizeWords(source);
+    for (let i = 0; i + shingleSize <= words.length; i += 1) {
+      set.add(shingleAt(words, i, shingleSize));
+    }
+  }
+  return set;
+};
+
 /**
  * Finds runs of the output that reproduce `shingleSize` consecutive words from
  * any source text. Overlapping/adjacent matches merge into one segment.
@@ -33,13 +45,7 @@ export const findPlagiarizedSegments = (
   sources: string[],
   shingleSize: number = DEFAULT_SHINGLE_SIZE
 ): PlagiarismSegment[] => {
-  const sourceShingles = new Set<string>();
-  for (const source of sources) {
-    const words = normalizeWords(source);
-    for (let i = 0; i + shingleSize <= words.length; i += 1) {
-      sourceShingles.add(shingleAt(words, i, shingleSize));
-    }
-  }
+  const sourceShingles = buildShingleSet(sources, shingleSize);
   if (!sourceShingles.size) return [];
 
   const words = normalizeWords(output);

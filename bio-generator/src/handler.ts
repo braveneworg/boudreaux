@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { runQualityPasses } from './factcheck.js';
+import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
@@ -260,7 +260,7 @@ const applyWebSearch = async (
   ];
 
   for (const query of queries) {
-    const found = await deps.searchArtistSources(artist, scrapeKey, undefined, {}, query);
+    const found = await deps.searchArtistSources(artist, scrapeKey, undefined, { query });
     if (!found) {
       logEvent('info', 'web_search_empty', { artist });
       continue;

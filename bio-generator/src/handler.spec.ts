@@ -170,7 +170,9 @@ describe('runBioGeneration', () => {
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null, undefined, {}, undefined);
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null, undefined, {
+      query: undefined,
+    });
   });
 
   it('uses web search content as grounding when found', async () => {
@@ -191,7 +193,9 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'jina-key', undefined, {}, undefined);
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'jina-key', undefined, {
+      query: undefined,
+    });
     const facts = factsArg(deps);
     expect(facts.sourceText).toBe('Web-sourced bio text.');
     expect(facts.sourceUrls).toEqual(['https://x.example']);
@@ -505,7 +509,11 @@ describe('runBioGeneration', () => {
   it('merges scraped images after Commons — 2 Commons + 5 scraped = 7, alt-titled scraped first', async () => {
     const scraped = [
       { url: 'https://a.example/photo-0.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
-      { url: 'https://a.example/photo-1.jpg', alt: 'Artist live', sourceUrl: 'https://a.example/bio' },
+      {
+        url: 'https://a.example/photo-1.jpg',
+        alt: 'Artist live',
+        sourceUrl: 'https://a.example/bio',
+      },
       { url: 'https://a.example/photo-2.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
       { url: 'https://a.example/photo-3.jpg', alt: 'Portrait', sourceUrl: 'https://a.example/bio' },
       { url: 'https://a.example/photo-4.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
@@ -565,7 +573,11 @@ describe('runBioGeneration', () => {
           sourceUrls: ['https://a.example/bio'],
           images: [
             { url: 'https://a.example/photo-0.jpg', alt: null, sourceUrl: 'https://a.example/bio' },
-            { url: 'https://a.example/photo-1.jpg', alt: 'Live shot', sourceUrl: 'https://a.example/bio' },
+            {
+              url: 'https://a.example/photo-1.jpg',
+              alt: 'Live shot',
+              sourceUrl: 'https://a.example/bio',
+            },
           ],
           references: [],
         })

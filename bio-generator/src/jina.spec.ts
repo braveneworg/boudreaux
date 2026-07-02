@@ -264,7 +264,9 @@ describe('searchArtistSources', () => {
   it('uses a custom query when provided', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jinaSearchResponse([]));
 
-    await searchArtistSources('Artist', 'k', fetchFn, {}, 'Artist musician interview review');
+    await searchArtistSources('Artist', 'k', fetchFn, {
+      query: 'Artist musician interview review',
+    });
 
     const [url] = fetchFn.mock.calls[0];
     expect(decodeURIComponent(url)).toContain('Artist musician interview review');
@@ -276,9 +278,11 @@ describe('searchArtistSources', () => {
     for (let i = 0; i < 21; i++) {
       images[`Image ${i}: Photo ${i}`] = `https://a.example/photo-${i}.jpg`;
     }
-    const fetchFn = vi.fn().mockResolvedValue(
-      jinaSearchResponse([{ url: 'https://a.example/bio', content: 'bio text', images }])
-    );
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(
+        jinaSearchResponse([{ url: 'https://a.example/bio', content: 'bio text', images }])
+      );
 
     const result = await searchArtistSources('Artist', 'k', fetchFn);
 
