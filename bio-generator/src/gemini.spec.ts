@@ -134,6 +134,36 @@ describe('generateProse', () => {
     expect(longBioSection).toContain('SPARINGLY');
   });
 
+  it('still requires a few bolded pivotal terms in the long bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('DO bold 2–4 pivotal');
+  });
+
+  it('forbids <img> tags when no images are available, in every call', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockImplementation(async () => geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+    await synthesizeProse(
+      { facts, drafts: [{ shortBio: 's', longBio: 'l' }], apiKey: 'k' },
+      { fetchFn }
+    );
+
+    for (const call of fetchFn.mock.calls) {
+      const systemMessage = JSON.parse(call[1].body).systemInstruction.parts[0].text;
+      expect(systemMessage).toContain('NEVER emit an <img> tag unless an Available images list');
+    }
+  });
+
   it('requires an inline link in every long-bio section', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
