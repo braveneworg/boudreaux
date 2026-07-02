@@ -55,13 +55,14 @@ describe('generateProse', () => {
     expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
   });
 
-  it('defaults to a valid GA model id (bare gemini-3-flash 404s)', async () => {
+  it('defaults to a model with free-tier quota (free tier grants zero 2.5-pro quota)', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
-    // No model arg → uses DEFAULT_GEMINI_MODEL; must be a real, current id.
+    // No model arg → uses DEFAULT_GEMINI_MODEL; must be a real, current id the
+    // free tier can call — gemini-2.5-pro 429s with `limit: 0` on every metric.
     await generateProse(facts, 'k', undefined, { fetchFn });
 
-    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-flash:generateContent');
   });
 
   it('embeds the source material and reference URLs in the user prompt', async () => {

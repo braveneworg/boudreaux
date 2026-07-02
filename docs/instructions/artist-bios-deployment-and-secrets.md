@@ -96,7 +96,7 @@ aws ssm put-parameter \
 > grants the function `ssm:GetParameter` on this one path plus `kms:Decrypt` on `alias/aws/ssm`.
 
 Model choice: the Gemini model id ships in code as `DEFAULT_GEMINI_MODEL`
-(`bio-generator/src/types.ts`, currently `gemini-2.5-pro`) — change it there and
+(`bio-generator/src/types.ts`, currently `gemini-2.5-flash`) — change it there and
 redeploy. It is deliberately **not** a SAM parameter: CloudFormation reuses a
 parameter's previous value across deploys, which once left a retired model id
 pinned in production. The `GEMINI_MODEL` env var remains honored by the handler
