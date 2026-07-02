@@ -157,6 +157,26 @@ describe('lookupArtist', () => {
     );
   });
 
+  it('skips a streaming relation with a malformed URL resource instead of throwing', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-11', name: 'Artist' }] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          relations: [
+            { type: 'streaming', url: { resource: 'not-a-valid-url' } },
+            { type: 'streaming', url: { resource: 'https://open.spotify.com/artist/x' } },
+          ],
+        })
+      );
+
+    const result = await lookupArtist('Artist', fetchFn, { sleep: noSleep });
+
+    const streamingLinks = result?.links.filter((l) => l.kind === 'streaming') ?? [];
+    expect(streamingLinks).toHaveLength(1);
+    expect(streamingLinks[0].label).toBe('open.spotify.com');
+  });
+
   it('classifies streaming and free streaming relation types as kind streaming', async () => {
     const fetchFn = vi
       .fn()

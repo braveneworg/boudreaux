@@ -83,6 +83,15 @@ const extractWikidataId = (resource: string): string | undefined => {
   return match?.[1];
 };
 
+/** Returns the hostname from a URL string, or `null` if the URL is unparseable. */
+const hostnameFromUrl = (resource: string): string | null => {
+  try {
+    return new URL(resource).hostname;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Walks the artist's url-relations once, collecting the Wikidata id and the
  * Wikipedia/official/social links (other kinds are dropped).
@@ -103,12 +112,15 @@ const collectRelations = (
 
     const kind = classifyRelation(relation.type);
     if (kind === 'wikipedia' || kind === 'official' || kind === 'social' || kind === 'streaming') {
-      // Streaming links: label by hostname so the UI shows "open.spotify.com", not "streaming".
-      const label =
-        kind === 'streaming'
-          ? new URL(resource).hostname.replace(/^www\./, '')
-          : relation.type;
-      links.push({ label, url: resource, kind });
+      if (kind === 'streaming') {
+        // Streaming links: label by hostname so the UI shows "open.spotify.com", not "streaming".
+        // Skip the relation entirely when the resource URL is unparseable.
+        const hostname = hostnameFromUrl(resource);
+        if (!hostname) continue;
+        links.push({ label: hostname.replace(/^www\./, ''), url: resource, kind });
+      } else {
+        links.push({ label: relation.type, url: resource, kind });
+      }
     }
   }
 

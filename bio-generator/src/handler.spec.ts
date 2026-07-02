@@ -255,7 +255,9 @@ describe('runBioGeneration', () => {
     expect(result.links.some((l) => l.url === 'https://radiohead.com')).toBe(true);
     const bandcampLink = result.links.find((l) => l.url.includes('bandcamp.com'));
     const spotifyLink = result.links.find((l) => l.url.includes('spotify.com'));
+    expect(bandcampLink).toBeDefined();
     expect(bandcampLink?.kind).toBe('streaming');
+    expect(spotifyLink).toBeDefined();
     expect(spotifyLink?.kind).toBe('streaming');
   });
 
@@ -646,7 +648,7 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
-    expect(result.links.length).toBeLessThanOrEqual(50);
+    expect(result.links.length).toBe(50);
   });
 });
 
