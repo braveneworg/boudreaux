@@ -576,6 +576,42 @@ describe('generateProse', () => {
       expect(systemMessage).toContain('born 1982-05-01');
       expect(systemMessage).toMatch(/never state or imply.*before/i);
     });
+
+    it('requires at least one list in the long bio when the material supports it', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('least one list in the long bio');
+    });
+
+    it('instructs bolding pivotal unlinkable facts in the long bio', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('ADDITIONALLY bold');
+    });
+
+    it('instructs italicizing work titles with <em> in the long bio', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('italicize');
+    });
+
+    it('has no streaming/listening service ban in the synthesis user-prompt', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).not.toContain('streaming');
+    });
   });
 
   describe('draftAndSynthesizeProse', () => {
