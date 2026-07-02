@@ -104,6 +104,12 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 /** Raw re-host result from {@link BioImageService.rehostImages}. */
 type RehostResult = { url: string; width: number | null; height: number | null };
 
+/** Structured output of the private {@link rehostImages} helper. */
+type RehostedBatch = {
+  rehosted: Array<RehostedImage | null>;
+  duplicateAliases: Map<number, string>;
+};
+
 /**
  * Builds the rich {@link RehostedImage} record from a raw re-host result and
  * the original image metadata returned by the Lambda. Extracted to keep
@@ -130,30 +136,44 @@ const buildRehostedRecord = (
  * deduplicating by content hash so the same photo appearing under different
  * URLs is only uploaded once. Attribution metadata is kept through re-host
  * (PR #547). Failures and duplicates are returned as `null` — best-effort.
+ * `duplicateAliases` carries each dropped index → survivor URL so callers
+ * can alias `image:N` placeholders rather than silently dropping them.
  */
 const rehostImages = async (
   images: BioGenerationData['images'],
   artistId: string
-): Promise<Array<RehostedImage | null>> => {
+): Promise<RehostedBatch> => {
   const urlsWithIndices = images.map((img, index) => ({ url: img.url, index }));
-  const rehosted = await BioImageService.rehostImages(urlsWithIndices, artistId);
+  const { results, duplicateAliases } = await BioImageService.rehostImages(
+    urlsWithIndices,
+    artistId
+  );
   // Use .at(i) rather than [i] so the ESLint security rule does not flag the
   // correlated array lookup as a potential object-injection sink.
-  return images.map((image, i) => {
-    const result = rehosted.at(i);
+  const rehosted = images.map((image, i) => {
+    const result = results.at(i);
     return result ? buildRehostedRecord(result, image) : null;
   });
+  return { rehosted, duplicateAliases };
 };
 
 /**
  * Builds a Map from each ORIGINAL image index to its re-hosted CDN URL so that
  * `<img src="image:N">` placeholders in the long bio can be resolved before
- * sanitizing. Indices for failed re-hosts are absent from the map.
+ * sanitizing. Survivors are keyed by their position; duplicates are aliased to
+ * the surviving copy's URL via `duplicateAliases` so their placeholders render
+ * the same picture instead of being dropped by the sanitizer.
  */
-const buildImageUrlIndex = (rehosted: Array<RehostedImage | null>): Map<number, string> => {
+const buildImageUrlIndex = (
+  rehosted: Array<RehostedImage | null>,
+  duplicateAliases: Map<number, string>
+): Map<number, string> => {
   const map = new Map<number, string>();
   rehosted.forEach((image, index) => {
     if (image) map.set(index, image.url);
+  });
+  duplicateAliases.forEach((survivorUrl, duplicateIndex) => {
+    if (!map.has(duplicateIndex)) map.set(duplicateIndex, survivorUrl);
   });
   return map;
 };
@@ -320,12 +340,13 @@ export class BioGenerationService {
 
     // Re-host each discovered image into S3 via a cheap thumbnail so it is
     // CDN-served. Full variant re-hosting moves to save-time in PR 2.
-    const rehosted = await rehostImages(result.data.images, artist.id);
+    const { rehosted, duplicateAliases } = await rehostImages(result.data.images, artist.id);
 
     // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
     // `<img src="image:N">` placeholders can be resolved to hosted images before
-    // sanitizing. Keyed by original index because re-hosting may drop failures.
-    const imageUrlByIndex = buildImageUrlIndex(rehosted);
+    // sanitizing. Deduped indices are aliased to their survivor URL so the prose
+    // retains the picture instead of having the sanitizer drop the placeholder.
+    const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
 
     // Re-index sortOrder after dropping failed images. The Lambda already caps
     // the number of primaries (and which images are primary is its choice, not

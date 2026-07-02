@@ -247,9 +247,9 @@ describe('BioImageService.rehostImages', () => {
     );
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(result).toHaveLength(2);
-    expect(result[0]).not.toBeNull();
-    expect(result[1]).not.toBeNull();
+    expect(result.results).toHaveLength(2);
+    expect(result.results[0]).not.toBeNull();
+    expect(result.results[1]).not.toBeNull();
   });
 
   it('skips the duplicate when two images have identical content', async () => {
@@ -280,8 +280,8 @@ describe('BioImageService.rehostImages', () => {
     );
 
     expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(result[0]).not.toBeNull();
-    expect(result[1]).toBeNull();
+    expect(result.results[0]).not.toBeNull();
+    expect(result.results[1]).toBeNull();
   });
 
   it('returns null for an image whose fetch fails', async () => {
@@ -293,7 +293,7 @@ describe('BioImageService.rehostImages', () => {
     );
 
     expect(sendMock).not.toHaveBeenCalled();
-    expect(result).toEqual([null]);
+    expect(result.results).toEqual([null]);
   });
 
   it('earlier-index image survives deduplication even when its fetch resolves last', async () => {
@@ -348,9 +348,9 @@ describe('BioImageService.rehostImages', () => {
     const result = await pending;
 
     // Index 0 must survive — it is the first copy by INPUT order.
-    expect(result.at(0)).not.toBeNull();
+    expect(result.results.at(0)).not.toBeNull();
     // Index 1 is a byte-identical duplicate and must be dropped.
-    expect(result.at(1)).toBeNull();
+    expect(result.results.at(1)).toBeNull();
     // Exactly one S3 upload for the surviving copy.
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
@@ -369,7 +369,7 @@ describe('BioImageService.rehostImages', () => {
     );
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(result).toEqual([
+    expect(result.results).toEqual([
       { url: 'https://x/a.jpg', width: null, height: null },
       { url: 'https://x/a.jpg', width: null, height: null },
     ]);

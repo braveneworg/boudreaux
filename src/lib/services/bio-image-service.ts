@@ -25,6 +25,21 @@ export interface RehostedImage {
 }
 
 /**
+ * Return value of {@link BioImageService.rehostImages}. Carries both the
+ * position-preserving results array and a map of any duplicate indices so
+ * callers can alias `image:N` placeholders to the surviving copy's URL.
+ */
+export interface RehostImagesResult {
+  /** Position-preserving array: `RehostedImage` on success, `null` on failure or duplicate. */
+  results: Array<RehostedImage | null>;
+  /**
+   * Maps each duplicate's original input index to the surviving copy's CDN URL.
+   * Allows callers to resolve `image:N` placeholders even when index N was deduped.
+   */
+  duplicateAliases: Map<number, string>;
+}
+
+/**
  * Skip the network/S3 round-trip in E2E and fake-generation modes — the bio
  * fixture already supplies a renderable URL, so re-hosting is a no-op there.
  */
@@ -161,23 +176,27 @@ export class BioImageService {
   /**
    * Re-hosts a batch of images as thumbnails, deduplicating by SHA-256 content
    * hash so the same photo appearing under two different URLs (e.g. a Commons
-   * image and a scraped copy) is only uploaded once. The returned array is
-   * position-preserving: `null` means the image at that index was either a
-   * duplicate or failed to fetch, so downstream logic (sortOrder assignment,
-   * persistence) can safely filter it out. In skip-rehost mode there are no
-   * buffers to hash, so every image passes through as-is with no deduplication.
+   * image and a scraped copy) is only uploaded once. The returned `results`
+   * array is position-preserving: `null` means the image at that index was
+   * either a duplicate or failed to fetch. `duplicateAliases` maps each
+   * dropped duplicate's input index to the surviving copy's CDN URL so callers
+   * can alias `image:N` placeholders rather than dropping them. In skip-rehost
+   * mode there are no buffers to hash, so every image passes through as-is
+   * with an empty `duplicateAliases` map.
    *
    * @param images - Source URLs paired with their original indices.
    * @param artistId - The owning artist id (for the S3 key namespace).
-   * @returns A position-preserving array: `RehostedImage` on success, `null` on
-   *   failure or duplicate.
+   * @returns Position-preserving results and a duplicate-alias map.
    */
   static async rehostImages(
     images: ReadonlyArray<{ url: string; index: number }>,
     artistId: string
-  ): Promise<Array<RehostedImage | null>> {
+  ): Promise<RehostImagesResult> {
     if (shouldSkipRehost()) {
-      return images.map(({ url }) => ({ url, width: null, height: null }));
+      return {
+        results: images.map(({ url }) => ({ url, width: null, height: null })),
+        duplicateAliases: new Map(),
+      };
     }
 
     // Phase 1: fetch all images concurrently for parallel I/O.
@@ -188,8 +207,10 @@ export class BioImageService {
 
     // Phase 2: hash-check and upload sequentially in INPUT INDEX ORDER so the
     // lowest-index copy of each distinct hash always survives the dedupe.
-    const seenHashes = new Set<string>();
+    // seenHashes maps content-hash → survivor CDN URL for alias look-ups.
+    const seenHashes = new Map<string, string>();
     const results: Array<RehostedImage | null> = [];
+    const duplicateAliases = new Map<number, string>();
 
     for (const [i, result] of settled.entries()) {
       // images and settled always share the same length; the guard is for TS.
@@ -208,19 +229,24 @@ export class BioImageService {
       try {
         const { buffer } = result.value;
         const hash = createHash('sha256').update(buffer).digest('hex');
-        if (seenHashes.has(hash)) {
+        const survivorUrl = seenHashes.get(hash);
+
+        if (survivorUrl !== undefined) {
           logger.warn('bio_image_duplicate_skipped', { index: image.index });
+          duplicateAliases.set(image.index, survivorUrl);
           results.push(null);
           continue;
         }
-        seenHashes.add(hash);
-        results.push(await processThumbnail(buffer, artistId, image.index));
+
+        const rehosted = await processThumbnail(buffer, artistId, image.index);
+        seenHashes.set(hash, rehosted.url);
+        results.push(rehosted);
       } catch (error) {
         logger.warn('Bio image fetch or upload failed', { error });
         results.push(null);
       }
     }
 
-    return results;
+    return { results, duplicateAliases };
   }
 }

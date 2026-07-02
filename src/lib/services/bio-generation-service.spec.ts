@@ -187,14 +187,17 @@ describe('BioGenerationService.generateForArtist', () => {
   beforeEach(() => {
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
-    // rehostImages returns a position-preserving array of RehostedImage | null
-    rehostImagesMock.mockResolvedValue([
-      {
-        url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
-        width: 1200,
-        height: 800,
-      },
-    ]);
+    // rehostImages returns { results, duplicateAliases } — position-preserving
+    rehostImagesMock.mockResolvedValue({
+      results: [
+        {
+          url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
+          width: 1200,
+          height: 800,
+        },
+      ],
+      duplicateAliases: new Map(),
+    });
     rehostWithVariantsMock.mockResolvedValue({
       url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
       width: 1200,
@@ -348,8 +351,8 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an inline image:N placeholder that has no re-hosted url', async () => {
-    // rehostImages returns [null] to signal the image was dropped (fetch failed / duplicate).
-    rehostImagesMock.mockResolvedValueOnce([null]);
+    // rehostImages returns { results: [null] } to signal the image was dropped (fetch failed).
+    rehostImagesMock.mockResolvedValueOnce({ results: [null], duplicateAliases: new Map() });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: { ...generateResult.data, longBio: '<p>Intro</p><img src="image:0" alt="x">' },
@@ -361,6 +364,55 @@ describe('BioGenerationService.generateForArtist', () => {
     if (!result.success) return;
     // The unresolved placeholder is a non-http(s) src, so the sanitizer drops it.
     expect(result.data.longBio).not.toContain('image:0');
+  });
+
+  it('aliases an image:N placeholder to the survivor URL when index N was deduped', async () => {
+    // index 1 is byte-identical to index 0; rehostImages drops index 1 (results[1] = null)
+    // and maps it to the survivor URL via duplicateAliases so image:1 still resolves.
+    const survivorUrl = 'https://cdn.example.com/media/artists/a/bio/thumbs/0-abcd1234.webp';
+    rehostImagesMock.mockResolvedValueOnce({
+      results: [{ url: survivorUrl, width: 384, height: 256 }, null],
+      duplicateAliases: new Map([[1, survivorUrl]]),
+    });
+    generateSpy.mockResolvedValue({
+      ...generateResult,
+      data: {
+        ...generateResult.data,
+        images: [
+          {
+            url: 'https://commons.example.com/a.jpg',
+            thumbnailUrl: null,
+            title: 'Photo',
+            attribution: 'Author',
+            license: 'CC BY-SA 4.0',
+            sourceUrl: 'https://commons.example.com/a.jpg',
+            width: 800,
+            height: 600,
+            isPrimary: true,
+          },
+          {
+            url: 'https://scraped.example.com/a.jpg',
+            thumbnailUrl: null,
+            title: null,
+            attribution: null,
+            license: null,
+            sourceUrl: null,
+            width: null,
+            height: null,
+            isPrimary: false,
+          },
+        ],
+        longBio: '<p>Bio <img src="image:1" alt="same photo"> text</p>',
+      },
+    });
+
+    const result = await BioGenerationService.generateForArtist(artist.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    // image:1 was deduped — its placeholder must resolve to the survivor's CDN URL.
+    expect(result.data.longBio).toContain(survivorUrl);
+    expect(result.data.longBio).not.toContain('image:1');
   });
 
   it('keeps streaming-service links (Spotify, Bandcamp) — product rule reversed 2026-07', async () => {
@@ -412,8 +464,8 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('drops an image whose re-host fails without aborting generation', async () => {
-    // rehostImages returns [null] when the image failed to fetch or was a duplicate.
-    rehostImagesMock.mockResolvedValueOnce([null]);
+    // rehostImages returns { results: [null] } when the image failed to fetch.
+    rehostImagesMock.mockResolvedValueOnce({ results: [null], duplicateAliases: new Map() });
 
     const result = await BioGenerationService.generateForArtist(artist.id);
 
@@ -542,7 +594,10 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('falls back to the original image dimensions and null title when re-host omits them', async () => {
-    rehostImagesMock.mockResolvedValue([{ url: 'https://cdn.example.com/x.jpg' }]);
+    rehostImagesMock.mockResolvedValue({
+      results: [{ url: 'https://cdn.example.com/x.jpg' }],
+      duplicateAliases: new Map(),
+    });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
@@ -572,7 +627,10 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('persists null dimensions when neither re-host nor source supply them', async () => {
-    rehostImagesMock.mockResolvedValue([{ url: 'https://cdn.example.com/x.jpg' }]);
+    rehostImagesMock.mockResolvedValue({
+      results: [{ url: 'https://cdn.example.com/x.jpg' }],
+      duplicateAliases: new Map(),
+    });
     generateSpy.mockResolvedValue({
       ...generateResult,
       data: {
