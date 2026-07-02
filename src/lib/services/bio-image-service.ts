@@ -180,23 +180,47 @@ export class BioImageService {
       return images.map(({ url }) => ({ url, width: null, height: null }));
     }
 
+    // Phase 1: fetch all images concurrently for parallel I/O.
+    // Promise.allSettled preserves input order regardless of download speed,
+    // so the sequential pass below can determine the winner by index —
+    // not by which fetch happened to finish first.
+    const settled = await Promise.allSettled(images.map(({ url }) => fetchImageBuffer(url)));
+
+    // Phase 2: hash-check and upload sequentially in INPUT INDEX ORDER so the
+    // lowest-index copy of each distinct hash always survives the dedupe.
     const seenHashes = new Set<string>();
-    return Promise.all(
-      images.map(async ({ url, index }) => {
-        try {
-          const { buffer } = await fetchImageBuffer(url);
-          const hash = createHash('sha256').update(buffer).digest('hex');
-          if (seenHashes.has(hash)) {
-            logger.warn('bio_image_duplicate_skipped', { index });
-            return null;
-          }
-          seenHashes.add(hash);
-          return await processThumbnail(buffer, artistId, index);
-        } catch (error) {
-          logger.warn('Bio image fetch or upload failed', { error });
-          return null;
+    const results: Array<RehostedImage | null> = [];
+
+    for (const [i, result] of settled.entries()) {
+      // images and settled always share the same length; the guard is for TS.
+      const image = images.at(i);
+      if (!image) {
+        results.push(null);
+        continue;
+      }
+
+      if (result.status === 'rejected') {
+        logger.warn('Bio image fetch or upload failed', { error: result.reason });
+        results.push(null);
+        continue;
+      }
+
+      try {
+        const { buffer } = result.value;
+        const hash = createHash('sha256').update(buffer).digest('hex');
+        if (seenHashes.has(hash)) {
+          logger.warn('bio_image_duplicate_skipped', { index: image.index });
+          results.push(null);
+          continue;
         }
-      })
-    );
+        seenHashes.add(hash);
+        results.push(await processThumbnail(buffer, artistId, image.index));
+      } catch (error) {
+        logger.warn('Bio image fetch or upload failed', { error });
+        results.push(null);
+      }
+    }
+
+    return results;
   }
 }

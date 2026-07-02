@@ -296,6 +296,65 @@ describe('BioImageService.rehostImages', () => {
     expect(result).toEqual([null]);
   });
 
+  it('earlier-index image survives deduplication even when its fetch resolves last', async () => {
+    const sameBuffer = new Uint8Array([9, 8, 7]);
+
+    // Deferred promise for index 0 — we control when it resolves.
+    let resolveFirst!: (r: Response) => void;
+    const firstFetch = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        // index 0 (attributed Commons image) — resolves LAST via the deferred
+        .mockImplementationOnce(() => firstFetch)
+        // index 1 (scraped copy) — resolves immediately
+        .mockImplementationOnce(() =>
+          Promise.resolve(
+            new Response(sameBuffer, {
+              status: 200,
+              headers: { 'Content-Type': 'image/jpeg' },
+            })
+          )
+        )
+    );
+
+    const pending = BioImageService.rehostImages(
+      [
+        { url: 'https://commons.example.com/a.jpg', index: 0 },
+        { url: 'https://scraped.example.com/a.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    // Drain the microtask queue so the index-1 fetch resolves and progresses
+    // through fetchImageBuffer (two await points: fetch + arrayBuffer) to the
+    // seenHashes check, reproducing the race in the current Promise.all path.
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+
+    // Now resolve index-0's fetch so it arrives LAST.
+    resolveFirst(
+      new Response(sameBuffer, {
+        status: 200,
+        headers: { 'Content-Type': 'image/jpeg' },
+      })
+    );
+
+    const result = await pending;
+
+    // Index 0 must survive — it is the first copy by INPUT order.
+    expect(result.at(0)).not.toBeNull();
+    // Index 1 is a byte-identical duplicate and must be dropped.
+    expect(result.at(1)).toBeNull();
+    // Exactly one S3 upload for the surviving copy.
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
   it('returns source urls without deduplication in skip-rehost mode', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
     const fetchMock = vi.fn();
