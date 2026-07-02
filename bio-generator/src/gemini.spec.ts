@@ -120,6 +120,47 @@ describe('generateProse', () => {
     expect(userMessage).toContain('<ul>/<ol> lists');
   });
 
+  it('prefers links over bold and keeps <strong> sparing in the long bio', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('Prefer links over bold');
+    expect(longBioSection).toContain('SPARINGLY');
+  });
+
+  it('requires an inline link in every long-bio section', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('EVERY <h2> section');
+  });
+
+  it('limits the long bio to a few tasteful inline images', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+    const longBioSection = userMessage.slice(
+      userMessage.indexOf('longBio:'),
+      userMessage.indexOf('altBio:')
+    );
+    expect(longBioSection).toContain('2–3 inline images');
+    expect(longBioSection).toContain('never place two images');
+  });
+
   it('caps the completion length high enough for three image-rich bios', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
@@ -345,6 +386,15 @@ describe('generateProse', () => {
       expect(userMessage).toContain('Available images (0-indexed)');
       expect(userMessage).toContain('https://en.wikipedia.org/wiki/Radiohead');
       expect(userMessage).toContain('"shortBio"');
+    });
+
+    it("instructs the synthesis to preserve the drafts' inline links and images", async () => {
+      const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+      await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
+
+      const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(userMessage).toContain('Preserve the inline <a> links and <img> images');
     });
 
     it('never forwards the raw source material to the synthesis call', async () => {
