@@ -129,6 +129,26 @@ describe('runBioGeneration', () => {
     expect(facts.tags).toEqual(['alternative rock']);
   });
 
+  it('forwards bornOn/diedOn/formedOn from input to the facts passed to generateProse', async () => {
+    const deps = makeDeps();
+
+    await runBioGeneration(
+      {
+        artistId: 'a1',
+        displayName: 'Test Artist',
+        bornOn: '1965-03-15',
+        diedOn: '2020-11-01',
+        formedOn: '1990-06-01',
+      },
+      deps
+    );
+
+    const passedFacts = factsArg(deps);
+    expect(passedFacts.bornOn).toBe('1965-03-15');
+    expect(passedFacts.diedOn).toBe('2020-11-01');
+    expect(passedFacts.formedOn).toBe('1990-06-01');
+  });
+
   it('degrades to no source text when no source is available', async () => {
     const deps = makeDeps({ getWikipediaExtract: vi.fn().mockResolvedValue(null) });
 

@@ -73,6 +73,19 @@ const SHARED_CONSTRAINT_LINES = [
   'Respond with a single JSON object and nothing else.',
 ];
 
+/**
+ * When an authoritative birth date is known, appends a hard constraint that
+ * outranks any other source and forbids implying activity before that date.
+ * Returns an empty string when `bornOn` is absent so `.filter(Boolean)` drops it.
+ */
+const authoritativeDateLine = (facts: ArtistFacts): string => {
+  if (!facts.bornOn) return '';
+  return (
+    `AUTHORITATIVE FACT: the artist was born ${facts.bornOn}. This outranks any other source. ` +
+    'NEVER state or imply the artist was active, performing, recording, or releasing work before this date.'
+  );
+};
+
 const buildSystemPrompt = (facts: ArtistFacts): string =>
   [
     'You are an exceptional writer across all domains with years of experience researching',
@@ -81,7 +94,10 @@ const buildSystemPrompt = (facts: ArtistFacts): string =>
     'dates, awards, members, labels, or URLs, and omit anything unknown rather than guessing.',
     'Rewrite all source material in your own original words — never copy sentences or distinctive phrasing.',
     ...SHARED_CONSTRAINT_LINES,
-  ].join(' ');
+    authoritativeDateLine(facts),
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 /** Formats the active-years line from MusicBrainz life-span data, if present. */
 const activeYears = (facts: ArtistFacts): string => {
@@ -114,6 +130,9 @@ const factLines = (facts: ArtistFacts): string[] => [
   labeledLine('Type', facts.artistType),
   labeledLine('Origin', facts.area),
   activeYears(facts),
+  labeledLine('Born', facts.bornOn),
+  labeledLine('Died', facts.diedOn),
+  labeledLine('Formed', facts.formedOn),
   labeledLine('Known genres', facts.existingGenres),
   labeledLine('MusicBrainz tags', facts.tags?.length ? facts.tags.join(', ') : undefined),
   labeledLine('MusicBrainz id', facts.musicBrainzId),
@@ -335,7 +354,10 @@ const buildSynthesisSystemPrompt = (facts: ArtistFacts, draftCount: number): str
     'dates, awards, members, labels, or URLs that appear in none of them, and omit anything',
     'unknown rather than guessing.',
     ...SHARED_CONSTRAINT_LINES,
-  ].join(' ');
+    authoritativeDateLine(facts),
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 const buildSynthesisUserPrompt = (facts: ArtistFacts, drafts: BioProse[]): string =>
   [

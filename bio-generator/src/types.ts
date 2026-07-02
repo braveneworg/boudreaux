@@ -18,6 +18,9 @@ export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourre
  */
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
+/** ISO calendar-date string in the form YYYY-MM-DD. */
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
 /**
  * Input the web app sends to the Lambda. Names drive the metadata lookup;
  * `links` and `description` are optional admin-supplied context. The LLM only
@@ -31,6 +34,9 @@ export const bioGenerationInputSchema = z.object({
   links: z.array(z.string().url()).max(20).optional(),
   description: z.string().max(2000).optional(),
   existingGenres: z.string().optional(),
+  bornOn: isoDate.optional(),
+  diedOn: isoDate.optional(),
+  formedOn: isoDate.optional(),
 });
 
 export type BioGenerationInput = z.infer<typeof bioGenerationInputSchema>;
@@ -109,6 +115,13 @@ export interface ArtistFacts {
   beginDate?: string;
   endDate?: string;
   tags?: string[];
+  /**
+   * Authoritative dates from the label's own database — they outrank MusicBrainz
+   * life-span. Tasks 4 and 10 rely on `bornOn` for the fact-check pass.
+   */
+  bornOn?: string;
+  diedOn?: string;
+  formedOn?: string;
   /**
    * Long-form source material (Wikipedia article body and/or web-search
    * content) the LLM rewrites into an original bio. The single biggest driver

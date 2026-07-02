@@ -342,6 +342,9 @@ const gatherMetadata = async (
       akaNames: input.akaNames,
       description: input.description,
       existingGenres: input.existingGenres,
+      bornOn: input.bornOn,
+      diedOn: input.diedOn,
+      formedOn: input.formedOn,
       imageTitles: [],
     },
   };

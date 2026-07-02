@@ -19,6 +19,24 @@ const geminiResponse = (content: unknown): Response =>
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 
+const baseFacts = (overrides: Partial<ArtistFacts> = {}): ArtistFacts => ({
+  displayName: 'Test Artist',
+  imageTitles: [],
+  ...overrides,
+});
+
+const capturePrompts = async (
+  factInput: ArtistFacts
+): Promise<{ systemPrompt: string; userPrompt: string }> => {
+  const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+  await generateProse(factInput, 'k', undefined, { fetchFn });
+  const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+  return {
+    systemPrompt: body.systemInstruction.parts[0].text,
+    userPrompt: body.contents[0].parts[0].text,
+  };
+};
+
 describe('generateProse', () => {
   it('returns validated prose and the image ranking', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
@@ -78,6 +96,15 @@ describe('generateProse', () => {
     const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(userMessage).toContain('Radiohead formed in Abingdon in 1985.');
     expect(userMessage).toContain('https://en.wikipedia.org/wiki/Radiohead');
+  });
+
+  it('includes authoritative birth/formed dates and the never-before-birth rule', async () => {
+    const factInput = baseFacts({ bornOn: '1982-05-01', formedOn: '2004-01-01' });
+    const { systemPrompt, userPrompt } = await capturePrompts(factInput);
+    expect(userPrompt).toContain('Born: 1982-05-01');
+    expect(userPrompt).toContain('Formed: 2004-01-01');
+    expect(systemPrompt).toContain('born 1982-05-01');
+    expect(systemPrompt).toMatch(/never state or imply.*before/i);
   });
 
   it('requires a 200+ word short bio with several informative inline links', async () => {
