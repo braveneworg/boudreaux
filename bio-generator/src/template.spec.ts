@@ -24,3 +24,12 @@ describe('template.yaml Gemini model wiring', () => {
     expect(template).not.toContain('GEMINI_MODEL');
   });
 });
+
+describe('template.yaml function timeout', () => {
+  // The draft-and-synthesize pipeline runs two parallel drafts plus an editor
+  // pass, each with up to 90s of 429 backoff — the worst case no longer fits
+  // the old 600s budget, so the function needs the Lambda maximum.
+  it('allows the two-phase ensemble worst case (Lambda max, 900s)', () => {
+    expect(template).toContain('Timeout: 900');
+  });
+});

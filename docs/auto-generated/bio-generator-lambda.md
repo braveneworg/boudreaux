@@ -20,10 +20,15 @@ Given an artist's name(s) plus optional reference links and an editor descriptio
    website, and English Wikipedia sitelink.
 3. **Wikimedia Commons** (`src/wikimedia.ts`) — resolves each image file name to a real,
    hotlinkable image URL with the **attribution + license** required to display it.
-4. **Gemini** (`src/gemini.ts`) — writes the short + long bio prose in JSON mode, grounded on the facts
-   gathered above so it does not invent discography/dates. The model also ranks which 2–3 images
-   best identify the artist. **The LLM never produces image or link URLs** — those come only from
-   the real sources above, which is why nothing 404s.
+4. **Gemini** (`src/gemini.ts`) — writes the bio prose in JSON mode via a draft-and-synthesize
+   ensemble: two parallel drafts (a precision-leaning pass and a higher-temperature narrative
+   pass) are merged by an editor pass that sees the drafts and facts but not the raw source
+   text, pushing the final prose further from any source phrasing. All calls are grounded on
+   the facts gathered above so the model does not invent discography/dates, and the ensemble
+   degrades gracefully (a failed draft is dropped; a failed synthesis ships the first draft).
+   The model also ranks which 2–3 images best identify the artist. **The LLM never produces
+   image or link URLs** — those come only from the real sources above, which is why nothing
+   404s.
 
 The handler (`src/handler.ts`) orchestrates these, degrades gracefully (prose-only) when no
 MusicBrainz match is found or a metadata call fails, and returns a discriminated result envelope:

@@ -27,9 +27,10 @@ import { BioImageService } from './bio-image-service';
 let lambdaClient: LambdaClient | null = null;
 
 // Bio generation runs a synchronous (RequestResponse) invoke that can take up to
-// the Lambda's 10-minute timeout. Give the HTTP client a slightly larger request
-// timeout so it never aborts the call before the function finishes.
-const INVOKE_REQUEST_TIMEOUT_MS = 11 * 60 * 1000;
+// the Lambda's 15-minute timeout (the draft-and-synthesize ensemble runs three
+// Gemini generations, each with rate-limit backoff). Give the HTTP client a
+// slightly larger request timeout so it never aborts before the function finishes.
+export const INVOKE_REQUEST_TIMEOUT_MS = 16 * 60 * 1000;
 
 const getLambdaClient = (): LambdaClient => {
   if (!lambdaClient) {

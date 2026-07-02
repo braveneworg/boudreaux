@@ -295,8 +295,10 @@ aws ssm put-parameter \
 
 > Like the Gemini key, this lives **only** in SSM. The IAM policy in `template.yaml` already grants the
 > function `ssm:GetParameter` on this path. To disable web-search context later, delete the parameter
-> — no redeploy needed. The function `Timeout` is **600s (10 min)** to allow the always-on search
-> plus lengthy, image-rich generation; the web app's invoke client uses a matching request timeout.
+> — no redeploy needed. The function `Timeout` is **900s (15 min, the Lambda maximum)** to allow the
+> always-on search plus the draft-and-synthesize prose ensemble (two parallel drafts merged by an
+> editor pass, each call with rate-limit backoff); the web app's invoke client uses a matching
+> request timeout.
 
 ---
 

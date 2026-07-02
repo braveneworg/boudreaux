@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { generateProse } from './gemini.js';
+import { draftAndSynthesizeProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
@@ -28,7 +28,8 @@ export interface BioGeneratorDeps {
   getWikidataData: typeof getWikidataData;
   getWikipediaExtract: typeof getWikipediaExtract;
   getCommonsImage: typeof getCommonsImage;
-  generateProse: typeof generateProse;
+  /** Prose generator — the draft-and-synthesize ensemble in production. */
+  generateProse: typeof draftAndSynthesizeProse;
   getGeminiApiKey: () => Promise<string>;
   getScrapeApiKey: typeof getScrapeApiKey;
   searchArtistSources: typeof searchArtistSources;
@@ -40,7 +41,7 @@ const defaultDeps: BioGeneratorDeps = {
   getWikidataData,
   getWikipediaExtract,
   getCommonsImage,
-  generateProse,
+  generateProse: draftAndSynthesizeProse,
   getGeminiApiKey,
   getScrapeApiKey,
   searchArtistSources,
