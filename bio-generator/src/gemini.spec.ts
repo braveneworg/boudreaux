@@ -124,13 +124,13 @@ describe('generateProse', () => {
     expect(userMessage).toContain('SEVERAL inline');
   });
 
-  it('forbids listening-service links and link-list sections in the system prompt', async () => {
+  it('forbids link-list sections in the system prompt but not streaming links', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
 
     const systemMessage = JSON.parse(fetchFn.mock.calls[0][1].body).systemInstruction.parts[0].text;
-    expect(systemMessage).toContain('NEVER link to streaming or listening services');
+    expect(systemMessage).not.toContain('NEVER link to streaming or listening services');
     expect(systemMessage).toContain('Discovered Links');
   });
 
@@ -436,7 +436,8 @@ describe('generateProse', () => {
         .text;
       expect(systemMessage).toContain('editor');
       expect(systemMessage).toContain('Radiohead');
-      expect(systemMessage).toContain('NEVER link to streaming or listening services');
+      expect(systemMessage).not.toContain('NEVER link to streaming or listening services');
+      expect(systemMessage).toContain('Discovered Links');
     });
 
     it('embeds every draft plus the images and reference URLs in the user prompt', async () => {

@@ -156,4 +156,25 @@ describe('lookupArtist', () => {
       'MusicBrainz request failed'
     );
   });
+
+  it('classifies streaming and free streaming relation types as kind streaming', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-10', name: 'Artist' }] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          relations: [
+            { type: 'streaming', url: { resource: 'https://open.spotify.com/artist/x' } },
+            { type: 'free streaming', url: { resource: 'https://artist.bandcamp.com' } },
+          ],
+        })
+      );
+
+    const result = await lookupArtist('Artist', fetchFn, { sleep: noSleep });
+
+    const streamingLinks = result?.links.filter((l) => l.kind === 'streaming') ?? [];
+    expect(streamingLinks).toHaveLength(2);
+    expect(streamingLinks[0].label).toBe('open.spotify.com');
+    expect(streamingLinks[1].label).toBe('artist.bandcamp.com');
+  });
 });

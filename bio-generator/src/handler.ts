@@ -56,6 +56,18 @@ const defaultDeps: BioGeneratorDeps = {
 
 const MAX_IMAGES = 6;
 const MAX_PRIMARY = 3;
+const MAX_LINKS = 50;
+
+/** Search-engine result pages and share widgets — never useful bio links. */
+const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
+const isJunkLinkUrl = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return JUNK_LINK_HOSTS.some((junk) => host === junk || host.endsWith(`.${junk}`));
+  } catch {
+    return true;
+  }
+};
 
 /**
  * True when a Commons license is public-domain or CC0 — safe to re-host without
@@ -232,7 +244,8 @@ const applyMatch = async (
  * Web search (Jina) as additional grounding *context*, not just a fallback:
  * always gathered and MERGED with any Wikipedia/official-site material so both
  * the extensive long bio and the informed short bio draw on the fullest
- * possible material. Optional + best-effort (never throws).
+ * possible material. Runs two searches (biography query + press/interview query)
+ * and merges results. Optional + best-effort (never throws).
  */
 const applyWebSearch = async (
   acc: MetadataAccumulator,
@@ -240,30 +253,35 @@ const applyWebSearch = async (
   scrapeKey: string | null,
   deps: BioGeneratorDeps
 ): Promise<void> => {
-  const found = await deps.searchArtistSources(searchNameFor(input), scrapeKey);
-  if (!found) {
-    logEvent('info', 'web_search_empty', { artist: searchNameFor(input) });
-    return;
-  }
-  logEvent('info', 'web_search_results', {
-    artist: searchNameFor(input),
-    urls: found.sourceUrls.length,
-  });
-
-  acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
-  acc.scrapedImages.push(...found.images);
-  acc.facts.sourceUrls = [
-    ...new Set(
-      [
-        acc.facts.wikipediaUrl,
-        acc.facts.officialUrl,
-        ...(acc.facts.sourceUrls ?? []),
-        ...found.sourceUrls,
-      ].filter((url): url is string => Boolean(url))
-    ),
+  const artist = searchNameFor(input);
+  const queries: Array<string | undefined> = [
+    undefined,
+    `${artist} musician interview review press`,
   ];
-  for (const url of found.sourceUrls) {
-    acc.links.push({ label: 'Reference', url, kind: 'other' });
+
+  for (const query of queries) {
+    const found = await deps.searchArtistSources(artist, scrapeKey, undefined, {}, query);
+    if (!found) {
+      logEvent('info', 'web_search_empty', { artist });
+      continue;
+    }
+    logEvent('info', 'web_search_results', { artist, urls: found.sourceUrls.length });
+
+    acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
+    acc.scrapedImages.push(...found.images);
+    acc.facts.sourceUrls = [
+      ...new Set(
+        [
+          acc.facts.wikipediaUrl,
+          acc.facts.officialUrl,
+          ...(acc.facts.sourceUrls ?? []),
+          ...found.sourceUrls,
+        ].filter((url): url is string => Boolean(url))
+      ),
+    ];
+    for (const ref of found.references) {
+      acc.links.push({ label: ref.title ?? 'Reference', url: ref.url, kind: 'other' });
+    }
   }
 };
 
@@ -311,19 +329,22 @@ const applyScrapedImageFallback = (acc: MetadataAccumulator): void => {
 
 /**
  * Finalizes the accumulator: appends admin links (last, so curated entries
- * survive dedupe), then drops every streaming/listening service from both the
- * discovered links and the reference URLs so none can reach the output, fills
- * the scraped-image fallback, and derives the image-title list for the prompt.
+ * survive dedupe), drops junk-host links (search engines, share widgets),
+ * classifies any remaining streaming-service links as `kind: 'streaming'`,
+ * caps the link list at {@link MAX_LINKS}, fills the scraped-image fallback,
+ * and derives the image-title list for the prompt.
  */
 const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
   for (const url of input.links ?? []) {
     acc.links.push({ label: 'Reference', url, kind: 'other' });
   }
 
-  acc.links = dedupeLinks(acc.links).filter((link) => !isListeningServiceUrl(link.url));
-  if (acc.facts.sourceUrls) {
-    acc.facts.sourceUrls = acc.facts.sourceUrls.filter((url) => !isListeningServiceUrl(url));
-  }
+  acc.links = dedupeLinks(acc.links)
+    .filter((link) => !isJunkLinkUrl(link.url))
+    .map((link) =>
+      isListeningServiceUrl(link.url) ? { ...link, kind: 'streaming' as const } : link
+    )
+    .slice(0, MAX_LINKS);
   applyScrapedImageFallback(acc);
   acc.facts.imageTitles = acc.images.map((image) => image.title ?? '');
 };

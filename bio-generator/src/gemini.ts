@@ -64,9 +64,6 @@ const artistFullName = (facts: ArtistFacts): string =>
 
 /** Output constraints every prose call must obey, drafts and synthesis alike. */
 const SHARED_CONSTRAINT_LINES = [
-  'NEVER link to streaming or listening services (Spotify, Apple Music, SoundCloud, Bandcamp,',
-  'YouTube Music, Tidal, Deezer, Amazon Music, or any other) — link only to INFORMATIVE sources',
-  'such as the official site, Wikipedia, press, interviews, or the label.',
   'NEVER output a "Discovered Links", "Sources", "References", or link-list section anywhere.',
   'NEVER emit an <img> tag unless an Available images list is provided in the facts — reference',
   'images only as <img src="image:N"> with N taken from that list; with no list, write no images.',

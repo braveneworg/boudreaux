@@ -56,11 +56,11 @@ export const bioImageSchema = z.object({
 
 export type BioImage = z.infer<typeof bioImageSchema>;
 
-/** A discovered external link (Wikipedia, official site, MusicBrainz, social). */
+/** A discovered external link (Wikipedia, official site, MusicBrainz, social, streaming). */
 export const bioLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'other']).optional(),
+  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
 });
 
 export type BioLink = z.infer<typeof bioLinkSchema>;

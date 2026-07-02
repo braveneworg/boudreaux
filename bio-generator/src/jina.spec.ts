@@ -244,6 +244,32 @@ describe('searchArtistSources', () => {
 
     expect(result?.images).toEqual([]);
   });
+
+  it('returns references with url and title for each result', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaSearchResponse([
+        { title: 'Bio Page', url: 'https://a.example/bio', content: 'some content' },
+        { url: 'https://b.example/page', content: 'other content' },
+      ])
+    );
+
+    const result = await searchArtistSources('Artist', 'k', fetchFn);
+
+    expect(result?.references).toEqual([
+      { url: 'https://a.example/bio', title: 'Bio Page' },
+      { url: 'https://b.example/page', title: null },
+    ]);
+  });
+
+  it('uses a custom query when provided', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jinaSearchResponse([]));
+
+    await searchArtistSources('Artist', 'k', fetchFn, {}, 'Artist musician interview review');
+
+    const [url] = fetchFn.mock.calls[0];
+    expect(decodeURIComponent(url)).toContain('Artist musician interview review');
+    expect(decodeURIComponent(url)).not.toContain('biography career discography');
+  });
 });
 
 describe('readUrl', () => {

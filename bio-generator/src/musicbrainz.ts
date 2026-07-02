@@ -66,11 +66,15 @@ const request = async <T>(url: string, options: FetchRetryOptions): Promise<T> =
   return (await response.json()) as T;
 };
 
+/** MusicBrainz relation types that map to streaming/purchasing services. */
+const STREAMING_RELATION_TYPES = new Set(['streaming', 'free streaming', 'purchase for download']);
+
 /** Maps a MusicBrainz relation type to our link taxonomy. */
 const classifyRelation = (type: string): BioLink['kind'] => {
   if (type === 'wikipedia') return 'wikipedia';
   if (type === 'official homepage') return 'official';
   if (type === 'social network') return 'social';
+  if (STREAMING_RELATION_TYPES.has(type)) return 'streaming';
   return 'other';
 };
 
@@ -98,8 +102,13 @@ const collectRelations = (
     }
 
     const kind = classifyRelation(relation.type);
-    if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
-      links.push({ label: relation.type, url: resource, kind });
+    if (kind === 'wikipedia' || kind === 'official' || kind === 'social' || kind === 'streaming') {
+      // Streaming links: label by hostname so the UI shows "open.spotify.com", not "streaming".
+      const label =
+        kind === 'streaming'
+          ? new URL(resource).hostname.replace(/^www\./, '')
+          : relation.type;
+      links.push({ label, url: resource, kind });
     }
   }
 

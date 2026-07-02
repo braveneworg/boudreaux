@@ -170,15 +170,19 @@ describe('runBioGeneration', () => {
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null);
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null, undefined, {}, undefined);
   });
 
   it('uses web search content as grounding when found', async () => {
-    const searchArtistSources = vi.fn().mockResolvedValue({
-      sourceText: 'Web-sourced bio text.',
-      sourceUrls: ['https://x.example'],
-      images: [],
-    });
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web-sourced bio text.',
+        sourceUrls: ['https://x.example'],
+        images: [],
+        references: [{ url: 'https://x.example', title: null }],
+      })
+      .mockResolvedValueOnce(null);
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
       getScrapeApiKey: vi.fn().mockResolvedValue('jina-key'),
@@ -187,7 +191,7 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
-    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'jina-key');
+    expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', 'jina-key', undefined, {}, undefined);
     const facts = factsArg(deps);
     expect(facts.sourceText).toBe('Web-sourced bio text.');
     expect(facts.sourceUrls).toEqual(['https://x.example']);
@@ -195,11 +199,15 @@ describe('runBioGeneration', () => {
   });
 
   it('merges web search context with the Wikipedia extract when both exist', async () => {
-    const searchArtistSources = vi.fn().mockResolvedValue({
-      sourceText: 'Extra web context.',
-      sourceUrls: ['https://x.example'],
-      images: [],
-    });
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Extra web context.',
+        sourceUrls: ['https://x.example'],
+        images: [],
+        references: [],
+      })
+      .mockResolvedValueOnce(null);
     const deps = makeDeps({ searchArtistSources });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -211,22 +219,26 @@ describe('runBioGeneration', () => {
     expect(facts.sourceUrls).toContain('https://x.example');
   });
 
-  it('drops listening-service URLs from the reference URLs given to the model', async () => {
-    const searchArtistSources = vi.fn().mockResolvedValue({
-      sourceText: 'Web context.',
-      sourceUrls: ['https://genius.com/radiohead', 'https://open.spotify.com/artist/x'],
-      images: [],
-    });
+  it('does not filter listening-service URLs from facts.sourceUrls', async () => {
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://genius.com/radiohead', 'https://open.spotify.com/artist/x'],
+        images: [],
+        references: [],
+      })
+      .mockResolvedValueOnce(null);
     const deps = makeDeps({ searchArtistSources });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
     const facts = factsArg(deps);
     expect(facts.sourceUrls).toContain('https://genius.com/radiohead');
-    expect(facts.sourceUrls?.some((u: string) => u.includes('spotify.com'))).toBe(false);
+    expect(facts.sourceUrls).toContain('https://open.spotify.com/artist/x');
   });
 
-  it('drops listening-service links from the discovered links', async () => {
+  it('classifies admin-supplied listening-service links as streaming kind', async () => {
     const result = await runBioGeneration(
       {
         artistId: 'a1',
@@ -241,8 +253,10 @@ describe('runBioGeneration', () => {
     );
 
     expect(result.links.some((l) => l.url === 'https://radiohead.com')).toBe(true);
-    expect(result.links.some((l) => l.url.includes('bandcamp.com'))).toBe(false);
-    expect(result.links.some((l) => l.url.includes('spotify.com'))).toBe(false);
+    const bandcampLink = result.links.find((l) => l.url.includes('bandcamp.com'));
+    const spotifyLink = result.links.find((l) => l.url.includes('spotify.com'));
+    expect(bandcampLink?.kind).toBe('streaming');
+    expect(spotifyLink?.kind).toBe('streaming');
   });
 
   it('marks the LLM-ranked image as primary', async () => {
@@ -338,17 +352,21 @@ describe('runBioGeneration', () => {
   it('falls back to web-scraped images when Commons yields none', async () => {
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
-      searchArtistSources: vi.fn().mockResolvedValue({
-        sourceText: 'Web-sourced bio text.',
-        sourceUrls: ['https://a.example/bio'],
-        images: [
-          {
-            url: 'https://a.example/artist.jpg',
-            alt: 'Artist in 2015',
-            sourceUrl: 'https://a.example/bio',
-          },
-        ],
-      }),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web-sourced bio text.',
+          sourceUrls: ['https://a.example/bio'],
+          images: [
+            {
+              url: 'https://a.example/artist.jpg',
+              alt: 'Artist in 2015',
+              sourceUrl: 'https://a.example/bio',
+            },
+          ],
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -371,17 +389,21 @@ describe('runBioGeneration', () => {
 
   it('keeps Commons images and ignores scraped ones when Commons resolves', async () => {
     const deps = makeDeps({
-      searchArtistSources: vi.fn().mockResolvedValue({
-        sourceText: 'Web context.',
-        sourceUrls: ['https://a.example/bio'],
-        images: [
-          {
-            url: 'https://a.example/artist.jpg',
-            alt: 'Artist',
-            sourceUrl: 'https://a.example/bio',
-          },
-        ],
-      }),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: [
+            {
+              url: 'https://a.example/artist.jpg',
+              alt: 'Artist',
+              sourceUrl: 'https://a.example/bio',
+            },
+          ],
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -398,11 +420,15 @@ describe('runBioGeneration', () => {
     }));
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
-      searchArtistSources: vi.fn().mockResolvedValue({
-        sourceText: 'Web context.',
-        sourceUrls: ['https://a.example/bio'],
-        images: scraped,
-      }),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: scraped,
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -446,17 +472,21 @@ describe('runBioGeneration', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
-      searchArtistSources: vi.fn().mockResolvedValue({
-        sourceText: 'Web context.',
-        sourceUrls: ['https://a.example/bio'],
-        images: [
-          {
-            url: 'https://a.example/artist.jpg',
-            alt: 'Artist',
-            sourceUrl: 'https://a.example/bio',
-          },
-        ],
-      }),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: [
+            {
+              url: 'https://a.example/artist.jpg',
+              alt: 'Artist',
+              sourceUrl: 'https://a.example/bio',
+            },
+          ],
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -514,6 +544,109 @@ describe('runBioGeneration', () => {
     expect(result.longBio).toBe('<p>Revised long.</p>');
     expect(result.altBio).toBe('Revised alt.');
     expect(result.genres).toBe('indie rock');
+  });
+
+  it('streaming links from MB relations survive finalizeMetadata with kind streaming', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue({
+        mbid: 'mbid-1',
+        name: 'Artist',
+        wikidataId: null,
+        artistType: 'Person',
+        area: 'USA',
+        beginDate: '1990',
+        tags: [],
+        links: [
+          {
+            label: 'open.spotify.com',
+            url: 'https://open.spotify.com/artist/x',
+            kind: 'streaming' as const,
+          },
+          {
+            label: 'MusicBrainz',
+            url: 'https://musicbrainz.org/artist/mbid-1',
+            kind: 'musicbrainz' as const,
+          },
+        ],
+      }),
+      getWikidataData: vi.fn().mockRejectedValue(new Error('no wikidata')),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const spotifyLink = result.links.find((l) => l.url === 'https://open.spotify.com/artist/x');
+    expect(spotifyLink).toBeDefined();
+    expect(spotifyLink?.kind).toBe('streaming');
+  });
+
+  it('labels jina reference links with the page title, falling back to Reference', async () => {
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://a.example/bio', 'https://b.example/page'],
+        images: [],
+        references: [
+          { url: 'https://a.example/bio', title: 'Artist Biography' },
+          { url: 'https://b.example/page', title: null },
+        ],
+      })
+      .mockResolvedValueOnce(null);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources,
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const bioLink = result.links.find((l) => l.url === 'https://a.example/bio');
+    const pageLink = result.links.find((l) => l.url === 'https://b.example/page');
+    expect(bioLink?.label).toBe('Artist Biography');
+    expect(pageLink?.label).toBe('Reference');
+  });
+
+  it('drops links from search-engine hosts', async () => {
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://www.google.com/search?q=artist'],
+        images: [],
+        references: [{ url: 'https://www.google.com/search?q=artist', title: 'Google Search' }],
+      })
+      .mockResolvedValueOnce(null);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources,
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.links.some((l) => l.url.includes('google.com'))).toBe(false);
+  });
+
+  it('caps links at 50 when many candidates exist', async () => {
+    const manyRefs = Array.from({ length: 60 }, (_, i) => ({
+      url: `https://source-${i}.example/page`,
+      title: `Source ${i}`,
+    }));
+    const searchArtistSources = vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web context.',
+        sourceUrls: manyRefs.map((r) => r.url),
+        images: [],
+        references: manyRefs,
+      })
+      .mockResolvedValueOnce(null);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources,
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.links.length).toBeLessThanOrEqual(50);
   });
 });
 
