@@ -439,5 +439,15 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
       expect(arg?.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
     });
+
+    it('includes id in the bioImages and bioLinks selects', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a2');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { id: true } });
+      expect(arg?.select?.bioLinks).toMatchObject({ select: { id: true } });
+    });
   });
 });

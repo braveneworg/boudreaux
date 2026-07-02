@@ -486,6 +486,7 @@ export class ArtistRepository {
     genres: string | null;
     bioModel: string | null;
     bioImages: Array<{
+      id: string;
       url: string;
       thumbnailUrl: string | null;
       title: string | null;
@@ -495,7 +496,7 @@ export class ArtistRepository {
       originalUrl: string | null;
       isPrimary: boolean;
     }>;
-    bioLinks: Array<{ label: string; url: string; kind: string | null }>;
+    bioLinks: Array<{ id: string; label: string; url: string; kind: string | null }>;
   } | null> {
     return runQuery(() =>
       prisma.artist.findUnique({
@@ -514,6 +515,7 @@ export class ArtistRepository {
           bioImages: {
             orderBy: { sortOrder: 'asc' },
             select: {
+              id: true,
               url: true,
               thumbnailUrl: true,
               title: true,
@@ -526,7 +528,7 @@ export class ArtistRepository {
           },
           bioLinks: {
             orderBy: { sortOrder: 'asc' },
-            select: { label: true, url: true, kind: true },
+            select: { id: true, label: true, url: true, kind: true },
           },
         },
       })
