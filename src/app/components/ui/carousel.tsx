@@ -233,7 +233,7 @@ const CarouselPrevious = ({
       variant={variant}
       size={size}
       className={cn(
-        'absolute z-15 size-8 rounded-full text-zinc-950',
+        'absolute z-15 size-8 rounded-none text-zinc-950',
         orientation === 'horizontal'
           ? 'top-1/2 left-0 -translate-y-1/2'
           : '-top-12 left-1/2 -translate-x-1/2 rotate-90',
@@ -263,7 +263,7 @@ const CarouselNext = ({
       variant={variant}
       size={size}
       className={cn(
-        'absolute z-15 size-8 rounded-full text-zinc-950',
+        'absolute z-15 size-8 rounded-none text-zinc-950',
         orientation === 'horizontal'
           ? 'top-1/2 right-0 -translate-y-1/2'
           : 'top-1/2 right-4 -mt-3 -translate-y-1/2',

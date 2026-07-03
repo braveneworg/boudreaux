@@ -85,10 +85,10 @@ describe('Progress', () => {
       expect(screen.getByTestId('progress')).toHaveClass('bg-primary/20');
     });
 
-    it('has rounded styling', () => {
+    it('has squared styling', () => {
       render(<Progress data-testid="progress" />);
 
-      expect(screen.getByTestId('progress')).toHaveClass('rounded-full');
+      expect(screen.getByTestId('progress')).toHaveClass('rounded-none');
     });
 
     it('indicator has background styling', () => {

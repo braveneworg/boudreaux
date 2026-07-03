@@ -186,13 +186,13 @@ export const ParticleGeneratorDemo = () => {
   return (
     <ContentContainer>
       <h1>Particle SVG Generator</h1>
-      <p className="mb-5 rounded-lg bg-zinc-50 p-4 text-gray-600 shadow-sm">
+      <p className="mb-5 bg-zinc-50 p-4 text-gray-600 shadow-sm">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
       </p>
 
       <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {(Object.entries(counts) as [keyof ParticleCounts, number][]).map(([type, count]) => (
-          <div key={type} className="rounded-lg bg-zinc-50 p-4 shadow-sm">
+          <div key={type} className="bg-zinc-50 p-4 shadow-sm">
             <label className="mb-2 block font-medium capitalize">
               {type}: {count}
             </label>
@@ -210,13 +210,13 @@ export const ParticleGeneratorDemo = () => {
               max="500"
               value={count}
               onChange={(e) => updateCount(type, e.target.value)}
-              className="mt-2 w-full rounded-sm border border-gray-300 px-1 py-1"
+              className="mt-2 w-full border border-gray-300 px-1 py-1"
             />
           </div>
         ))}
       </div>
 
-      <div className="mb-5 rounded-lg bg-white p-4 shadow-sm">
+      <div className="mb-5 bg-white p-4 shadow-sm">
         <h3 className="mt-0">Global Parameters</h3>
 
         <div className="mb-4">
@@ -227,14 +227,14 @@ export const ParticleGeneratorDemo = () => {
                 type="color"
                 value={particleColor === 'white' ? '#ffffff' : particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
-                className="h-10 w-[60px] cursor-pointer rounded-sm border border-gray-300"
+                className="h-10 w-[60px] cursor-pointer border border-gray-300"
               />
               <input
                 type="text"
                 value={particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
                 placeholder="e.g., white, #ffffff, rgb(255,255,255)"
-                className="flex-1 rounded-sm border border-gray-300 px-2 py-2"
+                className="flex-1 border border-gray-300 px-2 py-2"
               />
             </div>
           </div>
@@ -275,14 +275,14 @@ export const ParticleGeneratorDemo = () => {
                     type="color"
                     value={bgColor === 'black' ? '#000000' : bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    className="h-10 w-[60px] cursor-pointer rounded-sm border border-gray-300"
+                    className="h-10 w-[60px] cursor-pointer border border-gray-300"
                   />
                   <input
                     type="text"
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
                     placeholder="e.g., black, #000000, rgb(0,0,0)"
-                    className="flex-1 rounded-sm border border-gray-300 px-2 py-2"
+                    className="flex-1 border border-gray-300 px-2 py-2"
                   />
                 </div>
               </div>
@@ -362,13 +362,13 @@ export const ParticleGeneratorDemo = () => {
 
           <button
             onClick={() => setSeed(seed + 1)}
-            className="cursor-pointer rounded-md border-0 bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-blue-700"
+            className="cursor-pointer border-0 bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-blue-700"
           >
             Regenerate (New Random Positions)
           </button>
         </div>
       </div>
-      <div className="rounded-lg bg-white p-5 shadow-sm">
+      <div className="bg-white p-5 shadow-sm">
         <ParticleGenerator
           key={seed}
           particleCounts={counts}
@@ -382,7 +382,7 @@ export const ParticleGeneratorDemo = () => {
         />
       </div>
 
-      <div className="mt-5 rounded-lg bg-blue-50 p-4">
+      <div className="mt-5 bg-blue-50 p-4">
         <h3 className="mt-0">How to Export</h3>
         <p>
           Right-click the SVG above and &quot;Save image as...&quot; or inspect the element and copy

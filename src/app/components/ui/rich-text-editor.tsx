@@ -289,7 +289,7 @@ export const RichTextEditor = ({
   const toolbarState = useEditorState({ editor, selector: selectToolbarState });
 
   if (!editor) {
-    return <div className={cn('border-input rounded-md border', className)} aria-busy="true" />;
+    return <div className={cn('border-input border', className)} aria-busy="true" />;
   }
 
   const openLinkDialog = (): void => {
@@ -363,7 +363,7 @@ export const RichTextEditor = ({
   };
 
   return (
-    <div className={cn('border-input rounded-md border', className)}>
+    <div className={cn('border-input border', className)}>
       <RichTextEditorToolbar
         editor={editor}
         toolbarState={toolbarState ?? INACTIVE_TOOLBAR}
@@ -469,7 +469,7 @@ export const RichTextEditor = ({
                 <button
                   type="button"
                   aria-label={`Insert ${image.alt ?? 'image'}`}
-                  className="ring-border focus-visible:ring-primary block overflow-hidden rounded-md ring-1 focus-visible:ring-2 focus-visible:outline-none"
+                  className="ring-border focus-visible:ring-primary block overflow-hidden ring-1 focus-visible:ring-2 focus-visible:outline-none"
                   onClick={() => insertImage(image)}
                 >
                   <NextImage

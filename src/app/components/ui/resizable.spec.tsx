@@ -170,7 +170,8 @@ describe('ResizableHandle', () => {
     const handleContainer = document
       .querySelector('[data-slot="resizable-handle"]')
       ?.querySelector('div');
-    expect(handleContainer).toHaveClass('z-10', 'flex', 'rounded-xs');
+    expect(handleContainer).toHaveClass('z-10', 'flex');
+    expect(handleContainer).not.toHaveClass('rounded-xs');
   });
 });
 

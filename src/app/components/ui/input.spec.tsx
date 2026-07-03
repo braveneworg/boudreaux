@@ -57,7 +57,7 @@ describe('Input', () => {
       expect(input).toHaveClass(
         'h-9',
         'w-full',
-        'rounded-md',
+        'rounded-none',
         'border',
         'bg-transparent',
         'px-3',

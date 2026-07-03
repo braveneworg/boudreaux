@@ -120,7 +120,7 @@ describe('Popover Components', () => {
 
       await waitFor(() => {
         const content = screen.getByTestId('content');
-        expect(content).toHaveClass('rounded-md');
+        expect(content).toHaveClass('rounded-none');
         expect(content).toHaveClass('custom-class');
       });
     });

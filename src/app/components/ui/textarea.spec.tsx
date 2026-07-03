@@ -26,7 +26,7 @@ describe('Textarea', () => {
     it('should have default styling classes', () => {
       render(<Textarea data-testid="textarea" />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea).toHaveClass('rounded-md');
+      expect(textarea).toHaveClass('rounded-none');
       expect(textarea).toHaveClass('border');
     });
   });
@@ -40,7 +40,7 @@ describe('Textarea', () => {
     it('should merge custom className with default classes', () => {
       render(<Textarea data-testid="textarea" className="custom-class" />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea).toHaveClass('rounded-md');
+      expect(textarea).toHaveClass('rounded-none');
       expect(textarea).toHaveClass('custom-class');
     });
   });

@@ -58,7 +58,7 @@ describe('Checkbox', () => {
         'peer',
         'size-7',
         'shrink-0',
-        'rounded-[4px]',
+        'rounded-none',
         'border',
         'shadow-xs',
         'transition-shadow'

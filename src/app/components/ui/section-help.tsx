@@ -26,7 +26,7 @@ export const SectionHelp = ({ label, children }: SectionHelpProps): React.ReactE
   <Popover>
     <PopoverTrigger
       aria-label={label}
-      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-7 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px]"
+      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-7 shrink-0 items-center justify-center outline-none focus-visible:ring-[3px]"
     >
       <HelpCircle className="size-5" />
     </PopoverTrigger>
