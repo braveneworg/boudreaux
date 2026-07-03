@@ -67,7 +67,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0rem;
   /* Punk "tape" accent for the auth flyer card — drives the offset shadows,
      divider chip, submit stamp, input focus ring and social-button shadows from
      one token so a page can recolor the whole card to match its heading image.
@@ -140,10 +140,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
   --font-fake-four-cutout: var(--font-family-fake-four-cutout);
 }
 
@@ -248,26 +248,27 @@
   --card-accent-soft: oklch(0.63 0.04 73);
 }
 
-/* Punk-zine form controls inside profile cards — hard black borders + square
-   corners matching the sign-in/up email field. Covers text inputs, textareas,
-   combobox triggers (State/Country) and Select triggers. Keyed off tag/role
-   (FormControl's Radix Slot rewrites `data-slot` on inputs); unlayered + the
-   descendant selectors outrank the shadcn Input/Button utilities. The toggle
-   switches are intentionally excluded so they keep their pill shape. */
-.profile-accent input,
-.profile-accent textarea,
-.profile-accent [role='combobox'],
-.profile-accent [data-slot='select-trigger'] {
+/* Punk-zine form controls, site-wide: hard black borders, square corners,
+   paper fill, accent focus ring — matching the sign-in/up email field.
+   Covers text inputs, textareas, combobox triggers and Select triggers.
+   Unlayered so the descendant selectors outrank the shadcn Input/Button
+   utilities. Radix Switch/Checkbox/Radio render as <button>s and native
+   checkbox/radio/range/color inputs are excluded, so toggles keep their
+   pill shape. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+textarea,
+[role='combobox'],
+[data-slot='select-trigger'] {
   border-radius: 0;
   border-width: 2px;
   border-color: #000;
   background-color: var(--color-zinc-50);
 }
 
-.profile-accent input:focus-visible,
-.profile-accent textarea:focus-visible,
-.profile-accent [role='combobox']:focus-visible,
-.profile-accent [data-slot='select-trigger']:focus-visible {
+input:focus-visible,
+textarea:focus-visible,
+[role='combobox']:focus-visible,
+[data-slot='select-trigger']:focus-visible {
   --tw-ring-color: var(--card-accent);
 }
 

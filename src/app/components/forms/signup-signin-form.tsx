@@ -98,7 +98,6 @@ const EmailField = ({
               placeholder="Email address"
               type="email"
               autoComplete="email"
-              className="rounded-none border-2 border-black bg-zinc-50 focus-visible:ring-[var(--card-accent)]"
               {...field}
               autoFocusOnMount
             />
