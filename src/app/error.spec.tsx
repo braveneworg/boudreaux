@@ -30,4 +30,18 @@ describe('ErrorPage', () => {
 
     expect(reset).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the content on a storm zine panel', () => {
+    const { container } = render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-storm');
+  });
+
+  it('renders the error heading image', () => {
+    render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    expect(screen.getByRole('img', { name: 'error' })).toBeInTheDocument();
+  });
 });

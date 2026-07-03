@@ -38,4 +38,33 @@ describe('GlobalErrorPage', () => {
 
     expect(reset).toHaveBeenCalledTimes(1);
   });
+
+  it('applies the storm accent to the body', () => {
+    // React 19 treats <body> as a singleton and applies its props to document.body.
+    render(<GlobalErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    expect(document.body).toHaveClass('zine-accent-storm');
+  });
+
+  it('renders the content on a hand-rolled zine panel', () => {
+    const { container } = render(<GlobalErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    const panel = container.querySelector('main > div');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('bg-menu-item-tan-100', 'border-2', 'border-black', 'shadow-zine');
+  });
+
+  it('renders the plain error heading image', () => {
+    render(<GlobalErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    expect(screen.getByRole('img', { name: 'error' })).toBeInTheDocument();
+  });
+
+  it('gives the retry button the punk press treatment', () => {
+    render(<GlobalErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    const button = screen.getByRole('button', { name: /try again/i });
+    expect(button).toHaveClass('shadow-zine-sm');
+    expect(button).not.toHaveClass('rounded-md');
+  });
 });

@@ -6,10 +6,18 @@ import { render, screen } from '@testing-library/react';
 
 import NotFoundPage from './not-found';
 
-// Mock next/link
+// Mock next/link (forwards className so styling assertions see it)
 vi.mock('next/link', () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href} data-testid="not-found-link">
+  default: ({
+    href,
+    children,
+    className,
+  }: {
+    href: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <a href={href} className={className} data-testid="not-found-link">
       {children}
     </a>
   ),
@@ -35,5 +43,19 @@ describe('NotFoundPage', () => {
     render(<NotFoundPage />);
 
     expect(screen.getByText(/could not find the requested release/i)).toBeInTheDocument();
+  });
+
+  it('should apply the denim accent to the wrapper', () => {
+    const { container } = render(<NotFoundPage />);
+
+    expect(container.firstChild).toHaveClass('zine-accent-denim');
+  });
+
+  it('should style the back-link as a stamp', () => {
+    render(<NotFoundPage />);
+
+    const link = screen.getByTestId('not-found-link');
+    expect(link).toHaveClass('border-2', 'border-black', 'shadow-zine-ink');
+    expect(link).not.toHaveClass('rounded-md');
   });
 });
