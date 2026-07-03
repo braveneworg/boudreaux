@@ -42,7 +42,9 @@ const fetchBioGenerationStatus = async (
  * interval only while the job is in flight (`pending`/`processing`); terminal
  * states (`succeeded`/`failed`) and `null` (never generated) do not poll.
  * Callers that trigger generation get fresh polling for free: the action sets
- * `pending` server-side before the client enables/refetches the query.
+ * `pending` server-side, and because the query defaults to `staleTime: 0`
+ * (poll-status data is never considered fresh), enabling it fires an immediate
+ * fetch — the in-flight status then resumes the 2.5s interval.
  *
  * @param artistId - The artist to poll; the query is disabled when empty.
  * @param options - Caller overrides spread into `useQuery` (notably `enabled`);
@@ -61,6 +63,7 @@ export const useArtistBioGenerationStatusQuery = (
   } = useQuery({
     queryKey: queryKeys.artists.bioGeneration(artistId),
     queryFn: ({ signal }) => fetchBioGenerationStatus(artistId, signal),
+    staleTime: 0,
     ...options,
     enabled: (options.enabled ?? true) && !!artistId,
     refetchInterval: (query) =>

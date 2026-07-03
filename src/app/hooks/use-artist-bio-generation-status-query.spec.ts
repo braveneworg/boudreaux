@@ -16,6 +16,7 @@ vi.mock('@tanstack/react-query', () => ({
 interface QueryOptionsShape {
   queryKey: unknown[];
   enabled: boolean;
+  staleTime: number;
   queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
   refetchInterval: (query: { state: { data?: { status?: string | null } } }) => number | false;
 }
@@ -64,6 +65,22 @@ describe('useArtistBioGenerationStatusQuery', () => {
     const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
 
     expect(options.enabled).toBe(false);
+  });
+
+  it('marks status data stale immediately so enabling the query always refetches', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.staleTime).toBe(0);
+  });
+
+  it('lets a caller override the staleTime default', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1', { staleTime: 10_000 }));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.staleTime).toBe(10_000);
   });
 
   it('defaults the returned error when the query has none', () => {
