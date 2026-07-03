@@ -37,7 +37,7 @@ export const ContactForm = ({
   setValue,
 }: ContactFormProps) => {
   return (
-    <div className="animate-in fade-in space-y-4 duration-300">
+    <div className="animate-in fade-in space-y-6 duration-300">
       <ComboboxField
         control={control}
         name="reason"
@@ -50,7 +50,7 @@ export const ContactForm = ({
         setValue={setValue}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           control={control}
           name="firstName"

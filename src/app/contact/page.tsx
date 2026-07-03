@@ -14,6 +14,7 @@ import { ContactForm } from '@/app/components/forms/contact-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { useSession } from '@/app/hooks/use-session';
 import type { SessionUser } from '@/app/hooks/use-session';
 import { ImageHeading } from '@/components/ui/image-heading';
@@ -148,45 +149,53 @@ const ContactPage = () => {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
-        <ImageHeading src="/media/headings/CONTACT.webp" alt="contact" imageHeight={480} priority />
-        <div className="mb-4 flex flex-col space-y-2">
-          {CONTACTS.map(({ role, name, email }) => (
-            <Fragment key={role}>
-              <p>
-                <strong>{role}:</strong> {name}
-              </p>
-              {email && (
+        <ZinePanel accent="orange">
+          <ImageHeading
+            src="/media/headings/CONTACT.webp"
+            alt="contact"
+            imageHeight={480}
+            imageClassName="w-full"
+            priority
+          />
+          <div className="mb-4 flex flex-col space-y-2">
+            {CONTACTS.map(({ role, name, email }) => (
+              <Fragment key={role}>
                 <p>
-                  <a
-                    href={`mailto:${email}`}
-                    aria-label={`Email ${role}, ${email}`}
-                    className="inline-flex items-center gap-1.5 underline"
-                  >
-                    <Mail aria-hidden className="size-4 shrink-0" />
-                    {email}
-                  </a>
+                  <strong>{role}:</strong> {name}
                 </p>
-              )}
-            </Fragment>
-          ))}
-        </div>
-        <p className="mb-6 text-zinc-950">
-          Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
-          back to you.
-        </p>
-        <FormProvider {...form}>
-          <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
-            <ContactForm
-              control={form.control}
-              isPending={isSubmitting}
-              isVerified={isVerified}
-              setIsVerified={setIsVerified}
-              onTurnstileToken={setTurnstileToken}
-              state={state}
-              setValue={form.setValue}
-            />
-          </form>
-        </FormProvider>
+                {email && (
+                  <p>
+                    <a
+                      href={`mailto:${email}`}
+                      aria-label={`Email ${role}, ${email}`}
+                      className="inline-flex items-center gap-1.5 underline"
+                    >
+                      <Mail aria-hidden className="size-4 shrink-0" />
+                      {email}
+                    </a>
+                  </p>
+                )}
+              </Fragment>
+            ))}
+          </div>
+          <p className="mb-6 text-zinc-950">
+            Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
+            back to you.
+          </p>
+          <FormProvider {...form}>
+            <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
+              <ContactForm
+                control={form.control}
+                isPending={isSubmitting}
+                isVerified={isVerified}
+                setIsVerified={setIsVerified}
+                onTurnstileToken={setTurnstileToken}
+                state={state}
+                setValue={form.setValue}
+              />
+            </form>
+          </FormProvider>
+        </ZinePanel>
       </ContentContainer>
     </PageContainer>
   );

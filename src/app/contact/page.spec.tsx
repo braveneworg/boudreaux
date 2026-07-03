@@ -129,6 +129,21 @@ describe('ContactPage', () => {
       expect(headingImage).toHaveAttribute('alt', 'contact');
     });
 
+    it('should render the heading and form inside an orange zine panel', async () => {
+      const { container } = await importAndRender();
+
+      const panel = container.querySelector('section[data-slot="zine-panel"]');
+      expect(panel).toBeInTheDocument();
+      expect(panel).toHaveClass('zine-accent-orange');
+
+      const headingImage = screen.getByRole('img', { name: /contact/i });
+      expect(panel?.contains(headingImage)).toBe(true);
+
+      const form = container.querySelector('form');
+      expect(form).toBeInTheDocument();
+      expect(panel?.contains(form)).toBe(true);
+    });
+
     it('should render the breadcrumb', async () => {
       await importAndRender();
       expect(screen.getByText('Contact')).toBeInTheDocument();
