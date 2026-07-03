@@ -39,6 +39,36 @@ describe('bioLinkDragPayloadSchema', () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it('rejects a javascript: url', () => {
+    const parsed = bioLinkDragPayloadSchema.safeParse({
+      label: 'Click',
+      url: 'javascript:alert(1)',
+      kind: null,
+      isExternal: true,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts a site-relative url', () => {
+    const parsed = bioLinkDragPayloadSchema.safeParse({
+      label: 'Sad, Fat Luck',
+      url: '/releases/665f1f77bcf86cd799439021',
+      kind: 'release',
+      isExternal: false,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a protocol-relative url', () => {
+    const parsed = bioLinkDragPayloadSchema.safeParse({
+      label: 'Sneaky',
+      url: '//evil.example.com/path',
+      kind: null,
+      isExternal: true,
+    });
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe('bioImageDragPayloadSchema', () => {
@@ -88,6 +118,32 @@ describe('bioImageDragPayloadSchema', () => {
       attribution: null,
       alt: 'Artist photo',
       width: -1,
+      height: null,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects a javascript: url', () => {
+    const parsed = bioImageDragPayloadSchema.safeParse({
+      url: 'javascript:alert(1)',
+      thumbnailUrl: null,
+      title: null,
+      attribution: null,
+      alt: 'Artist photo',
+      width: null,
+      height: null,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects a site-relative url (image sources are always remote)', () => {
+    const parsed = bioImageDragPayloadSchema.safeParse({
+      url: '/media/photo.jpg',
+      thumbnailUrl: null,
+      title: null,
+      attribution: null,
+      alt: 'Artist photo',
+      width: null,
       height: null,
     });
     expect(parsed.success).toBe(false);

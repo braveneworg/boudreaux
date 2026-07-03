@@ -52,8 +52,9 @@ export const bioGenerationLinkSchema = z.object({
  * A link URL as persisted: absolute http(s) or a site-relative path
  * (injected release links use `/releases/<id>` paths).
  * Rejects `javascript:`, `data:`, and protocol-relative `//` URLs.
+ * Also reused by the palette drag-payload schema (`bio-dnd-schema.ts`).
  */
-const bioStatusLinkUrlSchema = z
+export const bioStatusLinkUrlSchema = z
   .string()
   .min(1)
   .refine(

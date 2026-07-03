@@ -85,8 +85,8 @@ const fetchImageBuffer = async (
 
 /**
  * Resize `buffer` to a 384px webp thumbnail and upload it to S3 under the
- * `media/artists/{artistId}/bio/thumbs/` prefix. Shared between
- * {@link BioImageService.rehostThumbnail} and {@link BioImageService.rehostImages}.
+ * `media/artists/{artistId}/bio/thumbs/` prefix. Used by
+ * {@link BioImageService.rehostImages}.
  */
 const processThumbnail = async (
   buffer: Buffer,
@@ -154,29 +154,6 @@ export class BioImageService {
 
     const { width, height } = await generateVariantsFromBuffer(buffer, s3Key);
     return { url: buildCdnUrl(s3Key), width, height };
-  }
-
-  /**
-   * Fetches an external image and uploads ONE small webp thumbnail — the cheap
-   * generation-time pass that keeps candidate palettes rendering from the CDN
-   * (no hotlink 403s) without paying for full variants on images the admin may
-   * dismiss. Save-time re-hosting upgrades kept images via rehostWithVariants.
-   *
-   * @param sourceUrl - The external image URL discovered during generation.
-   * @param artistId - The owning artist id (for the S3 key namespace).
-   * @param index - The image's position (for a stable, readable key prefix).
-   * @returns The thumbnail CDN URL and resized dimensions.
-   */
-  static async rehostThumbnail(
-    sourceUrl: string,
-    artistId: string,
-    index: number
-  ): Promise<RehostedImage> {
-    if (shouldSkipRehost()) {
-      return { url: sourceUrl, width: null, height: null };
-    }
-    const { buffer } = await fetchImageBuffer(sourceUrl);
-    return processThumbnail(buffer, artistId, index);
   }
 
   /**

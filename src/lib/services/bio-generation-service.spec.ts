@@ -40,15 +40,12 @@ vi.mock('@/lib/repositories/release-repository', () => ({
   },
 }));
 
-const rehostThumbnailMock = vi.fn();
 const rehostWithVariantsMock = vi.fn();
 const rehostImagesMock = vi.fn();
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
       rehostWithVariantsMock(url, artistId, index),
-    rehostThumbnail: (url: string, artistId: string, index: number) =>
-      rehostThumbnailMock(url, artistId, index),
     rehostImages: (images: ReadonlyArray<{ url: string; index: number }>, artistId: string) =>
       rehostImagesMock(images, artistId),
   },
@@ -745,7 +742,16 @@ describe('BioGenerationService.generateForArtist', () => {
 
     await BioGenerationService.generateForArtist(artist.id);
 
-    expect(replaceBioContentMock).toHaveBeenCalled();
+    // Only the discovered Wikipedia link survives — no kind:'release' entries
+    // are appended when the lookup fails, and the failure stays non-fatal.
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    expect(persisted.links).toHaveLength(1);
+    expect(persisted.links[0]).toEqual(
+      expect.objectContaining({
+        url: 'https://en.wikipedia.org/wiki/Radiohead',
+        kind: 'wikipedia',
+      })
+    );
   });
 });
 

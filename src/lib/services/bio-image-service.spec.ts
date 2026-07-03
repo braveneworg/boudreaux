@@ -431,32 +431,3 @@ describe('BioImageService.rehostImages', () => {
     ]);
   });
 });
-
-describe('BioImageService.rehostThumbnail', () => {
-  it('uploads a single 384px webp and returns its CDN URL', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', '');
-    vi.stubEnv('E2E_MODE', '');
-    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
-
-    const result = await BioImageService.rehostThumbnail('https://ex.com/big.jpg', 'artist1', 0);
-
-    expect(sendMock).toHaveBeenCalledTimes(1); // exactly one object — no variants
-    const putInput = sendMock.mock.calls[0][0].input as { Key: string; ContentType: string };
-    expect(putInput.Key).toMatch(/^media\/artists\/artist1\/bio\/thumbs\/0-[a-f0-9]{8}\.webp$/);
-    expect(putInput.ContentType).toBe('image/webp');
-    expect(result.url).toContain('/media/artists/artist1/bio/thumbs/');
-  });
-
-  it('skips upload in fake/E2E mode and echoes the source URL', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    const result = await BioImageService.rehostThumbnail('https://ex.com/big.jpg', 'artist1', 0);
-
-    expect(result).toEqual({ url: 'https://ex.com/big.jpg', width: null, height: null });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(sendMock).not.toHaveBeenCalled();
-  });
-});
