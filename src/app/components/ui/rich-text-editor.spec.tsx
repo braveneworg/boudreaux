@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useState } from 'react';
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { RichTextEditor, type RichTextEditorImage } from './rich-text-editor';
+
+import type { Editor } from '@tiptap/react';
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -417,6 +419,49 @@ describe('RichTextEditor link dialog handlers', () => {
     await waitFor(() =>
       expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
     );
+  });
+
+  it('updates the existing link in place when the caret sits inside it', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+    // Tiptap attaches the live editor instance onto its content DOM element
+    // (`dom.editor = this` in createView); use it to park a collapsed caret
+    // inside the link text ("te|xt") — an empty selection within the link.
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+    act(() => {
+      editor.commands.setTextSelection(3);
+    });
+    expect(editor.state.selection.empty).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    const urlField = screen.getByRole('textbox', { name: 'URL' });
+    await userEvent.clear(urlField);
+    await userEvent.type(urlField, 'https://new.example');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    // The setLink path rewrites the existing anchor's href in place …
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="https://new.example"'))
+    );
+    // … without inserting a duplicate anchor: "text" appears exactly once.
+    const lastHtml = onChange.mock.calls.at(-1)?.[0] as string;
+    expect(lastHtml.match(/text/g)).toHaveLength(1);
   });
 
   it('prefills the link dialog with the active link href', async () => {
