@@ -23,11 +23,6 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-const mockUseIsMobile = vi.fn();
-vi.mock('@/app/hooks/use-mobile', () => ({
-  useIsMobile: () => mockUseIsMobile(),
-}));
-
 const defaultProps = {
   src: '/media/headings/FEATURED-1920-480.webp',
   alt: 'featured artists',
@@ -35,10 +30,6 @@ const defaultProps = {
 };
 
 describe('ImageHeading', () => {
-  beforeEach(() => {
-    mockUseIsMobile.mockReturnValue(false);
-  });
-
   it('defaults to an h1', () => {
     render(<ImageHeading {...defaultProps} />);
 
@@ -134,38 +125,43 @@ describe('ImageHeading', () => {
     expect(screen.getByRole('heading')).toHaveAttribute('id', 'featured-heading');
   });
 
-  describe('responsive behavior', () => {
-    it('uses auto width on desktop', () => {
-      mockUseIsMobile.mockReturnValue(false);
-      render(<ImageHeading {...defaultProps} />);
+  describe('sketched border', () => {
+    it('wraps the image with hand-drawn strokes by default', () => {
+      const { container } = render(<ImageHeading {...defaultProps} />);
 
-      expect(screen.getByTestId('next-image')).toHaveClass('w-auto');
+      const strokes = container.querySelectorAll<HTMLElement>('[data-slot="zine-sketch-stroke"]');
+      expect(strokes).toHaveLength(2);
+      // The strokes anchor to an inline-block wrapper hugging the image box,
+      // not the full-width heading element.
+      const wrapper = screen.getByTestId('next-image').parentElement;
+      expect(wrapper).toHaveClass('relative', 'inline-block');
+      expect(wrapper).toContainElement(strokes[0]);
     });
 
-    it('uses the desktop sizes hint on desktop', () => {
-      mockUseIsMobile.mockReturnValue(false);
+    it('renders no sketch strokes when sketched is false', () => {
+      const { container } = render(<ImageHeading {...defaultProps} sketched={false} />);
+
+      expect(container.querySelectorAll('[data-slot="zine-sketch-stroke"]')).toHaveLength(0);
+    });
+  });
+
+  describe('strip-scale sizing', () => {
+    it('fills the row on mobile and matches the zine strip scale from sm up', () => {
+      render(<ImageHeading {...defaultProps} />);
+
+      // Full-width masthead on mobile; from sm up the wordmark is
+      // height-driven at the shared ZineHeading strip scale, width
+      // following the intrinsic aspect ratio.
+      const image = screen.getByTestId('next-image');
+      expect(image).toHaveClass('h-auto', 'w-full', 'sm:h-14', 'sm:w-auto');
+    });
+
+    it('hints the responsive rendering size to the loader', () => {
       render(<ImageHeading {...defaultProps} />);
 
       expect(screen.getByTestId('next-image')).toHaveAttribute(
         'data-sizes',
-        '(min-width: 600px) 600px, 100dvw'
-      );
-    });
-
-    it('uses full width on mobile', () => {
-      mockUseIsMobile.mockReturnValue(true);
-      render(<ImageHeading {...defaultProps} />);
-
-      expect(screen.getByTestId('next-image')).toHaveClass('w-full', 'max-w-480');
-    });
-
-    it('uses the mobile sizes hint on mobile', () => {
-      mockUseIsMobile.mockReturnValue(true);
-      render(<ImageHeading {...defaultProps} />);
-
-      expect(screen.getByTestId('next-image')).toHaveAttribute(
-        'data-sizes',
-        '(min-width: 380px) 380px, 100vw'
+        '(min-width: 640px) 224px, 100vw'
       );
     });
   });

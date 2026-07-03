@@ -29,11 +29,37 @@ describe('ZineHeading', () => {
     );
   });
 
+  it('spans the row on mobile and shrinks to its content from sm up', () => {
+    const { container } = render(<ZineHeading>Releases</ZineHeading>);
+
+    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass(
+      'w-full',
+      'sm:w-auto'
+    );
+  });
+
   it('neutralizes the fixed level height with h-auto', () => {
     render(<ZineHeading>Releases</ZineHeading>);
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveClass('h-auto');
     expect(heading).not.toHaveClass('h-[52px]');
+  });
+
+  it('sketches two skewed hand-drawn strokes around the strip', () => {
+    const { container } = render(<ZineHeading>Releases</ZineHeading>);
+
+    // The strip anchors two decorative zinc-950 frames, each nudged and
+    // skewed differently so the strokes never quite line up — the
+    // hand-drawn double border.
+    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass('relative');
+    const strokes = container.querySelectorAll('[data-slot="zine-sketch-stroke"]');
+    expect(strokes).toHaveLength(2);
+    strokes.forEach((stroke) => {
+      expect(stroke).toHaveAttribute('aria-hidden', 'true');
+      expect(stroke).toHaveClass('absolute', 'border-zinc-950');
+      expect(stroke.className).toMatch(/skew-x-/);
+      expect(stroke.className).toMatch(/rotate-/);
+    });
   });
 
   it('cn-merges a custom className onto the heading element', () => {
