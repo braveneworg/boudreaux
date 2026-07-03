@@ -55,7 +55,8 @@ const transformAnchor: sanitizeHtml.Transformer = (tagName, attribs) => {
  * external links are rewritten to carry `rel="nofollow noopener noreferrer"`
  * and `target="_blank"`. Inline `<img>` (re-hosted images), floated
  * `<figure>`/`<figcaption>` blocks (bio-figure classes + percentage width
- * only), and `<span>` font-size styling are permitted; the host of every
+ * bounded to the editor's 20–100% range), and `<span>` font-size styling are
+ * permitted; the host of every
  * `<img>`/`<a>` is additionally gated by next/image `remotePatterns` and the
  * `BioHtml` renderer at display time.
  */
@@ -84,10 +85,11 @@ const BIO_HTML_OPTIONS: sanitizeHtml.IOptions = {
       ],
     },
     figure: {
-      // Same two-pattern split as font-size above (integer, then decimal) to
-      // avoid the `security/detect-unsafe-regex` false positive. Width is only
-      // ever a percentage.
-      width: [/^\d+%$/, /^\d+\.\d+%$/],
+      // Same multi-pattern split as font-size above (integer, decimal, then
+      // the 100.0… edge) to avoid the `security/detect-unsafe-regex` false
+      // positive. Width is only ever a percentage, bounded to the editor's
+      // 20–100% range so an out-of-range width (5%, 9999%) is dropped.
+      width: [/^(?:2\d|[3-9]\d|100)%$/, /^(?:2\d|[3-9]\d)\.\d+%$/, /^100\.0+%$/],
     },
   },
   allowedSchemes: ['http', 'https'],
@@ -123,6 +125,10 @@ const BIO_HTML_NO_IMAGES_OPTIONS: sanitizeHtml.IOptions = {
   allowedSchemesByTag: {
     a: ['http', 'https'],
   },
+  // Discard the entire figure subtree — caption spans included — instead of
+  // just the tags, so no title/attribution text leaks into the teaser prose.
+  // The first four entries are sanitize-html's defaults.
+  nonTextTags: ['script', 'style', 'textarea', 'option', 'figure', 'figcaption'],
 };
 
 /**
@@ -137,10 +143,10 @@ export const sanitizeBioHtml = (html: string): string =>
   sanitizeHtml(html, BIO_HTML_OPTIONS).trim();
 
 /**
- * Sanitizes the short bio HTML, stripping `<img>` and `<figure>` tags entirely.
- * The short bio is a one-paragraph teaser; inline images break layout and
- * are never appropriate there. All other bio allowlist rules (links, emphasis,
- * etc.) apply unchanged.
+ * Sanitizes the short bio HTML, discarding `<img>` tags and whole
+ * `<figure>`/`<figcaption>` subtrees — caption text included. The short bio is
+ * a one-paragraph teaser; inline images break layout and are never appropriate
+ * there. All other bio allowlist rules (links, emphasis, etc.) apply unchanged.
  *
  * Use this wherever a shortBio is sanitized — at AI generation time and at
  * admin-save time — so no image can enter the field from either path.

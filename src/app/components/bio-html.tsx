@@ -47,7 +47,9 @@ const figureClassName = (classAttr: string | undefined): string => {
 };
 
 const parseFigureWidth = (styleAttr: string | undefined): string | undefined => {
-  const match = /width:\s*([\d.]+%)/.exec(styleAttr ?? '');
+  // Anchored to the string start or a `;` separator so only a standalone
+  // `width` declaration matches — never `max-width`.
+  const match = /(?:^|;)\s*width:\s*([\d.]+%)/.exec(styleAttr ?? '');
   return match?.[1];
 };
 

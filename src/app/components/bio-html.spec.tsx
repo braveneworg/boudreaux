@@ -228,6 +228,40 @@ describe('BioHtml', () => {
     expect(caption?.className).toContain('text-[11px]');
   });
 
+  it('ignores a max-width declaration when parsing the figure width', () => {
+    const html =
+      '<figure class="bio-figure bio-figure--left" style="max-width:45%">' +
+      '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="p" width="800" height="600">' +
+      '</figure>';
+    render(<BioHtml html={html} />);
+
+    expect(screen.getByRole('figure')).not.toHaveAttribute('style');
+  });
+
+  it('still parses a width declaration that follows another declaration', () => {
+    const html =
+      '<figure class="bio-figure bio-figure--left" style="margin:0; width:45%">' +
+      '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="p" width="800" height="600">' +
+      '</figure>';
+    render(<BioHtml html={html} />);
+
+    expect(screen.getByRole('figure')).toHaveStyle({ width: '45%' });
+  });
+
+  it('never carries an inline style onto the rendered figcaption', () => {
+    const html =
+      '<figure class="bio-figure bio-figure--center" style="width:60%">' +
+      '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="p" width="800" height="600">' +
+      '<figcaption class="bio-figure-caption" style="font-size:30px">' +
+      '<span class="bio-figure-title">T</span>' +
+      '</figcaption>' +
+      '</figure>';
+    render(<BioHtml html={html} />);
+
+    const caption = screen.getByText('T').closest('figcaption');
+    expect(caption).not.toHaveAttribute('style');
+  });
+
   it('keeps the caption span content intact', () => {
     render(<BioHtml html={FIGURE_HTML_WITH_CAPTION} />);
 

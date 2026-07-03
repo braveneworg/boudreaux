@@ -174,6 +174,54 @@ describe('sanitizeBioHtml', () => {
     expect(result).toContain('bio-figure-subtitle');
   });
 
+  it('keeps the 100 percent maximum figure width', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:100%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).toContain('width:100%');
+  });
+
+  it('strips a figure width above the 100 percent ceiling', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:9999%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('9999%');
+  });
+
+  it('strips a figure width below the 20 percent floor', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:5%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('width:5%');
+  });
+
+  it('strips a decimal figure width just under the floor', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:19.9%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('19.9%');
+  });
+
+  it('strips a decimal figure width just over the ceiling', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:100.1%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('100.1%');
+  });
+
+  it('strips inline styles off a figcaption', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure"><img src="https://cdn.example/x.webp" alt="" /><figcaption class="bio-figure-caption" style="font-size:30px"><span class="bio-figure-title">T</span></figcaption></figure>'
+    );
+
+    expect(result).not.toContain('font-size:30px');
+  });
+
   it('strips a non-percentage figure width', () => {
     const result = sanitizeBioHtml(
       '<figure class="bio-figure" style="width:9999px"><img src="https://cdn.example/x.webp" alt="" /></figure>'
@@ -217,6 +265,22 @@ describe('sanitizeBioHtmlNoImages', () => {
     );
 
     expect(result).toBe('<p>a</p>');
+  });
+
+  it('discards figure caption text entirely, not just the tags', () => {
+    const result = sanitizeBioHtmlNoImages(
+      '<p>Teaser.</p><figure class="bio-figure"><img src="https://cdn.example/x.webp" alt="" /><figcaption class="bio-figure-caption"><span class="bio-figure-title">Caption title</span><span class="bio-figure-attribution">Photo by X</span></figcaption></figure>'
+    );
+
+    expect(result).toBe('<p>Teaser.</p>');
+  });
+
+  it('discards a bare figcaption and its text', () => {
+    const result = sanitizeBioHtmlNoImages(
+      '<p>a</p><figcaption class="bio-figure-caption">Stray caption</figcaption>'
+    );
+
+    expect(result).not.toContain('Stray caption');
   });
 
   it('does not strip images from the long bio (sanitizeBioHtml keeps them)', () => {
