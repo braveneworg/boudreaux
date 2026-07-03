@@ -397,12 +397,12 @@ export const SignupSigninForm = ({
 
   return (
     <ZinePanel accent={isSigningIn ? 'pink' : 'teal'}>
-      {/* Heading wordmark — lives inside the flyer, above the social buttons,
-          spanning the panel's full content width */}
-      {heading && <div className="mb-6">{heading}</div>}
-      {/* Everything below the heading stays centered at the flyer's previous
+      {/* Everything — heading included — stays centered at the flyer's previous
           width while the panel itself spans the content area */}
       <div className="mx-auto w-full max-w-lg">
+        {/* Heading wordmark — lives inside the flyer, above the social buttons,
+            capped at the form column's width so it lines up with the controls */}
+        {heading && <div className="mb-6">{heading}</div>}
         {/* Signups-paused notice — shown only on the signup path when paused */}
         {signupsPaused && (
           <Alert className="mb-4">

@@ -753,19 +753,19 @@ describe('SignupSigninForm', () => {
       expect(panel).toContainElement(controlsWrapper);
     });
 
-    it('keeps the heading full-width outside the centered controls wrapper', () => {
-      const { container } = render(
+    it('constrains the heading to the centered max-w-lg controls column', () => {
+      render(
         <SignupSigninForm {...defaultProps} heading={<span data-testid="heading-wordmark" />} />
       );
 
-      const panel = container.querySelector('section[data-slot="zine-panel"]');
-      // The heading block sits directly in the panel's content div, not inside
-      // the width-capped controls wrapper — that widens it to the panel edges.
-      const contentDiv = panel?.querySelector(':scope > div.z-10');
+      // The heading block shares the width-capped controls wrapper so it
+      // matches the form column's width and stays centered with it.
+      const controlsWrapper = screen
+        .getByTestId('submit-button')
+        .closest<HTMLDivElement>('div.mx-auto.w-full.max-w-lg');
       const headingDiv = screen.getByTestId('heading-wordmark').parentElement;
       expect(headingDiv).toHaveClass('mb-6');
-      expect(headingDiv?.parentElement).toBe(contentDiv);
-      expect(screen.getByTestId('heading-wordmark').closest('.max-w-lg')).toBeNull();
+      expect(headingDiv?.parentElement).toBe(controlsWrapper);
     });
   });
 
