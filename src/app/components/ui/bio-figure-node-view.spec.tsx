@@ -183,6 +183,22 @@ describe('BioFigureNodeView', () => {
     expect(props.updateAttributes).toHaveBeenCalledWith({ width: 100 });
   });
 
+  it('jumps to the minimum width with the Home key', async () => {
+    const props = makeProps();
+    render(<BioFigureNodeView {...props} />);
+    screen.getByRole('slider', { name: 'Resize image' }).focus();
+    await userEvent.keyboard('{Home}');
+    expect(props.updateAttributes).toHaveBeenCalledWith({ width: 20 });
+  });
+
+  it('jumps to the maximum width with the End key', async () => {
+    const props = makeProps();
+    render(<BioFigureNodeView {...props} />);
+    screen.getByRole('slider', { name: 'Resize image' }).focus();
+    await userEvent.keyboard('{End}');
+    expect(props.updateAttributes).toHaveBeenCalledWith({ width: 100 });
+  });
+
   it('ignores unrelated keys on the resize handle', async () => {
     const props = makeProps();
     render(<BioFigureNodeView {...props} />);

@@ -104,6 +104,10 @@ interface LabeledTextFieldProps {
   onValueChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  /** Disables the input; pair with `hint` to explain why. */
+  disabled?: boolean;
+  /** Muted helper line under the input, wired via aria-describedby. */
+  hint?: string;
 }
 
 /** Label + Input pair used by the link and image dialogs. */
@@ -114,6 +118,8 @@ const LabeledTextField = ({
   onValueChange,
   placeholder,
   type = 'text',
+  disabled = false,
+  hint,
 }: LabeledTextFieldProps): JSX.Element => (
   <div className="space-y-2">
     <Label htmlFor={id}>{label}</Label>
@@ -123,7 +129,14 @@ const LabeledTextField = ({
       placeholder={placeholder}
       value={value}
       onChange={(event) => onValueChange(event.target.value)}
+      disabled={disabled}
+      aria-describedby={hint ? `${id}-hint` : undefined}
     />
+    {hint ? (
+      <p id={`${id}-hint`} className="text-muted-foreground text-xs">
+        {hint}
+      </p>
+    ) : null}
   </div>
 );
 
@@ -204,6 +217,10 @@ export const RichTextEditor = ({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  // True when the dialog targets a selection or an existing link — that path
+  // keeps the document's own text, so the anchor-text field is locked to stop
+  // admins typing into a value that would be ignored.
+  const [linkTextLocked, setLinkTextLocked] = useState(false);
   const [linkExternal, setLinkExternal] = useState(true);
   const [imageOpen, setImageOpen] = useState(false);
   const [imageTitle, setImageTitle] = useState('');
@@ -280,6 +297,7 @@ export const RichTextEditor = ({
     const { empty, from, to } = editor.state.selection;
     setLinkUrl(href);
     setLinkText(empty ? '' : editor.state.doc.textBetween(from, to, ' '));
+    setLinkTextLocked(!empty || editor.isActive('link'));
     setLinkExternal(href ? !isInternalBioUrl(href) : true);
     setLinkOpen(true);
   };
@@ -295,7 +313,10 @@ export const RichTextEditor = ({
     if (!isValidBioLinkUrl(href)) return;
     const attrs = { href, ...targetRelAttrs(linkExternal) };
     const anchorText = linkText.trim();
-    if (!editor.state.selection.empty || editor.isActive('link')) {
+    // linkTextLocked mirrors the selection state captured when the dialog
+    // opened (the dialog is modal, so it cannot change underneath us) and
+    // keeps this branch consistent with the disabled anchor-text field.
+    if (linkTextLocked) {
       editor.chain().focus().extendMarkRange('link').setLink(attrs).run();
     } else if (anchorText) {
       editor
@@ -385,6 +406,8 @@ export const RichTextEditor = ({
             placeholder="Linked text"
             value={linkText}
             onValueChange={setLinkText}
+            disabled={linkTextLocked}
+            hint={linkTextLocked ? 'The existing text is kept — edit it in the editor.' : undefined}
           />
           <LabeledTextField
             id="rte-link-url"

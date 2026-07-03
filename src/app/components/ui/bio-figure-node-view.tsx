@@ -55,11 +55,22 @@ interface FigureResizeHandlers {
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
+/** Maps a slider key to the next width (ARIA slider pattern: arrows step by
+ *  5, Home/End jump to the range bounds); `null` for unrelated keys. */
+const nextWidthForKey = (key: string, width: number): number | null => {
+  if (key === 'ArrowLeft') return clampFigureWidth(width - KEYBOARD_RESIZE_STEP);
+  if (key === 'ArrowRight') return clampFigureWidth(width + KEYBOARD_RESIZE_STEP);
+  if (key === 'Home') return BIO_FIGURE_MIN_WIDTH;
+  if (key === 'End') return BIO_FIGURE_MAX_WIDTH;
+  return null;
+};
+
 /**
  * Pointer + keyboard resize logic for the figure's corner handle. Pointer
  * drags are measured as a clientX delta against the editor container's pixel
  * width (the element the percentage width is relative to); keyboard arrows
- * step by 5. Both paths clamp into the 20–100% range before committing.
+ * step by 5 and Home/End jump to the min/max. All paths stay inside the
+ * 20–100% range before committing.
  */
 const useFigureResize = ({
   width,
@@ -90,10 +101,10 @@ const useFigureResize = ({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const nextWidth = nextWidthForKey(event.key, width);
+    if (nextWidth === null) return;
     event.preventDefault();
-    const step = event.key === 'ArrowRight' ? KEYBOARD_RESIZE_STEP : -KEYBOARD_RESIZE_STEP;
-    updateAttributes({ width: clampFigureWidth(width + step) });
+    updateAttributes({ width: nextWidth });
   };
 
   // A cancelled touch drag must clear dragRef too, or a later hover/touch
@@ -179,7 +190,7 @@ const FigureControls = ({
 /**
  * React NodeView for the `bioFigure` node: renders the figure in the editor
  * with hover/selection controls for float, delete, and a corner resize handle
- * (pointer drag + ArrowLeft/ArrowRight). The image container carries
+ * (pointer drag + ArrowLeft/ArrowRight/Home/End). The image container carries
  * `data-drag-handle` so ProseMirror-native drag repositions the whole node.
  */
 export const BioFigureNodeView = ({

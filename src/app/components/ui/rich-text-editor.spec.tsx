@@ -464,6 +464,67 @@ describe('RichTextEditor link dialog handlers', () => {
     expect(lastHtml.match(/text/g)).toHaveLength(1);
   });
 
+  it('disables the anchor-text field when a text selection is being linked', async () => {
+    render(<Harness />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
+  });
+
+  it('explains that the selected text is kept when the anchor field is locked', async () => {
+    render(<Harness />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByText(/existing text is kept/i)).toBeInTheDocument();
+  });
+
+  it('disables the anchor-text field when the caret sits in an existing link', async () => {
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
+      return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
+    };
+    render(<Controlled />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+    act(() => {
+      editor.commands.setTextSelection(3);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
+  });
+
+  it('keeps the anchor-text field enabled at an empty caret outside a link', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: 'Anchor text' })).toBeEnabled();
+  });
+
+  it('omits the locked-anchor hint on the empty-caret insert path', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.queryByText(/existing text is kept/i)).not.toBeInTheDocument();
+  });
+
   it('prefills the link dialog with the active link href', async () => {
     const Controlled = () => {
       const [value, setValue] = useState('<p><a href="https://prefilled.test/">x</a></p>');
