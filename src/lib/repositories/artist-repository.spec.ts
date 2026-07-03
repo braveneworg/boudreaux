@@ -29,6 +29,8 @@ vi.mock('@/lib/prisma', () => ({
     },
     artistBioImage: {
       delete: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -390,6 +392,33 @@ describe('ArtistRepository', () => {
 
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.create).toHaveBeenCalledWith({ data, select: nameSelect });
+    });
+  });
+
+  describe('findBioImagesForRehost', () => {
+    it('selects the rehost projection filtered by artistId', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([{ id: 'img-1' }] as never);
+
+      const result = await ArtistRepository.findBioImagesForRehost('a1');
+
+      expect(result).toEqual([{ id: 'img-1' }]);
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
+      });
+    });
+  });
+
+  describe('updateBioImageUrl', () => {
+    it('updates the image row url by id', async () => {
+      vi.mocked(prisma.artistBioImage.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.updateBioImageUrl('img-1', 'https://cdn.example/new.webp');
+
+      expect(prisma.artistBioImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { url: 'https://cdn.example/new.webp' },
+      });
     });
   });
 

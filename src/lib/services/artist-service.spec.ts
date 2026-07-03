@@ -5,9 +5,11 @@ import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
+import { BioImageService } from './bio-image-service';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -56,6 +58,18 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     connectToRelease: vi.fn(),
     deleteBioLink: vi.fn(),
     deleteBioImage: vi.fn(),
+    findBioImagesForRehost: vi.fn(),
+    updateBioImageUrl: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/utils/ip-guard', () => ({
+  isPubliclyRoutableUrl: vi.fn(),
+}));
+
+vi.mock('./bio-image-service', () => ({
+  BioImageService: {
+    rehostWithVariants: vi.fn(),
   },
 }));
 
@@ -434,6 +448,83 @@ describe('ArtistService', () => {
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to update artist' });
+    });
+  });
+
+  describe('updateArtist bio image finalization', () => {
+    const THUMB = 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp';
+    const FULL = 'https://cdn.example/media/artists/a1/bio/3-def.webp';
+    const thumbnailRow = {
+      id: 'img-1',
+      url: THUMB,
+      thumbnailUrl: THUMB,
+      originalUrl: 'https://upload.wikimedia.org/full.jpg',
+    };
+
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example');
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.updateBioImageUrl).mockResolvedValue(undefined);
+      vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(true);
+      vi.mocked(BioImageService.rehostWithVariants).mockResolvedValue({
+        url: FULL,
+        width: 1200,
+        height: 900,
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('re-hosts a thumbnail src to full variants and rewrites the html', async () => {
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(FULL);
+    });
+
+    it('upgrades the matching bio image row url', async () => {
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+
+      expect(vi.mocked(ArtistRepository.updateBioImageUrl)).toHaveBeenCalledWith('img-1', FULL);
+    });
+
+    it('skips an external src that resolves to a private address', async () => {
+      vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(false);
+
+      await ArtistService.updateArtist('a1', {
+        bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>',
+      });
+
+      expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
+    });
+
+    it('leaves a fully re-hosted CDN src untouched', async () => {
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${FULL}" alt="" /></p>` });
+
+      expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
+    });
+
+    it('saves with the original src when re-hosting throws', async () => {
+      vi.mocked(BioImageService.rehostWithVariants).mockRejectedValue(new Error('s3 down'));
+
+      const result = await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /></p>`,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('skips finalization entirely when no bio fields are updated', async () => {
+      await ArtistService.updateArtist('a1', { displayName: 'X' });
+
+      expect(vi.mocked(ArtistRepository.findBioImagesForRehost)).not.toHaveBeenCalled();
     });
   });
 

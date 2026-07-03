@@ -5,7 +5,7 @@ import 'server-only';
 
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { ArtistRepository, type BioImageRehostRow } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
@@ -18,7 +18,9 @@ import type {
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import type { ImageRecord } from '@/lib/types/domain/image';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object, getS3Client } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
@@ -30,6 +32,7 @@ import {
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import { failFromError } from './_internal/map-data-error';
+import { BioImageService } from './bio-image-service';
 
 import type { ServiceResponse } from './service.types';
 
@@ -163,6 +166,118 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
   return sanitized;
 };
 
+/** Matches every `<img src="…">` in a bio HTML string (capture group 1 = src). */
+const IMG_SRC_PATTERN = /<img\s[^>]*src="([^"]+)"/g;
+
+/** Path marker identifying generation-time single-variant thumbnails. */
+const BIO_THUMBS_MARKER = '/bio/thumbs/';
+
+/** Collects every `<img>` src from a bio HTML field (empty for null/undefined). */
+const collectImgSrcs = (html: string | null | undefined): string[] =>
+  [...(html ?? '').matchAll(IMG_SRC_PATTERN)].map((match) => match[1]);
+
+/** A src needs the full re-host when it is a generation-time thumbnail or an
+ *  external (non-CDN) URL pasted into the editor. */
+const needsFullRehost = (src: string, cdnPrefix: string): boolean =>
+  src.includes(BIO_THUMBS_MARKER) || !src.startsWith(cdnPrefix);
+
+/** One planned re-host: the embedded src, the URL to fetch from, and the bio
+ *  image row to upgrade when the src came from a generated thumbnail. */
+interface RehostPlan {
+  src: string;
+  source: string;
+  rowId: string | null;
+}
+
+/** Plans a single re-host. A src matching a bio image row re-hosts from the
+ *  row's recorded `originalUrl` (null plan when no original was recorded); an
+ *  unmatched src is a manual paste and re-hosts from itself. */
+const planRehost = (src: string, rows: BioImageRehostRow[]): RehostPlan | null => {
+  const row = rows.find((candidate) => candidate.thumbnailUrl === src || candidate.url === src);
+  if (row) return row.originalUrl ? { src, source: row.originalUrl, rowId: row.id } : null;
+  return { src, source: src, rowId: null };
+};
+
+/** Replaces every occurrence of `src` in the bio HTML fields with `nextUrl`. */
+const withReplacedSrc = (
+  result: UpdateArtistData,
+  src: string,
+  nextUrl: string
+): UpdateArtistData => ({
+  ...result,
+  ...(typeof result.bio === 'string' ? { bio: result.bio.replaceAll(src, nextUrl) } : {}),
+  ...(typeof result.altBio === 'string' ? { altBio: result.altBio.replaceAll(src, nextUrl) } : {}),
+});
+
+/** Inputs for a single save-time re-host pass over one embedded src. */
+interface RehostOneContext {
+  artistId: string;
+  src: string;
+  index: number;
+  rows: BioImageRehostRow[];
+}
+
+/** Executes one re-host plan: SSRF-guards the fetch source, re-hosts to full
+ *  variants, rewrites the src in both HTML fields, and upgrades the matching
+ *  bio image row. Any refusal or failure logs and returns `result` unchanged. */
+const rehostOne = async (
+  result: UpdateArtistData,
+  { artistId, src, index, rows }: RehostOneContext
+): Promise<UpdateArtistData> => {
+  const plan = planRehost(src, rows);
+  if (!plan) {
+    logger.warn('bio_image_rehost_missing_original', { artistId, src });
+    return result;
+  }
+  if (!(await isPubliclyRoutableUrl(plan.source))) {
+    logger.warn('bio_image_rehost_blocked_private', { artistId, source: plan.source });
+    return result;
+  }
+  try {
+    const rehosted = await BioImageService.rehostWithVariants(plan.source, artistId, index);
+    if (plan.rowId) {
+      await ArtistRepository.updateBioImageUrl(plan.rowId, rehosted.url);
+    }
+    return withReplacedSrc(result, src, rehosted.url);
+  } catch (error) {
+    logger.warn('bio_image_rehost_failed', { artistId, src, error: String(error) });
+    return result;
+  }
+};
+
+/**
+ * Upgrades embedded bio images to fully re-hosted CDN variants at save time:
+ * generation-time thumbnails re-host from their recorded originalUrl; manually
+ * pasted external URLs re-host directly (SSRF-guarded). Every failure is
+ * logged and non-blocking — the save proceeds with the prior src and the next
+ * save retries. Create-mode is exempt (no artistId/bio rows yet); pasted
+ * images finalize on the first update. Note: the SSRF guard resolves DNS
+ * separately from the re-host fetch (vet-then-fetch), so a DNS-rebinding /
+ * dual-stack window remains — an accepted residual risk for this admin-only
+ * save path.
+ */
+const finalizeBioImages = async (
+  artistId: string,
+  data: UpdateArtistData
+): Promise<UpdateArtistData> => {
+  if (data.bio === undefined && data.altBio === undefined) return data;
+  try {
+    const rows = await ArtistRepository.findBioImagesForRehost(artistId);
+    const cdnPrefix = buildCdnUrl('');
+    const srcs = [...new Set([...collectImgSrcs(data.bio), ...collectImgSrcs(data.altBio)])].filter(
+      (src) => needsFullRehost(src, cdnPrefix)
+    );
+    let result = { ...data };
+    for (const [index, src] of srcs.entries()) {
+      result = await rehostOne(result, { artistId, src, index, rows });
+    }
+    return result;
+  } catch (error) {
+    logger.warn('bio_image_finalize_failed', { artistId, error: String(error) });
+    return data;
+  }
+};
+
 /** Path marker for generation-time bio media on the CDN — the only keys the
  *  palette delete is allowed to clean up. */
 const BIO_MEDIA_PATH_MARKER = '/bio/';
@@ -239,6 +354,9 @@ export class ArtistService {
    */
   static async createArtist(data: CreateArtistData): Promise<ServiceResponse<Artist>> {
     try {
+      // Bio-image finalization (finalizeBioImages) is intentionally skipped on
+      // create: a new artist has no generated bio rows, and a manually pasted
+      // external image finalizes on the first update.
       const artist = await ArtistRepository.create(sanitizeBioWriteFields(data));
       return { success: true, data: artist };
     } catch (error) {
@@ -309,7 +427,9 @@ export class ArtistService {
    */
   static async updateArtist(id: string, data: UpdateArtistData): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = await ArtistRepository.update(id, sanitizeBioWriteFields(data));
+      const sanitized = sanitizeBioWriteFields(data);
+      const finalized = await finalizeBioImages(id, sanitized);
+      const artist = await ArtistRepository.update(id, finalized);
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
