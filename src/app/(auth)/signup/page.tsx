@@ -179,7 +179,7 @@ const SignupPage = () => {
       <ContentContainer>
         <div className="mt-6 flex flex-col items-center">
           {magicLinkError !== null && (
-            <Alert variant="destructive" className="mb-4 w-full max-w-lg">
+            <Alert variant="destructive" className="mb-4 w-full">
               <AlertDescription>{magicLinkError}</AlertDescription>
             </Alert>
           )}
@@ -188,7 +188,7 @@ const SignupPage = () => {
               noValidate
               onSubmit={form.handleSubmit(handleSubmit)}
               autoComplete="on"
-              className="w-full max-w-lg"
+              className="w-full"
             >
               <SignupSigninForm
                 control={form.control}

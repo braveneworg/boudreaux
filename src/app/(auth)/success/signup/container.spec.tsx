@@ -63,6 +63,19 @@ describe('SignupSuccessContainer', () => {
     expect(screen.getByText('Sign In')).toBeInTheDocument();
   });
 
+  it('renders a kraft zine panel', () => {
+    const { container } = render(<SuccessContainer email={testEmail} />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-kraft');
+  });
+
+  it('renders the success heading inside the panel', () => {
+    const { container } = render(<SuccessContainer email={testEmail} />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toContainElement(screen.getByRole('img', { name: /success/i }));
+  });
+
   it('renders check email instruction', () => {
     render(<SuccessContainer email={testEmail} />);
     expect(screen.getByText(/Check your email/i)).toBeInTheDocument();

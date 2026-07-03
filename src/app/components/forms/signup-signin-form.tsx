@@ -12,13 +12,13 @@ import {
 } from '@/app/components/auth/social-provider-buttons';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Button } from '@/app/components/ui/button';
-import { Card, CardContent } from '@/app/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { FormInput } from '@/app/components/ui/form-input';
 import { Separator } from '@/app/components/ui/separator';
 import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { useSignupStatusQuery } from '@/app/hooks/use-signup-status-query';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -52,7 +52,7 @@ interface SignupSigninFormProps {
   onSocialError?: (provider: SocialProvider, error: unknown) => void;
   /**
    * Optional heading (e.g. the SIGN-IN / SIGN-UP wordmark image) rendered at the
-   * top of the card, above the social buttons, so the whole flow lives in one
+   * top of the panel, above the social buttons, so the whole flow lives in one
    * flyer. The page owns the image so this component stays presentation-only.
    */
   heading?: React.ReactNode;
@@ -396,20 +396,13 @@ export const SignupSigninForm = ({
   const signupsPaused = hasTermsAndConditions && signupStatus?.paused === true;
 
   return (
-    <Card
-      className={cn(
-        'bg-menu-item-tan-100 shadow-zine relative mx-auto w-full max-w-lg overflow-visible rounded-none border-2 border-black p-0',
-        isSigningIn ? 'zine-accent-pink' : 'zine-accent-teal'
-      )}
-    >
-      {/* Decorative "washi tape" holding the flyer to the wall */}
-      <span
-        aria-hidden="true"
-        className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-28 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
-      />
-      <CardContent className="relative z-10 p-6 sm:p-8">
-        {/* Heading wordmark — lives inside the flyer, above the social buttons */}
-        {heading && <div className="mb-6">{heading}</div>}
+    <ZinePanel accent={isSigningIn ? 'pink' : 'teal'}>
+      {/* Heading wordmark — lives inside the flyer, above the social buttons,
+          spanning the panel's full content width */}
+      {heading && <div className="mb-6">{heading}</div>}
+      {/* Everything below the heading stays centered at the flyer's previous
+          width while the panel itself spans the content area */}
+      <div className="mx-auto w-full max-w-lg">
         {/* Signups-paused notice — shown only on the signup path when paused */}
         {signupsPaused && (
           <Alert className="mb-4">
@@ -458,7 +451,7 @@ export const SignupSigninForm = ({
 
         {/* Mode switch */}
         <ModeSwitchLink isSigningIn={isSigningIn} />
-      </CardContent>
-    </Card>
+      </div>
+    </ZinePanel>
   );
 };

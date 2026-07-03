@@ -398,6 +398,27 @@ describe('SignupPage', () => {
     });
   });
 
+  describe('full-width flyer layout', () => {
+    it('lets the form span the content area without a width cap', () => {
+      const { container } = render(<SignupPage />);
+
+      const form = container.querySelector('form');
+      expect(form).toHaveClass('w-full');
+      expect(form).not.toHaveClass('max-w-lg');
+    });
+
+    it('aligns the magic-link error alert edges with the full-width flyer', () => {
+      useSearchParamsMock.mockReturnValue({
+        get: (key: string) => (key === 'error' ? 'new_user_signup_disabled' : null),
+      });
+      render(<SignupPage />);
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveClass('w-full');
+      expect(alert).not.toHaveClass('max-w-lg');
+    });
+  });
+
   describe('social sign-in error handling', () => {
     it('passes onSocialError to SignupSigninForm', () => {
       render(<SignupPage />);

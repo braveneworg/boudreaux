@@ -216,19 +216,6 @@ vi.mock('@/app/components/ui/alert', () => ({
   ),
 }));
 
-vi.mock('@/app/components/ui/card', () => ({
-  Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="card" className={className}>
-      {children}
-    </div>
-  ),
-  CardContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="card-content" className={className}>
-      {children}
-    </div>
-  ),
-}));
-
 interface FormInputProps {
   id: string;
   placeholder: string;
@@ -733,9 +720,9 @@ describe('SignupSigninForm', () => {
   });
 
   describe('form layout and structure', () => {
-    it('renders the card container', () => {
-      render(<SignupSigninForm {...defaultProps} />);
-      expect(screen.getByTestId('card')).toBeInTheDocument();
+    it('renders the zine panel container', () => {
+      const { container } = render(<SignupSigninForm {...defaultProps} />);
+      expect(container.querySelector('section[data-slot="zine-panel"]')).toBeInTheDocument();
     });
 
     it('should apply correct CSS classes to form container', () => {
@@ -754,6 +741,32 @@ describe('SignupSigninForm', () => {
 
       expect(submitButton.parentElement).toContain(statusIndicator.parentElement);
     });
+
+    it('centers the controls in a max-w-lg wrapper inside the panel', () => {
+      const { container } = render(<SignupSigninForm {...defaultProps} />);
+
+      const panel = container.querySelector('section[data-slot="zine-panel"]');
+      const controlsWrapper = screen
+        .getByTestId('submit-button')
+        .closest<HTMLDivElement>('div.mx-auto.w-full.max-w-lg');
+      expect(controlsWrapper).toBeInTheDocument();
+      expect(panel).toContainElement(controlsWrapper);
+    });
+
+    it('keeps the heading full-width outside the centered controls wrapper', () => {
+      const { container } = render(
+        <SignupSigninForm {...defaultProps} heading={<span data-testid="heading-wordmark" />} />
+      );
+
+      const panel = container.querySelector('section[data-slot="zine-panel"]');
+      // The heading block sits directly in the panel's content div, not inside
+      // the width-capped controls wrapper — that widens it to the panel edges.
+      const contentDiv = panel?.querySelector(':scope > div.z-10');
+      const headingDiv = screen.getByTestId('heading-wordmark').parentElement;
+      expect(headingDiv).toHaveClass('mb-6');
+      expect(headingDiv?.parentElement).toBe(contentDiv);
+      expect(screen.getByTestId('heading-wordmark').closest('.max-w-lg')).toBeNull();
+    });
   });
 
   describe('zine accent styling', () => {
@@ -763,18 +776,22 @@ describe('SignupSigninForm', () => {
 
     it('applies the teal zine accent and offset shadow on the signup path', () => {
       mockUsePathname.mockReturnValue('/signup');
-      render(<SignupSigninForm {...defaultProps} />);
+      const { container } = render(<SignupSigninForm {...defaultProps} />);
 
-      const card = screen.getByTestId('card');
-      expect(card).toHaveClass('zine-accent-teal');
-      expect(card).toHaveClass('shadow-zine');
+      const panel = container.querySelector('section[data-slot="zine-panel"]');
+      expect(panel).toHaveClass('zine-accent-teal');
+      expect(panel).toHaveClass('shadow-zine');
     });
 
     it('applies the pink zine accent on the signin path', () => {
       mockUsePathname.mockReturnValue('/signin');
-      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+      const { container } = render(
+        <SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />
+      );
 
-      expect(screen.getByTestId('card')).toHaveClass('zine-accent-pink');
+      expect(container.querySelector('section[data-slot="zine-panel"]')).toHaveClass(
+        'zine-accent-pink'
+      );
     });
   });
 
