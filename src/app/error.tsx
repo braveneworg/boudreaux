@@ -34,7 +34,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps): React.JSX.E
           imageClassName="w-full"
           priority
         />
-        <h1 className="mb-2 text-2xl font-semibold">Something went wrong</h1>
+        <h2 className="mb-2 text-2xl font-semibold">Something went wrong</h2>
         <p className="text-muted-foreground mb-6">
           An unexpected error occurred. Please try again, or come back later.
         </p>
