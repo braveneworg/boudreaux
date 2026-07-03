@@ -443,13 +443,17 @@ describe('FeaturedArtistsPlayer', () => {
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
   });
 
-  it('should frame the player unit with a black border and zine shadow', () => {
+  it('should frame the player unit with a black outline only, no zine shadow', () => {
     render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
       wrapper: createWrapper(),
     });
 
+    // The accent offset shadow read as a yellow bottom/right border on the
+    // landing panel — the frame keeps only the black outline. On desktop it
+    // steps down a size to share the split with the headlines column.
     const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
-    expect(frame).toHaveClass('border-2', 'border-black', 'shadow-zine');
+    expect(frame).toHaveClass('border-2', 'border-black', 'lg:max-w-sm');
+    expect(frame).not.toHaveClass('shadow-zine');
   });
 
   it('should square the poster shell and info ticker (no rounded caps)', () => {

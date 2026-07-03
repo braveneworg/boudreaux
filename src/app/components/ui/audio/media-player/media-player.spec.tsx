@@ -151,11 +151,15 @@ vi.mock('@/components/ui/carousel', () => ({
       </div>
     );
   },
-  CarouselContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="carousel-content">{children}</div>
+  CarouselContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="carousel-content" className={className}>
+      {children}
+    </div>
   ),
-  CarouselItem: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="carousel-item">{children}</div>
+  CarouselItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="carousel-item" className={className}>
+      {children}
+    </div>
   ),
   CarouselPrevious: () => <button data-testid="carousel-previous">Previous</button>,
   CarouselNext: () => <button data-testid="carousel-next">Next</button>,
@@ -932,6 +936,67 @@ describe('MediaPlayer', () => {
 
       expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
       expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
+    });
+
+    it('should outline thumbnails in black, accenting and scaling the playing one', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={mockFeaturedArtists}
+            selectedArtistId="featured-2"
+          />
+        </MediaPlayer>
+      );
+
+      // Flat black outline on every tile (matching the player frame); the
+      // playing tile swaps to the panel accent and stays slightly scaled up,
+      // animating via the transform transition as it slides in.
+      const playing = screen.getByRole('button', { name: 'Select Artist Two' });
+      expect(playing).toHaveClass(
+        'border-2',
+        'border-(--card-accent)',
+        'scale-105',
+        'transition-transform'
+      );
+      const idle = screen.getByRole('button', { name: 'Select Artist One' });
+      expect(idle).toHaveClass('border-2', 'border-black');
+      expect(idle).not.toHaveClass('scale-105');
+    });
+
+    it('should ring thumbnails only for keyboard focus, not clicks', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      // focus-visible fires for keyboard/programmatic focus but not pointer
+      // clicks on buttons — so clicking a thumbnail shows no dark ring.
+      const tile = screen.getByRole('button', { name: 'Select Artist One' });
+      expect(tile).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-primary');
+      expect(tile.className).not.toMatch(/focus:ring/);
+    });
+
+    it('should widen the row past the content column with airier gutters', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      // The arrows sit in-flow at the row's ends; the negative margins match
+      // the panel padding (p-6/sm:p-8) so the arrow tips sit near-flush with
+      // the panel edge. On desktop the carousel instead centers at 80% width
+      // inside the split's left column (~20% smaller thumbnails).
+      const row = screen.getByTestId('carousel-previous').parentElement;
+      expect(row).toHaveClass('-mx-6', 'sm:-mx-8', 'lg:mx-auto', 'lg:max-w-[80%]');
+      // Roomy 24px gutters between the images, and 3-up on desktop where
+      // the carousel spans the landing split's left half.
+      expect(screen.getByTestId('carousel-content')).toHaveClass('-ml-6');
+      screen.getAllByTestId('carousel-item').forEach((item) => {
+        expect(item).toHaveClass('pl-6', 'lg:basis-1/3');
+        expect(item).not.toHaveClass('pl-2');
+      });
     });
 
     it('should call onSelect when a featured artist is clicked', () => {

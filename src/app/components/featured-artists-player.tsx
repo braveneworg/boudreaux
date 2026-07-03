@@ -163,7 +163,9 @@ const FeaturedArtistDetails = ({
 
   return (
     <div className="flex flex-col items-center">
-      <div className="shadow-zine mx-auto w-full max-w-xl border-2 border-black">
+      {/* lg: the player rides the left half of the landing split, stepped
+          down ~20% to leave the headlines column breathing room. */}
+      <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-sm">
         {/* Interactive Cover Art — aspect-square container prevents CLS */}
         <div className="bg-muted aspect-square w-full overflow-hidden">
           {coverArt && (

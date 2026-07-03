@@ -215,9 +215,14 @@ const FeaturedArtistCarousel = memo(
         opts={{ loop: true, align: 'center' }}
         setApi={setCarouselApi}
       >
-        <div className="flex items-center">
+        {/* Negative margins match the panel padding (p-6/sm:p-8) so the
+            in-flow arrow tips sit near-flush with the panel edge — the
+            images stay on the content column. On desktop the carousel
+            instead centers at 80% of the split's left column, stepping the
+            thumbnails down ~20%. */}
+        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-[80%]">
           <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ml-6">
             {sortedArtists.map((featured, index) => {
               const coverArt = getFeaturedArtistCoverArt(featured);
               const displayName = getFeaturedArtistDisplayName(featured);
@@ -227,12 +232,22 @@ const FeaturedArtistCarousel = memo(
               return (
                 <CarouselItem
                   key={featured.id}
-                  className="shrink-0 basis-1/3 pt-1 pb-1 pl-2 sm:basis-1/5 lg:basis-[calc(100%/7)]"
+                  // 3-up on desktop, where the carousel spans the left half
+                  // of the landing split instead of the full content width.
+                  className="shrink-0 basis-1/3 pt-1 pb-1 pl-6 sm:basis-1/5 lg:basis-1/3"
                 >
                   <button
                     type="button"
                     onClick={() => handleSelect(featured, index)}
-                    className="group focus:ring-primary relative aspect-square w-full focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                    className={cn(
+                      // focus-visible (not focus) so pointer clicks show no
+                      // dark ring — keyboard focus keeps it.
+                      'group focus-visible:ring-primary relative aspect-square w-full border-2 transition-transform duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                      // Flat black outline like the player frame; the playing
+                      // tile swaps to the panel accent and holds a slight
+                      // scale-up, animating as it slides toward center.
+                      isSelectedArtist ? 'scale-105 border-(--card-accent)' : 'border-black'
+                    )}
                     aria-label={`Select ${displayName}`}
                   >
                     <div className="absolute inset-0 overflow-hidden">
