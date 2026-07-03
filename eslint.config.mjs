@@ -48,12 +48,22 @@ const eslintConfig = [
       // Catches invalid/typo'd utilities that compile to nothing. `ignore` is a
       // list of anchored regexes for genuine non-Tailwind classes the resolver
       // can't know about: video.js skin classes (`vjs-*`) and its player-container
-      // hook, sonner's wrapper, and the banner animation marker (keyframes live in
-      // globals.css). Test placeholder classNames are handled by the spec override
-      // below. See docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
+      // hook, sonner's wrapper, the banner animation marker (keyframes live in
+      // globals.css), and the bio figure marker (`bio-figure`) that mirrors the
+      // sanitizer's figure contract for stable selectors. Test placeholder
+      // classNames are handled by the spec override below. See
+      // docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
       'better-tailwindcss/no-unknown-classes': [
         'error',
-        { ignore: ['^vjs-', '^audio-player-wrapper$', '^toaster$', '^banner-strip-slide$'] },
+        {
+          ignore: [
+            '^vjs-',
+            '^audio-player-wrapper$',
+            '^toaster$',
+            '^banner-strip-slide$',
+            '^bio-figure$',
+          ],
+        },
       ],
     },
   },
