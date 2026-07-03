@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { ScrollText } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { getLogLevelState } from '@/lib/utils/logger';
 
 import { LogLevelForm } from './log-level-form';
@@ -15,14 +15,15 @@ export default function LoggingPage() {
   const state = getLogLevelState();
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Logging', url: '/admin/logging', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Logging', url: '/admin/logging', isActive: true },
+      ]}
+    >
       <SectionHeader
         icon={ScrollText}
         title="Logging"
@@ -30,6 +31,6 @@ export default function LoggingPage() {
       />
 
       <LogLevelForm initialState={state} />
-    </div>
+    </ZinePanel>
   );
 }

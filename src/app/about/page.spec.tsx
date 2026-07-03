@@ -109,6 +109,27 @@ describe('AboutPage', () => {
     expect(headingImage).toHaveAttribute('data-priority', 'true');
   });
 
+  describe('zine panel', () => {
+    it('wraps the heading and all sections in one pink zine panel', () => {
+      const { container } = render(<AboutPage />);
+
+      const panel = container.querySelector('[data-slot="zine-panel"]');
+      expect(panel).toBeInTheDocument();
+      expect(panel).toHaveClass('zine-accent-pink');
+
+      expect(panel).toContainElement(screen.getByTestId('image-about fake four inc.'));
+      expect(panel).toContainElement(screen.getByTestId('section-community-and-impact'));
+    });
+
+    it('renders the breadcrumb inside the zine panel', () => {
+      const { container } = render(<AboutPage />);
+
+      const panel = container.querySelector('[data-slot="zine-panel"]');
+      expect(panel).toBeInTheDocument();
+      expect(panel).toContainElement(screen.getByTestId('breadcrumb'));
+    });
+  });
+
   describe('images', () => {
     it('renders founders image with correct path, dimensions, and priority', () => {
       render(<AboutPage />);
@@ -137,6 +158,26 @@ describe('AboutPage', () => {
       );
       expect(bandcampImage).toHaveAttribute('data-width', '380');
       expect(bandcampImage).toHaveAttribute('data-height', '42');
+    });
+
+    it('frames the founders image with a square black border and zine shadow', () => {
+      render(<AboutPage />);
+
+      const foundersImage = screen.getByTestId(
+        'image-Ceschi and David Ramos, founders of Fake Four Inc. in 2008'
+      );
+      expect(foundersImage).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+      expect(foundersImage).not.toHaveClass('rounded-full');
+    });
+
+    it('frames the bandcamp image with a square black border and zine shadow', () => {
+      render(<AboutPage />);
+
+      const bandcampImage = screen.getByTestId(
+        "image-Listen to David Ramos' This Up Here on Bandcamp"
+      );
+      expect(bandcampImage).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+      expect(bandcampImage).not.toHaveClass('rounded-md');
     });
   });
 

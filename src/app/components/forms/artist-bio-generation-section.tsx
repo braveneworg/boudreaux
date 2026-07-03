@@ -43,7 +43,7 @@ const ReferenceLinksList = ({ links, onRemove }: ReferenceLinksListProps) => (
             type="button"
             onClick={() => onRemove(url)}
             aria-label={`Remove ${url}`}
-            className="hover:text-destructive ml-1 rounded-full"
+            className="hover:text-destructive ml-1"
           >
             <X className="size-3" aria-hidden />
           </button>
@@ -176,7 +176,7 @@ export const ArtistBioGenerationSection = ({
   };
 
   return (
-    <section className="border-primary/40 bg-primary/5 space-y-4 rounded-lg border border-dashed p-4">
+    <section className="border-primary/40 bg-primary/5 space-y-4 border border-dashed p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="text-primary size-5" aria-hidden />
         <h2 className="font-semibold">AI Bio Generation</h2>

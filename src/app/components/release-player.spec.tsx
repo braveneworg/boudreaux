@@ -296,6 +296,13 @@ describe('ReleasePlayer', () => {
     expect(screen.getByTestId('format-file-list-drawer')).toBeInTheDocument();
   });
 
+  it('should frame the player unit with a black border and zine shadow', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+    expect(frame).toHaveClass('border-2', 'border-black', 'shadow-zine');
+  });
+
   it('should handle play/pause state', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 

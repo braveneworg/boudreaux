@@ -32,7 +32,7 @@ const PreviewThumbnail = ({ src, altText }: { src: string; altText: string }): R
     <button
       type="button"
       onClick={() => openPreview({ src, altText })}
-      className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
+      className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
     >
       <Image
         // Base64 data URLs are passed through unoptimized
@@ -43,7 +43,7 @@ const PreviewThumbnail = ({ src, altText }: { src: string; altText: string }): R
         className="object-cover"
         sizes="64px"
       />
-      <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+      <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
         <Eye className="h-3 w-3" />
       </span>
     </button>

@@ -15,10 +15,12 @@ import {
 } from '@/app/components/ui/breadcrumb';
 import { cn } from '@/lib/utils/tailwind-utils';
 
-type BreadcrumbItemData = {
+export type BreadcrumbItemData = {
   anchorText: string;
   url: string;
   isActive: boolean;
+  /** Crumbs for label-only segments with no route pass `false`; omitted means `true` */
+  isLink?: boolean;
   /** Optional CSS classes to apply to the breadcrumb text */
   className?: string;
 };
@@ -31,7 +33,7 @@ type BreadcrumbMenuProps = {
 export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
   <div
     data-slot="breadcrumb-menu"
-    className={cn('relative left-5 mt-1 mb-2 flex items-center gap-2 text-sm', className)}
+    className={cn('relative top-0 left-5 flex items-center gap-2 pb-3 text-sm', className)}
   >
     <Link href="/" className="hover:text-foreground text-zinc-950 transition-colors">
       <Home className="size-5" />
@@ -52,6 +54,8 @@ export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
                 <BreadcrumbPage>
                   <span className={item.className}>{item.anchorText}</span>
                 </BreadcrumbPage>
+              ) : item.isLink === false ? (
+                <span className={item.className}>{item.anchorText}</span>
               ) : (
                 <BreadcrumbLink asChild>
                   <Link href={item.url}>{item.anchorText}</Link>

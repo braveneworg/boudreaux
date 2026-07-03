@@ -16,6 +16,7 @@ import type { ReleaseOption } from '@/app/components/forms/fields/release-select
 import { Button } from '@/app/components/ui/button';
 import { Form } from '@/app/components/ui/form';
 import { Separator } from '@/app/components/ui/separator';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import {
   useCreateFeaturedArtistMutation,
   useDeleteFeaturedArtistMutation,
@@ -277,7 +278,16 @@ export const FeaturedArtistForm = ({
   }
 
   return (
-    <div className="space-y-6">
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Featured Artists', url: '/admin/featured-artists', isActive: false },
+        { anchorText: isEditMode ? 'Edit' : 'New', url: '#', isActive: true },
+      ]}
+    >
       <FeaturedArtistFormHeader isEditMode={isEditMode} />
 
       <Form {...form}>
@@ -332,6 +342,6 @@ export const FeaturedArtistForm = ({
           </div>
         </form>
       </Form>
-    </div>
+    </ZinePanel>
   );
 };

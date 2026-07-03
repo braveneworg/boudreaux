@@ -231,4 +231,30 @@ describe('BreadcrumbMenu', () => {
     const link = homeIcon.closest('a');
     expect(link).toHaveAttribute('href', '/');
   });
+
+  describe('label-only crumbs', () => {
+    it('renders an isLink: false crumb as a plain span with no link', () => {
+      render(
+        <BreadcrumbMenu
+          items={[
+            { anchorText: 'Legal', url: '', isActive: false, isLink: false },
+            { anchorText: 'Privacy Policy', url: '/legal/privacy-policy', isActive: true },
+          ]}
+        />
+      );
+
+      const legalCrumb = screen.getByText('Legal');
+      expect(legalCrumb).toBeInTheDocument();
+      expect(legalCrumb.tagName).toBe('SPAN');
+      expect(screen.queryByRole('link', { name: 'Legal' })).not.toBeInTheDocument();
+    });
+
+    it('still renders a link for a non-active crumb without isLink', () => {
+      render(
+        <BreadcrumbMenu items={[{ anchorText: 'Dashboard', url: '/dashboard', isActive: false }]} />
+      );
+
+      expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard');
+    });
+  });
 });

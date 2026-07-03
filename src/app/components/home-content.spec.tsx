@@ -30,6 +30,10 @@ vi.mock('./featured-artists-player', () => ({
   ),
 }));
 
+vi.mock('./release-headlines', () => ({
+  ReleaseHeadlines: () => <aside data-testid="release-headlines" />,
+}));
+
 // Drive next/dynamic synchronously: exercise the loader (so the dynamic import
 // arrow + its `.then` mapper are covered) and the `loading` placeholder branch.
 vi.mock('next/dynamic', () => ({
@@ -163,6 +167,59 @@ describe('HomeContent', () => {
     render(<HomeContent />);
 
     expect(screen.getByTestId('featured-count')).toHaveTextContent('0');
+  });
+
+  it('wraps the content after the banner in a yellow zine panel', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    const panel = screen.getByRole('img', { name: /featured artists/i }).closest('section');
+    expect(panel).toHaveAttribute('data-slot', 'zine-panel');
+    expect(panel).toHaveClass('zine-accent-yellow');
+    expect(panel).toContainElement(screen.getByTestId('artist-search'));
+  });
+
+  it('gives the landing heading extra breathing room', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // Landing-only: the wordmark separates the search field from the player,
+    // so it gets more air than the default tight heading margins — slightly
+    // more above than below, tying it to the player it titles.
+    const heading = screen.getByRole('heading', { name: /featured artists/i });
+    expect(heading).toHaveClass('mt-8', 'mb-6');
+  });
+
+  it('reflows the desktop layout: heading atop the headlines column', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // lg+: the search box keeps clear air above the split, then a
+    // two-column grid places the wordmark in the right column's first row
+    // (top-aligned with the carousel), the player spanning both rows on
+    // the left, and the headlines feed beneath the wordmark. The feed pane
+    // scrolls internally, so the wordmark stays put.
+    expect(screen.getByTestId('artist-search').parentElement).toHaveClass('lg:mb-8');
+    const heading = screen.getByRole('heading', { name: /featured artists/i });
+    expect(heading).toHaveClass('lg:col-start-2', 'lg:row-start-1', 'lg:mt-0', 'lg:mb-8');
+    const grid = heading.parentElement;
+    expect(grid).toHaveClass(
+      'lg:grid',
+      'lg:grid-cols-2',
+      'lg:grid-rows-[auto_1fr]',
+      'lg:items-start',
+      'lg:gap-x-10'
+    );
+    const playerCell = screen.getByTestId('dynamic-featured').parentElement;
+    expect(playerCell).toHaveClass('lg:col-start-1', 'lg:row-start-1', 'lg:row-span-2');
+    const headlinesCell = screen.getByTestId('release-headlines').parentElement;
+    expect(headlinesCell).toHaveClass('lg:col-start-2', 'lg:row-start-2');
   });
 
   it('renders both banner treatments so the visible one is correct from first paint', () => {

@@ -17,4 +17,10 @@ describe('OfflinePage', () => {
 
     expect(screen.getByText(/already visited will still load/i)).toBeInTheDocument();
   });
+
+  it('carries the kraft zine accent on the page container', () => {
+    const { container } = render(<OfflinePage />);
+
+    expect(container.firstChild).toHaveClass('zine-accent-kraft');
+  });
 });

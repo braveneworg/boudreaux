@@ -68,6 +68,20 @@ describe('Command', () => {
       expect(screen.getByPlaceholderText('Type a command...')).toBeInTheDocument();
     });
 
+    it('cn-merges wrapperClassName onto the input wrapper', () => {
+      render(
+        <Command>
+          <CommandInput placeholder="Type a command..." wrapperClassName="border-b-0" />
+        </Command>
+      );
+
+      const wrapper = screen
+        .getByPlaceholderText('Type a command...')
+        .closest('[data-slot="command-input-wrapper"]');
+      expect(wrapper).toHaveClass('border-b-0');
+      expect(wrapper).not.toHaveClass('border-b');
+    });
+
     it('applies custom className', () => {
       render(
         <Command>

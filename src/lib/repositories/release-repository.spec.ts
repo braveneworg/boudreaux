@@ -73,7 +73,9 @@ describe('ReleaseRepository', () => {
     images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
     artistReleases: {
       select: {
-        artist: { select: { id: true, firstName: true, surname: true, displayName: true } },
+        artist: {
+          select: { id: true, firstName: true, surname: true, displayName: true, slug: true },
+        },
       },
     },
     releaseUrls: { select: { url: { select: { platform: true, url: true } } } },

@@ -52,7 +52,7 @@ interface PreviewProps {
 }
 
 const CoverArtPreview = ({ src, isUploading, disabled, onRemove }: PreviewProps) => (
-  <div className="group relative h-40 w-40 overflow-hidden rounded-lg border">
+  <div className="group relative h-40 w-40 overflow-hidden border">
     {/* `unoptimized` bypasses the custom image loader, which would
         otherwise rewrite the src to `_w{width}.webp`. Width variants
         are generated asynchronously after upload (fire-and-forget),
@@ -69,7 +69,7 @@ const CoverArtPreview = ({ src, isUploading, disabled, onRemove }: PreviewProps)
       <button
         type="button"
         onClick={onRemove}
-        className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+        className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
         aria-label="Remove cover art"
       >
         <X className="h-3.5 w-3.5" />
@@ -116,7 +116,7 @@ const CoverArtDropZone = ({
       role="button"
       tabIndex={0}
       className={cn(
-        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
+        'flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-4 transition-colors',
         isDragOver && 'border-primary bg-primary/5',
         !isDragOver && 'border-muted-foreground/25 hover:border-muted-foreground/50',
         (disabled || isUploading) && 'cursor-not-allowed opacity-50'

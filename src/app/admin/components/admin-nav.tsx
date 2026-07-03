@@ -89,7 +89,7 @@ export const AdminNav = (): React.ReactElement => {
               href={item.href}
               aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
               className={cn(
-                'font-fake-four-cutout rounded-sm px-0.5 text-lg whitespace-nowrap transition-colors',
+                'font-fake-four-cutout px-0.5 text-lg whitespace-nowrap transition-colors',
                 'focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]',
                 isActiveHref(item.href, pathname)
                   ? 'text-foreground underline underline-offset-8'

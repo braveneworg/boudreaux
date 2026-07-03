@@ -14,6 +14,18 @@ import type {
 
 import { TourDetail } from './tour-detail';
 
+vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
+  BreadcrumbMenu: ({
+    items,
+  }: {
+    items: Array<{ anchorText: string; url: string; isActive: boolean }>;
+  }) => (
+    <nav data-testid="breadcrumb-menu" data-items={JSON.stringify(items)}>
+      Breadcrumbs
+    </nav>
+  ),
+}));
+
 type TourWithRelations = Tour & {
   tourDates: Array<
     TourDate & {
@@ -595,5 +607,76 @@ describe('TourDetail', () => {
     render(<TourDetail tour={createMockTour()} />);
 
     expect(screen.getByText('Tour Dates')).toBeInTheDocument();
+  });
+
+  // ─── Punk zine treatment ──────────────────────────────────────────────────────
+
+  it('wraps the tour content in a tan zine panel', () => {
+    const { container } = render(<TourDetail tour={createMockTour()} />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-tan');
+    expect(panel).toContainElement(screen.getByRole('link', { name: /Back to Tours/i }));
+    expect(panel).toContainElement(screen.getByText('Tour Dates'));
+  });
+
+  it('renders a breadcrumb trail ending at the tour title', () => {
+    render(<TourDetail tour={createMockTour({ id: 'tour-9', title: 'Breadcrumb Tour' })} />);
+
+    const breadcrumbs = screen.getByTestId('breadcrumb-menu');
+    const items = JSON.parse(breadcrumbs.getAttribute('data-items') ?? '[]');
+    expect(items).toEqual([
+      { anchorText: 'Tours', url: '/tours', isActive: false },
+      {
+        anchorText: 'Breadcrumb Tour',
+        url: '/tours/tour-9',
+        isActive: true,
+        className: 'max-w-[200px] truncate sm:max-w-none sm:overflow-visible',
+      },
+    ]);
+  });
+
+  it('renders the breadcrumb menu inside the zine panel', () => {
+    const { container } = render(<TourDetail tour={createMockTour()} />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toContainElement(screen.getByTestId('breadcrumb-menu'));
+  });
+
+  it('squares the hero image wrapper with punk border and shadow', () => {
+    const image = createMockImage({ altText: 'Concert promo photo', displayOrder: 0 });
+    render(<TourDetail tour={createMockTour({ images: [image] })} />);
+
+    const wrapper = screen.getByAltText('Concert promo photo').parentElement;
+    expect(wrapper).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+    expect(wrapper).not.toHaveClass('rounded-lg');
+  });
+
+  it('squares the gallery image wrappers', () => {
+    const images = [
+      createMockImage({ id: 'img-1', displayOrder: 0, altText: 'Hero' }),
+      createMockImage({ id: 'img-2', displayOrder: 1, altText: 'Gallery shot 1' }),
+    ];
+    render(<TourDetail tour={createMockTour({ images })} />);
+
+    const wrapper = screen.getByAltText('Gallery shot 1').parentElement;
+    expect(wrapper).toHaveClass('overflow-hidden');
+    expect(wrapper).not.toHaveClass('rounded-lg');
+  });
+
+  it('renders the Past Event badge without rounded corners', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          startDate: new Date('2020-01-01T00:00:00.000Z'),
+        }),
+      ],
+    });
+    render(<TourDetail tour={tour} />);
+
+    const badge = screen.getByText('Past Event');
+    expect(badge).toHaveClass('bg-muted', 'inline-block', 'px-3', 'py-1');
+    expect(badge).not.toHaveClass('rounded-full');
   });
 });

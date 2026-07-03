@@ -109,7 +109,6 @@ export const SocialProviderButtons = ({
         <Button
           key={provider}
           type="button"
-          variant="punk"
           aria-label={label}
           className="h-12 justify-center gap-2.5 text-sm tracking-[0.12em] uppercase"
           disabled={isPending || disabled}

@@ -286,7 +286,7 @@ export const ImageCropper = ({
         <div className="space-y-4">
           {/* Cropper area */}
           <div
-            className="relative flex h-100 w-full items-center justify-center rounded-lg"
+            className="relative flex h-100 w-full items-center justify-center"
             style={{ backgroundColor: useBackgroundColor ? backgroundColor : '#0a0a0a' }}
           >
             <ReactCrop
@@ -318,7 +318,7 @@ export const ImageCropper = ({
           </p>
 
           {/* Background color option */}
-          <div className="space-y-2 rounded-lg border p-4">
+          <div className="space-y-2 border p-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="use-bg-color" className="cursor-pointer">
                 Add background color (for images that don&apos;t fill the frame)
@@ -351,7 +351,7 @@ export const ImageCropper = ({
                   />
                 </div>
                 <div
-                  className="h-8 w-8 rounded-sm border"
+                  className="h-8 w-8 border"
                   style={{ backgroundColor }}
                   aria-label={`Background color preview: ${backgroundColor}`}
                 />

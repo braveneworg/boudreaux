@@ -100,6 +100,39 @@ describe('ReleasesPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
+  it('should sketch hand-drawn strokes around the heading wordmark', async () => {
+    const Page = await ReleasesPage();
+    const { container } = render(Page);
+
+    const strokes = container.querySelectorAll<HTMLElement>('[data-slot="zine-sketch-stroke"]');
+    expect(strokes).toHaveLength(2);
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(headingImage.parentElement).toContainElement(strokes[0]);
+  });
+
+  it('should size the heading to the shared zine strip scale', async () => {
+    const Page = await ReleasesPage();
+    render(Page);
+
+    // Consistent header size site-wide: full-width masthead on mobile, the
+    // ZineHeading strip height from sm up instead of spanning the panel.
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(headingImage).toHaveClass('h-auto', 'w-full', 'sm:h-14', 'sm:w-auto');
+  });
+
+  it('should wrap the heading and releases content in a cyan zine panel', async () => {
+    const Page = await ReleasesPage();
+    const { container } = render(Page);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-cyan');
+
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(panel).toContainElement(headingImage);
+    expect(panel).toContainElement(screen.getByTestId('releases-content'));
+  });
+
   it('should prefetch the first published-releases page as an infinite query', async () => {
     mockGetPublishedReleases.mockResolvedValue({
       success: true,

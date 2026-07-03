@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * ReleaseSearchCombobox — a combobox dropdown for searching published releases
- * by artist name, release title, or catalog number. Search runs server-side
- * (debounced), so it covers the full catalog rather than only loaded pages.
- * Uses shadcn/ui Popover + Command (cmdk) for keyboard-navigable results.
+ * ReleaseSearchCombobox — a combobox dropdown for browsing and searching
+ * published releases. Opening it immediately lists the published catalog
+ * (infinite-scrolled, sharing the page grid's prefetched query); typing
+ * switches to a server-side search by artist name, release title, or catalog
+ * number, covering the full catalog rather than only loaded pages. Uses
+ * shadcn/ui Popover + Command (cmdk) for keyboard-navigable results.
  * Selecting a result navigates to the release's media player page.
  */
 'use client';
@@ -25,15 +27,21 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { usePublishedReleaseSearchQuery } from '@/app/hooks/use-infinite-published-releases-query';
+import {
+  useInfinitePublishedReleasesQuery,
+  usePublishedReleaseSearchQuery,
+} from '@/app/hooks/use-infinite-published-releases-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { getArtistDisplayNameForRelease, getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
+/** How close to the list's bottom edge (px) before the next page loads. */
+const NEAR_BOTTOM_THRESHOLD_PX = 48;
+
 /**
- * A combobox dropdown that lets users search releases by typing. Results are
- * fetched from the server as the user types and each shows a cover art
- * thumbnail, artist name, and title. Selecting a result navigates to
- * `/releases/{releaseId}`.
+ * A combobox dropdown that opens onto the browsable published catalog
+ * (infinitely scrolled) and switches to server search as the user types.
+ * Each result shows a cover art thumbnail, artist name, and title.
+ * Selecting a result navigates to `/releases/{releaseId}`.
  */
 export const ReleaseSearchCombobox = () => {
   const router = useRouter();
@@ -41,7 +49,17 @@ export const ReleaseSearchCombobox = () => {
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data: releases, isFetching } = usePublishedReleaseSearchQuery(debouncedSearch);
+  const { data: searchReleases, isFetching } = usePublishedReleaseSearchQuery(debouncedSearch);
+
+  // Browse mode for an empty query: the same infinite listing the page grid
+  // uses (shared query key, so the SSR prefetch makes opening instant).
+  const {
+    data: browsePages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isPending: isBrowsePending,
+  } = useInfinitePublishedReleasesQuery('');
 
   const handleSelect = React.useCallback(
     (releaseId: string) => {
@@ -52,6 +70,12 @@ export const ReleaseSearchCombobox = () => {
   );
 
   const hasQuery = debouncedSearch.trim().length > 0;
+
+  const browseReleases = React.useMemo(
+    () => (browsePages?.pages ?? []).flatMap((page) => page.rows),
+    [browsePages]
+  );
+  const releases = hasQuery ? searchReleases : browseReleases;
 
   // Derive cover art + artist name once per result set rather than on every
   // keystroke-driven re-render (the search input updates state on each key,
@@ -68,29 +92,56 @@ export const ReleaseSearchCombobox = () => {
     [releases]
   );
 
+  /** Pull the next browse page as the list nears its bottom edge. */
+  const handleListScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (hasQuery || !hasNextPage || isFetchingNextPage) return;
+      const { scrollTop, clientHeight, scrollHeight } = event.currentTarget;
+      if (scrollTop + clientHeight >= scrollHeight - NEAR_BOTTOM_THRESHOLD_PX) {
+        void fetchNextPage();
+      }
+    },
+    [hasQuery, hasNextPage, isFetchingNextPage, fetchNextPage]
+  );
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           aria-expanded={open}
           aria-label="Search releases"
-          className="flex w-full items-center justify-between rounded-md border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-colors hover:border-zinc-400"
+          // Landing-search focus treatment on the trigger box: a 3px ring
+          // tinted to the RELEASES wordmark's cyan, shown while focused and
+          // while the dropdown is open.
+          className="flex w-full items-center justify-between border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-[color,box-shadow] hover:border-zinc-400 focus-visible:ring-[3px] focus-visible:ring-[#45fefc] focus-visible:outline-none data-[state=open]:ring-[3px] data-[state=open]:ring-[#45fefc]"
         >
           Search releases...
         </button>
       </PopoverTrigger>
+      {/* Dropdown surface: paper results under a query row swiped in a light
+          offset highlight of the RELEASES wordmark's cyan (#45fefc), with the
+          inner borders dropped — the important border-0 is needed because the
+          site-wide zine input border in globals.css is unlayered and outranks
+          plain utilities. */}
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         {/* Server provides the matches; disable cmdk's client-side filtering. */}
-        <Command shouldFilter={false}>
+        <Command
+          shouldFilter={false}
+          className="bg-transparent **:data-[slot=command-input-wrapper]:border-b-0"
+        >
           <CommandInput
             value={search}
             onValueChange={setSearch}
             placeholder="Search by artist, title, or catalog number..."
             aria-label="Search releases"
+            className="border-0!"
+            wrapperClassName="bg-[#d0fffe]"
           />
-          <CommandList>
+          <CommandList onScroll={handleListScroll}>
             <CommandEmpty>
-              {hasQuery && !isFetching ? 'No releases found.' : 'Type to search releases.'}
+              {(hasQuery ? isFetching : isBrowsePending)
+                ? 'Loading releases…'
+                : 'No releases found.'}
             </CommandEmpty>
             <CommandGroup>
               {enrichedResults.map(({ release, coverArt, artistName }) => {
@@ -107,10 +158,10 @@ export const ReleaseSearchCombobox = () => {
                         alt={coverArt.alt}
                         width={40}
                         height={40}
-                        className="rounded-sm object-cover"
+                        className="object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-zinc-200 text-xs text-zinc-500">
+                      <div className="flex h-10 w-10 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
                         ♫
                       </div>
                     )}
@@ -122,6 +173,9 @@ export const ReleaseSearchCombobox = () => {
                 );
               })}
             </CommandGroup>
+            {!hasQuery && isFetchingNextPage && (
+              <div className="py-2 text-center text-xs text-zinc-500">Loading more…</div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -41,7 +41,7 @@ import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
 import { type GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
-import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { ZinePanel } from '@/ui/zine-panel';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -552,17 +552,18 @@ export const ArtistForm = ({
   }
 
   return (
-    <>
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          {
-            anchorText: isEditMode ? 'Edit Artist' : 'Create Artist',
-            url: '/admin/artists',
-            isActive: true,
-          },
-        ]}
-      />
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        {
+          anchorText: isEditMode ? 'Edit Artist' : 'Create Artist',
+          url: '/admin/artists',
+          isActive: true,
+        },
+      ]}
+    >
       <div className="space-y-6">
         <ArtistFormHeader isEditMode={isEditMode} />
         <Form {...artistForm}>
@@ -609,6 +610,6 @@ export const ArtistForm = ({
           </form>
         </Form>
       </div>
-    </>
+    </ZinePanel>
   );
 };

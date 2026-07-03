@@ -25,17 +25,21 @@ export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps):
 
   return (
     <html lang="en">
-      <body className="bg-background text-foreground">
+      <body className="bg-background text-foreground zine-accent-storm">
         <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 text-center">
-          <h1 className="text-2xl font-semibold">Something went wrong</h1>
-          <p>An unexpected error occurred. Please try again, or come back later.</p>
-          <button
-            type="button"
-            onClick={reset}
-            className="hover:bg-accent rounded-md border px-4 py-2 font-medium focus-visible:outline-2"
-          >
-            Try again
-          </button>
+          {/* Hand-rolled zine panel — ZinePanel/ImageHeading/Button stay off-limits here. */}
+          <div className="bg-menu-item-tan-100 shadow-zine relative w-full max-w-2xl border-2 border-black p-6 text-center sm:p-8">
+            <img src="/media/headings/ERROR.webp" alt="error" className="w-full" />
+            <h1 className="text-2xl font-semibold">Something went wrong</h1>
+            <p>An unexpected error occurred. Please try again, or come back later.</p>
+            <button
+              type="button"
+              onClick={reset}
+              className="shadow-zine-sm border-2 border-black bg-zinc-50 px-4 py-2 font-medium transition-all hover:bg-black hover:text-white focus-visible:outline-2 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              Try again
+            </button>
+          </div>
         </main>
       </body>
     </html>

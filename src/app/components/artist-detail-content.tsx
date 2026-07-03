@@ -15,7 +15,7 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import { ArtistPlayer } from './artist-player';
 import { ExpandableThumbnail } from './expandable-thumbnail';
-import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ZinePanel } from './ui/zine-panel';
 
 interface ArtistDetailContentProps {
   slug: string;
@@ -152,7 +152,7 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
 
   if (!data) {
     return (
-      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center border-2 border-dashed p-8">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-zinc-950">
             {error ? 'Failed to load artist' : 'Artist not found'}
@@ -189,18 +189,18 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
 
   return (
     <div className="space-y-5">
-      <BreadcrumbMenu items={breadcrumbItems} />
+      <ZinePanel chat accent="hot-pink" contentClassName="space-y-5" breadcrumbs={breadcrumbItems}>
+        <ArtistDetailHeader
+          artist={artist}
+          slug={slug}
+          displayName={displayName}
+          genres={genres}
+          detailImages={detailImages}
+          hasFullBio={hasFullBio}
+        />
 
-      <ArtistDetailHeader
-        artist={artist}
-        slug={slug}
-        displayName={displayName}
-        genres={genres}
-        detailImages={detailImages}
-        hasFullBio={hasFullBio}
-      />
-
-      <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
+        <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
+      </ZinePanel>
     </div>
   );
 };

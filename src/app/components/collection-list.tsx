@@ -166,7 +166,7 @@ const CollectionListItem = memo(
       }));
 
     return (
-      <div className="flex items-center gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="shadow-zine-sm flex items-center gap-4 border-2 border-black bg-white p-4">
         {/* Cover Art */}
         <Link href={`/releases/${purchase.release.id}`} className="shrink-0">
           {coverArt ? (
@@ -175,10 +175,10 @@ const CollectionListItem = memo(
               alt={coverArt.alt}
               width={80}
               height={80}
-              className="size-20 rounded-md object-cover"
+              className="size-20 object-cover"
             />
           ) : (
-            <div className="flex size-20 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-400">
+            <div className="flex size-20 items-center justify-center bg-zinc-200 text-xs text-zinc-400">
               No art
             </div>
           )}
@@ -306,7 +306,7 @@ const DownloadFormatForm = ({
             key={formatType}
             value={formatType}
             aria-label={`Select ${getFormatLabel(formatType)}`}
-            className="rounded-md px-3"
+            className="px-3"
           >
             {getFormatLabel(formatType)}
           </ToggleGroupItem>

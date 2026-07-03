@@ -22,7 +22,7 @@ describe('Skeleton', () => {
       const skeleton = screen.getByTestId('skeleton');
       expect(skeleton).toHaveClass('bg-zinc-300');
       expect(skeleton).toHaveClass('animate-pulse');
-      expect(skeleton).toHaveClass('rounded-md');
+      expect(skeleton).toHaveClass('rounded-none');
       expect(skeleton).toHaveClass('my-4');
     });
   });

@@ -27,6 +27,19 @@ describe('ChangeEmailSuccessContainer', () => {
     expect(headingImage).toHaveAttribute('alt', 'success');
   });
 
+  it('renders a kraft zine panel', () => {
+    const { container } = render(<SuccessContainer email={testEmail} />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-kraft');
+  });
+
+  it('renders the success heading inside the panel', () => {
+    const { container } = render(<SuccessContainer email={testEmail} />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toContainElement(screen.getByRole('img', { name: /success/i }));
+  });
+
   it('renders email change success message', () => {
     render(<SuccessContainer email={testEmail} />);
     expect(

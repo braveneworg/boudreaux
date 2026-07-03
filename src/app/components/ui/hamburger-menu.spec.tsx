@@ -54,6 +54,28 @@ describe('HamburgerMenu', () => {
     expect(screen.getByRole('button')).toHaveClass('bg-transparent');
   });
 
+  it('lifts the tap area so the lines sit centered in the header bar', () => {
+    render(<HamburgerMenu />);
+
+    // -top-1 rises the visible mark 6px from its old top-0.5 seat,
+    // equalizing the air above and below the lines within the 58px bar.
+    expect(screen.getByRole('button')).toHaveClass('-top-1');
+  });
+
+  it('renders bare lines with no border, shadow, or stamp accent', () => {
+    render(<HamburgerMenu />);
+
+    // The offset-stamp accent never read as intentional at icon scale, so
+    // the tap area carries no chrome at all: a borderless, shadowless
+    // button around three stark lines on the black header.
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('border-0', 'shadow-none');
+    expect(button).not.toHaveClass('border-2', 'border-zinc-50');
+    const linesBox = button.querySelector('span.size-5');
+    expect(linesBox?.className).not.toMatch(/shadow/);
+    expect(linesBox?.className).not.toMatch(/card-accent/);
+  });
+
   it('toggles screen reader text when clicked', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);

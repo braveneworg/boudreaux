@@ -342,9 +342,10 @@ export const BannerCarousel = ({
       <section className="relative w-full md:hidden" aria-hidden="true">
         {/* Notification strip placeholder */}
         <div className="w-full" style={{ minHeight: '2.5rem' }} />
-        {/* Banner aspect-ratio placeholder */}
+        {/* Banner aspect-ratio placeholder — border-2 matches the loaded
+            carousel's zine frame so swapping it in causes no layout shift */}
         <div
-          className="bg-muted relative w-full"
+          className="bg-muted relative w-full border-2 border-black"
           style={{ paddingBottom: BANNER_ASPECT_PADDING }}
         />
         {/* Dot indicators placeholder */}
@@ -360,7 +361,7 @@ export const BannerCarousel = ({
 
   return (
     <section
-      className="relative w-full overflow-hidden md:hidden"
+      className="zine-accent-yellow shadow-zine-sm relative w-full overflow-hidden border-2 border-black md:hidden"
       aria-label="Banner carousel"
       aria-roledescription="carousel"
       // Capture-phase keydown so arrow keys steer the carousel while focus rests on

@@ -11,8 +11,10 @@ import { useBannersQuery } from '@/app/hooks/use-banners-query';
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
 import { BannerStrip } from './banner-strip';
+import { ReleaseHeadlines } from './release-headlines';
 import { ContentContainer } from './ui/content-container';
 import { ImageHeading } from './ui/image-heading';
+import { ZinePanel } from './ui/zine-panel';
 
 import type { BannerSlotData } from './banner-carousel';
 
@@ -51,21 +53,39 @@ export const HomeContent = () => {
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
-        <section>
-          <ArtistSearchInput />
-          {/* No `priority`: this heading sits below the banner and search
-              input, so it's not the LCP. `ImageHeading` is a client component
-              whose `sizes` flips on `useIsMobile()` between SSR and client, so a
-              `priority` preload (chosen from the SSR `sizes`) would pick a
-              different variant than the hydrated `<img>` ends up using —
-              surfacing "preloaded but not used". It lazy-loads normally instead. */}
-          <ImageHeading
-            src="/media/headings/FEATURED.webp"
-            alt="featured artists"
-            imageHeight={480}
-          />
-          <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
-        </section>
+        {/* Desktop (lg+) reflows via explicit grid placement: search on top,
+            then the player spanning the left half beside the wordmark, which
+            caps the infinitely-scrolling release headlines on the right half
+            (top-aligned with the carousel, fixed while the feed pane scrolls
+            internally). Mobile keeps the stacked search → heading → player
+            flow via plain block order. */}
+        <ZinePanel chat accent="yellow">
+          {/* Desktop: clear air beneath the search box before the split. */}
+          <div className="lg:mb-8">
+            <ArtistSearchInput />
+          </div>
+          {/* grid-rows [auto,1fr] keeps the wordmark row content-sized so the
+              tall row-spanning player can't inflate the gap beneath it. */}
+          <div className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-10">
+            {/* No `priority`: this heading sits below the banner and search
+                input, so it's not the LCP — it lazy-loads normally. Extra
+                vertical air (landing only) separates the search field above
+                from the player below; on desktop the wordmark heads the
+                headlines column with ample air before the feed. */}
+            <ImageHeading
+              src="/media/headings/FEATURED.webp"
+              alt="featured artists"
+              imageHeight={480}
+              className="mt-8 mb-6 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:mb-8"
+            />
+            <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
+              <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+            </div>
+            <div className="lg:col-start-2 lg:row-start-2">
+              <ReleaseHeadlines />
+            </div>
+          </div>
+        </ZinePanel>
       </ContentContainer>
     </>
   );

@@ -11,9 +11,9 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ReleasesContent } from '@/app/components/releases-content';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/app/hooks/use-infinite-published-releases-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
@@ -63,14 +63,15 @@ export default async function ReleasesPage() {
     <HydrationBoundary state={dehydrate(queryClient)}>
       <PageContainer>
         <ContentContainer>
-          <BreadcrumbMenu items={breadcrumbItems} />
-          <ImageHeading
-            src="/media/headings/RELEASES.webp"
-            alt="releases"
-            imageHeight={480}
-            priority
-          />
-          <ReleasesContent />
+          <ZinePanel chat accent="cyan" breadcrumbs={breadcrumbItems}>
+            <ImageHeading
+              src="/media/headings/RELEASES.webp"
+              alt="releases"
+              imageHeight={480}
+              priority
+            />
+            <ReleasesContent />
+          </ZinePanel>
         </ContentContainer>
       </PageContainer>
     </HydrationBoundary>

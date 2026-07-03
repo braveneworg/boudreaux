@@ -918,6 +918,27 @@ describe('BannerCarousel', () => {
       expect(section).toHaveClass('md:hidden');
     });
   });
+
+  describe('zine framing', () => {
+    it('frames the carousel as a yellow-accent zine band', () => {
+      const { container } = render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      const section = container.querySelector('section');
+      expect(section).toHaveClass(
+        'zine-accent-yellow',
+        'border-2',
+        'border-black',
+        'shadow-zine-sm'
+      );
+    });
+
+    it('matches the frame border on the empty-state banner band to avoid layout shift', () => {
+      const { container } = render(<BannerCarousel banners={[]} />);
+
+      const band = container.querySelector('div[style*="padding-bottom"]');
+      expect(band).toHaveClass('border-2', 'border-black');
+    });
+  });
 });
 
 describe('buildBannerSrc', () => {

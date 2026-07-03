@@ -6,7 +6,6 @@
 import { Star } from 'lucide-react';
 
 import { SectionHeader } from '@/app/components/ui/section-header';
-import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
 
 interface FeaturedArtistFormHeaderProps {
   isEditMode: boolean;
@@ -16,14 +15,7 @@ export const FeaturedArtistFormHeader = ({
   isEditMode,
 }: FeaturedArtistFormHeaderProps): React.ReactElement => (
   <>
-    <BreadcrumbMenu
-      items={[
-        { anchorText: 'Admin', url: '/admin', isActive: false },
-        { anchorText: 'Featured Artists', url: '/admin/featured-artists', isActive: false },
-        { anchorText: isEditMode ? 'Edit' : 'New', url: '#', isActive: true },
-      ]}
-    />
-
+    {/* The breadcrumb docks inside the form's storm panel. */}
     <div className="space-y-1">
       <SectionHeader
         icon={Star}

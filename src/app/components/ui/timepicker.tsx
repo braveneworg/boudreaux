@@ -175,7 +175,7 @@ export const TimePicker = ({
                 type="button"
                 onClick={() => setPeriod(p)}
                 className={cn(
-                  'rounded-sm border px-2 py-0.5 text-xs font-medium transition-colors',
+                  'border px-2 py-0.5 text-xs font-medium transition-colors',
                   period === p
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-input hover:bg-accent hover:text-accent-foreground'

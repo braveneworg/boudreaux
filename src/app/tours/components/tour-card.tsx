@@ -173,10 +173,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
   const { primaryTicketUrl, primaryTicketDate } = getTicketInfo(sortedTourDates);
 
   return (
-    <Card
-      className="group overflow-hidden transition-shadow hover:shadow-lg"
-      data-testid="tour-card"
-    >
+    <Card className="group shadow-zine-sm overflow-hidden bg-white" data-testid="tour-card">
       {/* Tour Image */}
       {primaryImage && (
         <Link href={`/tours/${tour.id}`} className="block">

@@ -1,14 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-'use client';
-
 import Image from 'next/image';
 
-import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import { Heading } from './heading';
+import { ZineSketchStrokes } from './zine-sketch-strokes';
 
 import type { HeadingProps } from './heading';
 
@@ -25,14 +23,18 @@ export interface ImageHeadingProps extends Omit<HeadingProps, 'children'> {
   imageClassName?: string;
   /** Whether to mark the image as a high-priority LCP candidate. */
   priority?: boolean;
+  /** Whether to trace the wordmark with the hand-drawn zine sketch strokes. Defaults to on. */
+  sketched?: boolean;
 }
 
 /**
  * A heading whose visible content is an image (e.g. a stylized wordmark).
  * The `alt` text serves as the heading's accessible name (announced once by
- * assistive technologies) and as crawlable SEO text. Pairs with the project's
- * CDN image loader so all seven width variants (`_w256`–`_w1200`) participate
- * in the generated srcset.
+ * assistive technologies) and as crawlable SEO text. The wordmark renders
+ * height-driven at the shared ZineHeading strip scale (`h-12`/`sm:h-14`,
+ * width from the aspect ratio) so page headers stay a consistent size
+ * site-wide; the static `sizes` hint matches that fixed rendering so the
+ * CDN loader serves the smallest useful variant.
  */
 const ImageHeading = ({
   src,
@@ -43,25 +45,33 @@ const ImageHeading = ({
   imageClassName,
   level = 1,
   priority = false,
+  sketched = true,
   ...headingProps
 }: ImageHeadingProps) => {
-  const isMobile = useIsMobile();
+  const image = (
+    <Image
+      src={src}
+      alt={alt}
+      width={imageWidth}
+      height={imageHeight}
+      sizes="(min-width: 640px) 224px, 100vw"
+      priority={priority}
+      className={cn('h-auto w-full sm:h-14 sm:w-auto', imageClassName)}
+    />
+  );
 
   return (
     <Heading level={level} className={cn('mt-1 mb-1.5 h-auto', className)} {...headingProps}>
-      <Image
-        src={src}
-        alt={alt}
-        width={imageWidth}
-        height={imageHeight}
-        sizes={isMobile ? '(min-width: 380px) 380px, 100vw' : '(min-width: 600px) 600px, 100dvw'}
-        priority={priority}
-        className={cn(
-          'h-auto',
-          { 'w-full': isMobile, 'max-w-480': isMobile, 'w-auto': !isMobile },
-          imageClassName
-        )}
-      />
+      {sketched ? (
+        // The strokes anchor to an inline-block wrapper hugging the image
+        // box — the heading element itself spans the full content width.
+        <span className="relative inline-block w-full sm:w-auto">
+          <ZineSketchStrokes />
+          {image}
+        </span>
+      ) : (
+        image
+      )}
     </Heading>
   );
 };

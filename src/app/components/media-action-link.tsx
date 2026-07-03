@@ -25,7 +25,7 @@ export const MediaActionLink = ({
     ref={ref}
     type="button"
     className={cn(
-      'focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 rounded-sm font-semibold text-zinc-950 underline focus-visible:ring-2 focus-visible:outline-none',
+      'focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 font-semibold text-zinc-950 underline focus-visible:ring-2 focus-visible:outline-none',
       className
     )}
     {...props}

@@ -36,9 +36,9 @@ interface ReleaseCardProps {
  */
 export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: ReleaseCardProps) => {
   return (
-    <div className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+    <div className="group shadow-zine-sm flex flex-col gap-2 border-2 border-black bg-white p-3">
       {/* Cover Art */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-md bg-zinc-100">
+      <div className="relative aspect-square w-full overflow-hidden border-2 border-black bg-zinc-100">
         {coverArt ? (
           <Image
             src={coverArt.src}
@@ -74,8 +74,8 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
           href={`/releases/${id}?autoplay=true`}
           aria-label={`Play ${title}`}
           className={cn(
-            'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium',
-            'bg-zinc-900 text-white transition-colors hover:bg-zinc-700'
+            'inline-flex items-center gap-1 border-2 border-black px-3 py-1.5 text-xs font-medium',
+            'shadow-zine-ink bg-zinc-900 text-white transition-colors hover:bg-zinc-700'
           )}
         >
           <Music2 className="size-3.5" />
@@ -87,7 +87,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
           releaseId={id}
           releaseTitle={title}
           triggerClassName={cn(
-            'mb-0 min-h-0 gap-1 rounded-md border-0 px-3 py-1.5 text-xs font-medium opacity-100',
+            'mb-0 min-h-0 gap-1 border-2 border-black shadow-zine-ink px-3 py-1.5 text-xs font-medium opacity-100',
             'bg-zinc-900 text-white hover:bg-zinc-700 hover:opacity-100 transition-colors'
           )}
         />
@@ -97,7 +97,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
             href={bandcampUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:text-zinc-900"
+            className="shadow-zine-ink inline-flex items-center border-2 border-black bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:text-zinc-900"
           >
             Bandcamp
           </Link>

@@ -103,9 +103,9 @@ describe('PlaylistPlayer', () => {
 
     // The current track should have special styling
     const trackItems = screen.getAllByRole('button');
-    expect(trackItems[0]).toHaveClass('bg-blue-100');
-    expect(trackItems[0]).toHaveClass('border-l-4');
-    expect(trackItems[0]).toHaveClass('border-blue-500');
+    expect(trackItems[0]).toHaveClass('bg-[var(--card-accent-soft)]');
+    expect(trackItems[0]).toHaveClass('border-2');
+    expect(trackItems[0]).toHaveClass('border-black');
   });
 
   it('non-current tracks have default styling', () => {
@@ -141,7 +141,7 @@ describe('PlaylistPlayer', () => {
 
     // The third track should now be highlighted
     const updatedTrackItems = screen.getAllByRole('button');
-    expect(updatedTrackItems[2]).toHaveClass('bg-blue-100');
+    expect(updatedTrackItems[2]).toHaveClass('bg-[var(--card-accent-soft)]');
     expect(updatedTrackItems[0]).toHaveClass('bg-gray-50');
   });
 

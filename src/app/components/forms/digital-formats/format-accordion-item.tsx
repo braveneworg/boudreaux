@@ -158,7 +158,7 @@ const FormatDropZone = ({
       onDragOver={(e) => onDragOver(config.type, e)}
       onDragLeave={onDragLeave}
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6',
+        'flex flex-col items-center justify-center border-2 border-dashed p-6',
         'hover:border-primary/50 transition-colors',
         dragOverFormat === config.type && 'border-primary bg-primary/5',
         disableInput && 'pointer-events-none opacity-50'
@@ -254,7 +254,7 @@ const FormatStatusRow = ({
   return (
     <div
       className={cn(
-        'rounded-md border p-3',
+        'border p-3',
         state.status === 'error' && 'border-destructive bg-destructive/10',
         isSuccess && 'border-green-500 bg-green-500/10'
       )}
@@ -291,7 +291,7 @@ interface FormatErrorAlertProps {
 const FormatErrorAlert = ({ errorMessage }: FormatErrorAlertProps) => (
   <div
     role="alert"
-    className="border-destructive bg-destructive/10 flex items-start gap-2 rounded-md border p-3"
+    className="border-destructive bg-destructive/10 flex items-start gap-2 border p-3"
   >
     <AlertCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
     <p className="text-destructive text-sm">{errorMessage}</p>

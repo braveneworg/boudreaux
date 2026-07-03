@@ -381,9 +381,10 @@ const eslintConfig = [
   // TipTap NodeView for in-editor bio figures: images come from arbitrary
   // scraped remote hosts that cannot be enumerated in `images.remotePatterns`,
   // so `next/image` is genuinely inapplicable — the editor-only plain `<img>`
-  // is intentional. Scope the Next.js rule off for this file only.
+  // is intentional. global-error likewise replaces the crashed root layout and
+  // must stay dependency-light (no next/image) — its heading is a plain <img>.
   {
-    files: ['src/app/components/ui/bio-figure-node-view.tsx'],
+    files: ['src/app/components/ui/bio-figure-node-view.tsx', 'src/app/global-error.tsx'],
     rules: {
       '@next/next/no-img-element': 'off',
     },

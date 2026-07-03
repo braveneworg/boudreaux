@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Settings } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { SignupSettingsService } from '@/lib/services/signup-settings-service';
 
 import { SignupsPausedToggle } from './signups-paused-toggle';
@@ -16,14 +16,15 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
   const envForced = SignupSettingsService.isEnvForced();
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Settings', url: '/admin/settings', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Settings', url: '/admin/settings', isActive: true },
+      ]}
+    >
       <SectionHeader
         icon={Settings}
         title="Settings"
@@ -31,7 +32,7 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
       />
 
       <div className="space-y-6">
-        <div className="rounded-lg border p-6">
+        <div className="border p-6">
           <h2 className="mb-1 text-sm font-semibold">Signups</h2>
           <p className="text-muted-foreground mb-4 text-sm">
             Pause or resume new account creation. Existing users can always sign in.
@@ -39,7 +40,7 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
           <SignupsPausedToggle paused={paused} envForced={envForced} />
         </div>
       </div>
-    </div>
+    </ZinePanel>
   );
 };
 

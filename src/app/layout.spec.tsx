@@ -204,5 +204,23 @@ describe('RootLayout', () => {
       expect(preconnect).toBeDefined();
       expect(preconnect.props.href).toBe('https://cdn.fakefourrecords.com');
     });
+
+    it('renders font preload link for the cutout display font', async () => {
+      const jsx = await RootLayout({ children: <div>Test</div> });
+      const children = jsx.props.children;
+      const head = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'head')
+        : null;
+
+      expect(head).toBeDefined();
+      const links = head.props.children;
+      const preload = Array.isArray(links)
+        ? links.find((l: React.JSX.Element) => l.props?.rel === 'preload' && l.props?.as === 'font')
+        : null;
+      expect(preload).toBeDefined();
+      expect(preload.props.href).toBe('/media/FakeFourCutout-Regular.woff2');
+      expect(preload.props.type).toBe('font/woff2');
+      expect(preload.props.crossOrigin).toBe('anonymous');
+    });
   });
 });

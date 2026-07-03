@@ -169,7 +169,7 @@ const SelectedArtistBadges = ({
         <button
           type="button"
           onClick={() => onRemove(artist.id)}
-          className="hover:bg-muted-foreground/20 ml-1 rounded-full"
+          className="hover:bg-muted-foreground/20 ml-1"
           disabled={disabled}
           aria-label={`Remove ${getArtistDisplayName(artist)}`}
         >

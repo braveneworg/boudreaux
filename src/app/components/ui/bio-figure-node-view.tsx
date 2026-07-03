@@ -164,7 +164,7 @@ const FigureControls = ({
           aria-pressed={float === value}
           onClick={() => updateAttributes({ float: value })}
           className={cn(
-            'bg-background/80 text-foreground rounded-sm p-1 shadow-sm backdrop-blur-sm',
+            'bg-background/80 text-foreground p-1 shadow-sm backdrop-blur-sm',
             'hover:bg-accent hover:text-accent-foreground',
             float === value && 'bg-primary text-primary-foreground hover:bg-primary'
           )}
@@ -178,7 +178,7 @@ const FigureControls = ({
       aria-label="Remove image"
       onClick={() => deleteNode()}
       className={cn(
-        'bg-background/80 text-foreground rounded-sm p-1 shadow-sm backdrop-blur-sm',
+        'bg-background/80 text-foreground p-1 shadow-sm backdrop-blur-sm',
         'hover:bg-destructive hover:text-white'
       )}
     >
@@ -216,7 +216,7 @@ export const BioFigureNodeView = ({
     >
       <div data-drag-handle className="relative cursor-grab">
         {/* Plain img on purpose: editor-only context with arbitrary remote hosts. */}
-        <img src={src} alt={alt} className="block h-auto w-full rounded-sm" draggable={false} />
+        <img src={src} alt={alt} className="block h-auto w-full" draggable={false} />
         <FigureControls float={float} updateAttributes={updateAttributes} deleteNode={deleteNode} />
         <div
           role="slider"
@@ -228,7 +228,7 @@ export const BioFigureNodeView = ({
           aria-orientation="horizontal"
           {...resizeHandlers}
           className={cn(
-            'absolute -right-1 -bottom-1 size-3 cursor-nwse-resize rounded-full',
+            'absolute -right-1 -bottom-1 size-3 cursor-nwse-resize',
             'border-background bg-primary border opacity-0 transition-opacity',
             'focus-visible:ring-ring focus-visible:opacity-100 focus-visible:ring-2',
             'group-hover:opacity-100 group-data-selected:opacity-100'

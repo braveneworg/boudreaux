@@ -30,4 +30,34 @@ describe('ErrorPage', () => {
 
     expect(reset).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the content on a storm zine panel', () => {
+    const { container } = render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-storm');
+  });
+
+  it('renders the error heading image', () => {
+    render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    expect(screen.getByRole('img', { name: 'error' })).toBeInTheDocument();
+  });
+
+  it('renders the error image heading as the only level-1 heading', () => {
+    render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    const topLevelHeadings = screen.getAllByRole('heading', { level: 1 });
+    expect(topLevelHeadings).toHaveLength(1);
+    expect(topLevelHeadings[0]).toHaveAccessibleName('error');
+  });
+
+  it('demotes the text heading below the image heading to level 2', () => {
+    render(<ErrorPage error={new Error('boom')} reset={vi.fn()} />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: /something went wrong/i })
+    ).toBeInTheDocument();
+  });
 });

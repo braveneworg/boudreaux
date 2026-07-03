@@ -41,6 +41,19 @@ describe('SignoutSuccessContainer', () => {
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-alt', 'success');
   });
 
+  it('renders a kraft zine panel', () => {
+    const { container } = render(<SuccessContainer />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-kraft');
+  });
+
+  it('renders the success heading inside the panel', () => {
+    const { container } = render(<SuccessContainer />);
+    const panel = container.querySelector('section[data-slot="zine-panel"]');
+    expect(panel).toContainElement(screen.getByTestId('next-image'));
+  });
+
   it('renders signed-out confirmation text', () => {
     render(<SuccessContainer />);
     expect(screen.getByText(/You're signed out/i)).toBeInTheDocument();

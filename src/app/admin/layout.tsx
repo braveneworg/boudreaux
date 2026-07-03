@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <PageContainer>
-      <ContentContainer>
+      <ContentContainer className="zine-accent-kraft">
         <AdminNav />
         {/* Tighter top gap so the breadcrumb groups with the nav above it;
             a little padding under the breadcrumb adds breathing room before the

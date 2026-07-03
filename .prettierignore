@@ -48,3 +48,7 @@ public/
 .github/
 docker-compose*.yml
 codecov.yml
+
+# SDD harness scratch files (git-ignored agent briefs/reports; only the
+# repo-root .gitignore is read by Prettier, so ignore them explicitly)
+.superpowers/

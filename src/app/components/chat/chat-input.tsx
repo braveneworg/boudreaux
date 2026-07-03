@@ -326,7 +326,7 @@ export const ChatInput = ({
           style={{ fieldSizing: 'content' } as React.CSSProperties}
           className={cn(
             'border-input focus-visible:border-ring focus-visible:ring-ring/50',
-            'block w-full resize-none rounded-md border bg-transparent px-3 py-2 pr-12 text-base leading-5 md:text-sm',
+            'block w-full resize-none border bg-transparent px-3 py-2 pr-12 text-base leading-5 md:text-sm',
             'transition-[color,box-shadow] outline-none focus-visible:ring-[3px]',
             'disabled:cursor-not-allowed disabled:opacity-60'
           )}
@@ -337,7 +337,7 @@ export const ChatInput = ({
           disabled={!hasContent || isSending || !fingerprint}
           aria-label="Send message"
           className={cn(
-            'absolute right-1 bottom-0.75 inline-flex size-8 items-center justify-center rounded-md',
+            'absolute right-1 bottom-0.75 inline-flex size-8 items-center justify-center',
             'transition-colors',
             hasContent && !isSending
               ? 'border border-zinc-950 bg-linear-to-b from-zinc-950 to-zinc-500 text-white shadow-sm'

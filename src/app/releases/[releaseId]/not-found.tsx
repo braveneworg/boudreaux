@@ -15,7 +15,7 @@ import { ImageHeading } from '@/components/ui/image-heading';
  */
 const NotFoundPage = () => {
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
+    <div className="zine-accent-denim flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
       <ImageHeading
         src="/media/headings/NOT-FOUND.webp"
         alt="release not found"
@@ -27,7 +27,7 @@ const NotFoundPage = () => {
       </p>
       <Link
         href="/releases"
-        className="inline-flex items-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
+        className="shadow-zine-ink inline-flex items-center border-2 border-black bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
       >
         Back to Releases
       </Link>

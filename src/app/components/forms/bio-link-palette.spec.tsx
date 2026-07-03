@@ -28,6 +28,12 @@ describe('BioLinkPalette', () => {
     expect(screen.getByText('release')).toBeInTheDocument();
   });
 
+  it('renders square draggable tiles with no rounded corners', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} />);
+    const tile = screen.getByText('Wikipedia').closest('li') as HTMLElement;
+    expect(tile.className).not.toMatch(/rounded/);
+  });
+
   it('shows the external icon only for external links', () => {
     render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} />);
     const internalTile = screen.getByText('Sad, Fat Luck').closest('li');

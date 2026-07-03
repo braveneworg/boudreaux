@@ -38,35 +38,35 @@ export default function HomeLoading() {
       <div className="flex justify-center gap-2 py-2">
         {Array.from({ length: 3 }, (_, i) => (
           <div key={i} className="flex h-11 w-11 items-center justify-center">
-            <div className="bg-muted h-2.5 w-2.5 animate-pulse rounded-full" />
+            <div className="bg-muted h-2.5 w-2.5 animate-pulse" />
           </div>
         ))}
       </div>
       {/* Content area skeleton — matches ContentContainer: bg-zinc-100, border-t, px-2 */}
       <div className="flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-2 font-sans">
         {/* Search input skeleton */}
-        <div className="bg-muted mb-0 h-9 w-full animate-pulse rounded-md" />
+        <div className="bg-muted mb-0 h-9 w-full animate-pulse" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}
-        <div className="bg-muted mb-0 h-13 w-48 animate-pulse rounded-sm" />
+        <div className="bg-muted mb-0 h-13 w-48 animate-pulse" />
         {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper.
             mb-1 mirrors the actual component, where the link-row uses -mt-1
             to sit closer to the carousel above. */}
-        <div className="bg-muted mb-1 min-h-19 w-full animate-pulse rounded-sm" />
+        <div className="bg-muted mb-1 min-h-19 w-full animate-pulse" />
         {/* View / Download link-row + NowPlayingHeading skeleton.
             min-h-10 holds the row stable across loading → hydrated states
             so there's no CLS once the link buttons render. */}
         <div className="mb-2 flex min-h-10 flex-col items-center">
-          <div className="bg-muted h-6 w-72 animate-pulse rounded-sm" />
+          <div className="bg-muted h-6 w-72 animate-pulse" />
         </div>
-        {/* Cover art skeleton — aspect-square with bg-muted, rounded-t */}
-        <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse rounded-t-lg" />
-        {/* Audio controls skeleton — matches bg-zinc-900 min-h-14 */}
-        <div className="mx-auto min-h-14 w-full max-w-xl animate-pulse bg-zinc-900/20" />
-        {/* InfoTickerTape skeleton — matches bg-zinc-800 rounded-b-lg min-h-[40px] */}
-        <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse rounded-b-lg bg-zinc-800/20" />
+        {/* Cover art skeleton — aspect-square with bg-muted */}
+        <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse" />
+        {/* Audio controls skeleton — matches bg-zinc-900 min-h-16 */}
+        <div className="mx-auto min-h-16 w-full max-w-xl animate-pulse bg-zinc-900/20" />
+        {/* InfoTickerTape skeleton — matches bg-zinc-800 min-h-[40px] */}
+        <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse bg-zinc-800/20" />
         {/* Share widget skeleton */}
         <div className="mb-2 flex justify-center gap-1">
-          <div className="bg-muted h-8 w-48 animate-pulse rounded-sm" />
+          <div className="bg-muted h-8 w-48 animate-pulse" />
         </div>
         <div className="bg-muted mx-auto h-px max-w-[calc(100%-2rem)]" />
       </div>

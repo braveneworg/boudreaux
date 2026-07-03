@@ -51,6 +51,19 @@ vi.mock('../components/tour-detail-content', () => ({
   ),
 }));
 
+// Mock page shell components
+vi.mock('@/app/components/ui/page-container', () => ({
+  PageContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="page-container">{children}</div>
+  ),
+}));
+
+vi.mock('@/app/components/ui/content-container', () => ({
+  ContentContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="content-container">{children}</div>
+  ),
+}));
+
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
@@ -111,5 +124,15 @@ describe('TourPage', () => {
     render(Page);
 
     expect(mockFindById).toHaveBeenCalledWith('tour/special');
+  });
+
+  it('should render the standard page shell instead of the legacy container div', async () => {
+    const Page = await TourPage({ params: defaultParams });
+    const { container } = render(Page);
+
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+    const contentContainer = screen.getByTestId('content-container');
+    expect(contentContainer).toContainElement(screen.getByTestId('tour-detail-content'));
+    expect(container.querySelector('.container')).toBeNull();
   });
 });

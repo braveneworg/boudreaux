@@ -73,6 +73,18 @@ describe('ChatDrawer', () => {
     ).toBeInTheDocument();
   });
 
+  it('carries the orchid zine accent and punk border on the drawer content', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    // Vaul portals the content into document.body, outside the render container.
+    expect(document.querySelector('[data-slot="drawer-content"]')).toHaveClass(
+      'zine-accent-orchid',
+      'border-2',
+      'border-black'
+    );
+  });
+
   describe('drawer direction', () => {
     it('slides up from the bottom on mobile', () => {
       useIsMobileMock.mockReturnValue(true);

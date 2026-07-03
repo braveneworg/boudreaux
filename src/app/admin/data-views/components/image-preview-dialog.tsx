@@ -56,7 +56,7 @@ export const ImagePreviewDialog = ({
           )}
         </div>
       )}
-      <DialogClose className="bg-background/90 text-foreground hover:bg-background absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
+      <DialogClose className="bg-background/90 text-foreground hover:bg-background absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center shadow-sm">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogClose>

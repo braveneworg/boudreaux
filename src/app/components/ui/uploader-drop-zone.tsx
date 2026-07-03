@@ -109,7 +109,7 @@ export const UploaderDropZone = ({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       className={cn(
-        'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors',
+        'relative flex flex-col items-center justify-center border-2 border-dashed transition-colors',
         containerClassName,
         isDragOver && 'border-primary bg-primary/5',
         !isDragOver && 'border-muted-foreground/25 hover:border-muted-foreground/50',

@@ -30,4 +30,23 @@ describe('ChatTriggerButton', () => {
     render(<ChatTriggerButton onOpen={() => undefined} className="custom-extra" />);
     expect(screen.getByRole('button', { name: /open chat/i })).toHaveClass('custom-extra');
   });
+
+  it('renders as an ink stamp with punk border and hard shadow', () => {
+    render(<ChatTriggerButton onOpen={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: /open chat/i })).toHaveClass(
+      'border-2',
+      'border-black',
+      'shadow-zine-ink',
+      'bg-zinc-50'
+    );
+  });
+
+  it('drops the glassy blur and soft shadow treatment', () => {
+    render(<ChatTriggerButton onOpen={() => undefined} />);
+
+    const button = screen.getByRole('button', { name: /open chat/i });
+    expect(button).not.toHaveClass('backdrop-blur-md');
+    expect(button).not.toHaveClass('shadow-lg');
+  });
 });

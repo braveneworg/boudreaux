@@ -228,6 +228,36 @@ describe('ProfileForm', () => {
       expect(screen.getByRole('button', { name: 'Edit Username' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Save Email' })).not.toBeInTheDocument();
     });
+
+    it('renders the four profile sections as kraft zine panels', () => {
+      const { container } = render(<ProfileForm />);
+
+      const panels = container.querySelectorAll('[data-slot="zine-panel"]');
+      expect(panels).toHaveLength(4);
+      panels.forEach((panel) => expect(panel).toHaveClass('zine-accent-kraft'));
+    });
+
+    it('spaces the three section forms with space-y-6', () => {
+      const { container } = render(<ProfileForm />);
+
+      expect(container.querySelectorAll('form.space-y-6')).toHaveLength(3);
+    });
+
+    it('lays out the personal name grid two-up from sm with no md override', () => {
+      const { container } = render(<ProfileForm />);
+
+      const nameGrid = screen.getByLabelText('First Name').closest('.grid');
+      expect(nameGrid).toHaveClass('sm:grid-cols-2');
+      expect(container.querySelector('.md\\:grid-cols-2')).toBeNull();
+    });
+
+    it('renders the SMS toggle row without a rounded frame', () => {
+      const { container } = render(<ProfileForm />);
+
+      const smsRow = container.querySelector('#allowSmsNotifications')?.parentElement;
+      expect(smsRow).toHaveClass('p-4');
+      expect(smsRow).not.toHaveClass('rounded-lg');
+    });
   });
 
   describe('form population effect', () => {

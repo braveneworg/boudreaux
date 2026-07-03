@@ -37,14 +37,14 @@ describe('Avatar', () => {
       expect(screen.getByTestId('avatar')).toHaveClass('custom-avatar');
     });
 
-    it('has default rounded-full class', () => {
+    it('has default rounded-none class', () => {
       render(
         <Avatar data-testid="avatar">
           <AvatarFallback>AB</AvatarFallback>
         </Avatar>
       );
 
-      expect(screen.getByTestId('avatar')).toHaveClass('rounded-full');
+      expect(screen.getByTestId('avatar')).toHaveClass('rounded-none');
     });
 
     it('passes additional props', () => {

@@ -10,8 +10,8 @@ import { Loader2 } from 'lucide-react';
 import { useCollectionQuery } from '@/app/hooks/use-collection-query';
 
 import { CollectionList } from './collection-list';
-import { BreadcrumbMenu } from './ui/breadcrumb-menu';
 import { ImageHeading } from './ui/image-heading';
+import { ZinePanel } from './ui/zine-panel';
 
 /**
  * Client content wrapper for the collection page.
@@ -30,7 +30,7 @@ export const CollectionContent = () => {
 
   if (error && !data) {
     return (
-      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center border-2 border-dashed p-8">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-zinc-950">Failed to load collection</h3>
           <p className="mt-2 text-sm text-zinc-950">Please try again later.</p>
@@ -47,16 +47,17 @@ export const CollectionContent = () => {
 
   return (
     <>
-      <BreadcrumbMenu
-        items={[
+      <ZinePanel
+        chat
+        accent="green"
+        breadcrumbs={[
           {
             anchorText: 'My Collection',
             url: '/collection',
             isActive: true,
           },
         ]}
-      />
-      <div className="px-4 pb-8">
+      >
         <ImageHeading
           src="/media/headings/MY-COLLECTION.webp"
           alt="my collection"
@@ -77,7 +78,7 @@ export const CollectionContent = () => {
         ) : (
           <CollectionList purchases={purchases} isAdmin={isAdmin} />
         )}
-      </div>
+      </ZinePanel>
     </>
   );
 };

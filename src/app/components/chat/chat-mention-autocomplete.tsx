@@ -51,7 +51,7 @@ export const ChatMentionAutocomplete = ({
       <div
         role="listbox"
         aria-label="Mention suggestions"
-        className="bg-popover text-popover-foreground absolute right-2 bottom-full left-2 mb-2 flex items-center gap-2 rounded-md border p-2 text-xs shadow-md"
+        className="bg-popover text-popover-foreground absolute right-2 bottom-full left-2 mb-2 flex items-center gap-2 border p-2 text-xs shadow-md"
       >
         <Loader2 aria-hidden="true" className="text-muted-foreground size-3 animate-spin" />
         <span className="text-muted-foreground">Searching…</span>
@@ -63,7 +63,7 @@ export const ChatMentionAutocomplete = ({
     <ul
       role="listbox"
       aria-label="Mention suggestions"
-      className="bg-popover text-popover-foreground absolute right-2 bottom-full left-2 mb-2 max-h-48 overflow-y-auto rounded-md border py-1 shadow-md"
+      className="bg-popover text-popover-foreground absolute right-2 bottom-full left-2 mb-2 max-h-48 overflow-y-auto border py-1 shadow-md"
     >
       {matches.map((match, index) => {
         const isActive = index === activeIndex;

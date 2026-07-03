@@ -43,7 +43,7 @@ import { error } from '@/lib/utils/console-logger';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
-import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { ZinePanel } from '@/ui/zine-panel';
 
 import type { UseFormReturn, UseFormSetValue } from 'react-hook-form';
 
@@ -560,17 +560,18 @@ export const ReleaseForm = ({
   }
 
   return (
-    <>
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          {
-            anchorText: isEditMode ? 'Edit Release' : 'Create Release',
-            url: '/admin/releases',
-            isActive: true,
-          },
-        ]}
-      />
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        {
+          anchorText: isEditMode ? 'Edit Release' : 'Create Release',
+          url: '/admin/releases',
+          isActive: true,
+        },
+      ]}
+    >
       <Card className="w-full border-none px-0 pb-0">
         <ReleaseCardHeader isEditMode={isEditMode} />
         <Form {...releaseForm}>
@@ -609,6 +610,6 @@ export const ReleaseForm = ({
           </form>
         </Form>
       </Card>
-    </>
+    </ZinePanel>
   );
 };

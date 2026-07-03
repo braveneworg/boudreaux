@@ -5,7 +5,6 @@ import Link from 'next/link';
 
 import { CalendarDays, Plus } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -15,6 +14,7 @@ import {
   CardTitle,
 } from '@/app/components/ui/card';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { TourService, type TourWithDisplayNames } from '@/lib/services/tours/tour-service';
 
 export const dynamic = 'force-dynamic';
@@ -47,14 +47,15 @@ export default async function ToursPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Tours', url: '/admin/tours', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Tours', url: '/admin/tours', isActive: true },
+      ]}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeader
           icon={CalendarDays}
@@ -114,6 +115,6 @@ export default async function ToursPage() {
           })
         )}
       </div>
-    </div>
+    </ZinePanel>
   );
 }

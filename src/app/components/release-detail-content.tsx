@@ -14,7 +14,7 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { ArtistReleasesCarousel } from './artist-releases-carousel';
 import { ReleaseDescription } from './release-description';
 import { ReleasePlayer } from './release-player';
-import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ZinePanel } from './ui/zine-panel';
 
 interface ReleaseDetailContentProps {
   releaseId: string;
@@ -53,7 +53,7 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
 
   if (!release) {
     return (
-      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center border-2 border-dashed p-8">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-zinc-950">Release not found</h3>
           <p className="mt-2 text-sm text-zinc-950">
@@ -81,17 +81,18 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
 
   return (
     <>
-      <BreadcrumbMenu items={breadcrumbItems} />
-      {otherReleases.length > 0 && (
-        <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
-      )}
-      <ReleasePlayer
-        release={release}
-        autoPlay={autoPlay}
-        releaseId={release.id}
-        releaseTitle={release.title}
-      />
-      <ReleaseDescription description={release.description ?? null} />
+      <ZinePanel chat accent="cyan" tape={false} breadcrumbs={breadcrumbItems}>
+        {otherReleases.length > 0 && (
+          <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
+        )}
+        <ReleasePlayer
+          release={release}
+          autoPlay={autoPlay}
+          releaseId={release.id}
+          releaseTitle={release.title}
+        />
+        <ReleaseDescription description={release.description ?? null} />
+      </ZinePanel>
     </>
   );
 };

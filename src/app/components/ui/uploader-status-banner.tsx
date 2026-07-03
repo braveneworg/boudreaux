@@ -21,7 +21,7 @@ export const UploaderStatusBanner = ({
   if (!message) return null;
 
   return (
-    <div className="bg-muted/50 flex items-center justify-center gap-2 rounded-md py-2 text-sm text-zinc-950">
+    <div className="bg-muted/50 flex items-center justify-center gap-2 py-2 text-sm text-zinc-950">
       <SpinnerRingCircle size="sm" />
       <span>{message}</span>
     </div>

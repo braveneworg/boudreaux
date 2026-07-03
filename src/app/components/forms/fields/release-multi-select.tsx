@@ -236,7 +236,7 @@ export const ReleaseMultiSelect = <
                       <button
                         type="button"
                         onClick={() => handleRemove(release.id)}
-                        className="hover:bg-muted-foreground/20 ml-1 rounded-full"
+                        className="hover:bg-muted-foreground/20 ml-1"
                         disabled={disabled}
                         aria-label={`Remove ${release.title}`}
                       >

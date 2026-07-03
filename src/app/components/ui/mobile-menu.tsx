@@ -54,11 +54,14 @@ export const MobileMenu = ({ menuItems, onNavigate }: MobileMenuProps) => {
               href={item.href}
               aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
               className={cn(
-                'mt-4 block text-xl tracking-wider text-zinc-50 underline-offset-8 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
+                'mt-4 block text-xl tracking-wider text-zinc-50 underline-offset-8 text-shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
                 item.color
               )}
               onClick={onNavigate}
-              prefetch={false}
+              // Default prefetch grabs static targets when the sheet opens;
+              // the boost upgrades force-dynamic ones (home) to a full data
+              // prefetch on touchstart, a beat before the click lands.
+              unstable_dynamicOnHover
             >
               {item.name}
             </Link>

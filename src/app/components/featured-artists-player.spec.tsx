@@ -443,6 +443,35 @@ describe('FeaturedArtistsPlayer', () => {
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
   });
 
+  it('should frame the player unit with a black outline only, no zine shadow', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    // The accent offset shadow read as a yellow bottom/right border on the
+    // landing panel — the frame keeps only the black outline. On desktop it
+    // steps down a size to share the split with the headlines column.
+    const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+    expect(frame).toHaveClass('border-2', 'border-black', 'lg:max-w-sm');
+    expect(frame).not.toHaveClass('shadow-zine');
+  });
+
+  it('should square the poster shell and info ticker (no rounded caps)', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    const poster = screen.getByTestId('interactive-cover-art').parentElement;
+    expect(poster).toHaveClass('aspect-square');
+    expect(poster).not.toHaveClass('rounded-t-lg');
+
+    // Select the artist with playable files so the ticker renders its content.
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+    const ticker = screen.getByTestId('info-ticker-tape').parentElement;
+    expect(ticker).toHaveClass('bg-zinc-800');
+    expect(ticker).not.toHaveClass('rounded-b-lg');
+  });
+
   it('should initialize the first artist when featured artists arrive after mount', () => {
     const { rerender } = render(<FeaturedArtistsPlayer featuredArtists={[]} />, {
       wrapper: createWrapper(),

@@ -100,6 +100,7 @@ vi.mock('@/app/components/forms/signup-signin-form', () => ({
     onBeforeSocialSignIn?: (provider: SocialProvider) => Promise<boolean>;
     socialDisabled?: boolean;
     heading?: React.ReactNode;
+    breadcrumbs?: Array<{ anchorText: string }>;
   }) => {
     capturedSetIsVerified = props.setIsVerified;
     capturedOnToken = props.onTurnstileToken ?? null;
@@ -107,6 +108,8 @@ vi.mock('@/app/components/forms/signup-signin-form', () => ({
     capturedOnBeforeSocialSignIn = props.onBeforeSocialSignIn;
     return (
       <div data-testid="signup-signin-form" data-social-disabled={String(!!props.socialDisabled)}>
+        {/* The form docks the crumb inside its flyer panel via this prop. */}
+        <nav data-testid="breadcrumb">{props.breadcrumbs?.[0]?.anchorText}</nav>
         {/* The page now renders the heading wordmark inside the card via this prop. */}
         {props.heading}
         <button type="submit">Submit</button>
@@ -395,6 +398,27 @@ describe('SignupPage', () => {
       useSearchParamsMock.mockReturnValue({ get: () => null });
       render(<SignupPage />);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('full-width flyer layout', () => {
+    it('lets the form span the content area without a width cap', () => {
+      const { container } = render(<SignupPage />);
+
+      const form = container.querySelector('form');
+      expect(form).toHaveClass('w-full');
+      expect(form).not.toHaveClass('max-w-lg');
+    });
+
+    it('aligns the magic-link error alert edges with the full-width flyer', () => {
+      useSearchParamsMock.mockReturnValue({
+        get: (key: string) => (key === 'error' ? 'new_user_signup_disabled' : null),
+      });
+      render(<SignupPage />);
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveClass('w-full');
+      expect(alert).not.toHaveClass('max-w-lg');
     });
   });
 

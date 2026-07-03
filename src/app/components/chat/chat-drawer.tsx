@@ -36,6 +36,8 @@ export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) =>
     <Drawer direction={isMobile ? 'bottom' : 'right'} open={open} onOpenChange={onOpenChange}>
       <DrawerContent
         className={cn(
+          'zine-accent-orchid',
+          'border-2 border-black',
           'data-[vaul-drawer-direction=bottom]:max-h-[85dvh]!',
           'data-[vaul-drawer-direction=bottom]:h-[85dvh]!',
           'data-[vaul-drawer-direction=right]:w-100!',

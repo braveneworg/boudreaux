@@ -282,7 +282,7 @@ export const TourDateList = ({ tourId, onDialogOpenChange }: TourDateListProps) 
 
                       {/* Notes */}
                       {tourDate.notes && (
-                        <div className="bg-muted mt-2 rounded-md p-3 text-sm">
+                        <div className="bg-muted mt-2 p-3 text-sm">
                           <p className="text-zinc-950">{tourDate.notes}</p>
                         </div>
                       )}

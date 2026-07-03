@@ -112,7 +112,7 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 rounded-md border p-4">
+      <div className="flex items-center justify-between gap-3 border p-4">
         <div>
           <p className="font-medium">Chat access</p>
           <p className="text-muted-foreground text-xs">
@@ -149,7 +149,7 @@ export const UserDetailView = ({ userId, initialChatDisabled }: UserDetailViewPr
               <li
                 key={message.id}
                 className={cn(
-                  'flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between',
+                  'flex flex-col gap-2 border p-3 sm:flex-row sm:items-start sm:justify-between',
                   isHidden && 'bg-muted/40'
                 )}
               >

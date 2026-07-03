@@ -14,7 +14,7 @@ export interface TourListProps {
 export const TourList = ({ tours }: TourListProps) => {
   if (tours.length === 0) {
     return (
-      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center border-2 border-dashed p-8">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-zinc-950">No tours found</h3>
           <p className="mt-2 text-sm text-zinc-950">Check back later for upcoming tour dates.</p>

@@ -5,7 +5,7 @@
 import { type ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
@@ -44,7 +44,13 @@ const mockReleases = [
         id: 'ar-1',
         artistId: 'artist-1',
         releaseId: 'release-1',
-        artist: { id: 'artist-1', firstName: 'John', surname: 'Doe', displayName: null },
+        artist: {
+          id: 'artist-1',
+          firstName: 'John',
+          surname: 'Doe',
+          displayName: null,
+          slug: 'john-doe',
+        },
       },
     ],
     releaseUrls: [],
@@ -60,7 +66,13 @@ const mockReleases = [
         id: 'ar-2',
         artistId: 'artist-2',
         releaseId: 'release-2',
-        artist: { id: 'artist-2', firstName: 'Jane', surname: 'Smith', displayName: 'J. Smith' },
+        artist: {
+          id: 'artist-2',
+          firstName: 'Jane',
+          surname: 'Smith',
+          displayName: 'J. Smith',
+          slug: 'j-smith',
+        },
       },
     ],
     releaseUrls: [],
@@ -99,14 +111,95 @@ describe('ReleaseSearchCombobox', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('prompts the user to type before any search', async () => {
+  it('auto-populates the dropdown with browsable releases on open', async () => {
     stubFetchReturning(mockReleases);
     const user = setupUser();
     renderCombobox();
 
     await user.click(screen.getByLabelText('Search releases'));
 
-    expect(screen.getByText(/type to search releases/i)).toBeInTheDocument();
+    // No typing needed — the published listing streams straight in.
+    expect(await screen.findByText('Midnight Serenade')).toBeInTheDocument();
+    expect(screen.getByText('Morning Glory')).toBeInTheDocument();
+    expect(screen.queryByText(/type to search releases/i)).not.toBeInTheDocument();
+  });
+
+  it('loads the next page when the browse list scrolls near the bottom', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: mockReleases, nextSkip: 24 }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await screen.findByText('Midnight Serenade');
+
+    const list = document.querySelector<HTMLElement>('[data-slot="command-list"]');
+    if (!list) {
+      throw new Error('command list not rendered');
+    }
+    // jsdom has no layout — fake being scrolled to within the near-bottom
+    // threshold, then fire the scroll the handler listens for.
+    Object.defineProperties(list, {
+      scrollTop: { value: 380, configurable: true },
+      clientHeight: { value: 300, configurable: true },
+      scrollHeight: { value: 400, configurable: true },
+    });
+    fireEvent.scroll(list);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('skip=24'), expect.anything());
+    });
+  });
+
+  it('tints the dropdown like the heading and drops the inner borders', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+
+    // Radix portals the dropdown to the body — query the document.
+    // Results sit on plain paper; only the search-icon row wears the light
+    // offset highlight of the RELEASES wordmark's cyan, like a highlighter
+    // swipe across the query line.
+    const panel = document.querySelector('[data-slot="popover-content"]');
+    expect(panel).not.toHaveClass('bg-[#d0fffe]');
+    const wrapper = document.querySelector('[data-slot="command-input-wrapper"]');
+    expect(wrapper).toHaveClass('bg-[#d0fffe]');
+
+    // No inner borders: the site-wide zine input border (globals.css is
+    // unlayered, so only an important utility beats it) and the input
+    // wrapper's underline are both suppressed inside the dropdown.
+    const input = document.querySelector('[data-slot="command-input"]');
+    expect(input).toHaveClass('border-0!');
+    const command = document.querySelector('[data-slot="command"]');
+    expect(command?.className).toContain('**:data-[slot=command-input-wrapper]:border-b-0');
+  });
+
+  it('rings the trigger box in the heading background cyan while open', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    // Mirrors the landing-page search focus treatment (3px ring), tinted to
+    // the RELEASES wordmark's #45fefc — around the "Search releases..." box,
+    // both while focused and while the dropdown is open.
+    const trigger = screen.getByLabelText('Search releases');
+    expect(trigger).toHaveClass(
+      'transition-[color,box-shadow]',
+      'focus-visible:ring-[3px]',
+      'focus-visible:ring-[#45fefc]',
+      'data-[state=open]:ring-[3px]',
+      'data-[state=open]:ring-[#45fefc]'
+    );
+
+    await user.click(trigger);
+
+    // The inner dropdown field carries no focus ring of its own.
+    const wrapper = document.querySelector('[data-slot="command-input-wrapper"]');
+    expect(wrapper).not.toHaveClass('focus-within:ring-[3px]', 'focus-within:ring-[#45fefc]');
   });
 
   it('fetches and displays server results when the user types', async () => {
@@ -117,14 +210,15 @@ describe('ReleaseSearchCombobox', () => {
     await user.click(screen.getByLabelText('Search releases'));
     await user.type(screen.getByPlaceholderText(/search by artist/i), 'Mid');
 
+    // Browse results render immediately, so wait for the debounced search
+    // request itself — it carries the typed term.
     await waitFor(() => {
-      expect(screen.getByText('Midnight Serenade')).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('search=Mid'),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
-    // The request carries the typed search term.
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('search=Mid'),
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    expect(await screen.findByText('Midnight Serenade')).toBeInTheDocument();
   });
 
   it('navigates to the release page when a result is selected', async () => {
@@ -169,7 +263,13 @@ describe('ReleaseSearchCombobox', () => {
             id: 'ar-nc',
             artistId: 'artist-1',
             releaseId: 'release-nc',
-            artist: { id: 'artist-1', firstName: 'John', surname: 'Doe', displayName: null },
+            artist: {
+              id: 'artist-1',
+              firstName: 'John',
+              surname: 'Doe',
+              displayName: null,
+              slug: 'john-doe',
+            },
           },
         ],
         releaseUrls: [],

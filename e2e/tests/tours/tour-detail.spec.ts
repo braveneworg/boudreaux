@@ -36,7 +36,8 @@ test.describe('Public Tour Detail Page', () => {
   test('renders the tour title, venue, headliner and tour-dates section', async ({ page }) => {
     await page.goto(`/tours/${summerTourId}`);
 
-    await expect(page.getByText('E2E Summer Tour 2026')).toBeVisible({ timeout: 10_000 });
+    // .first() — the title appears in both the breadcrumb and the card title
+    await expect(page.getByText('E2E Summer Tour 2026').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Tour Dates')).toBeVisible();
     await expect(page.getByText('The Fillmore')).toBeVisible();
     await expect(page.getByText('San Francisco, CA')).toBeVisible();

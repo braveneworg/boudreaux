@@ -22,12 +22,18 @@ export const HamburgerMenu = () => {
         <SheetTrigger className="relative" asChild>
           <Button
             size="icon"
-            className="pointer-events-auto relative top-0.5 right-2 bg-transparent"
+            // Bare tap target — no border, shadow, or stamp accent. The
+            // zine offset-print language needs surface area to read; at
+            // icon scale it looks like a stray mark, so the three lines
+            // stand alone on the header's black.
+            className="pointer-events-auto relative -top-1 right-2 border-0 bg-transparent shadow-none hover:shadow-none active:shadow-none"
           >
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
-            <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
-            <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
-            <HamburgerPatty isOpen={isOpen} rotateOpen={-45} yOffset={8} duration={0.3} />
+            <span className="relative flex size-5 items-center justify-center">
+              <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
+              <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
+              <HamburgerPatty isOpen={isOpen} rotateOpen={-45} yOffset={8} duration={0.3} />
+            </span>
           </Button>
         </SheetTrigger>
       </HamburgerMenuSheet>

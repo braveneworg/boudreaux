@@ -3,6 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
+import { ContentContainer } from '@/app/components/ui/content-container';
+import { PageContainer } from '@/app/components/ui/page-container';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { TOURS_PAGE_SIZE } from '@/app/hooks/use-infinite-tours-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
@@ -12,6 +15,8 @@ import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
 import { ToursContent } from './components/tours-content';
+
+const breadcrumbItems = [{ anchorText: 'Tours', url: '/tours', isActive: true }];
 
 /**
  * Public tours listing page with search functionality.
@@ -42,14 +47,25 @@ export default async function ToursPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="container mx-auto py-8">
-        <div className="mb-8 space-y-2">
-          <ImageHeading src="/media/headings/TOURS.webp" alt="tours" imageHeight={480} priority />
-          <p className="text-lg text-zinc-950">Search and browse upcoming and recent tour dates</p>
-        </div>
+      <PageContainer>
+        <ContentContainer>
+          <ZinePanel chat accent="tan" breadcrumbs={breadcrumbItems}>
+            <div className="mb-8 space-y-2">
+              <ImageHeading
+                src="/media/headings/TOURS.webp"
+                alt="tours"
+                imageHeight={480}
+                priority
+              />
+              <p className="text-lg text-zinc-950">
+                Search and browse upcoming and recent tour dates
+              </p>
+            </div>
 
-        <ToursContent />
-      </div>
+            <ToursContent />
+          </ZinePanel>
+        </ContentContainer>
+      </PageContainer>
     </HydrationBoundary>
   );
 }

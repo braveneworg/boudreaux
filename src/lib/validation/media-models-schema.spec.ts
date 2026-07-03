@@ -201,7 +201,11 @@ const publishedReleaseListing = {
   coverArt: 'cover.jpg',
   releasedOn: ISO,
   images: [{ src: null, altText: null }],
-  artistReleases: [{ artist: { id: 'a1', firstName: 'John', surname: 'Doe', displayName: null } }],
+  artistReleases: [
+    {
+      artist: { id: 'a1', firstName: 'John', surname: 'Doe', displayName: null, slug: 'john-doe' },
+    },
+  ],
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://bc' } }],
 };
 

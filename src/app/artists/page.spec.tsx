@@ -80,6 +80,26 @@ describe('ArtistsIndexPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'artists');
   });
 
+  it('should wrap the heading and artist list in a hot-pink zine panel', async () => {
+    const Page = await ArtistsIndexPage();
+    const { container } = render(Page);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-hot-pink');
+
+    const headingImage = screen.getByRole('img', { name: /artists/i });
+    expect(panel).toContainElement(headingImage);
+  });
+
+  it('should render the breadcrumb inside the zine panel', async () => {
+    const Page = await ArtistsIndexPage();
+    const { container } = render(Page);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toContainElement(screen.getByTestId('breadcrumb-menu'));
+  });
+
   it('should render a link to the artist search page', async () => {
     const Page = await ArtistsIndexPage();
     render(Page);

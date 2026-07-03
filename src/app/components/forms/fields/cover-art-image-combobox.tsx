@@ -173,7 +173,7 @@ export const CoverArtImageCombobox = ({
                         currentValue === img.src ? 'opacity-100' : 'opacity-0'
                       )}
                     />
-                    <div className="relative mr-2 h-8 w-8 shrink-0 overflow-hidden rounded-sm">
+                    <div className="relative mr-2 h-8 w-8 shrink-0 overflow-hidden">
                       <Image
                         src={img.src}
                         alt={img.altText || img.caption || 'Artist image'}

@@ -56,7 +56,7 @@ const ImageUploadingOverlay = ({ progress }: { progress?: number }): React.JSX.E
  */
 const thumbnailContainerClass = (item: ImageItem, isDragging: boolean): string =>
   cn(
-    'group bg-muted relative aspect-square overflow-hidden rounded-lg border',
+    'group bg-muted relative aspect-square overflow-hidden border',
     isDragging && 'z-50 opacity-80 shadow-lg',
     item.error && 'border-destructive',
     item.isUploading && 'pointer-events-none'
@@ -74,7 +74,7 @@ const ImageThumbnail = ({ item }: { item: ImageItem }): React.JSX.Element => (
 );
 
 const ImageSuccessBadge = (): React.JSX.Element => (
-  <div className="absolute bottom-1 left-1 rounded-full bg-green-500/90 p-1">
+  <div className="absolute bottom-1 left-1 bg-green-500/90 p-1">
     <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
     </svg>
@@ -102,7 +102,7 @@ const ImageItemControls = ({
 }: ImageItemControlsProps): React.JSX.Element => (
   <>
     <div
-      className="bg-background/80 sm:hover:bg-background pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-full shadow-sm backdrop-blur-sm sm:pointer-events-auto sm:cursor-grab sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:active:cursor-grabbing"
+      className="bg-background/80 sm:hover:bg-background pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center shadow-sm backdrop-blur-sm sm:pointer-events-auto sm:cursor-grab sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:active:cursor-grabbing"
       {...desktopDragProps(attributes, listeners)}
     >
       <GripVertical className="h-3.5 w-3.5 text-zinc-950" />
@@ -114,7 +114,7 @@ const ImageItemControls = ({
         e.stopPropagation();
         onDeleteRequest(item);
       }}
-      className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+      className="bg-destructive/90 hover:bg-destructive absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center text-white shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
       aria-label="Remove image"
     >
       <X className="h-3.5 w-3.5" />
@@ -126,7 +126,7 @@ const ImageItemControls = ({
         e.stopPropagation();
         onPreview(item);
       }}
-      className="bg-background/90 text-foreground hover:bg-background absolute right-1 bottom-1 z-20 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+      className="bg-background/90 text-foreground hover:bg-background absolute right-1 bottom-1 z-20 flex h-6 w-6 items-center justify-center shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
       aria-label="Preview image"
     >
       <Eye className="h-3.5 w-3.5" />

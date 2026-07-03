@@ -46,7 +46,8 @@ describe('Card Components', () => {
         </Card>
       );
       const card = screen.getByTestId('card');
-      expect(card).toHaveClass('rounded-xl');
+      expect(card).toHaveClass('rounded-none');
+      expect(card).toHaveClass('border-2', 'border-black', 'shadow-zine-ink');
       expect(card).toHaveClass('custom-class');
     });
   });

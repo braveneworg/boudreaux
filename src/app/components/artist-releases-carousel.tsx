@@ -54,10 +54,10 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
                     alt={coverArt.alt}
                     width={120}
                     height={120}
-                    className="rounded-md object-cover"
+                    className="shadow-zine-sm border-2 border-black object-cover"
                   />
                 ) : (
-                  <div className="flex h-30 w-30 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-500">
+                  <div className="shadow-zine-sm flex h-30 w-30 items-center justify-center border-2 border-black bg-zinc-200 text-xs text-zinc-500">
                     {release.title}
                   </div>
                 )}

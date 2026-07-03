@@ -36,10 +36,10 @@ export const MediaUploaderDeleteDialog = ({
         Are you sure you want to delete this file? This action cannot be undone.
       </p>
       {itemToDelete && (
-        <div className="bg-muted/50 my-4 flex items-center gap-3 rounded-lg border p-3">
+        <div className="bg-muted/50 my-4 flex items-center gap-3 border p-3">
           <div
             className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+              'flex h-10 w-10 shrink-0 items-center justify-center',
               itemToDelete.mediaType === 'audio' ? 'bg-primary/10' : 'bg-purple-500/10'
             )}
           >

@@ -76,6 +76,16 @@ describe('ArtistBioContent', () => {
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
   });
 
+  it('wraps the bio content in a hot-pink zine panel', () => {
+    useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
+
+    const { container } = render(<ArtistBioContent slug="test-artist" />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-hot-pink');
+  });
+
   it('renders bio links inline in the prose (link hardening covered in bio-html.spec)', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
 

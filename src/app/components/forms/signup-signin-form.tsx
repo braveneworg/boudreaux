@@ -11,14 +11,15 @@ import {
   type SocialProvider,
 } from '@/app/components/auth/social-provider-buttons';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
+import type { BreadcrumbItemData } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
-import { Card, CardContent } from '@/app/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { FormInput } from '@/app/components/ui/form-input';
 import { Separator } from '@/app/components/ui/separator';
 import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { useSignupStatusQuery } from '@/app/hooks/use-signup-status-query';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -52,10 +53,12 @@ interface SignupSigninFormProps {
   onSocialError?: (provider: SocialProvider, error: unknown) => void;
   /**
    * Optional heading (e.g. the SIGN-IN / SIGN-UP wordmark image) rendered at the
-   * top of the card, above the social buttons, so the whole flow lives in one
+   * top of the panel, above the social buttons, so the whole flow lives in one
    * flyer. The page owns the image so this component stays presentation-only.
    */
   heading?: React.ReactNode;
+  /** Optional breadcrumb trail docked inside the flyer panel. */
+  breadcrumbs?: BreadcrumbItemData[];
   /**
    * Disables the social buttons. The signup page passes
    * `!(termsAccepted && isVerified)` so social sign-in is gated on the same
@@ -98,7 +101,6 @@ const EmailField = ({
               placeholder="Email address"
               type="email"
               autoComplete="email"
-              className="rounded-none border-2 border-black bg-zinc-50 focus-visible:ring-[var(--card-accent)]"
               {...field}
               autoFocusOnMount
             />
@@ -300,7 +302,7 @@ const FormSubmitRow = ({
         type="submit"
         disabled={isPending || signupsPaused}
         size="lg"
-        className="rounded-none border-2 border-black font-bold tracking-[0.1em] uppercase shadow-[4px_4px_0_0_var(--card-accent)] transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0_0_var(--card-accent)]"
+        className="shadow-zine-md disabled:shadow-zine-md font-bold tracking-[0.1em] uppercase hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] disabled:translate-x-0 disabled:translate-y-0"
       >
         Email me a sign-in link
       </Button>
@@ -340,7 +342,7 @@ interface OrDividerProps {
 const OrDivider = ({ label }: OrDividerProps): React.ReactElement => (
   <div className="relative my-7 flex items-center gap-3">
     <Separator className="h-0.5 flex-1 bg-black" />
-    <span className="shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase shadow-[2px_2px_0_0_#000]">
+    <span className="shadow-zine-ink shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase">
       {label}
     </span>
     <Separator className="h-0.5 flex-1 bg-black" />
@@ -388,6 +390,7 @@ export const SignupSigninForm = ({
   callbackURL = '/',
   onSocialError,
   heading,
+  breadcrumbs,
   socialDisabled,
   onBeforeSocialSignIn,
 }: SignupSigninFormProps): React.ReactElement => {
@@ -397,19 +400,12 @@ export const SignupSigninForm = ({
   const signupsPaused = hasTermsAndConditions && signupStatus?.paused === true;
 
   return (
-    <Card
-      className={cn(
-        'bg-menu-item-tan-100 relative mx-auto w-full max-w-lg overflow-visible rounded-none border-2 border-black p-0 shadow-[6px_6px_0_0_var(--card-accent)]',
-        isSigningIn ? 'signin-accent' : 'signup-accent'
-      )}
-    >
-      {/* Decorative "washi tape" holding the flyer to the wall */}
-      <span
-        aria-hidden="true"
-        className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-28 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
-      />
-      <CardContent className="relative z-10 p-6 sm:p-8">
-        {/* Heading wordmark — lives inside the flyer, above the social buttons */}
+    <ZinePanel accent={isSigningIn ? 'pink' : 'teal'} breadcrumbs={breadcrumbs}>
+      {/* Everything — heading included — stays centered at the flyer's previous
+          width while the panel itself spans the content area */}
+      <div className="mx-auto w-full max-w-lg">
+        {/* Heading wordmark — lives inside the flyer, above the social buttons,
+            capped at the form column's width so it lines up with the controls */}
         {heading && <div className="mb-6">{heading}</div>}
         {/* Signups-paused notice — shown only on the signup path when paused */}
         {signupsPaused && (
@@ -459,7 +455,7 @@ export const SignupSigninForm = ({
 
         {/* Mode switch */}
         <ModeSwitchLink isSigningIn={isSigningIn} />
-      </CardContent>
-    </Card>
+      </div>
+    </ZinePanel>
   );
 };

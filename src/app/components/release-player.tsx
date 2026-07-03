@@ -195,15 +195,15 @@ const ReleasePlayerBody = ({
       )}
 
       <div className="flex flex-col items-center">
-        {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens */}
-        <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
+        {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens.
+            The black border + zine shadow frame cover art, controls, and ticker as one unit. */}
+        <div className="shadow-zine mx-auto w-full max-w-xl border-2 border-black md:max-w-3xl lg:max-w-4xl">
           <div className="relative">
             <MediaPlayer.InteractiveCoverArt
               src={coverArtSrc}
               alt={coverArtAlt}
               isPlaying={isPlaying}
               onTogglePlay={onTogglePlay}
-              className="shadow-lg"
               priority
             />
           </div>

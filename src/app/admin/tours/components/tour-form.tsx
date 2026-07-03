@@ -15,7 +15,6 @@ import { toast } from 'sonner';
 import { TourEditSections } from '@/app/admin/tours/components/tour-edit-sections';
 import { TourFormActions } from '@/app/admin/tours/components/tour-form-actions';
 import { TextField } from '@/app/components/forms/fields';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import {
   Form,
   FormControl,
@@ -27,6 +26,7 @@ import {
 } from '@/app/components/ui/form';
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Textarea } from '@/app/components/ui/textarea';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import {
   useCreateTourMutation,
   useDeleteTourMutation,
@@ -221,19 +221,20 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   }
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Tours', url: '/admin/tours', isActive: false },
-          {
-            anchorText: isEditMode ? 'Edit Tour' : 'Create Tour',
-            url: isEditMode ? `/admin/tours/${tourId}` : '/admin/tours/new',
-            isActive: true,
-          },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Tours', url: '/admin/tours', isActive: false },
+        {
+          anchorText: isEditMode ? 'Edit Tour' : 'Create Tour',
+          url: isEditMode ? `/admin/tours/${tourId}` : '/admin/tours/new',
+          isActive: true,
+        },
+      ]}
+    >
       <SectionHeader
         icon={CalendarDays}
         title={isEditMode ? 'Edit Tour' : 'Create New Tour'}
@@ -331,6 +332,6 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
           />
         </form>
       </Form>
-    </div>
+    </ZinePanel>
   );
 };

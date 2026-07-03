@@ -23,14 +23,14 @@ interface MediaItemCardProps {
 /** Container classes reflecting error / uploaded state. */
 const cardContainerClass = (item: MediaItem): string =>
   cn(
-    'group bg-card relative flex items-center gap-3 rounded-lg border p-3 transition-colors',
+    'group bg-card relative flex items-center gap-3 border p-3 transition-colors',
     item.error && 'border-destructive bg-destructive/5',
     item.uploadedUrl && !item.isUploading && 'border-green-500/50 bg-green-500/5'
   );
 
 const iconWrapperClass = (mediaType: MediaItem['mediaType']): string =>
   cn(
-    'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg',
+    'flex h-12 w-12 shrink-0 items-center justify-center',
     mediaType === 'audio' ? 'bg-primary/10' : 'bg-purple-500/10'
   );
 
@@ -74,7 +74,7 @@ const MediaItemMeta = ({ item }: { item: MediaItem }): React.JSX.Element => (
 );
 
 const MediaSuccessBadge = (): React.JSX.Element => (
-  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/90">
+  <div className="flex h-6 w-6 items-center justify-center bg-green-500/90">
     <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
     </svg>
@@ -101,7 +101,7 @@ const MediaItemStatus = ({
       <button
         type="button"
         onClick={() => onDeleteRequest(item)}
-        className="bg-muted hover:bg-destructive flex h-8 w-8 items-center justify-center rounded-full text-zinc-950 transition-colors hover:text-white"
+        className="bg-muted hover:bg-destructive flex h-8 w-8 items-center justify-center text-zinc-950 transition-colors hover:text-white"
         aria-label="Remove file"
       >
         <X className="h-4 w-4" />

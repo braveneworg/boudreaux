@@ -80,6 +80,20 @@ describe('ArtistSearchPage', () => {
     expect(screen.getByRole('heading', { name: 'Search Artists' })).toBeInTheDocument();
   });
 
+  it('should render the heading as a cutout strip inside a hot-pink zine panel', async () => {
+    const Page = await ArtistSearchPage({
+      searchParams: Promise.resolve({ q: 'john' }),
+    });
+    const { container } = render(Page);
+
+    const heading = screen.getByRole('heading', { name: 'Search Artists' });
+    expect(heading.querySelector('[data-slot="zine-heading"]')).toBeInTheDocument();
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-hot-pink');
+  });
+
   it('should prefetch search results when query is provided', async () => {
     const Page = await ArtistSearchPage({
       searchParams: Promise.resolve({ q: 'john' }),

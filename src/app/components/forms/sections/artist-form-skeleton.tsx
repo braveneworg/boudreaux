@@ -19,9 +19,9 @@ export const ArtistFormSkeleton = ({ isEditMode }: ArtistFormSkeletonProps): Rea
       helpText="Loading artist details…"
     />
     <div className="space-y-4">
-      <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-      <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
-      <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+      <div className="bg-muted h-10 w-full animate-pulse" />
+      <div className="bg-muted h-10 w-full animate-pulse" />
+      <div className="bg-muted h-10 w-full animate-pulse" />
     </div>
   </div>
 );

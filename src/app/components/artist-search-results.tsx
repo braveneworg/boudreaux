@@ -64,10 +64,10 @@ export const ArtistSearchResults = ({
                     alt={artist.artistName}
                     width={32}
                     height={32}
-                    className="size-8 rounded-full object-cover"
+                    className="size-8 object-cover"
                   />
                 ) : (
-                  <div className="bg-muted flex size-8 items-center justify-center rounded-full">
+                  <div className="bg-muted flex size-8 items-center justify-center">
                     <User className="size-4 text-zinc-950" />
                   </div>
                 )}

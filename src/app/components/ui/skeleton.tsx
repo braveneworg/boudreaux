@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const Skeleton = ({ className, ...props }: React.ComponentProps<'div'>) => (
   <div
     data-slot="skeleton"
-    className={cn('my-4 animate-pulse rounded-md bg-zinc-300', className)}
+    className={cn('my-4 animate-pulse rounded-none bg-zinc-300', className)}
     {...props}
   />
 );

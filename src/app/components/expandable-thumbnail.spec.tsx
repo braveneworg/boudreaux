@@ -21,6 +21,23 @@ describe('ExpandableThumbnail', () => {
     ).toBeInTheDocument();
   });
 
+  it('frames the thumbnail trigger with a square black border', () => {
+    render(<ExpandableThumbnail src="https://x/a.jpg" alt="Artist portrait" />);
+
+    const trigger = screen.getByRole('button', { name: 'Expand image: Artist portrait' });
+    expect(trigger).toHaveClass('border-2', 'border-black');
+    expect(trigger).not.toHaveClass('rounded-lg');
+  });
+
+  it('drops the resting ring but keeps the focus-visible ring', () => {
+    render(<ExpandableThumbnail src="https://x/a.jpg" alt="Artist portrait" />);
+
+    const trigger = screen.getByRole('button', { name: 'Expand image: Artist portrait' });
+    expect(trigger).not.toHaveClass('ring-1');
+    expect(trigger).not.toHaveClass('ring-border');
+    expect(trigger).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-primary');
+  });
+
   it('uses the thumbnail source for the collapsed image when provided', () => {
     render(
       <ExpandableThumbnail

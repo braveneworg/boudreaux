@@ -6,9 +6,9 @@ import { DataStoreHealthStatus } from '@/components/data-store-health-status';
 
 export default function Statuses() {
   return (
-    <>
+    <div className="zine-accent-kraft">
       <DataStoreHealthStatus />
       <CDNStatusBanner />
-    </>
+    </div>
   );
 }

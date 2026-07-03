@@ -82,4 +82,21 @@ describe('ArtistListCard', () => {
 
     expect(screen.queryByTestId('thumb')).not.toBeInTheDocument();
   });
+
+  it('styles the card as a punk photo card without the soft hover shadow', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('shadow-zine-sm', 'bg-white');
+    expect(card).not.toHaveClass('hover:shadow-md');
+    expect(card).not.toHaveClass('transition-shadow');
+  });
+
+  it('renders the no-image placeholder without rounded corners', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const placeholder = container.querySelector('.bg-muted');
+    expect(placeholder).toBeInTheDocument();
+    expect(placeholder).not.toHaveClass('rounded-lg');
+  });
 });

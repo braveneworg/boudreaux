@@ -109,6 +109,14 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
         {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
+        {/* crossOrigin is mandatory: font fetches are CORS-mode, so omitting it makes Chrome double-fetch the file. */}
+        <link
+          rel="preload"
+          href="/media/FakeFourCutout-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
       </head>
       <body
         className={`${jost.className} flex min-h-screen max-w-full flex-col overflow-x-clip antialiased`}

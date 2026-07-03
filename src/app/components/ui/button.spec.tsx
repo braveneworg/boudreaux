@@ -39,32 +39,51 @@ describe('Button', () => {
   });
 
   describe('variants', () => {
-    it('should apply default variant classes', () => {
+    it('should apply the zine-stamp classes as the default variant', () => {
       render(<Button>Default</Button>);
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('bg-primary', 'text-primary-foreground');
+      expect(button).toHaveClass('rounded-none', 'border-2', 'border-black', 'shadow-zine-sm');
+    });
+
+    it('should render the default variant as a paper stamp that inverts to ink on hover', () => {
+      render(<Button>Default</Button>);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass('bg-background', 'text-foreground', 'font-semibold');
+      expect(button).toHaveClass('hover:bg-foreground', 'hover:text-background');
+    });
+
+    it('should press the default variant into its shadow on active', () => {
+      render(<Button>Default</Button>);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass(
+        'active:translate-x-[3px]',
+        'active:translate-y-[3px]',
+        'active:shadow-none'
+      );
     });
 
     it('should apply destructive variant classes', () => {
       render(<Button variant="destructive">Delete</Button>);
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('bg-destructive', 'text-white');
+      expect(button).toHaveClass('bg-destructive', 'text-white', 'border-black', 'shadow-zine-ink');
     });
 
     it('should apply outline variant classes', () => {
       render(<Button variant="outline">Outline</Button>);
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('border', 'bg-background');
+      expect(button).toHaveClass('border-2', 'bg-background', 'shadow-zine-ink');
     });
 
     it('should apply secondary variant classes', () => {
       render(<Button variant="secondary">Secondary</Button>);
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('bg-secondary', 'text-secondary-foreground');
+      expect(button).toHaveClass('bg-secondary', 'text-secondary-foreground', 'border-black');
     });
 
     it('should apply ghost variant classes', () => {
@@ -95,6 +114,8 @@ describe('Button', () => {
 
       const button = screen.getByRole('button');
       expect(button).toHaveClass('h-8', 'px-3');
+      expect(button).toHaveClass('rounded-none'); // squared by the base, no size override
+      expect(button).not.toHaveClass('rounded-md');
     });
 
     it('should apply large size classes', () => {
@@ -102,6 +123,8 @@ describe('Button', () => {
 
       const button = screen.getByRole('button');
       expect(button).toHaveClass('h-10', 'px-6');
+      expect(button).toHaveClass('rounded-none'); // squared by the base, no size override
+      expect(button).not.toHaveClass('rounded-md');
     });
 
     it('should apply icon size classes', () => {
@@ -126,7 +149,7 @@ describe('Button', () => {
 
       const button = screen.getByRole('button');
       expect(button).toHaveClass('custom-class');
-      expect(button).toHaveClass('bg-primary'); // default variant should still be applied
+      expect(button).toHaveClass('border-black'); // default variant should still be applied
     });
   });
 
@@ -246,7 +269,7 @@ describe('Button', () => {
       );
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('border', 'bg-background'); // outline variant
+      expect(button).toHaveClass('border-2', 'bg-background'); // outline variant
       expect(button).toHaveClass('h-10', 'px-6'); // large size
     });
 

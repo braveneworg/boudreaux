@@ -93,5 +93,31 @@ describe('tailwind-utils', () => {
       expect(result).toContain('class2');
       expect(result).toContain('class3');
     });
+
+    describe('zine shadow merging', () => {
+      it('lets shadow-none override shadow-zine', () => {
+        expect(cn('shadow-zine', 'shadow-none')).toBe('shadow-none');
+      });
+
+      it('resolves conflicting zine shadows to the later class', () => {
+        expect(cn('shadow-zine-ink', 'shadow-zine')).toBe('shadow-zine');
+      });
+
+      it('lets a zine size override another zine shadow', () => {
+        expect(cn('shadow-zine', 'shadow-zine-sm')).toBe('shadow-zine-sm');
+      });
+
+      it('lets a zine shadow override a default Tailwind shadow', () => {
+        expect(cn('shadow-lg', 'shadow-zine')).toBe('shadow-zine');
+      });
+
+      it('keeps non-conflicting classes', () => {
+        expect(cn('rounded-none', 'border-2')).toBe('rounded-none border-2');
+      });
+
+      it('still resolves default Tailwind conflicts', () => {
+        expect(cn('p-2', 'p-4')).toBe('p-4');
+      });
+    });
   });
 });

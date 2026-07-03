@@ -71,7 +71,7 @@ export const IosInstallPrompt = (): React.ReactElement | null => {
       aria-label="Install Fake Four Inc."
       className={cn(
         'fixed inset-x-0 bottom-0 z-50 mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-md',
-        'bg-background rounded-xl border p-4 shadow-lg'
+        'bg-background border p-4 shadow-lg'
       )}
     >
       <div className="flex items-start gap-3">

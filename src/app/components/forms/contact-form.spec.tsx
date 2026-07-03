@@ -160,6 +160,25 @@ describe('ContactForm', () => {
     });
   });
 
+  describe('layout spacing', () => {
+    it('should space the form sections with space-y-6', () => {
+      const { container } = renderContactForm();
+
+      const wrapper = container.querySelector('.animate-in');
+      expect(wrapper).toHaveClass('space-y-6');
+      expect(wrapper).not.toHaveClass('space-y-4');
+    });
+
+    it('should lay out the name grid two-up from sm without a base column class', () => {
+      const { container } = renderContactForm();
+
+      const nameGrid = screen.getByTestId('text-field-firstName').closest('.grid');
+      expect(nameGrid).toHaveClass('sm:grid-cols-2');
+      expect(nameGrid).not.toHaveClass('grid-cols-1');
+      expect(container.querySelector('.grid-cols-1')).toBeNull();
+    });
+  });
+
   describe('field configuration', () => {
     it('should not disable name and email fields', () => {
       renderContactForm();
