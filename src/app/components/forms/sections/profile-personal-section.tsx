@@ -93,7 +93,7 @@ export const ProfilePersonalSection = ({
             <TextField control={form.control} name="zipCode" label="ZIP Code" placeholder="10001" />
           </div>
           <CountryField control={form.control} />
-          <div className="flex items-center rounded-lg p-4">
+          <div className="flex items-center p-4">
             <Controller
               name="allowSmsNotifications"
               control={form.control}

@@ -250,6 +250,14 @@ describe('ProfileForm', () => {
       expect(nameGrid).toHaveClass('sm:grid-cols-2');
       expect(container.querySelector('.md\\:grid-cols-2')).toBeNull();
     });
+
+    it('renders the SMS toggle row without a rounded frame', () => {
+      const { container } = render(<ProfileForm />);
+
+      const smsRow = container.querySelector('#allowSmsNotifications')?.parentElement;
+      expect(smsRow).toHaveClass('p-4');
+      expect(smsRow).not.toHaveClass('rounded-lg');
+    });
   });
 
   describe('form population effect', () => {
