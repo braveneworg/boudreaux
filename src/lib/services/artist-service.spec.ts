@@ -5,6 +5,7 @@ import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
 
@@ -32,6 +33,7 @@ vi.mock('@aws-sdk/client-s3', () => {
 });
 vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => new MockS3Client(),
+  deleteS3Object: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/lib/repositories/artist-repository', () => ({
@@ -52,6 +54,8 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     archive: vi.fn(),
     existsById: vi.fn(),
     connectToRelease: vi.fn(),
+    deleteBioLink: vi.fn(),
+    deleteBioImage: vi.fn(),
   },
 }));
 
@@ -1899,6 +1903,51 @@ describe('ArtistService', () => {
 
       const bio = result.success ? result.data.bio : 'unexpected';
       expect(bio).toBe('<p>Hi</p>');
+    });
+  });
+
+  describe('deleteBioLink', () => {
+    it('delegates to the repository without returning a value', async () => {
+      vi.mocked(ArtistRepository.deleteBioLink).mockResolvedValue(undefined as never);
+
+      await ArtistService.deleteBioLink('link-1');
+
+      expect(ArtistRepository.deleteBioLink).toHaveBeenCalledWith('link-1');
+    });
+  });
+
+  describe('deleteBioImage', () => {
+    beforeEach(() => {
+      vi.stubEnv('CDN_DOMAIN', 'cdn.example');
+    });
+
+    it('removes the CDN bio thumbnail after deleting the row', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).toHaveBeenCalledWith(
+        'media/artists/a1/bio/thumbs/0-abc.webp'
+      );
+    });
+
+    it('does not touch S3 for a non-bio url', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://upload.wikimedia.org/photo.jpg',
+        thumbnailUrl: null,
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).not.toHaveBeenCalled();
+    });
+
+    it('still succeeds when thumbnail cleanup fails', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      });
+      vi.mocked(deleteS3Object).mockResolvedValue(false);
+      await expect(ArtistService.deleteBioImage('img-1')).resolves.toBeUndefined();
     });
   });
 

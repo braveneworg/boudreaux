@@ -20,6 +20,8 @@ export type AuditEvent =
   | 'media.artist.images.reordered'
   | 'media.artist.image.deleted'
   | 'media.artist.image.updated'
+  | 'media.artist_bio_link.deleted'
+  | 'media.artist_bio_image.deleted'
   | 'media.artist.archived'
   | 'media.artist.restored'
   | 'media.artist.published'

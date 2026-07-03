@@ -20,7 +20,7 @@ import { DataError } from '@/lib/types/domain/errors';
 import type { ImageRecord } from '@/lib/types/domain/image';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { loggers } from '@/lib/utils/logger';
-import { getS3Client } from '@/lib/utils/s3-client';
+import { deleteS3Object, getS3Client } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import {
   sanitizeBioHtml,
@@ -161,6 +161,20 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
     sanitized.shortBio = sanitizeBioHtmlNoImages(sanitized.shortBio);
   if (typeof sanitized.altBio === 'string') sanitized.altBio = sanitizeBioHtml(sanitized.altBio);
   return sanitized;
+};
+
+/** Path marker for generation-time bio media on the CDN — the only keys the
+ *  palette delete is allowed to clean up. */
+const BIO_MEDIA_PATH_MARKER = '/bio/';
+
+/** Best-effort cleanup of a single CDN bio thumbnail. Only acts on URLs that
+ *  contain the bio media path marker; all others are silently skipped.
+ *  `deleteS3Object` never throws (returns `false` on error), so this is
+ *  inherently best-effort. */
+const cleanupBioMediaObject = async (url: string | null): Promise<void> => {
+  if (!url || !url.includes(BIO_MEDIA_PATH_MARKER)) return;
+  const s3Key = extractS3KeyFromUrl(url);
+  if (s3Key) await deleteS3Object(s3Key);
 };
 
 /** Pre-computed lookup keys for the find-or-create-by-name search order. */
@@ -709,6 +723,19 @@ export class ArtistService {
    */
   static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
     await ArtistRepository.connectToRelease(artistId, releaseId);
+  }
+
+  /** Deletes a single discovered bio link row (admin palette X). */
+  static async deleteBioLink(linkId: string): Promise<void> {
+    await ArtistRepository.deleteBioLink(linkId);
+  }
+
+  /** Deletes a single discovered bio image row (admin palette X) and performs
+   *  best-effort cleanup of its CDN thumbnail. */
+  static async deleteBioImage(imageId: string): Promise<void> {
+    const removed = await ArtistRepository.deleteBioImage(imageId);
+    await cleanupBioMediaObject(removed.url);
+    await cleanupBioMediaObject(removed.thumbnailUrl);
   }
 
   /**

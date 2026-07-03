@@ -535,6 +535,23 @@ export class ArtistRepository {
     );
   }
 
+  /** Deletes a single discovered bio link row (palette X). */
+  static async deleteBioLink(linkId: string): Promise<void> {
+    await prisma.artistBioLink.delete({ where: { id: linkId } });
+  }
+
+  /** Deletes a single discovered bio image row (palette X) and returns its
+   *  stored URLs so the caller can clean up the CDN thumbnail. */
+  static async deleteBioImage(
+    imageId: string
+  ): Promise<{ url: string; thumbnailUrl: string | null }> {
+    const removed = await prisma.artistBioImage.delete({
+      where: { id: imageId },
+      select: { url: true, thumbnailUrl: true },
+    });
+    return removed;
+  }
+
   /**
    * Idempotently connect an artist to a release via the ArtistRelease join
    * table. Uses upsert to avoid duplicate constraint violations.

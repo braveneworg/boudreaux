@@ -24,6 +24,12 @@ vi.mock('@/lib/prisma', () => ({
     artistRelease: {
       upsert: vi.fn(),
     },
+    artistBioLink: {
+      delete: vi.fn(),
+    },
+    artistBioImage: {
+      delete: vi.fn(),
+    },
   },
 }));
 
@@ -448,6 +454,24 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { id: true } });
       expect(arg?.select?.bioLinks).toMatchObject({ select: { id: true } });
+    });
+  });
+
+  describe('deleteBioLink', () => {
+    it('deletes the link row by id', async () => {
+      await ArtistRepository.deleteBioLink('link-1');
+      expect(prisma.artistBioLink.delete).toHaveBeenCalledWith({ where: { id: 'link-1' } });
+    });
+  });
+
+  describe('deleteBioImage', () => {
+    it('deletes the image row and returns its urls for cleanup', async () => {
+      vi.mocked(prisma.artistBioImage.delete).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      } as never);
+      const removed = await ArtistRepository.deleteBioImage('img-1');
+      expect(removed.url).toBe('https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp');
     });
   });
 });
