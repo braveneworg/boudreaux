@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.171.0] - 2026-07-03
+
+### Added
+
+- feat: admin bio palettes, editor DnD figures, save-time re-host (#549)\n- feat: admin bio palettes, editor DnD figures, save-time re-host (#549)\n
+
 ## [4.170.0] - 2026-07-02
 
 ### Added
