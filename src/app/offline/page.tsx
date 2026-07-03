@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // unavailable and the requested route has not been cached.
 export default function OfflinePage() {
   return (
-    <PageContainer className="items-center justify-center gap-4 px-6 py-24 text-center">
+    <PageContainer className="zine-accent-kraft items-center justify-center gap-4 px-6 py-24 text-center">
       <WifiOff aria-hidden="true" className="text-muted-foreground size-12" />
       <h1>You&apos;re offline</h1>
       <p className="text-muted-foreground max-w-prose">

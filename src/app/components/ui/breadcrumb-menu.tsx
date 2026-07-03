@@ -19,6 +19,8 @@ type BreadcrumbItemData = {
   anchorText: string;
   url: string;
   isActive: boolean;
+  /** Crumbs for label-only segments with no route pass `false`; omitted means `true` */
+  isLink?: boolean;
   /** Optional CSS classes to apply to the breadcrumb text */
   className?: string;
 };
@@ -52,6 +54,8 @@ export const BreadcrumbMenu = ({ items, className }: BreadcrumbMenuProps) => (
                 <BreadcrumbPage>
                   <span className={item.className}>{item.anchorText}</span>
                 </BreadcrumbPage>
+              ) : item.isLink === false ? (
+                <span className={item.className}>{item.anchorText}</span>
               ) : (
                 <BreadcrumbLink asChild>
                   <Link href={item.url}>{item.anchorText}</Link>
