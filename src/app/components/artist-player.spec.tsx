@@ -427,6 +427,13 @@ describe('ArtistPlayer', () => {
       expect(coverArt).toHaveAttribute('data-src', 'https://example.com/release-1-cover.jpg');
     });
 
+    it('should frame the player unit with a black border and zine shadow', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+      expect(frame).toHaveClass('border-2', 'border-black', 'shadow-zine');
+    });
+
     it('should render audio controls for the first file', () => {
       render(<ArtistPlayer artist={artist} />);
 

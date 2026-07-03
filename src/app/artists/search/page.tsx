@@ -12,8 +12,9 @@ import { ArtistSearchInput } from '@/app/components/artist-search-input';
 import { ArtistSearchResultsPanel } from '@/app/components/artist-search-results';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import { Heading } from '@/app/components/ui/heading';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ZineHeading } from '@/app/components/ui/zine-heading';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
@@ -52,11 +53,13 @@ export default async function ArtistSearchPage({ searchParams }: ArtistSearchPag
       <PageContainer>
         <ContentContainer>
           <BreadcrumbMenu items={breadcrumbItems} />
-          <Heading level={1}>Search Artists</Heading>
-          <div className="px-4 py-2">
-            <ArtistSearchInput />
-          </div>
-          <ArtistSearchResultsPanel query={query} />
+          <ZinePanel accent="hot-pink">
+            <ZineHeading level={1}>Search Artists</ZineHeading>
+            <div className="px-4 py-2">
+              <ArtistSearchInput />
+            </div>
+            <ArtistSearchResultsPanel query={query} />
+          </ZinePanel>
         </ContentContainer>
       </PageContainer>
     </HydrationBoundary>

@@ -37,7 +37,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const images = artist.bioImages;
 
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
+    <Card className="shadow-zine-sm overflow-hidden bg-white">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
         {images.length > 0 ? (
           <ul className="flex shrink-0 gap-2">
@@ -57,7 +57,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
             ))}
           </ul>
         ) : (
-          <div className="bg-muted flex size-20 shrink-0 items-center justify-center rounded-lg sm:size-24">
+          <div className="bg-muted flex size-20 shrink-0 items-center justify-center sm:size-24">
             <User className="text-muted-foreground size-8" aria-hidden />
           </div>
         )}

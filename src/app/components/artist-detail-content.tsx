@@ -16,6 +16,7 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { ArtistPlayer } from './artist-player';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ZinePanel } from './ui/zine-panel';
 
 interface ArtistDetailContentProps {
   slug: string;
@@ -191,16 +192,18 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
     <div className="space-y-5">
       <BreadcrumbMenu items={breadcrumbItems} />
 
-      <ArtistDetailHeader
-        artist={artist}
-        slug={slug}
-        displayName={displayName}
-        genres={genres}
-        detailImages={detailImages}
-        hasFullBio={hasFullBio}
-      />
+      <ZinePanel accent="hot-pink" contentClassName="space-y-5">
+        <ArtistDetailHeader
+          artist={artist}
+          slug={slug}
+          displayName={displayName}
+          genres={genres}
+          detailImages={detailImages}
+          hasFullBio={hasFullBio}
+        />
 
-      <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
+        <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
+      </ZinePanel>
     </div>
   );
 };

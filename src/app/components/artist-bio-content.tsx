@@ -13,6 +13,7 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ZinePanel } from './ui/zine-panel';
 
 interface ArtistBioContentProps {
   slug: string;
@@ -79,58 +80,62 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
     <div className="space-y-6">
       <BreadcrumbMenu items={breadcrumbItems} />
 
-      <header className="space-y-3">
-        <h1 className="text-2xl font-semibold sm:text-3xl">{displayName}</h1>
-        {genres.length > 0 && (
-          <ul className="flex flex-wrap gap-2">
-            {genres.map((genre) => (
-              <li key={genre}>
-                <Badge variant="secondary" className="gap-1">
-                  <Music2 className="size-3" aria-hidden />
-                  {genre}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-        {artist.shortBio && (
-          <BioHtml html={artist.shortBio} className="text-muted-foreground text-lg" />
-        )}
-      </header>
+      <ZinePanel accent="hot-pink" contentClassName="space-y-6">
+        <header className="space-y-3">
+          <h1 className="text-2xl font-semibold sm:text-3xl">{displayName}</h1>
+          {genres.length > 0 && (
+            <ul className="flex flex-wrap gap-2">
+              {genres.map((genre) => (
+                <li key={genre}>
+                  <Badge variant="secondary" className="gap-1">
+                    <Music2 className="size-3" aria-hidden />
+                    {genre}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+          {artist.shortBio && (
+            <BioHtml html={artist.shortBio} className="text-muted-foreground text-lg" />
+          )}
+        </header>
 
-      {bioImages.length > 0 && (
-        <section aria-label="Artist images">
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {bioImages.map((image) => (
-              <li key={image.id} className="aspect-square">
-                <ExpandableThumbnail
-                  src={image.url}
-                  thumbnailSrc={image.thumbnailUrl}
-                  alt={image.title ?? `${displayName} image`}
-                  caption={image.title}
-                  attribution={image.attribution}
-                  license={image.license}
-                  sourceUrl={image.sourceUrl}
-                  className="size-full"
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {bioImages.length > 0 && (
+          <section aria-label="Artist images">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {bioImages.map((image) => (
+                <li key={image.id} className="aspect-square">
+                  <ExpandableThumbnail
+                    src={image.url}
+                    thumbnailSrc={image.thumbnailUrl}
+                    alt={image.title ?? `${displayName} image`}
+                    caption={image.title}
+                    attribution={image.attribution}
+                    license={image.license}
+                    sourceUrl={image.sourceUrl}
+                    className="size-full"
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {artist.bio ? (
-        <article className="max-w-none [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6">
-          {/* The bio HTML is sanitized server-side on read (sanitizeBioHtml) and
-              again at generation time; BioHtml maps its <a>/<img> tags to Next
-              Link/Image instead of dangerouslySetInnerHTML. Links are woven
-              inline in the prose, so there is no separate link list. Section
-              <h2>s get top spacing + a rule to visually separate sections. */}
-          <BioHtml html={artist.bio} />
-        </article>
-      ) : (
-        <p className="text-muted-foreground">No biography has been written for this artist yet.</p>
-      )}
+        {artist.bio ? (
+          <article className="max-w-none [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6">
+            {/* The bio HTML is sanitized server-side on read (sanitizeBioHtml) and
+                again at generation time; BioHtml maps its <a>/<img> tags to Next
+                Link/Image instead of dangerouslySetInnerHTML. Links are woven
+                inline in the prose, so there is no separate link list. Section
+                <h2>s get top spacing + a rule to visually separate sections. */}
+            <BioHtml html={artist.bio} />
+          </article>
+        ) : (
+          <p className="text-muted-foreground">
+            No biography has been written for this artist yet.
+          </p>
+        )}
+      </ZinePanel>
     </div>
   );
 };

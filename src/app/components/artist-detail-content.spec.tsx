@@ -78,6 +78,24 @@ describe('ArtistDetailContent', () => {
     expect(screen.queryByRole('link', { name: /read full bio/i })).not.toBeInTheDocument();
   });
 
+  it('wraps the artist header and player in a hot-pink zine panel', () => {
+    useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
+
+    const { container } = render(<ArtistDetailContent slug="test-artist" />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-hot-pink');
+  });
+
+  it('does not render a zine panel while the query is pending', () => {
+    useArtistBySlugQueryMock.mockReturnValue({ isPending: true, data: undefined });
+
+    const { container } = render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(container.querySelector('[data-slot="zine-panel"]')).not.toBeInTheDocument();
+  });
+
   it('shows the not-found state when data is missing', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: null, error: undefined });
 

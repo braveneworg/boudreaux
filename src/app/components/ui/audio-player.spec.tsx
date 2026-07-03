@@ -138,7 +138,8 @@ describe('AudioPlayer', () => {
 
     const posterContainer = screen.getByAltText('Album cover').parentElement;
     expect(posterContainer).toHaveClass('overflow-hidden');
-    expect(posterContainer).toHaveClass('shadow-lg');
+    expect(posterContainer).toHaveClass('border-2', 'border-black', 'shadow-zine');
+    expect(posterContainer).not.toHaveClass('shadow-lg');
   });
 
   it('disposes player on unmount', async () => {

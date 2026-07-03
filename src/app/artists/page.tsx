@@ -19,6 +19,7 @@ import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { ArtistService } from '@/lib/services/artist-service';
 
 import type { Metadata } from 'next';
@@ -43,39 +44,42 @@ export default async function ArtistsIndexPage() {
         <div className="space-y-6">
           <BreadcrumbMenu items={breadcrumbItems} />
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <ImageHeading
-              src="/media/headings/ARTISTS.webp"
-              alt="artists"
-              imageHeight={480}
-              priority
-            />
-            <Button asChild variant="outline" size="sm">
-              <Link href="/artists/search">
-                <Search className="size-4" aria-hidden />
-                Search artists
-              </Link>
-            </Button>
-          </div>
-
-          {artists.length === 0 ? (
-            <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 border-2 border-dashed p-8 text-center">
-              <Users className="text-muted-foreground size-8" aria-hidden />
-              <p className="text-muted-foreground">
-                {result.success
-                  ? 'No artists have been published yet.'
-                  : 'Artists are unavailable right now. Please try again later.'}
-              </p>
+          <ZinePanel accent="hot-pink" contentClassName="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <ImageHeading
+                src="/media/headings/ARTISTS.webp"
+                alt="artists"
+                imageHeight={480}
+                imageClassName="w-full"
+                priority
+              />
+              <Button asChild variant="outline" size="sm">
+                <Link href="/artists/search">
+                  <Search className="size-4" aria-hidden />
+                  Search artists
+                </Link>
+              </Button>
             </div>
-          ) : (
-            <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {artists.map((artist) => (
-                <li key={artist.id}>
-                  <ArtistListCard artist={artist} />
-                </li>
-              ))}
-            </ul>
-          )}
+
+            {artists.length === 0 ? (
+              <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 border-2 border-dashed p-8 text-center">
+                <Users className="text-muted-foreground size-8" aria-hidden />
+                <p className="text-muted-foreground">
+                  {result.success
+                    ? 'No artists have been published yet.'
+                    : 'Artists are unavailable right now. Please try again later.'}
+                </p>
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {artists.map((artist) => (
+                  <li key={artist.id}>
+                    <ArtistListCard artist={artist} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ZinePanel>
         </div>
       </ContentContainer>
     </PageContainer>
