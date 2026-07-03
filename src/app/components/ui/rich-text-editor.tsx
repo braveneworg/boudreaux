@@ -149,7 +149,7 @@ interface LinkBubbleMenuProps {
 /** Floating Edit/Unlink menu shown while the caret sits inside a link. */
 const LinkBubbleMenu = ({ editor, onEdit, onRemove }: LinkBubbleMenuProps): JSX.Element => (
   <BubbleMenu editor={editor} shouldShow={({ editor: instance }) => instance.isActive('link')}>
-    <div className="bg-popover flex items-center gap-1 rounded-md border p-1 shadow-md">
+    <div className="bg-popover flex items-center gap-1 border p-1 shadow-md">
       <Button type="button" size="sm" variant="ghost" onClick={onEdit}>
         <Pencil className="size-3.5" aria-hidden />
         Edit

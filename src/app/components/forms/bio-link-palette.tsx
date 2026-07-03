@@ -47,7 +47,7 @@ export const BioLinkPalette = ({
             key={link.id}
             draggable
             onDragStart={onDragStart}
-            className="border-border bg-background flex cursor-grab items-center gap-2 rounded-md border px-2 py-1.5 text-sm active:cursor-grabbing"
+            className="border-border bg-background flex cursor-grab items-center gap-2 border px-2 py-1.5 text-sm active:cursor-grabbing"
           >
             {isExternal && (
               <ExternalLink
@@ -67,7 +67,7 @@ export const BioLinkPalette = ({
               disabled={disabled}
               onClick={() => onDelete(link.id)}
               aria-label={`Delete link ${link.label}`}
-              className="hover:text-destructive ml-auto shrink-0 rounded-full p-0.5"
+              className="hover:text-destructive ml-auto shrink-0 p-0.5"
             >
               <X className="size-3.5" aria-hidden />
             </button>

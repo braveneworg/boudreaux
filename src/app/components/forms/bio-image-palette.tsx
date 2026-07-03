@@ -76,7 +76,7 @@ export const BioImagePalette = ({
             key={image.id}
             draggable
             onDragStart={onDragStart}
-            className="border-border bg-background relative flex cursor-grab flex-col gap-1 rounded-md border p-1 active:cursor-grabbing"
+            className="border-border bg-background relative flex cursor-grab flex-col gap-1 border p-1 active:cursor-grabbing"
           >
             <Image
               src={thumbSrc}
@@ -84,7 +84,7 @@ export const BioImagePalette = ({
               width={96}
               height={96}
               unoptimized
-              className="h-24 w-full rounded-md object-cover"
+              className="h-24 w-full object-cover"
             />
             {image.attribution && (
               <p className="text-muted-foreground line-clamp-2 text-[11px]">{image.attribution}</p>
@@ -95,7 +95,7 @@ export const BioImagePalette = ({
                   <button
                     type="button"
                     aria-label={`Preview ${previewLabel}`}
-                    className="hover:text-primary rounded-full p-0.5"
+                    className="hover:text-primary p-0.5"
                   >
                     <Eye className="size-3.5" aria-hidden />
                   </button>
@@ -109,7 +109,7 @@ export const BioImagePalette = ({
                     alt={alt}
                     {...previewDimensions(image)}
                     unoptimized
-                    className="h-auto w-full rounded-md"
+                    className="h-auto w-full"
                   />
                   {image.attribution && (
                     <p className="text-muted-foreground text-xs">{image.attribution}</p>
@@ -121,7 +121,7 @@ export const BioImagePalette = ({
                 disabled={disabled}
                 onClick={() => onDelete(image.id)}
                 aria-label={`Delete image ${deleteLabel}`}
-                className="hover:text-destructive ml-auto rounded-full p-0.5"
+                className="hover:text-destructive ml-auto p-0.5"
               >
                 <X className="size-3.5" aria-hidden />
               </button>

@@ -65,6 +65,12 @@ describe('BioImagePalette', () => {
     expect(screen.getByText('Photo by Example')).toBeInTheDocument();
   });
 
+  it('renders square draggable tiles with no rounded corners', () => {
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    const tile = screen.getByText('Photo by Example').closest('li') as HTMLElement;
+    expect(tile.className).not.toMatch(/rounded/);
+  });
+
   it('calls onDelete with the row id when X is pressed', async () => {
     const onDelete = vi.fn();
     render(<BioImagePalette images={IMAGES} onDelete={onDelete} />);
