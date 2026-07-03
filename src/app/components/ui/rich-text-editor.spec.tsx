@@ -23,8 +23,14 @@ const IMAGES: RichTextEditorImage[] = [
   },
 ];
 
-const Harness = ({ images }: { images?: RichTextEditorImage[] }) => {
-  const [value, setValue] = useState('<p>Start</p>');
+const Harness = ({
+  images,
+  initialValue = '<p>Start</p>',
+}: {
+  images?: RichTextEditorImage[];
+  initialValue?: string;
+}) => {
+  const [value, setValue] = useState(initialValue);
   return <RichTextEditor value={value} onChange={setValue} images={images} ariaLabel="Bio" />;
 };
 
@@ -470,7 +476,7 @@ describe('RichTextEditor active toolbar state and props', () => {
 });
 
 describe('RichTextEditor image attributes and picker', () => {
-  it('persists width and height for an image set into the content', async () => {
+  it('inserts a picked image as a bio figure block', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
       const [value, setValue] = useState('<p>Body</p>');
@@ -493,10 +499,7 @@ describe('RichTextEditor image attributes and picker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Insert Portrait' }));
 
     await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('width="800"'))
-    );
-    await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('height="600"'))
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('class="bio-figure'))
     );
   });
 
@@ -618,6 +621,125 @@ describe('RichTextEditor preview mode', () => {
     expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Link' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled();
+  });
+});
+
+describe('RichTextEditor bio figures and upgraded dialogs', () => {
+  const FIGURE_HTML =
+    '<figure class="bio-figure bio-figure--center" style="width:60%">' +
+    '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="Portrait">' +
+    '<figcaption class="bio-figure-caption">' +
+    '<span class="bio-figure-attribution">Wikimedia Commons</span>' +
+    '</figcaption></figure>';
+
+  const ControlledFactory = (onChange: (html: string) => void, initial = '<p>Body</p>') => {
+    const Controlled = () => {
+      const [value, setValue] = useState(initial);
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          images={IMAGES}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    return Controlled;
+  };
+
+  it('registers the bioFigure node so figure content round-trips', async () => {
+    render(<Harness initialValue={FIGURE_HTML} />);
+    await waitForEditor();
+
+    // The NodeView renders the caption text inside the editor surface, plus its
+    // resize handle — proof the figure parsed as a bioFigure node, not as text
+    // lifted out of an unknown tag.
+    expect(screen.getByText('Wikimedia Commons')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Resize image' })).toBeInTheDocument();
+  });
+
+  it('inserts a link with anchor text from the upgraded link dialog', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange);
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Anchor text' }), 'My band');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'URL' }),
+      'https://myband.example.com'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('>My band</a>'))
+    );
+  });
+
+  it('marks the new-tab switch off automatically for a site-relative URL', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), '/tours');
+
+    expect(screen.getByRole('switch', { name: 'Opens in new tab' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('applies internal link attributes when the external toggle is off', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange, '<p>linkme</p>');
+    render(<Controlled />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), '/releases/first');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="/releases/first"'))
+    );
+    const lastHtml = onChange.mock.calls.at(-1)?.[0] as string;
+    expect(lastHtml).not.toContain('target="_blank"');
+  });
+
+  it('lets the admin override the auto-set new-tab switch', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
+    await userEvent.click(screen.getByRole('switch', { name: 'Opens in new tab' }));
+
+    expect(screen.getByRole('switch', { name: 'Opens in new tab' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('inserts a bioFigure with attribution from the upgraded image dialog', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange);
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Insert image' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'Wikimedia Commons');
+    await userEvent.click(screen.getByRole('button', { name: 'Insert Portrait' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('bio-figure-attribution'))
+    );
   });
 });
 

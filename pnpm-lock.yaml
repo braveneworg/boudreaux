@@ -173,6 +173,9 @@ importers:
       '@tanstack/react-query-devtools':
         specifier: ^5.101.0
         version: 5.101.0(@tanstack/react-query@5.101.0(react@19.2.7))(react@19.2.7)
+      '@tiptap/core':
+        specifier: ^3.27.0
+        version: 3.27.0(@tiptap/pm@3.27.0)
       '@tiptap/extension-image':
         specifier: ^3.27.0
         version: 3.27.0(@tiptap/core@3.27.0(@tiptap/pm@3.27.0))
