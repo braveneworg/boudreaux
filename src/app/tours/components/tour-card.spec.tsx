@@ -810,4 +810,15 @@ describe('TourCard', () => {
 
     expect(screen.getByRole('none')).toBeInTheDocument();
   });
+
+  // ─── Punk zine treatment ──────────────────────────────────────────────────────
+
+  it('renders as a punk photo card with zine shadow and white background', () => {
+    render(<TourCard tour={createMockTour()} />);
+
+    const card = screen.getByTestId('tour-card');
+    expect(card).toHaveClass('group', 'overflow-hidden', 'bg-white', 'shadow-zine-sm');
+    expect(card).not.toHaveClass('transition-shadow');
+    expect(card).not.toHaveClass('hover:shadow-lg');
+  });
 });

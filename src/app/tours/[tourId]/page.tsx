@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
+import { ContentContainer } from '@/app/components/ui/content-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import type { TourWithRelations } from '@/app/hooks/use-tour-query';
 import { TourDetailContent } from '@/app/tours/components/tour-detail-content';
 import { queryKeys } from '@/lib/query-keys';
@@ -39,9 +41,11 @@ export default async function TourPage({ params }: TourPageProps) {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="container mx-auto py-8">
-        <TourDetailContent tourId={tourId} />
-      </div>
+      <PageContainer>
+        <ContentContainer>
+          <TourDetailContent tourId={tourId} />
+        </ContentContainer>
+      </PageContainer>
     </HydrationBoundary>
   );
 }

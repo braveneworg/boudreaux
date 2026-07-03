@@ -178,4 +178,13 @@ describe('TourList', () => {
     expect(cards[1]).toHaveTextContent('Second Tour');
     expect(cards[2]).toHaveTextContent('Third Tour');
   });
+
+  it('renders the empty state as a squared dashed box (no rounded corners)', () => {
+    const { container } = render(<TourList tours={[]} />);
+
+    const box = container.querySelector('.border-dashed');
+    expect(box).toBeInTheDocument();
+    expect(box).toHaveClass('border-2', 'border-dashed');
+    expect(box).not.toHaveClass('rounded-lg');
+  });
 });
