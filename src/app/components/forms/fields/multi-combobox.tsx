@@ -123,7 +123,7 @@ const SelectedFormatBadges = ({
         {!disabled && (
           <button
             type="button"
-            className="hover:text-foreground ml-0.5 rounded-full outline-none"
+            className="hover:text-foreground ml-0.5 outline-none"
             onClick={() => onRemove(option.value)}
             aria-label={`Remove ${option.label}`}
           >

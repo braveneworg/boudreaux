@@ -37,7 +37,7 @@ export const BannerCarouselDots = ({
       >
         <span
           className={cn(
-            'h-2.5 w-2.5 rounded-full transition-colors',
+            'h-2.5 w-2.5 transition-colors',
             idx === currentIndex ? 'bg-foreground' : 'bg-foreground/30'
           )}
         />

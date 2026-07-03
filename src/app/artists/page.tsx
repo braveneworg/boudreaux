@@ -59,7 +59,7 @@ export default async function ArtistsIndexPage() {
           </div>
 
           {artists.length === 0 ? (
-            <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 text-center">
+            <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 border-2 border-dashed p-8 text-center">
               <Users className="text-muted-foreground size-8" aria-hidden />
               <p className="text-muted-foreground">
                 {result.success

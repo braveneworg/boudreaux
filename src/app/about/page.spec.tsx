@@ -138,6 +138,26 @@ describe('AboutPage', () => {
       expect(bandcampImage).toHaveAttribute('data-width', '380');
       expect(bandcampImage).toHaveAttribute('data-height', '42');
     });
+
+    it('frames the founders image with a square black border and zine shadow', () => {
+      render(<AboutPage />);
+
+      const foundersImage = screen.getByTestId(
+        'image-Ceschi and David Ramos, founders of Fake Four Inc. in 2008'
+      );
+      expect(foundersImage).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+      expect(foundersImage).not.toHaveClass('rounded-full');
+    });
+
+    it('frames the bandcamp image with a square black border and zine shadow', () => {
+      render(<AboutPage />);
+
+      const bandcampImage = screen.getByTestId(
+        "image-Listen to David Ramos' This Up Here on Bandcamp"
+      );
+      expect(bandcampImage).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+      expect(bandcampImage).not.toHaveClass('rounded-md');
+    });
   });
 
   describe('description content', () => {

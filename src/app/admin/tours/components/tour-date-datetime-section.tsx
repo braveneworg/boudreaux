@@ -142,7 +142,7 @@ export const TourDateDatetimeSection = ({
                 value={(field.value as string) || ''}
                 type="number"
                 placeholder="e.g. -300"
-                className="border-input focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-800 focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-input focus-visible:ring-ring flex h-9 w-full border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-800 focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
             </FormControl>
             <p className="text-xs text-zinc-950">

@@ -10,8 +10,8 @@ import { ArtistReleasesCarousel } from './artist-releases-carousel';
 
 // Mock next/image
 vi.mock('next/image', () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <span data-testid="carousel-image" data-src={src} data-alt={alt} />
+  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) => (
+    <span data-testid="carousel-image" data-src={src} data-alt={alt} className={className} />
   ),
 }));
 
@@ -78,6 +78,21 @@ describe('ArtistReleasesCarousel', () => {
           updatedAt: new Date(),
         },
       ],
+    },
+  ] as unknown as ReleaseCarouselItem[];
+
+  const noCoverRelease = [
+    {
+      id: 'release-no-art',
+      title: 'No Art Album',
+      coverArt: '',
+      description: null,
+      publishedAt: new Date(),
+      releasedOn: new Date(),
+      deletedOn: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      images: [],
     },
   ] as unknown as ReleaseCarouselItem[];
 
@@ -170,24 +185,25 @@ describe('ArtistReleasesCarousel', () => {
   });
 
   it('should render fallback div when release has no cover art and no images', () => {
-    const noCoverRelease = [
-      {
-        id: 'release-no-art',
-        title: 'No Art Album',
-        coverArt: '',
-        description: null,
-        publishedAt: new Date(),
-        releasedOn: new Date(),
-        deletedOn: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        images: [],
-      },
-    ] as unknown as ReleaseCarouselItem[];
-
     render(<ArtistReleasesCarousel releases={noCoverRelease} artistName="John Doe" />);
 
     expect(screen.getByText('No Art Album')).toBeInTheDocument();
     expect(screen.queryByTestId('carousel-image')).not.toBeInTheDocument();
+  });
+
+  it('should frame cover art tiles with a black border and zine shadow', () => {
+    render(<ArtistReleasesCarousel releases={mockReleases} artistName="John Doe" />);
+
+    const images = screen.getAllByTestId('carousel-image');
+    expect(images[0]).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+    expect(images[0]).not.toHaveClass('rounded-md');
+  });
+
+  it('should frame the no-art fallback tile with a black border and zine shadow', () => {
+    render(<ArtistReleasesCarousel releases={noCoverRelease} artistName="John Doe" />);
+
+    const fallback = screen.getByText('No Art Album');
+    expect(fallback).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+    expect(fallback).not.toHaveClass('rounded-md');
   });
 });

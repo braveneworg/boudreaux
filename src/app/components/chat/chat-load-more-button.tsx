@@ -22,7 +22,7 @@ export const ChatLoadMoreButton = ({ onLoadMore, isLoading }: ChatLoadMoreButton
         onClick={onLoadMore}
         disabled={isLoading}
         aria-label="Load older messages"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isLoading ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />

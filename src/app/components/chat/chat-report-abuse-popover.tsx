@@ -108,7 +108,7 @@ export const ChatReportAbusePopover = () => {
           <button
             type="button"
             className={cn(
-              'inline-flex items-center justify-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-zinc-950',
+              'inline-flex items-center justify-center gap-2 px-2 py-1 text-sm font-medium text-zinc-950',
               'underline hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-950/30 focus-visible:outline-none'
             )}
           >
@@ -136,7 +136,7 @@ export const ChatReportAbusePopover = () => {
             type="button"
             aria-label="Close report dialog"
             onClick={() => handleOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground absolute top-2 right-2 inline-flex size-6 items-center justify-center rounded-md transition-colors"
+            className="text-muted-foreground hover:text-foreground absolute top-2 right-2 inline-flex size-6 items-center justify-center transition-colors"
           >
             <X aria-hidden="true" className="size-4" />
           </button>

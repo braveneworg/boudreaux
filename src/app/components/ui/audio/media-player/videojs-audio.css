@@ -34,13 +34,13 @@
 
   &.vjs-audio {
     position: relative;
-    border-radius: 0.5rem;
+    border-radius: 0;
     overflow: visible !important;
 
     & .vjs-control-bar {
       align-items: center;
       background: rgba(0, 0, 0, 0.05);
-      border-radius: 0.875rem;
+      border-radius: 0;
       display: flex !important;
       gap: 0.5rem;
       flex-wrap: wrap !important;
@@ -74,13 +74,13 @@
     & .vjs-progress-holder {
       height: 4px !important;
       margin: 0;
-      border-radius: 2px;
+      border-radius: 0;
       background-color: rgba(255, 255, 255, 0.3) !important;
     }
 
     & .vjs-play-progress {
       background-color: currentColor;
-      border-radius: 0.188rem;
+      border-radius: 0;
       transition: width 0.2s ease;
     }
 
@@ -223,7 +223,7 @@
   .vjs-skip-next-control {
     width: 2.75rem !important;
     height: 2.75rem !important;
-    border-radius: 50%;
+    border-radius: 0;
     transition: all 0.2s ease;
     &:hover {
       background-color: rgba(255, 255, 255, 0.1);

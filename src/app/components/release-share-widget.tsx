@@ -18,7 +18,7 @@ const SocialShareWidget = nextDynamic(
   () => import('./social-share-widget').then((mod) => ({ default: mod.SocialShareWidget })),
   {
     ssr: false,
-    loading: () => <div className="bg-muted h-8 min-h-8 w-36 animate-pulse rounded-sm" />,
+    loading: () => <div className="bg-muted h-8 min-h-8 w-36 animate-pulse" />,
   }
 );
 

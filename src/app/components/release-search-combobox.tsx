@@ -74,7 +74,7 @@ export const ReleaseSearchCombobox = () => {
         <button
           aria-expanded={open}
           aria-label="Search releases"
-          className="flex w-full items-center justify-between rounded-md border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-colors hover:border-zinc-400"
+          className="flex w-full items-center justify-between border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-colors hover:border-zinc-400"
         >
           Search releases...
         </button>
@@ -107,10 +107,10 @@ export const ReleaseSearchCombobox = () => {
                         alt={coverArt.alt}
                         width={40}
                         height={40}
-                        className="rounded-sm object-cover"
+                        className="object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-zinc-200 text-xs text-zinc-500">
+                      <div className="flex h-10 w-10 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
                         ♫
                       </div>
                     )}

@@ -184,7 +184,7 @@ const ArtistPill = ({
       <div ref={ref} className="inline-flex flex-col items-start">
         <div
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-full py-1 pr-1 pl-1',
+            'inline-flex items-center gap-1.5 py-1 pr-1 pl-1',
             'transition-shadow',
             isDragging && 'ring-primary/30 shadow-lg ring-2'
           )}
@@ -193,7 +193,7 @@ const ArtistPill = ({
           {/* Drag handle */}
           <button
             type="button"
-            className="cursor-grab rounded-full p-0.5 opacity-50 hover:opacity-80 active:cursor-grabbing"
+            className="cursor-grab p-0.5 opacity-50 hover:opacity-80 active:cursor-grabbing"
             style={{ color: textColor }}
             aria-label="Drag to reorder"
             {...dragHandleProps}
@@ -201,9 +201,9 @@ const ArtistPill = ({
             <GripVertical className="size-3.5" />
           </button>
 
-          {/* Order number circle */}
+          {/* Order number badge */}
           <span
-            className="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+            className="flex size-6 shrink-0 items-center justify-center text-xs font-bold"
             style={{
               backgroundColor: useBlack ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)',
               color: textColor,
@@ -223,7 +223,7 @@ const ArtistPill = ({
               <button
                 type="button"
                 className={cn(
-                  'relative flex size-6 shrink-0 items-center justify-center rounded-full',
+                  'relative flex size-6 shrink-0 items-center justify-center',
                   'transition-colors hover:opacity-80',
                   // Invisible 44x44 tap target for accessibility
                   'before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'

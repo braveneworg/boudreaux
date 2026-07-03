@@ -91,7 +91,7 @@ export const ExpandableThumbnail = ({
         type="button"
         aria-label={`Expand image: ${alt}`}
         className={cn(
-          'group ring-border relative block overflow-hidden rounded-lg ring-1',
+          'group ring-border relative block overflow-hidden border-2 border-black ring-1',
           'focus-visible:ring-primary focus-visible:ring-2 focus-visible:outline-none',
           className
         )}
@@ -120,7 +120,7 @@ export const ExpandableThumbnail = ({
           alt={alt}
           width={1200}
           height={900}
-          className="h-auto w-full rounded-md object-contain"
+          className="h-auto w-full object-contain"
         />
         <ThumbnailCaption
           caption={caption}

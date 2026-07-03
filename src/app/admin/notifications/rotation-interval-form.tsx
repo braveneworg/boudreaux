@@ -38,7 +38,7 @@ export const RotationIntervalForm = ({ currentInterval }: RotationIntervalFormPr
   };
 
   return (
-    <div className="rounded-lg border p-4">
+    <div className="border p-4">
       <h3 className="mb-3 text-lg font-semibold">Rotation Interval</h3>
       <div className="flex items-end gap-3">
         <div className="space-y-2">

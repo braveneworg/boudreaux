@@ -41,7 +41,7 @@ export const SocialShareWidget = ({
         htmlTitle="Share on Facebook"
         aria-label="Share on Facebook"
       >
-        <FacebookIcon size={iconSize} className="rounded-sm bg-zinc-700" />
+        <FacebookIcon size={iconSize} className="bg-zinc-700" />
       </FacebookShareButton>
 
       <FacebookMessengerShareButton
@@ -51,7 +51,7 @@ export const SocialShareWidget = ({
         htmlTitle="Share on Messenger"
         aria-label="Share on Messenger"
       >
-        <FacebookMessengerIcon className="rounded-sm bg-zinc-700" size={iconSize} />
+        <FacebookMessengerIcon className="bg-zinc-700" size={iconSize} />
       </FacebookMessengerShareButton>
 
       <WhatsappShareButton
@@ -61,18 +61,18 @@ export const SocialShareWidget = ({
         htmlTitle="Share on WhatsApp"
         aria-label="Share on WhatsApp"
       >
-        <WhatsappIcon size={iconSize} className="rounded-sm bg-zinc-700" />
+        <WhatsappIcon size={iconSize} className="bg-zinc-700" />
       </WhatsappShareButton>
 
       {/* SMS / Messages button */}
       <a
         href={`sms:?&body=${encodeURIComponent(`${shareTitle} ${artistUrl}`)}`}
-        className="pointer-events-auto -mt-1.5 inline-flex size-10 items-center justify-center rounded-sm"
+        className="pointer-events-auto -mt-1.5 inline-flex size-10 items-center justify-center"
         aria-label="Share via SMS"
         title="Share via SMS"
         style={{ width: iconSize, height: iconSize }}
       >
-        <MessageSquareIcon size={iconSize} className="rounded-sm bg-zinc-700 p-2 text-white" />
+        <MessageSquareIcon size={iconSize} className="bg-zinc-700 p-2 text-white" />
       </a>
 
       <TelegramShareButton
@@ -82,7 +82,7 @@ export const SocialShareWidget = ({
         htmlTitle="Share on Telegram"
         aria-label="Share on Telegram"
       >
-        <TelegramIcon size={iconSize} className="rounded-sm bg-zinc-700" />
+        <TelegramIcon size={iconSize} className="bg-zinc-700" />
       </TelegramShareButton>
 
       {/* WeChat share link (not available in react-share, using web intent) */}
@@ -90,12 +90,12 @@ export const SocialShareWidget = ({
         href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(artistUrl)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative -top-3 inline-flex size-10 rounded-sm"
+        className="relative -top-3 inline-flex size-10"
         aria-label="Share on WeChat"
         title="Share on WeChat (scan QR code)"
       >
         <span
-          className="mt-3 inline-flex items-center justify-center rounded-sm bg-zinc-700 text-xs font-bold text-white"
+          className="mt-3 inline-flex items-center justify-center bg-zinc-700 text-xs font-bold text-white"
           style={{ width: iconSize, height: iconSize }}
         >
           微信
@@ -109,7 +109,7 @@ export const SocialShareWidget = ({
         url={artistUrl}
         aria-label="Share on X"
       >
-        <XIcon size={iconSize} className="rounded-sm bg-zinc-700" />
+        <XIcon size={iconSize} className="bg-zinc-700" />
       </XShareButton>
     </>
   );

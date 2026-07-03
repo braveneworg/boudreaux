@@ -67,7 +67,7 @@ export const BannerNotificationTicker = ({
     };
   }, [total, isTabVisible, rotationInterval]);
 
-  // Pause rotation when the tab is backgrounded (parity with the carousel).
+  // Pause rotation when the tab is in the background (parity with the carousel).
   useEffect(() => {
     const handleVisibility = () => setIsTabVisible(!document.hidden);
     document.addEventListener('visibilitychange', handleVisibility);

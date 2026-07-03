@@ -45,7 +45,7 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
 
   if (!data) {
     return (
-      <div className="border-muted-foreground/25 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8 text-center">
+      <div className="border-muted-foreground/25 flex min-h-100 items-center justify-center border-2 border-dashed p-8 text-center">
         <div>
           <h3 className="text-lg font-semibold">
             {error ? 'Failed to load bio' : 'Artist not found'}

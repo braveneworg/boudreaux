@@ -21,6 +21,14 @@ describe('ExpandableThumbnail', () => {
     ).toBeInTheDocument();
   });
 
+  it('frames the thumbnail trigger with a square black border', () => {
+    render(<ExpandableThumbnail src="https://x/a.jpg" alt="Artist portrait" />);
+
+    const trigger = screen.getByRole('button', { name: 'Expand image: Artist portrait' });
+    expect(trigger).toHaveClass('border-2', 'border-black');
+    expect(trigger).not.toHaveClass('rounded-lg');
+  });
+
   it('uses the thumbnail source for the collapsed image when provided', () => {
     render(
       <ExpandableThumbnail

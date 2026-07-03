@@ -32,7 +32,7 @@ export const ChatReactionBar = ({ reactions, currentUserId, onToggle }: ChatReac
             aria-pressed={mine}
             aria-label={`React with ${reaction.emoji} (${reaction.userIds.length})`}
             className={cn(
-              'inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap',
+              'inline-flex min-h-6 shrink-0 items-center gap-1 border px-2.5 py-0.5 text-xs whitespace-nowrap',
               'transition-colors',
               mine
                 ? 'border-primary/40 bg-primary/10 text-foreground'

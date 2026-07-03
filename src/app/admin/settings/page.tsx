@@ -31,7 +31,7 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
       />
 
       <div className="space-y-6">
-        <div className="rounded-lg border p-6">
+        <div className="border p-6">
           <h2 className="mb-1 text-sm font-semibold">Signups</h2>
           <p className="text-muted-foreground mb-4 text-sm">
             Pause or resume new account creation. Existing users can always sign in.

@@ -41,7 +41,7 @@ export const ChatMessageReactionBar = ({
           <button
             type="button"
             aria-label="Add reaction"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md p-1 transition-colors"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center p-1 transition-colors"
           >
             <SmilePlus aria-hidden="true" className="size-4" />
           </button>
@@ -54,7 +54,7 @@ export const ChatMessageReactionBar = ({
           aria-label="Delete message"
           data-testid="chat-delete-message"
           onClick={() => onRequestDelete(message.id, message.user.username)}
-          className="text-muted-foreground hover:text-destructive inline-flex items-center justify-center rounded-md p-1 transition-colors"
+          className="text-muted-foreground hover:text-destructive inline-flex items-center justify-center p-1 transition-colors"
         >
           <Trash2 aria-hidden="true" className="size-4" />
         </button>
@@ -65,7 +65,7 @@ export const ChatMessageReactionBar = ({
           aria-label="Pin message"
           data-testid="chat-pin-message"
           onClick={() => onTogglePin(message.id)}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md p-1 transition-colors"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center p-1 transition-colors"
         >
           <Pin aria-hidden="true" className="size-4" />
         </button>
@@ -92,7 +92,7 @@ export const ChatMessagePinIndicator = ({
         aria-label="Unpin message"
         data-testid="chat-unpin-message"
         onClick={() => onTogglePin(message.id)}
-        className="inline-flex items-center justify-center rounded-md p-1 text-red-600 transition-colors hover:bg-red-50"
+        className="inline-flex items-center justify-center p-1 text-red-600 transition-colors hover:bg-red-50"
       >
         <Pin aria-hidden="true" className="size-4 fill-current" />
       </button>

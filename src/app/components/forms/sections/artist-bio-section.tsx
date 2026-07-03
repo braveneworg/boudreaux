@@ -20,7 +20,7 @@ const RichTextEditor = dynamic(
   () => import('@/app/components/ui/rich-text-editor').then((mod) => mod.RichTextEditor),
   {
     ssr: false,
-    loading: () => <div className="border-input min-h-40 rounded-md border" aria-busy="true" />,
+    loading: () => <div className="border-input min-h-40 border" aria-busy="true" />,
   }
 );
 

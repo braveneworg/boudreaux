@@ -98,7 +98,7 @@ const BannerPreview = ({ content, textColor, backgroundColor }: BannerPreviewPro
   return (
     <div
       className={cn(
-        'rounded-sm px-4 py-2 text-center text-sm',
+        'px-4 py-2 text-center text-sm',
         isDarkColor(backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
       )}
       style={{ color: textColor, backgroundColor }}
@@ -260,9 +260,9 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
   const thumbnailUrl = `/${BANNER_CDN_PATH}/${slot.imageFilename}`;
 
   return (
-    <div className="rounded-lg border p-4">
+    <div className="border p-4">
       <div className="mb-3 flex items-center gap-3">
-        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-sm">
+        <div className="relative h-16 w-28 shrink-0 overflow-hidden">
           <Image
             src={thumbnailUrl}
             alt={`Banner ${slot.slotNumber}`}
@@ -303,7 +303,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
                 id={`textColor-${slot.slotNumber}`}
                 value={textColor}
                 onChange={(e) => setTextColor(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded-sm border"
+                className="h-9 w-12 cursor-pointer border"
               />
               <span className="text-xs text-zinc-950">{textColor}</span>
             </div>
@@ -316,7 +316,7 @@ export const BannerSlotCard = ({ slot }: BannerSlotCardProps) => {
                 id={`bgColor-${slot.slotNumber}`}
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded-sm border"
+                className="h-9 w-12 cursor-pointer border"
               />
               <span className="text-xs text-zinc-950">{backgroundColor}</span>
             </div>

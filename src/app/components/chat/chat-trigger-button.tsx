@@ -31,7 +31,7 @@ export const ChatTriggerButton = ({ onOpen, className }: ChatTriggerButtonProps)
       aria-label="Open chat"
       className={cn(
         'fixed right-6 bottom-6 z-50 flex flex-col items-center gap-1',
-        'rounded-2xl border border-white/40 bg-white/30 px-4 py-3',
+        'border border-white/40 bg-white/30 px-4 py-3',
         'shadow-lg backdrop-blur-md',
         'text-foreground transition-colors hover:bg-white/45',
         'focus-visible:ring-primary focus:outline-none focus-visible:ring-2',

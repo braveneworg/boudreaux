@@ -76,7 +76,7 @@ export const LogLevelForm = ({ initialState }: LogLevelFormProps) => {
   };
 
   return (
-    <div className="rounded-lg border p-4">
+    <div className="border p-4">
       <h3 className="mb-1 text-lg font-semibold">Runtime Log Level</h3>
       <p className="text-muted-foreground mb-4 text-sm">
         Configured default: <span className="font-medium">{state.configuredLevel}</span>
