@@ -11,6 +11,7 @@ import sharp from 'sharp';
 
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
+import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
@@ -62,11 +63,29 @@ const resolveExtension = (contentType: string | null, sourceUrl: string): string
   return '.jpg';
 };
 
-/** Shared fetch + validation helper used by both re-host paths. */
+/**
+ * Shared fetch + validation helper used by both re-host paths. SSRF defense
+ * lives here so every consumer is covered:
+ *
+ * 1. First hop — `isPubliclyRoutableUrl` vets the URL before any fetch, so a
+ *    source (lambda-scraped or admin-pasted) pointing at a private/link-local
+ *    address (10.x, 192.168.x, 127.x, 169.254.169.254, localhost, …) is
+ *    refused outright.
+ * 2. Redirects — the fetch runs with `redirect: 'error'` so a vetted URL
+ *    cannot 3xx to a private address after the vet (SSRF via redirect).
+ *
+ * A refused or legitimately redirecting source simply rejects here — callers
+ * treat that like any other fetch failure (log, skip, retry on the next pass).
+ * The vet resolves DNS separately from the fetch, so a DNS-rebinding window
+ * remains — an accepted residual risk for these server-side rehost paths.
+ */
 const fetchImageBuffer = async (
   sourceUrl: string
 ): Promise<{ buffer: Buffer; contentType: string | null }> => {
-  const response = await fetch(sourceUrl);
+  if (!(await isPubliclyRoutableUrl(sourceUrl))) {
+    throw new Error('Source URL is not publicly routable');
+  }
+  const response = await fetch(sourceUrl, { redirect: 'error' });
   if (!response.ok) throw new Error(`Failed to fetch image (${response.status})`);
   const contentType = response.headers.get('content-type');
   if (contentType && !contentType.startsWith('image/')) {
@@ -79,8 +98,8 @@ const fetchImageBuffer = async (
 
 /**
  * Resize `buffer` to a 384px webp thumbnail and upload it to S3 under the
- * `media/artists/{artistId}/bio/thumbs/` prefix. Shared between
- * {@link BioImageService.rehostThumbnail} and {@link BioImageService.rehostImages}.
+ * `media/artists/{artistId}/bio/thumbs/` prefix. Used by
+ * {@link BioImageService.rehostImages}.
  */
 const processThumbnail = async (
   buffer: Buffer,
@@ -148,29 +167,6 @@ export class BioImageService {
 
     const { width, height } = await generateVariantsFromBuffer(buffer, s3Key);
     return { url: buildCdnUrl(s3Key), width, height };
-  }
-
-  /**
-   * Fetches an external image and uploads ONE small webp thumbnail — the cheap
-   * generation-time pass that keeps candidate palettes rendering from the CDN
-   * (no hotlink 403s) without paying for full variants on images the admin may
-   * dismiss. Save-time re-hosting upgrades kept images via rehostWithVariants.
-   *
-   * @param sourceUrl - The external image URL discovered during generation.
-   * @param artistId - The owning artist id (for the S3 key namespace).
-   * @param index - The image's position (for a stable, readable key prefix).
-   * @returns The thumbnail CDN URL and resized dimensions.
-   */
-  static async rehostThumbnail(
-    sourceUrl: string,
-    artistId: string,
-    index: number
-  ): Promise<RehostedImage> {
-    if (shouldSkipRehost()) {
-      return { url: sourceUrl, width: null, height: null };
-    }
-    const { buffer } = await fetchImageBuffer(sourceUrl);
-    return processThumbnail(buffer, artistId, index);
   }
 
   /**

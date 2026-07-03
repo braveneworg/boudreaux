@@ -5,9 +5,7 @@
 
 import { useEffect, useState } from 'react';
 
-import Image from 'next/image';
-
-import { ExternalLink, Link2, Plus, RefreshCw, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { Link2, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { BioHtml } from '@/app/components/bio-html';
@@ -55,69 +53,6 @@ const ReferenceLinksList = ({ links, onRemove }: ReferenceLinksListProps) => (
   </ul>
 );
 
-interface DiscoveredImagesProps {
-  images: GeneratedBioContent['images'];
-}
-
-const DiscoveredImages = ({ images }: DiscoveredImagesProps) => (
-  <div className="space-y-2">
-    <h3 className="text-sm font-semibold">Discovered images</h3>
-    <ul className="flex flex-wrap gap-3">
-      {images.map((image) => (
-        <li key={image.url} className="relative">
-          <Image
-            src={image.thumbnailUrl ?? image.url}
-            alt={image.title ?? 'Discovered artist image'}
-            width={80}
-            height={80}
-            unoptimized
-            className="ring-border size-20 rounded-md object-cover ring-1"
-          />
-          {image.isPrimary && (
-            <Star
-              className="absolute -top-1 -right-1 size-4 fill-yellow-400 text-yellow-500"
-              aria-label="Primary image"
-            />
-          )}
-        </li>
-      ))}
-    </ul>
-    <p className="text-muted-foreground text-xs">
-      Starred images are shown beside the short bio on the public pages.
-    </p>
-  </div>
-);
-
-interface DiscoveredLinksProps {
-  links: GeneratedBioContent['links'];
-}
-
-const DiscoveredLinks = ({ links }: DiscoveredLinksProps) => (
-  <div role="group" aria-label="Discovered links" className="space-y-2">
-    <h3 className="text-sm font-semibold">Discovered links</h3>
-    <ul className="space-y-1">
-      {links.map((link) => (
-        <li key={link.url} className="flex items-center gap-2 text-sm">
-          <ExternalLink className="text-muted-foreground size-3.5" aria-hidden />
-          <a
-            href={link.url}
-            target="_blank"
-            rel="nofollow noopener noreferrer"
-            className="text-primary truncate hover:underline"
-          >
-            {link.label}
-          </a>
-          {link.kind && (
-            <Badge variant="outline" className="text-xs">
-              {link.kind}
-            </Badge>
-          )}
-        </li>
-      ))}
-    </ul>
-  </div>
-);
-
 interface GenerateBioButtonProps {
   hasResult: boolean;
   isPending: boolean;
@@ -159,13 +94,9 @@ const BioResultPreview = ({ result }: BioResultPreviewProps) => (
       <BioHtml html={result.shortBio} className="text-muted-foreground text-sm" />
     </div>
 
-    {result.images.length > 0 && <DiscoveredImages images={result.images} />}
-
-    {result.links.length > 0 && <DiscoveredLinks links={result.links} />}
-
     <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
       <Trash2 className="size-3" aria-hidden />
-      Regenerating replaces the images and links above. Save the form to keep the result.
+      Regenerating replaces the palette images and links. Save the form to keep the result.
     </p>
   </div>
 );
@@ -173,8 +104,9 @@ const BioResultPreview = ({ result }: BioResultPreviewProps) => (
 /**
  * Admin tool that generates an artist's short + long bio plus discovered images
  * and links via the bio-generator Lambda. Reference links and the description
- * are optional context. Renders a preview of the discovered media and supports
- * regenerating when the admin is unhappy with the result.
+ * are optional context. Renders a short-bio preview only — the discovered media
+ * is rendered by the palettes elsewhere on the page — and supports regenerating
+ * when the admin is unhappy with the result.
  *
  * @param artistId - The artist to generate for (edit mode only).
  * @param onGenerated - Receives the sanitized content to populate the form.

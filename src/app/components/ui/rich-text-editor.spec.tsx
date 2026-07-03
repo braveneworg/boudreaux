@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useState } from 'react';
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { RichTextEditor, type RichTextEditorImage } from './rich-text-editor';
+
+import type { Editor } from '@tiptap/react';
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -23,8 +25,14 @@ const IMAGES: RichTextEditorImage[] = [
   },
 ];
 
-const Harness = ({ images }: { images?: RichTextEditorImage[] }) => {
-  const [value, setValue] = useState('<p>Start</p>');
+const Harness = ({
+  images,
+  initialValue = '<p>Start</p>',
+}: {
+  images?: RichTextEditorImage[];
+  initialValue?: string;
+}) => {
+  const [value, setValue] = useState(initialValue);
   return <RichTextEditor value={value} onChange={setValue} images={images} ariaLabel="Bio" />;
 };
 
@@ -413,6 +421,110 @@ describe('RichTextEditor link dialog handlers', () => {
     );
   });
 
+  it('updates the existing link in place when the caret sits inside it', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+    // Tiptap attaches the live editor instance onto its content DOM element
+    // (`dom.editor = this` in createView); use it to park a collapsed caret
+    // inside the link text ("te|xt") — an empty selection within the link.
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+    act(() => {
+      editor.commands.setTextSelection(3);
+    });
+    expect(editor.state.selection.empty).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    const urlField = screen.getByRole('textbox', { name: 'URL' });
+    await userEvent.clear(urlField);
+    await userEvent.type(urlField, 'https://new.example');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    // The setLink path rewrites the existing anchor's href in place …
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="https://new.example"'))
+    );
+    // … without inserting a duplicate anchor: "text" appears exactly once.
+    const lastHtml = onChange.mock.calls.at(-1)?.[0] as string;
+    expect(lastHtml.match(/text/g)).toHaveLength(1);
+  });
+
+  it('disables the anchor-text field when a text selection is being linked', async () => {
+    render(<Harness />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
+  });
+
+  it('explains that the selected text is kept when the anchor field is locked', async () => {
+    render(<Harness />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByText(/existing text is kept/i)).toBeInTheDocument();
+  });
+
+  it('disables the anchor-text field when the caret sits in an existing link', async () => {
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
+      return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
+    };
+    render(<Controlled />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+    act(() => {
+      editor.commands.setTextSelection(3);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
+  });
+
+  it('keeps the anchor-text field enabled at an empty caret outside a link', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: 'Anchor text' })).toBeEnabled();
+  });
+
+  it('omits the locked-anchor hint on the empty-caret insert path', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.queryByText(/existing text is kept/i)).not.toBeInTheDocument();
+  });
+
   it('prefills the link dialog with the active link href', async () => {
     const Controlled = () => {
       const [value, setValue] = useState('<p><a href="https://prefilled.test/">x</a></p>');
@@ -470,7 +582,7 @@ describe('RichTextEditor active toolbar state and props', () => {
 });
 
 describe('RichTextEditor image attributes and picker', () => {
-  it('persists width and height for an image set into the content', async () => {
+  it('inserts a picked image as a bio figure block', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
       const [value, setValue] = useState('<p>Body</p>');
@@ -493,10 +605,7 @@ describe('RichTextEditor image attributes and picker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Insert Portrait' }));
 
     await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('width="800"'))
-    );
-    await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('height="600"'))
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('class="bio-figure'))
     );
   });
 
@@ -618,6 +727,125 @@ describe('RichTextEditor preview mode', () => {
     expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Link' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled();
+  });
+});
+
+describe('RichTextEditor bio figures and upgraded dialogs', () => {
+  const FIGURE_HTML =
+    '<figure class="bio-figure bio-figure--center" style="width:60%">' +
+    '<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="Portrait">' +
+    '<figcaption class="bio-figure-caption">' +
+    '<span class="bio-figure-attribution">Wikimedia Commons</span>' +
+    '</figcaption></figure>';
+
+  const ControlledFactory = (onChange: (html: string) => void, initial = '<p>Body</p>') => {
+    const Controlled = () => {
+      const [value, setValue] = useState(initial);
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          images={IMAGES}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    return Controlled;
+  };
+
+  it('registers the bioFigure node so figure content round-trips', async () => {
+    render(<Harness initialValue={FIGURE_HTML} />);
+    await waitForEditor();
+
+    // The NodeView renders the caption text inside the editor surface, plus its
+    // resize handle — proof the figure parsed as a bioFigure node, not as text
+    // lifted out of an unknown tag.
+    expect(screen.getByText('Wikimedia Commons')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Resize image' })).toBeInTheDocument();
+  });
+
+  it('inserts a link with anchor text from the upgraded link dialog', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange);
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Anchor text' }), 'My band');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'URL' }),
+      'https://myband.example.com'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('>My band</a>'))
+    );
+  });
+
+  it('marks the new-tab switch off automatically for a site-relative URL', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), '/tours');
+
+    expect(screen.getByRole('switch', { name: 'Opens in new tab' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('applies internal link attributes when the external toggle is off', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange, '<p>linkme</p>');
+    render(<Controlled />);
+    await waitForEditor();
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    editorEl.focus();
+    await userEvent.keyboard('{Control>}a{/Control}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), '/releases/first');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="/releases/first"'))
+    );
+    const lastHtml = onChange.mock.calls.at(-1)?.[0] as string;
+    expect(lastHtml).not.toContain('target="_blank"');
+  });
+
+  it('lets the admin override the auto-set new-tab switch', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
+    await userEvent.click(screen.getByRole('switch', { name: 'Opens in new tab' }));
+
+    expect(screen.getByRole('switch', { name: 'Opens in new tab' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+  });
+
+  it('inserts a bioFigure with attribution from the upgraded image dialog', async () => {
+    const onChange = vi.fn();
+    const Controlled = ControlledFactory(onChange);
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Insert image' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'Wikimedia Commons');
+    await userEvent.click(screen.getByRole('button', { name: 'Insert Portrait' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('bio-figure-attribution'))
+    );
   });
 });
 

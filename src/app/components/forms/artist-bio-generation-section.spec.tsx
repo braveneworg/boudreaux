@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type {
@@ -94,7 +94,6 @@ describe('ArtistBioGenerationSection', () => {
 
     await waitFor(() => expect(onGenerated).toHaveBeenCalledWith(content));
     expect(screen.getByText('A boundary-pushing artist.')).toBeInTheDocument();
-    expect(screen.getByAltText('Portrait')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /regenerate bios/i })).toBeInTheDocument();
   });
 
@@ -209,50 +208,29 @@ describe('ArtistBioGenerationSection', () => {
     );
   });
 
-  it('renders discovered links with their kind badge in the preview', async () => {
+  // The discovered links/images now live in the palettes rendered by
+  // `BioMediaPalettes` (bio-media-palettes.spec.tsx); the preview only keeps
+  // the short bio and a note pointing at them.
+  it('does not render discovered-media lists in the preview', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(screen.getByText('A boundary-pushing artist.')).toBeInTheDocument());
+    expect(screen.queryByText('Discovered links')).not.toBeInTheDocument();
+  });
+
+  it('points the regenerate note at the palettes', async () => {
     statusReturn = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Wikipedia' })).toBeInTheDocument()
+      expect(
+        screen.getByText(/regenerating replaces the palette images and links/i)
+      ).toBeInTheDocument()
     );
-    expect(screen.getByRole('link', { name: 'Wikipedia' })).toHaveAttribute(
-      'href',
-      'https://en.wikipedia.org/wiki/x'
-    );
-    expect(screen.getByText('wikipedia')).toBeInTheDocument();
-    // The discovered-links section is an addressable group so tests can scope to
-    // it unambiguously (other bio editors may also contain a "Wikipedia" link).
-    expect(
-      within(screen.getByRole('group', { name: 'Discovered links' })).getByRole('link', {
-        name: 'Wikipedia',
-      })
-    ).toBeInTheDocument();
-  });
-
-  it('marks a primary discovered image with a star', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
-    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
-
-    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
-
-    await waitFor(() => expect(screen.getByLabelText('Primary image')).toBeInTheDocument());
-  });
-
-  it('omits the images and links sections when none are discovered', async () => {
-    statusReturn = {
-      status: 'succeeded',
-      error: null,
-      content: { ...content, images: [], links: [] },
-    };
-    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
-
-    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
-
-    await waitFor(() => expect(screen.getByText('A boundary-pushing artist.')).toBeInTheDocument());
-    expect(screen.queryByText('Discovered images')).not.toBeInTheDocument();
-    expect(screen.queryByText('Discovered links')).not.toBeInTheDocument();
   });
 });

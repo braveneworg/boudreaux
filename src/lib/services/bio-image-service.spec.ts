@@ -26,6 +26,11 @@ vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
 }));
 
+const isPubliclyRoutableUrlMock = vi.fn();
+vi.mock('@/lib/utils/ip-guard', () => ({
+  isPubliclyRoutableUrl: (url: string) => isPubliclyRoutableUrlMock(url),
+}));
+
 const mockSharpInstance = {
   resize: vi.fn().mockReturnThis(),
   webp: vi.fn().mockReturnThis(),
@@ -42,6 +47,7 @@ const imageResponse = (): Response =>
   });
 
 beforeEach(() => {
+  isPubliclyRoutableUrlMock.mockResolvedValue(true);
   sendMock.mockResolvedValue({});
   generateVariantsMock.mockResolvedValue({ variantsGenerated: 14, width: 1200, height: 800 });
   mockSharpInstance.toBuffer.mockResolvedValue({
@@ -194,6 +200,68 @@ describe('BioImageService.rehostWithVariants', () => {
     const [, key] = generateVariantsMock.mock.calls[0];
     expect(key).toMatch(/^media\/artists\/artist-7\/bio\/4-[a-f0-9]{8}\.jpg$/);
     expect(result.url).toBe(`https://cdn.example.com/${key}`);
+  });
+
+  it('fetches with redirect: "error" so a vetted URL cannot 302 elsewhere', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await BioImageService.rehostWithVariants('https://x/a.jpg', 'artist-1', 0);
+
+    expect(fetchMock).toHaveBeenCalledWith('https://x/a.jpg', { redirect: 'error' });
+  });
+
+  it('never uploads when the source responds with a redirect', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    // Mirror undici: under redirect:'error' a 3xx rejects the fetch, while a
+    // fetch that still follows (the pre-fix default) resolves with the image
+    // the redirect target served — which must never reach S3.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        init?.redirect === 'error'
+          ? Promise.reject(new TypeError('fetch failed: unexpected redirect'))
+          : Promise.resolve(imageResponse())
+      )
+    );
+
+    await expect(
+      BioImageService.rehostWithVariants('https://x/redirects.jpg', 'artist-1', 0)
+    ).rejects.toThrow();
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(generateVariantsMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a private-address URL before any fetch is issued', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      BioImageService.rehostWithVariants('http://192.168.1.10/a.jpg', 'artist-1', 0)
+    ).rejects.toThrow('not publicly routable');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never uploads a localhost-sourced image', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await expect(
+      BioImageService.rehostWithVariants('http://localhost:8080/a.jpg', 'artist-1', 0)
+    ).rejects.toThrow();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('uploads with an octet-stream content type when the header is absent', async () => {
@@ -355,6 +423,61 @@ describe('BioImageService.rehostImages', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
+  it('skips a redirecting source without uploading anything', async () => {
+    // Same undici-mirroring stub as the rehostWithVariants redirect test:
+    // redirect:'error' rejects on a 3xx; the pre-fix default would follow.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        init?.redirect === 'error'
+          ? Promise.reject(new TypeError('fetch failed: unexpected redirect'))
+          : Promise.resolve(imageResponse())
+      )
+    );
+
+    const result = await BioImageService.rehostImages(
+      [{ url: 'https://x/redirects.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(result.results).toEqual([null]);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('never fetches a lambda-supplied URL that resolves to a private address', async () => {
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await BioImageService.rehostImages(
+      [{ url: 'http://10.0.0.5/internal.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.results).toEqual([null]);
+  });
+
+  it('never uploads when the source is the cloud metadata endpoint', async () => {
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await BioImageService.rehostImages(
+      [{ url: 'http://169.254.169.254/latest/meta-data', index: 0 }],
+      'artist-1'
+    );
+
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('vets each batched URL through the ip guard before fetching', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await BioImageService.rehostImages([{ url: 'https://x/a.jpg', index: 0 }], 'artist-1');
+
+    expect(isPubliclyRoutableUrlMock).toHaveBeenCalledWith('https://x/a.jpg');
+  });
+
   it('returns source urls without deduplication in skip-rehost mode', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
     const fetchMock = vi.fn();
@@ -373,34 +496,5 @@ describe('BioImageService.rehostImages', () => {
       { url: 'https://x/a.jpg', width: null, height: null },
       { url: 'https://x/a.jpg', width: null, height: null },
     ]);
-  });
-});
-
-describe('BioImageService.rehostThumbnail', () => {
-  it('uploads a single 384px webp and returns its CDN URL', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', '');
-    vi.stubEnv('E2E_MODE', '');
-    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
-
-    const result = await BioImageService.rehostThumbnail('https://ex.com/big.jpg', 'artist1', 0);
-
-    expect(sendMock).toHaveBeenCalledTimes(1); // exactly one object — no variants
-    const putInput = sendMock.mock.calls[0][0].input as { Key: string; ContentType: string };
-    expect(putInput.Key).toMatch(/^media\/artists\/artist1\/bio\/thumbs\/0-[a-f0-9]{8}\.webp$/);
-    expect(putInput.ContentType).toBe('image/webp');
-    expect(result.url).toContain('/media/artists/artist1/bio/thumbs/');
-  });
-
-  it('skips upload in fake/E2E mode and echoes the source URL', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    const result = await BioImageService.rehostThumbnail('https://ex.com/big.jpg', 'artist1', 0);
-
-    expect(result).toEqual({ url: 'https://ex.com/big.jpg', width: null, height: null });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(sendMock).not.toHaveBeenCalled();
   });
 });

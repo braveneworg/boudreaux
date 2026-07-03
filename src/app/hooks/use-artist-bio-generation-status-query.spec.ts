@@ -16,6 +16,7 @@ vi.mock('@tanstack/react-query', () => ({
 interface QueryOptionsShape {
   queryKey: unknown[];
   enabled: boolean;
+  staleTime: number;
   queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
   refetchInterval: (query: { state: { data?: { status?: string | null } } }) => number | false;
 }
@@ -66,6 +67,22 @@ describe('useArtistBioGenerationStatusQuery', () => {
     expect(options.enabled).toBe(false);
   });
 
+  it('marks status data stale immediately so enabling the query always refetches', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.staleTime).toBe(0);
+  });
+
+  it('lets a caller override the staleTime default', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1', { staleTime: 10_000 }));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.staleTime).toBe(10_000);
+  });
+
   it('defaults the returned error when the query has none', () => {
     const { result } = renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
 
@@ -114,11 +131,35 @@ describe('useArtistBioGenerationStatusQuery', () => {
     expect(options.refetchInterval({ state: { data: { status: 'processing' } } })).toBe(2500);
   });
 
-  it('keeps polling when no status data is present yet', () => {
+  it('does not poll when the artist has never generated (status null)', () => {
     renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
 
     const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
 
-    expect(options.refetchInterval({ state: {} })).toBe(2500);
+    expect(options.refetchInterval({ state: { data: { status: null } } })).toBe(false);
+  });
+
+  it('does not poll before any status data is fetched', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.refetchInterval({ state: {} })).toBe(false);
+  });
+
+  it('polls on the configured interval while the job is pending', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.refetchInterval({ state: { data: { status: 'pending' } } })).toBe(2500);
+  });
+
+  it('stops polling once the job has failed', () => {
+    renderHook(() => useArtistBioGenerationStatusQuery('artist-1'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as QueryOptionsShape;
+
+    expect(options.refetchInterval({ state: { data: { status: 'failed' } } })).toBe(false);
   });
 });

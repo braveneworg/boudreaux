@@ -35,6 +35,14 @@ export interface ArtistCountFilters {
   published?: boolean;
 }
 
+/** Bio image row projection used by the save-time full re-host pass. */
+export interface BioImageRehostRow {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  originalUrl: string | null;
+}
+
 // =============================================================================
 // Query shapes (single source of truth for both the query and the drift check)
 // =============================================================================
@@ -486,6 +494,7 @@ export class ArtistRepository {
     genres: string | null;
     bioModel: string | null;
     bioImages: Array<{
+      id: string;
       url: string;
       thumbnailUrl: string | null;
       title: string | null;
@@ -495,7 +504,7 @@ export class ArtistRepository {
       originalUrl: string | null;
       isPrimary: boolean;
     }>;
-    bioLinks: Array<{ label: string; url: string; kind: string | null }>;
+    bioLinks: Array<{ id: string; label: string; url: string; kind: string | null }>;
   } | null> {
     return runQuery(() =>
       prisma.artist.findUnique({
@@ -514,6 +523,7 @@ export class ArtistRepository {
           bioImages: {
             orderBy: { sortOrder: 'asc' },
             select: {
+              id: true,
               url: true,
               thumbnailUrl: true,
               title: true,
@@ -526,11 +536,44 @@ export class ArtistRepository {
           },
           bioLinks: {
             orderBy: { sortOrder: 'asc' },
-            select: { label: true, url: true, kind: true },
+            select: { id: true, label: true, url: true, kind: true },
           },
         },
       })
     );
+  }
+
+  /** Deletes a single discovered bio link row (palette X). */
+  static async deleteBioLink(linkId: string): Promise<void> {
+    await prisma.artistBioLink.delete({ where: { id: linkId } });
+  }
+
+  /** Deletes a single discovered bio image row (palette X) and returns its
+   *  stored URLs so the caller can clean up the CDN thumbnail. */
+  static async deleteBioImage(
+    imageId: string
+  ): Promise<{ url: string; thumbnailUrl: string | null }> {
+    const removed = await prisma.artistBioImage.delete({
+      where: { id: imageId },
+      select: { url: true, thumbnailUrl: true },
+    });
+    return removed;
+  }
+
+  /** Lists an artist's bio image rows with the URLs needed to decide whether a
+   *  save-time full re-host is required (thumbnail → originalUrl upgrade). */
+  static async findBioImagesForRehost(artistId: string): Promise<BioImageRehostRow[]> {
+    return runQuery(() =>
+      prisma.artistBioImage.findMany({
+        where: { artistId },
+        select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
+      })
+    );
+  }
+
+  /** Points a bio image row at its upgraded (fully re-hosted) CDN URL. */
+  static async updateBioImageUrl(imageId: string, url: string): Promise<void> {
+    await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { url } }));
   }
 
   /**

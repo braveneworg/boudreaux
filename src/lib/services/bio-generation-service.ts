@@ -7,6 +7,7 @@ import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
@@ -196,6 +197,34 @@ const sanitizeLinks = (links: BioGenerationData['links']): PersistedLink[] =>
     return acc;
   }, []);
 
+/**
+ * Appends internal release links (label = release title) after the discovered
+ * links. Uses an accumulating `seen` set so the same release URL is never
+ * written twice, even if the DB returns duplicate rows. Failure is non-fatal:
+ * generation content persists with the discovered links unchanged.
+ */
+const appendReleaseLinks = async (
+  artistId: string,
+  links: PersistedLink[]
+): Promise<PersistedLink[]> => {
+  try {
+    const releases = await ReleaseRepository.findPublishedByArtist(artistId);
+    const seen = new Set(links.map((link) => link.url));
+    const result = [...links];
+    for (const release of releases) {
+      const url = `/releases/${release.id}`;
+      if (!seen.has(url)) {
+        seen.add(url);
+        result.push({ label: release.title, url, kind: 'release', sortOrder: result.length });
+      }
+    }
+    return result;
+  } catch (error) {
+    loggers.media.warn('bio_release_links_failed', { artistId, error: String(error) });
+    return links;
+  }
+};
+
 /** Inputs to {@link assembleContent} — grouped to stay within the `max-params` limit. */
 type AssembleContentInput = {
   data: BioGenerationData;
@@ -356,7 +385,11 @@ export class BioGenerationService {
       .map((image, index) => ({ ...image, sortOrder: index }));
 
     // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
-    const persistedLinks = sanitizeLinks(result.data.links);
+    const sanitizedLinks = sanitizeLinks(result.data.links);
+
+    // Append internal release links for this artist. The lambda has no DB access,
+    // so we inject them here. Failure is non-fatal (appendReleaseLinks handles it).
+    const persistedLinks = await appendReleaseLinks(artist.id, sanitizedLinks);
 
     const content = assembleContent({
       data: result.data,

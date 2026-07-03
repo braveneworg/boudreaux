@@ -48,6 +48,43 @@ export const bioGenerationLinkSchema = z.object({
   kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
 });
 
+/**
+ * A link URL as persisted: absolute http(s) or a site-relative path
+ * (injected release links use `/releases/<id>` paths).
+ * Rejects `javascript:`, `data:`, and protocol-relative `//` URLs.
+ * Also reused by the palette drag-payload schema (`bio-dnd-schema.ts`).
+ */
+export const bioStatusLinkUrlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => /^https?:\/\//.test(value) || (value.startsWith('/') && !value.startsWith('//')),
+    { message: 'Must be an http(s) URL or a site-relative path' }
+  );
+
+/** Persisted bio image row as returned by the status endpoint (DB row id included). */
+export const bioStatusImageSchema = bioGenerationImageSchema.extend({
+  id: z.string(),
+  attribution: z.string().nullable(),
+});
+
+/** Persisted bio link row as returned by the status endpoint (DB row id included). */
+export const bioStatusLinkSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  url: bioStatusLinkUrlSchema,
+  kind: z
+    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'release', 'other'])
+    .nullable()
+    .optional(),
+});
+
+/** Inferred type for a persisted bio image row (has DB id). */
+export type BioStatusImage = z.infer<typeof bioStatusImageSchema>;
+
+/** Inferred type for a persisted bio link row (has DB id). */
+export type BioStatusLink = z.infer<typeof bioStatusLinkSchema>;
+
 export const bioGenerationDataSchema = z.object({
   shortBio: z.string(),
   longBio: z.string(),
@@ -74,15 +111,24 @@ export interface GeneratedBioContent {
   altBio: string;
   genres: string | null;
   images: Array<{
+    /** DB row id — present when content comes from the status endpoint; absent on the lambda path. */
+    id?: string;
     url: string;
-    thumbnailUrl: string | null;
-    title: string | null;
-    attribution: string | null;
-    license: string | null;
-    sourceUrl: string | null;
+    thumbnailUrl?: string | null;
+    title?: string | null;
+    attribution?: string | null;
+    license?: string | null;
+    sourceUrl?: string | null;
     isPrimary: boolean;
   }>;
-  links: Array<{ label: string; url: string; kind: string | null }>;
+  links: Array<{
+    /** DB row id — present when content comes from the status endpoint; absent on the lambda path. */
+    id?: string;
+    label: string;
+    url: string;
+    /** `null` when the lambda did not classify the link; absent when the link has no kind field. */
+    kind?: string | null;
+  }>;
   model: string;
 }
 
@@ -90,9 +136,9 @@ export interface GeneratedBioContent {
 export const BIO_STATUSES = ['pending', 'processing', 'succeeded', 'failed'] as const;
 export type BioStatus = (typeof BIO_STATUSES)[number];
 
-/** Terminal states — polling stops once the job reaches one of these. */
-export const isTerminalBioStatus = (status: BioStatus | null | undefined): boolean =>
-  status === 'succeeded' || status === 'failed';
+/** In-flight states — polling continues only while the job is one of these. */
+export const isInFlightBioStatus = (status: BioStatus | null | undefined): boolean =>
+  status === 'pending' || status === 'processing';
 
 /**
  * Result of *triggering* async bio generation. Generation now runs in the
@@ -121,19 +167,17 @@ export const bioGenerationStatusResponseSchema = z.object({
       longBio: z.string(),
       altBio: z.string(),
       genres: z.string().nullable(),
-      images: z.array(
-        z.object({
-          url: z.string(),
-          thumbnailUrl: z.string().nullable(),
-          title: z.string().nullable(),
-          attribution: z.string().nullable(),
-          license: z.string().nullable(),
-          sourceUrl: z.string().nullable(),
-          isPrimary: z.boolean(),
-        })
-      ),
-      links: z.array(z.object({ label: z.string(), url: z.string(), kind: z.string().nullable() })),
+      images: z.array(bioStatusImageSchema),
+      links: z.array(bioStatusLinkSchema),
       model: z.string(),
     })
     .nullable(),
 });
+
+/**
+ * Client-side type of the parsed status payload. Unlike
+ * {@link BioGenerationStatusResult} (the server-side shape, whose content rows
+ * may lack ids on the lambda path), content rows here always carry their DB
+ * row ids — the admin palettes need them for per-row deletes.
+ */
+export type BioGenerationStatusResponse = z.infer<typeof bioGenerationStatusResponseSchema>;

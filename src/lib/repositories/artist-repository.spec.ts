@@ -24,6 +24,14 @@ vi.mock('@/lib/prisma', () => ({
     artistRelease: {
       upsert: vi.fn(),
     },
+    artistBioLink: {
+      delete: vi.fn(),
+    },
+    artistBioImage: {
+      delete: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }));
 
@@ -387,6 +395,33 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('findBioImagesForRehost', () => {
+    it('selects the rehost projection filtered by artistId', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([{ id: 'img-1' }] as never);
+
+      const result = await ArtistRepository.findBioImagesForRehost('a1');
+
+      expect(result).toEqual([{ id: 'img-1' }]);
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
+      });
+    });
+  });
+
+  describe('updateBioImageUrl', () => {
+    it('updates the image row url by id', async () => {
+      vi.mocked(prisma.artistBioImage.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.updateBioImageUrl('img-1', 'https://cdn.example/new.webp');
+
+      expect(prisma.artistBioImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { url: 'https://cdn.example/new.webp' },
+      });
+    });
+  });
+
   describe('connectToRelease', () => {
     it('upserts an ArtistRelease join record', async () => {
       vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({} as never);
@@ -438,6 +473,45 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.altBio).toBe(true);
       expect(arg?.select?.bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
       expect(arg?.select?.bioLinks).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+    });
+
+    it('includes id in the bioImages and bioLinks selects', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a2');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { id: true } });
+      expect(arg?.select?.bioLinks).toMatchObject({ select: { id: true } });
+    });
+  });
+
+  describe('deleteBioLink', () => {
+    it('deletes the link row by id', async () => {
+      await ArtistRepository.deleteBioLink('link-1');
+      expect(prisma.artistBioLink.delete).toHaveBeenCalledWith({ where: { id: 'link-1' } });
+    });
+  });
+
+  describe('deleteBioImage', () => {
+    it('deletes the image row and returns its urls for cleanup', async () => {
+      vi.mocked(prisma.artistBioImage.delete).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      } as never);
+      const removed = await ArtistRepository.deleteBioImage('img-1');
+      expect(removed.url).toBe('https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp');
+    });
+
+    it('includes thumbnailUrl in the return contract', async () => {
+      vi.mocked(prisma.artistBioImage.delete).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
+        thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+      } as never);
+      const removed = await ArtistRepository.deleteBioImage('img-1');
+      expect(removed.thumbnailUrl).toBe(
+        'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp'
+      );
     });
   });
 });

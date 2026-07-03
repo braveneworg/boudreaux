@@ -205,6 +205,17 @@ export type ReleaseCarouselItem = ReleaseScalars & {
 };
 
 /**
+ * Narrow projection for bio release-link injection — just the id and title.
+ * Produced by `ReleaseRepository.findPublishedByArtist` and consumed by the
+ * bio-generation service to append internal `/releases/:id` links after
+ * generation (the lambda has no DB access).
+ */
+export interface ReleaseLinkSource {
+  id: string;
+  title: string;
+}
+
+/**
  * S3-cleanup view of a release loaded before a hard delete — just the
  * digital-format files and images needed to enumerate S3 keys. Mirrors the
  * `findForDeletion` include in release-repository.

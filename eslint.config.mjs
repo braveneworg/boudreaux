@@ -48,12 +48,24 @@ const eslintConfig = [
       // Catches invalid/typo'd utilities that compile to nothing. `ignore` is a
       // list of anchored regexes for genuine non-Tailwind classes the resolver
       // can't know about: video.js skin classes (`vjs-*`) and its player-container
-      // hook, sonner's wrapper, and the banner animation marker (keyframes live in
-      // globals.css). Test placeholder classNames are handled by the spec override
-      // below. See docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
+      // hook, sonner's wrapper, the banner animation marker (keyframes live in
+      // globals.css), and the bio figure markers (`bio-figure`, its float
+      // modifiers, and the caption classes) that mirror the sanitizer's figure
+      // contract for stable selectors (parsed by bio-figure-extension.ts and
+      // rendered by the NodeView). Test placeholder classNames are handled by
+      // the spec override below. See
+      // docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
       'better-tailwindcss/no-unknown-classes': [
         'error',
-        { ignore: ['^vjs-', '^audio-player-wrapper$', '^toaster$', '^banner-strip-slide$'] },
+        {
+          ignore: [
+            '^vjs-',
+            '^audio-player-wrapper$',
+            '^toaster$',
+            '^banner-strip-slide$',
+            '^bio-figure(--(left|right|center)|-(caption|title|subtitle|attribution))?$',
+          ],
+        },
       ],
     },
   },
@@ -364,6 +376,16 @@ const eslintConfig = [
     files: ['src/app/components/ui/chart.tsx'],
     rules: {
       'max-params': 'off',
+    },
+  },
+  // TipTap NodeView for in-editor bio figures: images come from arbitrary
+  // scraped remote hosts that cannot be enumerated in `images.remotePatterns`,
+  // so `next/image` is genuinely inapplicable — the editor-only plain `<img>`
+  // is intentional. Scope the Next.js rule off for this file only.
+  {
+    files: ['src/app/components/ui/bio-figure-node-view.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
     },
   },
   // Next.js App Router special files conventionally use named (often default-exported)

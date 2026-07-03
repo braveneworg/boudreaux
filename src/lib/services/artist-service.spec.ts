@@ -5,8 +5,11 @@ import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
+import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
+import { BioImageService } from './bio-image-service';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -32,6 +35,7 @@ vi.mock('@aws-sdk/client-s3', () => {
 });
 vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => new MockS3Client(),
+  deleteS3Object: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/lib/repositories/artist-repository', () => ({
@@ -52,6 +56,20 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     archive: vi.fn(),
     existsById: vi.fn(),
     connectToRelease: vi.fn(),
+    deleteBioLink: vi.fn(),
+    deleteBioImage: vi.fn(),
+    findBioImagesForRehost: vi.fn(),
+    updateBioImageUrl: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/utils/ip-guard', () => ({
+  isPubliclyRoutableUrl: vi.fn(),
+}));
+
+vi.mock('./bio-image-service', () => ({
+  BioImageService: {
+    rehostWithVariants: vi.fn(),
   },
 }));
 
@@ -430,6 +448,134 @@ describe('ArtistService', () => {
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to update artist' });
+    });
+  });
+
+  describe('updateArtist bio image finalization', () => {
+    const THUMB = 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp';
+    const FULL = 'https://cdn.example/media/artists/a1/bio/3-def.webp';
+    const thumbnailRow = {
+      id: 'img-1',
+      url: THUMB,
+      thumbnailUrl: THUMB,
+      originalUrl: 'https://upload.wikimedia.org/full.jpg',
+    };
+
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example');
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([]);
+      vi.mocked(ArtistRepository.updateBioImageUrl).mockResolvedValue(undefined);
+      vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(true);
+      vi.mocked(BioImageService.rehostWithVariants).mockResolvedValue({
+        url: FULL,
+        width: 1200,
+        height: 900,
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('re-hosts a thumbnail src to full variants and rewrites the html', async () => {
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(FULL);
+    });
+
+    it('upgrades the matching bio image row url', async () => {
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+
+      expect(vi.mocked(ArtistRepository.updateBioImageUrl)).toHaveBeenCalledWith('img-1', FULL);
+    });
+
+    it('skips an external src that resolves to a private address', async () => {
+      vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(false);
+
+      await ArtistService.updateArtist('a1', {
+        bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>',
+      });
+
+      expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
+    });
+
+    it('leaves a fully re-hosted CDN src untouched', async () => {
+      await ArtistService.updateArtist('a1', { bio: `<p><img src="${FULL}" alt="" /></p>` });
+
+      expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
+    });
+
+    it('saves with the original src when re-hosting throws', async () => {
+      vi.mocked(BioImageService.rehostWithVariants).mockRejectedValue(new Error('s3 down'));
+
+      const result = await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /></p>`,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('skips finalization entirely when no bio fields are updated', async () => {
+      await ArtistService.updateArtist('a1', { displayName: 'X' });
+
+      expect(vi.mocked(ArtistRepository.findBioImagesForRehost)).not.toHaveBeenCalled();
+    });
+
+    it('keeps a completed html replacement when a later iteration throws', async () => {
+      const THUMB2 = 'https://cdn.example/media/artists/a1/bio/thumbs/1-xyz.webp';
+      const secondRow = {
+        id: 'img-2',
+        url: THUMB2,
+        thumbnailUrl: THUMB2,
+        originalUrl: 'https://upload.wikimedia.org/full2.jpg',
+      };
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+        thumbnailRow,
+        secondRow,
+      ]);
+      // First image re-hosts fine (row url already updated); the second throws
+      // outside rehostOne's try, hitting the outer finalize catch mid-loop.
+      vi.mocked(isPubliclyRoutableUrl)
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('dns exploded'));
+
+      await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+      });
+
+      // The first image's row was upgraded to FULL, so the persisted html must
+      // carry FULL too — no row/html divergence.
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(FULL);
+    });
+
+    it('leaves the failed iteration source untouched when the loop aborts', async () => {
+      const THUMB2 = 'https://cdn.example/media/artists/a1/bio/thumbs/1-xyz.webp';
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+        thumbnailRow,
+        {
+          id: 'img-2',
+          url: THUMB2,
+          thumbnailUrl: THUMB2,
+          originalUrl: 'https://upload.wikimedia.org/full2.jpg',
+        },
+      ]);
+      vi.mocked(isPubliclyRoutableUrl)
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('dns exploded'));
+
+      await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+      });
+
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(THUMB2);
     });
   });
 
@@ -1899,6 +2045,64 @@ describe('ArtistService', () => {
 
       const bio = result.success ? result.data.bio : 'unexpected';
       expect(bio).toBe('<p>Hi</p>');
+    });
+  });
+
+  describe('deleteBioLink', () => {
+    it('delegates to the repository without returning a value', async () => {
+      vi.mocked(ArtistRepository.deleteBioLink).mockResolvedValue(undefined as never);
+
+      await ArtistService.deleteBioLink('link-1');
+
+      expect(ArtistRepository.deleteBioLink).toHaveBeenCalledWith('link-1');
+    });
+  });
+
+  describe('deleteBioImage', () => {
+    beforeEach(() => {
+      vi.stubEnv('CDN_DOMAIN', 'cdn.example');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('removes the CDN bio thumbnail after deleting the row', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).toHaveBeenCalledWith(
+        'media/artists/a1/bio/thumbs/0-abc.webp'
+      );
+    });
+
+    it('also cleans up a non-null thumbnailUrl that is a bio url', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
+        thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not touch S3 for a non-bio url', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://upload.wikimedia.org/photo.jpg',
+        thumbnailUrl: null,
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).not.toHaveBeenCalled();
+    });
+
+    it('still succeeds when thumbnail cleanup fails', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        thumbnailUrl: null,
+      });
+      vi.mocked(deleteS3Object).mockResolvedValue(false);
+      await expect(ArtistService.deleteBioImage('img-1')).resolves.toBeUndefined();
     });
   });
 

@@ -15,6 +15,7 @@ import type {
   ReleaseForDeletion,
   ReleaseListFilters,
   ReleaseListItem,
+  ReleaseLinkSource,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 
@@ -551,6 +552,26 @@ export class ReleaseRepository {
         include: releaseCarouselInclude,
       })
     ) as Promise<ReleaseCarouselItem[]>;
+  }
+
+  /**
+   * Fetch all published, non-deleted releases for an artist, returning only the
+   * `id` and `title` fields ordered newest first.
+   * Used by the bio-generation service to inject internal release links after
+   * generation (the lambda has no DB access).
+   */
+  static async findPublishedByArtist(artistId: string): Promise<ReleaseLinkSource[]> {
+    return runQuery(() =>
+      prisma.release.findMany({
+        where: {
+          artistReleases: { some: { artistId } },
+          publishedAt: { not: null },
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        orderBy: { releasedOn: 'desc' },
+        select: { id: true, title: true },
+      })
+    ) as Promise<ReleaseLinkSource[]>;
   }
 
   /**

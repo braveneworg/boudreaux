@@ -33,15 +33,19 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
   },
 }));
 
-const rehostThumbnailMock = vi.fn();
+const findPublishedByArtistMock = vi.fn();
+vi.mock('@/lib/repositories/release-repository', () => ({
+  ReleaseRepository: {
+    findPublishedByArtist: (id: string) => findPublishedByArtistMock(id),
+  },
+}));
+
 const rehostWithVariantsMock = vi.fn();
 const rehostImagesMock = vi.fn();
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
       rehostWithVariantsMock(url, artistId, index),
-    rehostThumbnail: (url: string, artistId: string, index: number) =>
-      rehostThumbnailMock(url, artistId, index),
     rehostImages: (images: ReadonlyArray<{ url: string; index: number }>, artistId: string) =>
       rehostImagesMock(images, artistId),
   },
@@ -187,6 +191,7 @@ describe('BioGenerationService.generateForArtist', () => {
   beforeEach(() => {
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
+    findPublishedByArtistMock.mockResolvedValue([]);
     // rehostImages returns { results, duplicateAliases } — position-preserving
     rehostImagesMock.mockResolvedValue({
       results: [
@@ -698,6 +703,55 @@ describe('BioGenerationService.generateForArtist', () => {
     expect(callArg.bornOn).toBeUndefined();
     expect(callArg.diedOn).toBeUndefined();
     expect(callArg.formedOn).toBeUndefined();
+  });
+
+  it('appends kind:release links for the artist published releases', async () => {
+    findPublishedByArtistMock.mockResolvedValue([
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
+    ]);
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    expect(persisted.links).toContainEqual(
+      expect.objectContaining({
+        label: 'Sad, Fat Luck',
+        url: '/releases/665f1f77bcf86cd799439021',
+        kind: 'release',
+      })
+    );
+  });
+
+  it('does not duplicate a release link already present', async () => {
+    findPublishedByArtistMock.mockResolvedValue([
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
+    ]);
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    const matches = persisted.links.filter(
+      (link: { url: string }) => link.url === '/releases/665f1f77bcf86cd799439021'
+    );
+    expect(matches).toHaveLength(1);
+  });
+
+  it('persists the discovered links unchanged when the release lookup fails', async () => {
+    findPublishedByArtistMock.mockRejectedValue(new Error('db down'));
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    // Only the discovered Wikipedia link survives — no kind:'release' entries
+    // are appended when the lookup fails, and the failure stays non-fatal.
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    expect(persisted.links).toHaveLength(1);
+    expect(persisted.links[0]).toEqual(
+      expect.objectContaining({
+        url: 'https://en.wikipedia.org/wiki/Radiohead',
+        kind: 'wikipedia',
+      })
+    );
   });
 });
 
