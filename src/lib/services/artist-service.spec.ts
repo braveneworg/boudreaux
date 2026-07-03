@@ -1921,6 +1921,10 @@ describe('ArtistService', () => {
       vi.stubEnv('CDN_DOMAIN', 'cdn.example');
     });
 
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('removes the CDN bio thumbnail after deleting the row', async () => {
       vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
         url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
@@ -1930,6 +1934,15 @@ describe('ArtistService', () => {
       expect(vi.mocked(deleteS3Object)).toHaveBeenCalledWith(
         'media/artists/a1/bio/thumbs/0-abc.webp'
       );
+    });
+
+    it('also cleans up a non-null thumbnailUrl that is a bio url', async () => {
+      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
+        thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+      });
+      await ArtistService.deleteBioImage('img-1');
+      expect(vi.mocked(deleteS3Object)).toHaveBeenCalledTimes(2);
     });
 
     it('does not touch S3 for a non-bio url', async () => {

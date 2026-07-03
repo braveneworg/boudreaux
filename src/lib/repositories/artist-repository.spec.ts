@@ -473,5 +473,16 @@ describe('ArtistRepository', () => {
       const removed = await ArtistRepository.deleteBioImage('img-1');
       expect(removed.url).toBe('https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp');
     });
+
+    it('includes thumbnailUrl in the return contract', async () => {
+      vi.mocked(prisma.artistBioImage.delete).mockResolvedValue({
+        url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
+        thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+      } as never);
+      const removed = await ArtistRepository.deleteBioImage('img-1');
+      expect(removed.thumbnailUrl).toBe(
+        'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp'
+      );
+    });
   });
 });
