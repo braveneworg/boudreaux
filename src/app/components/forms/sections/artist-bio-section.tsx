@@ -6,6 +6,7 @@
 import dynamic from 'next/dynamic';
 
 import { ArtistBioGenerationSection } from '@/app/components/forms/artist-bio-generation-section';
+import { BioMediaPalettes } from '@/app/components/forms/bio-media-palettes';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
@@ -79,9 +80,13 @@ export const ArtistBioSection = ({
     <h2 className="font-semibold">Biography</h2>
 
     {/* AI Bio Generation — first action; edit mode only (needs a persisted
-        artist). Populates the bio fields below. */}
+        artist). Populates the bio fields below. The palettes surface the
+        persisted discovered links/images so tiles drag into the editors. */}
     {isEditMode && artistId && (
-      <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
+      <>
+        <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
+        <BioMediaPalettes artistId={artistId} />
+      </>
     )}
 
     <BioEditorField

@@ -172,3 +172,11 @@ export const bioGenerationStatusResponseSchema = z.object({
     })
     .nullable(),
 });
+
+/**
+ * Client-side type of the parsed status payload. Unlike
+ * {@link BioGenerationStatusResult} (the server-side shape, whose content rows
+ * may lack ids on the lambda path), content rows here always carry their DB
+ * row ids — the admin palettes need them for per-row deletes.
+ */
+export type BioGenerationStatusResponse = z.infer<typeof bioGenerationStatusResponseSchema>;

@@ -86,6 +86,17 @@ vi.mock('@/lib/actions/register-image-actions', () => ({ registerArtistImagesAct
 vi.mock('@/lib/utils/direct-upload', () => ({ uploadFilesToS3: vi.fn() }));
 vi.mock('@/lib/utils/console-logger', () => ({ error: vi.fn(), warn: vi.fn(), log: vi.fn() }));
 
+// The bio palettes keep the generation-status query mounted in edit mode;
+// stub the hook so this suite never issues a real fetch and renders no tiles.
+vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
+  useArtistBioGenerationStatusQuery: () => ({
+    data: undefined,
+    isPending: true,
+    error: Error('Unknown error'),
+    refetch: vi.fn(),
+  }),
+}));
+
 // Mock the artist-detail query hook so edit-mode loading is driven by the
 // hook's return value instead of a raw `fetch`. Create-mode tests below leave
 // it at the default (null data, not pending).

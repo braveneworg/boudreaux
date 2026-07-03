@@ -7,7 +7,7 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   bioGenerationStatusResponseSchema,
   isTerminalBioStatus,
-  type BioGenerationStatusResult,
+  type BioGenerationStatusResponse,
 } from '@/lib/validation/bio-generation-schema';
 
 import { parseResponse } from './fetch-and-parse';
@@ -23,12 +23,12 @@ const POLL_INTERVAL_MS = 2500;
  *
  * @param artistId - The artist whose generation status to read.
  * @param signal - The TanStack Query `AbortSignal` used to cancel the request.
- * @returns The parsed status (and finished content when succeeded).
+ * @returns The parsed status (and finished content — with row ids — when succeeded).
  */
 const fetchBioGenerationStatus = async (
   artistId: string,
   signal?: AbortSignal
-): Promise<BioGenerationStatusResult> => {
+): Promise<BioGenerationStatusResponse> => {
   const url = `/api/artists/${encodeURIComponent(artistId)}/bio-generation`;
   const response = await fetch(url, { signal });
   if (!response.ok) {
@@ -51,7 +51,7 @@ const fetchBioGenerationStatus = async (
  */
 export const useArtistBioGenerationStatusQuery = (
   artistId: string,
-  options: QueryOptionsOverride<BioGenerationStatusResult> = {}
+  options: QueryOptionsOverride<BioGenerationStatusResponse> = {}
 ) => {
   const {
     isPending,
