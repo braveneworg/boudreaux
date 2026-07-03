@@ -251,33 +251,37 @@ const rehostOne = async (
  * pasted external URLs re-host directly (SSRF-guarded). Every failure is
  * logged and non-blocking — the save proceeds with the prior src and the next
  * save retries. Create-mode is exempt (no artistId/bio rows yet); pasted
- * images finalize on the first update. Note: the SSRF guard resolves DNS
- * separately from the re-host fetch (vet-then-fetch), so a DNS-rebinding /
- * dual-stack window remains — an accepted residual risk for this admin-only
- * save path. Redirects are NOT part of that acceptance: the re-host fetch
- * refuses them (`redirect: 'error'` in the shared fetch helper), so a vetted
- * URL cannot 3xx to a private address.
+ * images finalize on the first update. SSRF defense: the early
+ * `isPubliclyRoutableUrl` check in `rehostOne` refuses private sources with a
+ * specific log line, and the shared fetch helper (`fetchImageBuffer`) re-vets
+ * the first hop and refuses redirects (`redirect: 'error'`) for every re-host
+ * path. Both vets resolve DNS separately from the fetch (vet-then-fetch), so
+ * a DNS-rebinding / dual-stack window remains — an accepted residual risk for
+ * this admin-only save path.
  */
 const finalizeBioImages = async (
   artistId: string,
   data: UpdateArtistData
 ): Promise<UpdateArtistData> => {
   if (data.bio === undefined && data.altBio === undefined) return data;
+  // Accumulate outside the try so a mid-loop throw never discards replacements
+  // already applied: each rehostOne persists its row url and rewrites the html
+  // together, and returning the accumulated result keeps them consistent even
+  // when a later iteration aborts the loop.
+  let result = { ...data };
   try {
     const rows = await ArtistRepository.findBioImagesForRehost(artistId);
     const cdnPrefix = buildCdnUrl('');
     const srcs = [...new Set([...collectImgSrcs(data.bio), ...collectImgSrcs(data.altBio)])].filter(
       (src) => needsFullRehost(src, cdnPrefix)
     );
-    let result = { ...data };
     for (const [index, src] of srcs.entries()) {
       result = await rehostOne(result, { artistId, src, index, rows });
     }
-    return result;
   } catch (error) {
     logger.warn('bio_image_finalize_failed', { artistId, error: String(error) });
-    return data;
   }
+  return result;
 };
 
 /** Path marker for generation-time bio media on the CDN — the only keys the

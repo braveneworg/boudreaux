@@ -526,6 +526,57 @@ describe('ArtistService', () => {
 
       expect(vi.mocked(ArtistRepository.findBioImagesForRehost)).not.toHaveBeenCalled();
     });
+
+    it('keeps a completed html replacement when a later iteration throws', async () => {
+      const THUMB2 = 'https://cdn.example/media/artists/a1/bio/thumbs/1-xyz.webp';
+      const secondRow = {
+        id: 'img-2',
+        url: THUMB2,
+        thumbnailUrl: THUMB2,
+        originalUrl: 'https://upload.wikimedia.org/full2.jpg',
+      };
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+        thumbnailRow,
+        secondRow,
+      ]);
+      // First image re-hosts fine (row url already updated); the second throws
+      // outside rehostOne's try, hitting the outer finalize catch mid-loop.
+      vi.mocked(isPubliclyRoutableUrl)
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('dns exploded'));
+
+      await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+      });
+
+      // The first image's row was upgraded to FULL, so the persisted html must
+      // carry FULL too — no row/html divergence.
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(FULL);
+    });
+
+    it('leaves the failed iteration source untouched when the loop aborts', async () => {
+      const THUMB2 = 'https://cdn.example/media/artists/a1/bio/thumbs/1-xyz.webp';
+      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+        thumbnailRow,
+        {
+          id: 'img-2',
+          url: THUMB2,
+          thumbnailUrl: THUMB2,
+          originalUrl: 'https://upload.wikimedia.org/full2.jpg',
+        },
+      ]);
+      vi.mocked(isPubliclyRoutableUrl)
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('dns exploded'));
+
+      await ArtistService.updateArtist('a1', {
+        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+      });
+
+      const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
+      expect(updateData.bio).toContain(THUMB2);
+    });
   });
 
   describe('deleteArtist', () => {
