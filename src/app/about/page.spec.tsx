@@ -109,6 +109,27 @@ describe('AboutPage', () => {
     expect(headingImage).toHaveAttribute('data-priority', 'true');
   });
 
+  describe('zine panel', () => {
+    it('wraps the heading and all sections in one pink zine panel', () => {
+      const { container } = render(<AboutPage />);
+
+      const panel = container.querySelector('[data-slot="zine-panel"]');
+      expect(panel).toBeInTheDocument();
+      expect(panel).toHaveClass('zine-accent-pink');
+
+      expect(panel).toContainElement(screen.getByTestId('image-about fake four inc.'));
+      expect(panel).toContainElement(screen.getByTestId('section-community-and-impact'));
+    });
+
+    it('keeps the breadcrumb outside the zine panel', () => {
+      const { container } = render(<AboutPage />);
+
+      const panel = container.querySelector('[data-slot="zine-panel"]');
+      expect(panel).toBeInTheDocument();
+      expect(panel).not.toContainElement(screen.getByTestId('breadcrumb'));
+    });
+  });
+
   describe('images', () => {
     it('renders founders image with correct path, dimensions, and priority', () => {
       render(<AboutPage />);
