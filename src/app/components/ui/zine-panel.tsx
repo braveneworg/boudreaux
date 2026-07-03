@@ -5,6 +5,9 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { BreadcrumbMenu, type BreadcrumbItemData } from './breadcrumb-menu';
+import { ChatPanelTrigger } from '../chat/chat-panel-trigger';
+
 export type ZineAccent =
   | 'yellow'
   | 'hot-pink'
@@ -46,6 +49,14 @@ export interface ZinePanelProps extends React.ComponentProps<'section'> {
   accent: ZineAccent;
   tape?: boolean;
   contentClassName?: string;
+  /** Breadcrumb trail rendered inside the panel, just above the content. */
+  breadcrumbs?: BreadcrumbItemData[];
+  /**
+   * Dock the chat trigger inside this panel — it floats sticky at the
+   * viewport bottom while the panel is in view and parks at the panel's
+   * end. The global fixed trigger hides itself while a dock is present.
+   */
+  chat?: boolean;
 }
 
 /**
@@ -59,6 +70,8 @@ export const ZinePanel = ({
   accent,
   tape = true,
   contentClassName,
+  breadcrumbs,
+  chat = false,
   className,
   children,
   ...props
@@ -78,6 +91,12 @@ export const ZinePanel = ({
         className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-28 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
       />
     )}
-    <div className={cn('relative z-10 p-6 sm:p-8', contentClassName)}>{children}</div>
+    <div className={cn('relative z-10 p-6 pt-4 sm:p-8', contentClassName)}>
+      {/* Panel padding supplies the horizontal offset — the trail drops its
+          outside-the-panel nudge; vertical spacing stays the component's own. */}
+      {breadcrumbs && <BreadcrumbMenu items={breadcrumbs} className="left-0" />}
+      {children}
+      {chat && <ChatPanelTrigger />}
+    </div>
   </section>
 );

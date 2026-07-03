@@ -5,6 +5,10 @@ import { render, screen } from '@testing-library/react';
 
 import { ZinePanel, type ZineAccent } from './zine-panel';
 
+vi.mock('../chat/chat-panel-trigger', () => ({
+  ChatPanelTrigger: () => <div data-testid="chat-panel-trigger" />,
+}));
+
 /** Literal accent → class pairs guarding the component map against drift. */
 const ACCENT_CASES: ReadonlyArray<[ZineAccent, string]> = [
   ['yellow', 'zine-accent-yellow'],
@@ -32,6 +36,64 @@ describe('ZinePanel', () => {
   it('renders a section with data-slot="zine-panel"', () => {
     const { container } = render(<ZinePanel accent="yellow">Panel body</ZinePanel>);
     expect(getSection(container)).toBeInTheDocument();
+  });
+
+  it('renders no breadcrumb trail by default', () => {
+    const { container } = render(<ZinePanel accent="yellow">Panel body</ZinePanel>);
+    expect(container.querySelector('[data-slot="breadcrumb-menu"]')).toBeNull();
+  });
+
+  it('renders no chat dock by default', () => {
+    render(<ZinePanel accent="yellow">Panel body</ZinePanel>);
+    expect(screen.queryByTestId('chat-panel-trigger')).not.toBeInTheDocument();
+  });
+
+  it('docks the chat trigger at the end of the panel content when chat is set', () => {
+    render(
+      <ZinePanel accent="yellow" chat>
+        Panel body
+      </ZinePanel>
+    );
+
+    const dock = screen.getByTestId('chat-panel-trigger');
+    const content = screen.getByText('Panel body');
+    expect(content).toContainElement(dock);
+    expect(content.lastElementChild).toBe(dock);
+  });
+
+  it('renders the breadcrumb trail inside the panel above the content', () => {
+    const { container } = render(
+      <ZinePanel
+        accent="yellow"
+        breadcrumbs={[{ anchorText: 'Releases', url: '/releases', isActive: true }]}
+      >
+        Panel body
+      </ZinePanel>
+    );
+
+    const crumbs = container.querySelector('[data-slot="breadcrumb-menu"]');
+    expect(crumbs).toBeInTheDocument();
+    // Lives in the padded content div, before the children.
+    const content = screen.getByText('Panel body');
+    expect(crumbs?.parentElement).toBe(content);
+    expect(crumbs).toBe(content.firstElementChild);
+  });
+
+  it('drops the breadcrumb horizontal nudge inside the panel', () => {
+    const { container } = render(
+      <ZinePanel
+        accent="yellow"
+        breadcrumbs={[{ anchorText: 'Releases', url: '/releases', isActive: true }]}
+      >
+        Panel body
+      </ZinePanel>
+    );
+
+    // The panel padding supplies the horizontal offset; vertical spacing
+    // stays whatever the breadcrumb component's own defaults say.
+    const crumbs = container.querySelector('[data-slot="breadcrumb-menu"]');
+    expect(crumbs).toHaveClass('left-0');
+    expect(crumbs).not.toHaveClass('left-5');
   });
 
   it('renders children inside the inner content div', () => {
