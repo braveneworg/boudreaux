@@ -30,6 +30,10 @@ vi.mock('./featured-artists-player', () => ({
   ),
 }));
 
+vi.mock('./release-headlines', () => ({
+  ReleaseHeadlines: () => <aside data-testid="release-headlines" />,
+}));
+
 // Drive next/dynamic synchronously: exercise the loader (so the dynamic import
 // arrow + its `.then` mapper are covered) and the `loading` placeholder branch.
 vi.mock('next/dynamic', () => ({
@@ -165,14 +169,46 @@ describe('HomeContent', () => {
     expect(screen.getByTestId('featured-count')).toHaveTextContent('0');
   });
 
-  it('keys the featured section to the yellow zine accent', () => {
+  it('wraps the content after the banner in a yellow zine panel', () => {
     useBannersQueryMock.mockReturnValue({ data: undefined });
     useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
 
     render(<HomeContent />);
 
-    const section = screen.getByRole('img', { name: /featured artists/i }).closest('section');
-    expect(section).toHaveClass('zine-accent-yellow');
+    const panel = screen.getByRole('img', { name: /featured artists/i }).closest('section');
+    expect(panel).toHaveAttribute('data-slot', 'zine-panel');
+    expect(panel).toHaveClass('zine-accent-yellow');
+    expect(panel).toContainElement(screen.getByTestId('artist-search'));
+  });
+
+  it('gives the landing heading extra breathing room', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // Landing-only: the wordmark separates the search field from the player,
+    // so it gets more air than the default tight heading margins — slightly
+    // more above than below, tying it to the player it titles.
+    const heading = screen.getByRole('heading', { name: /featured artists/i });
+    expect(heading).toHaveClass('mt-8', 'mb-6');
+  });
+
+  it('reflows the desktop layout: heading first, player beside headlines', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // lg+: CSS order lifts the wordmark above the search field (tighter
+    // vertical air), the search box gets a clear margin before the split,
+    // and the player shares a two-column grid with the release headlines.
+    const heading = screen.getByRole('heading', { name: /featured artists/i });
+    expect(heading).toHaveClass('lg:order-first', 'lg:mt-0', 'lg:mb-3');
+    expect(screen.getByTestId('artist-search').parentElement).toHaveClass('lg:mb-8');
+    const grid = screen.getByTestId('release-headlines').parentElement;
+    expect(grid).toHaveClass('lg:grid', 'lg:grid-cols-2', 'lg:gap-10');
+    expect(grid).toContainElement(screen.getByTestId('dynamic-featured'));
   });
 
   it('renders both banner treatments so the visible one is correct from first paint', () => {

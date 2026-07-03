@@ -120,7 +120,8 @@ const publishedReleaseListingSelect = {
   artistReleases: {
     select: {
       artist: {
-        select: { id: true, firstName: true, surname: true, displayName: true },
+        // slug feeds the landing headlines' artist links.
+        select: { id: true, firstName: true, surname: true, displayName: true, slug: true },
       },
     },
   },

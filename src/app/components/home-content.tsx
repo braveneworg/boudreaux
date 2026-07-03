@@ -11,8 +11,10 @@ import { useBannersQuery } from '@/app/hooks/use-banners-query';
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
 import { BannerStrip } from './banner-strip';
+import { ReleaseHeadlines } from './release-headlines';
 import { ContentContainer } from './ui/content-container';
 import { ImageHeading } from './ui/image-heading';
+import { ZinePanel } from './ui/zine-panel';
 
 import type { BannerSlotData } from './banner-carousel';
 
@@ -51,21 +53,31 @@ export const HomeContent = () => {
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
-        <section className="zine-accent-yellow">
-          <ArtistSearchInput />
+        {/* Desktop (lg+) reflows via CSS order/grid: wordmark first, search
+            beneath it, then the player on the left half beside the
+            infinitely-scrolling release headlines on the right half. Mobile
+            keeps the stacked search → heading → player flow. */}
+        <ZinePanel chat accent="yellow" contentClassName="lg:flex lg:flex-col">
+          {/* Desktop: clear air beneath the search box before the split. */}
+          <div className="lg:mb-8">
+            <ArtistSearchInput />
+          </div>
           {/* No `priority`: this heading sits below the banner and search
-              input, so it's not the LCP. `ImageHeading` is a client component
-              whose `sizes` flips on `useIsMobile()` between SSR and client, so a
-              `priority` preload (chosen from the SSR `sizes`) would pick a
-              different variant than the hydrated `<img>` ends up using —
-              surfacing "preloaded but not used". It lazy-loads normally instead. */}
+              input, so it's not the LCP — it lazy-loads normally. Extra
+              vertical air (landing only) separates the search field above
+              from the player below; on desktop the wordmark leads with
+              tighter margins. */}
           <ImageHeading
             src="/media/headings/FEATURED.webp"
             alt="featured artists"
             imageHeight={480}
+            className="mt-8 mb-6 lg:order-first lg:mt-0 lg:mb-3"
           />
-          <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
-        </section>
+          <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-10">
+            <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+            <ReleaseHeadlines />
+          </div>
+        </ZinePanel>
       </ContentContainer>
     </>
   );

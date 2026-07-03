@@ -144,6 +144,7 @@ export type PublishedReleaseListingArtist = {
   firstName: string;
   surname: string;
   displayName: string | null;
+  slug: string;
 };
 
 /** A single image projected for the public listing (`src`/`altText` only). */

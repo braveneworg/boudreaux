@@ -358,6 +358,7 @@ export const publishedReleaseListingSchema = z.object({
         firstName: z.string(),
         surname: z.string(),
         displayName: nullableString,
+        slug: z.string(),
       }),
     })
   ),
