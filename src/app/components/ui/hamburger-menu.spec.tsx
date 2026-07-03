@@ -54,6 +54,18 @@ describe('HamburgerMenu', () => {
     expect(screen.getByRole('button')).toHaveClass('bg-transparent');
   });
 
+  it('drops the tap-target border and sizes the zinc-50 accent to the lines', () => {
+    render(<HamburgerMenu />);
+
+    // No outline or shadow on the whole tap target — the zinc-50 stamp
+    // accent rides an inner box matching the patty lines' width (w-5).
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('border-0', 'shadow-none');
+    expect(button).not.toHaveClass('border-2', 'border-zinc-50');
+    const accent = button.querySelector('span.shadow-zine-sm');
+    expect(accent).toHaveClass('size-5', '[--card-accent:var(--color-zinc-50)]');
+  });
+
   it('toggles screen reader text when clicked', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
