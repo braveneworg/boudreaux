@@ -13,7 +13,7 @@ interface ChatTriggerButtonProps {
 }
 
 /**
- * Frosted-glass floating chat trigger. Rendered globally — unauthenticated
+ * Ink-stamp floating chat trigger. Rendered globally — unauthenticated
  * visitors see the same button and are met with the sign-in gate inside
  * the drawer.
  */
@@ -31,9 +31,10 @@ export const ChatTriggerButton = ({ onOpen, className }: ChatTriggerButtonProps)
       aria-label="Open chat"
       className={cn(
         'fixed right-6 bottom-6 z-50 flex flex-col items-center gap-1',
-        'border border-white/40 bg-white/30 px-4 py-3',
-        'shadow-lg backdrop-blur-md',
-        'text-foreground transition-colors hover:bg-white/45',
+        'border-2 border-black bg-zinc-50 px-4 py-3',
+        'shadow-zine-ink',
+        'text-foreground transition-all hover:bg-black hover:text-white',
+        'active:translate-x-0.5 active:translate-y-0.5 active:shadow-none',
         'focus-visible:ring-primary focus:outline-none focus-visible:ring-2',
         className
       )}
