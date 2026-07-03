@@ -59,10 +59,17 @@ const CommandDialog = ({
 
 const CommandInput = ({
   className,
+  wrapperClassName,
   ref,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) => (
-  <div data-slot="command-input-wrapper" className="flex h-9 items-center gap-2 border-b px-3">
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  /** Optional classes for the icon + input wrapper row (e.g. focus-within rings). */
+  wrapperClassName?: string;
+}) => (
+  <div
+    data-slot="command-input-wrapper"
+    className={cn('flex h-9 items-center gap-2 border-b px-3', wrapperClassName)}
+  >
     <SearchIcon color="#000" className="size-4 shrink-0 opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
