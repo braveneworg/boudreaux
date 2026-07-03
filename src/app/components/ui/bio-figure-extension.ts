@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Node } from '@tiptap/core';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+
+import { BioFigureNodeView } from './bio-figure-node-view';
 
 import type { DOMOutputSpec } from '@tiptap/pm/model';
 
@@ -32,7 +35,7 @@ export interface BioFigureAttributes {
 
 /** Static-key lookup into FLOAT_TO_CLASS (dynamic indexing trips the
  *  `security/detect-object-injection` lint despite the closed union key). */
-const classForFloat = (float: BioFigureFloat): string => {
+export const classForFloat = (float: BioFigureFloat): string => {
   if (float === 'left') return FLOAT_TO_CLASS.left;
   if (float === 'right') return FLOAT_TO_CLASS.right;
   return FLOAT_TO_CLASS.none;
@@ -125,5 +128,9 @@ export const BioFigure = Node.create({
       { class: `bio-figure ${classForFloat(float)}`, style: `width: ${width}%` },
       ...children,
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(BioFigureNodeView);
   },
 });
