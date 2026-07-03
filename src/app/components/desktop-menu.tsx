@@ -24,7 +24,10 @@ export const DesktopMenu = () => {
                 href={item.href}
                 aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
                 className={`text-zinc-50 ${item.color} underline-offset-8 transition-colors duration-200 hover:underline aria-[current=page]:underline`}
-                prefetch={false}
+                // Static nav targets fully prefetch on viewport by default;
+                // the hover boost upgrades force-dynamic ones (home) to a
+                // full data prefetch the moment pointer intent shows.
+                unstable_dynamicOnHover
               >
                 {item.name}
               </Link>

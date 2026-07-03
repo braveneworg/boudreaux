@@ -6,6 +6,34 @@ import userEvent from '@testing-library/user-event';
 
 import { MobileMenu } from './mobile-menu';
 
+// Mock next/link to surface the prefetch posture as data attributes (Link
+// behavior, not DOM attributes — the real component hides them). Event props
+// (onClick) still spread onto the anchor so navigation tests keep working.
+vi.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    prefetch,
+    unstable_dynamicOnHover,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+    prefetch?: boolean;
+    unstable_dynamicOnHover?: boolean;
+  }) => (
+    <a
+      href={href}
+      data-prefetch={prefetch === undefined ? 'default' : String(prefetch)}
+      data-dynamic-on-hover={String(unstable_dynamicOnHover === true)}
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock('../auth/auth-toolbar', () => ({
   AuthToolbar: ({ onNavigate }: { onNavigate?: () => void }) => (
     <button data-testid="auth-toolbar-action" onClick={onNavigate}>
@@ -91,6 +119,22 @@ describe('MobileMenu', () => {
     render(<MobileMenu menuItems={menuItems} onNavigate={vi.fn()} />);
 
     expect(screen.getByRole('link', { name: 'About' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('keeps default viewport prefetching on every menu link', () => {
+    render(<MobileMenu menuItems={menuItems} onNavigate={vi.fn()} />);
+
+    screen.getAllByRole('link').forEach((link) => {
+      expect(link).toHaveAttribute('data-prefetch', 'default');
+    });
+  });
+
+  it('upgrades every menu link to a full prefetch on touch intent', () => {
+    render(<MobileMenu menuItems={menuItems} onNavigate={vi.fn()} />);
+
+    screen.getAllByRole('link').forEach((link) => {
+      expect(link).toHaveAttribute('data-dynamic-on-hover', 'true');
+    });
   });
 
   it('calls onNavigate when a menu link is clicked', async () => {

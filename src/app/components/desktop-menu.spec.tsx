@@ -11,20 +11,29 @@ vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 
-// Mock next/link to render a plain anchor
+// Mock next/link to render a plain anchor, surfacing the prefetch posture as
+// data attributes (they are Link behavior, not DOM attributes, so the real
+// component would hide them from assertions).
 vi.mock('next/link', () => ({
   __esModule: true,
   default: ({
     href,
     children,
-    prefetch: _prefetch,
+    prefetch,
+    unstable_dynamicOnHover,
     ...props
   }: {
     href: string;
     children: React.ReactNode;
     prefetch?: boolean;
+    unstable_dynamicOnHover?: boolean;
   }) => (
-    <a href={href} {...props}>
+    <a
+      href={href}
+      data-prefetch={prefetch === undefined ? 'default' : String(prefetch)}
+      data-dynamic-on-hover={String(unstable_dynamicOnHover === true)}
+      {...props}
+    >
       {children}
     </a>
   ),
@@ -76,6 +85,22 @@ describe('DesktopMenu', () => {
       const home = screen.getByRole('link', { name: 'Home' });
       expect(home).toHaveClass('transition-colors');
       expect(home).toHaveClass('duration-200');
+    });
+
+    it('keeps default viewport prefetching on every nav link', () => {
+      render(<DesktopMenu />);
+
+      screen.getAllByRole('link').forEach((link) => {
+        expect(link).toHaveAttribute('data-prefetch', 'default');
+      });
+    });
+
+    it('upgrades every nav link to a full prefetch on hover', () => {
+      render(<DesktopMenu />);
+
+      screen.getAllByRole('link').forEach((link) => {
+        expect(link).toHaveAttribute('data-dynamic-on-hover', 'true');
+      });
     });
 
     it('renders links white by default with color scoped to interactive states', () => {

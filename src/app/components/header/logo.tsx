@@ -17,7 +17,9 @@ interface LogoProps {
 
 export const Logo = ({ isMobile, priority = true }: Readonly<LogoProps>) => {
   return (
-    <Link href="/" className="shrink-0" prefetch={false}>
+    // Home is force-dynamic, so default prefetch only grabs its shell; the
+    // hover/touch boost upgrades to a full data prefetch on intent.
+    <Link href="/" className="shrink-0" unstable_dynamicOnHover>
       <Image
         alt="Fake Four Inc. Hand Logo"
         className="mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-10 xl:left-8 xl:size-36"

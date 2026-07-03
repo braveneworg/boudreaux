@@ -5,6 +5,33 @@ import { render, screen } from '@testing-library/react';
 
 import { Logo } from './logo';
 
+// Mock next/link to surface the prefetch posture as data attributes (Link
+// behavior, not DOM attributes — the real component hides them).
+vi.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    prefetch,
+    unstable_dynamicOnHover,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+    prefetch?: boolean;
+    unstable_dynamicOnHover?: boolean;
+  }) => (
+    <a
+      href={href}
+      data-prefetch={prefetch === undefined ? 'default' : String(prefetch)}
+      data-dynamic-on-hover={String(unstable_dynamicOnHover === true)}
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   __esModule: true,
@@ -50,6 +77,14 @@ describe('Logo', () => {
     const img = screen.getByTestId('logo-image');
     expect(link).toHaveAttribute('href', '/');
     expect(link).toContainElement(img);
+  });
+
+  it('keeps default prefetching and boosts the home route on hover', () => {
+    render(<Logo isMobile={false} />);
+
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('data-prefetch', 'default');
+    expect(link).toHaveAttribute('data-dynamic-on-hover', 'true');
   });
 
   it('renders logo image with correct alt text and dimensions', () => {
