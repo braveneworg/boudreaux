@@ -54,6 +54,17 @@ describe('Button', () => {
       expect(button).toHaveClass('hover:bg-foreground', 'hover:text-background');
     });
 
+    it('should press the default variant into its shadow on active', () => {
+      render(<Button>Default</Button>);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass(
+        'active:translate-x-[3px]',
+        'active:translate-y-[3px]',
+        'active:shadow-none'
+      );
+    });
+
     it('should apply destructive variant classes', () => {
       render(<Button variant="destructive">Delete</Button>);
 

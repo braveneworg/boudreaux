@@ -51,6 +51,7 @@ vi.mock('./deferred-download-dialog', () => ({
     artistName,
     releaseId,
     releaseTitle,
+    triggerClassName,
   }: {
     artistName: string;
     releaseId: string;
@@ -63,6 +64,7 @@ vi.mock('./deferred-download-dialog', () => ({
       data-artist={artistName}
       data-release-id={releaseId}
       data-release-title={releaseTitle}
+      className={triggerClassName}
     >
       Download
     </button>
@@ -191,5 +193,14 @@ describe('ReleaseCard', () => {
     const playLink = screen.getByRole('link', { name: /play midnight serenade/i });
     expect(playLink).toHaveClass('shadow-zine-ink');
     expect(playLink).not.toHaveClass('rounded-md');
+  });
+
+  it('should stamp the download trigger with the punk frame', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const downloadTrigger = screen.getByTestId('deferred-download-dialog');
+    expect(downloadTrigger).toHaveClass('border-2', 'border-black', 'shadow-zine-ink');
+    expect(downloadTrigger).not.toHaveClass('rounded-md');
+    expect(downloadTrigger).not.toHaveClass('border-0');
   });
 });

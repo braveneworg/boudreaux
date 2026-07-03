@@ -48,6 +48,10 @@ describe('twMergeZine', () => {
     it('keeps zine shadows with different modifiers', () => {
       expect(twMergeZine('shadow-zine', 'hover:shadow-none')).toBe('shadow-zine hover:shadow-none');
     });
+
+    it('keeps a shadow color alongside a zine shadow', () => {
+      expect(twMergeZine('shadow-zine', 'shadow-red-500')).toBe('shadow-zine shadow-red-500');
+    });
   });
 
   describe('default merge behavior is preserved', () => {
