@@ -36,4 +36,8 @@ describe('isInternalBioUrl', () => {
   it('returns false for a malformed URL', () => {
     expect(isInternalBioUrl('not-a-url')).toBe(false);
   });
+
+  it('treats an own-host non-http scheme as external', () => {
+    expect(isInternalBioUrl('ftp://example.com/x')).toBe(false);
+  });
 });

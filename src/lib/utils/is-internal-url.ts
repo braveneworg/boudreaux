@@ -25,6 +25,7 @@ export const isInternalBioUrl = (url: string): boolean => {
 
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
     const baseHostname = new URL(getApiBaseUrl()).hostname;
     return stripWww(parsed.hostname) === stripWww(baseHostname);
   } catch {
