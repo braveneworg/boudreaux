@@ -299,7 +299,7 @@ const FormSubmitRow = ({
         type="submit"
         disabled={isPending || signupsPaused}
         size="lg"
-        className="shadow-zine-md disabled:shadow-zine-md rounded-none border-2 border-black font-bold tracking-[0.1em] uppercase transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+        className="shadow-zine-md disabled:shadow-zine-md font-bold tracking-[0.1em] uppercase hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] disabled:translate-x-0 disabled:translate-y-0"
       >
         Email me a sign-in link
       </Button>
