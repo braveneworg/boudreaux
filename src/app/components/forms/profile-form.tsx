@@ -444,9 +444,9 @@ export const ProfileForm = (): React.ReactElement => {
   );
 
   return (
-    // Tan accent (matches the PROFILE kraft heading); the punk-styled section
+    // Kraft accent (matches the PROFILE kraft heading); the punk-styled section
     // cards self-separate, so no rules between them.
-    <div className="profile-accent space-y-10">
+    <div className="zine-accent-kraft space-y-10">
       <ProfilePersonalSection
         form={personalProfileForm}
         onSubmit={onSubmitPersonalProfileForm}

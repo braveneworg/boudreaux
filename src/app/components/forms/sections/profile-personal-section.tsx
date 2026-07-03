@@ -33,7 +33,7 @@ export const ProfilePersonalSection = ({
   const isSaving = isPending || isTransitionPending;
 
   return (
-    <Card className="bg-menu-item-tan-100 relative rounded-none border-2 border-black shadow-[6px_6px_0_0_var(--card-accent)]">
+    <Card className="bg-menu-item-tan-100 shadow-zine relative rounded-none border-2 border-black">
       <CardContent className="p-6 sm:p-8">
         <ImageHeading src="/media/headings/PROFILE.webp" alt="profile" imageHeight={480} priority />
 

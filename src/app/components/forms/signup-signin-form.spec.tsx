@@ -756,6 +756,28 @@ describe('SignupSigninForm', () => {
     });
   });
 
+  describe('zine accent styling', () => {
+    afterEach(() => {
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('applies the teal zine accent and offset shadow on the signup path', () => {
+      mockUsePathname.mockReturnValue('/signup');
+      render(<SignupSigninForm {...defaultProps} />);
+
+      const card = screen.getByTestId('card');
+      expect(card).toHaveClass('zine-accent-teal');
+      expect(card).toHaveClass('shadow-zine');
+    });
+
+    it('applies the pink zine accent on the signin path', () => {
+      mockUsePathname.mockReturnValue('/signin');
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.getByTestId('card')).toHaveClass('zine-accent-pink');
+    });
+  });
+
   describe('accessibility', () => {
     it('should have proper labels for form fields', () => {
       render(<SignupSigninForm {...defaultProps} />);

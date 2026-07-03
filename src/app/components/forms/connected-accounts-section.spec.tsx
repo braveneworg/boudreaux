@@ -264,4 +264,14 @@ describe('ConnectedAccountsSection', () => {
       expect(screen.getByRole('heading', { name: /Social accounts/i })).toBeInTheDocument();
     });
   });
+
+  describe('card styling', () => {
+    it('carries the zine offset shadow on the section card', () => {
+      useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
+
+      const { container } = render(<ConnectedAccountsSection />);
+
+      expect(container.querySelector('[data-slot="card"]')).toHaveClass('shadow-zine');
+    });
+  });
 });

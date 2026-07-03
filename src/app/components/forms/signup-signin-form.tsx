@@ -299,7 +299,7 @@ const FormSubmitRow = ({
         type="submit"
         disabled={isPending || signupsPaused}
         size="lg"
-        className="rounded-none border-2 border-black font-bold tracking-[0.1em] uppercase shadow-[4px_4px_0_0_var(--card-accent)] transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0_0_var(--card-accent)]"
+        className="shadow-zine-md disabled:shadow-zine-md rounded-none border-2 border-black font-bold tracking-[0.1em] uppercase transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_0_var(--card-accent)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:translate-x-0 disabled:translate-y-0"
       >
         Email me a sign-in link
       </Button>
@@ -339,7 +339,7 @@ interface OrDividerProps {
 const OrDivider = ({ label }: OrDividerProps): React.ReactElement => (
   <div className="relative my-7 flex items-center gap-3">
     <Separator className="h-0.5 flex-1 bg-black" />
-    <span className="shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase shadow-[2px_2px_0_0_#000]">
+    <span className="shadow-zine-ink shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase">
       {label}
     </span>
     <Separator className="h-0.5 flex-1 bg-black" />
@@ -398,8 +398,8 @@ export const SignupSigninForm = ({
   return (
     <Card
       className={cn(
-        'bg-menu-item-tan-100 relative mx-auto w-full max-w-lg overflow-visible rounded-none border-2 border-black p-0 shadow-[6px_6px_0_0_var(--card-accent)]',
-        isSigningIn ? 'signin-accent' : 'signup-accent'
+        'bg-menu-item-tan-100 shadow-zine relative mx-auto w-full max-w-lg overflow-visible rounded-none border-2 border-black p-0',
+        isSigningIn ? 'zine-accent-pink' : 'zine-accent-teal'
       )}
     >
       {/* Decorative "washi tape" holding the flyer to the wall */}

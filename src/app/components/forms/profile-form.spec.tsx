@@ -228,6 +228,13 @@ describe('ProfileForm', () => {
       expect(screen.getByRole('button', { name: 'Edit Username' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Save Email' })).not.toBeInTheDocument();
     });
+
+    it('wraps the profile sections in the kraft zine accent', () => {
+      const { container } = render(<ProfileForm />);
+
+      const wrapper = container.querySelector('.space-y-10');
+      expect(wrapper).toHaveClass('zine-accent-kraft');
+    });
   });
 
   describe('form population effect', () => {
