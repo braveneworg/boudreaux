@@ -40,4 +40,8 @@ describe('isInternalBioUrl', () => {
   it('treats an own-host non-http scheme as external', () => {
     expect(isInternalBioUrl('ftp://example.com/x')).toBe(false);
   });
+
+  it('treats a mailto url as external', () => {
+    expect(isInternalBioUrl('mailto:a@b.c')).toBe(false);
+  });
 });

@@ -16,7 +16,8 @@ const stripWww = (hostname: string): string =>
  *   own www-stripped hostname (from `getApiBaseUrl()`) → internal
  * - Malformed URLs or any other scheme → external (false)
  *
- * Task 6 will extend this to also strip sanitizer-injected origin prefixes.
+ * Works on server (sanitizer) and client (renderer, editor) —
+ * `getApiBaseUrl()` handles both contexts.
  */
 export const isInternalBioUrl = (url: string): boolean => {
   if (url.startsWith('/') && !url.startsWith('//')) {

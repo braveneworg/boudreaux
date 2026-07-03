@@ -6,6 +6,12 @@ import { sanitizeBioHtml, sanitizeBioHtmlNoImages, sanitizeBioText } from './san
 
 vi.mock('server-only', () => ({}));
 
+// Pin the app's own host so internal/external link branching is deterministic;
+// every `example.com` href below is therefore external.
+vi.mock('@/lib/utils/api-base-url', () => ({
+  getApiBaseUrl: () => 'https://fakefourrecords.com',
+}));
+
 describe('sanitizeBioHtml', () => {
   it('removes script tags and their content', () => {
     const result = sanitizeBioHtml('<p>Hi</p><script>alert(1)</script>');
@@ -31,16 +37,32 @@ describe('sanitizeBioHtml', () => {
     expect(result).toBe('<ul><li>one</li></ul><ol><li>two</li></ol>');
   });
 
-  it('forces rel="nofollow noopener noreferrer" on links', () => {
+  it('forces rel="nofollow noopener noreferrer" on external links', () => {
     const result = sanitizeBioHtml('<a href="https://example.com">link</a>');
 
     expect(result).toContain('rel="nofollow noopener noreferrer"');
   });
 
-  it('forces target="_blank" on links', () => {
+  it('forces target="_blank" on external links', () => {
     const result = sanitizeBioHtml('<a href="https://example.com">link</a>');
 
     expect(result).toContain('target="_blank"');
+  });
+
+  it('keeps an internal link same-tab without rel hardening', () => {
+    const result = sanitizeBioHtml(
+      '<p><a href="/releases/665f" target="_blank" rel="nofollow">Album</a></p>'
+    );
+
+    expect(result).toBe('<p><a href="/releases/665f">Album</a></p>');
+  });
+
+  it('treats an own-host absolute link as internal and unhardens it', () => {
+    const result = sanitizeBioHtml(
+      '<a href="https://www.fakefourrecords.com/artists/x">Artist</a>'
+    );
+
+    expect(result).toBe('<a href="https://www.fakefourrecords.com/artists/x">Artist</a>');
   });
 
   it('drops javascript: scheme links', () => {
@@ -118,6 +140,55 @@ describe('sanitizeBioHtml', () => {
 
     expect(result).not.toContain('onclick');
   });
+
+  it('preserves a bio figure with caption spans and percentage width', () => {
+    const figure =
+      '<figure class="bio-figure bio-figure--left" style="width:45%"><img src="https://cdn.example/x.webp" alt="x" /><figcaption class="bio-figure-caption"><span class="bio-figure-title">T</span></figcaption></figure>';
+
+    const result = sanitizeBioHtml(figure);
+
+    expect(result).toContain('bio-figure--left');
+  });
+
+  it('keeps the integer percentage width on a figure', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:45%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).toContain('width:45%');
+  });
+
+  it('keeps a decimal percentage width on a figure', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:33.5%"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).toContain('width:33.5%');
+  });
+
+  it('keeps the caption span classes', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure"><img src="https://cdn.example/x.webp" alt="" /><figcaption class="bio-figure-caption"><span class="bio-figure-subtitle">S</span><span class="bio-figure-attribution">A</span></figcaption></figure>'
+    );
+
+    expect(result).toContain('bio-figure-subtitle');
+  });
+
+  it('strips a non-percentage figure width', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure" style="width:9999px"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('9999px');
+  });
+
+  it('strips an unknown figure class', () => {
+    const result = sanitizeBioHtml(
+      '<figure class="bio-figure evil-class"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).not.toContain('evil-class');
+  });
 });
 
 describe('sanitizeBioHtmlNoImages', () => {
@@ -138,6 +209,14 @@ describe('sanitizeBioHtmlNoImages', () => {
 
     expect(result).toContain('<strong>Bold</strong>');
     expect(result).toContain('href="https://example.com"');
+  });
+
+  it('strips figures entirely from the short bio', () => {
+    const result = sanitizeBioHtmlNoImages(
+      '<p>a</p><figure class="bio-figure"><img src="https://cdn.example/x.webp" alt="" /></figure>'
+    );
+
+    expect(result).toBe('<p>a</p>');
   });
 
   it('does not strip images from the long bio (sanitizeBioHtml keeps them)', () => {
