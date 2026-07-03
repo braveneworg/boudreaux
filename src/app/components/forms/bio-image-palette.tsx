@@ -19,6 +19,18 @@ import {
 import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
+// Preview-dialog intrinsics when the scrape didn't capture real dimensions —
+// next/image only uses them for the initial aspect-ratio reservation, the
+// `h-auto w-full` styling lets the loaded image keep its natural ratio.
+const PREVIEW_FALLBACK_WIDTH = 800;
+const PREVIEW_FALLBACK_HEIGHT = 600;
+
+/** Real intrinsics from the scrape when present, fallbacks otherwise. */
+const previewDimensions = (image: BioStatusImage): { width: number; height: number } => ({
+  width: image.width ?? PREVIEW_FALLBACK_WIDTH,
+  height: image.height ?? PREVIEW_FALLBACK_HEIGHT,
+});
+
 interface BioImagePaletteProps {
   images: BioStatusImage[];
   onDelete: (imageId: string) => void;
@@ -95,8 +107,7 @@ export const BioImagePalette = ({
                   <Image
                     src={image.url}
                     alt={alt}
-                    width={800}
-                    height={600}
+                    {...previewDimensions(image)}
                     unoptimized
                     className="h-auto w-full rounded-md"
                   />

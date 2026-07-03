@@ -63,7 +63,7 @@ const eslintConfig = [
             '^audio-player-wrapper$',
             '^toaster$',
             '^banner-strip-slide$',
-            '^bio-figure(--?[a-z]+)?$',
+            '^bio-figure(--(left|right|center)|-(caption|title|subtitle|attribution))?$',
           ],
         },
       ],

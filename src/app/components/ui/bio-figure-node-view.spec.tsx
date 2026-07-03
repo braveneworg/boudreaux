@@ -217,6 +217,16 @@ describe('BioFigureNodeView', () => {
     expect(props.updateAttributes).not.toHaveBeenCalled();
   });
 
+  it('stops resizing after a cancelled pointer drag', () => {
+    const props = makeProps();
+    render(<BioFigureNodeView {...props} />);
+    const handle = screen.getByRole('slider', { name: 'Resize image' });
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerCancel(handle, { pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 300, pointerId: 1 });
+    expect(props.updateAttributes).not.toHaveBeenCalled();
+  });
+
   it('stops resizing after the pointer is released', () => {
     const props = makeProps();
     render(<BioFigureNodeView {...props} />);

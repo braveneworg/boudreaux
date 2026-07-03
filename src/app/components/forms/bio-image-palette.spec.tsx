@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
@@ -11,8 +11,24 @@ import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 import { BioImagePalette } from './bio-image-palette';
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <span data-testid="palette-image" data-src={src} data-alt={alt} />
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+  }: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+  }) => (
+    <span
+      data-testid="palette-image"
+      data-src={src}
+      data-alt={alt}
+      data-width={width}
+      data-height={height}
+    />
   ),
 }));
 
@@ -89,6 +105,32 @@ describe('BioImagePalette', () => {
     render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Preview Ceschi Ramos' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('uses the payload dimensions for the preview image', async () => {
+    const sized: BioStatusImage = {
+      id: 'i3',
+      url: 'https://example.com/photo3.jpg',
+      thumbnailUrl: null,
+      title: 'Sized',
+      attribution: null,
+      license: null,
+      sourceUrl: null,
+      width: 1024,
+      height: 768,
+      isPrimary: false,
+    };
+    render(<BioImagePalette images={[sized]} onDelete={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview Sized' }));
+    const dialogImage = within(screen.getByRole('dialog')).getByTestId('palette-image');
+    expect(dialogImage).toHaveAttribute('data-width', '1024');
+  });
+
+  it('falls back to default preview dimensions when the image has none', async () => {
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview image' }));
+    const dialogImage = within(screen.getByRole('dialog')).getByTestId('palette-image');
+    expect(dialogImage).toHaveAttribute('data-height', '600');
   });
 
   it('uses "image" as the preview label when title is absent', () => {

@@ -51,6 +51,7 @@ interface FigureResizeHandlers {
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
@@ -95,7 +96,9 @@ const useFigureResize = ({
     updateAttributes({ width: clampFigureWidth(width + step) });
   };
 
-  return { onPointerDown, onPointerMove, onPointerUp, onKeyDown };
+  // A cancelled touch drag must clear dragRef too, or a later hover/touch
+  // would commit stale resizes — alias cancel to the same teardown as up.
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onKeyDown };
 };
 
 interface FigureCaptionProps {
