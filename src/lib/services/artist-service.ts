@@ -254,7 +254,9 @@ const rehostOne = async (
  * images finalize on the first update. Note: the SSRF guard resolves DNS
  * separately from the re-host fetch (vet-then-fetch), so a DNS-rebinding /
  * dual-stack window remains — an accepted residual risk for this admin-only
- * save path.
+ * save path. Redirects are NOT part of that acceptance: the re-host fetch
+ * refuses them (`redirect: 'error'` in the shared fetch helper), so a vetted
+ * URL cannot 3xx to a private address.
  */
 const finalizeBioImages = async (
   artistId: string,

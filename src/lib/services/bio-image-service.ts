@@ -62,11 +62,17 @@ const resolveExtension = (contentType: string | null, sourceUrl: string): string
   return '.jpg';
 };
 
-/** Shared fetch + validation helper used by both re-host paths. */
+/**
+ * Shared fetch + validation helper used by both re-host paths. Fetches with
+ * `redirect: 'error'` so a source URL vetted by `isPubliclyRoutableUrl` cannot
+ * 3xx to a private/link-local address after the vet (SSRF via redirect). A
+ * legitimately redirecting source simply rejects here — callers treat that
+ * like any other fetch failure (log, skip, retry on the next pass).
+ */
 const fetchImageBuffer = async (
   sourceUrl: string
 ): Promise<{ buffer: Buffer; contentType: string | null }> => {
-  const response = await fetch(sourceUrl);
+  const response = await fetch(sourceUrl, { redirect: 'error' });
   if (!response.ok) throw new Error(`Failed to fetch image (${response.status})`);
   const contentType = response.headers.get('content-type');
   if (contentType && !contentType.startsWith('image/')) {

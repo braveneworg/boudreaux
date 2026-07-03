@@ -196,6 +196,41 @@ describe('BioImageService.rehostWithVariants', () => {
     expect(result.url).toBe(`https://cdn.example.com/${key}`);
   });
 
+  it('fetches with redirect: "error" so a vetted URL cannot 302 elsewhere', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await BioImageService.rehostWithVariants('https://x/a.jpg', 'artist-1', 0);
+
+    expect(fetchMock).toHaveBeenCalledWith('https://x/a.jpg', { redirect: 'error' });
+  });
+
+  it('never uploads when the source responds with a redirect', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    // Mirror undici: under redirect:'error' a 3xx rejects the fetch, while a
+    // fetch that still follows (the pre-fix default) resolves with the image
+    // the redirect target served — which must never reach S3.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        init?.redirect === 'error'
+          ? Promise.reject(new TypeError('fetch failed: unexpected redirect'))
+          : Promise.resolve(imageResponse())
+      )
+    );
+
+    await expect(
+      BioImageService.rehostWithVariants('https://x/redirects.jpg', 'artist-1', 0)
+    ).rejects.toThrow();
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(generateVariantsMock).not.toHaveBeenCalled();
+  });
+
   it('uploads with an octet-stream content type when the header is absent', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', '');
     vi.stubEnv('E2E_MODE', '');
@@ -353,6 +388,27 @@ describe('BioImageService.rehostImages', () => {
     expect(result.results.at(1)).toBeNull();
     // Exactly one S3 upload for the surviving copy.
     expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a redirecting source without uploading anything', async () => {
+    // Same undici-mirroring stub as the rehostWithVariants redirect test:
+    // redirect:'error' rejects on a 3xx; the pre-fix default would follow.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        init?.redirect === 'error'
+          ? Promise.reject(new TypeError('fetch failed: unexpected redirect'))
+          : Promise.resolve(imageResponse())
+      )
+    );
+
+    const result = await BioImageService.rehostImages(
+      [{ url: 'https://x/redirects.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(result.results).toEqual([null]);
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('returns source urls without deduplication in skip-rehost mode', async () => {
