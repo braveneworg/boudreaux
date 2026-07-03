@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { useSearchParams } from 'next/navigation';
 
@@ -14,6 +14,7 @@ import { ChatAuthGate } from './chat-auth-gate';
 import { ChatBody } from './chat-body';
 import { ChatDrawer } from './chat-drawer';
 import { ChatTriggerButton } from './chat-trigger-button';
+import { useChatOpen } from './use-chat-open';
 
 /**
  * Top-level chat entry point — mounted globally in the root layout.
@@ -21,7 +22,7 @@ import { ChatTriggerButton } from './chat-trigger-button';
  * behind authentication so anonymous visitors land on a sign-in CTA.
  */
 export const ChatLauncher = () => {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen } = useChatOpen();
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   // Mention emails link to `/?chat=mention`. When that param is present
@@ -29,8 +30,8 @@ export const ChatLauncher = () => {
   // to the most recent mention of the viewer once messages have loaded.
   const shouldAutoOpenForMention = searchParams.get('chat') === 'mention';
 
-  const handleOpen = useCallback(() => setOpen(true), []);
-  const handleClose = useCallback(() => setOpen(false), []);
+  const handleOpen = useCallback(() => setOpen(true), [setOpen]);
+  const handleClose = useCallback(() => setOpen(false), [setOpen]);
   const isAuthenticated = status === 'authenticated' && Boolean(session);
 
   const autoOpenedRef = useRef(false);
@@ -40,7 +41,7 @@ export const ChatLauncher = () => {
       autoOpenedRef.current = true;
       setOpen(true);
     }
-  }, [shouldAutoOpenForMention, isAuthenticated]);
+  }, [shouldAutoOpenForMention, isAuthenticated, setOpen]);
 
   // Tear down the Pusher socket on sign-out so the now-stale userId no
   // longer holds a presence membership in the chat channel. Without
@@ -54,11 +55,17 @@ export const ChatLauncher = () => {
       setOpen(false);
     }
     wasAuthenticatedRef.current = isAuthenticated;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setOpen]);
 
   return (
     <>
-      <ChatTriggerButton onOpen={handleOpen} />
+      {/* Pages that dock a trigger inside their ZinePanel mark it with
+          data-chat-panel-trigger; this CSS :has() variant hides the global
+          fixed stamp there without client state or a hydration flash. */}
+      <ChatTriggerButton
+        onOpen={handleOpen}
+        className="[body:has([data-chat-panel-trigger])_&]:hidden"
+      />
       <ChatDrawer open={open} onOpenChange={setOpen}>
         {isAuthenticated && session ? (
           <ChatBody session={session} enabled={open} scrollToMention={shouldAutoOpenForMention} />
