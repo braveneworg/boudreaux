@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Settings } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { SignupSettingsService } from '@/lib/services/signup-settings-service';
 
 import { SignupsPausedToggle } from './signups-paused-toggle';
@@ -16,14 +16,15 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
   const envForced = SignupSettingsService.isEnvForced();
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Settings', url: '/admin/settings', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Settings', url: '/admin/settings', isActive: true },
+      ]}
+    >
       <SectionHeader
         icon={Settings}
         title="Settings"
@@ -39,7 +40,7 @@ const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
           <SignupsPausedToggle paused={paused} envForced={envForced} />
         </div>
       </div>
-    </div>
+    </ZinePanel>
   );
 };
 

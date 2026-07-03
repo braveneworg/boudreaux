@@ -11,6 +11,7 @@ import {
   type SocialProvider,
 } from '@/app/components/auth/social-provider-buttons';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
+import type { BreadcrumbItemData } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { FormInput } from '@/app/components/ui/form-input';
@@ -56,6 +57,8 @@ interface SignupSigninFormProps {
    * flyer. The page owns the image so this component stays presentation-only.
    */
   heading?: React.ReactNode;
+  /** Optional breadcrumb trail docked inside the flyer panel. */
+  breadcrumbs?: BreadcrumbItemData[];
   /**
    * Disables the social buttons. The signup page passes
    * `!(termsAccepted && isVerified)` so social sign-in is gated on the same
@@ -387,6 +390,7 @@ export const SignupSigninForm = ({
   callbackURL = '/',
   onSocialError,
   heading,
+  breadcrumbs,
   socialDisabled,
   onBeforeSocialSignIn,
 }: SignupSigninFormProps): React.ReactElement => {
@@ -396,7 +400,7 @@ export const SignupSigninForm = ({
   const signupsPaused = hasTermsAndConditions && signupStatus?.paused === true;
 
   return (
-    <ZinePanel accent={isSigningIn ? 'pink' : 'teal'}>
+    <ZinePanel accent={isSigningIn ? 'pink' : 'teal'} breadcrumbs={breadcrumbs}>
       {/* Everything — heading included — stays centered at the flyer's previous
           width while the panel itself spans the content area */}
       <div className="mx-auto w-full max-w-lg">

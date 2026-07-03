@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { PageSection } from '@/app/components/ui/page-section';
@@ -12,8 +11,10 @@ export default function TermsAndConditionsPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu
-          items={[
+        <ZinePanel
+          chat
+          accent="kraft"
+          breadcrumbs={[
             { anchorText: 'Legal', url: '', isActive: false, isLink: false },
             {
               anchorText: 'Terms and Conditions',
@@ -21,8 +22,7 @@ export default function TermsAndConditionsPage() {
               isActive: true,
             },
           ]}
-        />
-        <ZinePanel accent="kraft">
+        >
           <h1 id="terms-and-conditions">Terms and Conditions</h1>
           <PageSectionParagraph>
             <strong>Last Updated: November 4, 2025</strong>

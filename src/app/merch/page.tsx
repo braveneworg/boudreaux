@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -23,8 +22,7 @@ export default function MerchPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu items={breadcrumbItems} />
-        <ZinePanel accent="mustard">
+        <ZinePanel chat accent="mustard" breadcrumbs={breadcrumbItems}>
           <ZineHeading level={1}>Merch</ZineHeading>
           <p className="mb-6 text-zinc-950">
             The merch table is being set up. Shirts, tapes, and prints are coming soon.

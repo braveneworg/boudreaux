@@ -22,7 +22,6 @@ export default function NotFound(): React.JSX.Element {
             src="/media/headings/NOT-FOUND.webp"
             alt="page not found"
             imageHeight={480}
-            imageClassName="w-full"
             priority
           />
           <p className="mb-6 text-zinc-950">

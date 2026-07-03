@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { Search, Users } from 'lucide-react';
 
 import { ArtistListCard } from '@/app/components/artist-list-card';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
@@ -42,15 +41,17 @@ export default async function ArtistsIndexPage() {
     <PageContainer>
       <ContentContainer>
         <div className="space-y-6">
-          <BreadcrumbMenu items={breadcrumbItems} />
-
-          <ZinePanel accent="hot-pink" contentClassName="space-y-6">
+          <ZinePanel
+            chat
+            accent="hot-pink"
+            contentClassName="space-y-6"
+            breadcrumbs={breadcrumbItems}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ImageHeading
                 src="/media/headings/ARTISTS.webp"
                 alt="artists"
                 imageHeight={480}
-                imageClassName="w-full"
                 priority
               />
               <Button asChild variant="outline" size="sm">

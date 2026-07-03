@@ -637,11 +637,11 @@ describe('TourDetail', () => {
     ]);
   });
 
-  it('keeps the breadcrumb menu outside the zine panel', () => {
+  it('renders the breadcrumb menu inside the zine panel', () => {
     const { container } = render(<TourDetail tour={createMockTour()} />);
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
-    expect(panel).not.toContainElement(screen.getByTestId('breadcrumb-menu'));
+    expect(panel).toContainElement(screen.getByTestId('breadcrumb-menu'));
   });
 
   it('squares the hero image wrapper with punk border and shadow', () => {

@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { ImageHeading } from '@/components/ui/image-heading';
-import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
 import { ContentContainer } from '@/ui/content-container';
 import { Heading } from '@/ui/heading';
 import { PageContainer } from '@/ui/page-container';
@@ -17,13 +16,15 @@ export default function AboutPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu items={[{ anchorText: 'About', url: '/about', isActive: true }]} />
-        <ZinePanel accent="pink">
+        <ZinePanel
+          chat
+          accent="pink"
+          breadcrumbs={[{ anchorText: 'About', url: '/about', isActive: true }]}
+        >
           <ImageHeading
             src="/media/headings/ABOUT.webp"
             alt="about fake four inc."
             imageHeight={480}
-            imageClassName="w-full"
             priority
           />
           <Heading level={2}>Overview</Heading>

@@ -27,13 +27,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps): React.JSX.E
   return (
     <main className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
       <ZinePanel accent="storm">
-        <ImageHeading
-          src="/media/headings/ERROR.webp"
-          alt="error"
-          imageHeight={480}
-          imageClassName="w-full"
-          priority
-        />
+        <ImageHeading src="/media/headings/ERROR.webp" alt="error" imageHeight={480} priority />
         <h2 className="mb-2 text-2xl font-semibold">Something went wrong</h2>
         <p className="text-muted-foreground mb-6">
           An unexpected error occurred. Please try again, or come back later.

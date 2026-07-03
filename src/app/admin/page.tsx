@@ -5,9 +5,9 @@ import Link from 'next/link';
 
 import { LayoutDashboard } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { AdminStatsService } from '@/lib/services/admin-stats-service';
 import type { AdminStats } from '@/lib/services/admin-stats-service';
 
@@ -71,9 +71,12 @@ export default async function AdminDashboardPage() {
   const tiles = buildTiles(stats);
 
   return (
-    <div className="space-y-8">
-      <BreadcrumbMenu items={[{ anchorText: 'Admin', url: '/admin', isActive: true }]} />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-8"
+      breadcrumbs={[{ anchorText: 'Admin', url: '/admin', isActive: true }]}
+    >
       <SectionHeader
         icon={LayoutDashboard}
         title="Dashboard"
@@ -116,6 +119,6 @@ export default async function AdminDashboardPage() {
         <h2 className="text-xl font-semibold">Published vs unpublished</h2>
         <DashboardCharts stats={stats} />
       </section>
-    </div>
+    </ZinePanel>
   );
 }

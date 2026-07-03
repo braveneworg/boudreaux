@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import { notFound } from 'next/navigation';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Heading } from '@/app/components/ui/heading';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { prisma } from '@/lib/prisma';
 
 import { UserDetailView } from './user-detail-view';
@@ -31,19 +31,20 @@ export default async function AdminChatUserPage({ params }: PageProps) {
   const chatDisabled = user.chatUsers.some((cu) => cu.disabled);
 
   return (
-    <div className="container mx-auto">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Chat', url: '/admin/chat', isActive: false },
-          {
-            anchorText: user.username ?? user.email,
-            url: `/admin/chat/users/${userId}`,
-            isActive: true,
-          },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      className="container mx-auto"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Chat', url: '/admin/chat', isActive: false },
+        {
+          anchorText: user.username ?? user.email,
+          url: `/admin/chat/users/${userId}`,
+          isActive: true,
+        },
+      ]}
+    >
       <div className="mt-4 mb-4 px-6">
         <Heading level={1} className="h-auto">
           {user.username ?? user.email}
@@ -61,6 +62,6 @@ export default async function AdminChatUserPage({ params }: PageProps) {
       <div className="px-6">
         <UserDetailView userId={userId} initialChatDisabled={chatDisabled} />
       </div>
-    </div>
+    </ZinePanel>
   );
 }

@@ -14,7 +14,6 @@ import { toast } from 'sonner';
 import type { SocialProvider } from '@/app/components/auth/social-provider-buttons';
 import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -172,10 +171,6 @@ const SignupPage = () => {
 
   return (
     <PageContainer>
-      <BreadcrumbMenu
-        className="mt-2"
-        items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
-      />
       <ContentContainer>
         <div className="mt-6 flex flex-col items-center">
           {magicLinkError !== null && (
@@ -202,6 +197,9 @@ const SignupPage = () => {
                 onSocialError={handleSocialError}
                 socialDisabled={socialDisabled}
                 onBeforeSocialSignIn={isSignupPath ? handleBeforeSocialSignIn : undefined}
+                breadcrumbs={[
+                  { anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true },
+                ]}
                 heading={
                   <ImageHeading
                     src={
@@ -209,7 +207,6 @@ const SignupPage = () => {
                     }
                     alt={isSignupPath ? 'sign up' : 'sign in'}
                     imageHeight={480}
-                    imageClassName="w-full"
                     priority
                   />
                 }

@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
@@ -50,14 +49,12 @@ export default async function ToursPage() {
     <HydrationBoundary state={dehydrate(queryClient)}>
       <PageContainer>
         <ContentContainer>
-          <BreadcrumbMenu items={breadcrumbItems} />
-          <ZinePanel accent="tan">
+          <ZinePanel chat accent="tan" breadcrumbs={breadcrumbItems}>
             <div className="mb-8 space-y-2">
               <ImageHeading
                 src="/media/headings/TOURS.webp"
                 alt="tours"
                 imageHeight={480}
-                imageClassName="w-full"
                 priority
               />
               <p className="text-lg text-zinc-950">

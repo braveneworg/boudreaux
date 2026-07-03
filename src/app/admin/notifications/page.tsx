@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Bell } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 
@@ -41,14 +41,15 @@ export default async function NotificationsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Notifications', url: '/admin/notifications', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Notifications', url: '/admin/notifications', isActive: true },
+      ]}
+    >
       <SectionHeader
         icon={Bell}
         title="Banner Notifications"
@@ -62,6 +63,6 @@ export default async function NotificationsPage() {
           <BannerSlotCard key={slot.slotNumber} slot={slot} />
         ))}
       </div>
-    </div>
+    </ZinePanel>
   );
 }

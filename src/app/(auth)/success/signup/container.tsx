@@ -5,7 +5,6 @@
 
 import { usePathname } from 'next/navigation';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { PageSectionParagraph } from '@/app/components/ui/page-section-paragraph';
@@ -18,17 +17,18 @@ export const SuccessContainer = ({ email }: { email: string }): React.ReactEleme
 
   return (
     <PageContainer>
-      <BreadcrumbMenu
-        className="mt-2"
-        items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
-      />
       <ContentContainer>
-        <ZinePanel accent="kraft">
+        <ZinePanel
+          chat
+          accent="kraft"
+          breadcrumbs={[
+            { anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true },
+          ]}
+        >
           <ImageHeading
             src="/media/headings/SUCCESS.webp"
             alt="success"
             imageHeight={480}
-            imageClassName="w-full"
             priority
           />
           {/* Copy stays centered at reading width inside the full-width panel */}

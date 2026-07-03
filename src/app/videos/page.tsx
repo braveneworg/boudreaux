@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -24,8 +23,7 @@ export default function VideosPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu items={breadcrumbItems} />
-        <ZinePanel accent="kraft">
+        <ZinePanel chat accent="kraft" breadcrumbs={breadcrumbItems}>
           <ZineHeading level={1}>Videos</ZineHeading>
           <p className="mb-6 text-zinc-950">
             Music videos and live session footage are on the way &mdash; we&apos;re digitizing the

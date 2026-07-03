@@ -121,12 +121,12 @@ describe('AboutPage', () => {
       expect(panel).toContainElement(screen.getByTestId('section-community-and-impact'));
     });
 
-    it('keeps the breadcrumb outside the zine panel', () => {
+    it('renders the breadcrumb inside the zine panel', () => {
       const { container } = render(<AboutPage />);
 
       const panel = container.querySelector('[data-slot="zine-panel"]');
       expect(panel).toBeInTheDocument();
-      expect(panel).not.toContainElement(screen.getByTestId('breadcrumb'));
+      expect(panel).toContainElement(screen.getByTestId('breadcrumb'));
     });
   });
 

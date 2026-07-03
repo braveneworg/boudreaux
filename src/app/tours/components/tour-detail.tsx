@@ -6,7 +6,6 @@ import Link from 'next/link';
 
 import { ArrowLeft, Calendar, MapPin, Music, Ticket } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
@@ -66,9 +65,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
 
   return (
     <div className="space-y-6">
-      <BreadcrumbMenu items={breadcrumbItems} />
-
-      <ZinePanel accent="tan" contentClassName="space-y-6">
+      <ZinePanel chat accent="tan" contentClassName="space-y-6" breadcrumbs={breadcrumbItems}>
         {/* Back button */}
         <div>
           <Button asChild variant="ghost" size="sm">

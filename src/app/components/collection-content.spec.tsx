@@ -104,7 +104,7 @@ describe('CollectionContent', () => {
     const panel = container.querySelector('[data-slot="zine-panel"]');
     expect(panel).toHaveClass('zine-accent-green');
     expect(panel).toContainElement(screen.getByRole('img', { name: /my collection/i }));
-    expect(panel).not.toContainElement(screen.getByTestId('breadcrumb'));
+    expect(panel).toContainElement(screen.getByTestId('breadcrumb'));
   });
 
   it('renders the breadcrumb with the collection label', () => {

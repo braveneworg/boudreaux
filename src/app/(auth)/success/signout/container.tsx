@@ -12,13 +12,7 @@ import { Separator } from '@/ui/separator';
 
 export const SuccessContainer = (): React.ReactElement => (
   <ZinePanel accent="kraft">
-    <ImageHeading
-      src="/media/headings/SUCCESS.webp"
-      alt="success"
-      imageHeight={480}
-      imageClassName="w-full"
-      priority
-    />
+    <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
 
     {/* Confirmation copy stays centered at its previous card width inside the
         full-width panel */}

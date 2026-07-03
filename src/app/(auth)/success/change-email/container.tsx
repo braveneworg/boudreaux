@@ -8,13 +8,7 @@ import { ZinePanel } from '@/components/ui/zine-panel';
 
 export const SuccessContainer = ({ email }: { email: string }): React.ReactElement => (
   <ZinePanel accent="kraft">
-    <ImageHeading
-      src="/media/headings/SUCCESS.webp"
-      alt="success"
-      imageHeight={480}
-      imageClassName="w-full"
-      priority
-    />
+    <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
     {/* Copy stays centered at reading width inside the full-width panel */}
     <div className="mx-auto w-full max-w-lg">
       <p>

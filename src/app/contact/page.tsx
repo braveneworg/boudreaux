@@ -11,7 +11,6 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { ContactForm } from '@/app/components/forms/contact-form';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
@@ -148,13 +147,15 @@ const ContactPage = () => {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
-        <ZinePanel accent="orange">
+        <ZinePanel
+          chat
+          accent="orange"
+          breadcrumbs={[{ anchorText: 'Contact', url: '/contact', isActive: true }]}
+        >
           <ImageHeading
             src="/media/headings/CONTACT.webp"
             alt="contact"
             imageHeight={480}
-            imageClassName="w-full"
             priority
           />
           <div className="mb-4 flex flex-col space-y-2">

@@ -3,21 +3,22 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import { MessageSquare } from 'lucide-react';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { SectionHeader } from '@/app/components/ui/section-header';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 
 import { ChatModerationTabs } from './chat-moderation-tabs';
 
 export default function AdminChatPage() {
   return (
-    <div className="space-y-6">
-      <BreadcrumbMenu
-        items={[
-          { anchorText: 'Admin', url: '/admin', isActive: false },
-          { anchorText: 'Chat', url: '/admin/chat', isActive: true },
-        ]}
-      />
-
+    <ZinePanel
+      accent="storm"
+      tape={false}
+      contentClassName="space-y-6"
+      breadcrumbs={[
+        { anchorText: 'Admin', url: '/admin', isActive: false },
+        { anchorText: 'Chat', url: '/admin/chat', isActive: true },
+      ]}
+    >
       <SectionHeader
         icon={MessageSquare}
         title="Chat Moderation"
@@ -25,6 +26,6 @@ export default function AdminChatPage() {
       />
 
       <ChatModerationTabs />
-    </div>
+    </ZinePanel>
   );
 }

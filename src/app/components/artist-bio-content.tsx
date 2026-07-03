@@ -12,7 +12,6 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
-import { BreadcrumbMenu } from './ui/breadcrumb-menu';
 import { ZinePanel } from './ui/zine-panel';
 
 interface ArtistBioContentProps {
@@ -78,9 +77,7 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
 
   return (
     <div className="space-y-6">
-      <BreadcrumbMenu items={breadcrumbItems} />
-
-      <ZinePanel accent="hot-pink" contentClassName="space-y-6">
+      <ZinePanel chat accent="hot-pink" contentClassName="space-y-6" breadcrumbs={breadcrumbItems}>
         <header className="space-y-3">
           <h1 className="text-2xl font-semibold sm:text-3xl">{displayName}</h1>
           {genres.length > 0 && (

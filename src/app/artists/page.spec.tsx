@@ -92,12 +92,12 @@ describe('ArtistsIndexPage', () => {
     expect(panel).toContainElement(headingImage);
   });
 
-  it('should keep the breadcrumb outside the zine panel', async () => {
+  it('should render the breadcrumb inside the zine panel', async () => {
     const Page = await ArtistsIndexPage();
     const { container } = render(Page);
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
-    expect(panel).not.toContainElement(screen.getByTestId('breadcrumb-menu'));
+    expect(panel).toContainElement(screen.getByTestId('breadcrumb-menu'));
   });
 
   it('should render a link to the artist search page', async () => {

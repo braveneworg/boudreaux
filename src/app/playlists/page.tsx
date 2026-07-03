@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -23,8 +22,7 @@ export default function PlaylistsPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <BreadcrumbMenu items={breadcrumbItems} />
-        <ZinePanel accent="teal">
+        <ZinePanel chat accent="teal" breadcrumbs={breadcrumbItems}>
           <ZineHeading level={1}>Playlists</ZineHeading>
           <p className="mb-6 text-zinc-950">
             Curated playlists from the Fake Four family are coming soon.

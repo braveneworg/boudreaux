@@ -16,6 +16,9 @@ import { Switch } from '@/ui/switch';
 
 import type { UseFormReturn } from 'react-hook-form';
 
+/** The profile page's crumb — docked in this first section's panel. */
+const PROFILE_BREADCRUMBS = [{ anchorText: 'Profile', url: '/profile', isActive: true }];
+
 interface ProfilePersonalSectionProps {
   form: UseFormReturn<ProfileFormData>;
   onSubmit: (data: ProfileFormData) => void;
@@ -33,14 +36,8 @@ export const ProfilePersonalSection = ({
   const isSaving = isPending || isTransitionPending;
 
   return (
-    <ZinePanel accent="kraft">
-      <ImageHeading
-        src="/media/headings/PROFILE.webp"
-        alt="profile"
-        imageHeight={480}
-        imageClassName="w-full"
-        priority
-      />
+    <ZinePanel accent="kraft" breadcrumbs={PROFILE_BREADCRUMBS}>
+      <ImageHeading src="/media/headings/PROFILE.webp" alt="profile" imageHeight={480} priority />
 
       <h2 className="font-fake-four-cutout mt-4 mb-4 text-2xl tracking-wide text-black uppercase">
         Personal Information
