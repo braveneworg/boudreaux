@@ -62,9 +62,9 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
             <li key={track.id}>
               <button
                 type="button"
-                className={`w-full cursor-pointer rounded-sm p-3 text-left transition-colors ${
+                className={`w-full cursor-pointer p-3 text-left transition-colors ${
                   index === currentTrack
-                    ? 'border-l-4 border-blue-500 bg-blue-100'
+                    ? 'border-2 border-black bg-[var(--card-accent-soft)]'
                     : 'bg-gray-50 hover:bg-gray-100'
                 }`}
                 onClick={() => playTrack(index)}

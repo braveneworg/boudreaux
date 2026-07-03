@@ -506,6 +506,24 @@ describe('MediaPlayer', () => {
       expect(centeredContainer).toBeInTheDocument();
     });
 
+    it('should render a square ticker without a rounded bottom edge', () => {
+      const mockRelease = createMockRelease([createMockFormatFile()]);
+
+      const featuredArtist = createMockFeaturedArtist({
+        release: mockRelease,
+      });
+
+      const { container } = render(
+        <MediaPlayer>
+          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
+        </MediaPlayer>
+      );
+
+      const ticker = container.querySelector('.bg-zinc-800');
+      expect(ticker).toBeInTheDocument();
+      expect(ticker).not.toHaveClass('rounded-b-lg');
+    });
+
     it('should fall back to artist firstName surname when no displayName on featuredArtist', () => {
       const mockRelease = createMockRelease([createMockFormatFile()]);
 
@@ -855,6 +873,18 @@ describe('MediaPlayer', () => {
       );
 
       expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    });
+
+    it('should render a square play badge without rounded corners', () => {
+      const { container } = render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const badge = container.querySelector('.backdrop-blur-sm');
+      expect(badge).toBeInTheDocument();
+      expect(badge).not.toHaveClass('rounded-full');
     });
   });
 

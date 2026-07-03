@@ -15,6 +15,7 @@ import { ArtistReleasesCarousel } from './artist-releases-carousel';
 import { ReleaseDescription } from './release-description';
 import { ReleasePlayer } from './release-player';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ZinePanel } from './ui/zine-panel';
 
 interface ReleaseDetailContentProps {
   releaseId: string;
@@ -82,16 +83,18 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
   return (
     <>
       <BreadcrumbMenu items={breadcrumbItems} />
-      {otherReleases.length > 0 && (
-        <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
-      )}
-      <ReleasePlayer
-        release={release}
-        autoPlay={autoPlay}
-        releaseId={release.id}
-        releaseTitle={release.title}
-      />
-      <ReleaseDescription description={release.description ?? null} />
+      <ZinePanel accent="cyan" tape={false}>
+        {otherReleases.length > 0 && (
+          <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
+        )}
+        <ReleasePlayer
+          release={release}
+          autoPlay={autoPlay}
+          releaseId={release.id}
+          releaseTitle={release.title}
+        />
+        <ReleaseDescription description={release.description ?? null} />
+      </ZinePanel>
     </>
   );
 };

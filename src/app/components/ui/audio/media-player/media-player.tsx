@@ -96,7 +96,6 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
             return (
               <CarouselItem key={artist.id}>
                 <Image
-                  className="rounded-[0.5rem]"
                   src={buildCdnImageVariantUrl(latestCoverArt, 256)}
                   alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
                   width={144}
@@ -233,10 +232,10 @@ const FeaturedArtistCarousel = memo(
                   <button
                     type="button"
                     onClick={() => handleSelect(featured, index)}
-                    className="group focus:ring-primary relative aspect-square w-full rounded-lg focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                    className="group focus:ring-primary relative aspect-square w-full focus:ring-2 focus:ring-offset-2 focus:outline-none"
                     aria-label={`Select ${displayName}`}
                   >
-                    <div className="absolute inset-0 overflow-hidden rounded-lg">
+                    <div className="absolute inset-0 overflow-hidden">
                       {coverArt && !imageError ? (
                         <Image
                           src={buildCdnImageVariantUrl(coverArt, 384)}
@@ -304,7 +303,7 @@ const CoverArtView = ({
       width={width}
       height={height}
       unoptimized
-      className="aspect-square w-full rounded-lg object-cover"
+      className="aspect-square w-full object-cover"
     />
   );
 };
@@ -433,7 +432,7 @@ const InteractiveCoverArt = ({
     <button
       type="button"
       onClick={handleClick}
-      className={`group relative aspect-square w-full cursor-pointer overflow-hidden rounded-t-lg focus:outline-none ${className ?? ''}`}
+      className={`group relative aspect-square w-full cursor-pointer overflow-hidden focus:outline-none ${className ?? ''}`}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
       {imageError ? (
@@ -494,7 +493,7 @@ const InteractiveCoverArt = ({
         {/* Nearly transparent background */}
         <div className="absolute inset-0 bg-black/10" />
         {/* Icon container */}
-        <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+        <div className="relative z-10 flex h-16 w-16 items-center justify-center bg-white/20 backdrop-blur-sm">
           <OverlayIcon className="h-8 w-8 text-white/30 drop-shadow-md" />
         </div>
       </div>
@@ -589,7 +588,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
   const { displayName, releaseTitle, trackTitle } = resolveInfoTickerTapeDisplay(props);
 
   return (
-    <div className={`w-full rounded-b-lg bg-zinc-800 py-2 ${isPlaying ? '' : 'text-center'}`}>
+    <div className={`w-full bg-zinc-800 py-2 ${isPlaying ? '' : 'text-center'}`}>
       <div className="mx-3 overflow-hidden">
         <div className={`inline-block whitespace-nowrap ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-xs font-medium text-zinc-100">
@@ -729,7 +728,7 @@ const TrackListDrawer = ({
                       {index + 1}.
                     </span>
                     {coverArt && (
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden">
                         <Image
                           src={buildCdnImageVariantUrl(coverArt, 384)}
                           alt={getTrackDisplayTitle(file.title, file.fileName)}
@@ -961,7 +960,7 @@ const FormatFileListDrawer = ({
         <DrawerTrigger asChild>
           <button
             type="button"
-            className="focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 rounded-sm font-semibold text-zinc-950 underline hover:text-zinc-700 focus-visible:ring-2 focus-visible:outline-none"
+            className="focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 font-semibold text-zinc-950 underline hover:text-zinc-700 focus-visible:ring-2 focus-visible:outline-none"
           >
             <Eye className="size-4" aria-hidden="true" />
             View

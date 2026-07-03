@@ -100,6 +100,19 @@ describe('ReleasesPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
+  it('should wrap the heading and releases content in a cyan zine panel', async () => {
+    const Page = await ReleasesPage();
+    const { container } = render(Page);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('zine-accent-cyan');
+
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(panel).toContainElement(headingImage);
+    expect(panel).toContainElement(screen.getByTestId('releases-content'));
+  });
+
   it('should prefetch the first published-releases page as an infinite query', async () => {
     mockGetPublishedReleases.mockResolvedValue({
       success: true,

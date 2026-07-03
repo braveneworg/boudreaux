@@ -29,7 +29,6 @@ export const CarouselNumberUp = ({
         {numberUpSliced.map((artist) => (
           <CarouselItem key={artist.id}>
             <Image
-              className="rounded-[0.5rem]"
               src={
                 artist.releases.sort(
                   (a: Artist['releases'][number], b: Artist['releases'][number]) =>

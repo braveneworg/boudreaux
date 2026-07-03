@@ -167,4 +167,29 @@ describe('ReleaseCard', () => {
     const ordering = playButton.compareDocumentPosition(downloadButton);
     expect(ordering & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('should style the root as a bordered punk photo card', () => {
+    const { container } = render(<ReleaseCard {...defaultProps} />);
+
+    const card = container.firstElementChild;
+    expect(card).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+    expect(card).not.toHaveClass('rounded-lg');
+    expect(card).not.toHaveClass('shadow-sm');
+  });
+
+  it('should frame the cover art wrapper with a black border', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const coverWrapper = screen.getByTestId('release-cover-image').parentElement;
+    expect(coverWrapper).toHaveClass('border-2', 'border-black');
+    expect(coverWrapper).not.toHaveClass('rounded-md');
+  });
+
+  it('should style the Play link as a square ink-stamp', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const playLink = screen.getByRole('link', { name: /play midnight serenade/i });
+    expect(playLink).toHaveClass('shadow-zine-ink');
+    expect(playLink).not.toHaveClass('rounded-md');
+  });
 });
