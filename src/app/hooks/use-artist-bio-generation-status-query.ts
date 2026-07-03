@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import {
   bioGenerationStatusResponseSchema,
-  isTerminalBioStatus,
+  isInFlightBioStatus,
   type BioGenerationStatusResponse,
 } from '@/lib/validation/bio-generation-schema';
 
@@ -38,11 +38,11 @@ const fetchBioGenerationStatus = async (
 };
 
 /**
- * Polls an artist's async bio-generation status. While the job is
- * pending/processing the query refetches on an interval; once it reaches a
- * terminal state (`succeeded`/`failed`) polling stops. Disabled by default —
- * callers enable it after triggering generation (and may keep it enabled to show
- * the last known status).
+ * Polls an artist's async bio-generation status. The query refetches on an
+ * interval only while the job is in flight (`pending`/`processing`); terminal
+ * states (`succeeded`/`failed`) and `null` (never generated) do not poll.
+ * Callers that trigger generation get fresh polling for free: the action sets
+ * `pending` server-side before the client enables/refetches the query.
  *
  * @param artistId - The artist to poll; the query is disabled when empty.
  * @param options - Caller overrides spread into `useQuery` (notably `enabled`);
@@ -64,7 +64,7 @@ export const useArtistBioGenerationStatusQuery = (
     ...options,
     enabled: (options.enabled ?? true) && !!artistId,
     refetchInterval: (query) =>
-      isTerminalBioStatus(query.state.data?.status) ? false : POLL_INTERVAL_MS,
+      isInFlightBioStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
   });
 
   return { isPending, error, data, refetch };

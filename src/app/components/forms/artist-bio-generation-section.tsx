@@ -104,8 +104,9 @@ const BioResultPreview = ({ result }: BioResultPreviewProps) => (
 /**
  * Admin tool that generates an artist's short + long bio plus discovered images
  * and links via the bio-generator Lambda. Reference links and the description
- * are optional context. Renders a preview of the discovered media and supports
- * regenerating when the admin is unhappy with the result.
+ * are optional context. Renders a short-bio preview only — the discovered media
+ * is rendered by the palettes elsewhere on the page — and supports regenerating
+ * when the admin is unhappy with the result.
  *
  * @param artistId - The artist to generate for (edit mode only).
  * @param onGenerated - Receives the sanitized content to populate the form.

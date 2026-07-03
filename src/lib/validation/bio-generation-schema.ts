@@ -135,9 +135,9 @@ export interface GeneratedBioContent {
 export const BIO_STATUSES = ['pending', 'processing', 'succeeded', 'failed'] as const;
 export type BioStatus = (typeof BIO_STATUSES)[number];
 
-/** Terminal states — polling stops once the job reaches one of these. */
-export const isTerminalBioStatus = (status: BioStatus | null | undefined): boolean =>
-  status === 'succeeded' || status === 'failed';
+/** In-flight states — polling continues only while the job is one of these. */
+export const isInFlightBioStatus = (status: BioStatus | null | undefined): boolean =>
+  status === 'pending' || status === 'processing';
 
 /**
  * Result of *triggering* async bio generation. Generation now runs in the

@@ -2,7 +2,33 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { bioGenerationStatusResponseSchema } from './bio-generation-schema';
+import { bioGenerationStatusResponseSchema, isInFlightBioStatus } from './bio-generation-schema';
+
+describe('isInFlightBioStatus', () => {
+  it('returns true for a pending job', () => {
+    expect(isInFlightBioStatus('pending')).toBe(true);
+  });
+
+  it('returns true for a processing job', () => {
+    expect(isInFlightBioStatus('processing')).toBe(true);
+  });
+
+  it('returns false for a succeeded job', () => {
+    expect(isInFlightBioStatus('succeeded')).toBe(false);
+  });
+
+  it('returns false for a failed job', () => {
+    expect(isInFlightBioStatus('failed')).toBe(false);
+  });
+
+  it('returns false when the artist has never generated (null)', () => {
+    expect(isInFlightBioStatus(null)).toBe(false);
+  });
+
+  it('returns false when the status is undefined', () => {
+    expect(isInFlightBioStatus(undefined)).toBe(false);
+  });
+});
 
 describe('bioGenerationStatusResponseSchema content rows', () => {
   const baseContent = {
