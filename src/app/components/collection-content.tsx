@@ -12,6 +12,7 @@ import { useCollectionQuery } from '@/app/hooks/use-collection-query';
 import { CollectionList } from './collection-list';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
 import { ImageHeading } from './ui/image-heading';
+import { ZinePanel } from './ui/zine-panel';
 
 /**
  * Client content wrapper for the collection page.
@@ -56,11 +57,12 @@ export const CollectionContent = () => {
           },
         ]}
       />
-      <div className="px-4 pb-8">
+      <ZinePanel accent="green">
         <ImageHeading
           src="/media/headings/MY-COLLECTION.webp"
           alt="my collection"
           imageHeight={480}
+          imageClassName="w-full"
           priority
         />
         {purchases.length === 0 ? (
@@ -77,7 +79,7 @@ export const CollectionContent = () => {
         ) : (
           <CollectionList purchases={purchases} isAdmin={isAdmin} />
         )}
-      </div>
+      </ZinePanel>
     </>
   );
 };

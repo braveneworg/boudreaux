@@ -92,6 +92,21 @@ describe('CollectionContent', () => {
     expect(headingImage).toHaveAttribute('src', '/media/headings/MY-COLLECTION.webp');
   });
 
+  it('wraps the collection content in a green zine panel with the heading inside', () => {
+    useCollectionQueryMock.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: { purchases: [], isAdmin: false },
+    });
+
+    const { container } = render(<CollectionContent />);
+
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+    expect(panel).toHaveClass('zine-accent-green');
+    expect(panel).toContainElement(screen.getByRole('img', { name: /my collection/i }));
+    expect(panel).not.toContainElement(screen.getByTestId('breadcrumb'));
+  });
+
   it('renders the breadcrumb with the collection label', () => {
     useCollectionQueryMock.mockReturnValue({
       isPending: false,

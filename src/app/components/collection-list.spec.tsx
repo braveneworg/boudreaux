@@ -86,6 +86,17 @@ describe('CollectionList', () => {
     expect(screen.getByText(/\$10\.00/)).toBeInTheDocument();
   });
 
+  it('frames each purchase row in the punk card language', () => {
+    const { container } = render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    const row = container.querySelector('.grid > div');
+    expect(row).toHaveClass('border-2', 'border-black', 'shadow-zine-sm');
+    expect(row).not.toHaveClass('border-zinc-200');
+    expect(row).not.toHaveClass('shadow-sm');
+  });
+
   it('renders cover art image when available', () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
