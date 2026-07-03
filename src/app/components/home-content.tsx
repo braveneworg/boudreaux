@@ -51,7 +51,7 @@ export const HomeContent = () => {
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
-        <section>
+        <section className="zine-accent-yellow">
           <ArtistSearchInput />
           {/* No `priority`: this heading sits below the banner and search
               input, so it's not the LCP. `ImageHeading` is a client component

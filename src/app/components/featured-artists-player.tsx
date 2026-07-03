@@ -163,16 +163,15 @@ const FeaturedArtistDetails = ({
 
   return (
     <div className="flex flex-col items-center">
-      <div className="mx-auto w-full max-w-xl">
+      <div className="shadow-zine mx-auto w-full max-w-xl border-2 border-black">
         {/* Interactive Cover Art — aspect-square container prevents CLS */}
-        <div className="bg-muted aspect-square w-full overflow-hidden rounded-t-lg">
+        <div className="bg-muted aspect-square w-full overflow-hidden">
           {coverArt && (
             <MediaPlayer.InteractiveCoverArt
               src={coverArt}
               alt={displayName}
               isPlaying={isPlaying}
               onTogglePlay={onTogglePlay}
-              className="shadow-lg"
               // No `priority`: `FeaturedArtistsPlayer` is dynamically
               // imported with `ssr: false` (see home-content.tsx), so its
               // `next/image` `priority` preload would be injected client-
@@ -201,7 +200,7 @@ const FeaturedArtistDetails = ({
         </div>
 
         {/* Info Ticker Tape — stable min-height */}
-        <div className="min-h-10 w-full rounded-b-lg bg-zinc-800">
+        <div className="min-h-10 w-full bg-zinc-800">
           {currentTrackTitle && (
             <MediaPlayer.InfoTickerTape
               featuredArtist={selectedArtist}

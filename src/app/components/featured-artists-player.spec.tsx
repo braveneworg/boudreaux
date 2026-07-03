@@ -443,6 +443,31 @@ describe('FeaturedArtistsPlayer', () => {
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
   });
 
+  it('should frame the player unit with a black border and zine shadow', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+    expect(frame).toHaveClass('border-2', 'border-black', 'shadow-zine');
+  });
+
+  it('should square the poster shell and info ticker (no rounded caps)', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    const poster = screen.getByTestId('interactive-cover-art').parentElement;
+    expect(poster).toHaveClass('aspect-square');
+    expect(poster).not.toHaveClass('rounded-t-lg');
+
+    // Select the artist with playable files so the ticker renders its content.
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+    const ticker = screen.getByTestId('info-ticker-tape').parentElement;
+    expect(ticker).toHaveClass('bg-zinc-800');
+    expect(ticker).not.toHaveClass('rounded-b-lg');
+  });
+
   it('should initialize the first artist when featured artists arrive after mount', () => {
     const { rerender } = render(<FeaturedArtistsPlayer featuredArtists={[]} />, {
       wrapper: createWrapper(),

@@ -90,6 +90,13 @@ describe('BannerStrip', () => {
     expect(strip).toHaveClass('hidden', 'md:block');
   });
 
+  it('frames the whole stitched strip as a yellow-accent zine band', () => {
+    const { container } = render(<BannerStrip banners={THREE_BANNERS} />);
+
+    const strip = container.querySelector('section');
+    expect(strip).toHaveClass('zine-accent-yellow', 'border-2', 'border-black', 'shadow-zine-sm');
+  });
+
   it('reserves the native banner aspect ratio on every cell to avoid layout shift', () => {
     const { container } = render(<BannerStrip banners={THREE_BANNERS} />);
 

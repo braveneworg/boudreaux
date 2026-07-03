@@ -165,6 +165,16 @@ describe('HomeContent', () => {
     expect(screen.getByTestId('featured-count')).toHaveTextContent('0');
   });
 
+  it('keys the featured section to the yellow zine accent', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    const section = screen.getByRole('img', { name: /featured artists/i }).closest('section');
+    expect(section).toHaveClass('zine-accent-yellow');
+  });
+
   it('renders both banner treatments so the visible one is correct from first paint', () => {
     useBannersQueryMock.mockReturnValue({
       data: {
