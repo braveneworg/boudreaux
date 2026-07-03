@@ -26,6 +26,11 @@ vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
 }));
 
+const isPubliclyRoutableUrlMock = vi.fn();
+vi.mock('@/lib/utils/ip-guard', () => ({
+  isPubliclyRoutableUrl: (url: string) => isPubliclyRoutableUrlMock(url),
+}));
+
 const mockSharpInstance = {
   resize: vi.fn().mockReturnThis(),
   webp: vi.fn().mockReturnThis(),
@@ -42,6 +47,7 @@ const imageResponse = (): Response =>
   });
 
 beforeEach(() => {
+  isPubliclyRoutableUrlMock.mockResolvedValue(true);
   sendMock.mockResolvedValue({});
   generateVariantsMock.mockResolvedValue({ variantsGenerated: 14, width: 1200, height: 800 });
   mockSharpInstance.toBuffer.mockResolvedValue({
@@ -231,6 +237,33 @@ describe('BioImageService.rehostWithVariants', () => {
     expect(generateVariantsMock).not.toHaveBeenCalled();
   });
 
+  it('rejects a private-address URL before any fetch is issued', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      BioImageService.rehostWithVariants('http://192.168.1.10/a.jpg', 'artist-1', 0)
+    ).rejects.toThrow('not publicly routable');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never uploads a localhost-sourced image', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await expect(
+      BioImageService.rehostWithVariants('http://localhost:8080/a.jpg', 'artist-1', 0)
+    ).rejects.toThrow();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it('uploads with an octet-stream content type when the header is absent', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', '');
     vi.stubEnv('E2E_MODE', '');
@@ -409,6 +442,40 @@ describe('BioImageService.rehostImages', () => {
 
     expect(result.results).toEqual([null]);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('never fetches a lambda-supplied URL that resolves to a private address', async () => {
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await BioImageService.rehostImages(
+      [{ url: 'http://10.0.0.5/internal.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.results).toEqual([null]);
+  });
+
+  it('never uploads when the source is the cloud metadata endpoint', async () => {
+    isPubliclyRoutableUrlMock.mockResolvedValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await BioImageService.rehostImages(
+      [{ url: 'http://169.254.169.254/latest/meta-data', index: 0 }],
+      'artist-1'
+    );
+
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('vets each batched URL through the ip guard before fetching', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    await BioImageService.rehostImages([{ url: 'https://x/a.jpg', index: 0 }], 'artist-1');
+
+    expect(isPubliclyRoutableUrlMock).toHaveBeenCalledWith('https://x/a.jpg');
   });
 
   it('returns source urls without deduplication in skip-rehost mode', async () => {

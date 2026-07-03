@@ -64,8 +64,12 @@ export const isDisallowedAddress = (address: string): boolean => {
 
 /**
  * True when the URL is http(s) and its hostname resolves to a publicly
- * routable address. Guards server-side fetches of admin-supplied URLs
- * (save-time bio image re-hosting) against SSRF into private ranges.
+ * routable address. Guards every server-side bio image re-host fetch against
+ * SSRF into private ranges: enforced centrally inside the shared fetch helper
+ * (`fetchImageBuffer` in bio-image-service), which covers both the
+ * generation-time path (lambda-scraped URLs) and the save-time path
+ * (admin-supplied URLs, which also pre-vet in `rehostOne` for specific
+ * logging).
  */
 export const isPubliclyRoutableUrl = async (url: string): Promise<boolean> => {
   let parsed: URL;

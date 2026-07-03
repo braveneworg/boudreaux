@@ -11,6 +11,7 @@ import sharp from 'sharp';
 
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
+import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
@@ -63,15 +64,27 @@ const resolveExtension = (contentType: string | null, sourceUrl: string): string
 };
 
 /**
- * Shared fetch + validation helper used by both re-host paths. Fetches with
- * `redirect: 'error'` so a source URL vetted by `isPubliclyRoutableUrl` cannot
- * 3xx to a private/link-local address after the vet (SSRF via redirect). A
- * legitimately redirecting source simply rejects here — callers treat that
- * like any other fetch failure (log, skip, retry on the next pass).
+ * Shared fetch + validation helper used by both re-host paths. SSRF defense
+ * lives here so every consumer is covered:
+ *
+ * 1. First hop — `isPubliclyRoutableUrl` vets the URL before any fetch, so a
+ *    source (lambda-scraped or admin-pasted) pointing at a private/link-local
+ *    address (10.x, 192.168.x, 127.x, 169.254.169.254, localhost, …) is
+ *    refused outright.
+ * 2. Redirects — the fetch runs with `redirect: 'error'` so a vetted URL
+ *    cannot 3xx to a private address after the vet (SSRF via redirect).
+ *
+ * A refused or legitimately redirecting source simply rejects here — callers
+ * treat that like any other fetch failure (log, skip, retry on the next pass).
+ * The vet resolves DNS separately from the fetch, so a DNS-rebinding window
+ * remains — an accepted residual risk for these server-side rehost paths.
  */
 const fetchImageBuffer = async (
   sourceUrl: string
 ): Promise<{ buffer: Buffer; contentType: string | null }> => {
+  if (!(await isPubliclyRoutableUrl(sourceUrl))) {
+    throw new Error('Source URL is not publicly routable');
+  }
   const response = await fetch(sourceUrl, { redirect: 'error' });
   if (!response.ok) throw new Error(`Failed to fetch image (${response.status})`);
   const contentType = response.headers.get('content-type');
