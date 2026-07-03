@@ -100,6 +100,34 @@ describe('ReleasesPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
+  it('should cap the heading image width instead of spanning the panel', async () => {
+    const Page = await ReleasesPage();
+    render(Page);
+
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(headingImage).toHaveClass('sm:max-w-md');
+    expect(headingImage).not.toHaveClass('w-full');
+  });
+
+  it('should trail the heading with squares in its background color', async () => {
+    const Page = await ReleasesPage();
+    const { container } = render(Page);
+
+    const trail = container.querySelector('[data-slot="zine-square-trail"]');
+    // Tinted to match the RELEASES wordmark's cyan block; squares read the
+    // color via bg-current. Hidden on mobile where the image fills the row.
+    // The negative margin tucks the scatter under the image's right edge —
+    // past its transparent fringe — so squares start out from behind the
+    // wordmark's color block itself.
+    expect(trail).toHaveClass('text-[#45fefc]', 'hidden', 'sm:block', 'sm:-ml-6');
+
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    const row = trail?.parentElement;
+    expect(row).toHaveClass('sm:flex', 'sm:items-center');
+    expect(row).not.toHaveClass('sm:gap-6');
+    expect(row).toContainElement(headingImage);
+  });
+
   it('should wrap the heading and releases content in a cyan zine panel', async () => {
     const Page = await ReleasesPage();
     const { container } = render(Page);
