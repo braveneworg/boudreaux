@@ -60,8 +60,8 @@ export default function HomeLoading() {
         </div>
         {/* Cover art skeleton — aspect-square with bg-muted */}
         <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse" />
-        {/* Audio controls skeleton — matches bg-zinc-900 min-h-14 */}
-        <div className="mx-auto min-h-14 w-full max-w-xl animate-pulse bg-zinc-900/20" />
+        {/* Audio controls skeleton — matches bg-zinc-900 min-h-16 */}
+        <div className="mx-auto min-h-16 w-full max-w-xl animate-pulse bg-zinc-900/20" />
         {/* InfoTickerTape skeleton — matches bg-zinc-800 min-h-[40px] */}
         <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse bg-zinc-800/20" />
         {/* Share widget skeleton */}

@@ -190,5 +190,5 @@ export const Controls = ({
     }
   }, [audioSrc, autoPlay]);
 
-  return <div ref={containerRef} className="audio-player-wrapper min-h-14" data-vjs-player />;
+  return <div ref={containerRef} className="audio-player-wrapper min-h-16" data-vjs-player />;
 };

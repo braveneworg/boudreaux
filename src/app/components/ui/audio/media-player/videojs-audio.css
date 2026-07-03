@@ -25,7 +25,7 @@
 .video-js {
   min-width: calc(20rem - 4rem);
   width: 100%;
-  height: 3.15rem !important;
+  height: 4rem !important;
 
   button:active {
     /* Better touch feedback */
@@ -46,10 +46,12 @@
       flex-wrap: wrap !important;
       justify-content: center;
       margin: 0;
-      min-height: 3rem;
+      min-height: 4rem;
       opacity: 1 !important;
       position: relative;
-      padding: 0 0 0.25rem 0;
+      /* Vertical air above the progress row and below the transport row —
+         the cluster floats inside the strip instead of touching its edges. */
+      padding: 0.625rem 0;
       transition: none !important;
       visibility: visible !important;
     }
@@ -109,23 +111,23 @@
     & .vjs-skip-next-control {
       order: 4 !important;
       position: relative;
-      top: -2.75rem;
+      top: -2rem;
       line-height: 0.75rem;
       height: 0.75rem;
     }
 
-    /* Bigger play button on mobile */
+    /* Center the play glyph on the transport row */
     & .vjs-play-control .vjs-icon-placeholder {
       position: relative;
       font-size: 1rem;
-      top: -1.55rem;
+      top: -1.3rem;
     }
 
     & .vjs-volume-panel {
       order: 4 !important;
       display: flex;
       position: absolute;
-      top: 1.1rem;
+      top: 1.15rem;
       right: -0.25rem;
       width: calc(var(--audio-control-button-size) - 0.25rem);
       height: calc(var(--audio-control-button-size) - 0.25rem);
@@ -133,6 +135,7 @@
 
     & .vjs-mute-control {
       font-size: 0.666rem;
+      position: relative;
       width: calc(var(--audio-control-button-size) - 0.25rem);
       height: calc(var(--audio-control-button-size) - 0.25rem);
       z-index: 10;
@@ -221,8 +224,8 @@
   .vjs-audio-fast-forward-control,
   .vjs-skip-previous-control,
   .vjs-skip-next-control {
-    width: 2.75rem !important;
-    height: 2.75rem !important;
+    width: 2.25rem !important;
+    height: 2.25rem !important;
     border-radius: 0;
     transition: all 0.2s ease;
     &:hover {
@@ -234,6 +237,25 @@
       opacity: 0.3;
       cursor: not-allowed;
     }
+  }
+
+  /* The boxes above are sized for looks; these invisible extensions keep
+     every effective touch target at ≥44px (the play button's own box is
+     only 40×12px, so it gets the widest reach). */
+  .vjs-audio-rewind-control::after,
+  .vjs-audio-fast-forward-control::after,
+  .vjs-skip-previous-control::after,
+  .vjs-skip-next-control::after,
+  .vjs-mute-control::after {
+    content: '';
+    position: absolute;
+    inset: -0.25rem;
+  }
+
+  .vjs-play-control::after {
+    content: '';
+    position: absolute;
+    inset: -1rem -0.25rem;
   }
 
   .vjs-skip-previous-control {

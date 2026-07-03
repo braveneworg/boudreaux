@@ -186,7 +186,7 @@ const FeaturedArtistDetails = ({
         </div>
 
         {/* Audio Controls — stable min-height prevents CLS during Video.js lazy load */}
-        <div className="min-h-14 w-full bg-zinc-900">
+        <div className="min-h-16 w-full bg-zinc-900">
           {audioSrc && (
             <MediaPlayer.Controls
               audioSrc={audioSrc}
