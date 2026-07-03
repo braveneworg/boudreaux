@@ -53,29 +53,37 @@ export const HomeContent = () => {
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
-        {/* Desktop (lg+) reflows via CSS order/grid: wordmark first, search
-            beneath it, then the player on the left half beside the
-            infinitely-scrolling release headlines on the right half. Mobile
-            keeps the stacked search → heading → player flow. */}
-        <ZinePanel chat accent="yellow" contentClassName="lg:flex lg:flex-col">
+        {/* Desktop (lg+) reflows via explicit grid placement: search on top,
+            then the player spanning the left half beside the wordmark, which
+            caps the infinitely-scrolling release headlines on the right half
+            (top-aligned with the carousel, fixed while the feed pane scrolls
+            internally). Mobile keeps the stacked search → heading → player
+            flow via plain block order. */}
+        <ZinePanel chat accent="yellow">
           {/* Desktop: clear air beneath the search box before the split. */}
           <div className="lg:mb-8">
             <ArtistSearchInput />
           </div>
-          {/* No `priority`: this heading sits below the banner and search
-              input, so it's not the LCP — it lazy-loads normally. Extra
-              vertical air (landing only) separates the search field above
-              from the player below; on desktop the wordmark leads with
-              tighter margins. */}
-          <ImageHeading
-            src="/media/headings/FEATURED.webp"
-            alt="featured artists"
-            imageHeight={480}
-            className="mt-8 mb-6 lg:order-first lg:mt-0 lg:mb-3"
-          />
-          <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-10">
-            <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
-            <ReleaseHeadlines />
+          {/* grid-rows [auto,1fr] keeps the wordmark row content-sized so the
+              tall row-spanning player can't inflate the gap beneath it. */}
+          <div className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-10">
+            {/* No `priority`: this heading sits below the banner and search
+                input, so it's not the LCP — it lazy-loads normally. Extra
+                vertical air (landing only) separates the search field above
+                from the player below; on desktop the wordmark heads the
+                headlines column with ample air before the feed. */}
+            <ImageHeading
+              src="/media/headings/FEATURED.webp"
+              alt="featured artists"
+              imageHeight={480}
+              className="mt-8 mb-6 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:mb-8"
+            />
+            <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
+              <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+            </div>
+            <div className="lg:col-start-2 lg:row-start-2">
+              <ReleaseHeadlines />
+            </div>
           </div>
         </ZinePanel>
       </ContentContainer>

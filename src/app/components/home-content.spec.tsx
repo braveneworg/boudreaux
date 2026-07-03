@@ -194,21 +194,32 @@ describe('HomeContent', () => {
     expect(heading).toHaveClass('mt-8', 'mb-6');
   });
 
-  it('reflows the desktop layout: heading first, player beside headlines', () => {
+  it('reflows the desktop layout: heading atop the headlines column', () => {
     useBannersQueryMock.mockReturnValue({ data: undefined });
     useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
 
     render(<HomeContent />);
 
-    // lg+: CSS order lifts the wordmark above the search field (tighter
-    // vertical air), the search box gets a clear margin before the split,
-    // and the player shares a two-column grid with the release headlines.
-    const heading = screen.getByRole('heading', { name: /featured artists/i });
-    expect(heading).toHaveClass('lg:order-first', 'lg:mt-0', 'lg:mb-3');
+    // lg+: the search box keeps clear air above the split, then a
+    // two-column grid places the wordmark in the right column's first row
+    // (top-aligned with the carousel), the player spanning both rows on
+    // the left, and the headlines feed beneath the wordmark. The feed pane
+    // scrolls internally, so the wordmark stays put.
     expect(screen.getByTestId('artist-search').parentElement).toHaveClass('lg:mb-8');
-    const grid = screen.getByTestId('release-headlines').parentElement;
-    expect(grid).toHaveClass('lg:grid', 'lg:grid-cols-2', 'lg:gap-10');
-    expect(grid).toContainElement(screen.getByTestId('dynamic-featured'));
+    const heading = screen.getByRole('heading', { name: /featured artists/i });
+    expect(heading).toHaveClass('lg:col-start-2', 'lg:row-start-1', 'lg:mt-0', 'lg:mb-8');
+    const grid = heading.parentElement;
+    expect(grid).toHaveClass(
+      'lg:grid',
+      'lg:grid-cols-2',
+      'lg:grid-rows-[auto_1fr]',
+      'lg:items-start',
+      'lg:gap-x-10'
+    );
+    const playerCell = screen.getByTestId('dynamic-featured').parentElement;
+    expect(playerCell).toHaveClass('lg:col-start-1', 'lg:row-start-1', 'lg:row-span-2');
+    const headlinesCell = screen.getByTestId('release-headlines').parentElement;
+    expect(headlinesCell).toHaveClass('lg:col-start-2', 'lg:row-start-2');
   });
 
   it('renders both banner treatments so the visible one is correct from first paint', () => {
