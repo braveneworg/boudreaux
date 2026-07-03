@@ -2,10 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+
+import { twMergeZine } from './zine-tw-merge';
 
 export const cn = (...inputs: ClassValue[]) => {
-  const result = twMerge(clsx(inputs));
+  const result = twMergeZine(clsx(inputs));
   // Deduplicate identical classes while preserving order
   const classes = result.split(' ').filter(Boolean);
   const seen = new Set();
