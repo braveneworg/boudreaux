@@ -50,8 +50,10 @@ test.describe('Admin bio palettes', () => {
 
     await gotoArtistEdit(adminPage);
 
+    // Guard against transient hydration doubles before asserting visibility.
     const tile = adminPage.getByText(doomedLabel);
-    await expect(tile).toBeVisible({ timeout: 15_000 });
+    await expect(tile).toHaveCount(1, { timeout: 15_000 });
+    await expect(tile).toBeVisible();
 
     await adminPage.getByRole('button', { name: `Delete link ${doomedLabel}` }).click();
     await expect(adminPage.getByText(doomedLabel)).toHaveCount(0, { timeout: 15_000 });
@@ -65,9 +67,13 @@ test.describe('Admin bio palettes', () => {
     const attribution = `E2E figure ${randomUUID().slice(0, 8)}`;
 
     // The Bio editor renders first on the form, so its toolbar owns the first
-    // Insert image button (Short Bio and Alternative Bio follow it).
-    const insertImage = adminPage.getByRole('button', { name: 'Insert image' }).first();
-    await expect(insertImage).toBeVisible({ timeout: 15_000 });
+    // Insert image button (Short Bio and Alternative Bio follow it). Guard the
+    // full button count first so a transient hydration double (which would
+    // briefly duplicate the editors) has settled before we click.
+    const insertImageButtons = adminPage.getByRole('button', { name: 'Insert image' });
+    await expect(insertImageButtons).toHaveCount(3, { timeout: 15_000 });
+    const insertImage = insertImageButtons.first();
+    await expect(insertImage).toBeVisible();
     await insertImage.click();
 
     await expect(
@@ -76,7 +82,9 @@ test.describe('Admin bio palettes', () => {
     await adminPage.getByLabel('Attribution', { exact: true }).fill(attribution);
     await adminPage.getByRole('button', { name: 'Insert E2E palette photo' }).click();
 
+    // Same hydration-double guard on the editing surface before reading it.
     const bioEditor = adminPage.getByRole('textbox', { name: 'Bio', exact: true });
+    await expect(bioEditor).toHaveCount(1, { timeout: 15_000 });
     await expect(bioEditor.getByText(attribution)).toBeVisible();
 
     const save = adminPage.getByRole('button', { name: 'Save', exact: true });
@@ -86,8 +94,10 @@ test.describe('Admin bio palettes', () => {
 
     // In the E2E environment no CDN prefix is configured, so save-time
     // re-hosting is a no-op by design — the figure src persists unchanged.
-    // Reload and assert the caption round-tripped through the sanitizer.
+    // Reload, wait out any hydration double, and assert the caption
+    // round-tripped through the sanitizer.
     await adminPage.reload();
+    await expect(bioEditor).toHaveCount(1, { timeout: 15_000 });
     await expect(bioEditor.getByText(attribution).first()).toBeVisible({ timeout: 15_000 });
   });
 
