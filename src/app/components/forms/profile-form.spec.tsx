@@ -229,11 +229,26 @@ describe('ProfileForm', () => {
       expect(screen.queryByRole('button', { name: 'Save Email' })).not.toBeInTheDocument();
     });
 
-    it('wraps the profile sections in the kraft zine accent', () => {
+    it('renders the four profile sections as kraft zine panels', () => {
       const { container } = render(<ProfileForm />);
 
-      const wrapper = container.querySelector('.space-y-10');
-      expect(wrapper).toHaveClass('zine-accent-kraft');
+      const panels = container.querySelectorAll('[data-slot="zine-panel"]');
+      expect(panels).toHaveLength(4);
+      panels.forEach((panel) => expect(panel).toHaveClass('zine-accent-kraft'));
+    });
+
+    it('spaces the three section forms with space-y-6', () => {
+      const { container } = render(<ProfileForm />);
+
+      expect(container.querySelectorAll('form.space-y-6')).toHaveLength(3);
+    });
+
+    it('lays out the personal name grid two-up from sm with no md override', () => {
+      const { container } = render(<ProfileForm />);
+
+      const nameGrid = screen.getByLabelText('First Name').closest('.grid');
+      expect(nameGrid).toHaveClass('sm:grid-cols-2');
+      expect(container.querySelector('.md\\:grid-cols-2')).toBeNull();
     });
   });
 

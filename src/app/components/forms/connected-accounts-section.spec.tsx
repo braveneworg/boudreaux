@@ -265,13 +265,15 @@ describe('ConnectedAccountsSection', () => {
     });
   });
 
-  describe('card styling', () => {
-    it('carries the zine offset shadow on the section card', () => {
+  describe('panel styling', () => {
+    it('carries the zine offset shadow and kraft accent on the section panel', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
       const { container } = render(<ConnectedAccountsSection />);
 
-      expect(container.querySelector('[data-slot="card"]')).toHaveClass('shadow-zine');
+      const panel = container.querySelector('[data-slot="zine-panel"]');
+      expect(panel).toHaveClass('shadow-zine');
+      expect(panel).toHaveClass('zine-accent-kraft');
     });
   });
 });

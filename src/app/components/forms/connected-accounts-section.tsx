@@ -30,9 +30,9 @@ import {
 } from '@/ui/alert-dialog';
 import { Badge } from '@/ui/badge';
 import { Button } from '@/ui/button';
-import { Card, CardContent } from '@/ui/card';
 import { Separator } from '@/ui/separator';
 import { Skeleton } from '@/ui/skeleton';
+import { ZinePanel } from '@/ui/zine-panel';
 
 type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 
@@ -51,7 +51,7 @@ const PROVIDERS: ProviderConfig[] = [
 ];
 
 /**
- * Profile card showing all 4 social providers with their link/unlink status.
+ * Profile panel showing all 4 social providers with their link/unlink status.
  * Calls `authClient.linkSocial` to initiate OAuth redirect, and
  * `authClient.unlinkAccount` (behind an AlertDialog confirm) to disconnect.
  */
@@ -84,79 +84,77 @@ export const ConnectedAccountsSection = (): React.ReactElement => {
   };
 
   return (
-    <Card className="bg-menu-item-tan-100 shadow-zine relative rounded-none border-2 border-black">
-      <CardContent className="p-6 sm:p-8">
-        <h2 className="font-fake-four-cutout mb-4 text-2xl tracking-wide text-black uppercase">
-          Social accounts
-        </h2>
+    <ZinePanel accent="kraft">
+      <h2 className="font-fake-four-cutout mb-4 text-2xl tracking-wide text-black uppercase">
+        Social accounts
+      </h2>
 
-        <Separator className="mb-4" />
+      <Separator className="mb-4" />
 
-        {isLoading && (
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        )}
+      {isLoading && (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      )}
 
-        {!isLoading && error !== null && (
-          <Alert variant="destructive">
-            <AlertDescription>{error.message}</AlertDescription>
-          </Alert>
-        )}
+      {!isLoading && error !== null && (
+        <Alert variant="destructive">
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
+      )}
 
-        {!isLoading && error === null && (
-          <div>
-            {PROVIDERS.map(({ provider, providerId, label, Icon }) => {
-              const isLinked = linkedProviderIds.has(providerId);
+      {!isLoading && error === null && (
+        <div>
+          {PROVIDERS.map(({ provider, providerId, label, Icon }) => {
+            const isLinked = linkedProviderIds.has(providerId);
 
-              return (
-                <div key={provider} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <Icon className="size-5 shrink-0" aria-hidden="true" />
-                    <span className="font-medium">{label}</span>
-                    {isLinked ? (
-                      <Badge variant="secondary">Connected</Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Not connected</span>
-                    )}
-                  </div>
-
+            return (
+              <div key={provider} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <Icon className="size-5 shrink-0" aria-hidden="true" />
+                  <span className="font-medium">{label}</span>
                   {isLinked ? (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          Unlink
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Disconnect {label}?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            You can reconnect it at any time.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => void handleUnlink(providerId, label)}>
-                            Disconnect
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Badge variant="secondary">Connected</Badge>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => handleLink(provider)}>
-                      Link
-                    </Button>
+                    <span className="text-muted-foreground text-sm">Not connected</span>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                {isLinked ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Unlink
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect {label}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          You can reconnect it at any time.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => void handleUnlink(providerId, label)}>
+                          Disconnect
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => handleLink(provider)}>
+                    Link
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </ZinePanel>
   );
 };

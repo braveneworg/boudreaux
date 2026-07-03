@@ -14,9 +14,9 @@ import { useMatchingFieldErrorClear } from '@/app/components/forms/hooks/use-for
 import { ProfileEmailSection } from '@/app/components/forms/sections/profile-email-section';
 import { ProfilePersonalSection } from '@/app/components/forms/sections/profile-personal-section';
 import { ProfileUsernameSection } from '@/app/components/forms/sections/profile-username-section';
-import { Card, CardContent, CardHeader } from '@/app/components/ui/card';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Switch } from '@/app/components/ui/switch';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
@@ -172,19 +172,17 @@ const showUsernameErrorToasts = (errors: Record<string, string[]>): void => {
 };
 
 const ProfileFormSkeleton = (): React.ReactElement => (
-  <div className="space-y-6">
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-96" />
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </CardContent>
-    </Card>
-  </div>
+  <ZinePanel accent="kraft">
+    <div className="mb-6 space-y-2">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-4 w-96" />
+    </div>
+    <div className="space-y-4">
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full" />
+    </div>
+  </ZinePanel>
 );
 
 export const ProfileForm = (): React.ReactElement => {
@@ -444,9 +442,9 @@ export const ProfileForm = (): React.ReactElement => {
   );
 
   return (
-    // Kraft accent (matches the PROFILE kraft heading); the punk-styled section
-    // cards self-separate, so no rules between them.
-    <div className="zine-accent-kraft space-y-10">
+    // Each section rides its own kraft ZinePanel, which carries the accent
+    // and its mt-4/mb-8 margins handle the stacking — no wrapper classes.
+    <div>
       <ProfilePersonalSection
         form={personalProfileForm}
         onSubmit={onSubmitPersonalProfileForm}

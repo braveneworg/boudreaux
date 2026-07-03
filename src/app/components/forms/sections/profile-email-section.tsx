@@ -5,8 +5,8 @@
 
 import { TextField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
-import { Card, CardContent } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
 import type { ChangeEmailFormData } from '@/lib/types/form-data';
 import { Separator } from '@/ui/separator';
 
@@ -36,59 +36,57 @@ export const ProfileEmailSection = ({
   const isSaving = isPending || isTransitionPending;
 
   return (
-    <Card className="bg-menu-item-tan-100 shadow-zine relative rounded-none border-2 border-black">
-      <CardContent className="p-6 sm:p-8">
-        <h2 className="font-fake-four-cutout mb-4 text-2xl tracking-wide text-black uppercase">
-          Email Address
-        </h2>
+    <ZinePanel accent="kraft">
+      <h2 className="font-fake-four-cutout mb-4 text-2xl tracking-wide text-black uppercase">
+        Email Address
+      </h2>
 
-        <Separator className="mb-4" />
+      <Separator className="mb-4" />
 
-        <p className="text-muted-foreground mb-6 text-sm">
-          Manage your email address. This will not be shared publicly with anyone. We may contact
-          you from time to time to keep you up-to-date.
-        </p>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
-            data-testid="form"
-            noValidate
-          >
-            <TextField
-              control={form.control}
-              name="email"
-              label="Email"
-              placeholder="john@example.com"
-              type="email"
-              disabled={!isEditing}
-            />
+      <p className="text-muted-foreground mb-6 text-sm">
+        Manage your email address. This will not be shared publicly with anyone. We may contact you
+        from time to time to keep you up-to-date.
+      </p>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-6"
+          data-testid="form"
+          noValidate
+        >
+          <TextField
+            control={form.control}
+            name="email"
+            label="Email"
+            placeholder="john@example.com"
+            type="email"
+            disabled={!isEditing}
+          />
+          {isEditing && (
+            <>
+              <TextField
+                control={form.control}
+                name="confirmEmail"
+                label="Confirm Email"
+                placeholder="john@example.com"
+                type="email"
+              />
+              <input type="hidden" {...form.register('previousEmail')} />
+            </>
+          )}
+          {emailOptIn}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onEditToggle} data-field="email">
+              {isEditing ? 'Cancel' : 'Edit Email'}
+            </Button>
             {isEditing && (
-              <>
-                <TextField
-                  control={form.control}
-                  name="confirmEmail"
-                  label="Confirm Email"
-                  placeholder="john@example.com"
-                  type="email"
-                />
-                <input type="hidden" {...form.register('previousEmail')} />
-              </>
-            )}
-            {emailOptIn}
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onEditToggle} data-field="email">
-                {isEditing ? 'Cancel' : 'Edit Email'}
+              <Button type="submit" disabled={!isDirty || isSaving}>
+                {isSaving ? 'Saving...' : 'Save Email'}
               </Button>
-              {isEditing && (
-                <Button type="submit" disabled={!isDirty || isSaving}>
-                  {isSaving ? 'Saving...' : 'Save Email'}
-                </Button>
-              )}
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            )}
+          </div>
+        </form>
+      </Form>
+    </ZinePanel>
   );
 };
