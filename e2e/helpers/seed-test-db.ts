@@ -97,6 +97,39 @@ const SIGNOUT_USER = {
 const SIGNOUT_USER_ID = SIGNOUT_USER.id;
 
 /**
+ * Deterministic id of the dedicated bio-palette artist used by
+ * `admin-bio-palettes.spec.ts`. Seeded with `bioStatus: 'succeeded'` plus
+ * persisted bio link/image rows so the palettes render on load without
+ * running a generation.
+ */
+const BIO_PALETTE_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a1';
+
+/**
+ * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
+ * delete spec creates its own uniquely-labelled row per run (and per retry)
+ * so deleting it can never race the shared seeded rows other tests assert on.
+ *
+ * Uses the same isolated E2E Prisma client as the seed (datasourceUrl pinned
+ * to the local Docker Mongo) — never the ambient DATABASE_URL.
+ */
+const createBioPaletteLinkRow = async (label: string): Promise<void> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    await prisma.artistBioLink.create({
+      data: {
+        artistId: BIO_PALETTE_ARTIST_ID,
+        label,
+        url: 'https://example.com/e2e-doomed-link',
+        kind: 'other',
+        sortOrder: 99,
+      },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/**
  * Far-future session expiry so the minted cookies never lapse mid-suite.
  */
 const sessionExpiresAt = (): Date => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -443,6 +476,67 @@ const seedTestDatabase = async () => {
           create: [
             {
               label: 'Wikipedia',
+              url: 'https://en.wikipedia.org/wiki/Music',
+              kind: 'wikipedia',
+              sortOrder: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    // Dedicated artist for the admin bio palette / figure specs
+    // (admin-bio-palettes.spec.ts). bioStatus 'succeeded' + persisted rows make
+    // the palettes render on load without running a generation. createdAt is
+    // pinned far in the past so this artist sorts LAST in the admin list
+    // (createdAt desc) — the bio-generation spec regenerates the FIRST listed
+    // artist, which must never be this one (regeneration replaces the palette
+    // rows). Left unpublished so public artist pages are untouched. The
+    // uploaded Image row feeds the bio editors' insert-image picker; the
+    // ArtistBioImage thumbnail is a data URL so the palette thumb (rendered
+    // `unoptimized`) always loads.
+    await prisma.artist.create({
+      data: {
+        id: BIO_PALETTE_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Palette',
+        slug: 'e2e-bio-palette-artist',
+        displayName: 'E2E Palette Artist',
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+        bioStatus: 'succeeded',
+        bioModel: 'fake/deterministic',
+        bioGeneratedAt: now,
+        shortBio: 'E2E Palette Artist is seeded for the bio palette specs.',
+        // The inline link feeds the link BubbleMenu (Edit/Unlink) spec.
+        bio:
+          '<p>Seeded bio with an ' +
+          '<a href="https://en.wikipedia.org/wiki/Music">E2E bubble link</a>' +
+          ' for the bubble menu spec.</p>',
+        images: {
+          create: [
+            {
+              src: 'https://cdn.fakefourrecords.com/media/artists/e2e-bio-palette/photo.jpg',
+              altText: 'E2E palette photo',
+              sortOrder: 0,
+            },
+          ],
+        },
+        bioImages: {
+          create: [
+            {
+              url: 'https://cdn.fakefourrecords.com/media/artists/e2e-bio-palette/bio/portrait.jpg',
+              thumbnailUrl: PLACEHOLDER_COVER_ART,
+              title: 'E2E palette portrait',
+              attribution: 'E2E seeded attribution',
+              isPrimary: true,
+              sortOrder: 0,
+            },
+          ],
+        },
+        bioLinks: {
+          create: [
+            {
+              label: 'E2E Wikipedia',
               url: 'https://en.wikipedia.org/wiki/Music',
               kind: 'wikipedia',
               sortOrder: 0,
@@ -825,4 +919,11 @@ const seedTestDatabase = async () => {
   }
 };
 
-export { createDisposableSignoutState, seedTestDatabase, SIGNOUT_USER_ID, TEST_USERS };
+export {
+  BIO_PALETTE_ARTIST_ID,
+  createBioPaletteLinkRow,
+  createDisposableSignoutState,
+  seedTestDatabase,
+  SIGNOUT_USER_ID,
+  TEST_USERS,
+};

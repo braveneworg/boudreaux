@@ -37,19 +37,21 @@ test.describe('Admin AI bio generation', () => {
     // text content rather than a form value.
     const regenerate = adminPage.getByRole('button', { name: /regenerate bios/i });
     await expect(regenerate).toBeVisible({ timeout: 30_000 });
-    // Scope to the discovered-links group so the assertion is unambiguous — other
-    // bio editors (long bio, alt bio) also render inline "Wikipedia" links.
+    // The palette renders draggable tiles (not anchors); the delete button's
+    // accessible name uniquely identifies the Wikipedia tile within the group.
     const discoveredLinks = adminPage.getByRole('group', { name: 'Discovered links' });
-    await expect(discoveredLinks.getByRole('link', { name: 'Wikipedia' })).toBeVisible();
+    await expect(
+      discoveredLinks.getByRole('button', { name: 'Delete link Wikipedia' })
+    ).toBeVisible();
     await expect(adminPage.getByRole('textbox', { name: 'Short Bio' })).toContainText(
       /boundary-pushing artist on the roster/
     );
 
     // Regenerate replaces the preview (also async — poll again).
     await regenerate.click();
-    await expect(discoveredLinks.getByRole('link', { name: 'Wikipedia' })).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(
+      discoveredLinks.getByRole('button', { name: 'Delete link Wikipedia' })
+    ).toBeVisible({ timeout: 30_000 });
 
     // Editing a generated field dirties the form so Save (which persists the
     // possibly hand-edited bio) becomes enabled.
