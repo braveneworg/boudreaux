@@ -116,6 +116,22 @@ describe('DesktopMenuDrawer', () => {
     expect(tokens).not.toContain('underline');
   });
 
+  it('opens on Enter and closes on Escape from the keyboard', async () => {
+    const user = userEvent.setup();
+    renderDrawer();
+
+    const trigger = screen.getByRole('button', { name: /music/i });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('link', { name: 'Releases' })).toBeVisible();
+
+    await user.keyboard('{Escape}');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('keeps the trigger text white when open and when focused', () => {
     renderDrawer();
 
