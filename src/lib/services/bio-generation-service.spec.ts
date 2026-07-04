@@ -34,9 +34,11 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
 }));
 
 const findPublishedByArtistMock = vi.fn();
+const findPublishedByArtistWithCoversMock = vi.fn();
 vi.mock('@/lib/repositories/release-repository', () => ({
   ReleaseRepository: {
     findPublishedByArtist: (id: string) => findPublishedByArtistMock(id),
+    findPublishedByArtistWithCovers: (id: string) => findPublishedByArtistWithCoversMock(id),
   },
 }));
 
@@ -191,7 +193,7 @@ describe('BioGenerationService.generateForArtist', () => {
   beforeEach(() => {
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
-    findPublishedByArtistMock.mockResolvedValue([]);
+    findPublishedByArtistWithCoversMock.mockResolvedValue([]);
     // rehostImages returns { results, duplicateAliases } — position-preserving
     rehostImagesMock.mockResolvedValue({
       results: [
@@ -706,8 +708,8 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('appends kind:release links for the artist published releases', async () => {
-    findPublishedByArtistMock.mockResolvedValue([
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
+    findPublishedByArtistWithCoversMock.mockResolvedValue([
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
     ]);
 
     await BioGenerationService.generateForArtist(artist.id);
@@ -723,9 +725,9 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('does not duplicate a release link already present', async () => {
-    findPublishedByArtistMock.mockResolvedValue([
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck' },
+    findPublishedByArtistWithCoversMock.mockResolvedValue([
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
+      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
     ]);
 
     await BioGenerationService.generateForArtist(artist.id);
@@ -738,7 +740,7 @@ describe('BioGenerationService.generateForArtist', () => {
   });
 
   it('persists the discovered links unchanged when the release lookup fails', async () => {
-    findPublishedByArtistMock.mockRejectedValue(new Error('db down'));
+    findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('db down'));
 
     await BioGenerationService.generateForArtist(artist.id);
 
@@ -752,6 +754,69 @@ describe('BioGenerationService.generateForArtist', () => {
         kind: 'wikipedia',
       })
     );
+  });
+
+  describe('internal release grounding and covers', () => {
+    it('passes label releases to the lambda input', async () => {
+      findPublishedByArtistWithCoversMock.mockResolvedValue([
+        {
+          id: 'rel1',
+          title: 'Label Album',
+          releasedOn: new Date('2020-02-02T00:00:00Z'),
+          coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
+        },
+      ]);
+      await BioGenerationService.generateForArtist('a'.repeat(24));
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.releases).toEqual([
+        { title: 'Label Album', releasedOn: '2020-02-02', url: '/releases/rel1' },
+      ]);
+    });
+
+    it('appends internal cover images with kind cover and CDN thumbnail', async () => {
+      findPublishedByArtistWithCoversMock.mockResolvedValue([
+        {
+          id: 'rel1',
+          title: 'Label Album',
+          releasedOn: new Date('2020-02-02T00:00:00Z'),
+          coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
+        },
+      ]);
+      const result = await BioGenerationService.generateForArtist('a'.repeat(24));
+      if (!result.success) throw new Error(result.error);
+      const cover = result.data.images.find((image) => image.kind === 'cover');
+      expect(cover).toMatchObject({
+        url: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
+        title: 'Label Album',
+        alt: 'Label Album album cover',
+      });
+      // Persisted through the repository with sortOrder after discovered images.
+      const persisted = replaceBioContentMock.mock.calls[0][1].images;
+      expect(persisted.at(-1)).toMatchObject({ kind: 'cover', title: 'Label Album' });
+    });
+
+    it('skips cover rows whose url already exists among discovered images', async () => {
+      const coverUrl = 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg';
+      findPublishedByArtistWithCoversMock.mockResolvedValue([
+        {
+          id: 'rel1',
+          title: 'Label Album',
+          releasedOn: new Date('2020-02-02T00:00:00Z'),
+          coverUrl,
+        },
+      ]);
+      // rehostImages returns the same CDN url as the release cover so it's already persisted
+      rehostImagesMock.mockResolvedValueOnce({
+        results: [{ url: coverUrl, width: null, height: null }],
+        duplicateAliases: new Map(),
+      });
+
+      const result = await BioGenerationService.generateForArtist('a'.repeat(24));
+      if (!result.success) throw new Error(result.error);
+
+      const matching = result.data.images.filter((image) => image.url === coverUrl);
+      expect(matching).toHaveLength(1);
+    });
   });
 });
 
