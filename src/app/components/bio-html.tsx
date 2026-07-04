@@ -26,10 +26,12 @@ interface BioHtmlProps {
 const DEFAULT_IMAGE_WIDTH = 1200;
 const DEFAULT_IMAGE_HEIGHT = 900;
 
-/** Static float-class map — Tailwind-visible literals only (never dynamic). */
+/** Static float-class map — Tailwind-visible literals only (never dynamic).
+ *  shape-outside:margin-box + 0.75rem gutters keep prose hugging the figure
+ *  without touching it — deliberately not zero-gap (unreadable). */
 const FIGURE_FLOAT_CLASSES = new Map<string, string>([
-  ['bio-figure--left', 'float-left mr-4 mb-2'],
-  ['bio-figure--right', 'float-right ml-4 mb-2'],
+  ['bio-figure--left', 'float-left [shape-outside:margin-box] mr-3 mb-2'],
+  ['bio-figure--right', 'float-right [shape-outside:margin-box] ml-3 mb-2'],
   ['bio-figure--center', 'mx-auto mb-4'],
 ]);
 

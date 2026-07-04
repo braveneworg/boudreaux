@@ -267,4 +267,21 @@ describe('BioHtml', () => {
 
     expect(screen.getByText('By A')).toBeInTheDocument();
   });
+
+  it('floated figures hug text with shape-outside and tightened gutters', () => {
+    render(
+      <BioHtml html='<figure class="bio-figure bio-figure--left" style="width: 40%"><img src="https://cdn/x.jpg" alt="a" /></figure><p>text</p>' />
+    );
+    const figure = document.querySelector('figure');
+    expect(figure?.className).toContain('[shape-outside:margin-box]');
+    expect(figure?.className).toContain('mr-3');
+    expect(figure?.className).not.toContain('mr-4');
+  });
+
+  it('caption stays fixed at 11px regardless of figure width', () => {
+    render(
+      <BioHtml html='<figure class="bio-figure bio-figure--left" style="width: 20%"><img src="https://cdn/x.jpg" alt="a" /><figcaption class="bio-figure-caption"><span class="bio-figure-attribution">via zine</span></figcaption></figure>' />
+    );
+    expect(document.querySelector('figcaption')?.className).toContain('text-[11px]');
+  });
 });

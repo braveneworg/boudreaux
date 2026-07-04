@@ -24,6 +24,20 @@ import type { LucideIcon } from 'lucide-react';
 
 const KEYBOARD_RESIZE_STEP = 5;
 
+/** Editor-surface float preview — mirrors BioHtml's FIGURE_FLOAT_CLASSES so
+ *  admins see the real wrap while editing. */
+const FLOAT_PREVIEW_CLASSES: Record<BioFigureFloat, string> = {
+  left: 'float-left [shape-outside:margin-box] mr-3 mb-2',
+  right: 'float-right [shape-outside:margin-box] ml-3 mb-2',
+  none: 'mx-auto mb-4',
+};
+
+const previewClassForFloat = (float: BioFigureFloat): string => {
+  if (float === 'left') return FLOAT_PREVIEW_CLASSES.left;
+  if (float === 'right') return FLOAT_PREVIEW_CLASSES.right;
+  return FLOAT_PREVIEW_CLASSES.none;
+};
+
 interface FloatOption {
   value: BioFigureFloat;
   label: string;
@@ -210,6 +224,7 @@ export const BioFigureNodeView = ({
       className={cn(
         'bio-figure group relative my-2',
         classForFloat(float),
+        previewClassForFloat(float),
         selected && 'ring-ring ring-2 ring-offset-2'
       )}
       style={{ width: `${width}%` }}
