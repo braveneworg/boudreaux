@@ -17,12 +17,16 @@ import { test, expect } from '../../fixtures/base.fixture';
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test.describe('Desktop header — primary navigation', () => {
-  test('shows the Playlists nav link', async ({ page }) => {
+  test('shows the Playlists nav link inside the Music drawer', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('banner').getByRole('link', { name: 'Playlists' })).toBeVisible({
-      timeout: 10_000,
-    });
+    // Drawered links only render once their drawer opens — click the Music
+    // trigger first (10s allowance covers the nav's client mount).
+    const musicTrigger = page.getByRole('banner').getByRole('button', { name: 'Music' });
+    await expect(musicTrigger).toBeVisible({ timeout: 10_000 });
+    await musicTrigger.click();
+
+    await expect(page.getByRole('banner').getByRole('link', { name: 'Playlists' })).toBeVisible();
   });
 
   test('hides the My Collection link when signed out', async ({ page }) => {
