@@ -217,10 +217,9 @@ const FeaturedArtistCarousel = memo(
       >
         {/* Negative margins match the panel padding (p-6/sm:p-8) so the
             in-flow arrow tips sit near-flush with the panel edge — the
-            images stay on the content column. On desktop the carousel
-            instead centers at 80% of the split's left column, stepping the
-            thumbnails down ~20%. */}
-        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-[80%]">
+            images stay on the content column. On desktop the carousel fills
+            the split's left column so it matches the headlines width. */}
+        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-full">
           <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
           <CarouselContent className="-ml-6">
             {sortedArtists.map((featured, index) => {
