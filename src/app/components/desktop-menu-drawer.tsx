@@ -61,7 +61,10 @@ export const DesktopMenuDrawer = ({
       </NavigationMenuTrigger>
       <NavigationMenuContent
         className={cn(
-          'bg-menu-item-tan-100 shadow-zine-sm w-56 overflow-visible border-2 border-black p-0 pt-3 md:w-56',
+          // `top-full mt-3` hangs the scrap from the masthead's bottom edge —
+          // shadcn's own positioning is gated behind the `group/navigation-menu`
+          // marker the Root omits, leaving base `top-0` to cover the trigger.
+          'bg-menu-item-tan-100 shadow-zine-sm top-full mt-3 w-56 overflow-visible border-2 border-black p-0 pt-3 md:w-56',
           DRAWER_ACCENT_CLASS.get(group.label)
         )}
       >

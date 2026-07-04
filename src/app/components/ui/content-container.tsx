@@ -14,7 +14,9 @@ export const ContentContainer = ({ children, className }: ContentContainerProps)
   return (
     <section
       className={cn(
-        'flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-1 font-sans',
+        // xl:bg-transparent lets main's zine-page-edges sheet (same zinc-100
+        // tone) paint the column, so its torn-edge tiles stay visible.
+        'flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-1 font-sans xl:bg-transparent',
         className
       )}
       key="client-only"

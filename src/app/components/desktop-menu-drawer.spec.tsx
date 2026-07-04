@@ -73,6 +73,22 @@ describe('DesktopMenuDrawer', () => {
     expect(screen.getByRole('button', { name: /music/i })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('positions the drawer below the trigger, never over it', async () => {
+    const user = userEvent.setup();
+    const { container } = renderDrawer();
+
+    await user.click(screen.getByRole('button', { name: /music/i }));
+    await screen.findByRole('link', { name: 'Releases' });
+
+    // shadcn's own `top-full`/`mt-1.5` are gated behind the
+    // `group/navigation-menu` marker the Root omits, so without these tokens
+    // the panel inherits base `top-0` and covers its trigger.
+    const content = container.querySelector('[data-slot="navigation-menu-content"]');
+    const tokens = (content?.className ?? '').split(/\s+/);
+    expect(tokens).toContain('top-full');
+    expect(tokens).toContain('mt-3');
+  });
+
   it('marks the active child with aria-current=page', async () => {
     const user = userEvent.setup();
     renderDrawer('/releases/some-release');

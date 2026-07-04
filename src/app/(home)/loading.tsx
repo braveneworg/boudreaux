@@ -42,8 +42,9 @@ export default function HomeLoading() {
           </div>
         ))}
       </div>
-      {/* Content area skeleton — matches ContentContainer: bg-zinc-100, border-t, px-2 */}
-      <div className="flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-2 font-sans">
+      {/* Content area skeleton — matches ContentContainer: bg-zinc-100 (xl:
+          transparent over main's zine-page-edges sheet), border-t, px-2 */}
+      <div className="flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-2 font-sans xl:bg-transparent">
         {/* Search input skeleton */}
         <div className="bg-muted mb-0 h-9 w-full animate-pulse" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}

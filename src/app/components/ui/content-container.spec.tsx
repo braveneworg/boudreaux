@@ -59,6 +59,17 @@ describe('ContentContainer', () => {
     expect(section).toHaveClass('bg-zinc-100');
   });
 
+  it('goes transparent at xl so the torn page edges on main show through', () => {
+    render(
+      <ContentContainer>
+        <div>Content</div>
+      </ContentContainer>
+    );
+
+    const section = document.querySelector('section');
+    expect(section).toHaveClass('xl:bg-transparent');
+  });
+
   it('has flex layout classes', () => {
     render(
       <ContentContainer>
