@@ -55,20 +55,6 @@ describe('useNavMenuItems', () => {
       expect(result.current.some((item) => item.name === 'My Collection')).toBe(false);
     });
 
-    it('gives Videos a separator bullet when logged out', () => {
-      const { result } = renderHook(() => useNavMenuItems());
-
-      const videos = result.current.find((item) => item.name === 'Videos');
-      expect(videos?.hasBullet).toBe(true);
-    });
-
-    it('omits the Merch separator bullet when logged out', () => {
-      const { result } = renderHook(() => useNavMenuItems());
-
-      const merch = result.current.find((item) => item.name === 'Merch');
-      expect(merch?.hasBullet).toBe(false);
-    });
-
     it('scopes the Home color to the active and hover states with a matching hover underline', () => {
       const { result } = renderHook(() => useNavMenuItems());
 
@@ -117,15 +103,6 @@ describe('useNavMenuItems', () => {
 
       const names = result.current.map((item) => item.name);
       expect(names.indexOf('My Collection')).toBe(names.indexOf('Releases') + 1);
-    });
-
-    it('flips the bullets so Merch gains and Videos loses its separator', () => {
-      const { result } = renderHook(() => useNavMenuItems());
-
-      const videos = result.current.find((item) => item.name === 'Videos');
-      const merch = result.current.find((item) => item.name === 'Merch');
-      expect(videos?.hasBullet).toBe(false);
-      expect(merch?.hasBullet).toBe(true);
     });
 
     it('scopes the My Collection color to the active and hover states with matching underline colors', () => {

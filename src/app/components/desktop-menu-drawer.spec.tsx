@@ -38,8 +38,8 @@ const MUSIC_GROUP: NavMenuGroup = {
   label: 'Music',
   color: 'hover:text-menu-item-cyan-400',
   items: [
-    { name: 'Releases', href: '/releases', hasBullet: true, color: 'c1' },
-    { name: 'Artists', href: '/artists', hasBullet: true, color: 'c2' },
+    { name: 'Releases', href: '/releases', color: 'c1' },
+    { name: 'Artists', href: '/artists', color: 'c2' },
   ],
 };
 

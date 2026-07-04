@@ -15,7 +15,6 @@ vi.mock('./use-nav-menu-items', () => ({
 const item = (name: string, href: string, color = `${name}-color`) => ({
   name,
   href,
-  hasBullet: true,
   color,
 });
 
