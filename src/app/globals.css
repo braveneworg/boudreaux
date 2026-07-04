@@ -364,13 +364,22 @@ textarea:focus-visible,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cg transform='translate(14 0) scale(-1 1)'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/g%3E%3C/svg%3E");
   background-repeat: repeat-y, repeat-y;
-  background-origin: border-box;
+  /* Pin the teeth to the viewport (fixed = viewport-relative) so the sheet and
+     its content scroll past a stationary torn frame. Each 14px tile sits at the
+     centered column's outer edge — 664px = half the 83rem cap; max()/min() clamp
+     to the viewport edge once the column meets it below 1328px. */
+  background-attachment: fixed, fixed;
   background-position:
-    left top,
-    right top;
+    max(0px, 50vw - 664px) top,
+    min(50vw + 650px, 100vw - 14px) top;
   background-size:
     14px 140px,
     14px 140px;
+  /* Slight, transparent lift so the torn sheet floats above the kraft desk;
+     side-only (offset X, negative spread) to avoid a seam under the header. */
+  box-shadow:
+    9px 0 22px -6px rgb(0 0 0 / 0.28),
+    -9px 0 22px -6px rgb(0 0 0 / 0.28);
 }
 
 /* Banner notification strip slide animations — keyframes are referenced from
