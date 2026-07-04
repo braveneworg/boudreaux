@@ -40,13 +40,8 @@ export default async function ArtistsIndexPage() {
   return (
     <PageContainer>
       <ContentContainer>
-        <div className="space-y-6">
-          <ZinePanel
-            chat
-            accent="hot-pink"
-            contentClassName="space-y-6"
-            breadcrumbs={breadcrumbItems}
-          >
+        <ZinePanel chat accent="hot-pink" breadcrumbs={breadcrumbItems}>
+          <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ImageHeading
                 src="/media/headings/ARTISTS.webp"
@@ -80,8 +75,8 @@ export default async function ArtistsIndexPage() {
                 ))}
               </ul>
             )}
-          </ZinePanel>
-        </div>
+          </div>
+        </ZinePanel>
       </ContentContainer>
     </PageContainer>
   );
