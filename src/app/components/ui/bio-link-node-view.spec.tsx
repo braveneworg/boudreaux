@@ -68,4 +68,11 @@ describe('BioLinkNodeView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Edit link zine' }));
     expect(props.extension.options.onEditRequest).toHaveBeenCalledWith(7);
   });
+
+  it('requests editing when the visible link text is clicked', async () => {
+    const props = makeProps({ href: 'https://z.net', text: 'zine', external: true });
+    render(<BioLinkNodeView {...props} />);
+    await userEvent.click(screen.getByText('zine'));
+    expect(props.extension.options.onEditRequest).toHaveBeenCalledWith(7);
+  });
 });

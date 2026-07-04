@@ -103,49 +103,31 @@ test.describe('Admin bio palettes', () => {
     await expect(bioEditor.getByText(attribution).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test('BioLink NodeView edit dialog and remove control', async ({ adminPage }) => {
+  test('BioLink NodeView click-to-edit dialog and remove', async ({ adminPage }) => {
     await gotoArtistEdit(adminPage);
 
     // The seeded bio carries <a href="https://en.wikipedia.org/wiki/Music">E2E bubble link</a>.
-    // The BioLink TipTap extension (added in B4) parses every <a[href]> into an inline
-    // atom node rendered by BioLinkNodeView — a <span> with `title={href}`, not an <a>.
-    // Controls (Edit / Remove) appear when the node is selected or hovered.
+    // The BioLink TipTap extension parses every <a[href]> into an inline atom node
+    // rendered by BioLinkNodeView — a <span> with `title={href}`, not an <a>. The
+    // anchor text itself is the click-to-edit control; the dialog carries Remove.
     const bioEditor = adminPage.getByRole('textbox', { name: 'Bio', exact: true });
     await expect(bioEditor).toHaveCount(1, { timeout: 15_000 });
 
-    // Locate the BioLink atom node by its unique title attribute (the href value set on
-    // the NodeViewWrapper). Clicking selects the atom so data-selected is set,
-    // making the inline controls display:inline-flex.
+    // Locate the BioLink atom node by its unique title attribute (the href value).
     const bioLinkNode = bioEditor.locator('[title="https://en.wikipedia.org/wiki/Music"]');
     await expect(bioLinkNode).toBeVisible({ timeout: 15_000 });
-    await bioLinkNode.click();
 
-    // Edit control reopens the link dialog prefilled with the existing href.
-    const editButton = adminPage.getByRole('button', {
-      name: 'Edit link E2E bubble link',
-      exact: true,
-    });
-    await expect(editButton).toBeVisible({ timeout: 10_000 });
-    await editButton.click();
-    await expect(adminPage.getByRole('dialog', { name: 'Insert link', exact: true })).toBeVisible();
+    // Clicking the link text opens the edit dialog directly, prefilled with the href.
+    await bioLinkNode.click();
+    const dialog = adminPage.getByRole('dialog', { name: 'Insert link', exact: true });
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
     await expect(adminPage.getByLabel('URL', { exact: true })).toHaveValue(
       'https://en.wikipedia.org/wiki/Music'
     );
-    await adminPage.keyboard.press('Escape');
-    await expect(adminPage.getByRole('dialog', { name: 'Insert link', exact: true })).toHaveCount(
-      0
-    );
 
-    // Remove control deletes the BioLink atom entirely (text is removed with the node).
-    await bioLinkNode.click();
-    const removeButton = adminPage.getByRole('button', {
-      name: 'Remove link E2E bubble link',
-      exact: true,
-    });
-    await expect(removeButton).toBeVisible({ timeout: 10_000 });
-    await removeButton.click();
-
-    // After removal the atom node and its text are gone from the editor.
+    // The dialog's Remove control deletes the BioLink atom entirely (text goes too).
+    await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(bioEditor.getByText('E2E bubble link')).toHaveCount(0);
   });
 });
