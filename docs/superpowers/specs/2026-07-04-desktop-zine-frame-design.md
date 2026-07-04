@@ -90,8 +90,9 @@ additions (the row wraps into extra height rather than colliding).
 - Behavior: opens on **hover and click**; full keyboard support (Enter/Space
   open, arrows navigate, Escape closes), `aria-expanded` on triggers, outside
   click closes. Built on the existing shadcn/Radix menu primitives — no new UI
-  primitive. Panels portal to `body` so the header's `overflow-hidden` never
-  clips them.
+  primitive. Radix NavigationMenu panels render inline (no portal); the header's overflow
+  clipping moves to the backdrop layer (Task: masthead geometry) so drawers are
+  never clipped — same guarantee, different mechanism.
 - Active trail: a trigger renders the active (underlined) state when the current
   route matches any child (e.g. Music underlined on `/releases`), using
   `isActiveHref` semantics. Child items keep `aria-current="page"` styling.
