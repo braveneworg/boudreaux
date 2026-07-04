@@ -104,10 +104,12 @@ const activeYears = (facts: ArtistFacts): string => {
 };
 
 /** Reference URLs the model may inline, derived from explicit sources or links. */
-const referenceUrls = (facts: ArtistFacts): string[] =>
-  facts.sourceUrls?.length
+const referenceUrls = (facts: ArtistFacts): string[] => {
+  const external = facts.sourceUrls?.length
     ? facts.sourceUrls
     : [facts.wikipediaUrl, facts.officialUrl].filter((url): url is string => Boolean(url));
+  return [...external, ...(facts.internalReleaseUrls ?? [])];
+};
 
 /** The available-images line listing 0-indexed image titles, if any. */
 const imagesLine = (facts: ArtistFacts): string =>
@@ -139,6 +141,16 @@ const factLines = (facts: ArtistFacts): string[] => [
   imagesLine(facts),
 ];
 
+/** The authoritative-timeline block, or empty when no chronology exists. */
+const chronologyLine = (facts: ArtistFacts): string =>
+  facts.chronology?.length
+    ? [
+        'CHRONOLOGY (authoritative — every date and release year in the prose MUST come from',
+        'these lines or the labeled facts above, never from memory):',
+        ...facts.chronology,
+      ].join('\n')
+    : '';
+
 /** The long-form source-material block, or a notice that none was found. */
 const sourceMaterialLine = (facts: ArtistFacts): string =>
   facts.sourceText
@@ -168,6 +180,7 @@ const OUTPUT_SPEC_LINES = [
   "  each with VARIED, descriptive anchor text (e.g. the artist's official site, a Wikipedia",
   '  article) — never reuse one phrase and never write "click here".',
   '- Do NOT embed any <img> tags in the short bio — it renders as a text-only lede.',
+  '- Chunk into 2–3 short <p> paragraphs for web readability — never one long block.',
   '- Use <strong>/<em> emphasis where it helps; keep it to prose, never a list of links.',
   '- Do NOT add a "Discovered Links"/"Sources"/"References" section.',
   '',
@@ -177,10 +190,12 @@ const OUTPUT_SPEC_LINES = [
   '- Weave inline <a href="..."> links to the reference URLs throughout: AT LEAST one link in',
   '  EVERY <h2> section. Reference URLs may be reused across sections with different anchor',
   '  text; VARY the wording around each link and never reuse one phrase.',
-  '- Prefer links over bold: when a key name or term is covered by a reference URL, make it an',
-  '  inline link instead of bolding it. ADDITIONALLY bold the pivotal unlinkable facts — key',
-  '  dates, release titles, collaborators, and turning points — with <strong> so they stand out',
-  '  when scanning, and italicize album/song/work titles with <em> wherever they appear.',
+  "- Reference URLs beginning with /releases/ are THIS label's own release pages — link each",
+  '  relevant release title to its /releases/ path at first mention.',
+  '- Emphasis policy — links first: when a key name or term is covered by a reference URL, make',
+  '  it an inline link. Use <em> for album/song/work titles that are NOT linked, and <strong>',
+  '  sparingly for pivotal unlinked facts — key dates, collaborators, turning points. One',
+  '  treatment per phrase: Never stack <strong>, <em>, and <a> on the same phrase.',
   '- Chunk enumerable content into <ul>/<ol> lists for web readability: discographies, timelines,',
   '  collaborator rosters, and similar runs of items belong in lists, not comma prose. Include at',
   '  least one list in the long bio whenever the material supports it.',
@@ -213,6 +228,8 @@ const OUTPUT_SPEC_LINES = [
 const buildUserPrompt = (facts: ArtistFacts): string =>
   [
     ...factLines(facts),
+    '',
+    chronologyLine(facts),
     '',
     sourceMaterialLine(facts),
     '',
@@ -364,6 +381,8 @@ const buildSynthesisUserPrompt = (facts: ArtistFacts, drafts: BioProse[]): strin
   [
     ...factLines(facts),
     '',
+    chronologyLine(facts),
+    '',
     referenceUrlsLine(referenceUrls(facts)),
     '',
     ...drafts.map((draft, i) => `DRAFT ${i + 1} (JSON): ${JSON.stringify(draft)}`),
@@ -451,13 +470,17 @@ export const critiqueProse = (
     {
       systemPrompt: [
         'You are a meticulous fact-checker for artist biographies. Compare the bios against the',
-        'verified facts and source material. Report ONLY concrete violations: claims contradicted',
-        'by the facts, dates preceding the authoritative birth/formation dates, or claims with no',
-        'support in the source material. An empty violations array is the correct answer for clean',
-        'bios. Respond with a single JSON object and nothing else.',
+        'verified facts, the chronology, and the source material. Report ONLY concrete violations:',
+        'claims contradicted by the facts or chronology, dates preceding the authoritative',
+        'birth/formation dates, and specific checkable claims (dates, chart positions, label names,',
+        'collaborations, awards) with no support in the source material, facts, or chronology.',
+        'An empty violations array is the correct answer for clean bios.',
+        'Respond with a single JSON object and nothing else.',
       ].join(' '),
       userPrompt: [
         ...factLines(facts),
+        '',
+        chronologyLine(facts),
         '',
         sourceMaterialLine(facts),
         '',
@@ -515,6 +538,8 @@ export const reviseProse = (
       ].join(' '),
       userPrompt: [
         ...factLines(facts),
+        '',
+        chronologyLine(facts),
         '',
         referenceUrlsLine(referenceUrls(facts)),
         '',
