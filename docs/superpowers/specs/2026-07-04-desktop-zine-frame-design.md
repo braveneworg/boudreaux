@@ -44,7 +44,9 @@ border-b-zinc-50`) all preserved.
   144px), `left-8` (32px) inside the content column, vertically centered across
   the bar: **16px above and below** (`top-4`). Hard ink shadow
   (`shadow-zine-ink`-style, black) so it sits like a sticker. White disc backing
-  kept.
+  kept. Note: the disc carries pre-existing optical margins (`ml-3 mt-px`), so
+  effective placement is 44px from the column edge with 17/15px vertical gaps —
+  part of the approved composite.
 - **Wordmark** (`fake-four-inc-words-sans-hand.webp`, natural 444×40): rendered at
   **48px tall** (+20%), horizontally centered, positioned so the gap above it
   (viewport top → wordmark) equals the gap below it (wordmark → nav top):
@@ -122,8 +124,10 @@ additions (the row wraps into extra height rather than colliding).
 - **Torn edges**: the white content column reads as a torn-out sheet — jagged
   white/kraft tear silhouettes run down both edges of `main`, implemented as
   `repeat-y` SVG data-URI background layers **inside** `main`'s box (≈14px wide,
-  ~140px vertical period, mirrored left/right), with `main` gaining `xl:bg-white`
-  to stay an opaque sheet. No new DOM, nothing escapes `overflow-x-clip`.
+  ~140px vertical period, mirrored left/right). As shipped, `main`'s
+  `zine-page-edges` utility paints `var(--color-zinc-100)` — the column tone the
+  site always had via `ContentContainer`, which goes `xl:bg-transparent` at `xl`
+  so the tear tiles show. No new DOM, nothing escapes `overflow-x-clip`.
 - The content column itself stays exactly as white as today; panels and text
   never sit on texture.
 - Known accepted limitation: at 1280–1366px viewports the gutters are ≤ 43px
@@ -157,9 +161,9 @@ additions (the row wraps into extra height rather than colliding).
 - **`footer.tsx`**: `xl:` background swap to starfield, `xl:border-t-2`,
   content `xl:max-w-7xl`.
 - **`layout.tsx` + `globals.css`**: `zine-desk` utility (kraft + grain) applied
-  to `body` at `xl`; `zine-page-edges` utility (white fill + torn-edge layers)
-  applied to `main` at `xl`. Pure CSS/SVG data-URIs — no image requests, no JS,
-  no animation.
+  to `body` at `xl`; `zine-page-edges` utility (zinc-100 fill + torn-edge
+  layers) applied to `main` at `xl`. Pure CSS/SVG data-URIs — no image requests,
+  no JS, no animation.
 - **Banner strip/ticker**: untouched except spacing context.
 - **Assets**: zero new downloads. The footer reuses the header's already-cached
   starfield tile; grain and tears are inline data-URIs.
