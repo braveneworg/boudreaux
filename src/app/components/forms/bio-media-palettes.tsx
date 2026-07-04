@@ -84,7 +84,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
       {content.links.length > 0 && (
         <BioLinkPalette
           links={content.links}

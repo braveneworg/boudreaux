@@ -100,41 +100,51 @@ export const ArtistBioSection = ({
   bioEditorImages,
   onBioGenerated,
 }: ArtistBioSectionProps): JSX.Element => (
-  <BioEditorRegistryProvider>
-    <section className="space-y-4">
-      <h2 className="font-semibold">Biography</h2>
+  <section className="space-y-4">
+    <h2 className="font-semibold">Biography</h2>
 
-      {/* AI Bio Generation — first action; edit mode only (needs a persisted
-          artist). Populates the bio fields below. The palettes surface the
-          persisted discovered links/images so tiles drag into the editors. */}
-      {isEditMode && artistId && (
-        <>
-          <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
-          <BioMediaPalettes artistId={artistId} />
-        </>
-      )}
+    {/* AI Bio Generation — edit mode only (needs a persisted artist).
+        Populates the bio fields below. */}
+    {isEditMode && artistId && (
+      <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
+    )}
 
-      <BioEditorField
-        control={control}
-        name="bio"
-        label="Bio"
-        ariaLabel="Bio"
-        images={bioEditorImages}
-      />
-      <BioEditorField
-        control={control}
-        name="shortBio"
-        label="Short Bio"
-        ariaLabel="Short Bio"
-        images={bioEditorImages}
-      />
-      <BioEditorField
-        control={control}
-        name="altBio"
-        label="Alternative Bio"
-        ariaLabel="Alternative Bio"
-        images={bioEditorImages}
-      />
-    </section>
-  </BioEditorRegistryProvider>
+    {/* xl+: editors left (~2/3), palettes in a sticky right rail.
+        below xl: palettes above editors (DOM order matches visual order). */}
+    <BioEditorRegistryProvider>
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+        {isEditMode && artistId && (
+          <div
+            data-testid="bio-media-rail"
+            className="xl:sticky xl:top-24 xl:order-2 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
+          >
+            <BioMediaPalettes artistId={artistId} />
+          </div>
+        )}
+        <div data-testid="bio-editors-column" className="space-y-4 xl:order-1">
+          <BioEditorField
+            control={control}
+            name="bio"
+            label="Bio"
+            ariaLabel="Bio"
+            images={bioEditorImages}
+          />
+          <BioEditorField
+            control={control}
+            name="shortBio"
+            label="Short Bio"
+            ariaLabel="Short Bio"
+            images={bioEditorImages}
+          />
+          <BioEditorField
+            control={control}
+            name="altBio"
+            label="Alternative Bio"
+            ariaLabel="Alternative Bio"
+            images={bioEditorImages}
+          />
+        </div>
+      </div>
+    </BioEditorRegistryProvider>
+  </section>
 );

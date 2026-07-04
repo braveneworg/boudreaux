@@ -80,6 +80,12 @@ beforeEach(() => {
 });
 
 describe('BioMediaPalettes', () => {
+  it('uses xl:grid-cols-1 so palettes stack in the sticky rail', () => {
+    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect((container.firstChild as HTMLElement).className).toContain('xl:grid-cols-1');
+  });
+
   it('reads the status for the given artist', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
 
