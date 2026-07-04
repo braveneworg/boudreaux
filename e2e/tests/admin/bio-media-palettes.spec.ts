@@ -52,7 +52,7 @@ test.describe('Admin bio media palettes', () => {
     await expect(linksGroup.getByText('Discovered links (', { exact: false })).toBeVisible();
 
     const imagesGroup = adminPage.getByRole('group', { name: 'Discovered images' });
-    await expect(imagesGroup).toHaveCount(1);
+    await expect(imagesGroup).toHaveCount(1, { timeout: 15_000 });
     await expect(imagesGroup).toBeVisible();
     await expect(imagesGroup.getByText('Discovered images (', { exact: false })).toBeVisible();
 
@@ -74,10 +74,14 @@ test.describe('Admin bio media palettes', () => {
     await adminPage
       .getByRole('button', { name: 'Insert link An interview with the artist' })
       .click();
-    // The BioLink NodeView renders as an inline <span> in the editor; assert
-    // on the visible anchor text rather than a role='link' (which the atom
-    // node's span does not have).
-    await expect(bioEditor.getByText('An interview with the artist')).toBeVisible();
+    // The BioLink NodeView renders as an inline <span data-testid="bio-link-node">
+    // in the editor. Asserting on the NodeView wrapper (not just the text)
+    // proves the atom node was inserted rather than raw text.
+    await expect(
+      bioEditor.locator('[data-testid="bio-link-node"]').filter({
+        hasText: 'An interview with the artist',
+      })
+    ).toHaveCount(1);
 
     // 5. Click-to-insert the cover image ("Fixture Album") into the Bio editor.
     //    The image palette is independent of the link filter — no need to clear it.
@@ -96,9 +100,13 @@ test.describe('Admin bio media palettes', () => {
     await adminPage.reload();
     // Wait out any transient hydration doubles on the editor before reading it.
     await expect(bioEditor).toHaveCount(1, { timeout: 15_000 });
-    await expect(bioEditor.getByText('An interview with the artist')).toBeVisible({
-      timeout: 15_000,
-    });
+    // Assert the NodeView wrapper (not just text) to confirm the bioLink atom
+    // was correctly round-tripped through the sanitizer and re-parsed.
+    await expect(
+      bioEditor.locator('[data-testid="bio-link-node"]').filter({
+        hasText: 'An interview with the artist',
+      })
+    ).toHaveCount(1, { timeout: 15_000 });
     await expect(bioEditor.locator('img[alt="Fixture Album cover art"]')).toBeVisible({
       timeout: 15_000,
     });

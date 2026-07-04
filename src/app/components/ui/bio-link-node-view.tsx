@@ -33,6 +33,7 @@ export const BioLinkNodeView = ({
     <NodeViewWrapper
       as="span"
       data-drag-handle
+      data-testid="bio-link-node"
       data-selected={selected ? true : undefined}
       className={cn(
         'group/biolink relative inline-flex cursor-grab items-baseline gap-0.5',

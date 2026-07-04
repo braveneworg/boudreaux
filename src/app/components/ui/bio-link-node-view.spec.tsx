@@ -33,6 +33,13 @@ const makeProps = (attrs: LinkAttrs): NodeViewProps =>
   }) as unknown as NodeViewProps;
 
 describe('BioLinkNodeView', () => {
+  it('renders the NodeViewWrapper with data-testid="bio-link-node"', () => {
+    render(
+      <BioLinkNodeView {...makeProps({ href: 'https://z.net', text: 'zine', external: false })} />
+    );
+    expect(document.querySelector('[data-testid="bio-link-node"]')).toBeInTheDocument();
+  });
+
   it('renders underlined anchor text with the external icon when external', () => {
     render(
       <BioLinkNodeView {...makeProps({ href: 'https://z.net', text: 'zine', external: true })} />

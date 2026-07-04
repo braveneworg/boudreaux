@@ -215,7 +215,15 @@ describe('BioMediaPalettes', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
     await userEvent.click(screen.getByRole('button', { name: 'Insert link Wikipedia' }));
 
-    expect(chain.insertContent).toHaveBeenCalledWith(expect.objectContaining({ type: 'bioLink' }));
+    expect(chain.insertContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'bioLink',
+        attrs: expect.objectContaining({
+          href: LINK_ROW.url,
+          text: LINK_ROW.label,
+        }),
+      })
+    );
     expect(run).toHaveBeenCalled();
   });
 
