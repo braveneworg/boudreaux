@@ -136,7 +136,11 @@ describe('RootLayout', () => {
         'flex',
         'flex-col',
         'w-full',
-        'xl:max-w-7xl',
+        // Sheet widened by its own xl padding (xl:px-6) so the torn edges clear
+        // the content; the cap grows to match (7xl + 2×px-6 = 83rem), keeping
+        // the content column itself at 80rem.
+        'xl:max-w-[83rem]',
+        'xl:px-6',
         'grow',
         'overflow-x-clip'
       );

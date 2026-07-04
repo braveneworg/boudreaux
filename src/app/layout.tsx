@@ -128,7 +128,7 @@ export default function RootLayout({
           <main
             id={MAIN_CONTENT_ID}
             tabIndex={-1}
-            className="xl:zine-page-edges mx-auto flex w-full grow flex-col overflow-x-clip outline-none xl:max-w-7xl"
+            className="xl:zine-page-edges mx-auto flex w-full grow flex-col overflow-x-clip outline-none xl:max-w-[83rem] xl:px-6"
           >
             {children}
           </main>
