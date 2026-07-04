@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useState } from 'react';
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { RichTextEditor, type RichTextEditorImage } from './rich-text-editor';
@@ -251,6 +251,39 @@ describe('RichTextEditor toolbar handlers and branches', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'true')
+    );
+  });
+
+  it('activates the image toolbar button when a figure node is selected', async () => {
+    let editorInstance: Editor | null = null;
+    const Controlled = () => {
+      const [value, setValue] = useState(
+        '<figure class="bio-figure bio-figure--center" style="width:60%"><img src="https://cdn.fakefourrecords.com/x.jpg" alt="p"></figure>'
+      );
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={setValue}
+          images={IMAGES}
+          ariaLabel="Bio"
+          onEditorReady={(instance) => {
+            editorInstance = instance;
+          }}
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    act(() => {
+      editorInstance?.commands.setNodeSelection(0);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Insert image' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
     );
   });
 

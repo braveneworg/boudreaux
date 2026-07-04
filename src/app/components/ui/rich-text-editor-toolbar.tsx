@@ -43,6 +43,7 @@ export interface ToolbarState {
   isBold: boolean;
   isItalic: boolean;
   isLink: boolean;
+  isImage: boolean;
   isHeading2: boolean;
   isHeading3: boolean;
   isBulletList: boolean;
@@ -178,8 +179,9 @@ export const RichTextEditorToolbar = ({
       <Button
         type="button"
         size="icon"
-        variant="ghost"
+        variant={activeVariant(toolbarState.isImage)}
         aria-label="Insert image"
+        aria-pressed={toolbarState.isImage}
         disabled={images.length === 0}
         onClick={onOpenImage}
       >
