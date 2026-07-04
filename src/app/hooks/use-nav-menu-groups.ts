@@ -10,8 +10,6 @@ import { useNavMenuItems, type NavMenuItem } from '@/hooks/use-nav-menu-items';
 export interface NavMenuGroup {
   /** Trigger label rendered in the nav row. */
   label: string;
-  /** Tailwind hover/active classes — the group wears its lead item's color. */
-  color: string;
   /** Drawer links, in spec order. */
   items: NavMenuItem[];
 }
@@ -34,7 +32,7 @@ const pickGroup = (
     return found ? [found] : [];
   });
   const [lead] = items;
-  return lead ? [{ kind: 'group', group: { label, color: lead.color, items } }] : [];
+  return lead ? [{ kind: 'group', group: { label, items } }] : [];
 };
 
 const pickLink = (href: string, byHref: Map<string, NavMenuItem>): NavMenuEntry[] => {

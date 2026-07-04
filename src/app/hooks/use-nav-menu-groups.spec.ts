@@ -68,17 +68,6 @@ describe('useNavMenuGroups', () => {
     expect(label.group.items.map((i) => i.name)).toEqual(['Tours', 'Merch', 'About']);
   });
 
-  it('gives each trigger its lead item color (Music→Releases, Label→Tours)', () => {
-    mockUseNavMenuItems.mockReturnValue(FLAT_SIGNED_OUT);
-
-    const { result } = renderHook(() => useNavMenuGroups());
-    const [, music, label] = result.current;
-
-    if (music?.kind !== 'group' || label?.kind !== 'group') throw new Error('expected groups');
-    expect(music.group.color).toBe('releases-cyan');
-    expect(label.group.color).toBe('tours-tan');
-  });
-
   it('inserts My Collection top-level before Contact Us when present', () => {
     mockUseNavMenuItems.mockReturnValue([
       ...FLAT_SIGNED_OUT.slice(0, 3),

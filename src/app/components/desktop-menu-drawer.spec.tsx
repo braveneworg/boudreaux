@@ -36,7 +36,6 @@ vi.mock('next/link', () => ({
 
 const MUSIC_GROUP: NavMenuGroup = {
   label: 'Music',
-  color: 'hover:text-menu-item-cyan-400',
   items: [
     { name: 'Releases', href: '/releases', color: 'c1' },
     { name: 'Artists', href: '/artists', color: 'c2' },
@@ -100,13 +99,15 @@ describe('DesktopMenuDrawer', () => {
     expect(screen.getByRole('link', { name: 'Artists' })).not.toHaveAttribute('aria-current');
   });
 
-  it('underlines the trigger when a child route is active (active trail)', () => {
+  it('underlines the trigger in the group color when a child route is active (active trail)', () => {
     renderDrawer('/artists/123');
 
     // Token-level check — a substring match would false-positive on
-    // `underline-offset-8`.
+    // `underline-offset-8`. The active trail carries the group color so the
+    // label and its underline match (underline follows currentColor).
     const tokens = screen.getByRole('button', { name: /music/i }).className.split(/\s+/);
     expect(tokens).toContain('underline');
+    expect(tokens).toContain('text-menu-item-cyan-400');
   });
 
   it('does not underline the trigger on unrelated routes', () => {
@@ -132,17 +133,35 @@ describe('DesktopMenuDrawer', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('keeps the trigger text white when open and when focused', () => {
+  it('keeps the trigger legible on the black masthead when open and focused', () => {
     renderDrawer();
 
-    // shadcn's trigger cva ships `data-[state=open]:text-accent-foreground`
-    // and `focus:text-accent-foreground` (near-black); without competing
-    // tokens tailwind-merge keeps them and open/focused labels go dark on the
-    // black starfield. The overrides must survive the cn() merge.
+    // shadcn's trigger cva ships `data-[state=open]:text-accent-foreground` and
+    // `focus:text-accent-foreground` (near-black); without competing tokens
+    // tailwind-merge keeps them and open/focused labels go dark on the black
+    // starfield. Open and focus both wear the group color — light and legible,
+    // and both must survive the cn() merge over the cva defaults.
     const tokens = screen.getByRole('button', { name: /music/i }).className.split(/\s+/);
-    expect(tokens).toContain('data-[state=open]:text-zinc-50');
-    expect(tokens).toContain('focus:text-zinc-50');
+    expect(tokens).toContain('data-[state=open]:text-menu-item-cyan-400');
+    expect(tokens).toContain('focus:text-menu-item-cyan-400');
     expect(tokens).not.toContain('data-[state=open]:text-accent-foreground');
     expect(tokens).not.toContain('focus:text-accent-foreground');
+    expect(tokens).not.toContain('data-[state=open]:text-zinc-50');
+  });
+
+  it('colors the label to match its underline on hover, focus, and while open', () => {
+    renderDrawer();
+
+    // Hover, focus, and open all color the label; the underline follows
+    // currentColor, so label and underline share the group color. A plain
+    // `focus:text-zinc-50` white override would snap a clicked/tabbed trigger
+    // back to white, so it must be absent.
+    const tokens = screen.getByRole('button', { name: /music/i }).className.split(/\s+/);
+    expect(tokens).toContain('hover:text-menu-item-cyan-400');
+    expect(tokens).toContain('focus:text-menu-item-cyan-400');
+    expect(tokens).toContain('hover:underline');
+    expect(tokens).toContain('data-[state=open]:text-menu-item-cyan-400');
+    expect(tokens).toContain('data-[state=open]:underline');
+    expect(tokens).not.toContain('focus:text-zinc-50');
   });
 });

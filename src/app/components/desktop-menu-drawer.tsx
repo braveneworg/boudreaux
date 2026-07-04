@@ -27,6 +27,35 @@ const DRAWER_ACCENT_CLASS = new Map<string, string>([
   ['Label', 'zine-accent-hot-pink rotate-[1.5deg]'],
 ]);
 
+/**
+ * Per-group trigger color: Music ▾ wears cyan (its Releases ramp), Label ▾ wears
+ * the hot pink of its own drawer accent. Literal map — Tailwind only emits
+ * classes it can read whole (same rule as DRAWER_ACCENT_CLASS). `interactive`
+ * colors the label on hover and while the drawer is open; `trail` colors it
+ * while the current route sits inside the group. The label's color drives the
+ * underline (`text-decoration-color` follows `currentColor`), so the two never
+ * diverge — and each ramp value stays legible on the black masthead, overriding
+ * shadcn's near-black `data-[state=open]:text-accent-foreground` trigger default.
+ */
+const TRIGGER_COLOR_CLASS = new Map<string, { interactive: string; trail: string }>([
+  [
+    'Music',
+    {
+      interactive:
+        'hover:text-menu-item-cyan-400 focus:text-menu-item-cyan-400 data-[state=open]:text-menu-item-cyan-400',
+      trail: 'text-menu-item-cyan-400',
+    },
+  ],
+  [
+    'Label',
+    {
+      interactive:
+        'hover:text-menu-item-pink-400 focus:text-menu-item-pink-400 data-[state=open]:text-menu-item-pink-400',
+      trail: 'text-menu-item-pink-400',
+    },
+  ],
+]);
+
 export interface DesktopMenuDrawerProps {
   group: NavMenuGroup;
   /** Current pathname, threaded from the parent so the drawer stays presentational. */
@@ -45,16 +74,22 @@ export const DesktopMenuDrawer = ({
   pathname,
 }: DesktopMenuDrawerProps): React.ReactElement => {
   const isTrailActive = group.items.some((item) => isActiveHref(item.href, pathname));
+  const triggerColor = TRIGGER_COLOR_CLASS.get(group.label);
 
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger
         className={cn(
           'h-auto w-auto bg-transparent p-0 text-2xl font-normal text-zinc-50 underline-offset-8',
-          'hover:bg-transparent hover:underline focus:bg-transparent focus:text-zinc-50',
-          'data-[state=open]:bg-transparent data-[state=open]:text-zinc-50 data-[state=open]:underline data-[state=open]:hover:bg-transparent data-[state=open]:focus:bg-transparent',
-          group.color,
-          isTrailActive && 'underline'
+          'hover:bg-transparent hover:underline focus:bg-transparent',
+          'data-[state=open]:bg-transparent data-[state=open]:underline data-[state=open]:hover:bg-transparent data-[state=open]:focus:bg-transparent',
+          // Color tracks hover, keyboard focus, and open — a plain `focus:` white
+          // override here would beat the hover color once a click or Tab focuses
+          // the trigger (Radix keeps it focused), snapping the label back to
+          // white. The underline follows the text via currentColor, so the two
+          // always match.
+          triggerColor?.interactive,
+          isTrailActive && cn('underline', triggerColor?.trail)
         )}
       >
         {group.label}
