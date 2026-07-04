@@ -106,3 +106,56 @@ export const getCommonsImage = async (
 
   return toBioImage(info, title);
 };
+
+/**
+ * Lists file members of a Commons category (P373) and resolves each to a
+ * displayable image. Categories often hold dozens of real photos of the
+ * artist beyond the single P18 portrait. Best-effort: failures return [].
+ */
+export const getCommonsCategoryImages = async (
+  category: string,
+  limit: number,
+  fetchFn: FetchFn = fetch
+): Promise<BioImage[]> => {
+  const params = new URLSearchParams({
+    action: 'query',
+    generator: 'categorymembers',
+    gcmtitle: `Category:${category}`,
+    gcmtype: 'file',
+    gcmlimit: String(limit),
+    prop: 'imageinfo',
+    iiprop: 'url|size|extmetadata',
+    iiurlwidth: String(THUMB_WIDTH),
+    format: 'json',
+    formatversion: '1',
+  });
+
+  try {
+    const response = await fetchFn(`${COMMONS_API}?${params.toString()}`, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as CommonsResponse;
+    const images: BioImage[] = [];
+    for (const page of Object.values(body.query?.pages ?? {})) {
+      const info = page.imageinfo?.[0];
+      if (!info?.url || !page.title) continue;
+      const base = toBioImage(info, page.title);
+      images.push({
+        url: base.url,
+        thumbnailUrl: base.thumbnailUrl,
+        title: base.title,
+        attribution: base.attribution,
+        license: base.license,
+        sourceUrl: base.sourceUrl,
+        width: base.width,
+        height: base.height,
+        isPrimary: base.isPrimary,
+        kind: 'photo',
+      });
+    }
+    return images.slice(0, limit);
+  } catch {
+    return [];
+  }
+};

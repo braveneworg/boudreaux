@@ -42,4 +42,22 @@ describe('getWikidataData', () => {
 
     await expect(getWikidataData('Q11649', fetchFn)).rejects.toThrow('Wikidata request failed');
   });
+
+  it('extracts the commons category (P373)', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          entities: {
+            Q1: {
+              claims: { P373: [{ mainsnak: { datavalue: { value: 'Ceschi' } } }] },
+              sitelinks: {},
+            },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    const data = await getWikidataData('Q1', fetchFn);
+    expect(data.commonsCategory).toBe('Ceschi');
+  });
 });

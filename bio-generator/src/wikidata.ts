@@ -22,6 +22,8 @@ export interface WikidataData {
   imageFileNames: string[];
   officialUrl?: string;
   wikipediaUrl?: string;
+  /** Commons category name from P373, e.g. "Ceschi" (no `Category:` prefix). */
+  commonsCategory?: string;
 }
 
 type Claim = { mainsnak?: { datavalue?: { value?: unknown } } };
@@ -42,6 +44,7 @@ const extractWikidataData = (body: WikidataEntities): WikidataData => {
     imageFileNames: stringValues(entity?.claims?.P18),
     officialUrl: stringValues(entity?.claims?.P856)[0],
     wikipediaUrl: entity?.sitelinks?.enwiki?.url,
+    commonsCategory: stringValues(entity?.claims?.P373)[0],
   };
 };
 
