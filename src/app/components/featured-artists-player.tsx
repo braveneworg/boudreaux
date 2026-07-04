@@ -163,9 +163,9 @@ const FeaturedArtistDetails = ({
 
   return (
     <div className="flex flex-col items-center">
-      {/* lg: the player fills the left half of the landing split so its width
-          matches the headlines column on the right. */}
-      <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-full">
+      {/* lg: the player sits inside the carousel's arrow gutters (2rem each
+          side) so its edges line up with the thumbnail strip above it. */}
+      <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-[calc(100%_-_4rem)]">
         {/* Interactive Cover Art — aspect-square container prevents CLS */}
         <div className="bg-muted aspect-square w-full overflow-hidden">
           {coverArt && (

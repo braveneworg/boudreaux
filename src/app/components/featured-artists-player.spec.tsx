@@ -450,9 +450,9 @@ describe('FeaturedArtistsPlayer', () => {
 
     // The accent offset shadow read as a yellow bottom/right border on the
     // landing panel — the frame keeps only the black outline. On desktop it
-    // fills the split's left column to match the headlines width.
+    // insets by the carousel's arrow gutters so it lines up with the thumbs.
     const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
-    expect(frame).toHaveClass('border-2', 'border-black', 'lg:max-w-full');
+    expect(frame).toHaveClass('border-2', 'border-black', 'lg:max-w-[calc(100%_-_4rem)]');
     expect(frame).not.toHaveClass('shadow-zine');
   });
 
