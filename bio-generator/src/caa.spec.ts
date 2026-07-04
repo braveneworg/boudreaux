@@ -2,14 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { getCoverArtImages } from './caa.js';
 import { logEvent } from './lib/log.js';
 
 vi.mock('./lib/log.js', () => ({
   logEvent: vi.fn(),
   toErrorMessage: (err: unknown) => String(err),
 }));
-
-import { getCoverArtImages } from './caa.js';
 
 const group = (rgMbid: string, title: string) => ({
   rgMbid,
@@ -90,7 +89,10 @@ describe('getCoverArtImages', () => {
         {
           front: false,
           image: 'https://archive.org/full.jpg',
-          thumbnails: { '250': 'https://archive.org/250.jpg', '500': 'https://archive.org/500.jpg' },
+          thumbnails: {
+            '250': 'https://archive.org/250.jpg',
+            '500': 'https://archive.org/500.jpg',
+          },
         },
       ],
     };

@@ -38,7 +38,11 @@ describe('deriveLinkLabel', () => {
 
   it('prefers the more specific service domain over its parent', () => {
     expect(
-      deriveLinkLabel({ title: null, url: 'https://music.youtube.com/channel/x', artistName: 'Ceschi' })
+      deriveLinkLabel({
+        title: null,
+        url: 'https://music.youtube.com/channel/x',
+        artistName: 'Ceschi',
+      })
     ).toBe('Ceschi on YouTube Music');
   });
 

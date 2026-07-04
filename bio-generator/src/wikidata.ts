@@ -40,11 +40,13 @@ const stringValues = (entries: Claim[] | undefined): string[] =>
  */
 const extractWikidataData = (body: WikidataEntities): WikidataData => {
   const entity = Object.values(body.entities ?? {})[0];
+  const claims = entity?.claims ?? {};
+  const sitelinks = entity?.sitelinks ?? {};
   return {
-    imageFileNames: stringValues(entity?.claims?.P18),
-    officialUrl: stringValues(entity?.claims?.P856)[0],
-    wikipediaUrl: entity?.sitelinks?.enwiki?.url,
-    commonsCategory: stringValues(entity?.claims?.P373)[0],
+    imageFileNames: stringValues(claims.P18),
+    officialUrl: stringValues(claims.P856)[0],
+    wikipediaUrl: sitelinks.enwiki?.url,
+    commonsCategory: stringValues(claims.P373)[0],
   };
 };
 

@@ -23,13 +23,26 @@ interface CaaResponse {
   }>;
 }
 
-const toCoverImage = (body: CaaResponse, group: ReleaseGroupSummary): BioImage | null => {
-  const front = (body.images ?? []).find((image) => image.front) ?? body.images?.[0];
-  const url = front?.thumbnails?.['500'] ?? front?.image;
+type CaaImage = NonNullable<CaaResponse['images']>[number];
+
+const selectFrontEntry = (images: NonNullable<CaaResponse['images']>): CaaImage | undefined =>
+  images.find((image) => image.front) ?? images[0];
+
+const selectCoverUrls = (front: CaaImage): { url: string; thumbnailUrl: string | null } | null => {
+  const url = front.thumbnails?.['500'] ?? front.image;
   if (!url) return null;
+  return { url, thumbnailUrl: front.thumbnails?.['250'] ?? null };
+};
+
+const toCoverImage = (body: CaaResponse, group: ReleaseGroupSummary): BioImage | null => {
+  const images = body.images ?? [];
+  const front = selectFrontEntry(images);
+  if (!front) return null;
+  const cover = selectCoverUrls(front);
+  if (!cover) return null;
   return {
-    url,
-    thumbnailUrl: front?.thumbnails?.['250'] ?? null,
+    url: cover.url,
+    thumbnailUrl: cover.thumbnailUrl,
     title: group.title,
     attribution: 'Cover Art Archive',
     license: null,

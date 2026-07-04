@@ -2,19 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { getCoverArtImages } from './caa.js';
 import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
+import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
-import { lookupArtist } from './musicbrainz.js';
+import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { bioGenerationInputSchema, DEFAULT_GEMINI_MODEL } from './types.js';
+import { verifyScrapedImages } from './vision.js';
 import { getWikidataData } from './wikidata.js';
-import { getCommonsImage } from './wikimedia.js';
+import { getCommonsCategoryImages, getCommonsImage } from './wikimedia.js';
 import { getWikipediaExtract } from './wikipedia.js';
 
 import type { ScrapedImage } from './jina.js';
+import type { ReleaseGroupSummary } from './musicbrainz.js';
 import type {
   ArtistFacts,
   BioGenerationData,
@@ -23,6 +27,7 @@ import type {
   BioImage,
   BioLink,
 } from './types.js';
+import type { VisionContext } from './vision.js';
 
 /** Injectable collaborators so the orchestration can be unit-tested in full. */
 export interface BioGeneratorDeps {
@@ -38,6 +43,10 @@ export interface BioGeneratorDeps {
   getScrapeApiKey: typeof getScrapeApiKey;
   searchArtistSources: typeof searchArtistSources;
   readUrl: typeof readUrl;
+  listReleaseGroups: typeof listReleaseGroups;
+  getCoverArtImages: typeof getCoverArtImages;
+  getCommonsCategoryImages: typeof getCommonsCategoryImages;
+  verifyScrapedImages: typeof verifyScrapedImages;
 }
 
 const defaultDeps: BioGeneratorDeps = {
@@ -52,11 +61,19 @@ const defaultDeps: BioGeneratorDeps = {
   getScrapeApiKey,
   searchArtistSources,
   readUrl,
+  listReleaseGroups,
+  getCoverArtImages,
+  getCommonsCategoryImages,
+  verifyScrapedImages,
 };
 
-const MAX_IMAGES = 30;
+const MAX_IMAGES = 100;
 const MAX_PRIMARY = 3;
-const MAX_LINKS = 50;
+const MAX_LINKS = 100;
+/** Commons category members resolved per artist (P373). */
+const MAX_COMMONS_CATEGORY_IMAGES = 30;
+/** Cover Art Archive front covers resolved per artist. */
+const MAX_COVER_ART = 40;
 
 /** Search-engine result pages and share widgets — never useful bio links. */
 const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
@@ -105,6 +122,7 @@ interface MetadataAccumulator {
   facts: ArtistFacts;
   /** Web-page image candidates, used only when Commons yields no images. */
   scrapedImages: ScrapedImage[];
+  releaseGroups: ReleaseGroupSummary[];
 }
 
 /** The display/real name used to drive both the MusicBrainz and web searches. */
@@ -218,6 +236,18 @@ const applyWikidataFacts = async (
     candidates: wd.imageFileNames.length,
     resolved: images.length,
   });
+
+  if (wd.commonsCategory) {
+    const categoryImages = await deps.getCommonsCategoryImages(
+      wd.commonsCategory,
+      MAX_COMMONS_CATEGORY_IMAGES
+    );
+    acc.images.push(...categoryImages);
+    logEvent('info', 'commons_category_images', {
+      category: wd.commonsCategory,
+      resolved: categoryImages.length,
+    });
+  }
 };
 
 /** Enriches the accumulator with a found MusicBrainz match and its Wikidata data. */
@@ -238,14 +268,24 @@ const applyMatch = async (
   if (match.wikidataId) {
     await applyWikidataFacts(acc, match.wikidataId, scrapeKey, deps);
   }
+
+  acc.releaseGroups = await deps.listReleaseGroups(match.mbid);
+  if (acc.releaseGroups.length) {
+    const covers = await deps.getCoverArtImages(acc.releaseGroups, MAX_COVER_ART);
+    acc.images.push(...covers);
+    logEvent('info', 'cover_art_images', {
+      releaseGroups: acc.releaseGroups.length,
+      covers: covers.length,
+    });
+  }
 };
 
 /**
  * Web search (Jina) as additional grounding *context*, not just a fallback:
  * always gathered and MERGED with any Wikipedia/official-site material so both
  * the extensive long bio and the informed short bio draw on the fullest
- * possible material. Runs two searches (biography query + press/interview query)
- * and merges results. Optional + best-effort (never throws).
+ * possible material. Runs three searches (biography + two press queries) and
+ * merges results. Optional + best-effort (never throws).
  */
 const applyWebSearch = async (
   acc: MetadataAccumulator,
@@ -257,6 +297,7 @@ const applyWebSearch = async (
   const queries: Array<string | undefined> = [
     undefined,
     `${artist} musician interview review press`,
+    `${artist} music press feature profile`,
   ];
 
   for (const query of queries) {
@@ -280,7 +321,11 @@ const applyWebSearch = async (
       ),
     ];
     for (const ref of found.references) {
-      acc.links.push({ label: ref.title ?? 'Reference', url: ref.url, kind: 'other' });
+      acc.links.push({
+        label: deriveLinkLabel({ title: ref.title, url: ref.url, artistName: artist }),
+        url: ref.url,
+        kind: classifyReferenceKind(ref.title),
+      });
     }
   }
 };
@@ -307,27 +352,84 @@ const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
   isPrimary: false,
 });
 
+/** Year prefix of an ISO date, or null when absent/malformed. */
+const yearOf = (isoDate: string | null | undefined): string | null => {
+  const year = isoDate?.slice(0, 4);
+  return year && /^\d{4}$/.test(year) ? year : null;
+};
+
 /**
- * Merges web-scraped candidates AFTER the licensed Commons images (which always
- * rank first), deduped by URL, up to MAX_IMAGES. Alt-titled candidates rank
- * before untitled ones — a named image is likelier to actually depict the
- * artist.
+ * Structured timeline: label-catalog releases first (authoritative), then
+ * MusicBrainz release groups, deduped by title, newest last. Prose dates must
+ * come from these lines or the labeled facts — not model recall.
  */
-const applyScrapedImages = (acc: MetadataAccumulator): void => {
+const buildChronology = (
+  releases: BioGenerationInput['releases'],
+  releaseGroups: ReleaseGroupSummary[]
+): string[] => {
+  const seen = new Set<string>();
+  const lines: Array<{ year: number; line: string }> = [];
+  for (const release of releases ?? []) {
+    const year = yearOf(release.releasedOn);
+    if (!year || seen.has(release.title.toLowerCase())) continue;
+    seen.add(release.title.toLowerCase());
+    lines.push({
+      year: Number(year),
+      line: `${year}: released "${release.title}" (label catalog — authoritative)`,
+    });
+  }
+  for (const group of releaseGroups) {
+    const year = yearOf(group.firstReleaseDate);
+    if (!year || seen.has(group.title.toLowerCase())) continue;
+    seen.add(group.title.toLowerCase());
+    lines.push({ year: Number(year), line: `${year}: released "${group.title}" (MusicBrainz)` });
+  }
+  return lines.sort((a, b) => a.year - b.year).map((entry) => entry.line);
+};
+
+/**
+ * Vision-verifies the scraped candidates, then merges survivors AFTER the
+ * provenance-guaranteed tiers (Commons portrait/category, Cover Art Archive),
+ * deduped by URL, up to MAX_IMAGES. Fail-closed: an unverifiable candidate
+ * never ships.
+ */
+const applyVerifiedScrapedImages = async (
+  acc: MetadataAccumulator,
+  input: BioGenerationInput,
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<BioImage[]>
+): Promise<void> => {
   if (!acc.scrapedImages.length) return;
   const seen = new Set(acc.images.map((image) => image.url.toLowerCase()));
   const ranked = [...acc.scrapedImages].sort(
     (a, b) => Number(Boolean(b.alt)) - Number(Boolean(a.alt))
   );
+  const candidates: BioImage[] = [];
   for (const candidate of ranked) {
-    if (acc.images.length >= MAX_IMAGES) break;
     const key = candidate.url.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    acc.images.push(toScrapedBioImage(candidate));
+    candidates.push(toScrapedBioImage(candidate));
+  }
+
+  const context: VisionContext = {
+    artistNames: [
+      input.displayName,
+      input.realName,
+      ...(input.akaNames?.split(',').map((name) => name.trim()) ?? []),
+    ].filter((name): name is string => Boolean(name)),
+    releaseTitles: [
+      ...(input.releases?.map((release) => release.title) ?? []),
+      ...acc.releaseGroups.map((group) => group.title),
+    ],
+  };
+  const verified = await verify(candidates, context);
+  for (const image of verified) {
+    if (acc.images.length >= MAX_IMAGES) break;
+    acc.images.push(image);
   }
   logEvent('info', 'scraped_images_merged', {
-    candidates: acc.scrapedImages.length,
+    candidates: candidates.length,
+    verified: verified.length,
     total: acc.images.length,
   });
 };
@@ -336,10 +438,15 @@ const applyScrapedImages = (acc: MetadataAccumulator): void => {
  * Finalizes the accumulator: appends admin links (last, so curated entries
  * survive dedupe), drops junk-host links (search engines, share widgets),
  * classifies any remaining streaming-service links as `kind: 'streaming'`,
- * caps the link list at {@link MAX_LINKS}, merges scraped images after any
- * licensed Commons images, and derives the image-title list for the prompt.
+ * caps the link list at {@link MAX_LINKS}, verifies and merges scraped images
+ * after provenance-guaranteed tiers, caps images at {@link MAX_IMAGES}, and
+ * derives the chronology, internal release URLs, and image-title list for the prompt.
  */
-const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): void => {
+const finalizeMetadata = async (
+  acc: MetadataAccumulator,
+  input: BioGenerationInput,
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<BioImage[]>
+): Promise<void> => {
   for (const url of input.links ?? []) {
     acc.links.push({ label: 'Reference', url, kind: 'other' });
   }
@@ -350,9 +457,14 @@ const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): 
       isListeningServiceUrl(link.url) ? { ...link, kind: 'streaming' as const } : link
     )
     .slice(0, MAX_LINKS);
-  applyScrapedImages(acc);
+
+  await applyVerifiedScrapedImages(acc, input, verify);
+  acc.images = acc.images.slice(0, MAX_IMAGES);
+
+  acc.facts.chronology = buildChronology(input.releases, acc.releaseGroups);
+  acc.facts.internalReleaseUrls = input.releases?.map((release) => release.url);
   acc.facts.imageTitles = acc.images.map(
-    (image) => image.title?.trim() || `Photo of ${input.displayName}`
+    (image) => image.alt?.trim() || image.title?.trim() || `Photo of ${input.displayName}`
   );
 };
 
@@ -363,12 +475,15 @@ const finalizeMetadata = (acc: MetadataAccumulator, input: BioGenerationInput): 
  */
 const gatherMetadata = async (
   input: BioGenerationInput,
+  apiKey: string,
+  model: string,
   deps: BioGeneratorDeps
 ): Promise<{ images: BioImage[]; links: BioLink[]; facts: ArtistFacts }> => {
   const acc: MetadataAccumulator = {
     images: [],
     links: [],
     scrapedImages: [],
+    releaseGroups: [],
     facts: {
       displayName: input.displayName,
       realName: input.realName,
@@ -405,7 +520,9 @@ const gatherMetadata = async (
   }
 
   await applyWebSearch(acc, input, scrapeKey, deps);
-  finalizeMetadata(acc, input);
+  await finalizeMetadata(acc, input, (candidates, context) =>
+    deps.verifyScrapedImages(candidates, context, { apiKey, model })
+  );
 
   logEvent('info', 'enrichment_complete', {
     artist,
@@ -438,9 +555,9 @@ export const runBioGeneration = async (
   deps: BioGeneratorDeps = defaultDeps
 ): Promise<BioGenerationData> => {
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-  const { images, links, facts } = await gatherMetadata(input, deps);
-
   const apiKey = await deps.getGeminiApiKey();
+  const { images, links, facts } = await gatherMetadata(input, apiKey, model, deps);
+
   const prose = await deps.generateProse(facts, apiKey, model);
   const checked = await runQualityPasses(
     { prose, facts, apiKey, model },

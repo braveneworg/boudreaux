@@ -51,8 +51,7 @@ describe('verifyScrapedImages', () => {
     const kept = await verifyScrapedImages(
       [candidate('https://a.com/1.png'), candidate('https://a.com/2.png')],
       context,
-      'key',
-      'gemini-2.5-flash',
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
       { fetchFn, sleep: async () => {} }
     );
     expect(kept).toHaveLength(1);
@@ -75,8 +74,7 @@ describe('verifyScrapedImages', () => {
     const kept = await verifyScrapedImages(
       [candidate('https://a.com/1.png')],
       context,
-      'key',
-      'gemini-2.5-flash',
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
       { fetchFn, sleep: async () => {} }
     );
     expect(kept).toEqual([]);
@@ -90,8 +88,7 @@ describe('verifyScrapedImages', () => {
     const kept = await verifyScrapedImages(
       [candidate('https://a.com/1.png')],
       context,
-      'key',
-      'gemini-2.5-flash',
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
       { fetchFn, sleep: async () => {}, retries: 0 }
     );
     expect(kept).toEqual([]);
@@ -107,8 +104,7 @@ describe('verifyScrapedImages', () => {
     const kept = await verifyScrapedImages(
       [candidate('https://a.com/1.png'), candidate('https://a.com/2.png')],
       context,
-      'key',
-      'gemini-2.5-flash',
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
       { fetchFn, sleep: async () => {} }
     );
     expect(kept).toEqual([]);
@@ -124,10 +120,15 @@ describe('verifyScrapedImages', () => {
         geminiVerdicts([{ index: 0, verdict: 'album_cover', confidence: 0.8 }])
       );
     const withTitle = { ...candidate('https://a.com/1.png'), title: 'BBB cover' };
-    const kept = await verifyScrapedImages([withTitle], context, 'key', 'gemini-2.5-flash', {
-      fetchFn,
-      sleep: async () => {},
-    });
+    const kept = await verifyScrapedImages(
+      [withTitle],
+      context,
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
+      {
+        fetchFn,
+        sleep: async () => {},
+      }
+    );
     expect(kept[0]).toMatchObject({ kind: 'cover', alt: 'BBB cover' });
   });
 });

@@ -27,6 +27,12 @@ export interface VisionContext {
   releaseTitles: string[];
 }
 
+/** Gemini model credentials for a vision API call. */
+export interface VisionApiConfig {
+  apiKey: string;
+  model: string;
+}
+
 const visionVerdictSchema = z.object({
   verdicts: z.array(
     z.object({
@@ -111,10 +117,10 @@ const buildVisionParts = (
 const verifyBatch = async (
   batch: FetchedCandidate[],
   context: VisionContext,
-  apiKey: string,
-  model: string,
+  config: VisionApiConfig,
   options: FetchRetryOptions
 ): Promise<BioImage[]> => {
+  const { apiKey, model } = config;
   const response = await fetchWithRetry(
     `${GEMINI_API_BASE}/${model}:generateContent`,
     {
@@ -170,8 +176,7 @@ const verifyBatch = async (
 export const verifyScrapedImages = async (
   candidates: BioImage[],
   context: VisionContext,
-  apiKey: string,
-  model: string,
+  config: VisionApiConfig,
   options: FetchRetryOptions = {}
 ): Promise<BioImage[]> => {
   if (!candidates.length) return [];
@@ -184,7 +189,7 @@ export const verifyScrapedImages = async (
   for (let i = 0; i < fetched.length; i += VISION_BATCH_SIZE) {
     const batch = fetched.slice(i, i + VISION_BATCH_SIZE);
     try {
-      kept.push(...(await verifyBatch(batch, context, apiKey, model, options)));
+      kept.push(...(await verifyBatch(batch, context, config, options)));
     } catch (err) {
       // Fail closed: an unverifiable batch ships nothing from that batch.
       logEvent('warn', 'vision_batch_failed', { size: batch.length, error: toErrorMessage(err) });

@@ -107,6 +107,15 @@ export const getCommonsImage = async (
   return toBioImage(info, title);
 };
 
+type CommonsPage = NonNullable<NonNullable<CommonsResponse['query']>['pages']>[string];
+
+/** Maps one category-member page to a photo BioImage, or null if unusable. */
+const categoryPageToImage = (page: CommonsPage): BioImage | null => {
+  const info = page.imageinfo?.[0];
+  if (!info?.url || !page.title) return null;
+  return { ...toBioImage(info, page.title), kind: 'photo' as const };
+};
+
 /**
  * Lists file members of a Commons category (P373) and resolves each to a
  * displayable image. Categories often hold dozens of real photos of the
@@ -136,25 +145,10 @@ export const getCommonsCategoryImages = async (
     });
     if (!response.ok) return [];
     const body = (await response.json()) as CommonsResponse;
-    const images: BioImage[] = [];
-    for (const page of Object.values(body.query?.pages ?? {})) {
-      const info = page.imageinfo?.[0];
-      if (!info?.url || !page.title) continue;
-      const base = toBioImage(info, page.title);
-      images.push({
-        url: base.url,
-        thumbnailUrl: base.thumbnailUrl,
-        title: base.title,
-        attribution: base.attribution,
-        license: base.license,
-        sourceUrl: base.sourceUrl,
-        width: base.width,
-        height: base.height,
-        isPrimary: base.isPrimary,
-        kind: 'photo',
-      });
-    }
-    return images.slice(0, limit);
+    return Object.values(body.query?.pages ?? {})
+      .map(categoryPageToImage)
+      .filter((img): img is BioImage => img !== null)
+      .slice(0, limit);
   } catch {
     return [];
   }
