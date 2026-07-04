@@ -85,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.176.0] - 2026-07-04
+
+### Added
+
+- feat: ✨ desktop punk-zine site chrome (#554)\n- feat: ✨ desktop punk-zine site chrome (#554)\n
+
 ## [4.175.0] - 2026-07-04
 
 ### Added
