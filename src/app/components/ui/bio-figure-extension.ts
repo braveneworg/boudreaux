@@ -69,6 +69,25 @@ const parseFigureAttributes = (element: HTMLElement): BioFigureAttributes | fals
   };
 };
 
+/**
+ * Adopts a bare `<img>` (legacy bio content saved before the figure node) into
+ * a full-width, unfloated figure, so old images gain the editor's resize/float/
+ * caption controls and re-serialize as `figure.bio-figure` on save.
+ */
+const parseBareImage = (element: HTMLElement): BioFigureAttributes | false => {
+  const src = element.getAttribute('src');
+  if (!src) return false;
+  return {
+    src,
+    alt: element.getAttribute('alt') ?? '',
+    width: 100,
+    float: 'none',
+    title: null,
+    subtitle: null,
+    attribution: null,
+  };
+};
+
 type CaptionSpan = [string, { class: string }, string];
 
 const buildCaptionSpans = ({
@@ -112,7 +131,12 @@ export const BioFigure = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'figure.bio-figure', getAttrs: parseFigureAttributes }];
+    // The figure rule matches first and, being an atom, consumes its inner
+    // <img>; the bare-<img> rule then adopts any standalone legacy image.
+    return [
+      { tag: 'figure.bio-figure', getAttrs: parseFigureAttributes },
+      { tag: 'img[src]', getAttrs: parseBareImage },
+    ];
   },
 
   renderHTML({ node }): DOMOutputSpec {
