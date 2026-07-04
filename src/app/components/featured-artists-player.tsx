@@ -164,8 +164,11 @@ const FeaturedArtistDetails = ({
   return (
     <div className="flex flex-col items-center">
       {/* lg: the player sits inside the carousel's arrow gutters (2rem each
-          side) so its edges line up with the thumbnail strip above it. */}
-      <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-[calc(100%_-_4rem)]">
+          side) plus a 1rem inset, so its edges line up with the thumbnail
+          strip above it while both sit in from the column edge. Keep in sync
+          with the carousel's lg:max-w in media-player.tsx (player = carousel
+          inset + 4rem for the arrow gutters). */}
+      <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-[calc(100%_-_6rem)]">
         {/* Interactive Cover Art — aspect-square container prevents CLS */}
         <div className="bg-muted aspect-square w-full overflow-hidden">
           {coverArt && (
