@@ -78,7 +78,9 @@ describe('Footer', () => {
     it('matches the header at xl: starfield, top border, 7xl content', () => {
       render(<Footer />);
       const footer = screen.getByRole('contentinfo');
-      expect(footer.className).toContain("xl:bg-[url('/media/ffinc-starfield-tile.png')]");
+      // Bare (unquoted) url form — the same byte-form the header backdrop
+      // uses, so the two starfield utilities stay one Tailwind class.
+      expect(footer.className).toContain('xl:bg-[url(/media/ffinc-starfield-tile.png)]');
       expect(footer.className).toContain('xl:bg-repeat');
       expect(footer.className).toContain('xl:border-t-2');
       expect(footer.className).toContain('xl:border-t-zinc-50');
