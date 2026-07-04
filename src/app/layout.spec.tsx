@@ -136,10 +136,22 @@ describe('RootLayout', () => {
         'flex',
         'flex-col',
         'w-full',
-        'xl:max-w-7xl',
+        // Sheet widened by its own xl padding (xl:px-6) so the torn edges clear
+        // the content; the cap grows to match (7xl + 2×px-6 = 83rem), keeping
+        // the content column itself at 80rem.
+        'xl:max-w-[83rem]',
+        'xl:px-6',
         'grow',
         'overflow-x-clip'
       );
+    });
+
+    it('paints the kraft desk on body and the torn sheet on main at xl', async () => {
+      render(await RootLayout({ children: <div>Test</div> }));
+
+      expect(document.body.className).toContain('xl:zine-desk');
+      const main = document.querySelector('main');
+      expect(main?.className).toContain('xl:zine-page-edges');
     });
   });
 

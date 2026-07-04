@@ -8,6 +8,18 @@ import { render } from '@testing-library/react';
 import { HeaderBackdrop } from './header-backdrop';
 
 describe('HeaderBackdrop', () => {
+  it('clips its animated layers inside its own wrapper', () => {
+    const { container } = render(<HeaderBackdrop />);
+    const wrapper = container.firstElementChild;
+    // `absolute inset-0` make the clip actually cover the header container —
+    // without them `overflow-hidden` clips a zero-sized box.
+    const tokens = (wrapper?.className ?? '').split(/\s+/);
+    expect(tokens).toContain('overflow-hidden');
+    expect(tokens).toContain('absolute');
+    expect(tokens).toContain('inset-0');
+    expect(wrapper?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   describe('animated background', () => {
     it('renders background div with CSS animation class', () => {
       const { container } = render(<HeaderBackdrop />);

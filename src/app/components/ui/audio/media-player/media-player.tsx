@@ -217,10 +217,12 @@ const FeaturedArtistCarousel = memo(
       >
         {/* Negative margins match the panel padding (p-6/sm:p-8) so the
             in-flow arrow tips sit near-flush with the panel edge — the
-            images stay on the content column. On desktop the carousel
-            instead centers at 80% of the split's left column, stepping the
-            thumbnails down ~20%. */}
-        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-[80%]">
+            images stay on the content column. On desktop the carousel sits in
+            from the column edge (1rem each side) so the media below it reads
+            as a smaller card with breathing room; the player wrap in
+            featured-artists-player.tsx tracks this (its inset = this + 2rem
+            arrow gutters). */}
+        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-[calc(100%_-_2rem)]">
           <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
           <CarouselContent className="-ml-6">
             {sortedArtists.map((featured, index) => {

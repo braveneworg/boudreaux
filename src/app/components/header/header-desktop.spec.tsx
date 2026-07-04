@@ -81,6 +81,16 @@ describe('HeaderDesktop', () => {
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-priority', 'false');
   });
 
+  it('renders the wordmark at 48px, centered 18px from the top', () => {
+    render(<HeaderDesktop />);
+    // The next/image mock renders a <span data-alt=…>, so select the sole
+    // wordmark image by testid and pin its identity via the alt data attribute.
+    const wordmark = screen.getByTestId('next-image');
+    expect(wordmark).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
+    expect(wordmark.className).toContain('top-[18px]');
+    expect(wordmark.className).toContain('h-12');
+  });
+
   it('uses the Fake Four Inc. words asset', () => {
     render(<HeaderDesktop />);
     expect(screen.getByTestId('next-image')).toHaveAttribute(

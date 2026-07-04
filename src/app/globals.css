@@ -339,6 +339,41 @@ textarea:focus-visible,
   background-image: url('/media/particles-6.svg');
 }
 
+/* Desktop-only zine frame — the kraft "desk" the white page sits on, plus the
+   torn-out sheet edges. Pure CSS/SVG data-URIs: no image requests, no JS.
+   Applied with the `xl:` variant in layout.tsx; below 1280px viewports the
+   gutters have zero width, so neither utility is ever visible there. */
+@utility zine-desk {
+  background-color: #d7ccb4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+}
+
+/* The content column as a torn-out sheet: kraft-toned tear teeth tile down both
+   edges, mirrored. Painted as background layers inside main's box so nothing
+   escapes overflow-x-clip. The 14×140 tiles are drawn to ~7px wide / 70px period
+   by background-size — a tight, shallow torn edge (no drop shadow). The tooth
+   fill must match zine-desk's background-color, and the sheet color must match
+   ContentContainer's below-xl bg-zinc-100 — the column tone the site has always
+   had (that wrapper goes xl:bg-transparent so these tiles show). */
+@utility zine-page-edges {
+  background-color: var(--color-zinc-100);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cg transform='translate(14 0) scale(-1 1)'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat-y, repeat-y;
+  /* Pin the teeth to the viewport (fixed = viewport-relative) so the sheet and
+     its content scroll past a stationary torn frame. Each 7px-wide tile sits at
+     the centered column's outer edge — 664px = half the 83rem cap; max()/min()
+     clamp to the viewport edge once the column meets it below 1328px. */
+  background-attachment: fixed, fixed;
+  background-position:
+    max(0px, 50vw - 664px) top,
+    min(50vw + 657px, 100vw - 7px) top;
+  background-size:
+    7px 70px,
+    7px 70px;
+}
+
 /* Banner notification strip slide animations — keyframes are referenced from
    inline styles with dynamic durations, so they must stay outside @theme. */
 @keyframes banner-strip-slide-right {

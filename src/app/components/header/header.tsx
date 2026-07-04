@@ -8,7 +8,7 @@ import { HeaderContent } from './header-content';
 
 const Header = () => {
   return (
-    <HeaderContainer className="mx-auto xl:max-w-7xl">
+    <HeaderContainer>
       <HeaderBackdrop />
       <HeaderContent />
     </HeaderContainer>

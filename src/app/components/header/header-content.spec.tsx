@@ -185,7 +185,17 @@ describe('HeaderContent', () => {
     it('grows to the desktop height at xl', () => {
       const { container } = render(<HeaderContent />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('xl:h-56');
+      expect(header).toHaveClass('xl:h-32');
+    });
+
+    it('caps content at 7xl with the 128px xl bar', () => {
+      render(<HeaderContent />);
+      const header = screen.getByRole('banner');
+      expect(header.className).toContain('xl:h-32');
+      expect(header.className).toContain('xl:max-w-7xl');
+      expect(header.className).toContain('xl:overflow-visible');
+      expect(header.className).not.toContain('xl:h-56');
+      expect(header.className).not.toContain('xl:max-w-480');
     });
 
     it('renders content layer with proper z-index', () => {
@@ -197,7 +207,7 @@ describe('HeaderContent', () => {
     it('content layer has max-width constraint', () => {
       const { container } = render(<HeaderContent />);
       const contentLayer = container.querySelector('.z-20');
-      expect(contentLayer).toHaveClass('xl:max-w-480');
+      expect(contentLayer).toHaveClass('xl:max-w-7xl');
     });
 
     it('content layer has overflow hidden', () => {

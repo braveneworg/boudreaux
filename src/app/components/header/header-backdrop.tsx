@@ -8,13 +8,15 @@ import { useSparklingParticles } from '@/hooks/use-sparkling-particles';
 /**
  * Decorative, non-interactive backdrop for the site header: the animated
  * background layer plus the sparkle/ember overlay. Self-contained so the header
- * doesn't carry the particle wiring.
+ * doesn't carry the particle wiring. Clips its own animated overflow (the
+ * `header-bg-pulse` scale-up and the sparkles) inside an aria-hidden wrapper,
+ * since HeaderContainer stops clipping at `xl` to let the nav drawers overhang.
  */
 const HeaderBackdrop = () => {
   const { sparkles, extinguishParticles } = useSparklingParticles();
 
   return (
-    <>
+    <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
       {/* Animated background layer — mobile particles below `xl`, the desktop
           starfield tile at `xl`. Driven by viewport width (CSS), not the
           server's User-Agent guess. */}
@@ -48,7 +50,7 @@ const HeaderBackdrop = () => {
           />
         ))}
       </div>
-    </>
+    </div>
   );
 };
 

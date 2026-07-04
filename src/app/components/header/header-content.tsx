@@ -16,8 +16,11 @@ const HeaderContent = () => {
     // picks the right one at paint time — no hydration flash on devices the
     // server misdetects (e.g. an iPhone with Safari's "Request Desktop Website"
     // enabled). The height steps 58px → 122px (`md`, to meet the hamburger
-    // sheet) → 224px (`xl`, the desktop header).
-    <header className="relative z-20 mx-auto flex h-14.5 w-full min-w-0 items-center justify-between overflow-hidden border-b pb-1 pl-0 leading-14.5 md:h-30.5 xl:h-56 xl:max-w-480 xl:justify-start">
+    // sheet) → 128px (`xl`, the desktop header).
+    // xl:overflow-visible is load-bearing: the Music/Label nav drawers hang
+    // ~206px below this 128px bar, so clipping here hides them (the decorative
+    // starfield is clipped on HeaderBackdrop instead, not here).
+    <header className="relative z-20 mx-auto flex h-14.5 w-full min-w-0 items-center justify-between overflow-hidden pb-0 pl-0 leading-14.5 md:h-30.5 xl:h-32 xl:max-w-7xl xl:justify-start xl:overflow-visible">
       <HeaderMobile />
       <HeaderDesktop />
     </header>

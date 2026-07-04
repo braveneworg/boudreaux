@@ -115,7 +115,19 @@ describe('Logo', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByTestId('logo-image');
-    expect(img).toHaveClass('rounded-full', 'bg-zinc-50', 'size-10', 'xl:size-36');
+    expect(img).toHaveClass('rounded-full', 'bg-zinc-50', 'size-10', 'xl:size-24');
+  });
+
+  it('renders the desktop logo as a 96px centered sticker', () => {
+    render(<Logo isMobile={false} />);
+
+    // The next/image mock renders a <span>, so select by testid (getByAltText
+    // cannot match the span's data-alt attribute).
+    const img = screen.getByTestId('logo-image');
+    expect(img.className).toContain('xl:size-24');
+    expect(img.className).toContain('xl:top-4');
+    expect(img.className).toContain('xl:shadow-zine-ink');
+    expect(img.className).not.toContain('xl:size-36');
   });
 
   describe('mobile vs desktop logo source', () => {

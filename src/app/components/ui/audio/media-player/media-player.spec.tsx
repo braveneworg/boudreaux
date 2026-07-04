@@ -977,7 +977,7 @@ describe('MediaPlayer', () => {
       expect(tile.className).not.toMatch(/focus:ring/);
     });
 
-    it('should widen the row past the content column with airier gutters', () => {
+    it('should inset the desktop row from the column edge with airier gutters', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
@@ -986,10 +986,10 @@ describe('MediaPlayer', () => {
 
       // The arrows sit in-flow at the row's ends; the negative margins match
       // the panel padding (p-6/sm:p-8) so the arrow tips sit near-flush with
-      // the panel edge. On desktop the carousel instead centers at 80% width
-      // inside the split's left column (~20% smaller thumbnails).
+      // the panel edge. On desktop the carousel insets 1rem from the left
+      // column edge so the media below reads as a smaller card with air.
       const row = screen.getByTestId('carousel-previous').parentElement;
-      expect(row).toHaveClass('-mx-6', 'sm:-mx-8', 'lg:mx-auto', 'lg:max-w-[80%]');
+      expect(row).toHaveClass('-mx-6', 'sm:-mx-8', 'lg:mx-auto', 'lg:max-w-[calc(100%_-_2rem)]');
       // Roomy 24px gutters between the images, and 3-up on desktop where
       // the carousel spans the landing split's left half.
       expect(screen.getByTestId('carousel-content')).toHaveClass('-ml-6');

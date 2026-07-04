@@ -2,13 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { DesktopMenu } from './desktop-menu';
 
 const mockUseSession = vi.fn();
+const mockUsePathname = vi.fn();
 
 vi.mock('@/app/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockUsePathname(),
 }));
 
 // Mock next/link to render a plain anchor, surfacing the prefetch posture as
@@ -40,76 +46,87 @@ vi.mock('next/link', () => ({
 }));
 
 describe('DesktopMenu', () => {
+  beforeEach(() => {
+    mockUsePathname.mockReturnValue('/');
+  });
+
   describe('unauthenticated', () => {
     beforeEach(() => {
       mockUseSession.mockReturnValue({ status: 'unauthenticated' });
     });
 
-    it('renders the public menu items', () => {
+    it('renders Home and Contact Us as always-visible links', () => {
       render(<DesktopMenu />);
 
       expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
-      expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute('href', '/artists');
-      expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute('href', '/releases');
-      expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/videos');
-      expect(screen.getByRole('link', { name: 'Tours' })).toHaveAttribute('href', '/tours');
-      expect(screen.getByRole('link', { name: 'Merch' })).toHaveAttribute('href', '/merch');
-      expect(screen.getByRole('link', { name: 'Playlists' })).toHaveAttribute('href', '/playlists');
-      expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
       expect(screen.getByRole('link', { name: 'Contact Us' })).toHaveAttribute('href', '/contact');
     });
 
-    it('renders nine menu items when logged out', () => {
+    it('renders Music and Label as drawer triggers, not links', () => {
       render(<DesktopMenu />);
 
-      expect(screen.getAllByRole('listitem')).toHaveLength(9);
+      expect(screen.getByRole('button', { name: /music/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /label/i })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Releases' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Tours' })).not.toBeInTheDocument();
     });
 
-    it('does not render the My Collection link', () => {
+    it('reveals the Music drawer links on trigger click', async () => {
+      const user = userEvent.setup();
+      render(<DesktopMenu />);
+
+      await user.click(screen.getByRole('button', { name: /music/i }));
+
+      expect(await screen.findByRole('link', { name: 'Releases' })).toHaveAttribute(
+        'href',
+        '/releases'
+      );
+      expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute('href', '/artists');
+      expect(screen.getByRole('link', { name: 'Playlists' })).toHaveAttribute('href', '/playlists');
+      expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/videos');
+    });
+
+    it('reveals the Label drawer links on trigger click', async () => {
+      const user = userEvent.setup();
+      render(<DesktopMenu />);
+
+      await user.click(screen.getByRole('button', { name: /label/i }));
+
+      expect(await screen.findByRole('link', { name: 'Tours' })).toHaveAttribute('href', '/tours');
+      expect(screen.getByRole('link', { name: 'Merch' })).toHaveAttribute('href', '/merch');
+      expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+    });
+
+    it('does not render My Collection anywhere', () => {
       render(<DesktopMenu />);
 
       expect(screen.queryByRole('link', { name: 'My Collection' })).not.toBeInTheDocument();
     });
 
-    it('colors each link underline on hover to match its own hue', () => {
+    it('marks Home with aria-current on the root route', () => {
       render(<DesktopMenu />);
 
-      expect(screen.getByRole('link', { name: 'Home' })).toHaveClass(
-        'hover:decoration-menu-item-yellow-400'
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('applies the dynamic-on-hover prefetch boost to top-level links', () => {
+      render(<DesktopMenu />);
+
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+        'data-dynamic-on-hover',
+        'true'
       );
     });
 
-    it('fades the text and underline color in and out on hover', () => {
+    it('keeps top-level link text white on focus', () => {
       render(<DesktopMenu />);
 
-      const home = screen.getByRole('link', { name: 'Home' });
-      expect(home).toHaveClass('transition-colors');
-      expect(home).toHaveClass('duration-200');
-    });
-
-    it('keeps default viewport prefetching on every nav link', () => {
-      render(<DesktopMenu />);
-
-      screen.getAllByRole('link').forEach((link) => {
-        expect(link).toHaveAttribute('data-prefetch', 'default');
-      });
-    });
-
-    it('upgrades every nav link to a full prefetch on hover', () => {
-      render(<DesktopMenu />);
-
-      screen.getAllByRole('link').forEach((link) => {
-        expect(link).toHaveAttribute('data-dynamic-on-hover', 'true');
-      });
-    });
-
-    it('renders links white by default with color scoped to interactive states', () => {
-      render(<DesktopMenu />);
-
-      const home = screen.getByRole('link', { name: 'Home' });
-      expect(home).toHaveClass('text-zinc-50');
-      expect(home).toHaveClass('hover:text-menu-item-yellow-400');
-      expect(home).toHaveClass('aria-[current=page]:text-menu-item-yellow-400');
+      // shadcn's link base ships `focus:text-accent-foreground` (near-black);
+      // the override must survive the cn() merge or a keyboard-focused label
+      // goes dark on the black starfield.
+      const tokens = screen.getByRole('link', { name: 'Home' }).className.split(/\s+/);
+      expect(tokens).toContain('focus:text-zinc-50');
+      expect(tokens).not.toContain('focus:text-accent-foreground');
     });
   });
 
@@ -118,37 +135,25 @@ describe('DesktopMenu', () => {
       mockUseSession.mockReturnValue({ status: 'authenticated' });
     });
 
-    it('renders the My Collection link', () => {
+    it('renders My Collection top-level between Label and Contact Us', async () => {
       render(<DesktopMenu />);
 
-      expect(screen.getByRole('link', { name: 'My Collection' })).toHaveAttribute(
+      // `useNavMenuItems` mount-gates auth, so wait for the post-mount render.
+      expect(await screen.findByRole('link', { name: 'My Collection' })).toHaveAttribute(
         'href',
         '/collection'
       );
-    });
 
-    it('renders ten menu items when logged in', () => {
-      render(<DesktopMenu />);
+      const topLevel = screen
+        .getAllByRole('listitem')
+        .map((li) => li.textContent ?? '')
+        .filter((text) => text.length > 0);
+      const collectionIndex = topLevel.findIndex((t) => t.includes('My Collection'));
+      const labelIndex = topLevel.findIndex((t) => t.includes('Label'));
+      const contactIndex = topLevel.findIndex((t) => t.includes('Contact Us'));
 
-      expect(screen.getAllByRole('listitem')).toHaveLength(10);
-    });
-
-    it('inserts My Collection after Releases', () => {
-      render(<DesktopMenu />);
-
-      const labels = screen.getAllByRole('link').map((link) => link.textContent);
-      expect(labels).toEqual([
-        'Home',
-        'Artists',
-        'Releases',
-        'My Collection',
-        'Videos',
-        'Tours',
-        'Merch',
-        'Playlists',
-        'About',
-        'Contact Us',
-      ]);
+      expect(collectionIndex).toBeGreaterThan(labelIndex);
+      expect(collectionIndex).toBeLessThan(contactIndex);
     });
   });
 });
