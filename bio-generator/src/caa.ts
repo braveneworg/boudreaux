@@ -50,6 +50,7 @@ const fetchCover = async (
     const response = await fetchFn(`${CAA_BASE}/${group.rgMbid}`, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
     });
+    // Non-OK (usually 404 "no cover art") is an expected miss — skip silently; only thrown fetches warrant a warn.
     if (!response.ok) return null;
     return toCoverImage((await response.json()) as CaaResponse, group);
   } catch (err) {
