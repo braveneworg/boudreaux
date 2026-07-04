@@ -429,6 +429,9 @@ const eslintConfig = [
       // Relax strict rules that flag legitimate test patterns
       'vitest/no-conditional-expect': 'warn',
       'vitest/expect-expect': 'warn',
+      // Test files render raw <a> elements to assert component class behavior, not
+      // to navigate — the no-html-link-for-pages rule is inapplicable here.
+      '@next/next/no-html-link-for-pages': 'off',
     },
     languageOptions: {
       globals: {

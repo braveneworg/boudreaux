@@ -54,7 +54,7 @@ export const MobileMenu = ({ menuItems, onNavigate }: MobileMenuProps) => {
               href={item.href}
               aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
               className={cn(
-                'mt-4 block text-xl tracking-wider text-zinc-50 underline-offset-8 text-shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
+                'mt-4 block text-xl tracking-wider text-zinc-50 no-underline underline-offset-8 text-shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
                 item.color
               )}
               onClick={onNavigate}

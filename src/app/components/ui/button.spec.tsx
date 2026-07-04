@@ -260,6 +260,22 @@ describe('Button', () => {
     });
   });
 
+  describe('global link underline opt-out', () => {
+    it('opts anchors-as-buttons out of the global link underline', () => {
+      render(
+        <Button asChild>
+          <a href="/releases">Browse</a>
+        </Button>
+      );
+      expect(screen.getByRole('link', { name: 'Browse' })).toHaveClass('no-underline');
+    });
+
+    it('link variant keeps a persistent underline', () => {
+      render(<Button variant="link">Go</Button>);
+      expect(screen.getByRole('button', { name: 'Go' })).toHaveClass('underline');
+    });
+  });
+
   describe('variant and size combinations', () => {
     it('should apply both variant and size classes correctly', () => {
       render(
