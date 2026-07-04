@@ -84,6 +84,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.175.0] - 2026-07-04
+
+### Added
+
+- feat: ✨ bio editor image resize/border + click-to-edit links (#553)\n- feat: ✨ bio editor image resize/border + click-to-edit links (#553)\n
+
 ## [4.174.0] - 2026-07-04
 
 ### Added
