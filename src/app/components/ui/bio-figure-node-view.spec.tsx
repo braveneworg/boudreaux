@@ -88,6 +88,11 @@ describe('BioFigureNodeView', () => {
     expect(screen.getByAltText('x')).toBeInTheDocument();
   });
 
+  it('gives the image the site black border', () => {
+    render(<BioFigureNodeView {...makeProps()} />);
+    expect(screen.getByAltText('x')).toHaveClass('border-2', 'border-black');
+  });
+
   it('renders the subtitle line when set', () => {
     render(<BioFigureNodeView {...makeProps({ attrs: { subtitle: 'S' } })} />);
     expect(screen.getByText('S')).toBeInTheDocument();

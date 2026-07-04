@@ -231,7 +231,12 @@ export const BioFigureNodeView = ({
     >
       <div data-drag-handle className="relative cursor-grab">
         {/* Plain img on purpose: editor-only context with arbitrary remote hosts. */}
-        <img src={src} alt={alt} className="block h-auto w-full" draggable={false} />
+        <img
+          src={src}
+          alt={alt}
+          className="shadow-zine-ink block h-auto w-full border-2 border-black"
+          draggable={false}
+        />
         <FigureControls float={float} updateAttributes={updateAttributes} deleteNode={deleteNode} />
         <div
           role="slider"

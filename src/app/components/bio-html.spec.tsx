@@ -11,11 +11,13 @@ vi.mock('next/image', () => ({
     alt,
     width,
     height,
+    className,
   }: {
     src: string;
     alt: string;
     width: number;
     height: number;
+    className?: string;
   }) => (
     <span
       data-testid="next-image"
@@ -23,6 +25,7 @@ vi.mock('next/image', () => ({
       data-alt={alt}
       data-width={width}
       data-height={height}
+      className={className}
     />
   ),
 }));
@@ -150,6 +153,14 @@ describe('BioHtml', () => {
     );
 
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-width', '1200');
+  });
+
+  it('gives the image the site black border', () => {
+    render(
+      <BioHtml html='<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="p">' />
+    );
+
+    expect(screen.getByTestId('next-image')).toHaveClass('border-2', 'border-black');
   });
 
   it('preserves non-mapped formatting tags', () => {

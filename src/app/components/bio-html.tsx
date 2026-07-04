@@ -91,7 +91,7 @@ const renderImage = (domNode: Element): JSX.Element => {
       width={parseDimension(domNode.attribs.width, DEFAULT_IMAGE_WIDTH)}
       height={parseDimension(domNode.attribs.height, DEFAULT_IMAGE_HEIGHT)}
       sizes="(min-width: 768px) 50vw, 100vw"
-      className="h-auto w-full"
+      className="shadow-zine-ink h-auto w-full border-2 border-black"
     />
   );
 };
