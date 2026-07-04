@@ -97,27 +97,21 @@ describe('handleBioEditorDrop', () => {
     expect(event.preventDefault).toHaveBeenCalled();
   });
 
-  it('inserts linked text at the drop position for a link payload', () => {
+  it('inserts a bioLink node at the drop position for a link payload', () => {
     const { editor, insertContentAt } = makeEditor();
     const event = makeDropEvent({ [BIO_LINK_DRAG_MIME]: JSON.stringify(LINK_PAYLOAD) });
     handleBioEditorDrop(editor, makeView(), event, false);
     expect(insertContentAt).toHaveBeenCalledWith(7, {
-      type: 'text',
-      text: 'Wikipedia',
-      marks: [
-        {
-          type: 'link',
-          attrs: {
-            href: 'https://en.wikipedia.org/wiki/X',
-            target: '_blank',
-            rel: 'nofollow noopener noreferrer',
-          },
-        },
-      ],
+      type: 'bioLink',
+      attrs: {
+        href: 'https://en.wikipedia.org/wiki/X',
+        text: 'Wikipedia',
+        external: true,
+      },
     });
   });
 
-  it('inserts an internal link without new-tab attributes', () => {
+  it('inserts an internal bioLink node without external flag', () => {
     const { editor, insertContentAt } = makeEditor();
     const event = makeDropEvent({
       [BIO_LINK_DRAG_MIME]: JSON.stringify({
@@ -129,14 +123,8 @@ describe('handleBioEditorDrop', () => {
     });
     handleBioEditorDrop(editor, makeView(), event, false);
     expect(insertContentAt).toHaveBeenCalledWith(7, {
-      type: 'text',
-      text: 'First Release',
-      marks: [
-        {
-          type: 'link',
-          attrs: { href: '/releases/first', target: null, rel: null },
-        },
-      ],
+      type: 'bioLink',
+      attrs: { href: '/releases/first', text: 'First Release', external: false },
     });
   });
 
