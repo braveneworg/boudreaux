@@ -82,6 +82,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.173.0] - 2026-07-04
+
+### Added
+
+- fix: 🐛 scope home banner fallback to home route (#551)\n- fix: 🐛 scope home banner fallback to home route (#551)\n
+
 ## [4.172.0] - 2026-07-03
 
 ### Added
