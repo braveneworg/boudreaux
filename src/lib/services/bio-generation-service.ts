@@ -89,6 +89,8 @@ type RehostedImage = {
   width: number | null;
   height: number | null;
   isPrimary: boolean;
+  kind: string | null;
+  alt: string | null;
 };
 
 /** Re-hosted image with its final sort position for persistence. */
@@ -111,6 +113,10 @@ type RehostedBatch = {
   duplicateAliases: Map<number, string>;
 };
 
+/** Sanitize an optional text string; return null if absent or empty. */
+const sanitizeOptional = (text: string | null | undefined): string | null =>
+  text ? sanitizeBioText(text) : null;
+
 /**
  * Builds the rich {@link RehostedImage} record from a raw re-host result and
  * the original image metadata returned by the Lambda. Extracted to keep
@@ -122,14 +128,16 @@ const buildRehostedRecord = (
 ): RehostedImage => ({
   url: result.url,
   thumbnailUrl: result.url,
-  title: image.title ? sanitizeBioText(image.title) : null,
-  attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
+  title: sanitizeOptional(image.title),
+  attribution: sanitizeOptional(image.attribution),
   license: image.license ?? null,
   sourceUrl: image.sourceUrl ?? null,
   originalUrl: image.url,
   width: result.width ?? image.width ?? null,
   height: result.height ?? image.height ?? null,
   isPrimary: image.isPrimary,
+  kind: image.kind ?? null,
+  alt: sanitizeOptional(image.alt),
 });
 
 /**

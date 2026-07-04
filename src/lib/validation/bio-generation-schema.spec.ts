@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { bioGenerationStatusResponseSchema, isInFlightBioStatus } from './bio-generation-schema';
+import {
+  bioGenerationImageSchema,
+  bioGenerationLinkSchema,
+  bioGenerationStatusResponseSchema,
+  bioStatusLinkSchema,
+  isInFlightBioStatus,
+} from './bio-generation-schema';
 
 describe('isInFlightBioStatus', () => {
   it('returns true for a pending job', () => {
@@ -142,5 +148,41 @@ describe('bioGenerationStatusResponseSchema content rows', () => {
       },
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('media v2 wire additions', () => {
+  it('accepts image kind and alt', () => {
+    const image = {
+      url: 'https://cdn.example.com/a.jpg',
+      attribution: 'CAA',
+      isPrimary: false,
+      kind: 'cover',
+      alt: 'Album cover',
+    };
+    const parsed = bioGenerationImageSchema.parse(image);
+    expect(parsed.kind).toBe('cover');
+    expect(parsed.alt).toBe('Album cover');
+  });
+
+  it('rejects unknown image kinds', () => {
+    expect(
+      bioGenerationImageSchema.safeParse({
+        url: 'https://cdn.example.com/a.jpg',
+        attribution: 'CAA',
+        isPrimary: false,
+        kind: 'gif',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts press links on both wire and status schemas', () => {
+    expect(
+      bioGenerationLinkSchema.parse({ label: 'Review', url: 'https://z.net/r', kind: 'press' }).kind
+    ).toBe('press');
+    expect(
+      bioStatusLinkSchema.parse({ id: 'x', label: 'Review', url: 'https://z.net/r', kind: 'press' })
+        .kind
+    ).toBe('press');
   });
 });

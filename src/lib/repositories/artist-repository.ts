@@ -430,6 +430,8 @@ export class ArtistRepository {
         width: number | null;
         height: number | null;
         isPrimary: boolean;
+        kind: string | null;
+        alt: string | null;
         sortOrder: number;
       }>;
       links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;
@@ -503,6 +505,8 @@ export class ArtistRepository {
       sourceUrl: string | null;
       originalUrl: string | null;
       isPrimary: boolean;
+      kind: string | null;
+      alt: string | null;
     }>;
     bioLinks: Array<{ id: string; label: string; url: string; kind: string | null }>;
   } | null> {
@@ -532,6 +536,8 @@ export class ArtistRepository {
               sourceUrl: true,
               originalUrl: true,
               isPrimary: true,
+              kind: true,
+              alt: true,
             },
           },
           bioLinks: {
