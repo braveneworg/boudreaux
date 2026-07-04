@@ -5,6 +5,7 @@ import { Node } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import { isValidBioLinkUrl } from '@/lib/utils/is-valid-bio-link-url';
 
 import { BioLinkNodeView } from './bio-link-node-view';
 
@@ -25,6 +26,7 @@ const parseAnchor = (element: HTMLElement): BioLinkAttributes | false => {
   const href = element.getAttribute('href');
   const text = element.textContent?.trim() ?? '';
   if (!href || !text) return false;
+  if (!isValidBioLinkUrl(href)) return false;
   const external = element.getAttribute('target') === '_blank' || !isInternalBioUrl(href);
   return { href, text, external };
 };

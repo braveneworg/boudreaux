@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lambdaHandler, runBioGeneration } from './handler.js';
+import { lambdaHandler, MAX_SCRAPED_IMAGES, runBioGeneration } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
@@ -563,12 +563,9 @@ describe('runBioGeneration', () => {
     expect(result.images[3].title).toBe('Portrait');
   });
 
-  it('caps total images at 100 when many scraped candidates exist', async () => {
-    const manyScraped = Array.from({ length: 130 }, (_, i) => ({
-      url: `https://a.example/photo-${i}.jpg`,
-      alt: `Photo ${i}`,
-      sourceUrl: 'https://a.example/bio',
-    }));
+  it('caps total images at 100 when vision returns more than the global limit', async () => {
+    // Verify receives ≤MAX_SCRAPED_IMAGES candidates; mock always returns 150 to
+    // confirm the global MAX_IMAGES=100 cap fires regardless.
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
       searchArtistSources: vi
@@ -576,11 +573,19 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: manyScraped,
+          images: Array.from({ length: MAX_SCRAPED_IMAGES + 20 }, (_, i) => ({
+            url: `https://a.example/photo-${i}.jpg`,
+            alt: `Photo ${i}`,
+            sourceUrl: 'https://a.example/bio',
+          })),
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi
+        .fn()
+        .mockResolvedValue(
+          Array.from({ length: 150 }, (_, i) => commonsImage(`https://a.example/photo-${i}.jpg`))
+        ),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Many Images' }, deps);
@@ -790,6 +795,32 @@ describe('runBioGeneration', () => {
 
     expect(lookupArtist).toHaveBeenNthCalledWith(1, 'Ceschi');
     expect(lookupArtist).toHaveBeenNthCalledWith(2, 'Julio Francisco Ramos');
+  });
+
+  it('caps scraped candidates at MAX_SCRAPED_IMAGES before vision verification', async () => {
+    const verifyMock = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: Array.from({ length: MAX_SCRAPED_IMAGES + 5 }, (_, i) => ({
+            url: `https://a.example/photo-${i}.jpg`,
+            alt: `Photo ${i}`,
+            sourceUrl: 'https://a.example/bio',
+          })),
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+      verifyScrapedImages: verifyMock,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    const [candidates] = (verifyMock as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown[]];
+    expect(candidates).toHaveLength(MAX_SCRAPED_IMAGES);
   });
 
   it('caps links at 100 when many candidates exist', async () => {

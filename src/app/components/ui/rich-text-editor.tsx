@@ -28,8 +28,8 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Switch } from '@/app/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import { isValidBioLinkUrl } from '@/lib/utils/is-valid-bio-link-url';
 
 import { handleBioEditorDrop } from './bio-editor-drop';
 import { BioFigure } from './bio-figure-extension';
@@ -83,11 +83,6 @@ const BioEditorImage = TiptapImage.extend({
     };
   },
 });
-
-/** Valid bio link targets: absolute http(s) URLs or site-relative paths
- *  (`/releases/x`, but never protocol-relative `//host`). */
-const isValidBioLinkUrl = (href: string): boolean =>
-  isHttpUrl(href) || (href.startsWith('/') && !href.startsWith('//'));
 
 interface LabeledTextFieldProps {
   id: string;

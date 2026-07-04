@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { verifyScrapedImages, VISION_MIN_CONFIDENCE } from './vision.js';
+import { verifyScrapedImages, VISION_FETCH_MAX_BYTES, VISION_MIN_CONFIDENCE } from './vision.js';
 
 import type { BioImage } from './types.js';
 
@@ -110,6 +110,31 @@ describe('verifyScrapedImages', () => {
     expect(kept).toEqual([]);
     // No Gemini call when nothing survived fetching.
     expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a candidate with an oversized content-length header without reading the body', async () => {
+    // The body is small (4 bytes — would pass the post-read check), but the
+    // Content-Length header declares the payload as oversized. The pre-read check
+    // must reject so the body is never consumed.
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(new Uint8Array([137, 80, 78, 71]), {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          'Content-Length': String(VISION_FETCH_MAX_BYTES + 1),
+        },
+      })
+    );
+    const kept = await verifyScrapedImages(
+      [candidate('https://a.com/1.png')],
+      context,
+      { apiKey: 'key', model: 'gemini-2.5-flash' },
+      { fetchFn, sleep: async () => {} }
+    );
+    expect(kept).toEqual([]);
+    // Without the pre-read check the 4-byte body would be accepted and Gemini
+    // called (2 fetches total). Exactly 1 fetch confirms early rejection.
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it('keeps album covers as kind cover with a title-derived alt fallback', async () => {

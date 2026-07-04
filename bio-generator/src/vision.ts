@@ -50,6 +50,14 @@ interface FetchedCandidate {
   base64: string;
 }
 
+/** True when the Content-Length header declares a payload larger than the byte limit. */
+const isOversizedByHeader = (headers: Headers): boolean => {
+  const header = headers.get('content-length');
+  if (header === null) return false;
+  const declared = Number(header);
+  return !Number.isNaN(declared) && declared > VISION_FETCH_MAX_BYTES;
+};
+
 /** Fetches one candidate's bytes; null (drop) on any failure — fail closed. */
 const fetchCandidate = async (
   image: BioImage,
@@ -62,6 +70,7 @@ const fetchCandidate = async (
     if (!response.ok) return null;
     const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
     if (!mimeType.startsWith('image/')) return null;
+    if (isOversizedByHeader(response.headers)) return null;
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength === 0 || bytes.byteLength > VISION_FETCH_MAX_BYTES) return null;
     return { image, mimeType, base64: Buffer.from(bytes).toString('base64') };

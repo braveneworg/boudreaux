@@ -48,4 +48,28 @@ describe('BioLink extension', () => {
     const editor = makeEditor('<p><a>bare</a></p>');
     expect(editor.getHTML()).not.toContain('bioLink');
   });
+
+  it('rejects a javascript: href — no bioLink node is created', () => {
+    const editor = makeEditor('<p><a href="javascript:alert(1)">click</a></p>');
+    const firstChild = editor.state.doc.content.firstChild?.firstChild;
+    expect(firstChild?.type.name).not.toBe('bioLink');
+  });
+
+  it('rejects a data: href — no bioLink node is created', () => {
+    const editor = makeEditor('<p><a href="data:text/html,<h1>x</h1>">click</a></p>');
+    const firstChild = editor.state.doc.content.firstChild?.firstChild;
+    expect(firstChild?.type.name).not.toBe('bioLink');
+  });
+
+  it('still parses valid https: hrefs into bioLink nodes after the guard', () => {
+    const editor = makeEditor('<p><a href="https://example.com">link</a></p>');
+    const node = editor.state.doc.content.firstChild?.firstChild;
+    expect(node?.type.name).toBe('bioLink');
+  });
+
+  it('still parses site-relative /releases/... hrefs into bioLink nodes after the guard', () => {
+    const editor = makeEditor('<p><a href="/releases/slug">link</a></p>');
+    const node = editor.state.doc.content.firstChild?.firstChild;
+    expect(node?.type.name).toBe('bioLink');
+  });
 });
