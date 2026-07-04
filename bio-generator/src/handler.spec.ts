@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lambdaHandler, MAX_SCRAPED_IMAGES, runBioGeneration } from './handler.js';
+import { lambdaHandler, MAX_VISION_CANDIDATES, runBioGeneration } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
@@ -564,7 +564,7 @@ describe('runBioGeneration', () => {
   });
 
   it('caps total images at 100 when vision returns more than the global limit', async () => {
-    // Verify receives ≤MAX_SCRAPED_IMAGES candidates; mock always returns 150 to
+    // Verify receives ≤MAX_VISION_CANDIDATES candidates; mock always returns 150 to
     // confirm the global MAX_IMAGES=100 cap fires regardless.
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -573,7 +573,7 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: Array.from({ length: MAX_SCRAPED_IMAGES + 20 }, (_, i) => ({
+          images: Array.from({ length: MAX_VISION_CANDIDATES + 20 }, (_, i) => ({
             url: `https://a.example/photo-${i}.jpg`,
             alt: `Photo ${i}`,
             sourceUrl: 'https://a.example/bio',
@@ -797,7 +797,7 @@ describe('runBioGeneration', () => {
     expect(lookupArtist).toHaveBeenNthCalledWith(2, 'Julio Francisco Ramos');
   });
 
-  it('caps scraped candidates at MAX_SCRAPED_IMAGES before vision verification', async () => {
+  it('caps scraped candidates at MAX_VISION_CANDIDATES before vision verification', async () => {
     const verifyMock = vi.fn().mockResolvedValue([]);
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -806,7 +806,7 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: Array.from({ length: MAX_SCRAPED_IMAGES + 5 }, (_, i) => ({
+          images: Array.from({ length: MAX_VISION_CANDIDATES + 5 }, (_, i) => ({
             url: `https://a.example/photo-${i}.jpg`,
             alt: `Photo ${i}`,
             sourceUrl: 'https://a.example/bio',
@@ -820,7 +820,7 @@ describe('runBioGeneration', () => {
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
     const [candidates] = (verifyMock as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown[]];
-    expect(candidates).toHaveLength(MAX_SCRAPED_IMAGES);
+    expect(candidates).toHaveLength(MAX_VISION_CANDIDATES);
   });
 
   it('caps links at 100 when many candidates exist', async () => {

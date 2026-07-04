@@ -74,8 +74,8 @@ const MAX_LINKS = 100;
 const MAX_COMMONS_CATEGORY_IMAGES = 30;
 /** Cover Art Archive front covers resolved per artist. */
 const MAX_COVER_ART = 40;
-/** Scraped (Jina/official-site) candidates forwarded to vision verification. */
-export const MAX_SCRAPED_IMAGES = 50;
+/** Global cap on scraped candidates entering vision verification. */
+export const MAX_VISION_CANDIDATES = 60;
 
 /** Search-engine result pages and share widgets — never useful bio links. */
 const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
@@ -424,7 +424,7 @@ const applyVerifiedScrapedImages = async (
       ...acc.releaseGroups.map((group) => group.title),
     ],
   };
-  const verified = await verify(candidates.slice(0, MAX_SCRAPED_IMAGES), context);
+  const verified = await verify(candidates.slice(0, MAX_VISION_CANDIDATES), context);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
