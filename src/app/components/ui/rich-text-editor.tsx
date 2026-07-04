@@ -59,6 +59,10 @@ interface RichTextEditorProps {
   ariaLabel?: string;
   id?: string;
   className?: string;
+  /** Called once with the editor instance when TipTap finishes initialising. */
+  onEditorReady?: (editor: Editor) => void;
+  /** Called each time this editor gains focus. */
+  onEditorFocus?: () => void;
 }
 
 /** Image node that also persists width/height so variants render at the right size. */
@@ -326,6 +330,8 @@ export const RichTextEditor = ({
   ariaLabel,
   id,
   className,
+  onEditorReady,
+  onEditorFocus,
 }: RichTextEditorProps): JSX.Element => {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -368,6 +374,12 @@ export const RichTextEditor = ({
       },
       handleDrop: (view, event, _slice, moved) =>
         editorRef.current ? handleBioEditorDrop(editorRef.current, view, event, moved) : false,
+    },
+    onCreate: ({ editor: instance }) => {
+      onEditorReady?.(instance);
+    },
+    onFocus: () => {
+      onEditorFocus?.();
     },
     onUpdate: ({ editor: instance }) => {
       const html = instance.getHTML();

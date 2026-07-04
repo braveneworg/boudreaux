@@ -61,26 +61,26 @@ const IMAGES: BioStatusImage[] = [
 
 describe('BioImagePalette', () => {
   it('renders a tile with attribution text', () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByText('Photo by Example')).toBeInTheDocument();
   });
 
   it('renders square draggable tiles with no rounded corners', () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const tile = screen.getByText('Photo by Example').closest('li') as HTMLElement;
     expect(tile.className).not.toMatch(/rounded/);
   });
 
   it('calls onDelete with the row id when X is pressed', async () => {
     const onDelete = vi.fn();
-    render(<BioImagePalette images={IMAGES} onDelete={onDelete} />);
+    render(<BioImagePalette images={IMAGES} onDelete={onDelete} onInsert={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete image Ceschi Ramos' }));
     expect(onDelete).toHaveBeenCalledWith('i1');
   });
 
   it('uses the image url as the delete label when title is absent', async () => {
     const onDelete = vi.fn();
-    render(<BioImagePalette images={IMAGES} onDelete={onDelete} />);
+    render(<BioImagePalette images={IMAGES} onDelete={onDelete} onInsert={vi.fn()} />);
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete image https://example.com/photo2.jpg' })
     );
@@ -88,7 +88,7 @@ describe('BioImagePalette', () => {
   });
 
   it('sets the image drag payload on dragstart', () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const setData = vi.fn();
     fireEvent.dragStart(screen.getByText('Photo by Example').closest('li') as HTMLElement, {
       dataTransfer: { setData, effectAllowed: '' },
@@ -108,7 +108,7 @@ describe('BioImagePalette', () => {
   });
 
   it('opens a preview dialog when the eye button is pressed', async () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Preview Ceschi Ramos' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
@@ -126,26 +126,45 @@ describe('BioImagePalette', () => {
       height: 768,
       isPrimary: false,
     };
-    render(<BioImagePalette images={[sized]} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={[sized]} onDelete={vi.fn()} onInsert={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Preview Sized' }));
     const dialogImage = within(screen.getByRole('dialog')).getByTestId('palette-image');
     expect(dialogImage).toHaveAttribute('data-width', '1024');
   });
 
   it('falls back to default preview dimensions when the image has none', async () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Preview image' }));
     const dialogImage = within(screen.getByRole('dialog')).getByTestId('palette-image');
     expect(dialogImage).toHaveAttribute('data-height', '600');
   });
 
   it('uses "image" as the preview label when title is absent', () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Preview image' })).toBeInTheDocument();
   });
 
   it('disables the delete button when disabled prop is true', () => {
-    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} disabled />);
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
     expect(screen.getByRole('button', { name: 'Delete image Ceschi Ramos' })).toBeDisabled();
+  });
+
+  it('renders the count, shows kind badge, filters by attribution, and inserts on click', async () => {
+    const imagesWithKind: BioStatusImage[] = [{ ...IMAGES[0], kind: 'photo' }, { ...IMAGES[1] }];
+    const onInsert = vi.fn();
+    render(<BioImagePalette images={imagesWithKind} onDelete={vi.fn()} onInsert={onInsert} />);
+    expect(screen.getByText(/Discovered images \(2\)/)).toBeInTheDocument();
+    expect(screen.getByText('photo')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Filter images'), 'Example');
+    expect(screen.queryByRole('button', { name: 'Insert image image' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Insert image Ceschi Ramos' }));
+    expect(onInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://example.com/photo.jpg' })
+    );
+  });
+
+  it('disables the insert button when disabled prop is true', () => {
+    render(<BioImagePalette images={IMAGES} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
+    expect(screen.getByRole('button', { name: 'Insert image Ceschi Ramos' })).toBeDisabled();
   });
 });

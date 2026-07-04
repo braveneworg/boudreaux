@@ -5,12 +5,16 @@
 
 import type { JSX } from 'react';
 
+import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/bio-editor-insert';
 import {
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
 } from '@/app/hooks/mutations/use-bio-media-mutations';
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
+import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import type { BioStatusImage, BioStatusLink } from '@/lib/validation/bio-generation-schema';
 
+import { useBioEditorRegistry } from './bio-editor-registry';
 import { BioImagePalette } from './bio-image-palette';
 import { BioLinkPalette } from './bio-link-palette';
 
@@ -21,9 +25,11 @@ interface BioMediaPalettesProps {
 /**
  * Side-by-side curated palettes of the artist's discovered bio links and
  * images, fed by the persisted rows (bio-generation status query). Rendered
- * directly above the bio editors so tiles drag straight in. Renders nothing
- * until a generation has succeeded and left at least one row; while either
- * delete mutation is pending both palettes' delete buttons are disabled.
+ * directly above the bio editors so tiles drag straight in. The Plus button
+ * on each tile inserts at the focused editor's cursor (touch/keyboard path).
+ * Renders nothing until a generation has succeeded and left at least one row;
+ * while either delete mutation is pending both palettes' delete buttons are
+ * disabled.
  *
  * @param artistId - The artist whose discovered media to show (edit mode only).
  */
@@ -31,6 +37,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   const status = useArtistBioGenerationStatusQuery(artistId);
   const { deleteBioLink, isDeletingBioLink } = useDeleteBioLinkMutation(artistId);
   const { deleteBioImage, isDeletingBioImage } = useDeleteBioImageMutation(artistId);
+  const registry = useBioEditorRegistry();
 
   const content = status.data?.status === 'succeeded' ? status.data.content : null;
   if (!content || (content.links.length === 0 && content.images.length === 0)) {
@@ -39,13 +46,60 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
 
   const isDeleting = isDeletingBioLink || isDeletingBioImage;
 
+  const insertLink = (link: BioStatusLink): void => {
+    const target = registry.getTarget();
+    if (!target) return;
+    target
+      .chain()
+      .focus()
+      .insertContent(
+        buildBioLinkContent({
+          label: link.label,
+          url: link.url,
+          kind: link.kind ?? null,
+          isExternal: !isInternalBioUrl(link.url),
+        })
+      )
+      .run();
+  };
+
+  const insertImage = (image: BioStatusImage): void => {
+    const target = registry.getTarget();
+    if (!target) return;
+    target
+      .chain()
+      .focus()
+      .insertContent(
+        buildBioFigureContent({
+          url: image.url,
+          thumbnailUrl: image.thumbnailUrl ?? null,
+          title: image.title ?? null,
+          attribution: image.attribution ?? null,
+          alt: image.alt ?? image.title ?? 'Artist photo',
+          width: image.width ?? null,
+          height: image.height ?? null,
+        })
+      )
+      .run();
+  };
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {content.links.length > 0 && (
-        <BioLinkPalette links={content.links} onDelete={deleteBioLink} disabled={isDeleting} />
+        <BioLinkPalette
+          links={content.links}
+          onDelete={deleteBioLink}
+          onInsert={insertLink}
+          disabled={isDeleting}
+        />
       )}
       {content.images.length > 0 && (
-        <BioImagePalette images={content.images} onDelete={deleteBioImage} disabled={isDeleting} />
+        <BioImagePalette
+          images={content.images}
+          onDelete={deleteBioImage}
+          onInsert={insertImage}
+          disabled={isDeleting}
+        />
       )}
     </div>
   );
