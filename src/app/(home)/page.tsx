@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
+import { HomeContent } from '@/components/home-content';
 import { queryKeys } from '@/lib/query-keys';
 import {
   type BannersApiResponse,
@@ -13,9 +14,7 @@ import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-
-import { HomeContent } from './components/home-content';
-import { PageContainer } from './components/ui/page-container';
+import { PageContainer } from '@/ui/page-container';
 
 /**
  * Force dynamic rendering on every request.

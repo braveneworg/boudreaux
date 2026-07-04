@@ -72,13 +72,13 @@ vi.mock('@/lib/utils/attach-stream-urls', () => ({
 }));
 
 // Mock child components
-vi.mock('./components/ui/page-container', () => ({
+vi.mock('@/ui/page-container', () => ({
   PageContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="page-container">{children}</div>
   ),
 }));
 
-vi.mock('./components/home-content', () => ({
+vi.mock('@/components/home-content', () => ({
   HomeContent: () => <div data-testid="home-content">Home Content</div>,
 }));
 
