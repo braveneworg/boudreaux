@@ -375,6 +375,146 @@ describe('RichTextEditor link dialog handlers', () => {
     );
   });
 
+  it('keeps the dialog open when Remove is clicked but editLinkPos points to a stale (non-bioLink) node', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    // Get the editor instance first
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
+    );
+
+    // Externally mutate the editor content so the node at editLinkPos is no longer a bioLink
+    // This simulates a stale position after external edits
+    onChange.mockClear();
+
+    // Replace the entire doc with plain text (no bioLink)
+    editor.chain().focus().setContent('<p>plain text</p>', { emitUpdate: false }).run();
+
+    // Now click Remove — the command should fail silently because the node is gone
+    // and the dialog should remain open
+    const removeBtn = screen.getByRole('button', { name: 'Remove' });
+    await userEvent.click(removeBtn);
+
+    // Dialog should still be open because the remove failed
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'URL' })).toBeInTheDocument());
+  });
+
+  it('closes the dialog when Remove is clicked and editLinkPos points to a valid bioLink node', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    // Get the editor instance
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
+    );
+
+    // Click Remove with a valid bioLink node still at editLinkPos
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    // Dialog should close
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+    );
+
+    // Verify the link was actually removed from the HTML
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.not.stringContaining('href='))
+    );
+  });
+
+  it('resets editLinkPos when the dialog is dismissed via Escape or overlay', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open with edit-mode state
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
+    );
+
+    // Dismiss the dialog via Escape
+    await userEvent.keyboard('{Escape}');
+
+    // Dialog should close
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+    );
+
+    // Open the link dialog again — it should be in insert mode (not edit mode)
+    // In insert mode, the URL and text fields should be empty (not pre-filled with old values)
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    // Fields should be empty (insert mode), not pre-filled with the previous edit state
+    await waitFor(() => {
+      const urlField = screen.getByRole('textbox', { name: 'URL' });
+      expect(urlField).toHaveValue('');
+    });
+  });
+
   it('inserts a bioLink node with the given href when inserted via dialog', async () => {
     const onChange = vi.fn();
     const Controlled = () => {

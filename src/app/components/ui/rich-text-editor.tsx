@@ -456,18 +456,34 @@ export const RichTextEditor = ({
 
   const removeLink = (): void => {
     if (editLinkPos !== null) {
+      let removeSucceeded = false;
       editor
         .chain()
         .focus()
         .command(({ tr, state }) => {
           const node = state.doc.nodeAt(editLinkPos);
           if (node?.type.name !== 'bioLink') return false;
+          removeSucceeded = true;
           tr.delete(editLinkPos, editLinkPos + node.nodeSize);
           return true;
         })
         .run();
+      // Only close the dialog and reset if the remove actually succeeded
+      if (removeSucceeded) {
+        setLinkOpen(false);
+        setEditLinkPos(null);
+      }
+    } else {
+      // editLinkPos is null, so we're in insert mode (nothing to remove)
+      setLinkOpen(false);
     }
-    setLinkOpen(false);
+  };
+
+  const handleLinkDialogOpenChange = (open: boolean): void => {
+    setLinkOpen(open);
+    if (!open) {
+      setEditLinkPos(null);
+    }
   };
 
   const handleImageOpenChange = (open: boolean): void => {
@@ -521,7 +537,7 @@ export const RichTextEditor = ({
       )}
       <LinkDialog
         open={linkOpen}
-        onOpenChange={setLinkOpen}
+        onOpenChange={handleLinkDialogOpenChange}
         linkUrl={linkUrl}
         linkText={linkText}
         linkExternal={linkExternal}
