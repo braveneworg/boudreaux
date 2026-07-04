@@ -19,7 +19,7 @@ const HeaderContainer = ({ children, className }: HeaderContainerProps) => {
   return (
     <div
       className={cn(
-        'sticky top-0 right-0 left-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)] xl:overflow-visible xl:border-b-2 xl:border-b-zinc-50 xl:shadow-none',
+        'sticky top-0 right-0 left-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)] xl:overflow-visible xl:shadow-none',
         className
       )}
     >
