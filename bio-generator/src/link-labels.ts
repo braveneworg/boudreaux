@@ -5,15 +5,18 @@
 /** Longest label the palette renders comfortably on one tile line. */
 const MAX_LABEL_LENGTH = 80;
 
-/** Registrable domains → human service names for label fallbacks. */
+/** Registrable domains → human service names for label fallbacks.
+ * NOTE: more-specific domains must precede their parent domains, since
+ * lookup returns the first match (e.g., music.youtube.com before youtube.com).
+ */
 const SERVICE_HOST_NAMES = new Map<string, string>([
   ['bandcamp.com', 'Bandcamp'],
   ['spotify.com', 'Spotify'],
   ['music.apple.com', 'Apple Music'],
   ['itunes.apple.com', 'Apple Music'],
   ['soundcloud.com', 'SoundCloud'],
-  ['youtube.com', 'YouTube'],
   ['music.youtube.com', 'YouTube Music'],
+  ['youtube.com', 'YouTube'],
   ['tidal.com', 'Tidal'],
   ['deezer.com', 'Deezer'],
   ['discogs.com', 'Discogs'],
