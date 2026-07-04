@@ -68,11 +68,23 @@ describe('Footer', () => {
       expect(footer).toHaveClass('bg-zinc-950', 'w-full', 'relative');
     });
 
-    it('renders content container with max width', () => {
+    it('renders content container with xl max width', () => {
       render(<Footer />);
 
       const container = document.querySelector('footer > div');
-      expect(container).toHaveClass('max-w-480');
+      expect(container).toHaveClass('xl:max-w-7xl');
+    });
+
+    it('matches the header at xl: starfield, top border, 7xl content', () => {
+      render(<Footer />);
+      const footer = screen.getByRole('contentinfo');
+      expect(footer.className).toContain("xl:bg-[url('/media/ffinc-starfield-tile.png')]");
+      expect(footer.className).toContain('xl:bg-repeat');
+      expect(footer.className).toContain('xl:border-t-2');
+      expect(footer.className).toContain('xl:border-t-zinc-50');
+      const content = footer.firstElementChild;
+      expect(content?.className).toContain('xl:max-w-7xl');
+      expect(content?.className).not.toContain('max-w-480');
     });
 
     it('renders navigation with flex-wrap for responsive layout', () => {

@@ -9,8 +9,8 @@ export const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative min-h-23 w-full bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:opacity-90 before:content-['']">
-      <div className="relative z-10 mx-auto mt-2 w-full max-w-480 py-1">
+    <footer className="relative min-h-23 w-full bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:opacity-90 before:content-[''] xl:border-t-2 xl:border-t-zinc-50 xl:bg-black xl:bg-[url('/media/ffinc-starfield-tile.png')] xl:bg-auto xl:bg-repeat">
+      <div className="relative z-10 mx-auto mt-2 w-full py-1 xl:max-w-7xl">
         <div className="flex flex-col items-center justify-center gap-0 px-4 md:flex-row md:justify-between md:px-8">
           <div className="flex text-sm text-zinc-50 md:text-base">
             © {currentYear} Fake Four Inc.
