@@ -53,12 +53,14 @@ describe('BioLink extension', () => {
     const editor = makeEditor('<p><a href="javascript:alert(1)">click</a></p>');
     const firstChild = editor.state.doc.content.firstChild?.firstChild;
     expect(firstChild?.type.name).not.toBe('bioLink');
+    expect(editor.getText()).toContain('click');
   });
 
   it('rejects a data: href — no bioLink node is created', () => {
     const editor = makeEditor('<p><a href="data:text/html,<h1>x</h1>">click</a></p>');
     const firstChild = editor.state.doc.content.firstChild?.firstChild;
     expect(firstChild?.type.name).not.toBe('bioLink');
+    expect(editor.getText()).toContain('click');
   });
 
   it('still parses valid https: hrefs into bioLink nodes after the guard', () => {
