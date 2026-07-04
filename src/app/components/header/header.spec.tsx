@@ -77,10 +77,11 @@ describe('Header', () => {
     expect(headerWrapper).toHaveClass('right-0');
   });
 
-  it('centers and caps the container width at xl', () => {
+  it('renders the container full-bleed (no xl content cap on the shell)', () => {
     const { container } = render(<Header />);
-    const headerWrapper = container.firstChild as HTMLElement;
-    expect(headerWrapper).toHaveClass('mx-auto', 'xl:max-w-7xl');
+    const shell = container.firstElementChild;
+    expect(shell?.className).not.toContain('xl:max-w-7xl');
+    expect(shell?.className).toContain('w-full');
   });
 
   it('renders the decorative backdrop layer', () => {

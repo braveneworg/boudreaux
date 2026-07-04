@@ -22,7 +22,7 @@ export const Logo = ({ isMobile, priority = true }: Readonly<LogoProps>) => {
     <Link href="/" className="shrink-0" unstable_dynamicOnHover>
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-10 xl:left-8 xl:size-36"
+        className="xl:shadow-zine-ink mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-4 xl:left-8 xl:size-24"
         height={48}
         priority={priority}
         unoptimized

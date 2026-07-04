@@ -8,6 +8,13 @@ import { render } from '@testing-library/react';
 import { HeaderBackdrop } from './header-backdrop';
 
 describe('HeaderBackdrop', () => {
+  it('clips its animated layers inside its own wrapper', () => {
+    const { container } = render(<HeaderBackdrop />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain('overflow-hidden');
+    expect(wrapper?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   describe('animated background', () => {
     it('renders background div with CSS animation class', () => {
       const { container } = render(<HeaderBackdrop />);
