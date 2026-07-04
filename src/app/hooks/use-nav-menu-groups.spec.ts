@@ -107,4 +107,19 @@ describe('useNavMenuGroups', () => {
     if (music?.kind !== 'group') throw new Error('expected Music group');
     expect(music.group.items.map((i) => i.name)).toEqual(['Releases', 'Artists', 'Playlists']);
   });
+
+  it('omits a group entirely when every member is absent from the flat list', () => {
+    const labelHrefs = ['/tours', '/merch', '/about'];
+    mockUseNavMenuItems.mockReturnValue(
+      FLAT_SIGNED_OUT.filter((i) => !labelHrefs.includes(i.href))
+    );
+
+    const { result } = renderHook(() => useNavMenuGroups());
+
+    expect(result.current.map((e) => (e.kind === 'link' ? e.item.name : e.group.label))).toEqual([
+      'Home',
+      'Music',
+      'Contact Us',
+    ]);
+  });
 });
