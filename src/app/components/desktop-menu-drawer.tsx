@@ -20,10 +20,11 @@ import {
 /**
  * Per-drawer paper-scrap accent + tilt. Literal map — Tailwind only emits
  * classes it can see as full literals in source (same rule as ZinePanel's
- * ACCENT_CLASS). Accents match the approved comps: Music yellow, Label hot pink.
+ * ACCENT_CLASS). Each drawer's accent matches its trigger's ramp color: Music
+ * cyan, Label hot pink.
  */
 const DRAWER_ACCENT_CLASS = new Map<string, string>([
-  ['Music', 'zine-accent-yellow -rotate-[1.5deg]'],
+  ['Music', 'zine-accent-cyan -rotate-[1.5deg]'],
   ['Label', 'zine-accent-hot-pink rotate-[1.5deg]'],
 ]);
 
