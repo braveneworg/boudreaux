@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import * as React from 'react';
+
 import Link from 'next/link';
 
 import type { NavMenuGroup } from '@/hooks/use-nav-menu-groups';
@@ -38,7 +40,10 @@ export interface DesktopMenuDrawerProps {
  * clipping lives on the backdrop layer, not on any of the drawer's ancestors.
  * Trigger wears the group color and underlines while a child route is active.
  */
-export const DesktopMenuDrawer = ({ group, pathname }: DesktopMenuDrawerProps) => {
+export const DesktopMenuDrawer = ({
+  group,
+  pathname,
+}: DesktopMenuDrawerProps): React.ReactElement => {
   const isTrailActive = group.items.some((item) => isActiveHref(item.href, pathname));
 
   return (
@@ -73,14 +78,18 @@ export const DesktopMenuDrawer = ({ group, pathname }: DesktopMenuDrawerProps) =
                 key={item.name}
                 className="border-b-2 border-dashed border-black/15 last:border-b-0"
               >
-                <NavigationMenuLink asChild active={isActive}>
-                  {/* Drawer links are ink-on-paper by design (no per-item palette
+                <NavigationMenuLink
+                  asChild
+                  className="font-fake-four-cutout hover:text-menu-item-tan-100 focus:text-menu-item-tan-100 block px-4 py-2 text-[22px] text-zinc-950 underline-offset-4 hover:bg-zinc-950 focus:bg-zinc-950 aria-[current=page]:underline"
+                >
+                  {/* Classes live on NavigationMenuLink so its cn() tailwind-merges
+                      them over the shadcn defaults (Slot would only concatenate).
+                      Drawer links are ink-on-paper by design (no per-item palette
                       colors inside the drawer); active child is underlined in ink. */}
                   <Link
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
                     unstable_dynamicOnHover
-                    className="font-fake-four-cutout hover:text-menu-item-tan-100 focus:text-menu-item-tan-100 block px-4 py-2 text-[22px] text-zinc-950 underline-offset-4 hover:bg-zinc-950 focus:bg-zinc-950 aria-[current=page]:underline"
                   >
                     {item.name}
                   </Link>
