@@ -141,6 +141,14 @@ describe('RootLayout', () => {
         'overflow-x-clip'
       );
     });
+
+    it('paints the kraft desk on body and the torn sheet on main at xl', async () => {
+      render(await RootLayout({ children: <div>Test</div> }));
+
+      expect(document.body.className).toContain('xl:zine-desk');
+      const main = document.querySelector('main');
+      expect(main?.className).toContain('xl:zine-page-edges');
+    });
   });
 
   describe('html structure', () => {

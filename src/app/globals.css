@@ -341,6 +341,33 @@ textarea:focus-visible,
   background-image: url('/media/particles-6.svg');
 }
 
+/* Desktop-only zine frame — the kraft "desk" the white page sits on, plus the
+   torn-out sheet edges. Pure CSS/SVG data-URIs: no image requests, no JS.
+   Applied with the `xl:` variant in layout.tsx; below 1280px viewports the
+   gutters have zero width, so neither utility is ever visible there. */
+@utility zine-desk {
+  background-color: #d7ccb4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+}
+
+/* The 1280px content column as a torn-out white sheet: kraft-toned tear teeth
+   tile down both inside edges (14px wide, 140px period, mirrored). Painted as
+   background layers inside main's box so nothing escapes overflow-x-clip. The
+   tooth fill must match zine-desk's background-color. */
+@utility zine-page-edges {
+  background-color: var(--color-background);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cg transform='translate(14 0) scale(-1 1)'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat-y, repeat-y;
+  background-position:
+    left top,
+    right top;
+  background-size:
+    14px 140px,
+    14px 140px;
+}
+
 /* Banner notification strip slide animations — keyframes are referenced from
    inline styles with dynamic durations, so they must stay outside @theme. */
 @keyframes banner-strip-slide-right {
