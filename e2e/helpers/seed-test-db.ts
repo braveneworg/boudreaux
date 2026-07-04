@@ -105,6 +105,16 @@ const SIGNOUT_USER_ID = SIGNOUT_USER.id;
 const BIO_PALETTE_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a1';
 
 /**
+ * Deterministic id of the dedicated artist used by
+ * `admin/bio-media-palettes.spec.ts` for the filter, click-to-insert, and
+ * persistence test. Left without a bioStatus so the palettes do not render on
+ * load — the spec triggers a fresh generation to get the deterministic fixture
+ * output (press link + cover image). No releases are linked so the fixture
+ * produces exactly 2 links (Wikipedia + press) and 2 images (photo + cover).
+ */
+const BIO_FILTER_INSERT_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a2';
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -546,6 +556,25 @@ const seedTestDatabase = async () => {
       },
     });
 
+    // Dedicated artist for the filter/click-to-insert E2E spec
+    // (admin/bio-media-palettes.spec.ts). No bioStatus means the palette
+    // does not render on load; the spec triggers generation to get the
+    // deterministic fixture rows (press link + cover image). createdAt is
+    // pinned slightly after the palette artist so it consistently sorts last
+    // and does not become the first artist in the admin list (which would
+    // displace the artist the bio-generation spec targets). No releases are
+    // linked, so the fixture produces exactly 2 links and 2 images.
+    await prisma.artist.create({
+      data: {
+        id: BIO_FILTER_INSERT_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Bio Media',
+        slug: 'e2e-bio-media-artist',
+        displayName: 'E2E Bio Media Artist',
+        createdAt: new Date('2020-01-02T00:00:00Z'),
+      },
+    });
+
     const e2eRelease1 = await prisma.release.create({
       data: {
         title: 'E2E Album One',
@@ -920,6 +949,7 @@ const seedTestDatabase = async () => {
 };
 
 export {
+  BIO_FILTER_INSERT_ARTIST_ID,
   BIO_PALETTE_ARTIST_ID,
   createBioPaletteLinkRow,
   createDisposableSignoutState,

@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lambdaHandler, runBioGeneration } from './handler.js';
+import { lambdaHandler, MAX_VISION_CANDIDATES, runBioGeneration } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
-import type { BioImage } from './types.js';
+import type { ArtistFacts, BioImage } from './types.js';
 
 const image = (overrides: Partial<BioImage> = {}): BioImage => ({
   url: 'https://upload.wikimedia.org/a.jpg',
@@ -19,6 +19,20 @@ const image = (overrides: Partial<BioImage> = {}): BioImage => ({
   isPrimary: false,
   ...overrides,
 });
+
+const commonsImage = (url: string): BioImage => ({
+  url,
+  thumbnailUrl: null,
+  title: null,
+  attribution: 'Wikimedia Commons',
+  license: null,
+  sourceUrl: null,
+  width: null,
+  height: null,
+  isPrimary: false,
+});
+
+const baseInput = () => ({ artistId: 'a1', displayName: 'Ceschi' });
 
 const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps => ({
   lookupArtist: vi.fn().mockResolvedValue({
@@ -61,6 +75,10 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   getScrapeApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
   readUrl: vi.fn().mockResolvedValue(null),
+  listReleaseGroups: vi.fn().mockResolvedValue([]),
+  getCoverArtImages: vi.fn().mockResolvedValue([]),
+  getCommonsCategoryImages: vi.fn().mockResolvedValue([]),
+  verifyScrapedImages: vi.fn().mockResolvedValue([]),
   ...overrides,
 });
 
@@ -373,6 +391,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -410,6 +429,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -421,7 +441,7 @@ describe('runBioGeneration', () => {
     expect(result.images[2].url).toBe('https://a.example/artist.jpg');
   });
 
-  it('ranks alt-titled scraped images first; all 8 candidates fit under the new cap of 30', async () => {
+  it('ranks alt-titled scraped images first; all 8 candidates fit under the cap', async () => {
     const scraped = Array.from({ length: 8 }, (_, i) => ({
       url: `https://a.example/photo-${i}.jpg`,
       alt: i % 2 === 0 ? null : `Photo ${i}`,
@@ -438,6 +458,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -468,6 +489,7 @@ describe('runBioGeneration', () => {
           },
         ],
       }),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -496,6 +518,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -528,6 +551,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -539,12 +563,9 @@ describe('runBioGeneration', () => {
     expect(result.images[3].title).toBe('Portrait');
   });
 
-  it('caps total images at 30 when many scraped candidates exist', async () => {
-    const manyScraped = Array.from({ length: 40 }, (_, i) => ({
-      url: `https://a.example/photo-${i}.jpg`,
-      alt: `Photo ${i}`,
-      sourceUrl: 'https://a.example/bio',
-    }));
+  it('caps total images at 100 when vision returns more than the global limit', async () => {
+    // Verify receives ≤MAX_VISION_CANDIDATES candidates; mock always returns 150 to
+    // confirm the global MAX_IMAGES=100 cap fires regardless.
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
       searchArtistSources: vi
@@ -552,15 +573,24 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: manyScraped,
+          images: Array.from({ length: MAX_VISION_CANDIDATES + 20 }, (_, i) => ({
+            url: `https://a.example/photo-${i}.jpg`,
+            alt: `Photo ${i}`,
+            sourceUrl: 'https://a.example/bio',
+          })),
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi
+        .fn()
+        .mockResolvedValue(
+          Array.from({ length: 150 }, (_, i) => commonsImage(`https://a.example/photo-${i}.jpg`))
+        ),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Many Images' }, deps);
 
-    expect(result.images).toHaveLength(30);
+    expect(result.images).toHaveLength(100);
   });
 
   it('fills facts.imageTitles entries with Photo of {displayName} when title is absent', async () => {
@@ -582,6 +612,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Test Artist' }, deps);
@@ -675,7 +706,7 @@ describe('runBioGeneration', () => {
     expect(spotifyLink?.kind).toBe('streaming');
   });
 
-  it('labels jina reference links with the page title, falling back to Reference', async () => {
+  it('labels jina reference links with the page title, falling back to artist-hostname', async () => {
     const searchArtistSources = vi
       .fn()
       .mockResolvedValueOnce({
@@ -698,7 +729,7 @@ describe('runBioGeneration', () => {
     const bioLink = result.links.find((l) => l.url === 'https://a.example/bio');
     const pageLink = result.links.find((l) => l.url === 'https://b.example/page');
     expect(bioLink?.label).toBe('Artist Biography');
-    expect(pageLink?.label).toBe('Reference');
+    expect(pageLink?.label).toBe('Artist — b.example');
   });
 
   it('drops links from search-engine hosts', async () => {
@@ -766,8 +797,34 @@ describe('runBioGeneration', () => {
     expect(lookupArtist).toHaveBeenNthCalledWith(2, 'Julio Francisco Ramos');
   });
 
-  it('caps links at 50 when many candidates exist', async () => {
-    const manyRefs = Array.from({ length: 60 }, (_, i) => ({
+  it('caps scraped candidates at MAX_VISION_CANDIDATES before vision verification', async () => {
+    const verifyMock = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://a.example/bio'],
+          images: Array.from({ length: MAX_VISION_CANDIDATES + 5 }, (_, i) => ({
+            url: `https://a.example/photo-${i}.jpg`,
+            alt: `Photo ${i}`,
+            sourceUrl: 'https://a.example/bio',
+          })),
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+      verifyScrapedImages: verifyMock,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    const [candidates] = (verifyMock as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown[]];
+    expect(candidates).toHaveLength(MAX_VISION_CANDIDATES);
+  });
+
+  it('caps links at 100 when many candidates exist', async () => {
+    const manyRefs = Array.from({ length: 130 }, (_, i) => ({
       url: `https://source-${i}.example/page`,
       title: `Source ${i}`,
     }));
@@ -787,7 +844,7 @@ describe('runBioGeneration', () => {
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
-    expect(result.links.length).toBe(50);
+    expect(result.links.length).toBe(100);
   });
 });
 
@@ -807,5 +864,113 @@ describe('lambdaHandler', () => {
 
     expect(result.ok).toBe(false);
     vi.unstubAllGlobals();
+  });
+});
+
+describe('media discovery v2 orchestration', () => {
+  it('merges commons, covers, and vision-verified scraped images with covers before scraped', async () => {
+    const deps = makeDeps();
+    deps.getWikidataData = vi.fn().mockResolvedValue({
+      imageFileNames: ['A.jpg'],
+      commonsCategory: 'Ceschi',
+      wikipediaUrl: undefined,
+      officialUrl: undefined,
+    });
+    deps.getCommonsImage = vi.fn().mockResolvedValue(commonsImage('https://commons/a.jpg'));
+    deps.getCommonsCategoryImages = vi
+      .fn()
+      .mockResolvedValue([commonsImage('https://commons/cat.jpg')]);
+    deps.listReleaseGroups = vi
+      .fn()
+      .mockResolvedValue([
+        { rgMbid: 'rg-1', title: 'BBB', firstReleaseDate: '2015-04-14', primaryType: 'Album' },
+      ]);
+    deps.getCoverArtImages = vi
+      .fn()
+      .mockResolvedValue([
+        { ...commonsImage('https://caa/500.jpg'), kind: 'cover', alt: 'BBB album cover' },
+      ]);
+    deps.searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'text',
+      sourceUrls: ['https://zine.net/a'],
+      references: [{ url: 'https://zine.net/a', title: 'An interview with Ceschi' }],
+      images: [
+        { url: 'https://zine.net/live.jpg', alt: 'Ceschi live', sourceUrl: 'https://zine.net/a' },
+      ],
+    });
+    deps.verifyScrapedImages = vi.fn().mockResolvedValue([
+      {
+        ...commonsImage('https://zine.net/live.jpg'),
+        kind: 'photo',
+        alt: 'Ceschi live on stage',
+      },
+    ]);
+
+    const data = await runBioGeneration(baseInput(), deps);
+
+    const urls = data.images.map((img) => img.url);
+    expect(urls.indexOf('https://caa/500.jpg')).toBeGreaterThan(
+      urls.indexOf('https://commons/cat.jpg')
+    );
+    expect(urls.indexOf('https://zine.net/live.jpg')).toBeGreaterThan(
+      urls.indexOf('https://caa/500.jpg')
+    );
+    expect(deps.verifyScrapedImages).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels search references descriptively and classifies press', async () => {
+    const deps = makeDeps();
+    deps.searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'text',
+      sourceUrls: ['https://zine.net/a'],
+      references: [{ url: 'https://zine.net/a', title: 'Album review: BBB' }],
+      images: [],
+    });
+    const data = await runBioGeneration(baseInput(), deps);
+    const ref = data.links.find((link) => link.url === 'https://zine.net/a');
+    expect(ref?.label).toBe('Album review: BBB');
+    expect(ref?.kind).toBe('press');
+  });
+
+  it('builds chronology and internal release urls from label releases + release groups', async () => {
+    const deps = makeDeps();
+    deps.listReleaseGroups = vi
+      .fn()
+      .mockResolvedValue([
+        { rgMbid: 'rg-1', title: 'Old EP', firstReleaseDate: '2009-06-01', primaryType: 'EP' },
+      ]);
+    const input = {
+      ...baseInput(),
+      releases: [{ title: 'Label Album', releasedOn: '2020-02-02', url: '/releases/abc' }],
+    };
+    let capturedFacts: ArtistFacts | undefined;
+    deps.generateProse = vi.fn().mockImplementation(async (facts: ArtistFacts) => {
+      capturedFacts = facts;
+      return { shortBio: 's', longBio: 'l', altBio: 'a' };
+    });
+    await runBioGeneration(input, deps);
+    expect(capturedFacts?.chronology).toEqual(
+      expect.arrayContaining([
+        '2020: released "Label Album" (label catalog — authoritative)',
+        '2009: released "Old EP" (MusicBrainz)',
+      ])
+    );
+    expect(capturedFacts?.internalReleaseUrls).toEqual(['/releases/abc']);
+  });
+
+  it('caps links at 100', async () => {
+    const deps = makeDeps();
+    deps.searchArtistSources = vi.fn().mockResolvedValue({
+      sourceText: 'text',
+      sourceUrls: [],
+      references: Array.from({ length: 130 }, (_, i) => ({
+        url: `https://zine.net/${i}`,
+        title: `Ref ${i}`,
+      })),
+      images: [],
+    });
+    const data = await runBioGeneration(baseInput(), deps);
+    expect(data.links.length).toBeLessThanOrEqual(100);
+    expect(data.links.length).toBeGreaterThan(50);
   });
 });

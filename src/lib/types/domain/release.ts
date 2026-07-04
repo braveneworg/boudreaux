@@ -216,6 +216,14 @@ export interface ReleaseLinkSource {
   title: string;
 }
 
+/** Source row for injecting internal release links AND cover art after generation. */
+export interface ReleaseCoverSource {
+  id: string;
+  title: string;
+  releasedOn: Date | null;
+  coverUrl: string | null;
+}
+
 /**
  * S3-cleanup view of a release loaded before a hard delete — just the
  * digital-format files and images needed to enumerate S3 keys. Mirrors the

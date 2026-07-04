@@ -40,12 +40,16 @@ export const bioGenerationImageSchema = z.object({
   width: z.number().int().positive().nullable().optional(),
   height: z.number().int().positive().nullable().optional(),
   isPrimary: z.boolean(),
+  kind: z.enum(['photo', 'cover']).nullable().optional(),
+  alt: z.string().nullable().optional(),
 });
 
 export const bioGenerationLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
+  kind: z
+    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'press', 'other'])
+    .optional(),
 });
 
 /**
@@ -74,7 +78,16 @@ export const bioStatusLinkSchema = z.object({
   label: z.string(),
   url: bioStatusLinkUrlSchema,
   kind: z
-    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'release', 'other'])
+    .enum([
+      'wikipedia',
+      'official',
+      'musicbrainz',
+      'social',
+      'streaming',
+      'press',
+      'release',
+      'other',
+    ])
     .nullable()
     .optional(),
 });
@@ -120,6 +133,8 @@ export interface GeneratedBioContent {
     license?: string | null;
     sourceUrl?: string | null;
     isPrimary: boolean;
+    kind?: string | null;
+    alt?: string | null;
   }>;
   links: Array<{
     /** DB row id — present when content comes from the status endpoint; absent on the lambda path. */

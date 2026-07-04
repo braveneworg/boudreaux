@@ -422,6 +422,8 @@ model ArtistBioImage {
   width        Int?
   height       Int?
   isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images
+  kind         String? // photo | cover — subject classification from discovery
+  alt          String? // Accessible description written by the vision pass
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 

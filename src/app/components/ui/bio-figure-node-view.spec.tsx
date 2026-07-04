@@ -257,4 +257,12 @@ describe('BioFigureNodeView', () => {
     const { container } = render(<BioFigureNodeView {...makeProps()} />);
     expect(container.querySelector('[data-drag-handle]')).toBeInTheDocument();
   });
+
+  it('applies float-left, shape-outside, and mr-3 to the wrapper when float is left', () => {
+    render(<BioFigureNodeView {...makeProps()} />);
+    const figure = screen.getByRole('figure');
+    expect(figure).toHaveClass('float-left');
+    expect(figure.className).toContain('[shape-outside:margin-box]');
+    expect(figure).toHaveClass('mr-3');
+  });
 });

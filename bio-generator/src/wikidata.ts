@@ -22,6 +22,8 @@ export interface WikidataData {
   imageFileNames: string[];
   officialUrl?: string;
   wikipediaUrl?: string;
+  /** Commons category name from P373, e.g. "Ceschi" (no `Category:` prefix). */
+  commonsCategory?: string;
 }
 
 type Claim = { mainsnak?: { datavalue?: { value?: unknown } } };
@@ -38,10 +40,13 @@ const stringValues = (entries: Claim[] | undefined): string[] =>
  */
 const extractWikidataData = (body: WikidataEntities): WikidataData => {
   const entity = Object.values(body.entities ?? {})[0];
+  const claims = entity?.claims ?? {};
+  const sitelinks = entity?.sitelinks ?? {};
   return {
-    imageFileNames: stringValues(entity?.claims?.P18),
-    officialUrl: stringValues(entity?.claims?.P856)[0],
-    wikipediaUrl: entity?.sitelinks?.enwiki?.url,
+    imageFileNames: stringValues(claims.P18),
+    officialUrl: stringValues(claims.P856)[0],
+    wikipediaUrl: sitelinks.enwiki?.url,
+    commonsCategory: stringValues(claims.P373)[0],
   };
 };
 

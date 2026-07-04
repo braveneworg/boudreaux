@@ -8,7 +8,8 @@ import {
   bioImageDragPayloadSchema,
   bioLinkDragPayloadSchema,
 } from '@/lib/validation/bio-dnd-schema';
-import type { BioLinkDragPayload } from '@/lib/validation/bio-dnd-schema';
+
+import { buildBioFigureContent, buildBioLinkContent } from './bio-editor-insert';
 
 import type { Editor } from '@tiptap/core';
 
@@ -25,23 +26,6 @@ const readPayload = (event: DragEvent, mime: string): unknown => {
   } catch {
     return null;
   }
-};
-
-const linkMarkAttrs = (payload: BioLinkDragPayload): Record<string, string | null> =>
-  payload.isExternal
-    ? { href: payload.url, target: '_blank', rel: 'nofollow noopener noreferrer' }
-    : { href: payload.url, target: null, rel: null };
-
-const insertLinkAt = (editor: Editor, pos: number, payload: BioLinkDragPayload): void => {
-  editor
-    .chain()
-    .focus()
-    .insertContentAt(pos, {
-      type: 'text',
-      text: payload.label,
-      marks: [{ type: 'link', attrs: linkMarkAttrs(payload) }],
-    })
-    .run();
 };
 
 /**
@@ -64,7 +48,7 @@ export const handleBioEditorDrop = (
   const linkParsed = bioLinkDragPayloadSchema.safeParse(readPayload(event, BIO_LINK_DRAG_MIME));
   if (linkParsed.success) {
     event.preventDefault();
-    insertLinkAt(editor, coords.pos, linkParsed.data);
+    editor.chain().focus().insertContentAt(coords.pos, buildBioLinkContent(linkParsed.data)).run();
     return true;
   }
 
@@ -74,15 +58,7 @@ export const handleBioEditorDrop = (
     editor
       .chain()
       .focus()
-      .insertContentAt(coords.pos, {
-        type: 'bioFigure',
-        attrs: {
-          src: imageParsed.data.url,
-          alt: imageParsed.data.alt,
-          title: imageParsed.data.title,
-          attribution: imageParsed.data.attribution,
-        },
-      })
+      .insertContentAt(coords.pos, buildBioFigureContent(imageParsed.data))
       .run();
     return true;
   }

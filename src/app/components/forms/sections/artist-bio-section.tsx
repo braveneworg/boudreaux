@@ -3,15 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useEffect } from 'react';
+import type { JSX } from 'react';
+
 import dynamic from 'next/dynamic';
 
 import { ArtistBioGenerationSection } from '@/app/components/forms/artist-bio-generation-section';
+import {
+  BioEditorRegistryProvider,
+  useBioEditorRegistry,
+} from '@/app/components/forms/bio-editor-registry';
 import { BioMediaPalettes } from '@/app/components/forms/bio-media-palettes';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
+import type { Editor } from '@tiptap/react';
 import type { Control, FieldPath } from 'react-hook-form';
 
 // Admin-only rich-text editor for the bio fields. Lazy + `ssr: false` so the
@@ -40,26 +48,42 @@ const BioEditorField = ({
   label,
   ariaLabel,
   images,
-}: BioEditorFieldProps): React.ReactElement => (
-  <FormField
-    control={control}
-    name={name}
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel>{label}</FormLabel>
-        <FormControl>
-          <RichTextEditor
-            value={field.value ?? ''}
-            onChange={field.onChange}
-            images={images}
-            ariaLabel={ariaLabel}
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-);
+}: BioEditorFieldProps): JSX.Element => {
+  const registry = useBioEditorRegistry();
+
+  useEffect(() => () => registry.unregister(name), [name, registry]);
+
+  const handleEditorReady = (instance: Editor): void => {
+    registry.register(name, instance);
+  };
+
+  const handleEditorFocus = (): void => {
+    registry.setActive(name);
+  };
+
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <FormControl>
+            <RichTextEditor
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              images={images}
+              ariaLabel={ariaLabel}
+              onEditorReady={handleEditorReady}
+              onEditorFocus={handleEditorFocus}
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+};
 
 interface ArtistBioSectionProps {
   control: Control<ArtistFormData>;
@@ -75,40 +99,52 @@ export const ArtistBioSection = ({
   artistId,
   bioEditorImages,
   onBioGenerated,
-}: ArtistBioSectionProps): React.ReactElement => (
+}: ArtistBioSectionProps): JSX.Element => (
   <section className="space-y-4">
     <h2 className="font-semibold">Biography</h2>
 
-    {/* AI Bio Generation — first action; edit mode only (needs a persisted
-        artist). Populates the bio fields below. The palettes surface the
-        persisted discovered links/images so tiles drag into the editors. */}
+    {/* AI Bio Generation — edit mode only (needs a persisted artist).
+        Populates the bio fields below. */}
     {isEditMode && artistId && (
-      <>
-        <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
-        <BioMediaPalettes artistId={artistId} />
-      </>
+      <ArtistBioGenerationSection artistId={artistId} onGenerated={onBioGenerated} />
     )}
 
-    <BioEditorField
-      control={control}
-      name="bio"
-      label="Bio"
-      ariaLabel="Bio"
-      images={bioEditorImages}
-    />
-    <BioEditorField
-      control={control}
-      name="shortBio"
-      label="Short Bio"
-      ariaLabel="Short Bio"
-      images={bioEditorImages}
-    />
-    <BioEditorField
-      control={control}
-      name="altBio"
-      label="Alternative Bio"
-      ariaLabel="Alternative Bio"
-      images={bioEditorImages}
-    />
+    {/* xl+: editors left (~2/3), palettes in a sticky right rail.
+        below xl: palettes above editors (DOM order matches visual order). */}
+    <BioEditorRegistryProvider>
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+        {isEditMode && artistId && (
+          <div
+            data-testid="bio-media-rail"
+            className="xl:sticky xl:top-24 xl:order-2 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
+          >
+            <BioMediaPalettes artistId={artistId} />
+          </div>
+        )}
+        <div data-testid="bio-editors-column" className="space-y-4 xl:order-1">
+          <BioEditorField
+            control={control}
+            name="bio"
+            label="Bio"
+            ariaLabel="Bio"
+            images={bioEditorImages}
+          />
+          <BioEditorField
+            control={control}
+            name="shortBio"
+            label="Short Bio"
+            ariaLabel="Short Bio"
+            images={bioEditorImages}
+          />
+          <BioEditorField
+            control={control}
+            name="altBio"
+            label="Alternative Bio"
+            ariaLabel="Alternative Bio"
+            images={bioEditorImages}
+          />
+        </div>
+      </div>
+    </BioEditorRegistryProvider>
   </section>
 );

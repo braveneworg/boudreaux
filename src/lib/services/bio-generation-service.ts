@@ -8,7 +8,9 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import type { ReleaseCoverSource } from '@/lib/types/domain/release';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
+import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
@@ -89,6 +91,8 @@ type RehostedImage = {
   width: number | null;
   height: number | null;
   isPrimary: boolean;
+  kind: string | null;
+  alt: string | null;
 };
 
 /** Re-hosted image with its final sort position for persistence. */
@@ -111,6 +115,10 @@ type RehostedBatch = {
   duplicateAliases: Map<number, string>;
 };
 
+/** Sanitize an optional text string; return null if absent or empty. */
+const sanitizeOptional = (text: string | null | undefined): string | null =>
+  text ? sanitizeBioText(text) : null;
+
 /**
  * Builds the rich {@link RehostedImage} record from a raw re-host result and
  * the original image metadata returned by the Lambda. Extracted to keep
@@ -122,14 +130,16 @@ const buildRehostedRecord = (
 ): RehostedImage => ({
   url: result.url,
   thumbnailUrl: result.url,
-  title: image.title ? sanitizeBioText(image.title) : null,
-  attribution: image.attribution ? sanitizeBioText(image.attribution) : null,
+  title: sanitizeOptional(image.title),
+  attribution: sanitizeOptional(image.attribution),
   license: image.license ?? null,
   sourceUrl: image.sourceUrl ?? null,
   originalUrl: image.url,
   width: result.width ?? image.width ?? null,
   height: result.height ?? image.height ?? null,
   isPrimary: image.isPrimary,
+  kind: image.kind ?? null,
+  alt: sanitizeOptional(image.alt),
 });
 
 /**
@@ -197,32 +207,68 @@ const sanitizeLinks = (links: BioGenerationData['links']): PersistedLink[] =>
     return acc;
   }, []);
 
+/** Builds the lambda-input releases payload from the label's own catalog. */
+const toLambdaReleases = (
+  releases: ReleaseCoverSource[]
+): NonNullable<BioGenerationLambdaInput['releases']> =>
+  releases.map((release) => ({
+    title: release.title,
+    releasedOn: toIsoDate(release.releasedOn),
+    url: `/releases/${release.id}`,
+  }));
+
 /**
  * Appends internal release links (label = release title) after the discovered
- * links. Uses an accumulating `seen` set so the same release URL is never
- * written twice, even if the DB returns duplicate rows. Failure is non-fatal:
- * generation content persists with the discovered links unchanged.
+ * links using the prefetched `ReleaseCoverSource[]`. Uses an accumulating
+ * `seen` set so the same release URL is never written twice, even if the
+ * list contains duplicate rows.
  */
-const appendReleaseLinks = async (
-  artistId: string,
-  links: PersistedLink[]
-): Promise<PersistedLink[]> => {
-  try {
-    const releases = await ReleaseRepository.findPublishedByArtist(artistId);
-    const seen = new Set(links.map((link) => link.url));
-    const result = [...links];
-    for (const release of releases) {
-      const url = `/releases/${release.id}`;
-      if (!seen.has(url)) {
-        seen.add(url);
-        result.push({ label: release.title, url, kind: 'release', sortOrder: result.length });
-      }
+const appendReleaseLinks = (
+  links: PersistedLink[],
+  releases: ReleaseCoverSource[]
+): PersistedLink[] => {
+  const seen = new Set(links.map((link) => link.url));
+  const result = [...links];
+  for (const release of releases) {
+    const url = `/releases/${release.id}`;
+    if (!seen.has(url)) {
+      seen.add(url);
+      result.push({ label: release.title, url, kind: 'release', sortOrder: result.length });
     }
-    return result;
-  } catch (error) {
-    loggers.media.warn('bio_release_links_failed', { artistId, error: String(error) });
-    return links;
   }
+  return result;
+};
+
+/**
+ * Appends the label's own release covers as palette images — rights-cleared,
+ * already CDN-hosted (no fetch, no re-host), deduped against discovered rows.
+ */
+const appendInternalCoverImages = (
+  persistedImages: PersistedImage[],
+  releases: ReleaseCoverSource[]
+): PersistedImage[] => {
+  const seen = new Set(persistedImages.map((image) => image.url));
+  const result = [...persistedImages];
+  for (const release of releases) {
+    if (!release.coverUrl || seen.has(release.coverUrl)) continue;
+    seen.add(release.coverUrl);
+    result.push({
+      url: release.coverUrl,
+      thumbnailUrl: buildCdnImageVariantUrl(release.coverUrl, 384),
+      title: release.title,
+      attribution: `${release.title} — label release`,
+      license: null,
+      sourceUrl: null,
+      originalUrl: null,
+      width: null,
+      height: null,
+      isPrimary: false,
+      kind: 'cover',
+      alt: `${release.title} album cover`,
+      sortOrder: result.length,
+    });
+  }
+  return result;
 };
 
 /** Inputs to {@link assembleContent} — grouped to stay within the `max-params` limit. */
@@ -348,6 +394,18 @@ export class BioGenerationService {
       return { success: false, error: 'Artist has no name to generate a bio from.' };
     }
 
+    // Fetch once: feeds (a) lambda-input releases, (b) release links, and (c) cover palette.
+    // Failure falls back to [] so generation still completes without catalog context.
+    const releases = await ReleaseRepository.findPublishedByArtistWithCovers(artist.id).catch(
+      (error) => {
+        loggers.media.warn('bio_release_covers_failed', {
+          artistId: artist.id,
+          error: String(error),
+        });
+        return [] as ReleaseCoverSource[];
+      }
+    );
+
     const result = await BioGenerationService.generate({
       artistId: artist.id,
       displayName,
@@ -359,6 +417,7 @@ export class BioGenerationService {
       bornOn: toIsoDate(artist.bornOn),
       diedOn: toIsoDate(artist.diedOn),
       formedOn: toIsoDate(artist.formedOn),
+      releases: releases.length ? toLambdaReleases(releases) : undefined,
     });
 
     if (!result.ok) {
@@ -387,13 +446,15 @@ export class BioGenerationService {
     // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
     const sanitizedLinks = sanitizeLinks(result.data.links);
 
-    // Append internal release links for this artist. The lambda has no DB access,
-    // so we inject them here. Failure is non-fatal (appendReleaseLinks handles it).
-    const persistedLinks = await appendReleaseLinks(artist.id, sanitizedLinks);
+    // Append internal release links using the prefetched catalog (no extra query).
+    const persistedLinks = appendReleaseLinks(sanitizedLinks, releases);
+
+    // Append rights-cleared CDN cover images after the discovered palette.
+    const persistedImagesWithCovers = appendInternalCoverImages(persistedImages, releases);
 
     const content = assembleContent({
       data: result.data,
-      persistedImages,
+      persistedImages: persistedImagesWithCovers,
       imageUrlByIndex,
       persistedLinks,
       genres,
@@ -405,7 +466,7 @@ export class BioGenerationService {
       altBio: content.altBio,
       genres: content.genres,
       bioModel: content.model,
-      images: persistedImages,
+      images: persistedImagesWithCovers,
       links: persistedLinks,
     });
 

@@ -539,6 +539,77 @@ describe('ReleaseRepository', () => {
     });
   });
 
+  describe('findPublishedByArtistWithCovers', () => {
+    it('returns releases mapped to ReleaseCoverSource with the first image src as coverUrl', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([
+        {
+          id: 'r1',
+          title: 'Test Album',
+          releasedOn: new Date('2020-05-01T00:00:00Z'),
+          images: [{ src: 'https://cdn.example.com/cover.jpg' }],
+        },
+      ] as never);
+
+      const result = await ReleaseRepository.findPublishedByArtistWithCovers('artist-1');
+
+      expect(result).toEqual([
+        {
+          id: 'r1',
+          title: 'Test Album',
+          releasedOn: new Date('2020-05-01T00:00:00Z'),
+          coverUrl: 'https://cdn.example.com/cover.jpg',
+        },
+      ]);
+    });
+
+    it('maps coverUrl to null when no image exists', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([
+        {
+          id: 'r1',
+          title: 'No Cover',
+          releasedOn: new Date('2021-01-01T00:00:00Z'),
+          images: [],
+        },
+      ] as never);
+
+      const result = await ReleaseRepository.findPublishedByArtistWithCovers('artist-1');
+
+      expect(result).toEqual([
+        {
+          id: 'r1',
+          title: 'No Cover',
+          releasedOn: new Date('2021-01-01T00:00:00Z'),
+          coverUrl: null,
+        },
+      ]);
+    });
+
+    it('queries with the correct where/select/orderBy shape', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findPublishedByArtistWithCovers('artist-1');
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith({
+        where: {
+          artistReleases: { some: { artistId: 'artist-1' } },
+          publishedAt: { not: null },
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        orderBy: { releasedOn: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          releasedOn: true,
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+            select: { src: true },
+          },
+        },
+      });
+    });
+  });
+
   describe('findByTitleInsensitive', () => {
     it('queries case-insensitively and projects id/title/publishedAt/deletedOn', async () => {
       const found = { id: 'r-1', title: 'Test', publishedAt: null, deletedOn: null };

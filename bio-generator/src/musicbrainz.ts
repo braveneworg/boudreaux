@@ -69,6 +69,21 @@ const request = async <T>(url: string, options: FetchRetryOptions): Promise<T> =
 /** MusicBrainz relation types that map to streaming/purchasing services. */
 const STREAMING_RELATION_TYPES = new Set(['streaming', 'free streaming', 'purchase for download']);
 
+/**
+ * MusicBrainz relation types that map to a named service. Previously dropped
+ * entirely; surfaced now so the palette can offer Discogs/YouTube/etc. links
+ * with descriptive labels instead of nothing.
+ */
+const SERVICE_RELATIONS = new Map<string, { label: string; kind: NonNullable<BioLink['kind']> }>([
+  ['discogs', { label: 'Discogs', kind: 'other' }],
+  ['youtube', { label: 'YouTube', kind: 'social' }],
+  ['video channel', { label: 'YouTube', kind: 'social' }],
+  ['soundcloud', { label: 'SoundCloud', kind: 'streaming' }],
+  ['bandcamp', { label: 'Bandcamp', kind: 'streaming' }],
+  ['allmusic', { label: 'AllMusic', kind: 'press' }],
+  ['last.fm', { label: 'Last.fm', kind: 'other' }],
+]);
+
 /** Maps a MusicBrainz relation type to our link taxonomy. */
 const classifyRelation = (type: string): BioLink['kind'] => {
   if (type === 'wikipedia') return 'wikipedia';
@@ -98,6 +113,10 @@ const hostnameFromUrl = (resource: string): string | null => {
  * Streaming links use the hostname as the label instead of the raw type string.
  */
 const relationToLink = (type: string, resource: string): BioLink | null => {
+  const service = SERVICE_RELATIONS.get(type);
+  if (service) {
+    return { label: service.label, url: resource, kind: service.kind };
+  }
   const kind = classifyRelation(type);
   if (kind === 'wikipedia' || kind === 'official' || kind === 'social') {
     return { label: type, url: resource, kind };
@@ -133,6 +152,57 @@ const collectRelations = (
   }
 
   return { wikidataId, links };
+};
+
+/** One release group from the browse endpoint — chronology + cover-art seed. */
+export interface ReleaseGroupSummary {
+  rgMbid: string;
+  title: string;
+  firstReleaseDate: string | null;
+  primaryType: string | null;
+}
+
+/** Subset of the release-group browse response we rely on. */
+interface MbReleaseGroupResponse {
+  'release-groups'?: Array<{
+    id?: string;
+    title?: string;
+    'first-release-date'?: string;
+    'primary-type'?: string | null;
+  }>;
+}
+
+const MAX_RELEASE_GROUPS = 50;
+
+/**
+ * Browses the artist's release groups (albums, EPs, singles) — the titles and
+ * first-release dates anchor the chronology table, and the MBIDs seed Cover
+ * Art Archive lookups. Sleeps the MusicBrainz rate limit BEFORE requesting so
+ * it can safely follow other MB calls. Best-effort: failures return [].
+ */
+export const listReleaseGroups = async (
+  mbid: string,
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
+): Promise<ReleaseGroupSummary[]> => {
+  await (options.sleep ?? sleep)(MB_RATE_LIMIT_MS);
+  const url = `${MB_BASE}/release-group?artist=${encodeURIComponent(mbid)}&limit=${MAX_RELEASE_GROUPS}&fmt=json`;
+  try {
+    const body = await request<MbReleaseGroupResponse>(url, { ...options, fetchFn });
+    return (body['release-groups'] ?? [])
+      .filter((group): group is { id: string; title: string } & typeof group =>
+        Boolean(group.id && group.title)
+      )
+      .map((group) => ({
+        rgMbid: group.id,
+        title: group.title,
+        firstReleaseDate: group['first-release-date']?.trim() || null,
+        primaryType: group['primary-type'] ?? null,
+      }));
+  } catch (err) {
+    logEvent('warn', 'musicbrainz_release_groups_failed', { mbid, error: String(err) });
+    return [];
+  }
 };
 
 /**

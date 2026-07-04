@@ -37,6 +37,21 @@ export const bioGenerationInputSchema = z.object({
   bornOn: isoDate.optional(),
   diedOn: isoDate.optional(),
   formedOn: isoDate.optional(),
+  /**
+   * The label's own published releases for this artist — authoritative
+   * chronology anchors AND allow-listed internal link targets
+   * (`/releases/<id>` paths) the prose may cite.
+   */
+  releases: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        releasedOn: isoDate.optional(),
+        url: z.string().min(1),
+      })
+    )
+    .max(100)
+    .optional(),
 });
 
 export type BioGenerationInput = z.infer<typeof bioGenerationInputSchema>;
@@ -52,6 +67,10 @@ export const bioImageSchema = z.object({
   width: z.number().int().positive().nullable().optional(),
   height: z.number().int().positive().nullable().optional(),
   isPrimary: z.boolean(),
+  /** Subject classification from provenance or the vision pass. */
+  kind: z.enum(['photo', 'cover']).nullable().optional(),
+  /** Short accessible description, written by the vision pass when available. */
+  alt: z.string().nullable().optional(),
 });
 
 export type BioImage = z.infer<typeof bioImageSchema>;
@@ -60,7 +79,9 @@ export type BioImage = z.infer<typeof bioImageSchema>;
 export const bioLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
-  kind: z.enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'other']).optional(),
+  kind: z
+    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'press', 'other'])
+    .optional(),
 });
 
 export type BioLink = z.infer<typeof bioLinkSchema>;
@@ -142,4 +163,12 @@ export interface ArtistFacts {
   sourceText?: string;
   /** Provenance of {@link sourceText}, for the model to weave in as inline links. */
   sourceUrls?: string[];
+  /**
+   * Structured timeline lines ("2015: released \"Broken Bone Ballads\"") built
+   * from MusicBrainz release-group dates and the label's own releases. Dates
+   * in prose must come from here or the labeled facts — not model recall.
+   */
+  chronology?: string[];
+  /** Site-relative `/releases/<id>` paths the prose may link, labeled by title. */
+  internalReleaseUrls?: string[];
 }

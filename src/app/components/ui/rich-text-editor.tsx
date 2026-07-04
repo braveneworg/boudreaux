@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 
 import NextImage from 'next/image';
@@ -11,9 +11,8 @@ import NextImage from 'next/image';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus';
 import { StarterKit } from '@tiptap/starter-kit';
-import { Link2Off, Pencil } from 'lucide-react';
+import { Link2Off } from 'lucide-react';
 
 import { BioHtml } from '@/app/components/bio-html';
 import { Button } from '@/app/components/ui/button';
@@ -29,13 +28,15 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Switch } from '@/app/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import { isValidBioLinkUrl } from '@/lib/utils/is-valid-bio-link-url';
 
 import { handleBioEditorDrop } from './bio-editor-drop';
 import { BioFigure } from './bio-figure-extension';
+import { BioLink } from './bio-link-extension';
 import { RichTextEditorToolbar } from './rich-text-editor-toolbar';
 
+import type { BioLinkAttributes } from './bio-link-extension';
 import type { ToolbarState } from './rich-text-editor-toolbar';
 import type { Editor } from '@tiptap/react';
 
@@ -58,6 +59,10 @@ interface RichTextEditorProps {
   ariaLabel?: string;
   id?: string;
   className?: string;
+  /** Called once with the editor instance when TipTap finishes initialising. */
+  onEditorReady?: (editor: Editor) => void;
+  /** Called each time this editor gains focus. */
+  onEditorFocus?: () => void;
 }
 
 /** Image node that also persists width/height so variants render at the right size. */
@@ -79,24 +84,6 @@ const BioEditorImage = TiptapImage.extend({
   },
 });
 
-/** Valid bio link targets: absolute http(s) URLs or site-relative paths
- *  (`/releases/x`, but never protocol-relative `//host`). */
-const isValidBioLinkUrl = (href: string): boolean =>
-  isHttpUrl(href) || (href.startsWith('/') && !href.startsWith('//'));
-
-interface LinkTargetRel {
-  target: string | null;
-  rel: string | null;
-}
-
-/** New-tab attributes for external links; explicit nulls for internal ones so
- *  editing an external link into an internal one clears them. The sanitizer
- *  remains authoritative at save time — these are a preview courtesy. */
-const targetRelAttrs = (external: boolean): LinkTargetRel =>
-  external
-    ? { target: '_blank', rel: 'nofollow noopener noreferrer' }
-    : { target: null, rel: null };
-
 interface LabeledTextFieldProps {
   id: string;
   label: string;
@@ -104,9 +91,7 @@ interface LabeledTextFieldProps {
   onValueChange: (value: string) => void;
   placeholder?: string;
   type?: string;
-  /** Disables the input; pair with `hint` to explain why. */
   disabled?: boolean;
-  /** Muted helper line under the input, wired via aria-describedby. */
   hint?: string;
 }
 
@@ -140,26 +125,152 @@ const LabeledTextField = ({
   </div>
 );
 
-interface LinkBubbleMenuProps {
-  editor: Editor;
-  onEdit: () => void;
+interface LinkDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  linkUrl: string;
+  linkText: string;
+  linkExternal: boolean;
+  onLinkUrlChange: (url: string) => void;
+  onLinkTextChange: (text: string) => void;
+  onLinkExternalChange: (external: boolean) => void;
+  onApply: () => void;
   onRemove: () => void;
 }
 
-/** Floating Edit/Unlink menu shown while the caret sits inside a link. */
-const LinkBubbleMenu = ({ editor, onEdit, onRemove }: LinkBubbleMenuProps): JSX.Element => (
-  <BubbleMenu editor={editor} shouldShow={({ editor: instance }) => instance.isActive('link')}>
-    <div className="bg-popover flex items-center gap-1 border p-1 shadow-md">
-      <Button type="button" size="sm" variant="ghost" onClick={onEdit}>
-        <Pencil className="size-3.5" aria-hidden />
-        Edit
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onRemove}>
-        <Link2Off className="size-3.5" aria-hidden />
-        Unlink
-      </Button>
-    </div>
-  </BubbleMenu>
+const LinkDialog = ({
+  open,
+  onOpenChange,
+  linkUrl,
+  linkText,
+  linkExternal,
+  onLinkUrlChange,
+  onLinkTextChange,
+  onLinkExternalChange,
+  onApply,
+  onRemove,
+}: LinkDialogProps): JSX.Element => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Insert link</DialogTitle>
+        <DialogDescription>
+          Enter an http(s) URL or a site-relative path like /releases/slug.
+        </DialogDescription>
+      </DialogHeader>
+      <LabeledTextField
+        id="rte-link-text"
+        label="Anchor text"
+        placeholder="Linked text"
+        value={linkText}
+        onValueChange={onLinkTextChange}
+      />
+      <LabeledTextField
+        id="rte-link-url"
+        label="URL"
+        type="url"
+        placeholder="https://example.com"
+        value={linkUrl}
+        onValueChange={onLinkUrlChange}
+      />
+      <div className="flex items-center gap-2">
+        <Switch
+          id="rte-link-external"
+          checked={linkExternal}
+          onCheckedChange={onLinkExternalChange}
+        />
+        <Label htmlFor="rte-link-external">Opens in new tab</Label>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onRemove}>
+          <Link2Off className="size-4" aria-hidden />
+          Remove
+        </Button>
+        <Button
+          type="button"
+          onClick={onApply}
+          disabled={!isValidBioLinkUrl(linkUrl.trim()) || !linkText.trim()}
+        >
+          Apply
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+interface ImageDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  images: RichTextEditorImage[];
+  imageTitle: string;
+  imageSubtitle: string;
+  imageAttribution: string;
+  onImageTitleChange: (v: string) => void;
+  onImageSubtitleChange: (v: string) => void;
+  onImageAttributionChange: (v: string) => void;
+  onInsertImage: (image: RichTextEditorImage) => void;
+}
+
+const ImageDialog = ({
+  open,
+  onOpenChange,
+  images,
+  imageTitle,
+  imageSubtitle,
+  imageAttribution,
+  onImageTitleChange,
+  onImageSubtitleChange,
+  onImageAttributionChange,
+  onInsertImage,
+}: ImageDialogProps): JSX.Element => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Insert image</DialogTitle>
+        <DialogDescription>
+          Choose one of this artist&apos;s images. Caption lines are optional.
+        </DialogDescription>
+      </DialogHeader>
+      <LabeledTextField
+        id="rte-image-title"
+        label="Title"
+        value={imageTitle}
+        onValueChange={onImageTitleChange}
+      />
+      <LabeledTextField
+        id="rte-image-subtitle"
+        label="Subtitle"
+        value={imageSubtitle}
+        onValueChange={onImageSubtitleChange}
+      />
+      <LabeledTextField
+        id="rte-image-attribution"
+        label="Attribution"
+        value={imageAttribution}
+        onValueChange={onImageAttributionChange}
+      />
+      <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
+        {images.map((image) => (
+          <li key={image.url}>
+            <button
+              type="button"
+              aria-label={`Insert ${image.alt ?? 'image'}`}
+              className="ring-border focus-visible:ring-primary block overflow-hidden ring-1 focus-visible:ring-2 focus-visible:outline-none"
+              onClick={() => onInsertImage(image)}
+            >
+              <NextImage
+                src={image.url}
+                alt={image.alt ?? ''}
+                width={120}
+                height={120}
+                className="size-full object-cover"
+              />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </DialogContent>
+  </Dialog>
 );
 
 const isActive = (instance: Editor | null, name: string, attrs?: object): boolean =>
@@ -169,7 +280,7 @@ const isActive = (instance: Editor | null, name: string, attrs?: object): boolea
 const selectToolbarState = ({ editor: instance }: { editor: Editor | null }): ToolbarState => ({
   isBold: isActive(instance, 'bold'),
   isItalic: isActive(instance, 'italic'),
-  isLink: isActive(instance, 'link'),
+  isLink: isActive(instance, 'bioLink'),
   isHeading2: isActive(instance, 'heading', { level: 2 }),
   isHeading3: isActive(instance, 'heading', { level: 3 }),
   isBulletList: isActive(instance, 'bulletList'),
@@ -194,9 +305,10 @@ const INACTIVE_TOOLBAR: ToolbarState = {
  * `bioFigure` with optional title/subtitle/attribution captions), new
  * paragraph, and a preview toggle that swaps the editing surface for the
  * public-site renderer (`BioHtml`) so admins see the bio exactly as visitors
- * will — real links and CDN images. A bubble menu over active links offers
- * Edit/Unlink, and palette tiles drop straight into the text as links or
- * figures (`handleBioEditorDrop`). Output HTML is sanitized again on save
+ * will — real links and CDN images. Links are bioLink atom nodes with their
+ * own edit/remove controls (NodeView pencil and X). Palette tiles drop
+ * straight into the text as bioLink nodes or bioFigure nodes
+ * (`handleBioEditorDrop`). Output HTML is sanitized again on save
  * (`sanitizeBioHtml`).
  *
  * Load via `next/dynamic` with `ssr: false` — it is admin-only and never ships
@@ -213,41 +325,36 @@ export const RichTextEditor = ({
   ariaLabel,
   id,
   className,
+  onEditorReady,
+  onEditorFocus,
 }: RichTextEditorProps): JSX.Element => {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
-  // True when the dialog targets a selection or an existing link — that path
-  // keeps the document's own text, so the anchor-text field is locked to stop
-  // admins typing into a value that would be ignored.
-  const [linkTextLocked, setLinkTextLocked] = useState(false);
+  /** null = inserting a new node; number = position of the node being edited. */
+  const [editLinkPos, setEditLinkPos] = useState<number | null>(null);
   const [linkExternal, setLinkExternal] = useState(true);
   const [imageOpen, setImageOpen] = useState(false);
   const [imageTitle, setImageTitle] = useState('');
   const [imageSubtitle, setImageSubtitle] = useState('');
   const [imageAttribution, setImageAttribution] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
-  // The last HTML this editor emitted, so the value-sync effect can recognize
-  // its own change echoing back through the controlled `value` and skip the
-  // expensive full-document getHTML() serialization on every keystroke.
   const lastEmittedHtml = useRef<string | null>(null);
-  // useEditor's options close over nothing editor-shaped (the instance doesn't
-  // exist yet), so handleDrop reaches the editor through this ref instead.
   const editorRef = useRef<Editor | null>(null);
+  const onEditRequestRef = useRef<((pos: number) => void) | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        // Restrict headings to h2–h4 to match the bio HTML sanitizer allowlist
-        // (h1 is reserved for the page title and would be stripped on save).
         heading: { levels: [2, 3, 4] },
-        link: { openOnClick: false, protocols: ['http', 'https'], autolink: false },
+        link: false,
+      }),
+      BioLink.configure({
+        onEditRequest: (pos) => onEditRequestRef.current?.(pos),
       }),
       TextStyle,
       FontSize,
-      // Legacy <img> bios must still parse, so BioEditorImage stays registered
-      // alongside the figure node new inserts use.
       BioEditorImage,
       BioFigure,
     ],
@@ -263,6 +370,12 @@ export const RichTextEditor = ({
       handleDrop: (view, event, _slice, moved) =>
         editorRef.current ? handleBioEditorDrop(editorRef.current, view, event, moved) : false,
     },
+    onCreate: ({ editor: instance }) => {
+      onEditorReady?.(instance);
+    },
+    onFocus: () => {
+      onEditorFocus?.();
+    },
     onUpdate: ({ editor: instance }) => {
       const html = instance.getHTML();
       lastEmittedHtml.current = html;
@@ -274,10 +387,6 @@ export const RichTextEditor = ({
     editorRef.current = editor;
   }, [editor]);
 
-  // Sync external value changes (RHF reset on load, AI-generation populating the
-  // fields) into the editor. When `value` equals the HTML we just emitted, this
-  // is our own keystroke echoing back — skip it without serializing the doc.
-  // `emitUpdate: false` prevents an onChange feedback loop on genuine externals.
   useEffect(() => {
     if (!editor) return;
     if (value === lastEmittedHtml.current) return;
@@ -286,6 +395,23 @@ export const RichTextEditor = ({
     }
   }, [editor, value]);
 
+  const openLinkDialogForNode = useCallback((pos: number): void => {
+    const instance = editorRef.current;
+    if (!instance) return;
+    const node = instance.state.doc.nodeAt(pos);
+    if (node?.type.name !== 'bioLink') return;
+    const attrs = node.attrs as BioLinkAttributes;
+    setEditLinkPos(pos);
+    setLinkUrl(attrs.href);
+    setLinkText(attrs.text);
+    setLinkExternal(attrs.external);
+    setLinkOpen(true);
+  }, []);
+
+  useEffect(() => {
+    onEditRequestRef.current = openLinkDialogForNode;
+  }, [openLinkDialogForNode]);
+
   const toolbarState = useEditorState({ editor, selector: selectToolbarState });
 
   if (!editor) {
@@ -293,16 +419,21 @@ export const RichTextEditor = ({
   }
 
   const openLinkDialog = (): void => {
-    const href: string = editor.getAttributes('link').href ?? '';
+    const { selection } = editor.state;
+    const selectedNode =
+      'node' in selection ? (selection as { node?: { type: { name: string } } }).node : undefined;
+    if (selectedNode?.type.name === 'bioLink') {
+      openLinkDialogForNode(selection.from);
+      return;
+    }
     const { empty, from, to } = editor.state.selection;
-    setLinkUrl(href);
+    setEditLinkPos(null);
+    setLinkUrl('');
     setLinkText(empty ? '' : editor.state.doc.textBetween(from, to, ' '));
-    setLinkTextLocked(!empty || editor.isActive('link'));
-    setLinkExternal(href ? !isInternalBioUrl(href) : true);
+    setLinkExternal(true);
     setLinkOpen(true);
   };
 
-  /** URL edits re-derive the new-tab default; the switch stays overridable. */
   const handleLinkUrlChange = (nextUrl: string): void => {
     setLinkUrl(nextUrl);
     setLinkExternal(!isInternalBioUrl(nextUrl));
@@ -310,31 +441,58 @@ export const RichTextEditor = ({
 
   const applyLink = (): void => {
     const href = linkUrl.trim();
-    if (!isValidBioLinkUrl(href)) return;
-    const attrs = { href, ...targetRelAttrs(linkExternal) };
-    const anchorText = linkText.trim();
-    // linkTextLocked mirrors the selection state captured when the dialog
-    // opened (the dialog is modal, so it cannot change underneath us) and
-    // keeps this branch consistent with the disabled anchor-text field.
-    if (linkTextLocked) {
-      editor.chain().focus().extendMarkRange('link').setLink(attrs).run();
-    } else if (anchorText) {
+    const text = linkText.trim();
+    if (!isValidBioLinkUrl(href) || !text) return;
+    const attrs: BioLinkAttributes = { href, text, external: linkExternal };
+    if (editLinkPos !== null) {
       editor
         .chain()
         .focus()
-        .insertContent({ type: 'text', text: anchorText, marks: [{ type: 'link', attrs }] })
+        .command(({ tr, state }) => {
+          const node = state.doc.nodeAt(editLinkPos);
+          if (node?.type.name !== 'bioLink') return false;
+          tr.setNodeMarkup(editLinkPos, undefined, attrs);
+          return true;
+        })
         .run();
+    } else {
+      editor.chain().focus().insertContent({ type: 'bioLink', attrs }).run();
     }
     setLinkOpen(false);
   };
 
   const removeLink = (): void => {
-    editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    setLinkOpen(false);
+    if (editLinkPos !== null) {
+      let removeSucceeded = false;
+      editor
+        .chain()
+        .focus()
+        .command(({ tr, state }) => {
+          const node = state.doc.nodeAt(editLinkPos);
+          if (node?.type.name !== 'bioLink') return false;
+          removeSucceeded = true;
+          tr.delete(editLinkPos, editLinkPos + node.nodeSize);
+          return true;
+        })
+        .run();
+      // Only close the dialog and reset if the remove actually succeeded
+      if (removeSucceeded) {
+        setLinkOpen(false);
+        setEditLinkPos(null);
+      }
+    } else {
+      // editLinkPos is null, so we're in insert mode (nothing to remove)
+      setLinkOpen(false);
+    }
   };
 
-  /** Closes the image dialog, clearing the caption fields so the next insert
-   *  starts fresh. */
+  const handleLinkDialogOpenChange = (open: boolean): void => {
+    setLinkOpen(open);
+    if (!open) {
+      setEditLinkPos(null);
+    }
+  };
+
   const handleImageOpenChange = (open: boolean): void => {
     setImageOpen(open);
     if (!open) {
@@ -373,16 +531,9 @@ export const RichTextEditor = ({
         isPreview={previewOpen}
         onTogglePreview={() => setPreviewOpen((open) => !open)}
       />
-
-      {/* Keep the editor mounted (state, undo history) while previewing — just
-          hide it and render the same component the public site uses. */}
       <div hidden={previewOpen}>
         <EditorContent editor={editor} />
       </div>
-
-      <LinkBubbleMenu editor={editor} onEdit={openLinkDialog} onRemove={removeLink} />
-      {/* Mirrors the public bio page's article styling (artist-bio-content) so
-          the preview matches what visitors will see. */}
       {previewOpen && (
         <div role="region" aria-label={`${ariaLabel ?? 'Bio editor'} preview`}>
           <BioHtml
@@ -391,100 +542,30 @@ export const RichTextEditor = ({
           />
         </div>
       )}
-
-      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Insert link</DialogTitle>
-            <DialogDescription>
-              Enter an http(s) URL or a site-relative path like /releases/slug.
-            </DialogDescription>
-          </DialogHeader>
-          <LabeledTextField
-            id="rte-link-text"
-            label="Anchor text"
-            placeholder="Linked text"
-            value={linkText}
-            onValueChange={setLinkText}
-            disabled={linkTextLocked}
-            hint={linkTextLocked ? 'The existing text is kept — edit it in the editor.' : undefined}
-          />
-          <LabeledTextField
-            id="rte-link-url"
-            label="URL"
-            type="url"
-            placeholder="https://example.com"
-            value={linkUrl}
-            onValueChange={handleLinkUrlChange}
-          />
-          <div className="flex items-center gap-2">
-            <Switch
-              id="rte-link-external"
-              checked={linkExternal}
-              onCheckedChange={setLinkExternal}
-            />
-            <Label htmlFor="rte-link-external">Opens in new tab</Label>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={removeLink}>
-              <Link2Off className="size-4" aria-hidden />
-              Remove
-            </Button>
-            <Button type="button" onClick={applyLink} disabled={!isValidBioLinkUrl(linkUrl.trim())}>
-              Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={imageOpen} onOpenChange={handleImageOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Insert image</DialogTitle>
-            <DialogDescription>
-              Choose one of this artist&apos;s images. Caption lines are optional.
-            </DialogDescription>
-          </DialogHeader>
-          <LabeledTextField
-            id="rte-image-title"
-            label="Title"
-            value={imageTitle}
-            onValueChange={setImageTitle}
-          />
-          <LabeledTextField
-            id="rte-image-subtitle"
-            label="Subtitle"
-            value={imageSubtitle}
-            onValueChange={setImageSubtitle}
-          />
-          <LabeledTextField
-            id="rte-image-attribution"
-            label="Attribution"
-            value={imageAttribution}
-            onValueChange={setImageAttribution}
-          />
-          <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
-            {images.map((image) => (
-              <li key={image.url}>
-                <button
-                  type="button"
-                  aria-label={`Insert ${image.alt ?? 'image'}`}
-                  className="ring-border focus-visible:ring-primary block overflow-hidden ring-1 focus-visible:ring-2 focus-visible:outline-none"
-                  onClick={() => insertImage(image)}
-                >
-                  <NextImage
-                    src={image.url}
-                    alt={image.alt ?? ''}
-                    width={120}
-                    height={120}
-                    className="size-full object-cover"
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </DialogContent>
-      </Dialog>
+      <LinkDialog
+        open={linkOpen}
+        onOpenChange={handleLinkDialogOpenChange}
+        linkUrl={linkUrl}
+        linkText={linkText}
+        linkExternal={linkExternal}
+        onLinkUrlChange={handleLinkUrlChange}
+        onLinkTextChange={setLinkText}
+        onLinkExternalChange={setLinkExternal}
+        onApply={applyLink}
+        onRemove={removeLink}
+      />
+      <ImageDialog
+        open={imageOpen}
+        onOpenChange={handleImageOpenChange}
+        images={images}
+        imageTitle={imageTitle}
+        imageSubtitle={imageSubtitle}
+        imageAttribution={imageAttribution}
+        onImageTitleChange={setImageTitle}
+        onImageSubtitleChange={setImageSubtitle}
+        onImageAttributionChange={setImageAttribution}
+        onInsertImage={insertImage}
+      />
     </div>
   );
 };

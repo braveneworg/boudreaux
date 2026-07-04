@@ -90,6 +90,8 @@ const artistBioImageSchema = z.object({
   width: z.number().nullable(),
   height: z.number().nullable(),
   isPrimary: z.boolean(),
+  kind: nullableString,
+  alt: nullableString,
   sortOrder: z.number(),
   createdAt: date,
 });
