@@ -26,10 +26,12 @@ interface BioHtmlProps {
 const DEFAULT_IMAGE_WIDTH = 1200;
 const DEFAULT_IMAGE_HEIGHT = 900;
 
-/** Static float-class map — Tailwind-visible literals only (never dynamic). */
+/** Static float-class map — Tailwind-visible literals only (never dynamic).
+ *  shape-outside:margin-box + 0.75rem gutters keep prose hugging the figure
+ *  without touching it — deliberately not zero-gap (unreadable). */
 const FIGURE_FLOAT_CLASSES = new Map<string, string>([
-  ['bio-figure--left', 'float-left mr-4 mb-2'],
-  ['bio-figure--right', 'float-right ml-4 mb-2'],
+  ['bio-figure--left', 'float-left [shape-outside:margin-box] mr-3 mb-2'],
+  ['bio-figure--right', 'float-right [shape-outside:margin-box] ml-3 mb-2'],
   ['bio-figure--center', 'mx-auto mb-4'],
 ]);
 
@@ -89,7 +91,7 @@ const renderImage = (domNode: Element): JSX.Element => {
       width={parseDimension(domNode.attribs.width, DEFAULT_IMAGE_WIDTH)}
       height={parseDimension(domNode.attribs.height, DEFAULT_IMAGE_HEIGHT)}
       sizes="(min-width: 768px) 50vw, 100vw"
-      className="h-auto w-full"
+      className="shadow-zine-ink h-auto w-full border-2 border-black"
     />
   );
 };

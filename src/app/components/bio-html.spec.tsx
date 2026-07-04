@@ -11,11 +11,13 @@ vi.mock('next/image', () => ({
     alt,
     width,
     height,
+    className,
   }: {
     src: string;
     alt: string;
     width: number;
     height: number;
+    className?: string;
   }) => (
     <span
       data-testid="next-image"
@@ -23,6 +25,7 @@ vi.mock('next/image', () => ({
       data-alt={alt}
       data-width={width}
       data-height={height}
+      className={className}
     />
   ),
 }));
@@ -152,6 +155,14 @@ describe('BioHtml', () => {
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-width', '1200');
   });
 
+  it('gives the image the site black border', () => {
+    render(
+      <BioHtml html='<img src="https://cdn.fakefourrecords.com/media/artists/a/bio/0.jpg" alt="p">' />
+    );
+
+    expect(screen.getByTestId('next-image')).toHaveClass('border-2', 'border-black');
+  });
+
   it('preserves non-mapped formatting tags', () => {
     render(<BioHtml html="<p><strong>Bold</strong> text</p>" />);
 
@@ -266,5 +277,22 @@ describe('BioHtml', () => {
     render(<BioHtml html={FIGURE_HTML_WITH_CAPTION} />);
 
     expect(screen.getByText('By A')).toBeInTheDocument();
+  });
+
+  it('floated figures hug text with shape-outside and tightened gutters', () => {
+    render(
+      <BioHtml html='<figure class="bio-figure bio-figure--left" style="width: 40%"><img src="https://cdn/x.jpg" alt="a" /></figure><p>text</p>' />
+    );
+    const figure = document.querySelector('figure');
+    expect(figure?.className).toContain('[shape-outside:margin-box]');
+    expect(figure?.className).toContain('mr-3');
+    expect(figure?.className).not.toContain('mr-4');
+  });
+
+  it('caption stays fixed at 11px regardless of figure width', () => {
+    render(
+      <BioHtml html='<figure class="bio-figure bio-figure--left" style="width: 20%"><img src="https://cdn/x.jpg" alt="a" /><figcaption class="bio-figure-caption"><span class="bio-figure-attribution">via zine</span></figcaption></figure>' />
+    );
+    expect(document.querySelector('figcaption')?.className).toContain('text-[11px]');
   });
 });

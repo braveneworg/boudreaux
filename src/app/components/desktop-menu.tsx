@@ -50,7 +50,7 @@ export const DesktopMenu = (): React.ReactElement => {
                 <NavigationMenuLink
                   asChild
                   className={cn(
-                    'bg-transparent p-0 text-2xl text-zinc-50 underline-offset-8 transition-colors duration-200',
+                    'bg-transparent p-0 text-2xl text-zinc-50 no-underline underline-offset-8 transition-colors duration-200',
                     'hover:bg-transparent hover:underline focus:bg-transparent focus:text-zinc-50',
                     'aria-[current=page]:underline',
                     entry.item.color

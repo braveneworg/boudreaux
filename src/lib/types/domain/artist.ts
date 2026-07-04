@@ -100,6 +100,8 @@ export interface ArtistBioImageRecord {
   width: number | null;
   height: number | null;
   isPrimary: boolean;
+  kind: string | null;
+  alt: string | null;
   sortOrder: number;
   createdAt: Date;
 }

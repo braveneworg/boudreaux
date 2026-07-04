@@ -148,11 +148,12 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
   });
 
-  it('enables the link Apply button for an http(s) URL', async () => {
+  it('enables the link Apply button for an http(s) URL with anchor text', async () => {
     render(<Harness />);
     await waitForEditor();
 
     await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Anchor text' }), 'Click here');
     await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
 
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
@@ -250,6 +251,39 @@ describe('RichTextEditor toolbar handlers and branches', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'true')
+    );
+  });
+
+  it('activates the image toolbar button when a figure node is selected', async () => {
+    let editorInstance: Editor | null = null;
+    const Controlled = () => {
+      const [value, setValue] = useState(
+        '<figure class="bio-figure bio-figure--center" style="width:60%"><img src="https://cdn.fakefourrecords.com/x.jpg" alt="p"></figure>'
+      );
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={setValue}
+          images={IMAGES}
+          ariaLabel="Bio"
+          onEditorReady={(instance) => {
+            editorInstance = instance;
+          }}
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    act(() => {
+      editorInstance?.commands.setNodeSelection(0);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Insert image' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
     );
   });
 
@@ -360,10 +394,24 @@ describe('RichTextEditor toolbar handlers and branches', () => {
 });
 
 describe('RichTextEditor link dialog handlers', () => {
-  it('applies an http link to the selected text and closes the dialog', async () => {
+  it('closes the dialog when Apply is clicked with URL and anchor text', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Anchor text' }), 'My site');
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('keeps the dialog open when Remove is clicked but editLinkPos points to a stale (non-bioLink) node', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
-      const [value, setValue] = useState('<p>linkme</p>');
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
       return (
         <RichTextEditor
           value={value}
@@ -377,28 +425,41 @@ describe('RichTextEditor link dialog handlers', () => {
     };
     render(<Controlled />);
     await waitForEditor();
-    // Focus the editor (no mouse coords) and select all via keyboard so the
-    // applied link wraps real text and serializes an href.
+
+    // Get the editor instance first
     const editorEl = screen.getByRole('textbox', { name: 'Bio' });
-    editorEl.focus();
-    await userEvent.keyboard('{Control>}a{/Control}');
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
-    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
 
+    // Dialog should open
     await waitFor(() =>
-      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
     );
-    await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="https://example.com"'))
-    );
+
+    // Externally mutate the editor content so the node at editLinkPos is no longer a bioLink
+    // This simulates a stale position after external edits
+    onChange.mockClear();
+
+    // Replace the entire doc with plain text (no bioLink)
+    editor.chain().focus().setContent('<p>plain text</p>', { emitUpdate: false }).run();
+
+    // Now click Remove — the command should fail silently because the node is gone
+    // and the dialog should remain open
+    const removeBtn = screen.getByRole('button', { name: 'Remove' });
+    await userEvent.click(removeBtn);
+
+    // Dialog should still be open because the remove failed
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'URL' })).toBeInTheDocument());
   });
 
-  it('removes a link via the Remove button and closes the dialog', async () => {
+  it('closes the dialog when Remove is clicked and editLinkPos points to a valid bioLink node', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
-      const [value, setValue] = useState('<p><a href="https://example.com">x</a></p>');
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
       return (
         <RichTextEditor
           value={value}
@@ -411,6 +472,112 @@ describe('RichTextEditor link dialog handlers', () => {
       );
     };
     render(<Controlled />);
+    await waitForEditor();
+
+    // Get the editor instance
+    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
+    const { editor } = editorEl as HTMLElement & { editor?: Editor };
+    if (!editor) throw new Error('Tiptap editor instance not attached to element');
+
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
+    );
+
+    // Click Remove with a valid bioLink node still at editLinkPos
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    // Dialog should close
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+    );
+
+    // Verify the link was actually removed from the HTML
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.not.stringContaining('href='))
+    );
+  });
+
+  it('resets editLinkPos when the dialog is dismissed via Escape or overlay', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://example.com">text</a></p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    // Trigger the edit dialog via the NodeView pencil button
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open with edit-mode state
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://example.com')
+    );
+
+    // Dismiss the dialog via Escape
+    await userEvent.keyboard('{Escape}');
+
+    // Dialog should close
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
+    );
+
+    // Open the link dialog again — it should be in insert mode (not edit mode)
+    // In insert mode, the URL and text fields should be empty (not pre-filled with old values)
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    // Fields should be empty (insert mode), not pre-filled with the previous edit state
+    await waitFor(() => {
+      const urlField = screen.getByRole('textbox', { name: 'URL' });
+      expect(urlField).toHaveValue('');
+    });
+  });
+
+  it('inserts a bioLink node with the given href when inserted via dialog', async () => {
+    const onChange = vi.fn();
+    const Controlled = () => {
+      const [value, setValue] = useState('<p>Body</p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={(html) => {
+            setValue(html);
+            onChange(html);
+          }}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Anchor text' }), 'My band');
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="https://example.com"'))
+    );
+  });
+
+  it('closes the dialog when Remove is clicked', async () => {
+    render(<Harness />);
     await waitForEditor();
 
     await userEvent.click(screen.getByRole('button', { name: 'Link' }));
@@ -421,7 +588,42 @@ describe('RichTextEditor link dialog handlers', () => {
     );
   });
 
-  it('updates the existing link in place when the caret sits inside it', async () => {
+  it('keeps the anchor-text field enabled at an empty caret (insert path)', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+
+    expect(screen.getByRole('textbox', { name: 'Anchor text' })).toBeEnabled();
+  });
+
+  it('keeps the Apply button disabled when the anchor text is empty', async () => {
+    render(<Harness />);
+    await waitForEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'URL' }), 'https://example.com');
+    // anchor text field is empty — Apply must stay disabled
+
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+  });
+
+  it('parses legacy <a> content into a bioLink node (NodeView renders the anchor text)', async () => {
+    // The legacy <a> is parsed by BioLink.parseHTML into a bioLink atom node.
+    // The NodeView renders the link text as a span in the live editor DOM
+    // (the <a> element only appears in the serialized getHTML() output).
+    const Controlled = () => {
+      const [value, setValue] = useState('<p><a href="https://example.com">clickme</a></p>');
+      return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    // The NodeView renders the text label inside the editor surface.
+    await waitFor(() => expect(screen.getByText('clickme')).toBeInTheDocument());
+  });
+
+  it('updates an existing bioLink node via NodeView edit path', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
       const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
@@ -438,111 +640,30 @@ describe('RichTextEditor link dialog handlers', () => {
     };
     render(<Controlled />);
     await waitForEditor();
-    // Tiptap attaches the live editor instance onto its content DOM element
-    // (`dom.editor = this` in createView); use it to park a collapsed caret
-    // inside the link text ("te|xt") — an empty selection within the link.
     const editorEl = screen.getByRole('textbox', { name: 'Bio' });
     const { editor } = editorEl as HTMLElement & { editor?: Editor };
     if (!editor) throw new Error('Tiptap editor instance not attached to element');
-    act(() => {
-      editor.commands.setTextSelection(3);
-    });
-    expect(editor.state.selection.empty).toBe(true);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
+    // Click the pencil edit button rendered by BioLinkNodeView
+    const editBtn = await waitFor(() => screen.getByRole('button', { name: /Edit link/i }));
+    await userEvent.click(editBtn);
+
+    // Dialog should open pre-filled with the existing href
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://old.example')
+    );
+
     const urlField = screen.getByRole('textbox', { name: 'URL' });
     await userEvent.clear(urlField);
     await userEvent.type(urlField, 'https://new.example');
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
-    // The setLink path rewrites the existing anchor's href in place …
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith(expect.stringContaining('href="https://new.example"'))
     );
-    // … without inserting a duplicate anchor: "text" appears exactly once.
+    // text label unchanged
     const lastHtml = onChange.mock.calls.at(-1)?.[0] as string;
     expect(lastHtml.match(/text/g)).toHaveLength(1);
-  });
-
-  it('disables the anchor-text field when a text selection is being linked', async () => {
-    render(<Harness />);
-    await waitForEditor();
-    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
-    editorEl.focus();
-    await userEvent.keyboard('{Control>}a{/Control}');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
-  });
-
-  it('explains that the selected text is kept when the anchor field is locked', async () => {
-    render(<Harness />);
-    await waitForEditor();
-    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
-    editorEl.focus();
-    await userEvent.keyboard('{Control>}a{/Control}');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    expect(screen.getByText(/existing text is kept/i)).toBeInTheDocument();
-  });
-
-  it('disables the anchor-text field when the caret sits in an existing link', async () => {
-    const Controlled = () => {
-      const [value, setValue] = useState('<p><a href="https://old.example">text</a></p>');
-      return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
-    };
-    render(<Controlled />);
-    await waitForEditor();
-    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
-    const { editor } = editorEl as HTMLElement & { editor?: Editor };
-    if (!editor) throw new Error('Tiptap editor instance not attached to element');
-    act(() => {
-      editor.commands.setTextSelection(3);
-    });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    expect(screen.getByRole('textbox', { name: /Anchor text/ })).toBeDisabled();
-  });
-
-  it('keeps the anchor-text field enabled at an empty caret outside a link', async () => {
-    render(<Harness />);
-    await waitForEditor();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    expect(screen.getByRole('textbox', { name: 'Anchor text' })).toBeEnabled();
-  });
-
-  it('omits the locked-anchor hint on the empty-caret insert path', async () => {
-    render(<Harness />);
-    await waitForEditor();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    expect(screen.queryByText(/existing text is kept/i)).not.toBeInTheDocument();
-  });
-
-  it('prefills the link dialog with the active link href', async () => {
-    const Controlled = () => {
-      const [value, setValue] = useState('<p><a href="https://prefilled.test/">x</a></p>');
-      return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
-    };
-    render(<Controlled />);
-    await waitForEditor();
-    // Focus the editor and move the cursor right (into the link text) via
-    // keyboard so getAttributes('link').href resolves — no mouse coords needed.
-    const editorEl = screen.getByRole('textbox', { name: 'Bio' });
-    editorEl.focus();
-    await userEvent.keyboard('{Control>}a{/Control}');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Link' }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'URL' })).toHaveValue('https://prefilled.test/')
-    );
   });
 });
 
@@ -609,25 +730,27 @@ describe('RichTextEditor image attributes and picker', () => {
     );
   });
 
-  it('parses and renders width/height off an <img> in the incoming HTML value', async () => {
+  it('upgrades a bare <img> in the incoming HTML value into an editable figure', async () => {
     const Controlled = () => {
       const [value, setValue] = useState(
-        '<p><img src="https://cdn.fakefourrecords.com/x.jpg" alt="P" width="320" height="240"></p>'
+        '<p><img src="https://cdn.fakefourrecords.com/x.jpg" alt="P"></p>'
       );
       return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
     };
     render(<Controlled />);
     await waitForEditor();
 
-    // BioEditorImage.parseHTML reads width/height off the incoming markup and
-    // renderHTML writes them back onto the DOM node the editor displays.
-    const img = await waitFor(() => {
-      const node = screen.getByRole('textbox', { name: 'Bio' }).querySelector('img');
-      if (!node) throw new Error('image not rendered yet');
+    // Legacy bare <img> content is adopted into a bioFigure node, so it renders
+    // inside a figure.bio-figure that carries the resize/float/remove controls.
+    const image = await waitFor(() => {
+      const node = screen
+        .getByRole('textbox', { name: 'Bio' })
+        .querySelector('figure.bio-figure img');
+      if (!node) throw new Error('figure image not rendered yet');
       return node;
     });
 
-    expect(img).toHaveAttribute('width', '320');
+    expect(image).toHaveAttribute('src', 'https://cdn.fakefourrecords.com/x.jpg');
   });
 
   it('inserts an image with a null alt using fallbacks for label and alt', async () => {

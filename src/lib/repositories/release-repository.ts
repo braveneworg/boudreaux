@@ -11,6 +11,7 @@ import type {
   PublishedReleaseFilters,
   Release,
   ReleaseCarouselItem,
+  ReleaseCoverSource,
   ReleaseCountFilters,
   ReleaseForDeletion,
   ReleaseListFilters,
@@ -177,6 +178,22 @@ const releaseCarouselInclude = {
     take: 1,
   },
 } as const satisfies Prisma.ReleaseInclude;
+
+/**
+ * Narrow select for bio cover-source rows: id, title, releasedOn, and the
+ * first image's `src` for mapping to `coverUrl`. Mirrors the cover-image
+ * ordering from `releaseCarouselInclude`.
+ */
+const releaseCoverSourceSelect = {
+  id: true,
+  title: true,
+  releasedOn: true,
+  images: {
+    orderBy: { sortOrder: 'asc' as const },
+    take: 1,
+    select: { src: true },
+  },
+} as const satisfies Prisma.ReleaseSelect;
 
 /** S3-cleanup include for the pre-delete view (files + images). */
 const releaseForDeletionInclude = {
@@ -573,6 +590,34 @@ export class ReleaseRepository {
         select: { id: true, title: true },
       })
     ) as Promise<ReleaseLinkSource[]>;
+  }
+
+  /**
+   * Fetch all published, non-deleted releases for an artist with their first
+   * cover image projected. Returns `ReleaseCoverSource[]` — id, title,
+   * releasedOn, and the first image's `src` as `coverUrl` (null when no image
+   * exists). Ordered newest first. Used by the bio-generation service to (a)
+   * build the lambda-input releases payload and (b) append rights-cleared
+   * cover art to the image palette after generation.
+   */
+  static async findPublishedByArtistWithCovers(artistId: string): Promise<ReleaseCoverSource[]> {
+    const releases = await runQuery(() =>
+      prisma.release.findMany({
+        where: {
+          artistReleases: { some: { artistId } },
+          publishedAt: { not: null },
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        },
+        orderBy: { releasedOn: 'desc' },
+        select: releaseCoverSourceSelect,
+      })
+    );
+    return releases.map(({ id, title, releasedOn, images }) => ({
+      id,
+      title,
+      releasedOn,
+      coverUrl: images.at(0)?.src ?? null,
+    }));
   }
 
   /**

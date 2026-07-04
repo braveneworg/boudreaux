@@ -7,6 +7,8 @@ import { StarterKit } from '@tiptap/starter-kit';
 
 import { BioFigure, FLOAT_TO_CLASS, clampFigureWidth } from './bio-figure-extension';
 
+import type { BioFigureAttributes } from './bio-figure-extension';
+
 const createEditor = (content: string): Editor =>
   new Editor({ extensions: [StarterKit, BioFigure], content });
 
@@ -82,6 +84,53 @@ describe('BioFigure extension', () => {
       '<figure class="bio-figure" style="width: 5%"><img src="https://cdn.example/x.webp" alt=""></figure>'
     );
     expect(editor.state.doc.firstChild?.attrs.width).toBe(20);
+  });
+});
+
+const firstFigureAttrs = (editor: Editor): BioFigureAttributes | null => {
+  let found: BioFigureAttributes | null = null;
+  editor.state.doc.descendants((node) => {
+    if (found === null && node.type.name === 'bioFigure') {
+      found = node.attrs as BioFigureAttributes;
+    }
+  });
+  return found;
+};
+
+describe('BioFigure legacy image adoption', () => {
+  it('adopts a bare <img> into a bioFigure node', () => {
+    const editor = createEditor('<img src="https://cdn.example/y.webp" alt="Legacy photo">');
+    expect(firstFigureAttrs(editor)?.src).toBe('https://cdn.example/y.webp');
+  });
+
+  it('preserves the alt text when adopting a bare <img>', () => {
+    const editor = createEditor('<img src="https://cdn.example/y.webp" alt="Legacy photo">');
+    expect(firstFigureAttrs(editor)?.alt).toBe('Legacy photo');
+  });
+
+  it('defaults an adopted bare <img> to full width', () => {
+    const editor = createEditor('<img src="https://cdn.example/y.webp" alt="">');
+    expect(firstFigureAttrs(editor)?.width).toBe(100);
+  });
+
+  it('defaults an adopted bare <img> to no float', () => {
+    const editor = createEditor('<img src="https://cdn.example/y.webp" alt="">');
+    expect(firstFigureAttrs(editor)?.float).toBe('none');
+  });
+
+  it('upgrades an adopted bare <img> to figure markup on serialize', () => {
+    const editor = createEditor('<img src="https://cdn.example/y.webp" alt="">');
+    expect(editor.getHTML()).toContain('bio-figure');
+  });
+
+  it('adopts a bare <img> that sits among paragraphs', () => {
+    const editor = createEditor('<p>Intro</p><img src="https://cdn.example/y.webp" alt="mid">');
+    expect(firstFigureAttrs(editor)?.src).toBe('https://cdn.example/y.webp');
+  });
+
+  it('ignores a bare <img> with no src', () => {
+    const editor = createEditor('<p>x</p><img alt="broken">');
+    expect(firstFigureAttrs(editor)).toBeNull();
   });
 });
 

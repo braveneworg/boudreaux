@@ -497,4 +497,31 @@ describe('BioImageService.rehostImages', () => {
       { url: 'https://x/a.jpg', width: null, height: null },
     ]);
   });
+
+  it('never runs more than 8 fetches concurrently', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        });
+      })
+    );
+
+    const images = Array.from({ length: 20 }, (_, i) => ({
+      url: `https://x/${i}.jpg`,
+      index: i,
+    }));
+
+    await BioImageService.rehostImages(images, 'artist-1');
+
+    expect(peak).toBeLessThanOrEqual(8);
+  });
 });

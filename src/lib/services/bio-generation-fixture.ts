@@ -15,6 +15,7 @@ export interface BioGenerationLambdaInput {
   bornOn?: string;
   diedOn?: string;
   formedOn?: string;
+  releases?: Array<{ title: string; releasedOn?: string; url: string }>;
 }
 
 /**
@@ -48,10 +49,30 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
         width: 1200,
         height: 800,
         isPrimary: true,
+        kind: 'photo',
+        alt: `${input.displayName} portrait photo`,
+      },
+      {
+        url: 'https://picsum.photos/seed/e2e-cover/1000/1000',
+        thumbnailUrl: 'https://picsum.photos/seed/e2e-cover/400/400',
+        title: 'Fixture Album',
+        attribution: 'Cover Art Archive',
+        license: null,
+        sourceUrl: null,
+        width: 1000,
+        height: 1000,
+        isPrimary: false,
+        kind: 'cover',
+        alt: 'Fixture Album cover art',
       },
     ],
     links: [
       { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Music', kind: 'wikipedia' },
+      {
+        label: 'An interview with the artist',
+        url: 'https://example.com/interview',
+        kind: 'press' as const,
+      },
       ...(input.links ?? []).map((url) => ({ label: 'Reference', url, kind: 'other' as const })),
     ],
     model: 'fake/deterministic',

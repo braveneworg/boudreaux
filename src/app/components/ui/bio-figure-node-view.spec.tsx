@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { BioFigureNodeView } from './bio-figure-node-view';
+import { BioFigureNodeView, pinchWidth } from './bio-figure-node-view';
 
 import type { NodeViewProps } from '@tiptap/react';
 
@@ -86,6 +86,11 @@ describe('BioFigureNodeView', () => {
   it('renders the image with its alt text', () => {
     render(<BioFigureNodeView {...makeProps()} />);
     expect(screen.getByAltText('x')).toBeInTheDocument();
+  });
+
+  it('gives the image the site black border', () => {
+    render(<BioFigureNodeView {...makeProps()} />);
+    expect(screen.getByAltText('x')).toHaveClass('border-2', 'border-black');
   });
 
   it('renders the subtitle line when set', () => {
@@ -256,5 +261,73 @@ describe('BioFigureNodeView', () => {
   it('marks the image container as the ProseMirror drag handle', () => {
     const { container } = render(<BioFigureNodeView {...makeProps()} />);
     expect(container.querySelector('[data-drag-handle]')).toBeInTheDocument();
+  });
+
+  it('applies float-left, shape-outside, and mr-3 to the wrapper when float is left', () => {
+    render(<BioFigureNodeView {...makeProps()} />);
+    const figure = screen.getByRole('figure');
+    expect(figure).toHaveClass('float-left');
+    expect(figure.className).toContain('[shape-outside:margin-box]');
+    expect(figure).toHaveClass('mr-3');
+  });
+
+  it('renders a resize handle at each of the four corners', () => {
+    const { container } = render(<BioFigureNodeView {...makeProps()} />);
+    expect(container.querySelectorAll('[data-resize-corner]')).toHaveLength(4);
+  });
+
+  it('widens the figure when the top-right handle is dragged outward', () => {
+    const props = makeProps();
+    const { container } = render(<BioFigureNodeView {...props} />);
+    const handle = container.querySelector('[data-resize-corner="tr"]');
+    if (!handle) throw new Error('top-right handle not rendered');
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 130, pointerId: 1 });
+    expect(props.updateAttributes).toHaveBeenLastCalledWith({ width: 80 });
+  });
+
+  it('widens the figure when the bottom-left handle is dragged outward', () => {
+    const props = makeProps();
+    const { container } = render(<BioFigureNodeView {...props} />);
+    const handle = container.querySelector('[data-resize-corner="bl"]');
+    if (!handle) throw new Error('bottom-left handle not rendered');
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 80, pointerId: 1 });
+    expect(props.updateAttributes).toHaveBeenLastCalledWith({ width: 70 });
+  });
+
+  it('resizes the figure with a two-finger pinch on the image', () => {
+    const props = makeProps();
+    const { container } = render(<BioFigureNodeView {...props} />);
+    const image = container.querySelector('[data-drag-handle]');
+    if (!image) throw new Error('image container not rendered');
+    fireEvent.pointerDown(image, { pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(image, { pointerId: 2, clientX: 100, clientY: 0 });
+    fireEvent.pointerMove(image, { pointerId: 2, clientX: 200, clientY: 0 });
+    expect(props.updateAttributes).toHaveBeenLastCalledWith({ width: 100 });
+  });
+
+  it('ignores a single-pointer move on the image so a drag never pinches', () => {
+    const props = makeProps();
+    const { container } = render(<BioFigureNodeView {...props} />);
+    const image = container.querySelector('[data-drag-handle]');
+    if (!image) throw new Error('image container not rendered');
+    fireEvent.pointerDown(image, { pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 200, clientY: 0 });
+    expect(props.updateAttributes).not.toHaveBeenCalled();
+  });
+});
+
+describe('pinchWidth', () => {
+  it('doubles the width when the fingers move twice as far apart', () => {
+    expect(pinchWidth(50, 100, 200)).toBe(100);
+  });
+
+  it('halves the width when the fingers move half as close', () => {
+    expect(pinchWidth(80, 200, 100)).toBe(40);
+  });
+
+  it('clamps a pinch-out beyond the 100 percent ceiling', () => {
+    expect(pinchWidth(80, 100, 200)).toBe(100);
   });
 });

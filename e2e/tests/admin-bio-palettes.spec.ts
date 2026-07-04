@@ -70,7 +70,9 @@ test.describe('Admin bio palettes', () => {
     // Insert image button (Short Bio and Alternative Bio follow it). Guard the
     // full button count first so a transient hydration double (which would
     // briefly duplicate the editors) has settled before we click.
-    const insertImageButtons = adminPage.getByRole('button', { name: 'Insert image' });
+    // Use exact:true so the palette tiles' "Insert image E2E palette portrait"
+    // buttons (partial matches) are excluded — only the 3 toolbar buttons count.
+    const insertImageButtons = adminPage.getByRole('button', { name: 'Insert image', exact: true });
     await expect(insertImageButtons).toHaveCount(3, { timeout: 15_000 });
     const insertImage = insertImageButtons.first();
     await expect(insertImage).toBeVisible();
@@ -101,37 +103,31 @@ test.describe('Admin bio palettes', () => {
     await expect(bioEditor.getByText(attribution).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test('link bubble menu edits and unlinks an existing link', async ({ adminPage }) => {
+  test('BioLink NodeView click-to-edit dialog and remove', async ({ adminPage }) => {
     await gotoArtistEdit(adminPage);
 
+    // The seeded bio carries <a href="https://en.wikipedia.org/wiki/Music">E2E bubble link</a>.
+    // The BioLink TipTap extension parses every <a[href]> into an inline atom node
+    // rendered by BioLinkNodeView — a <span> with `title={href}`, not an <a>. The
+    // anchor text itself is the click-to-edit control; the dialog carries Remove.
     const bioEditor = adminPage.getByRole('textbox', { name: 'Bio', exact: true });
-    const seededLink = bioEditor.getByRole('link', { name: 'E2E bubble link' });
-    await expect(seededLink).toBeVisible({ timeout: 15_000 });
+    await expect(bioEditor).toHaveCount(1, { timeout: 15_000 });
 
-    // Clicking into the link text places the caret inside the link mark, which
-    // makes the floating bubble menu appear.
-    await seededLink.click();
-    const editButton = adminPage.getByRole('button', { name: 'Edit', exact: true });
-    await expect(editButton).toBeVisible({ timeout: 10_000 });
+    // Locate the BioLink atom node by its unique title attribute (the href value).
+    const bioLinkNode = bioEditor.locator('[title="https://en.wikipedia.org/wiki/Music"]');
+    await expect(bioLinkNode).toBeVisible({ timeout: 15_000 });
 
-    // Edit reopens the link dialog prefilled with the existing href.
-    await editButton.click();
-    await expect(adminPage.getByRole('dialog', { name: 'Insert link', exact: true })).toBeVisible();
+    // Clicking the link text opens the edit dialog directly, prefilled with the href.
+    await bioLinkNode.click();
+    const dialog = adminPage.getByRole('dialog', { name: 'Insert link', exact: true });
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
     await expect(adminPage.getByLabel('URL', { exact: true })).toHaveValue(
       'https://en.wikipedia.org/wiki/Music'
     );
-    await adminPage.keyboard.press('Escape');
-    await expect(adminPage.getByRole('dialog', { name: 'Insert link', exact: true })).toHaveCount(
-      0
-    );
 
-    // Unlink removes the link mark but keeps the text.
-    await seededLink.click();
-    const unlinkButton = adminPage.getByRole('button', { name: 'Unlink', exact: true });
-    await expect(unlinkButton).toBeVisible({ timeout: 10_000 });
-    await unlinkButton.click();
-
-    await expect(bioEditor.getByRole('link')).toHaveCount(0);
-    await expect(bioEditor.getByText('E2E bubble link')).toBeVisible();
+    // The dialog's Remove control deletes the BioLink atom entirely (text goes too).
+    await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(bioEditor.getByText('E2E bubble link')).toHaveCount(0);
   });
 });

@@ -4,7 +4,6 @@
 
 import { fetchWithRetry } from './lib/http.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
-import { isListeningServiceUrl } from './listening-services.js';
 
 import type { FetchRetryOptions } from './lib/http.js';
 
@@ -22,13 +21,13 @@ const JINA_SEARCH_ENDPOINT = 'https://s.jina.ai/';
 const JINA_READER_ENDPOINT = 'https://r.jina.ai/';
 
 /** Number of search results to pull content from. */
-const MAX_RESULTS = 5;
+const MAX_RESULTS = 10;
 /** Upper bound on combined search source text, to bound the LLM prompt size. */
 const MAX_SOURCE_CHARS = 14_000;
 /** Upper bound on a single reader (e.g. official site) extract. */
 const MAX_READER_CHARS = 12_000;
 /** Upper bound on scraped image candidates returned per call. */
-const MAX_SCRAPED_IMAGES = 20;
+const MAX_SCRAPED_IMAGES = 60;
 
 /** An images-summary map: `"Image N[,M][: alt]"` keys to absolute image URLs. */
 type JinaImagesSummary = Record<string, string>;
@@ -220,11 +219,10 @@ export const searchArtistSources = async (
       url: result.url,
       title: result.title?.trim() || null,
     }));
-    // Streaming pages flood the summary with album art, never artist photos.
+    // Listening-service pages are album art — wanted since media v2. Every
+    // scraped candidate is subject-verified by the vision pass downstream.
     const images = dedupeScrapedImages(
-      results
-        .filter((result) => !isListeningServiceUrl(result.url))
-        .flatMap((result) => collectPageImages(result.images, result.url))
+      results.flatMap((result) => collectPageImages(result.images, result.url))
     );
 
     return { sourceText, sourceUrls, references, images };

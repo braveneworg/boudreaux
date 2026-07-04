@@ -249,6 +249,8 @@ const artistWithPublishedReleases = {
       width: 1200,
       height: 800,
       isPrimary: true,
+      kind: null,
+      alt: null,
       sortOrder: 0,
       createdAt: ISO,
     },

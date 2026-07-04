@@ -25,6 +25,9 @@ const geminiResponse = (content: unknown): Response =>
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 
+const proseResponse = (): Response => geminiResponse({ shortBio: 's', longBio: 'l' });
+const critiqueResponse = (): Response => geminiResponse({ violations: [] });
+
 const baseFacts = (overrides: Partial<ArtistFacts> = {}): ArtistFacts => ({
   displayName: 'Test Artist',
   imageTitles: [],
@@ -160,7 +163,7 @@ describe('generateProse', () => {
     expect(userMessage).toContain('<ul>/<ol> lists');
   });
 
-  it('prefers links over bold in the long bio', async () => {
+  it('states the links-first emphasis policy in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -170,10 +173,10 @@ describe('generateProse', () => {
       userMessage.indexOf('longBio:'),
       userMessage.indexOf('altBio:')
     );
-    expect(longBioSection).toContain('Prefer links over bold');
+    expect(longBioSection).toContain('Emphasis policy — links first');
   });
 
-  it('bolds pivotal unlinkable facts in the long bio', async () => {
+  it('uses <strong> sparingly for pivotal unlinked facts in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -183,10 +186,10 @@ describe('generateProse', () => {
       userMessage.indexOf('longBio:'),
       userMessage.indexOf('altBio:')
     );
-    expect(longBioSection).toContain('ADDITIONALLY bold');
+    expect(longBioSection).toContain('sparingly for pivotal unlinked facts');
   });
 
-  it('instructs italicizing work titles with <em> in the long bio', async () => {
+  it('instructs <em> for work titles not covered by a link in the long bio', async () => {
     const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
     await generateProse(facts, 'k', undefined, { fetchFn });
@@ -196,7 +199,7 @@ describe('generateProse', () => {
       userMessage.indexOf('longBio:'),
       userMessage.indexOf('altBio:')
     );
-    expect(longBioSection).toContain('italicize');
+    expect(longBioSection).toContain('Use <em> for album/song/work titles');
     expect(longBioSection).toContain('work titles');
   });
 
@@ -615,22 +618,22 @@ describe('generateProse', () => {
       expect(userMessage).toContain('least one list in the long bio');
     });
 
-    it('instructs bolding pivotal unlinkable facts in the long bio', async () => {
+    it('uses <strong> sparingly for pivotal unlinked facts in the long bio', async () => {
       const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
       await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
 
       const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
-      expect(userMessage).toContain('ADDITIONALLY bold');
+      expect(userMessage).toContain('sparingly for pivotal unlinked facts');
     });
 
-    it('instructs italicizing work titles with <em> in the long bio', async () => {
+    it('instructs <em> for work titles not covered by a link in the long bio', async () => {
       const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
 
       await synthesizeProse({ facts: groundedFacts, drafts, apiKey: 'k' }, { fetchFn });
 
       const userMessage = JSON.parse(fetchFn.mock.calls[0][1].body).contents[0].parts[0].text;
-      expect(userMessage).toContain('italicize');
+      expect(userMessage).toContain('Use <em> for album/song/work titles');
     });
 
     it('has no streaming/listening service ban in the synthesis user-prompt', async () => {
@@ -830,5 +833,63 @@ describe('reviseProse', () => {
     const text = body.contents[0].parts[0].text;
     expect(text).not.toContain('FACT VIOLATIONS');
     expect(text).not.toContain('PLAGIARIZED PHRASING');
+  });
+});
+
+describe('media v2 prompt upgrades', () => {
+  const factsWithChronology: ArtistFacts = {
+    displayName: 'Ceschi',
+    imageTitles: [],
+    chronology: ['2015: released "Broken Bone Ballads" (label catalog — authoritative)'],
+    internalReleaseUrls: ['/releases/abc'],
+    sourceUrls: ['https://zine.net/a'],
+  };
+
+  const captureBody = async (run: (fetchFn: typeof fetch) => Promise<unknown>) => {
+    const fetchFn = vi.fn().mockResolvedValue(proseResponse());
+    await run(fetchFn);
+    return JSON.parse(String(fetchFn.mock.calls[0][1]?.body));
+  };
+
+  it('injects the chronology block and internal release urls into the draft prompt', async () => {
+    const body = await captureBody((fetchFn) =>
+      generateProse(factsWithChronology, 'key', 'gemini-2.5-flash', {
+        fetchFn,
+        sleep: async () => {},
+      })
+    );
+    const userPrompt: string = body.contents[0].parts[0].text;
+    expect(userPrompt).toContain('CHRONOLOGY (authoritative');
+    expect(userPrompt).toContain('2015: released "Broken Bone Ballads"');
+    expect(userPrompt).toContain('/releases/abc');
+  });
+
+  it('states the links-first emphasis policy and short-bio chunking', async () => {
+    const body = await captureBody((fetchFn) =>
+      generateProse(factsWithChronology, 'key', 'gemini-2.5-flash', {
+        fetchFn,
+        sleep: async () => {},
+      })
+    );
+    const userPrompt: string = body.contents[0].parts[0].text;
+    expect(userPrompt).toContain('Never stack <strong>, <em>, and <a>');
+    expect(userPrompt).toContain('2–3 short <p> paragraphs');
+  });
+
+  it('gives the critic the chronology and unsupported-claim instruction', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(critiqueResponse());
+    await critiqueProse(
+      {
+        facts: factsWithChronology,
+        prose: { shortBio: 's', longBio: 'l' },
+        suspectYears: [],
+        apiKey: 'key',
+      },
+      { fetchFn, sleep: async () => {} }
+    );
+    const body = JSON.parse(String(fetchFn.mock.calls[0][1]?.body));
+    expect(body.systemInstruction.parts[0].text).toContain('no support in the source material');
+    expect(body.systemInstruction.parts[0].text).toContain('chronology');
+    expect(body.contents[0].parts[0].text).toContain('CHRONOLOGY (authoritative');
   });
 });

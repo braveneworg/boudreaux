@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lookupArtist } from './musicbrainz.js';
+import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 
 const jsonResponse = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -196,5 +196,69 @@ describe('lookupArtist', () => {
     expect(streamingLinks).toHaveLength(2);
     expect(streamingLinks[0].label).toBe('open.spotify.com');
     expect(streamingLinks[1].label).toBe('artist.bandcamp.com');
+  });
+});
+
+describe('service relations', () => {
+  const relationsResponse = {
+    artists: undefined,
+    type: 'Person',
+    relations: [
+      { type: 'discogs', url: { resource: 'https://www.discogs.com/artist/123' } },
+      { type: 'youtube', url: { resource: 'https://www.youtube.com/@ceschi' } },
+      { type: 'soundcloud', url: { resource: 'https://soundcloud.com/ceschi' } },
+      { type: 'bandcamp', url: { resource: 'https://ceschi.bandcamp.com' } },
+      { type: 'allmusic', url: { resource: 'https://www.allmusic.com/artist/x' } },
+    ],
+  };
+
+  it('maps service relations to labeled links', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ artists: [{ id: 'mbid-1', name: 'Ceschi' }] }))
+      .mockResolvedValueOnce(jsonResponse(relationsResponse));
+    const match = await lookupArtist('Ceschi', fetchFn, { sleep: async () => {} });
+    const byLabel = new Map(match?.links.map((link) => [link.label, link]));
+    expect(byLabel.get('Discogs')?.kind).toBe('other');
+    expect(byLabel.get('YouTube')?.kind).toBe('social');
+    expect(byLabel.get('SoundCloud')?.kind).toBe('streaming');
+    expect(byLabel.get('Bandcamp')?.kind).toBe('streaming');
+    expect(byLabel.get('AllMusic')?.kind).toBe('press');
+  });
+});
+
+describe('listReleaseGroups', () => {
+  it('returns titled release groups with first-release dates', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      jsonResponse({
+        'release-groups': [
+          {
+            id: 'rg-1',
+            title: 'Broken Bone Ballads',
+            'first-release-date': '2015-04-14',
+            'primary-type': 'Album',
+          },
+          { id: 'rg-2', title: 'Untitled', 'first-release-date': '', 'primary-type': null },
+        ],
+      })
+    );
+    const groups = await listReleaseGroups('mbid-1', fetchFn, { sleep: async () => {} });
+    expect(groups).toEqual([
+      {
+        rgMbid: 'rg-1',
+        title: 'Broken Bone Ballads',
+        firstReleaseDate: '2015-04-14',
+        primaryType: 'Album',
+      },
+      { rgMbid: 'rg-2', title: 'Untitled', firstReleaseDate: null, primaryType: null },
+    ]);
+    expect(String(fetchFn.mock.calls[0][0])).toContain('/release-group?artist=mbid-1');
+  });
+
+  it('returns an empty list when the request fails', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(new Response('nope', { status: 503 }));
+    await expect(
+      listReleaseGroups('mbid-1', fetchFn, { sleep: async () => {}, retries: 0 })
+    ).resolves.toEqual([]);
   });
 });

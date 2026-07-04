@@ -13,9 +13,11 @@ import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
+import { pooledMap } from '@/lib/utils/pooled-map';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
 const MAX_BYTES = 50 * 1024 * 1024;
+const REHOST_CONCURRENCY = 8;
 const THUMBNAIL_WIDTH = 384;
 const logger = loggers.media;
 
@@ -196,10 +198,9 @@ export class BioImageService {
     }
 
     // Phase 1: fetch all images concurrently for parallel I/O.
-    // Promise.allSettled preserves input order regardless of download speed,
-    // so the sequential pass below can determine the winner by index —
-    // not by which fetch happened to finish first.
-    const settled = await Promise.allSettled(images.map(({ url }) => fetchImageBuffer(url)));
+    // Bounded fan-out: 100 candidates would otherwise open 100 simultaneous
+    // fetches from the web server. pooledMap preserves input order.
+    const settled = await pooledMap(images, REHOST_CONCURRENCY, ({ url }) => fetchImageBuffer(url));
 
     // Phase 2: hash-check and upload sequentially in INPUT INDEX ORDER so the
     // lowest-index copy of each distinct hash always survives the dedupe.
