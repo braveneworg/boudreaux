@@ -351,35 +351,32 @@ textarea:focus-visible,
 }
 
 /* The content column as a torn-out sheet: kraft-toned tear teeth tile down both
-   edges (14px wide, 140px period, mirrored). Painted as background layers inside
-   main's box so nothing escapes overflow-x-clip. `border-box` origin pins the
-   teeth to main's outer edge; main's own xl:px-6 then holds the content clear of
-   them, so panels and the banner strip never cover the tear. The tooth fill must
-   match zine-desk's background-color, and the sheet color must match
-   ContentContainer's below-xl bg-zinc-100 — the column tone the site has always
-   had (that wrapper goes xl:bg-transparent so these tiles show). */
+   edges (~15px teeth, 140px period, mirrored). Painted as background layers
+   inside main's box so nothing escapes overflow-x-clip. A soft shadow is baked
+   into each tile with feDropShadow, offset toward the sheet, so the lift follows
+   the jagged tear itself instead of a straight box-shadow on the kraft desk;
+   20px tiles leave ~5px for that shadow, and main's xl:px-6 holds content clear.
+   The right tile mirrors the left, which flips the shadow to hug its edge too.
+   The tooth fill must match zine-desk's background-color, and the sheet color
+   must match ContentContainer's below-xl bg-zinc-100 — the column tone the site
+   has always had (that wrapper goes xl:bg-transparent so these tiles show). */
 @utility zine-page-edges {
   background-color: var(--color-zinc-100);
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='140'%3E%3Cg transform='translate(14 0) scale(-1 1)'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4'/%3E%3C/g%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='140'%3E%3Cfilter id='s'%3E%3CfeDropShadow dx='2' dy='0' stdDeviation='2 0' flood-color='%23000' flood-opacity='0.4'/%3E%3C/filter%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4' filter='url(%23s)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='140'%3E%3Cfilter id='s'%3E%3CfeDropShadow dx='2' dy='0' stdDeviation='2 0' flood-color='%23000' flood-opacity='0.4'/%3E%3C/filter%3E%3Cg transform='translate(20 0) scale(-1 1)'%3E%3Cpath d='M0 0h6l4 7-6 11 7 12-5 10 8 13-6 11 5 12-7 10 8 12-5 11 6 12-7 9-2 10H0Z' fill='%23d7ccb4' filter='url(%23s)'/%3E%3C/g%3E%3C/svg%3E");
   background-repeat: repeat-y, repeat-y;
   /* Pin the teeth to the viewport (fixed = viewport-relative) so the sheet and
-     its content scroll past a stationary torn frame. Each 14px tile sits at the
+     its content scroll past a stationary torn frame. Each 20px tile sits at the
      centered column's outer edge — 664px = half the 83rem cap; max()/min() clamp
      to the viewport edge once the column meets it below 1328px. */
   background-attachment: fixed, fixed;
   background-position:
     max(0px, 50vw - 664px) top,
-    min(50vw + 650px, 100vw - 14px) top;
+    min(50vw + 644px, 100vw - 20px) top;
   background-size:
-    14px 140px,
-    14px 140px;
-  /* Slight, transparent lift so the torn sheet floats above the kraft desk;
-     side-only (offset X, negative spread) to avoid a seam under the header. */
-  box-shadow:
-    9px 0 22px -6px rgb(0 0 0 / 0.28),
-    -9px 0 22px -6px rgb(0 0 0 / 0.28);
+    20px 140px,
+    20px 140px;
 }
 
 /* Banner notification strip slide animations — keyframes are referenced from
