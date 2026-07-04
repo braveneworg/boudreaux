@@ -191,7 +191,7 @@ describe('searchArtistSources', () => {
     ]);
   });
 
-  it('skips images from listening-service result pages', async () => {
+  it('collects images from listening-service pages alongside other pages', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       jinaSearchResponse([
         {
@@ -210,6 +210,11 @@ describe('searchArtistSources', () => {
     const result = await searchArtistSources('Artist', 'k', fetchFn);
 
     expect(result?.images).toEqual([
+      {
+        url: 'https://i.scdn.co/image/cover.jpg',
+        alt: null,
+        sourceUrl: 'https://open.spotify.com/artist/x',
+      },
       { url: 'https://a.example/artist.jpg', alt: 'Artist', sourceUrl: 'https://a.example/bio' },
     ]);
   });
@@ -316,9 +321,9 @@ describe('searchArtistSources', () => {
     expect(result?.images).toHaveLength(1);
   });
 
-  it('does not truncate beyond the new cap of 20 images per call', async () => {
+  it('does not truncate beyond the new cap of 60 images per call', async () => {
     const images: Record<string, string> = {};
-    for (let i = 0; i < 21; i++) {
+    for (let i = 0; i < 61; i++) {
       images[`Image ${i}: Photo ${i}`] = `https://a.example/photo-${i}.jpg`;
     }
     const fetchFn = vi
@@ -329,7 +334,27 @@ describe('searchArtistSources', () => {
 
     const result = await searchArtistSources('Artist', 'k', fetchFn);
 
-    expect(result?.images).toHaveLength(20);
+    expect(result?.images).toHaveLength(60);
+  });
+
+  it('collects images from listening-service result pages (album covers wanted)', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              url: 'https://ceschi.bandcamp.com/album/x',
+              title: 'Ceschi on Bandcamp',
+              content: 'album page',
+              images: { 'Image 1: Broken Bone Ballads cover': 'https://f4.bcbits.com/img/a1.jpg' },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    const sources = await searchArtistSources('Ceschi', null, fetchFn);
+    expect(sources?.images.map((image) => image.url)).toContain('https://f4.bcbits.com/img/a1.jpg');
   });
 });
 
