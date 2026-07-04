@@ -117,6 +117,17 @@ describe('DesktopMenu', () => {
         'true'
       );
     });
+
+    it('keeps top-level link text white on focus', () => {
+      render(<DesktopMenu />);
+
+      // shadcn's link base ships `focus:text-accent-foreground` (near-black);
+      // the override must survive the cn() merge or a keyboard-focused label
+      // goes dark on the black starfield.
+      const tokens = screen.getByRole('link', { name: 'Home' }).className.split(/\s+/);
+      expect(tokens).toContain('focus:text-zinc-50');
+      expect(tokens).not.toContain('focus:text-accent-foreground');
+    });
   });
 
   describe('authenticated', () => {

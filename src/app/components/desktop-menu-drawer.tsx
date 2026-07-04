@@ -51,8 +51,8 @@ export const DesktopMenuDrawer = ({
       <NavigationMenuTrigger
         className={cn(
           'h-auto w-auto bg-transparent p-0 text-2xl font-normal text-zinc-50 underline-offset-8',
-          'hover:bg-transparent hover:underline focus:bg-transparent',
-          'data-[state=open]:bg-transparent data-[state=open]:underline data-[state=open]:hover:bg-transparent data-[state=open]:focus:bg-transparent',
+          'hover:bg-transparent hover:underline focus:bg-transparent focus:text-zinc-50',
+          'data-[state=open]:bg-transparent data-[state=open]:text-zinc-50 data-[state=open]:underline data-[state=open]:hover:bg-transparent data-[state=open]:focus:bg-transparent',
           group.color,
           isTrailActive && 'underline'
         )}

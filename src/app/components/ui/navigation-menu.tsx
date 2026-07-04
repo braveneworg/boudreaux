@@ -20,6 +20,11 @@ const NavigationMenu = ({
   <NavigationMenuPrimitive.Root
     data-slot="navigation-menu"
     data-viewport={viewport}
+    // Deliberately omits upstream shadcn's `group/navigation-menu` marker class:
+    // the desktop drawers (desktop-menu-drawer.tsx tape chip + top-full/mt-3
+    // positioning) rely on the gated `group-data-[viewport=false]` styles below
+    // (mt-1.5, overflow-hidden, bg-popover) staying inert. Do not re-add the
+    // marker on upstream re-sync without re-testing the desktop drawers.
     className={cn('relative flex max-w-max flex-1 items-center justify-center', className)}
     {...props}
   >

@@ -11,7 +11,12 @@ describe('HeaderBackdrop', () => {
   it('clips its animated layers inside its own wrapper', () => {
     const { container } = render(<HeaderBackdrop />);
     const wrapper = container.firstElementChild;
-    expect(wrapper?.className).toContain('overflow-hidden');
+    // `absolute inset-0` make the clip actually cover the header container —
+    // without them `overflow-hidden` clips a zero-sized box.
+    const tokens = (wrapper?.className ?? '').split(/\s+/);
+    expect(tokens).toContain('overflow-hidden');
+    expect(tokens).toContain('absolute');
+    expect(tokens).toContain('inset-0');
     expect(wrapper?.getAttribute('aria-hidden')).toBe('true');
   });
 

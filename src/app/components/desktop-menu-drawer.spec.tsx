@@ -115,4 +115,18 @@ describe('DesktopMenuDrawer', () => {
     const tokens = screen.getByRole('button', { name: /music/i }).className.split(/\s+/);
     expect(tokens).not.toContain('underline');
   });
+
+  it('keeps the trigger text white when open and when focused', () => {
+    renderDrawer();
+
+    // shadcn's trigger cva ships `data-[state=open]:text-accent-foreground`
+    // and `focus:text-accent-foreground` (near-black); without competing
+    // tokens tailwind-merge keeps them and open/focused labels go dark on the
+    // black starfield. The overrides must survive the cn() merge.
+    const tokens = screen.getByRole('button', { name: /music/i }).className.split(/\s+/);
+    expect(tokens).toContain('data-[state=open]:text-zinc-50');
+    expect(tokens).toContain('focus:text-zinc-50');
+    expect(tokens).not.toContain('data-[state=open]:text-accent-foreground');
+    expect(tokens).not.toContain('focus:text-accent-foreground');
+  });
 });
