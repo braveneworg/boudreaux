@@ -1377,15 +1377,13 @@ describe('media discovery v2 orchestration', () => {
         { url: 'https://zine.net/live.jpg', alt: 'Ceschi live', sourceUrl: 'https://zine.net/a' },
       ],
     });
-    deps.verifyScrapedImages = vi
-      .fn()
-      .mockResolvedValue([
-        {
-          ...commonsImage('https://zine.net/live.jpg'),
-          kind: 'photo',
-          alt: 'Ceschi live on stage',
-        },
-      ]);
+    deps.verifyScrapedImages = vi.fn().mockResolvedValue([
+      {
+        ...commonsImage('https://zine.net/live.jpg'),
+        kind: 'photo',
+        alt: 'Ceschi live on stage',
+      },
+    ]);
 
     const data = await runBioGeneration(baseInput(), deps);
 
