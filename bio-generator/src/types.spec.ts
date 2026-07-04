@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { bioGenerationInputSchema } from './types.js';
+import { bioGenerationInputSchema, bioImageSchema, bioLinkSchema } from './types.js';
 
 describe('bioGenerationInputSchema', () => {
   it('parses valid input without optional date fields', () => {
@@ -51,5 +51,52 @@ describe('bioGenerationInputSchema', () => {
       formedOn: '90-06-01',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('bio media discovery v2 wire types', () => {
+  it('accepts image kind and alt', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      kind: 'cover',
+      alt: 'Album cover for Example',
+    };
+    expect(bioImageSchema.parse(image).kind).toBe('cover');
+    expect(bioImageSchema.parse(image).alt).toBe('Album cover for Example');
+  });
+
+  it('rejects an unknown image kind', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      kind: 'landscape',
+    };
+    expect(bioImageSchema.safeParse(image).success).toBe(false);
+  });
+
+  it('accepts the press link kind', () => {
+    const link = { label: 'Interview', url: 'https://example.com/i', kind: 'press' };
+    expect(bioLinkSchema.parse(link).kind).toBe('press');
+  });
+
+  it('accepts input releases with title, releasedOn, and url', () => {
+    const input = {
+      artistId: 'a1',
+      displayName: 'Ceschi',
+      releases: [{ title: 'Broken Bone Ballads', releasedOn: '2015-04-14', url: '/releases/abc' }],
+    };
+    expect(bioGenerationInputSchema.parse(input).releases?.[0]?.title).toBe('Broken Bone Ballads');
+  });
+
+  it('rejects a malformed releasedOn date', () => {
+    const input = {
+      artistId: 'a1',
+      displayName: 'Ceschi',
+      releases: [{ title: 'X', releasedOn: '2015/04/14', url: '/releases/abc' }],
+    };
+    expect(bioGenerationInputSchema.safeParse(input).success).toBe(false);
   });
 });
