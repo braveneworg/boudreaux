@@ -20,7 +20,7 @@ const deleteBioLink = vi.hoisted(() => vi.fn());
 const deleteBioImage = vi.hoisted(() => vi.fn());
 const pending = vi.hoisted(() => ({ link: false, image: false }));
 /** Controls what `registry.getTarget()` returns for insert tests. */
-const mockGetTarget = vi.hoisted(() => vi.fn<[], Editor | null>().mockReturnValue(null));
+const mockGetTarget = vi.hoisted(() => vi.fn(() => null as Editor | null));
 
 vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: (artistId: string) => statusMock(artistId),
