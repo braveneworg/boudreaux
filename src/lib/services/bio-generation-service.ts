@@ -397,7 +397,13 @@ export class BioGenerationService {
     // Fetch once: feeds (a) lambda-input releases, (b) release links, and (c) cover palette.
     // Failure falls back to [] so generation still completes without catalog context.
     const releases = await ReleaseRepository.findPublishedByArtistWithCovers(artist.id).catch(
-      () => []
+      (error) => {
+        loggers.media.warn('bio_release_covers_failed', {
+          artistId: artist.id,
+          error: String(error),
+        });
+        return [] as ReleaseCoverSource[];
+      }
     );
 
     const result = await BioGenerationService.generate({

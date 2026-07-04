@@ -10,7 +10,15 @@ import type { BioGenerationLambdaInput } from './bio-generation-fixture';
 
 vi.mock('server-only', () => ({}));
 
-const sendMock = vi.fn();
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
+const mockLoggerError = vi.hoisted(() => vi.fn());
+const sendMock = vi.hoisted(() => vi.fn());
+const findByIdMock = vi.hoisted(() => vi.fn());
+const replaceBioContentMock = vi.hoisted(() => vi.fn());
+const setBioStatusMock = vi.hoisted(() => vi.fn());
+const getBioGenerationStateMock = vi.hoisted(() => vi.fn());
+const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@aws-sdk/client-lambda', () => ({
   LambdaClient: class {
     send = sendMock;
@@ -20,10 +28,10 @@ vi.mock('@aws-sdk/client-lambda', () => ({
   },
 }));
 
-const findByIdMock = vi.fn();
-const replaceBioContentMock = vi.fn();
-const setBioStatusMock = vi.fn();
-const getBioGenerationStateMock = vi.fn();
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { media: { warn: mockLoggerWarn, error: mockLoggerError } },
+}));
+
 vi.mock('@/lib/repositories/artist-repository', () => ({
   ArtistRepository: {
     findById: (id: string) => findByIdMock(id),
@@ -33,11 +41,8 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
   },
 }));
 
-const findPublishedByArtistMock = vi.fn();
-const findPublishedByArtistWithCoversMock = vi.fn();
 vi.mock('@/lib/repositories/release-repository', () => ({
   ReleaseRepository: {
-    findPublishedByArtist: (id: string) => findPublishedByArtistMock(id),
     findPublishedByArtistWithCovers: (id: string) => findPublishedByArtistWithCoversMock(id),
   },
 }));
@@ -191,6 +196,8 @@ describe('BioGenerationService.generateForArtist', () => {
   let generateSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    mockLoggerWarn.mockReset();
+    mockLoggerError.mockReset();
     findByIdMock.mockResolvedValue(artist);
     replaceBioContentMock.mockResolvedValue(undefined);
     findPublishedByArtistWithCoversMock.mockResolvedValue([]);
@@ -754,6 +761,20 @@ describe('BioGenerationService.generateForArtist', () => {
         kind: 'wikipedia',
       })
     );
+  });
+
+  it('logs the cover lookup failure while still completing generation', async () => {
+    const releaseError = new Error('connection timeout');
+    findPublishedByArtistWithCoversMock.mockRejectedValue(releaseError);
+
+    await BioGenerationService.generateForArtist(artist.id);
+
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'bio_release_covers_failed',
+      expect.objectContaining({ artistId: artist.id })
+    );
+    // Generation still succeeds despite the cover lookup failure.
+    expect(replaceBioContentMock).toHaveBeenCalled();
   });
 
   describe('internal release grounding and covers', () => {
