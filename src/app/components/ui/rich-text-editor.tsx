@@ -8,7 +8,6 @@ import type { JSX } from 'react';
 
 import NextImage from 'next/image';
 
-import { Image as TiptapImage } from '@tiptap/extension-image';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
@@ -64,25 +63,6 @@ interface RichTextEditorProps {
   /** Called each time this editor gains focus. */
   onEditorFocus?: () => void;
 }
-
-/** Image node that also persists width/height so variants render at the right size. */
-const BioEditorImage = TiptapImage.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      width: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('width'),
-        renderHTML: (attributes) => (attributes.width ? { width: attributes.width } : {}),
-      },
-      height: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('height'),
-        renderHTML: (attributes) => (attributes.height ? { height: attributes.height } : {}),
-      },
-    };
-  },
-});
 
 interface LabeledTextFieldProps {
   id: string;
@@ -355,7 +335,6 @@ export const RichTextEditor = ({
       }),
       TextStyle,
       FontSize,
-      BioEditorImage,
       BioFigure,
     ],
     content: value,

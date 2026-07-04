@@ -697,25 +697,27 @@ describe('RichTextEditor image attributes and picker', () => {
     );
   });
 
-  it('parses and renders width/height off an <img> in the incoming HTML value', async () => {
+  it('upgrades a bare <img> in the incoming HTML value into an editable figure', async () => {
     const Controlled = () => {
       const [value, setValue] = useState(
-        '<p><img src="https://cdn.fakefourrecords.com/x.jpg" alt="P" width="320" height="240"></p>'
+        '<p><img src="https://cdn.fakefourrecords.com/x.jpg" alt="P"></p>'
       );
       return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
     };
     render(<Controlled />);
     await waitForEditor();
 
-    // BioEditorImage.parseHTML reads width/height off the incoming markup and
-    // renderHTML writes them back onto the DOM node the editor displays.
-    const img = await waitFor(() => {
-      const node = screen.getByRole('textbox', { name: 'Bio' }).querySelector('img');
-      if (!node) throw new Error('image not rendered yet');
+    // Legacy bare <img> content is adopted into a bioFigure node, so it renders
+    // inside a figure.bio-figure that carries the resize/float/remove controls.
+    const image = await waitFor(() => {
+      const node = screen
+        .getByRole('textbox', { name: 'Bio' })
+        .querySelector('figure.bio-figure img');
+      if (!node) throw new Error('figure image not rendered yet');
       return node;
     });
 
-    expect(img).toHaveAttribute('width', '320');
+    expect(image).toHaveAttribute('src', 'https://cdn.fakefourrecords.com/x.jpg');
   });
 
   it('inserts an image with a null alt using fallbacks for label and alt', async () => {
