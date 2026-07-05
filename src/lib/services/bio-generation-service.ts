@@ -306,6 +306,68 @@ const assembleContent = ({
   model: data.model,
 });
 
+/**
+ * Re-host + sanitize + assemble raw generation data and persist it, replacing
+ * the artist's bio content. Shared by the synchronous
+ * {@link BioGenerationService.generateForArtist} flow and the async callback
+ * route (which persists on the Lambda's out-of-band completion). Returns the
+ * assembled {@link GeneratedBioContent}; callers pair it with the artist slug
+ * to revalidate pages. Throws on a DB error (callers map that to `failed`).
+ */
+export const persistGeneratedBio = async (
+  artistId: string,
+  data: BioGenerationData,
+  releases: ReleaseCoverSource[]
+): Promise<GeneratedBioContent> => {
+  const genres = data.genres ? sanitizeBioText(data.genres) || null : null;
+
+  // Re-host each discovered image into S3 via a cheap thumbnail so it is
+  // CDN-served. Full variant re-hosting moves to save-time in PR 2.
+  const { rehosted, duplicateAliases } = await rehostImages(data.images, artistId);
+
+  // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
+  // `<img src="image:N">` placeholders can be resolved to hosted images before
+  // sanitizing. Deduped indices are aliased to their survivor URL so the prose
+  // retains the picture instead of having the sanitizer drop the placeholder.
+  const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
+
+  // Re-index sortOrder after dropping failed images. The Lambda already caps
+  // the number of primaries (and which images are primary is its choice, not
+  // a function of array position), so preserve isPrimary as-is.
+  const persistedImages = rehosted
+    .filter((image): image is RehostedImage => image !== null)
+    .map((image, index) => ({ ...image, sortOrder: index }));
+
+  // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
+  const sanitizedLinks = sanitizeLinks(data.links);
+
+  // Append internal release links using the prefetched catalog (no extra query).
+  const persistedLinks = appendReleaseLinks(sanitizedLinks, releases);
+
+  // Append rights-cleared CDN cover images after the discovered palette.
+  const persistedImagesWithCovers = appendInternalCoverImages(persistedImages, releases);
+
+  const content = assembleContent({
+    data,
+    persistedImages: persistedImagesWithCovers,
+    imageUrlByIndex,
+    persistedLinks,
+    genres,
+  });
+
+  await ArtistRepository.replaceBioContent(artistId, {
+    shortBio: content.shortBio,
+    bio: content.longBio,
+    altBio: content.altBio,
+    genres: content.genres,
+    bioModel: content.model,
+    images: persistedImagesWithCovers,
+    links: persistedLinks,
+  });
+
+  return content;
+};
+
 /** Result of the high-level flow; `slug` lets the caller revalidate its pages. */
 export type GenerateForArtistResult =
   | { success: true; data: GeneratedBioContent; slug: string }
@@ -424,52 +486,7 @@ export class BioGenerationService {
       return { success: false, error: result.error };
     }
 
-    const genres = result.data.genres ? sanitizeBioText(result.data.genres) || null : null;
-
-    // Re-host each discovered image into S3 via a cheap thumbnail so it is
-    // CDN-served. Full variant re-hosting moves to save-time in PR 2.
-    const { rehosted, duplicateAliases } = await rehostImages(result.data.images, artist.id);
-
-    // Map each ORIGINAL image index → its re-hosted CDN URL so the long bio's
-    // `<img src="image:N">` placeholders can be resolved to hosted images before
-    // sanitizing. Deduped indices are aliased to their survivor URL so the prose
-    // retains the picture instead of having the sanitizer drop the placeholder.
-    const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
-
-    // Re-index sortOrder after dropping failed images. The Lambda already caps
-    // the number of primaries (and which images are primary is its choice, not
-    // a function of array position), so preserve isPrimary as-is.
-    const persistedImages = rehosted
-      .filter((image): image is RehostedImage => image !== null)
-      .map((image, index) => ({ ...image, sortOrder: index }));
-
-    // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
-    const sanitizedLinks = sanitizeLinks(result.data.links);
-
-    // Append internal release links using the prefetched catalog (no extra query).
-    const persistedLinks = appendReleaseLinks(sanitizedLinks, releases);
-
-    // Append rights-cleared CDN cover images after the discovered palette.
-    const persistedImagesWithCovers = appendInternalCoverImages(persistedImages, releases);
-
-    const content = assembleContent({
-      data: result.data,
-      persistedImages: persistedImagesWithCovers,
-      imageUrlByIndex,
-      persistedLinks,
-      genres,
-    });
-
-    await ArtistRepository.replaceBioContent(artist.id, {
-      shortBio: content.shortBio,
-      bio: content.longBio,
-      altBio: content.altBio,
-      genres: content.genres,
-      bioModel: content.model,
-      images: persistedImagesWithCovers,
-      links: persistedLinks,
-    });
-
+    const content = await persistGeneratedBio(artist.id, result.data, releases);
     return { success: true, data: content, slug: artist.slug };
   }
 

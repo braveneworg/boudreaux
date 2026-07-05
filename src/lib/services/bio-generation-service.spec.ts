@@ -2,9 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { BioGenerationResult } from '@/lib/validation/bio-generation-schema';
+import type {
+  BioGenerationData,
+  BioGenerationResult,
+} from '@/lib/validation/bio-generation-schema';
 
-import { BioGenerationService } from './bio-generation-service';
+import { BioGenerationService, persistGeneratedBio } from './bio-generation-service';
 
 import type { BioGenerationLambdaInput } from './bio-generation-fixture';
 
@@ -838,6 +841,81 @@ describe('BioGenerationService.generateForArtist', () => {
       const matching = result.data.images.filter((image) => image.url === coverUrl);
       expect(matching).toHaveLength(1);
     });
+  });
+});
+
+describe('persistGeneratedBio', () => {
+  const artistId = 'a'.repeat(24);
+
+  const data: BioGenerationData = {
+    shortBio: '<b>Short</b> teaser',
+    longBio: '<p>Long</p><a href="javascript:alert(1)">x</a><script>evil()</script>',
+    altBio: '<p>Punchy <strong>promo</strong></p><script>evil()</script>',
+    genres: 'art rock',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/a.jpg',
+        thumbnailUrl: 'https://upload.wikimedia.org/thumb/a.jpg',
+        title: 'Portrait',
+        attribution: 'Photographer',
+        license: 'CC BY-SA 4.0',
+        sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
+        width: 1000,
+        height: 800,
+        isPrimary: true,
+      },
+    ],
+    links: [
+      { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead', kind: 'wikipedia' },
+    ],
+    model: 'gemini-2.5-pro',
+  };
+
+  beforeEach(() => {
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    rehostImagesMock.mockReset().mockResolvedValue({
+      results: [
+        {
+          url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
+          width: 1200,
+          height: 800,
+        },
+      ],
+      duplicateAliases: new Map(),
+    });
+  });
+
+  it('returns the assembled sanitized content', async () => {
+    const content = await persistGeneratedBio(artistId, data, []);
+
+    expect(content.longBio).not.toContain('<script>');
+    expect(content.longBio).not.toContain('javascript:');
+    expect(content.altBio).toContain('<strong>promo</strong>');
+    expect(content.genres).toBe('art rock');
+    expect(content.model).toBe('gemini-2.5-pro');
+    expect(content.images[0].url).toBe(
+      'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
+    );
+    expect(content.links[0].url).toBe('https://en.wikipedia.org/wiki/Radiohead');
+  });
+
+  it('persists the re-hosted images and links via the repository', async () => {
+    await persistGeneratedBio(artistId, data, []);
+
+    expect(rehostImagesMock).toHaveBeenCalledWith(
+      [{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }],
+      artistId
+    );
+    expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
+    const [id, content] = replaceBioContentMock.mock.calls[0];
+    expect(id).toBe(artistId);
+    expect(content.bioModel).toBe('gemini-2.5-pro');
+    expect(content.images[0].url).toBe(
+      'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
+    );
+    expect(content.images[0].attribution).toBe('Photographer');
+    expect(content.images[0].sortOrder).toBe(0);
+    expect(content.links[0].url).toBe('https://en.wikipedia.org/wiki/Radiohead');
   });
 });
 
