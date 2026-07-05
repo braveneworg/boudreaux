@@ -251,6 +251,7 @@ const AttributionField = ({
   };
 
   const handleCommit = (): void => {
+    if (!editing) return;
     updateAttributes({ attribution: draft.trim() || null });
     setEditing(false);
   };

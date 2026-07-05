@@ -347,6 +347,27 @@ describe('BioFigureNodeView', () => {
       expect(props.updateAttributes).toHaveBeenCalledWith({ attribution: null });
     });
 
+    it('pressing Escape cancels editing without calling updateAttributes', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      expect(screen.getByRole('textbox', { name: 'Attribution' })).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      expect(props.updateAttributes).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Edit attribution' })).toBeInTheDocument();
+    });
+
+    it('blurring the input commits the typed value', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      const input = screen.getByRole('textbox', { name: 'Attribution' });
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Blur credit');
+      fireEvent.blur(input);
+      expect(props.updateAttributes).toHaveBeenCalledWith({ attribution: 'Blur credit' });
+    });
+
     it('does not render the edit button when editor is not editable', () => {
       render(<BioFigureNodeView {...makeProps({ isEditable: false })} />);
       expect(screen.queryByRole('button', { name: 'Edit attribution' })).not.toBeInTheDocument();
