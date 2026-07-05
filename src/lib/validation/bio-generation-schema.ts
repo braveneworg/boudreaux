@@ -117,6 +117,14 @@ export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
 
 export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 
+/** Body the bio-generator Lambda POSTs to the async completion callback route. */
+export const bioGenerationCallbackSchema = z.object({
+  jobToken: z.string().min(1),
+  result: bioGenerationResultSchema,
+});
+
+export type BioGenerationCallback = z.infer<typeof bioGenerationCallbackSchema>;
+
 /** Sanitized content the Server Action returns to the admin form for preview. */
 export interface GeneratedBioContent {
   shortBio: string;
