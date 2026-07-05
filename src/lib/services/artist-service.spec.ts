@@ -114,6 +114,7 @@ describe('ArtistService', () => {
     bioStatus: null,
     bioError: null,
     bioStartedAt: null,
+    bioJobToken: null,
     slug: 'john-doe',
     genres: null,
     bornOn: null,
