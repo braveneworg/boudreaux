@@ -530,6 +530,10 @@ describe('ArtistRepository', () => {
         attribution: 'Uploaded',
       });
 
+      expect(prisma.artistBioImage.aggregate).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        _max: { sortOrder: true },
+      });
       expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           artistId: 'a1',
@@ -552,6 +556,40 @@ describe('ArtistRepository', () => {
 
       expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ sortOrder: 0 }),
+      });
+    });
+
+    it('forwards isPrimary true when supplied', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.create).mockResolvedValue({ id: 'img-2' } as never);
+
+      await ArtistRepository.createBioImage({
+        artistId: 'a1',
+        url: 'https://cdn.example/x.webp',
+        isPrimary: true,
+      });
+
+      expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ isPrimary: true }),
+      });
+    });
+
+    it('forwards a supplied optional field to create', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.create).mockResolvedValue({ id: 'img-3' } as never);
+
+      await ArtistRepository.createBioImage({
+        artistId: 'a1',
+        url: 'https://cdn.example/x.webp',
+        thumbnailUrl: 'https://cdn.example/t.webp',
+      });
+
+      expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ thumbnailUrl: 'https://cdn.example/t.webp' }),
       });
     });
   });
