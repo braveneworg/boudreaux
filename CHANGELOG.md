@@ -88,6 +88,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.179.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ persistent bio palette + bio-image write backend (1a) (#557)\n- feat: ✨ persistent bio palette + bio-image write backend (1a) (#557)\n
+
 ## [4.178.0] - 2026-07-05
 
 ### Added
