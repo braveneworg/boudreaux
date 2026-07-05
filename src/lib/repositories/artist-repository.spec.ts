@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     artistRelease: {
@@ -463,7 +464,66 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('setBioJobToken', () => {
+    it('sets the job token when given a string', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioJobToken('a1', 'tok');
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioJobToken: 'tok' },
+      });
+    });
+
+    it('clears the job token when given null', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioJobToken('a1', null);
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioJobToken: null },
+      });
+    });
+  });
+
+  describe('claimBioJobToken', () => {
+    it('updates only the row matching id, token, and processing status', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await ArtistRepository.claimBioJobToken('a1', 'tok');
+
+      expect(prisma.artist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', bioJobToken: 'tok', bioStatus: 'processing' },
+        data: { bioJobToken: null },
+      });
+    });
+
+    it('returns true when exactly one row was claimed', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      expect(await ArtistRepository.claimBioJobToken('a1', 'tok')).toBe(true);
+    });
+
+    it('returns false when no row matched (already claimed)', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      expect(await ArtistRepository.claimBioJobToken('a1', 'tok')).toBe(false);
+    });
+  });
+
   describe('getBioGenerationState', () => {
+    it('selects and returns the bioJobToken', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioJobToken: 'tok' } as never);
+
+      const result = await ArtistRepository.getBioGenerationState('a1');
+
+      expect(result).toEqual({ bioJobToken: 'tok' });
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioJobToken).toBe(true);
+    });
+
     it('selects the status fields plus ordered images and links', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
 

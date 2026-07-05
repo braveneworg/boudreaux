@@ -38,6 +38,7 @@ const artistResponse = {
   bioStatus: null,
   bioError: null,
   bioStartedAt: null,
+  bioJobToken: null,
   slug: 'jane-doe',
   genres: null,
   bornOn: null,

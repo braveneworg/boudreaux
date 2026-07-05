@@ -6,7 +6,6 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
-import { logSecurityEvent } from '@/utils/audit-log';
 
 interface BioInFlightState {
   bioStatus: string | null;
@@ -36,9 +35,23 @@ export const resolveInFlightBioStatus = (
   return null;
 };
 
+/**
+ * Revalidate the four Next.js cache paths a bio change affects: the admin and
+ * public artist lists, plus the artist's detail and bio pages. Shared by the
+ * synchronous fake path here and the async Lambda callback route (Task B7/B8),
+ * so both completion paths invalidate the same set of pages.
+ *
+ * @param slug - The artist slug whose detail/bio pages should be revalidated.
+ */
+export const revalidateArtistBioPaths = (slug: string): void => {
+  revalidatePath('/admin/artists');
+  revalidatePath('/artists');
+  revalidatePath(`/artists/${slug}`);
+  revalidatePath(`/artists/${slug}/bio`);
+};
+
 interface RunBioGenerationParams {
   artistId: string;
-  userId: string;
   links?: string[];
   description?: string;
 }
@@ -46,37 +59,20 @@ interface RunBioGenerationParams {
 /**
  * The heavy read → generate → re-host → persist flow for an artist bio, run via
  * `after()` once the action response has been sent. `runGenerationJob` records
- * its own succeeded/failed status and never throws, so on success this only
- * audit-logs and revalidates the public artist pages; on failure it no-ops.
+ * its own succeeded/failed status and never throws.
  *
- * Extracted verbatim from the prior inline `after()` callback to keep the
- * action's own branching small.
+ * Only the synchronous fake/E2E path (`completed`) finishes in-process, so it is
+ * the only outcome revalidated here; the real async path (`dispatched`) is
+ * finished — and revalidated — by the Lambda callback route. `failed` no-ops.
+ * The accepted trigger is audit-logged by the action, not here.
  */
 export const runBioGenerationAfterResponse = async ({
   artistId,
-  userId,
   links,
   description,
 }: RunBioGenerationParams): Promise<void> => {
-  const result = await BioGenerationService.runGenerationJob(artistId, { links, description });
-  if (!result.success) {
-    return;
+  const outcome = await BioGenerationService.runGenerationJob(artistId, { links, description });
+  if (outcome.status === 'completed') {
+    revalidateArtistBioPaths(outcome.slug);
   }
-
-  logSecurityEvent({
-    event: 'media.artist.updated',
-    userId,
-    metadata: {
-      artistId,
-      action: 'bio-generated',
-      model: result.data.model,
-      imageCount: result.data.images.length,
-      linkCount: result.data.links.length,
-    },
-  });
-
-  revalidatePath('/admin/artists');
-  revalidatePath('/artists');
-  revalidatePath(`/artists/${result.slug}`);
-  revalidatePath(`/artists/${result.slug}/bio`);
 };

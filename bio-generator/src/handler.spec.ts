@@ -2,7 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lambdaHandler, MAX_VISION_CANDIDATES, runBioGeneration } from './handler.js';
+import {
+  lambdaHandler,
+  MAX_FOLLOWED_LINKS,
+  MAX_VISION_CANDIDATES,
+  runBioGeneration,
+} from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
@@ -79,6 +84,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   getCoverArtImages: vi.fn().mockResolvedValue([]),
   getCommonsCategoryImages: vi.fn().mockResolvedValue([]),
   verifyScrapedImages: vi.fn().mockResolvedValue([]),
+  postCallback: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
@@ -190,6 +196,24 @@ describe('runBioGeneration', () => {
 
     expect(searchArtistSources).toHaveBeenCalledWith('Obscure Act', null, undefined, {
       query: undefined,
+    });
+  });
+
+  it('issues targeted bandcamp, discogs, and press-photo image search queries', async () => {
+    const searchArtistSources = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({ searchArtistSources });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchArtistSources).toHaveBeenCalledTimes(6);
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead press photo live performance',
+    });
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead musician site:bandcamp.com',
+    });
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead musician site:discogs.com',
     });
   });
 
@@ -848,6 +872,135 @@ describe('runBioGeneration', () => {
   });
 });
 
+describe('followKnownLinksForImages (bounded 1-level link-follow)', () => {
+  const matchWithLinks = (links: Array<{ label: string; url: string; kind: string }>) => ({
+    mbid: 'mbid-1',
+    name: 'Artist',
+    wikidataId: null,
+    artistType: 'Person',
+    area: 'USA',
+    beginDate: '1990',
+    tags: [],
+    links,
+  });
+
+  const bandcampScrape = () => ({
+    content: '',
+    images: [{ url: 'https://img/bc.jpg', alt: null, sourceUrl: 'https://x.bandcamp.com' }],
+  });
+
+  it('routes an image from a followed Bandcamp link into the vision-gate candidates', async () => {
+    const verifyScrapedImages = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      readUrl: vi.fn().mockResolvedValue(bandcampScrape()),
+      verifyScrapedImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const [candidates] = verifyScrapedImages.mock.calls[0] as [
+      Array<{ url: string; sourceUrl: string | null }>,
+    ];
+    expect(candidates.some((candidate) => candidate.sourceUrl === 'https://x.bandcamp.com')).toBe(
+      true
+    );
+  });
+
+  it('reads a discovered Discogs link one level deep for images', async () => {
+    const readUrl = vi.fn().mockResolvedValue({ content: '', images: [] });
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([
+            { label: 'Discogs', url: 'https://www.discogs.com/artist/123', kind: 'other' },
+          ])
+        ),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).toHaveBeenCalledWith('https://www.discogs.com/artist/123', null);
+  });
+
+  it('does not follow links outside the known Bandcamp/Discogs hosts', async () => {
+    const readUrl = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Blog', url: 'https://blog.example.com/post', kind: 'other' }])
+        ),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).not.toHaveBeenCalled();
+  });
+
+  it('caps the number of followed links at MAX_FOLLOWED_LINKS', async () => {
+    const readUrl = vi.fn().mockResolvedValue({ content: '', images: [] });
+    const links = Array.from({ length: MAX_FOLLOWED_LINKS + 2 }, (_, i) => ({
+      label: `Bandcamp ${i}`,
+      url: `https://a${i}.bandcamp.com`,
+      kind: 'streaming',
+    }));
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(matchWithLinks(links)),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).toHaveBeenCalledTimes(MAX_FOLLOWED_LINKS);
+  });
+
+  it('subjects followed images to the vision gate rather than trusting them directly', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      readUrl: vi.fn().mockResolvedValue(bandcampScrape()),
+      verifyScrapedImages: vi.fn().mockResolvedValue([]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.images.some((img) => img.url === 'https://img/bc.jpg')).toBe(false);
+  });
+
+  it('skips a followed link whose URL was already read during earlier scraping', async () => {
+    const readUrl = vi.fn().mockResolvedValue(bandcampScrape());
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: '',
+        sourceUrls: ['https://x.bandcamp.com'],
+        images: [],
+        references: [],
+      }),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).not.toHaveBeenCalled();
+  });
+});
+
 describe('lambdaHandler', () => {
   it('returns ok:false for invalid input', async () => {
     const result = await lambdaHandler({ artistId: '' });
@@ -864,6 +1017,58 @@ describe('lambdaHandler', () => {
 
     expect(result.ok).toBe(false);
     vi.unstubAllGlobals();
+  });
+
+  it('posts the result to the callback when callbackUrl and jobToken are present', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      deps
+    );
+
+    expect(postCallback).toHaveBeenCalledWith({
+      url: 'https://app.example/cb',
+      jobToken: 'tok-1',
+      result: { ok: true, data: expect.objectContaining({ shortBio: 'Short teaser.' }) },
+    });
+  });
+
+  it('posts the failure result to the callback when generation fails', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      postCallback,
+      getGeminiApiKey: vi.fn().mockRejectedValue(new Error('no api key')),
+    });
+
+    await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      deps
+    );
+
+    expect(postCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ result: expect.objectContaining({ ok: false }) })
+    );
+  });
+
+  it('does not post a callback when no callbackUrl is present', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await lambdaHandler({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(postCallback).not.toHaveBeenCalled();
   });
 });
 

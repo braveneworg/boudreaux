@@ -14,6 +14,7 @@ import {
   generateArtistBioInputSchema,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
 
 import {
   resolveInFlightBioStatus,
@@ -25,9 +26,10 @@ const logger = loggers.media;
 /**
  * A job is considered stale (abandoned, e.g. the server restarted mid-run) once
  * it has been `pending`/`processing` longer than this, after which a new trigger
- * is allowed to supersede it. Kept above the Lambda's 10-minute timeout.
+ * is allowed to supersede it. Must exceed the Lambda's 15-minute timeout so an
+ * in-flight ASYNC job is never superseded mid-run.
  */
-const STALE_JOB_MS = 12 * 60 * 1000;
+const STALE_JOB_MS = 17 * 60 * 1000;
 
 /**
  * Triggers (or re-triggers) async generation of an artist's bio. Admin-only.
@@ -71,16 +73,23 @@ export const generateArtistBioAction = async (
     });
 
     // Run the heavy work after the response is sent. `runGenerationJob` records
-    // its own succeeded/failed status and never throws, so the only thing left
-    // is to revalidate the public pages and audit-log on success.
+    // its own succeeded/failed status and never throws; the after-response helper
+    // only revalidates the public pages once a completed outcome finishes.
     after(() =>
       runBioGenerationAfterResponse({
         artistId,
-        userId: session.user.id,
         links,
         description,
       })
     );
+
+    // Audit the accepted trigger here — under async the job returns after DISPATCH,
+    // so completion is not observable in-process; the trigger is what we can log.
+    logSecurityEvent({
+      event: 'media.artist.updated',
+      userId: session.user.id,
+      metadata: { artistId, action: 'bio-generation-triggered' },
+    });
 
     return { success: true, status: 'pending' };
   } catch (error) {

@@ -16,6 +16,8 @@ export interface BioGenerationLambdaInput {
   diedOn?: string;
   formedOn?: string;
   releases?: Array<{ title: string; releasedOn?: string; url: string }>;
+  callbackUrl?: string;
+  jobToken?: string;
 }
 
 /**

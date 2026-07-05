@@ -37,6 +37,10 @@ export const bioGenerationInputSchema = z.object({
   bornOn: isoDate.optional(),
   diedOn: isoDate.optional(),
   formedOn: isoDate.optional(),
+  /** Async completion callback URL the Lambda POSTs its result to (absent = synchronous/no callback). */
+  callbackUrl: z.string().url().optional(),
+  /** Opaque per-job token echoed back in the callback so the web app can match the in-flight job. */
+  jobToken: z.string().min(1).optional(),
   /**
    * The label's own published releases for this artist — authoritative
    * chronology anchors AND allow-listed internal link targets

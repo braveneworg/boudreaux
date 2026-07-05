@@ -46,6 +46,7 @@ export type ArtistScalars = {
   bioStatus: string | null;
   bioError: string | null;
   bioStartedAt: Date | null;
+  bioJobToken: string | null;
   slug: string;
   genres: string | null;
   bornOn: Date | null;

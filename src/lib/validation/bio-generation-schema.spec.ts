@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import {
+  bioGenerationCallbackSchema,
   bioGenerationImageSchema,
   bioGenerationLinkSchema,
   bioGenerationStatusResponseSchema,
@@ -146,6 +147,63 @@ describe('bioGenerationStatusResponseSchema content rows', () => {
         images: [],
         links: [{ id: '665f1f77bcf86cd799439017', label: 'Evil', url: '//evil.com/x' }],
       },
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('bioGenerationCallbackSchema', () => {
+  const validData = {
+    shortBio: '<p>s</p>',
+    longBio: '<p>l</p>',
+    altBio: '<p>a</p>',
+    genres: null,
+    images: [
+      {
+        url: 'https://cdn.example/a.webp',
+        attribution: 'Wikimedia Commons',
+        isPrimary: true,
+      },
+    ],
+    links: [{ label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/X' }],
+    model: 'gemini-2.5-flash',
+  };
+
+  it('accepts a successful result with valid data', () => {
+    const parsed = bioGenerationCallbackSchema.safeParse({
+      jobToken: 'x',
+      result: { ok: true, data: validData },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a failed result carrying an error', () => {
+    const parsed = bioGenerationCallbackSchema.safeParse({
+      jobToken: 'x',
+      result: { ok: false, error: 'nope' },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a missing jobToken', () => {
+    const parsed = bioGenerationCallbackSchema.safeParse({
+      result: { ok: false, error: 'nope' },
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects an empty jobToken', () => {
+    const parsed = bioGenerationCallbackSchema.safeParse({
+      jobToken: '',
+      result: { ok: false, error: 'nope' },
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects a malformed result', () => {
+    const parsed = bioGenerationCallbackSchema.safeParse({
+      jobToken: 'x',
+      result: { ok: true },
     });
     expect(parsed.success).toBe(false);
   });

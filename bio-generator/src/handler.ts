@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { getCoverArtImages } from './caa.js';
+import { postBioCallback } from './callback.js';
 import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
@@ -17,6 +18,7 @@ import { getWikidataData } from './wikidata.js';
 import { getCommonsCategoryImages, getCommonsImage } from './wikimedia.js';
 import { getWikipediaExtract } from './wikipedia.js';
 
+import type { BioCallbackPayload } from './callback.js';
 import type { ScrapedImage } from './jina.js';
 import type { ReleaseGroupSummary } from './musicbrainz.js';
 import type {
@@ -47,6 +49,8 @@ export interface BioGeneratorDeps {
   getCoverArtImages: typeof getCoverArtImages;
   getCommonsCategoryImages: typeof getCommonsCategoryImages;
   verifyScrapedImages: typeof verifyScrapedImages;
+  /** Best-effort POST of the result back to the web app's async callback. */
+  postCallback: (payload: BioCallbackPayload) => Promise<void>;
 }
 
 const defaultDeps: BioGeneratorDeps = {
@@ -65,6 +69,7 @@ const defaultDeps: BioGeneratorDeps = {
   getCoverArtImages,
   getCommonsCategoryImages,
   verifyScrapedImages,
+  postCallback: postBioCallback,
 };
 
 const MAX_IMAGES = 100;
@@ -77,6 +82,11 @@ const MAX_COVER_ART = 40;
 /** Global cap on scraped candidates entering vision verification. */
 export const MAX_VISION_CANDIDATES = 60;
 
+/** Known link hosts worth following one level deep for additional images. */
+const LINK_FOLLOW_HOSTS = ['bandcamp.com', 'discogs.com'] as const;
+/** Cap the fan-out so expansion stays bounded against the Lambda time budget. */
+export const MAX_FOLLOWED_LINKS = 4;
+
 /** Search-engine result pages and share widgets — never useful bio links. */
 const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
 const isJunkLinkUrl = (url: string): boolean => {
@@ -85,6 +95,20 @@ const isJunkLinkUrl = (url: string): boolean => {
     return JUNK_LINK_HOSTS.some((junk) => host === junk || host.endsWith(`.${junk}`));
   } catch {
     return true;
+  }
+};
+
+/**
+ * True when {@link url}'s registrable host equals {@link host} or is a subdomain
+ * of it (e.g. `x.bandcamp.com` matches `bandcamp.com`). Guards the `URL` parse,
+ * returning `false` on any malformed input.
+ */
+const registrableHostMatches = (url: string, host: string): boolean => {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return hostname === host || hostname.endsWith(`.${host}`);
+  } catch {
+    return false;
   }
 };
 
@@ -286,8 +310,9 @@ const applyMatch = async (
  * Web search (Jina) as additional grounding *context*, not just a fallback:
  * always gathered and MERGED with any Wikipedia/official-site material so both
  * the extensive long bio and the informed short bio draw on the fullest
- * possible material. Runs three searches (biography + two press queries) and
- * merges results. Optional + best-effort (never throws).
+ * possible material. Runs six searches (biography + press queries + targeted
+ * press-photo/bandcamp/discogs image queries) and merges results. Optional +
+ * best-effort (never throws).
  */
 const applyWebSearch = async (
   acc: MetadataAccumulator,
@@ -300,6 +325,9 @@ const applyWebSearch = async (
     undefined,
     `${artist} musician interview review press`,
     `${artist} music press feature profile`,
+    `${artist} press photo live performance`,
+    `${artist} musician site:bandcamp.com`,
+    `${artist} musician site:discogs.com`,
   ];
 
   for (const query of queries) {
@@ -329,6 +357,31 @@ const applyWebSearch = async (
         kind: classifyReferenceKind(ref.title),
       });
     }
+  }
+};
+
+/**
+ * Follow a FIXED set of already-discovered high-value links (Bandcamp/Discogs)
+ * one level deep for images, pushing them into `acc.scrapedImages` so they pass
+ * the same vision gate as web-search images. No recursive crawl; deduped
+ * against links already read (`acc.facts.sourceUrls`); capped at
+ * {@link MAX_FOLLOWED_LINKS}. Best-effort — a null read simply contributes
+ * nothing.
+ */
+const followKnownLinksForImages = async (
+  acc: MetadataAccumulator,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const alreadyRead = new Set(acc.facts.sourceUrls ?? []);
+  const targets = acc.links
+    .filter((link) => LINK_FOLLOW_HOSTS.some((host) => registrableHostMatches(link.url, host)))
+    .filter((link) => !alreadyRead.has(link.url))
+    .slice(0, MAX_FOLLOWED_LINKS);
+
+  for (const link of targets) {
+    const result = await deps.readUrl(link.url, scrapeKey);
+    if (result) acc.scrapedImages.push(...result.images);
   }
 };
 
@@ -522,6 +575,7 @@ const gatherMetadata = async (
   }
 
   await applyWebSearch(acc, input, scrapeKey, deps);
+  await followKnownLinksForImages(acc, scrapeKey, deps);
   await finalizeMetadata(acc, input, (candidates, context) =>
     deps.verifyScrapedImages(candidates, context, { apiKey, model })
   );
@@ -586,11 +640,33 @@ export const runBioGeneration = async (
 };
 
 /**
+ * Runs the generation, converting a thrown error into the `ok: false` envelope
+ * so both branches yield a {@link BioGenerationResult} the caller can inspect.
+ */
+const runToResult = async (
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<BioGenerationResult> => {
+  try {
+    const data = await runBioGeneration(input, deps);
+    return { ok: true, data };
+  } catch (err) {
+    logEvent('warn', 'bio_generation_failed', { error: toErrorMessage(err) });
+    return { ok: false, error: err instanceof Error ? err.message : 'Bio generation failed' };
+  }
+};
+
+/**
  * Lambda entry point. Invoked directly (not via HTTP) by the web app's
  * bio-generation service. Returns a discriminated result envelope so the
  * caller can branch on success without throwing across the invoke boundary.
+ * When the event carries a `callbackUrl` + `jobToken`, the same result is also
+ * POSTed back to that async callback (best-effort) before returning.
  */
-export const lambdaHandler = async (event: unknown): Promise<BioGenerationResult> => {
+export const lambdaHandler = async (
+  event: unknown,
+  deps: BioGeneratorDeps = defaultDeps
+): Promise<BioGenerationResult> => {
   const parsed = bioGenerationInputSchema.safeParse(event);
   if (!parsed.success) {
     return {
@@ -599,11 +675,11 @@ export const lambdaHandler = async (event: unknown): Promise<BioGenerationResult
     };
   }
 
-  try {
-    const data = await runBioGeneration(parsed.data);
-    return { ok: true, data };
-  } catch (err) {
-    logEvent('warn', 'bio_generation_failed', { error: toErrorMessage(err) });
-    return { ok: false, error: err instanceof Error ? err.message : 'Bio generation failed' };
+  const result = await runToResult(parsed.data, deps);
+
+  const { callbackUrl, jobToken } = parsed.data;
+  if (callbackUrl && jobToken) {
+    await deps.postCallback({ url: callbackUrl, jobToken, result });
   }
+  return result;
 };
