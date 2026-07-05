@@ -106,6 +106,23 @@ export interface ArtistBioImageRecord {
   createdAt: Date;
 }
 
+/** Fields for creating one bio image row (manual upload / curated addition). */
+export interface CreateArtistBioImageData {
+  artistId: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  title?: string | null;
+  attribution?: string | null;
+  license?: string | null;
+  sourceUrl?: string | null;
+  originalUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  isPrimary?: boolean;
+  kind?: string | null;
+  alt?: string | null;
+}
+
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
 export interface ArtistBioLinkRecord {
   id: string;
