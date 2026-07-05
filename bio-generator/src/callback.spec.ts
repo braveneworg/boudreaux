@@ -6,6 +6,13 @@ import { postBioCallback } from './callback.js';
 
 import type { BioGenerationResult } from './types.js';
 
+const logEventMock = vi.hoisted(() => vi.fn());
+
+vi.mock('./lib/log.js', () => ({
+  logEvent: logEventMock,
+  toErrorMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)),
+}));
+
 const result: BioGenerationResult = {
   ok: true,
   data: {
@@ -63,6 +70,22 @@ describe('postBioCallback', () => {
     await expect(
       postBioCallback({ url: 'https://app.example/cb', jobToken: 'tok-1', result }, fetchFn)
     ).resolves.toBeUndefined();
+  });
+
+  it('logs a warn event when the callback responds non-ok', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 400 }));
+
+    await postBioCallback({ url: 'https://app.example/cb', jobToken: 'tok-1', result }, fetchFn);
+
+    expect(logEventMock).toHaveBeenCalledWith('warn', 'bio_callback_non_ok', { status: 400 });
+  });
+
+  it('does not log the non-ok event when the callback responds 2xx', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(okResponse());
+
+    await postBioCallback({ url: 'https://app.example/cb', jobToken: 'tok-1', result }, fetchFn);
+
+    expect(logEventMock).not.toHaveBeenCalledWith('warn', 'bio_callback_non_ok', expect.anything());
   });
 
   it('does not throw when the fetch itself rejects', async () => {

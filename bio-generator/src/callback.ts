@@ -22,7 +22,9 @@ export interface BioCallbackPayload {
  * Never throws — the result was already produced; a failed callback just leaves
  * the web app to time the job out and let a retrigger supersede it. Uses
  * {@link fetchWithRetry} so a transient 429/503 on the callback endpoint backs
- * off and retries rather than dropping the result on the first blip.
+ * off and retries rather than dropping the result on the first blip. A
+ * persistent non-ok response is logged (`bio_callback_non_ok`, status only) so
+ * a mis-derived callback URL is visible instead of failing silently.
  *
  * @param payload - The callback URL, job token, and result to deliver.
  * @param fetchFn - Injectable fetch (defaults to the nodejs24 global `fetch`).
@@ -32,7 +34,7 @@ export const postBioCallback = async (
   fetchFn: typeof fetch = fetch
 ): Promise<void> => {
   try {
-    await fetchWithRetry(
+    const res = await fetchWithRetry(
       url,
       {
         method: 'POST',
@@ -41,6 +43,13 @@ export const postBioCallback = async (
       },
       { fetchFn }
     );
+    // fetchWithRetry only retries 429/503 and otherwise returns the last
+    // response without throwing, so a persistent 4xx from a mis-derived
+    // callback URL would be silently dropped. Surface it (status only — the
+    // URL may embed identifiers and the token must never be logged).
+    if (!res.ok) {
+      logEvent('warn', 'bio_callback_non_ok', { status: res.status });
+    }
   } catch (err) {
     logEvent('warn', 'bio_callback_failed', { error: toErrorMessage(err) });
   }
