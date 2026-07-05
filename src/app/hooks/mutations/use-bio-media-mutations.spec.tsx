@@ -8,9 +8,14 @@ import { toast } from 'sonner';
 
 import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
 import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
+import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
 import { queryKeys } from '@/lib/query-keys';
 
-import { useDeleteBioImageMutation, useDeleteBioLinkMutation } from './use-bio-media-mutations';
+import {
+  useDeleteBioImageMutation,
+  useDeleteBioLinkMutation,
+  useUpdateBioImageAttributionMutation,
+} from './use-bio-media-mutations';
 
 const useMutationMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -28,6 +33,10 @@ vi.mock('@/lib/actions/delete-artist-bio-image-action', () => ({
   deleteArtistBioImageAction: vi.fn(),
 }));
 
+vi.mock('@/lib/actions/update-artist-bio-image-attribution-action', () => ({
+  updateArtistBioImageAttributionAction: vi.fn(),
+}));
+
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
@@ -37,9 +46,19 @@ interface MutationOptions {
   onSuccess: (result: { success: boolean; error?: string }) => void;
 }
 
+interface AttributionMutationOptions {
+  mutationFn: (input: { imageId: string; attribution: string | null }) => Promise<unknown>;
+  onSuccess: (result: { success: boolean; error?: string }) => void;
+}
+
 const getOptions = (renderFn: () => unknown): MutationOptions => {
   renderHook(renderFn);
   return useMutationMock.mock.calls.at(-1)?.[0] as MutationOptions;
+};
+
+const getAttributionOptions = (renderFn: () => unknown): AttributionMutationOptions => {
+  renderHook(renderFn);
+  return useMutationMock.mock.calls.at(-1)?.[0] as AttributionMutationOptions;
 };
 
 beforeEach(() => {
@@ -151,5 +170,61 @@ describe('useDeleteBioImageMutation', () => {
     const { result } = renderHook(() => useDeleteBioImageMutation('artist-1'));
 
     expect(result.current.isDeletingBioImage).toBe(true);
+  });
+});
+
+describe('useUpdateBioImageAttributionMutation', () => {
+  it('calls updateArtistBioImageAttributionAction with the input', async () => {
+    vi.mocked(updateArtistBioImageAttributionAction).mockResolvedValue({ success: true });
+    const opts = getAttributionOptions(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    await opts.mutationFn({ imageId: 'i1', attribution: 'Photo by Jane' });
+
+    expect(updateArtistBioImageAttributionAction).toHaveBeenCalledWith({
+      imageId: 'i1',
+      attribution: 'Photo by Jane',
+    });
+  });
+
+  it('invalidates the bio-generation query on success', () => {
+    const opts = getAttributionOptions(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    opts.onSuccess({ success: true });
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.artists.bioGeneration('artist-1'),
+    });
+  });
+
+  it('surfaces a failed update as an error toast', () => {
+    const opts = getAttributionOptions(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'x' });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('x');
+  });
+
+  it('falls back to a generic message when the failure has no error', () => {
+    const opts = getAttributionOptions(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    opts.onSuccess({ success: false });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update attribution');
+  });
+
+  it('does not invalidate the query on a failed update', () => {
+    const opts = getAttributionOptions(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'x' });
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+
+  it('exposes the pending state from the mutation', () => {
+    useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: true });
+
+    const { result } = renderHook(() => useUpdateBioImageAttributionMutation('artist-1'));
+
+    expect(result.current.isUpdatingBioImageAttribution).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
 import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
+import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
 import { queryKeys } from '@/lib/query-keys';
 
 interface UseDeleteBioLinkMutationResult {
@@ -73,4 +74,41 @@ export const useDeleteBioImageMutation = (artistId: string): UseDeleteBioImageMu
   });
 
   return { deleteBioImage, isDeletingBioImage };
+};
+
+interface UseUpdateBioImageAttributionMutationResult {
+  /** Persists an edited attribution for one bio image row. */
+  updateBioImageAttribution: (input: { imageId: string; attribution: string | null }) => void;
+  /** True while an attribution update is in flight. */
+  isUpdatingBioImageAttribution: boolean;
+}
+
+/**
+ * Mutation hook wrapping {@link updateArtistBioImageAttributionAction} for the
+ * admin bio image palette's inline attribution editor. On success invalidates
+ * the artist's bio-generation status query so the palette (and RTE picker)
+ * reflect the new value; a failed result surfaces as an error toast.
+ *
+ * @param artistId - The artist whose bio-generation cache to invalidate.
+ */
+export const useUpdateBioImageAttributionMutation = (
+  artistId: string
+): UseUpdateBioImageAttributionMutationResult => {
+  const queryClient = useQueryClient();
+  const { mutate: updateBioImageAttribution, isPending: isUpdatingBioImageAttribution } =
+    useMutation({
+      mutationFn: (input: { imageId: string; attribution: string | null }) =>
+        updateArtistBioImageAttributionAction(input),
+      onSuccess: (result) => {
+        if (!result.success) {
+          toast.error(result.error ?? 'Failed to update attribution');
+          return;
+        }
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.artists.bioGeneration(artistId),
+        });
+      },
+    });
+
+  return { updateBioImageAttribution, isUpdatingBioImageAttribution };
 };
