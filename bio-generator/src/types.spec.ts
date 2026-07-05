@@ -52,6 +52,44 @@ describe('bioGenerationInputSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('parses input with callbackUrl and jobToken', () => {
+    const data = bioGenerationInputSchema.parse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      callbackUrl: 'https://x/cb',
+      jobToken: 'abc',
+    });
+    expect(data.callbackUrl).toBe('https://x/cb');
+    expect(data.jobToken).toBe('abc');
+  });
+
+  it('parses input without callbackUrl or jobToken (both optional)', () => {
+    const data = bioGenerationInputSchema.parse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+    });
+    expect(data.callbackUrl).toBeUndefined();
+    expect(data.jobToken).toBeUndefined();
+  });
+
+  it('rejects a non-URL callbackUrl', () => {
+    const result = bioGenerationInputSchema.safeParse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      callbackUrl: 'not-a-url',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty jobToken', () => {
+    const result = bioGenerationInputSchema.safeParse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      jobToken: '',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('bio media discovery v2 wire types', () => {
