@@ -12,17 +12,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useImageOperations } from '@/app/components/forms/hooks/use-image-operations';
 import { ArtistBioSection } from '@/app/components/forms/sections/artist-bio-section';
 import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-footer';
 import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
 import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
-import { ArtistImagesSection } from '@/app/components/forms/sections/artist-images-section';
 import { ArtistMusicAndDatesSection } from '@/app/components/forms/sections/artist-music-dates-section';
 import { ArtistNameSection } from '@/app/components/forms/sections/artist-name-section';
 import { uploadBioImage } from '@/app/components/forms/utils/upload-bio-image';
 import { Form } from '@/app/components/ui/form';
-import { type ImageItem } from '@/app/components/ui/image-uploader';
 import type {
   RichTextEditorImage,
   RichTextEditorUploadHandler,
@@ -36,11 +33,6 @@ import {
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { type ArtistDetail, useArtistQuery } from '@/app/hooks/use-artist-query';
 import { useSession } from '@/hooks/use-session';
-import {
-  deleteArtistImageAction,
-  reorderArtistImagesAction,
-} from '@/lib/actions/artist-image-actions';
-import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
 import { queryKeys } from '@/lib/query-keys';
 import { error } from '@/lib/utils/console-logger';
 import { generateSlug } from '@/lib/utils/generate-slug';
@@ -91,12 +83,6 @@ const UpdatedToastContent = ({ fullName }: { fullName: string }) => (
 const PublishedToastContent = ({ fullName }: { fullName: string }) => (
   <>
     Artist <b>{`${fullName}`}</b> published successfully.
-  </>
-);
-
-const CreatedWithImagesToast = ({ fullName, count }: { fullName: string; count: number }) => (
-  <>
-    Artist <b>{fullName}</b> created with {count} image{count !== 1 ? 's' : ''}.
   </>
 );
 
@@ -155,17 +141,6 @@ const mapArtistToFormValues = (
   createdBy: createdBy || userId,
 });
 
-/** Map a loaded artist's persisted images into uploader items. */
-const mapArtistImages = (artist: ArtistDetail): ImageItem[] =>
-  artist.images.map(({ id, src, caption, altText, sortOrder }) => ({
-    id,
-    preview: src ?? '',
-    uploadedUrl: src ?? '',
-    caption: caption || '',
-    altText: altText || '',
-    sortOrder: sortOrder ?? 0,
-  }));
-
 /** Build the create-mode default form values (only `createdBy` is dynamic). */
 const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
   firstName: '',
@@ -189,24 +164,16 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
 });
 
 /**
- * Images selectable in the bio editor: uploaded artist images, freshly-generated
- * bio picker images, and persisted library images from the status endpoint —
- * deduped by URL (uploaded first, then generated, then library; first wins).
+ * Images selectable in the bio editor: freshly-generated bio picker images and
+ * persisted library images from the status endpoint — deduped by URL (generated
+ * first, then library; first wins).
  */
 const computeBioEditorImages = (
-  images: ImageItem[],
   bioPickerImages: RichTextEditorImage[],
   libraryImages: RichTextEditorImage[]
 ): RichTextEditorImage[] => {
   const seen = new Set<string>();
   const collected: RichTextEditorImage[] = [];
-  for (const image of images) {
-    const url = image.uploadedUrl;
-    if (url && !seen.has(url)) {
-      seen.add(url);
-      collected.push({ url, alt: image.altText ?? '' });
-    }
-  }
   for (const image of bioPickerImages) {
     if (!seen.has(image.url)) {
       seen.add(image.url);
@@ -252,32 +219,19 @@ interface SubmittingState {
   isCreatingArtist: boolean;
   isUpdatingArtist: boolean;
   isTransitionPending: boolean;
-  isUploadingImages: boolean;
 }
 
 const computeIsSubmitting = ({
   isCreatingArtist,
   isUpdatingArtist,
   isTransitionPending,
-  isUploadingImages,
-}: SubmittingState): boolean =>
-  isCreatingArtist || isUpdatingArtist || isTransitionPending || isUploadingImages;
-
-const computeIsDirty = (
-  formIsDirty: boolean,
-  imagesReordered: boolean,
-  hasPendingImages: boolean
-): boolean => formIsDirty || imagesReordered || hasPendingImages;
+}: SubmittingState): boolean => isCreatingArtist || isUpdatingArtist || isTransitionPending;
 
 const fullNameOf = (data: ArtistFormData): string =>
   data.displayName || `${data.firstName} ${data.surname}`.trim();
 
-const pendingImages = (images: ImageItem[]): ImageItem[] =>
-  images.filter((img) => img.file && !img.uploadedUrl);
-
 interface SubmitArtistDeps {
   artistForm: UseFormReturn<ArtistFormData>;
-  images: ReturnType<typeof useImageOperations>;
   isPublished: boolean;
   setIsPublished: (value: boolean) => void;
   setArtistId: (id: string) => void;
@@ -290,22 +244,13 @@ const submitArtistUpdate = async (
   data: ArtistFormData,
   deps: SubmitArtistDeps
 ): Promise<void> => {
-  const { artistForm, images, isPublished, setIsPublished, updateArtistAsync } = deps;
+  const { artistForm, isPublished, setIsPublished, updateArtistAsync } = deps;
   const fullName = fullNameOf(data);
 
   const newFormState = await updateArtistAsync({ id: artistId, values: data });
   if (!newFormState.success) {
     toast.error('Failed to update artist. Please check the form for errors.');
     return;
-  }
-
-  const imagesToUpload = pendingImages(images.images);
-  if (imagesToUpload.length > 0) {
-    await images.uploadImages(imagesToUpload, artistId, {
-      register: registerArtistImagesAction,
-      mergeStrategy: 'counter',
-      onSuccess: () => {},
-    });
   }
 
   if (data.publishedOn && !isPublished) {
@@ -315,11 +260,10 @@ const submitArtistUpdate = async (
     toast.success(<UpdatedToastContent fullName={fullName} />);
   }
   artistForm.reset(data);
-  images.resetImagesReordered();
 };
 
 const submitArtistCreate = async (data: ArtistFormData, deps: SubmitArtistDeps): Promise<void> => {
-  const { artistForm, images, setIsPublished, setArtistId, createArtistAsync } = deps;
+  const { artistForm, setIsPublished, setArtistId, createArtistAsync } = deps;
   const fullName = fullNameOf(data);
 
   const newFormState = await createArtistAsync(data);
@@ -339,21 +283,8 @@ const submitArtistCreate = async (data: ArtistFormData, deps: SubmitArtistDeps):
     setIsPublished(true);
   }
 
-  const imagesToUpload = pendingImages(images.images);
-  if (imagesToUpload.length > 0) {
-    await images.uploadImages(imagesToUpload, createdArtistId, {
-      register: registerArtistImagesAction,
-      mergeStrategy: 'by-index',
-      onSuccess: (uploaded) =>
-        toast.success(<CreatedWithImagesToast fullName={fullName} count={uploaded.length} />),
-      onError: () => toast.success(<ToastContent fullName={fullName} />),
-    });
-  } else {
-    toast.success(<ToastContent fullName={fullName} />);
-  }
-
+  toast.success(<ToastContent fullName={fullName} />);
   artistForm.reset(data);
-  images.resetImagesReordered();
 };
 
 /** Breadcrumb label for the artist form — "Edit Artist" in edit mode, "Create Artist" otherwise. */
@@ -388,10 +319,10 @@ export const ArtistForm = ({
   const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
   const { archiveArtistAsync } = useArchiveArtistMutation();
-  // Re-hosted bio images (existing + freshly generated) offered in the
-  // rich-text editor's insert-image picker, alongside uploaded images.
+  // Freshly generated bio images offered in the rich-text editor's insert-image
+  // picker, merged with the persisted bio library from the status endpoint.
   const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
-  // artistId will be set after artist creation or from URL param for persisting image reordering
+  // artistId is set after artist creation or read from the URL param in edit mode.
   const [artistId, setArtistId] = useState<string | null>(initialArtistId || null);
   // Track if artist is published (publishedOn date exists)
   const [isPublished, setIsPublished] = useState(false);
@@ -430,24 +361,16 @@ export const ArtistForm = ({
     [artistId, queryClient]
   );
 
-  const images = useImageOperations({
-    entityType: 'artists',
-    entityId: artistId,
-    reorderAction: reorderArtistImagesAction,
-    deleteAction: deleteArtistImageAction,
-  });
-
   const bioEditorImages = useMemo(
     () =>
       computeBioEditorImages(
-        images.images,
         bioPickerImages,
         (statusQuery.data?.content?.images ?? []).map((image) => ({
           url: image.url,
           alt: image.alt ?? image.title ?? '',
         }))
       ),
-    [images.images, bioPickerImages, statusQuery.data]
+    [bioPickerImages, statusQuery.data]
   );
 
   const artistForm = useForm<ArtistFormData>({
@@ -469,7 +392,6 @@ export const ArtistForm = ({
   // create mode there's nothing to load.
   const isLoadingArtist = !!initialArtistId && isArtistPending;
 
-  const { setImages } = images;
   useEffect(() => {
     if (!initialArtistId || !artistData) return;
 
@@ -478,13 +400,7 @@ export const ArtistForm = ({
     if (artistData.publishedOn) {
       setIsPublished(true);
     }
-
-    // Load existing images if any. The by-id route returns scalars + `images`
-    // only (no `bioImages` relation), so there's no bio-picker hydration here.
-    if (artistData.images.length > 0) {
-      setImages(mapArtistImages(artistData));
-    }
-  }, [initialArtistId, artistData, artistForm, user?.id, setImages]);
+  }, [initialArtistId, artistData, artistForm, user?.id]);
 
   // Surface a load failure (edit mode only) without unmounting the form. Gate
   // on `isError` — `artistError` is defaulted to a non-null Error, so it is
@@ -515,7 +431,6 @@ export const ArtistForm = ({
     async (data: ArtistFormData): Promise<void> => {
       const deps: SubmitArtistDeps = {
         artistForm,
-        images,
         isPublished,
         setIsPublished,
         setArtistId,
@@ -524,14 +439,13 @@ export const ArtistForm = ({
       };
       startTransition(() => runArtistSubmit(formRef.current, artistId, data, deps));
     },
-    [artistForm, images, artistId, isPublished, createArtistAsync, updateArtistAsync]
+    [artistForm, artistId, isPublished, createArtistAsync, updateArtistAsync]
   );
 
   const isSubmitting = computeIsSubmitting({
     isCreatingArtist,
     isUpdatingArtist,
     isTransitionPending,
-    isUploadingImages: images.isUploadingImages,
   });
 
   // Watch name fields for auto-generating slug (using useWatch for React Compiler compatibility)
@@ -595,11 +509,7 @@ export const ArtistForm = ({
     artistForm.handleSubmit(onSubmitArtistForm, onInvalidSubmit)();
   }, [artistForm, onSubmitArtistForm, onInvalidSubmit]);
 
-  const isDirty = computeIsDirty(
-    artistForm.formState.isDirty,
-    images.imagesReordered,
-    images.hasPendingImages
-  );
+  const isDirty = artistForm.formState.isDirty;
 
   if (isLoadingArtist) {
     return <ArtistFormSkeleton isEditMode={!!initialArtistId} />;
@@ -626,16 +536,6 @@ export const ArtistForm = ({
               <Separator />
 
               <ArtistNameSection control={control} isNameRequired={isNameRequired} />
-
-              <Separator />
-
-              <ArtistImagesSection
-                images={images.images}
-                isSubmitting={isSubmitting}
-                onImagesChange={images.handleImagesChange}
-                onReorder={images.handleReorder}
-                onDelete={images.handleDeleteImage}
-              />
 
               <Separator />
 
