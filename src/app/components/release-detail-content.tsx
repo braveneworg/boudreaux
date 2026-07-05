@@ -12,7 +12,7 @@ import { useReleaseUserStatusQuery } from '@/app/hooks/use-release-user-status-q
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import { ArtistReleasesCarousel } from './artist-releases-carousel';
-import { ReleaseDescription } from './release-description';
+import { ReleaseNotes } from './release-notes';
 import { ReleasePlayer } from './release-player';
 import { ZinePanel } from './ui/zine-panel';
 
@@ -91,7 +91,7 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
           releaseId={release.id}
           releaseTitle={release.title}
         />
-        <ReleaseDescription description={release.description ?? null} />
+        <ReleaseNotes release={release} artistName={artistName} />
       </ZinePanel>
     </>
   );

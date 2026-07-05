@@ -6,20 +6,6 @@ import { render, screen } from '@testing-library/react';
 
 import { ReleaseCard } from './release-card';
 
-// Mock next/image
-vi.mock('next/image', () => ({
-  default: ({
-    src,
-    alt,
-    ...props
-  }: {
-    src: string;
-    alt: string;
-    loading?: string;
-    className?: string;
-  }) => <span data-testid="release-cover-image" data-src={src} data-alt={alt} {...props} />,
-}));
-
 // Mock next/link
 vi.mock('next/link', () => ({
   default: ({
@@ -42,6 +28,33 @@ vi.mock('next/link', () => ({
 vi.mock('lucide-react', () => ({
   Music2: ({ className }: { className?: string }) => (
     <span data-testid="music2-icon" className={className} />
+  ),
+}));
+
+// Mock the cover modal — its behavior is covered by release-cover-modal.spec.
+// Here we only assert ReleaseCard delegates the right props to it.
+vi.mock('./release-cover-modal', () => ({
+  ReleaseCoverModal: ({
+    id,
+    title,
+    artistName,
+    coverArt,
+    releasedOn,
+  }: {
+    id: string;
+    title: string;
+    artistName: string | null;
+    coverArt: { src: string; alt: string } | null;
+    releasedOn: Date;
+  }) => (
+    <div
+      data-testid="release-cover-modal"
+      data-id={id}
+      data-title={title}
+      data-artist={artistName ?? ''}
+      data-cover-src={coverArt?.src ?? ''}
+      data-released-on={releasedOn.toISOString()}
+    />
   ),
 }));
 
@@ -80,16 +93,19 @@ describe('ReleaseCard', () => {
       src: 'https://cdn.example.com/cover.jpg',
       alt: 'Midnight Serenade cover art',
     },
+    releasedOn: new Date(2024, 0, 2),
     bandcampUrl: 'https://label.bandcamp.com/album/midnight',
   };
 
-  it('should render cover art image', () => {
+  it('should delegate cover art to ReleaseCoverModal with the release details', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const image = screen.getByTestId('release-cover-image');
-    expect(image).toBeInTheDocument();
-    expect(image).toHaveAttribute('data-src', defaultProps.coverArt.src);
-    expect(image).toHaveAttribute('data-alt', defaultProps.coverArt.alt);
+    const modal = screen.getByTestId('release-cover-modal');
+    expect(modal).toHaveAttribute('data-id', 'release-1');
+    expect(modal).toHaveAttribute('data-title', 'Midnight Serenade');
+    expect(modal).toHaveAttribute('data-artist', 'John Doe');
+    expect(modal).toHaveAttribute('data-cover-src', defaultProps.coverArt.src);
+    expect(modal).toHaveAttribute('data-released-on', defaultProps.releasedOn.toISOString());
   });
 
   it('should render artist name', () => {
@@ -139,15 +155,6 @@ describe('ReleaseCard', () => {
     expect(playLink).toHaveAttribute('href', '/releases/release-1?autoplay=true');
   });
 
-  it('should render styled placeholder when coverArt is null', () => {
-    render(<ReleaseCard {...defaultProps} coverArt={null} />);
-
-    expect(screen.queryByTestId('release-cover-image')).not.toBeInTheDocument();
-    // Placeholder should show title and artist name
-    const placeholder = screen.getByTestId('cover-art-placeholder');
-    expect(placeholder).toBeInTheDocument();
-  });
-
   it('should have aria-label on Play button', () => {
     render(<ReleaseCard {...defaultProps} />);
 
@@ -179,12 +186,16 @@ describe('ReleaseCard', () => {
     expect(card).not.toHaveClass('shadow-sm');
   });
 
-  it('should frame the cover art wrapper with a black border', () => {
-    render(<ReleaseCard {...defaultProps} />);
+  it('should scale up on hover on desktop only', () => {
+    const { container } = render(<ReleaseCard {...defaultProps} />);
 
-    const coverWrapper = screen.getByTestId('release-cover-image').parentElement;
-    expect(coverWrapper).toHaveClass('border-2', 'border-black');
-    expect(coverWrapper).not.toHaveClass('rounded-md');
+    const card = container.firstElementChild;
+    expect(card).toHaveClass(
+      'relative',
+      'transition-transform',
+      'md:hover:scale-[1.03]',
+      'md:hover:z-10'
+    );
   });
 
   it('should style the Play link as a square ink-stamp', () => {

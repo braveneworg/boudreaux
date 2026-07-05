@@ -34,6 +34,7 @@ const toCardRelease = (release: PublishedReleaseListing) => {
     title: release.title,
     artistName: artistName ?? 'Unknown Artist',
     coverArt: getReleaseCoverArt(release),
+    releasedOn: release.releasedOn,
     bandcampUrl: getBandcampUrl(release),
   };
 };

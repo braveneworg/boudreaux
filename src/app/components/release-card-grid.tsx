@@ -18,6 +18,8 @@ interface ReleaseCardGridRelease {
   artistName: string;
   /** Cover art source and alt text, or null for styled placeholder */
   coverArt: { src: string; alt: string } | null;
+  /** Release date, shown in the cover preview dialog */
+  releasedOn: Date;
   /** Bandcamp URL for external purchase link, or null */
   bandcampUrl: string | null;
 }
@@ -53,6 +55,7 @@ export const ReleaseCardGrid = ({ releases }: ReleaseCardGridProps) => {
           title={release.title}
           artistName={release.artistName}
           coverArt={release.coverArt}
+          releasedOn={release.releasedOn}
           bandcampUrl={release.bandcampUrl}
         />
       ))}
