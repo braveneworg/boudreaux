@@ -79,7 +79,7 @@ export const ZinePanel = ({
   <section
     data-slot="zine-panel"
     className={cn(
-      'bg-menu-item-tan-100 shadow-zine relative mt-4 mb-8 w-full overflow-visible rounded-none border-2 border-black',
+      'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-2 border-black',
       ACCENT_CLASS.get(accent),
       className
     )}
@@ -91,7 +91,15 @@ export const ZinePanel = ({
         className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-28 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
       />
     )}
-    <div className={cn('relative z-10 p-6 pt-4 sm:p-8', contentClassName)}>
+    <div
+      className={cn(
+        'relative z-10 p-6 pt-4 sm:p-8',
+        // Pull the breadcrumb trail snug to the panel top — trim only the top
+        // inset when a trail renders, leaving the horizontal/bottom padding.
+        breadcrumbs && 'pt-3 sm:pt-4',
+        contentClassName
+      )}
+    >
       {/* Panel padding supplies the horizontal offset — the trail drops its
           outside-the-panel nudge; vertical spacing stays the component's own. */}
       {breadcrumbs && <BreadcrumbMenu items={breadcrumbs} className="left-0" />}
