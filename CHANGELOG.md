@@ -91,6 +91,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.182.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ discovery image quality gate (2a) (#560)\n- feat: ✨ discovery image quality gate (2a) (#560)\n
+
 ## [4.181.0] - 2026-07-05
 
 ### Added
