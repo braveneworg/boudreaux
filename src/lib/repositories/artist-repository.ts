@@ -481,6 +481,13 @@ export class ArtistRepository {
     );
   }
 
+  /** Set (or clear, with null) the per-job async-callback token for an artist. */
+  static async setBioJobToken(artistId: string, token: string | null): Promise<void> {
+    await runQuery(() =>
+      prisma.artist.update({ where: { id: artistId }, data: { bioJobToken: token } })
+    );
+  }
+
   /**
    * Reads the async bio-generation state plus the persisted bio content, so the
    * status endpoint can report progress and hand back the finished bio for the
@@ -490,6 +497,7 @@ export class ArtistRepository {
     bioStatus: string | null;
     bioError: string | null;
     bioStartedAt: Date | null;
+    bioJobToken: string | null;
     bioGeneratedAt: Date | null;
     slug: string;
     shortBio: string | null;
@@ -519,6 +527,7 @@ export class ArtistRepository {
           bioStatus: true,
           bioError: true,
           bioStartedAt: true,
+          bioJobToken: true,
           bioGeneratedAt: true,
           slug: true,
           shortBio: true,
