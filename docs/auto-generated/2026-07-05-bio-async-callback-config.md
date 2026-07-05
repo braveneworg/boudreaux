@@ -18,9 +18,11 @@ POST https://<public-origin>/api/artists/<artistId>/bio-generation/callback
 Body: { "jobToken": "<per-job uuid>", "result": <BioGenerationResult> }
 ```
 
-The route verifies the token, answers `202` unconditionally (so it cannot be
-used to enumerate jobs), then runs the heavy re-host/persist + cache
-revalidation post-response via Next.js `after()`.
+The route verifies the token and answers `202` for the token-check path
+regardless of whether the token matches (so it cannot be used to enumerate
+jobs) — a `413` for an oversized body or a `400` for a malformed body precedes
+that check. It then runs the heavy re-host/persist + cache revalidation
+post-response via Next.js `after()`.
 
 ## Auth: a per-job capability token — nothing to rotate
 
@@ -54,12 +56,14 @@ it (trimming a trailing slash so the path has exactly one separator).
   uses (email links, notification URLs) — no new variable was introduced.
 - It is **not globally required**: when it is unset, `buildBioCallbackUrl`
   returns `null` and `runGenerationJob` marks the job `failed` (rather than
-  dispatching an un-answerable invoke). Because of that it is **not** added to
-  the required-env registry in `src/lib/config/env-validation.ts` (whose flat
-  `required` list has no per-feature/optional slot); adding it there would
-  over-constrain the fake/E2E path, which never dispatches and so never needs
-  it. It must, of course, be set in **production** for real generation to
-  complete.
+  dispatching an un-answerable invoke). Because the code already degrades
+  gracefully on an unset base URL, it is **not** added to the required-env
+  registry in `src/lib/config/env-validation.ts` (whose flat `required` list
+  has no per-feature/optional slot) — a hard requirement would add nothing.
+  Adding it there would not constrain the fake/E2E path either:
+  `validateEnvironment` short-circuits entirely under `SKIP_ENV_VALIDATION`,
+  and the `required` list is only enforced under `production`. It must, of
+  course, be set in **production** for real generation to complete.
 
 ## Related constants & unchanged paths
 
