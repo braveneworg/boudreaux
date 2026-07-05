@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
@@ -476,7 +476,7 @@ const runFakeGeneration = async (prep: GenerationPrep): Promise<RunGenerationJob
  * unconfigured or the invoke cannot be dispatched.
  */
 const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJobResult> => {
-  const jobToken = crypto.randomUUID();
+  const jobToken = randomUUID();
   const callbackUrl = buildBioCallbackUrl(prep.artist.id);
   if (!callbackUrl) {
     const error = 'Bio generator callback URL is not configured';
