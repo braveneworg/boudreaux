@@ -391,9 +391,11 @@ type GenerationPrep = {
 
 /**
  * Build the absolute callback URL the Lambda POSTs its result to, derived from
- * the app's public base URL (`NEXT_PUBLIC_BASE_URL`). Returns `null` when the
- * base URL is not configured, so the caller can fail the job rather than
- * dispatch an un-answerable invoke. Task B10 refines this derivation.
+ * the app's canonical public origin (`NEXT_PUBLIC_BASE_URL` — the same env every
+ * publicly-reachable absolute link uses, e.g. email/notification URLs). A
+ * trailing slash on the base is trimmed so the path has exactly one separator.
+ * Returns `null` when the base URL is unconfigured, so the caller can fail the
+ * job rather than dispatch an un-answerable invoke (fake/E2E never reach here).
  */
 const buildBioCallbackUrl = (artistId: string): string | null => {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();

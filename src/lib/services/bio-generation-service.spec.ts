@@ -673,6 +673,19 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(payload.jobToken).toBe(token);
     });
 
+    it('trims a trailing slash on the base URL so the path has exactly one slash', async () => {
+      // A base URL configured WITH a trailing slash must not double the slash
+      // before `/api/...` (closes a B6 coverage gap on the derivation).
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', `${CALLBACK_BASE}/`);
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const payload = decodePayload(lastCommand());
+      expect(payload.callbackUrl).toBe(
+        `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/callback`
+      );
+    });
+
     it('leaves the artist processing — no succeeded/failed flip, no persist', async () => {
       await BioGenerationService.runGenerationJob(artist.id);
 
