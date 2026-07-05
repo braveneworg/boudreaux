@@ -58,8 +58,8 @@ export const ReleaseCard = ({
 
       {/* Info */}
       <div className="flex flex-col gap-0.5">
-        <h3 className="line-clamp-1 text-sm font-semibold text-zinc-900">{title}</h3>
-        {artistName && <p className="line-clamp-1 text-xs text-zinc-500">{artistName}</p>}
+        <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+        {artistName && <p className="text-xs text-zinc-500">{artistName}</p>}
       </div>
 
       {/* Actions */}
@@ -69,7 +69,7 @@ export const ReleaseCard = ({
           aria-label={`Play ${title}`}
           className={cn(
             'inline-flex items-center gap-1 border-2 border-black px-3 py-1.5 text-xs font-medium',
-            'shadow-zine-ink bg-zinc-900 text-white transition-colors hover:bg-zinc-700'
+            'shadow-zine-ink transition-colors hover:bg-zinc-950 hover:text-zinc-50'
           )}
         >
           <Music2 className="size-3.5" />
@@ -82,7 +82,7 @@ export const ReleaseCard = ({
           releaseTitle={title}
           triggerClassName={cn(
             'mb-0 min-h-0 gap-1 border-2 border-black shadow-zine-ink px-3 py-1.5 text-xs font-medium opacity-100',
-            'bg-zinc-900 text-white hover:bg-zinc-700 hover:opacity-100 transition-colors'
+            'hover:bg-zinc-950 hover:text-zinc-50 hover:opacity-100 transition-colors'
           )}
         />
 
