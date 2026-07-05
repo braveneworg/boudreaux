@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     artistRelease: {
@@ -484,6 +485,31 @@ describe('ArtistRepository', () => {
         where: { id: 'a1' },
         data: { bioJobToken: null },
       });
+    });
+  });
+
+  describe('claimBioJobToken', () => {
+    it('updates only the row matching id, token, and processing status', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await ArtistRepository.claimBioJobToken('a1', 'tok');
+
+      expect(prisma.artist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', bioJobToken: 'tok', bioStatus: 'processing' },
+        data: { bioJobToken: null },
+      });
+    });
+
+    it('returns true when exactly one row was claimed', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      expect(await ArtistRepository.claimBioJobToken('a1', 'tok')).toBe(true);
+    });
+
+    it('returns false when no row matched (already claimed)', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      expect(await ArtistRepository.claimBioJobToken('a1', 'tok')).toBe(false);
     });
   });
 

@@ -489,6 +489,21 @@ export class ArtistRepository {
   }
 
   /**
+   * Atomically claim the async bio job iff the stored token matches AND the job
+   * is still processing, clearing the token so only ONE concurrent callback wins.
+   * Returns true iff THIS caller claimed it (updateMany count === 1).
+   */
+  static async claimBioJobToken(artistId: string, token: string): Promise<boolean> {
+    const result = await runQuery(() =>
+      prisma.artist.updateMany({
+        where: { id: artistId, bioJobToken: token, bioStatus: 'processing' },
+        data: { bioJobToken: null },
+      })
+    );
+    return result.count === 1;
+  }
+
+  /**
    * Reads the async bio-generation state plus the persisted bio content, so the
    * status endpoint can report progress and hand back the finished bio for the
    * admin form to populate. Returns `null` when the artist does not exist.

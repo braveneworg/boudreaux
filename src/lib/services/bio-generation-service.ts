@@ -623,11 +623,15 @@ export class BioGenerationService {
 
   /**
    * Verifies an async completion callback and atomically claims the job so it can
-   * only be completed once. Returns the artist slug (for revalidation) and clears
-   * the single-use token ONLY when the job is `processing` and the stored token
-   * constant-time-matches the callback's token. Returns `null` — without clearing
-   * the token — when the artist is missing, the job is not in flight, no token is
-   * stored, or the token mismatches (so a forged callback cannot DoS a real one).
+   * only be completed once, even under concurrent duplicate callbacks (AWS `Event`
+   * invoke is at-least-once and the Lambda's callback POST can retry). Returns the
+   * artist slug (for revalidation) only when the job is `processing`, the stored
+   * token constant-time-matches the callback's token, AND this caller wins the
+   * atomic `claimBioJobToken` (a conditional `updateMany` that clears the
+   * single-use token as it matches). Returns `null` — without touching the token —
+   * when the artist is missing, the job is not in flight, no token is stored, the
+   * token mismatches (so a forged callback can neither DoS a real one nor attempt
+   * the claim), or another concurrent callback already claimed the job.
    *
    * @param artistId - The artist whose in-flight job the callback targets.
    * @param jobToken - The per-job token the callback presents.
@@ -641,9 +645,12 @@ export class BioGenerationService {
       return null;
     }
     if (!tokensMatch(state.bioJobToken, jobToken)) {
-      return null; // do NOT clear a valid token on a mismatched/forged callback
+      return null; // do NOT attempt the claim on a mismatched/forged callback
     }
-    await ArtistRepository.setBioJobToken(artistId, null); // single-use
+    const claimed = await ArtistRepository.claimBioJobToken(artistId, jobToken);
+    if (!claimed) {
+      return null; // a concurrent callback already won the atomic claim
+    }
     return { slug: state.slug };
   }
 

@@ -20,6 +20,7 @@ const findByIdMock = vi.hoisted(() => vi.fn());
 const replaceBioContentMock = vi.hoisted(() => vi.fn());
 const setBioStatusMock = vi.hoisted(() => vi.fn());
 const setBioJobTokenMock = vi.hoisted(() => vi.fn());
+const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
 const getBioGenerationStateMock = vi.hoisted(() => vi.fn());
 const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
 const fakeBioGenerationMock = vi.hoisted(() => vi.fn());
@@ -43,6 +44,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     replaceBioContent: (id: string, content: unknown) => replaceBioContentMock(id, content),
     setBioStatus: (id: string, status: string, opts: unknown) => setBioStatusMock(id, status, opts),
     setBioJobToken: (id: string, token: string | null) => setBioJobTokenMock(id, token),
+    claimBioJobToken: (id: string, token: string) => claimBioJobTokenMock(id, token),
     getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
   },
 }));
@@ -1079,22 +1081,31 @@ describe('BioGenerationService.verifyAndClaimCallback', () => {
   beforeEach(() => {
     getBioGenerationStateMock.mockReset();
     setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
+    claimBioJobTokenMock.mockReset().mockResolvedValue(true);
   });
 
-  it('returns the slug when the token matches', async () => {
+  it('returns the slug when the token matches and the claim is won', async () => {
     getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
+    claimBioJobTokenMock.mockResolvedValue(true);
 
     const result = await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
 
     expect(result).toEqual({ slug: 'radiohead' });
   });
 
-  it('clears the token (single-use) on a successful claim', async () => {
+  it('atomically claims the token (single-use) on a successful match', async () => {
     getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
 
     await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
 
-    expect(setBioJobTokenMock).toHaveBeenCalledWith('a1', null);
+    expect(claimBioJobTokenMock).toHaveBeenCalledWith('a1', 'stored-token');
+  });
+
+  it('returns null when a concurrent callback already won the claim', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
+    claimBioJobTokenMock.mockResolvedValue(false);
+
+    expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
   });
 
   it('returns null when the artist has no state', async () => {
@@ -1103,10 +1114,26 @@ describe('BioGenerationService.verifyAndClaimCallback', () => {
     expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
   });
 
+  it('does not attempt a claim when the artist has no state', async () => {
+    getBioGenerationStateMock.mockResolvedValue(null);
+
+    await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
+
+    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
+  });
+
   it('returns null when the status is not processing', async () => {
     getBioGenerationStateMock.mockResolvedValue(claimState({ bioStatus: 'succeeded' }));
 
     expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
+  });
+
+  it('does not attempt a claim when the status is not processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioStatus: 'succeeded' }));
+
+    await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
+
+    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
   });
 
   it('returns null when there is no stored token', async () => {
@@ -1115,18 +1142,26 @@ describe('BioGenerationService.verifyAndClaimCallback', () => {
     expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
   });
 
+  it('does not attempt a claim when there is no stored token', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: null }));
+
+    await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
+
+    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
+  });
+
   it('returns null when an equal-length token does not match', async () => {
     getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'aaaaaaaaaaaa' }));
 
     expect(await BioGenerationService.verifyAndClaimCallback('a1', 'bbbbbbbbbbbb')).toBeNull();
   });
 
-  it('does NOT clear the stored token on a mismatched (forged) callback', async () => {
+  it('does NOT attempt the claim on a mismatched (forged) callback', async () => {
     getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
 
     await BioGenerationService.verifyAndClaimCallback('a1', 'forged');
 
-    expect(setBioJobTokenMock).not.toHaveBeenCalled();
+    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
   });
 });
 
