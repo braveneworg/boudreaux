@@ -92,6 +92,20 @@ describe('ImageDialog', () => {
     expect(screen.getByRole('button', { name: 'Upload & insert' })).toBeEnabled();
   });
 
+  it('enables Upload & insert when a file is dropped onto the drop zone', async () => {
+    const file = makeFile();
+    render(<Harness onUploadImage={vi.fn(async () => UPLOADED)} />);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Upload' }));
+    const dropZone = screen
+      .getByLabelText<HTMLInputElement>('Upload image file')
+      .closest('div') as HTMLElement;
+    fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+    await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'Jane Doe');
+
+    expect(screen.getByRole('button', { name: 'Upload & insert' })).toBeEnabled();
+  });
+
   it('uploads the file with the typed attribution metadata', async () => {
     const file = makeFile();
     const onUploadImage = vi.fn(async () => UPLOADED);

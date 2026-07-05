@@ -29,8 +29,8 @@ interface BioMediaPalettesProps {
  * directly above the bio editors so tiles drag straight in. The Plus button
  * on each tile inserts at the focused editor's cursor (touch/keyboard path).
  * Renders nothing until the artist has at least one persisted bio image or
- * link; while either delete mutation is pending both palettes' delete buttons
- * are disabled.
+ * link; while any mutation (delete or attribution update) is pending both
+ * palettes' controls are disabled.
  *
  * @param artistId - The artist whose discovered media to show (edit mode only).
  */
@@ -47,7 +47,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
     return null;
   }
 
-  const isDeleting = isDeletingBioLink || isDeletingBioImage || isUpdatingBioImageAttribution;
+  const isMutating = isDeletingBioLink || isDeletingBioImage || isUpdatingBioImageAttribution;
 
   const insertLink = (link: BioStatusLink): void => {
     const target = registry.getTarget();
@@ -93,7 +93,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
           links={content.links}
           onDelete={deleteBioLink}
           onInsert={insertLink}
-          disabled={isDeleting}
+          disabled={isMutating}
         />
       )}
       {content.images.length > 0 && (
@@ -104,7 +104,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
           onEditAttribution={(id, value) =>
             updateBioImageAttribution({ imageId: id, attribution: value })
           }
-          disabled={isDeleting}
+          disabled={isMutating}
         />
       )}
     </div>

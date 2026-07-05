@@ -254,6 +254,21 @@ describe('BioImagePalette', () => {
     expect(screen.getByRole('button', { name: 'Insert image Ceschi Ramos' })).toBeDisabled();
   });
 
+  it('disables the edit attribution button when disabled prop is true', () => {
+    render(
+      <BioImagePalette
+        images={IMAGES}
+        onDelete={vi.fn()}
+        onInsert={vi.fn()}
+        onEditAttribution={vi.fn()}
+        disabled
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Edit attribution for Ceschi Ramos' })
+    ).toBeDisabled();
+  });
+
   it('clicking the edit button reveals an input prefilled with the attribution', async () => {
     render(
       <BioImagePalette

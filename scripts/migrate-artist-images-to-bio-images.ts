@@ -81,12 +81,12 @@ const mapImageToBioImage = (
   artistId: string
 ): Prisma.ArtistBioImageUncheckedCreateInput => ({
   url: src,
-  title: caption ?? null,
-  alt: altText ?? null,
+  title: caption,
+  alt: altText,
   attribution: caption ?? altText ?? 'Uploaded',
   kind: 'upload',
   isPrimary: false,
-  sortOrder: sortOrder ?? 0,
+  sortOrder,
   artistId,
 });
 

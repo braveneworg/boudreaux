@@ -103,6 +103,7 @@ describe('ArtistBioSection', () => {
     render(<ArtistBioSection {...editModeProps} />);
 
     const editors = screen.getAllByTestId('rich-text-editor-stub');
+    expect(editors).toHaveLength(3);
     for (const editor of editors) {
       expect(editor).toHaveAttribute('data-has-upload-handler', 'false');
     }

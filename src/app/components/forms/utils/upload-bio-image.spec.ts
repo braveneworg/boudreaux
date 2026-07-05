@@ -5,6 +5,7 @@ import { createArtistBioImageAction } from '@/lib/actions/create-artist-bio-imag
 import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
+import { warn } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 
 import { uploadBioImage } from './upload-bio-image';
@@ -174,5 +175,9 @@ describe('uploadBioImage', () => {
     await Promise.resolve();
 
     expect(result).toEqual({ success: true, data: record });
+    expect(vi.mocked(warn)).toHaveBeenCalledWith(
+      '[Bio image upload] Variant generation failed:',
+      expect.any(Error)
+    );
   });
 });

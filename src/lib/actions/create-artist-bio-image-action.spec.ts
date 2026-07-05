@@ -88,7 +88,7 @@ describe('createArtistBioImageAction', () => {
   });
 
   it('passes null title and alt through without sanitizing', async () => {
-    const nullInput = { ...validInput, title: null as null, alt: null as null };
+    const nullInput = { ...validInput, title: null, alt: null };
 
     await createArtistBioImageAction(nullInput);
 

@@ -307,7 +307,7 @@ describe('ArtistForm', () => {
         },
       },
       isPending: false,
-      error: Error('Unknown error'),
+      error: null,
       refetch: vi.fn(),
     };
 

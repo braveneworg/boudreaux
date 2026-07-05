@@ -86,6 +86,7 @@ const mockStatus = (data: BioGenerationStatusResponse | undefined): void => {
 beforeEach(() => {
   pending.link = false;
   pending.image = false;
+  pending.updating = false;
   mockStatus({
     status: 'succeeded',
     error: null,
@@ -196,6 +197,14 @@ describe('BioMediaPalettes', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
 
     expect(screen.getByRole('button', { name: 'Delete link Wikipedia' })).toBeDisabled();
+  });
+
+  it('disables palette controls while an attribution update is pending', () => {
+    pending.updating = true;
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('button', { name: 'Insert image Portrait' })).toBeDisabled();
   });
 
   // ── insertLink ──────────────────────────────────────────────────────────────
