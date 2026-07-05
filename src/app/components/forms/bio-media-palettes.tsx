@@ -27,9 +27,9 @@ interface BioMediaPalettesProps {
  * images, fed by the persisted rows (bio-generation status query). Rendered
  * directly above the bio editors so tiles drag straight in. The Plus button
  * on each tile inserts at the focused editor's cursor (touch/keyboard path).
- * Renders nothing until a generation has succeeded and left at least one row;
- * while either delete mutation is pending both palettes' delete buttons are
- * disabled.
+ * Renders nothing until the artist has at least one persisted bio image or
+ * link; while either delete mutation is pending both palettes' delete buttons
+ * are disabled.
  *
  * @param artistId - The artist whose discovered media to show (edit mode only).
  */
@@ -39,7 +39,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   const { deleteBioImage, isDeletingBioImage } = useDeleteBioImageMutation(artistId);
   const registry = useBioEditorRegistry();
 
-  const content = status.data?.status === 'succeeded' ? status.data.content : null;
+  const content = status.data?.content ?? null;
   if (!content || (content.links.length === 0 && content.images.length === 0)) {
     return null;
   }
