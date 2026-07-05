@@ -87,6 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.178.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ releases cover modal + release notes section (#555)\n- feat: ✨ releases cover modal + release notes section (#555)\n
+
 ## [4.177.0] - 2026-07-05
 
 ### Added
