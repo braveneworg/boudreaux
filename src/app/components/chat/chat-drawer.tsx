@@ -64,7 +64,7 @@ export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) =>
           </DrawerTitle>
           <DrawerClose
             aria-label="Close chat"
-            className="text-muted-foreground hover:text-foreground absolute -top-2 right-4 transition-colors"
+            className="text-muted-foreground hover:text-foreground absolute -top-2 right-4 transition-colors md:top-1/2 md:-translate-y-1/2"
           >
             <X aria-hidden="true" className="size-5" />
           </DrawerClose>

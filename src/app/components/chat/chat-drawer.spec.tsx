@@ -55,6 +55,16 @@ describe('ChatDrawer', () => {
     expect(screen.getByRole('button', { name: /close chat/i })).toBeInTheDocument();
   });
 
+  it('lowers the close trigger on desktop so it is not clipped at the viewport top', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    expect(screen.getByRole('button', { name: /close chat/i })).toHaveClass(
+      'md:top-1/2',
+      'md:-translate-y-1/2'
+    );
+  });
+
   it('fires onOpenChange(false) when the close button is clicked', () => {
     useIsMobileMock.mockReturnValue(false);
     const { onOpenChange } = renderDrawer();
