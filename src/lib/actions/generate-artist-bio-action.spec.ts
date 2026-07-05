@@ -130,10 +130,25 @@ describe('generateArtistBioAction', () => {
     expect(afterCallback).toBeNull();
   });
 
-  it('re-triggers a stale in-flight job', async () => {
+  // Pins STALE_JOB_MS to 17 min: a 16-min-old job is still in flight (under the
+  // window, exceeds the Lambda's 15-min timeout) so it is NOT superseded.
+  it('keeps a 16-minute-old in-flight job (under the stale window)', async () => {
     getBioGenerationStateMock.mockResolvedValue({
       bioStatus: 'processing',
-      bioStartedAt: new Date(Date.now() - 20 * 60 * 1000),
+      bioStartedAt: new Date(Date.now() - 16 * 60 * 1000),
+    });
+
+    const result = await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(result).toEqual({ success: true, status: 'processing' });
+    expect(setBioStatusMock).not.toHaveBeenCalled();
+  });
+
+  // Pins STALE_JOB_MS to 17 min: an 18-min-old job is past the window → stale.
+  it('re-triggers a stale (18-minute-old) in-flight job', async () => {
+    getBioGenerationStateMock.mockResolvedValue({
+      bioStatus: 'processing',
+      bioStartedAt: new Date(Date.now() - 18 * 60 * 1000),
     });
 
     const result = await generateArtistBioAction({ artistId: VALID_ID });
@@ -143,28 +158,54 @@ describe('generateArtistBioAction', () => {
     expect(afterCallback).toBeTypeOf('function');
   });
 
-  it('audits and revalidates when the background job succeeds', async () => {
+  it('audit-logs the trigger with the admin user id at dispatch', async () => {
     await generateArtistBioAction({ artistId: VALID_ID });
+
+    // Audit fires at trigger, before the background job runs.
+    expect(logSecurityEventMock).toHaveBeenCalledWith({
+      event: 'media.artist.updated',
+      userId: 'admin-1',
+      metadata: { artistId: VALID_ID, action: 'bio-generation-triggered' },
+    });
+    expect(runGenerationJobMock).not.toHaveBeenCalled();
+  });
+
+  it('revalidates but does not audit-log when the background job completes', async () => {
+    await generateArtistBioAction({ artistId: VALID_ID });
+    logSecurityEventMock.mockClear(); // drop the trigger-time audit
     await afterCallback?.();
 
     expect(runGenerationJobMock).toHaveBeenCalledWith(VALID_ID, {
       links: undefined,
       description: undefined,
     });
-    expect(logSecurityEventMock).toHaveBeenCalledTimes(1);
+    // Completion no longer audit-logs (moved to the trigger).
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
     const revalidated = revalidatePathMock.mock.calls.map(([path]) => path);
     expect(revalidated).toContain('/artists/radiohead');
     expect(revalidated).toContain('/artists/radiohead/bio');
   });
 
-  it('does not audit or revalidate when the background job fails', async () => {
+  it('does not revalidate when the background job is dispatched to the Lambda', async () => {
+    runGenerationJobMock.mockResolvedValue({ status: 'dispatched' });
+
+    await generateArtistBioAction({ artistId: VALID_ID });
+    logSecurityEventMock.mockClear();
+    await afterCallback?.();
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
+  });
+
+  it('does not revalidate when the background job fails', async () => {
     runGenerationJobMock.mockResolvedValue({ status: 'failed', error: 'boom' });
 
     await generateArtistBioAction({ artistId: VALID_ID });
+    logSecurityEventMock.mockClear();
     await afterCallback?.();
 
-    expect(logSecurityEventMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
   });
 
   it('returns a typed error and logs when triggering throws unexpectedly', async () => {

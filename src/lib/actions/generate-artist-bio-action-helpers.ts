@@ -6,7 +6,6 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
-import { logSecurityEvent } from '@/utils/audit-log';
 
 interface BioInFlightState {
   bioStatus: string | null;
@@ -53,7 +52,6 @@ export const revalidateArtistBioPaths = (slug: string): void => {
 
 interface RunBioGenerationParams {
   artistId: string;
-  userId: string;
   links?: string[];
   description?: string;
 }
@@ -64,32 +62,17 @@ interface RunBioGenerationParams {
  * its own succeeded/failed status and never throws.
  *
  * Only the synchronous fake/E2E path (`completed`) finishes in-process, so it is
- * the only outcome that audit-logs and revalidates here; the real async path
- * (`dispatched`) is finished — and revalidated — by the Lambda callback route
- * (Task B8 relocates the audit/revalidate there). `failed` no-ops.
+ * the only outcome revalidated here; the real async path (`dispatched`) is
+ * finished — and revalidated — by the Lambda callback route. `failed` no-ops.
+ * The accepted trigger is audit-logged by the action, not here.
  */
 export const runBioGenerationAfterResponse = async ({
   artistId,
-  userId,
   links,
   description,
 }: RunBioGenerationParams): Promise<void> => {
   const outcome = await BioGenerationService.runGenerationJob(artistId, { links, description });
-  if (outcome.status !== 'completed') {
-    return;
+  if (outcome.status === 'completed') {
+    revalidateArtistBioPaths(outcome.slug);
   }
-
-  logSecurityEvent({
-    event: 'media.artist.updated',
-    userId,
-    metadata: {
-      artistId,
-      action: 'bio-generated',
-      model: outcome.data.model,
-      imageCount: outcome.data.images.length,
-      linkCount: outcome.data.links.length,
-    },
-  });
-
-  revalidateArtistBioPaths(outcome.slug);
 };
