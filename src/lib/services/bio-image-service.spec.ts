@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { createHash } from 'crypto';
+
+import type * as ImageQualityModule from '@/lib/utils/image-quality';
+
 import { BioImageService } from './bio-image-service';
 
 vi.mock('server-only', () => ({}));
@@ -31,6 +35,12 @@ vi.mock('@/lib/utils/ip-guard', () => ({
   isPubliclyRoutableUrl: (url: string) => isPubliclyRoutableUrlMock(url),
 }));
 
+const assessImageQualityMock = vi.fn();
+vi.mock('@/lib/utils/image-quality', async (importOriginal) => ({
+  ...((await importOriginal()) as typeof ImageQualityModule),
+  assessImageQuality: (buffer: Buffer) => assessImageQualityMock(buffer),
+}));
+
 const mockSharpInstance = {
   resize: vi.fn().mockReturnThis(),
   webp: vi.fn().mockReturnThis(),
@@ -54,6 +64,15 @@ beforeEach(() => {
     data: Buffer.from('webp-data'),
     info: { width: 384, height: 256 },
   });
+  assessImageQualityMock.mockImplementation((buffer: Buffer) => ({
+    width: 800,
+    height: 600,
+    sharpness: 500,
+    // sha256-derived 64-bit dHash: identical buffers hash identically (those
+    // are caught by the exact-SHA-256 dedupe first), distinct buffers land far
+    // apart in Hamming space so they are not treated as near-duplicates.
+    dHash: BigInt(`0x${createHash('sha256').update(buffer).digest('hex').slice(0, 16)}`),
+  }));
 });
 
 afterEach(() => {
@@ -523,5 +542,120 @@ describe('BioImageService.rehostImages', () => {
     await BioImageService.rehostImages(images, 'artist-1');
 
     expect(peak).toBeLessThanOrEqual(8);
+  });
+
+  it('drops an image below the resolution floor and uploads nothing for it', async () => {
+    assessImageQualityMock.mockResolvedValueOnce({
+      width: 100,
+      height: 100,
+      sharpness: 500,
+      dHash: 1n,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [{ url: 'https://x/small.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(results).toEqual([null]);
+    expect(duplicateAliases.size).toBe(0);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a blurry image below the sharpness floor', async () => {
+    assessImageQualityMock.mockResolvedValueOnce({
+      width: 800,
+      height: 600,
+      sharpness: 5,
+      dHash: 1n,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [{ url: 'https://x/blurry.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(results).toEqual([null]);
+    expect(duplicateAliases.size).toBe(0);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('aliases a perceptual near-duplicate to the surviving copy', async () => {
+    // Two byte-distinct images (so SHA-256 does NOT collide) whose dHashes are
+    // 1 bit apart -> within NEAR_DUPLICATE_MAX_DISTANCE.
+    assessImageQualityMock
+      .mockResolvedValueOnce({ width: 800, height: 600, sharpness: 500, dHash: 0b1010n })
+      .mockResolvedValueOnce({ width: 800, height: 600, sharpness: 500, dHash: 0b1011n });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 1, 1, 1]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([2, 2, 2, 2]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/b.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(results[0]).not.toBeNull();
+    expect(results[1]).toBeNull();
+    expect(duplicateAliases.get(1)).toBe(results[0]?.url);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps two perceptually-distinct images', async () => {
+    assessImageQualityMock
+      .mockResolvedValueOnce({ width: 800, height: 600, sharpness: 500, dHash: 0n })
+      .mockResolvedValueOnce({
+        width: 800,
+        height: 600,
+        sharpness: 500,
+        dHash: (1n << 64n) - 1n,
+      });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 1, 1, 1]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([2, 2, 2, 2]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/b.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(results[0]).not.toBeNull();
+    expect(results[1]).not.toBeNull();
+    expect(duplicateAliases.size).toBe(0);
+    expect(sendMock).toHaveBeenCalledTimes(2);
   });
 });

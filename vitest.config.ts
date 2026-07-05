@@ -26,6 +26,11 @@ const htmlDomParserClient = require.resolve('html-dom-parser/lib/client/html-to-
 // `.spec.tsx` stays on the faster `vmThreads` pool.
 const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx', '**/rich-text-editor.spec.tsx'];
 
+// Specs that exercise REAL `sharp` (a libvips native addon) must run under the
+// `forks` pool: the default `vmThreads` pool cannot reliably load native
+// addons. Keep this list tight — every other `.spec.ts` stays on `vmThreads`.
+const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts'];
+
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {
   const withCoverage = process.argv.includes('--coverage');
@@ -63,7 +68,12 @@ export default defineConfig((): ViteUserConfig => {
             // The Lambda projects are separate pnpm workspaces with their own
             // vitest runners/configs; their specs exercise real default deps
             // (e.g. live MusicBrainz fetches) and must not run under the app suite.
-            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+            exclude: [
+              '**/node_modules/**',
+              'bio-generator/**',
+              'stripe-webhook/**',
+              ...NATIVE_ADDON_SPECS,
+            ],
           },
         },
         {
@@ -90,6 +100,18 @@ export default defineConfig((): ViteUserConfig => {
             environment: 'jsdom',
             pool: 'forks',
             include: HTML_PARSER_SPECS,
+            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+          },
+        },
+        {
+          // Real-`sharp` specs need the `forks` pool (native addon won't load
+          // under vmThreads). Node environment, no DOM. See NATIVE_ADDON_SPECS.
+          extends: true,
+          test: {
+            name: 'node-forks',
+            environment: 'node',
+            pool: 'forks',
+            include: NATIVE_ADDON_SPECS,
             exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
           },
         },
