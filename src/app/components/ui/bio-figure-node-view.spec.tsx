@@ -16,7 +16,9 @@ vi.mock('@tiptap/react', () => ({
   ),
 }));
 
-const makeProps = (overrides?: Partial<{ attrs: Record<string, unknown> }>): NodeViewProps =>
+const makeProps = (
+  overrides?: Partial<{ attrs: Record<string, unknown>; isEditable: boolean }>
+): NodeViewProps =>
   ({
     node: {
       attrs: {
@@ -33,6 +35,7 @@ const makeProps = (overrides?: Partial<{ attrs: Record<string, unknown> }>): Nod
     updateAttributes: vi.fn(),
     deleteNode: vi.fn(),
     selected: true,
+    editor: { isEditable: overrides?.isEditable ?? true } as unknown as NodeViewProps['editor'],
   }) as unknown as NodeViewProps;
 
 // jsdom has no layout: stub the wrapper's parent bounding rect to a fixed
@@ -315,6 +318,61 @@ describe('BioFigureNodeView', () => {
     fireEvent.pointerDown(image, { pointerId: 1, clientX: 0, clientY: 0 });
     fireEvent.pointerMove(image, { pointerId: 1, clientX: 200, clientY: 0 });
     expect(props.updateAttributes).not.toHaveBeenCalled();
+  });
+
+  describe('edit attribution', () => {
+    it('shows an edit-attribution button when editor is editable', () => {
+      render(<BioFigureNodeView {...makeProps()} />);
+      expect(screen.getByRole('button', { name: 'Edit attribution' })).toBeInTheDocument();
+    });
+
+    it('committing a typed value calls updateAttributes with the new attribution', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      const input = screen.getByRole('textbox', { name: 'Attribution' });
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Credit');
+      await userEvent.keyboard('{Enter}');
+      expect(props.updateAttributes).toHaveBeenCalledWith({ attribution: 'Credit' });
+    });
+
+    it('committing an empty value calls updateAttributes with null', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      const input = screen.getByRole('textbox', { name: 'Attribution' });
+      await userEvent.clear(input);
+      await userEvent.keyboard('{Enter}');
+      expect(props.updateAttributes).toHaveBeenCalledWith({ attribution: null });
+    });
+
+    it('pressing Escape cancels editing without calling updateAttributes', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      expect(screen.getByRole('textbox', { name: 'Attribution' })).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      expect(props.updateAttributes).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Edit attribution' })).toBeInTheDocument();
+    });
+
+    it('blurring the input commits the typed value', async () => {
+      const props = makeProps();
+      render(<BioFigureNodeView {...props} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit attribution' }));
+      const input = screen.getByRole('textbox', { name: 'Attribution' });
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Blur credit');
+      fireEvent.blur(input);
+      expect(props.updateAttributes).toHaveBeenCalledWith({ attribution: 'Blur credit' });
+    });
+
+    it('does not render the edit button when editor is not editable', () => {
+      render(<BioFigureNodeView {...makeProps({ isEditable: false })} />);
+      expect(screen.queryByRole('button', { name: 'Edit attribution' })).not.toBeInTheDocument();
+      expect(screen.getByText('A')).toBeInTheDocument();
+    });
   });
 });
 

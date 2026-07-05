@@ -18,7 +18,8 @@ import type { Editor } from '@tiptap/react';
 const statusMock = vi.hoisted(() => vi.fn());
 const deleteBioLink = vi.hoisted(() => vi.fn());
 const deleteBioImage = vi.hoisted(() => vi.fn());
-const pending = vi.hoisted(() => ({ link: false, image: false }));
+const updateBioImageAttribution = vi.hoisted(() => vi.fn());
+const pending = vi.hoisted(() => ({ link: false, image: false, updating: false }));
 /** Controls what `registry.getTarget()` returns for insert tests. */
 const mockGetTarget = vi.hoisted(() => vi.fn(() => null as Editor | null));
 
@@ -29,6 +30,10 @@ vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
 vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
   useDeleteBioLinkMutation: () => ({ deleteBioLink, isDeletingBioLink: pending.link }),
   useDeleteBioImageMutation: () => ({ deleteBioImage, isDeletingBioImage: pending.image }),
+  useUpdateBioImageAttributionMutation: () => ({
+    updateBioImageAttribution,
+    isUpdatingBioImageAttribution: pending.updating,
+  }),
 }));
 
 vi.mock('@/lib/utils/api-base-url', () => ({
@@ -81,6 +86,7 @@ const mockStatus = (data: BioGenerationStatusResponse | undefined): void => {
 beforeEach(() => {
   pending.link = false;
   pending.image = false;
+  pending.updating = false;
   mockStatus({
     status: 'succeeded',
     error: null,
@@ -193,6 +199,14 @@ describe('BioMediaPalettes', () => {
     expect(screen.getByRole('button', { name: 'Delete link Wikipedia' })).toBeDisabled();
   });
 
+  it('disables palette controls while an attribution update is pending', () => {
+    pending.updating = true;
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('button', { name: 'Insert image Portrait' })).toBeDisabled();
+  });
+
   // ── insertLink ──────────────────────────────────────────────────────────────
 
   it('insertLink is a no-op when no editor is registered (getTarget returns null)', async () => {
@@ -293,6 +307,23 @@ describe('BioMediaPalettes', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
 
     expect(screen.getByRole('group', { name: 'Discovered images' })).toBeInTheDocument();
+  });
+
+  it('routes an image attribution edit through the mutation', async () => {
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: `Edit attribution for ${IMAGE_ROW.title}` })
+    );
+    const input = screen.getByRole('textbox', { name: /attribution/i });
+    await userEvent.clear(input);
+    await userEvent.type(input, 'New credit');
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(updateBioImageAttribution).toHaveBeenCalledWith({
+      imageId: IMAGE_ROW.id,
+      attribution: 'New credit',
+    });
   });
 
   it('insertImage falls back to "Artist photo" when both alt and title are absent', async () => {

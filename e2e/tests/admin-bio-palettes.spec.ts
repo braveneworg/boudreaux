@@ -82,7 +82,7 @@ test.describe('Admin bio palettes', () => {
       adminPage.getByRole('dialog', { name: 'Insert image', exact: true })
     ).toBeVisible();
     await adminPage.getByLabel('Attribution', { exact: true }).fill(attribution);
-    await adminPage.getByRole('button', { name: 'Insert E2E palette photo' }).click();
+    await adminPage.getByRole('button', { name: 'Insert E2E palette portrait' }).click();
 
     // Same hydration-double guard on the editing surface before reading it.
     const bioEditor = adminPage.getByRole('textbox', { name: 'Bio', exact: true });

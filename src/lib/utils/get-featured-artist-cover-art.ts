@@ -10,7 +10,7 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
  *   1. `featured.coverArt`
  *   2. `featured.release.coverArt`
  *   3. First `featured.release.images[].src`
- *   4. First `featured.artists[].images[].src`
+ *   4. Primary `featured.artists[].bioImages[].url`
  *   5. null
  */
 const releaseCoverArt = (featured: FeaturedArtist): string | null => {
@@ -23,13 +23,13 @@ const releaseCoverArt = (featured: FeaturedArtist): string | null => {
   return null;
 };
 
-const firstArtistImageSrc = (featured: FeaturedArtist): string | null => {
+const firstArtistImageUrl = (featured: FeaturedArtist): string | null => {
   if (!featured.artists?.length) {
     return null;
   }
   for (const artist of featured.artists) {
-    if (artist.images?.length && artist.images[0].src) {
-      return artist.images[0].src;
+    if (artist.bioImages?.length && artist.bioImages[0].url) {
+      return artist.bioImages[0].url;
     }
   }
   return null;
@@ -39,5 +39,5 @@ export const getFeaturedArtistCoverArt = (featured: FeaturedArtist): string | nu
   if (featured.coverArt) {
     return featured.coverArt;
   }
-  return releaseCoverArt(featured) ?? firstArtistImageSrc(featured);
+  return releaseCoverArt(featured) ?? firstArtistImageUrl(featured);
 };

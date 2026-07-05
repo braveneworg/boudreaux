@@ -4,13 +4,14 @@
 'use client';
 
 import { useState } from 'react';
-import type { DragEvent, JSX } from 'react';
+import type { DragEvent, JSX, KeyboardEvent } from 'react';
 
 import Image from 'next/image';
 
-import { Eye, Plus, X } from 'lucide-react';
+import { Check, Eye, Pencil, Plus, X } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
+import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -51,16 +52,79 @@ const resolveImageLabels = (image: BioStatusImage): ImageLabels => ({
   alt: image.alt ?? image.title ?? 'Artist photo',
 });
 
+interface AttributionEditorProps {
+  imageId: string;
+  currentAttribution: string;
+  onSave: (imageId: string, attribution: string) => void;
+  onCancel: () => void;
+}
+
+/** Inline input for editing or adding a bio image attribution. */
+const AttributionEditor = ({
+  imageId,
+  currentAttribution,
+  onSave,
+  onCancel,
+}: AttributionEditorProps): JSX.Element => {
+  const [draft, setDraft] = useState(currentAttribution);
+
+  const save = (): void => {
+    onSave(imageId, draft.trim());
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') save();
+    if (event.key === 'Escape') onCancel();
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Input
+        aria-label="Attribution"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={handleKeyDown}
+        maxLength={500}
+        className="h-6 text-[11px]"
+      />
+      <div className="flex gap-1">
+        <Button type="button" size="sm" onClick={save} className="h-5 px-2 text-[11px]">
+          <Check className="size-3" aria-hidden />
+          Save
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={onCancel}
+          className="h-5 px-2 text-[11px]"
+        >
+          <X className="size-3" aria-hidden />
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 interface BioImageTileProps {
   image: BioStatusImage;
   onDelete: (id: string) => void;
   onInsert: (image: BioStatusImage) => void;
+  onEditAttribution: (imageId: string, attribution: string) => void;
   disabled: boolean;
 }
 
-/** Single draggable image tile with preview, insert, and delete controls. */
-const BioImageTile = ({ image, onDelete, onInsert, disabled }: BioImageTileProps): JSX.Element => {
+/** Single draggable image tile with preview, insert, delete, and attribution-edit controls. */
+const BioImageTile = ({
+  image,
+  onDelete,
+  onInsert,
+  onEditAttribution,
+  disabled,
+}: BioImageTileProps): JSX.Element => {
   const { thumbSrc, title, deleteLabel, previewLabel, alt } = resolveImageLabels(image);
+  const [editing, setEditing] = useState(false);
 
   const onDragStart = (event: DragEvent<HTMLLIElement>): void => {
     event.dataTransfer.setData(
@@ -76,6 +140,11 @@ const BioImageTile = ({ image, onDelete, onInsert, disabled }: BioImageTileProps
       })
     );
     event.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleSave = (imageId: string, attribution: string): void => {
+    onEditAttribution(imageId, attribution);
+    setEditing(false);
   };
 
   return (
@@ -97,8 +166,32 @@ const BioImageTile = ({ image, onDelete, onInsert, disabled }: BioImageTileProps
         unoptimized
         className="h-24 w-full object-cover"
       />
-      {image.attribution && (
-        <p className="text-muted-foreground line-clamp-2 text-[11px]">{image.attribution}</p>
+      {editing ? (
+        <AttributionEditor
+          imageId={image.id}
+          currentAttribution={image.attribution ?? ''}
+          onSave={handleSave}
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <div className="flex items-center gap-1">
+          {image.attribution ? (
+            <p className="text-muted-foreground line-clamp-2 flex-1 text-[11px]">
+              {image.attribution}
+            </p>
+          ) : (
+            <span className="text-muted-foreground flex-1 text-[11px]">Add attribution</span>
+          )}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setEditing(true)}
+            aria-label={`Edit attribution for ${previewLabel}`}
+            className="hover:text-primary shrink-0 p-0.5"
+          >
+            <Pencil className="size-3.5" aria-hidden />
+          </button>
+        </div>
       )}
       <div className="flex gap-1">
         <Dialog>
@@ -154,17 +247,19 @@ interface BioImagePaletteProps {
   images: BioStatusImage[];
   onDelete: (imageId: string) => void;
   onInsert: (image: BioStatusImage) => void;
+  onEditAttribution: (imageId: string, attribution: string) => void;
   disabled?: boolean;
 }
 
 /** Curated, draggable grid of discovered images. Tiles drag into the bio
  *  editors as `application/x-bio-image` payloads; the Plus button inserts
  *  at the focused editor's cursor (touch/keyboard path); eye opens a full
- *  preview; X deletes the row. */
+ *  preview; X deletes the row; pencil edits the attribution inline. */
 export const BioImagePalette = ({
   images,
   onDelete,
   onInsert,
+  onEditAttribution,
   disabled = false,
 }: BioImagePaletteProps): JSX.Element => {
   const [filter, setFilter] = useState('');
@@ -196,6 +291,7 @@ export const BioImagePalette = ({
             image={image}
             onDelete={onDelete}
             onInsert={onInsert}
+            onEditAttribution={onEditAttribution}
             disabled={disabled}
           />
         ))}

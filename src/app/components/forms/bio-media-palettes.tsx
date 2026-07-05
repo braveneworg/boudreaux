@@ -9,6 +9,7 @@ import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/
 import {
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
+  useUpdateBioImageAttributionMutation,
 } from '@/app/hooks/mutations/use-bio-media-mutations';
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
@@ -28,8 +29,8 @@ interface BioMediaPalettesProps {
  * directly above the bio editors so tiles drag straight in. The Plus button
  * on each tile inserts at the focused editor's cursor (touch/keyboard path).
  * Renders nothing until the artist has at least one persisted bio image or
- * link; while either delete mutation is pending both palettes' delete buttons
- * are disabled.
+ * link; while any mutation (delete or attribution update) is pending both
+ * palettes' controls are disabled.
  *
  * @param artistId - The artist whose discovered media to show (edit mode only).
  */
@@ -37,6 +38,8 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   const status = useArtistBioGenerationStatusQuery(artistId);
   const { deleteBioLink, isDeletingBioLink } = useDeleteBioLinkMutation(artistId);
   const { deleteBioImage, isDeletingBioImage } = useDeleteBioImageMutation(artistId);
+  const { updateBioImageAttribution, isUpdatingBioImageAttribution } =
+    useUpdateBioImageAttributionMutation(artistId);
   const registry = useBioEditorRegistry();
 
   const content = status.data?.content ?? null;
@@ -44,7 +47,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
     return null;
   }
 
-  const isDeleting = isDeletingBioLink || isDeletingBioImage;
+  const isMutating = isDeletingBioLink || isDeletingBioImage || isUpdatingBioImageAttribution;
 
   const insertLink = (link: BioStatusLink): void => {
     const target = registry.getTarget();
@@ -90,7 +93,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
           links={content.links}
           onDelete={deleteBioLink}
           onInsert={insertLink}
-          disabled={isDeleting}
+          disabled={isMutating}
         />
       )}
       {content.images.length > 0 && (
@@ -98,7 +101,10 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
           images={content.images}
           onDelete={deleteBioImage}
           onInsert={insertImage}
-          disabled={isDeleting}
+          onEditAttribution={(id, value) =>
+            updateBioImageAttribution({ imageId: id, attribution: value })
+          }
+          disabled={isMutating}
         />
       )}
     </div>

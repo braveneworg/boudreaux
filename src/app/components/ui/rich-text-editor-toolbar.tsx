@@ -54,6 +54,8 @@ interface RichTextEditorToolbarProps {
   editor: Editor;
   toolbarState: ToolbarState;
   images: RichTextEditorImage[];
+  /** Whether the insert-image dialog can upload (enables the button with no library images). */
+  canUpload?: boolean;
   onOpenLink: () => void;
   onOpenImage: () => void;
   /** Whether the editor is showing the rendered preview instead of the editing surface. */
@@ -74,6 +76,7 @@ export const RichTextEditorToolbar = ({
   editor,
   toolbarState,
   images,
+  canUpload = false,
   onOpenLink,
   onOpenImage,
   isPreview,
@@ -182,7 +185,7 @@ export const RichTextEditorToolbar = ({
         variant={activeVariant(toolbarState.isImage)}
         aria-label="Insert image"
         aria-pressed={toolbarState.isImage}
-        disabled={images.length === 0}
+        disabled={images.length === 0 && !canUpload}
         onClick={onOpenImage}
       >
         <ImageIcon className="size-4" aria-hidden />

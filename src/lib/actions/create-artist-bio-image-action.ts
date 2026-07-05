@@ -12,6 +12,7 @@ import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
+import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import {
   createBioImageInputSchema,
   type CreateBioImageInput,
@@ -49,7 +50,13 @@ export const createArtistBioImageAction = async (
       return { success: false, error: 'Artist not found' };
     }
 
-    const created = await ArtistService.createBioImage(parsed.data);
+    const { attribution, title, alt } = parsed.data;
+    const created = await ArtistService.createBioImage({
+      ...parsed.data,
+      attribution: sanitizeBioText(attribution),
+      title: title == null ? title : sanitizeBioText(title),
+      alt: alt == null ? alt : sanitizeBioText(alt),
+    });
 
     logSecurityEvent({
       event: 'media.artist_bio_image.created',

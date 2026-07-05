@@ -44,7 +44,7 @@ export type FeaturedArtistArtist = {
   firstName: string;
   surname: string;
   slug: string;
-  images: Array<{ src: string | null }>;
+  bioImages: Array<{ url: string }>;
 };
 
 /** Narrow release projection on a featured artist (cover-art/title display). */

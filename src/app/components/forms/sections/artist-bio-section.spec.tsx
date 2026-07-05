@@ -24,8 +24,14 @@ vi.mock('@/app/components/forms/bio-media-palettes', () => ({
 
 // next/dynamic resolves this lazily; mock the underlying module so the
 // dynamic wrapper gets the stub regardless of pool.
+// Expose onUploadImage presence via a data attribute so tests can assert prop pass-through.
 vi.mock('@/app/components/ui/rich-text-editor', () => ({
-  RichTextEditor: () => <div data-testid="rich-text-editor-stub" />,
+  RichTextEditor: ({ onUploadImage }: { onUploadImage?: (...args: unknown[]) => unknown }) => (
+    <div
+      data-testid="rich-text-editor-stub"
+      data-has-upload-handler={onUploadImage != null ? 'true' : 'false'}
+    />
+  ),
 }));
 
 // FormLabel/FormControl call useFormField() which requires a live FormProvider
@@ -80,5 +86,26 @@ describe('ArtistBioSection', () => {
     render(<ArtistBioSection {...editModeProps} isEditMode={false} artistId={null} />);
 
     expect(screen.getByTestId('bio-editors-column')).toBeInTheDocument();
+  });
+
+  it('passes onUploadImage to each RichTextEditor when provided', () => {
+    const handler = vi.fn();
+    render(<ArtistBioSection {...editModeProps} onUploadImage={handler} />);
+
+    const editors = screen.getAllByTestId('rich-text-editor-stub');
+    expect(editors).toHaveLength(3);
+    for (const editor of editors) {
+      expect(editor).toHaveAttribute('data-has-upload-handler', 'true');
+    }
+  });
+
+  it('passes no onUploadImage to RichTextEditors when not provided', () => {
+    render(<ArtistBioSection {...editModeProps} />);
+
+    const editors = screen.getAllByTestId('rich-text-editor-stub');
+    expect(editors).toHaveLength(3);
+    for (const editor of editors) {
+      expect(editor).toHaveAttribute('data-has-upload-handler', 'false');
+    }
   });
 });

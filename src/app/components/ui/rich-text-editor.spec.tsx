@@ -129,6 +129,25 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('button', { name: 'Insert image' })).toBeEnabled();
   });
 
+  it('enables the insert-image button when an upload handler is provided with no images', async () => {
+    const Controlled = () => {
+      const [value, setValue] = useState('<p>Body</p>');
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={setValue}
+          images={[]}
+          onUploadImage={vi.fn(async () => null)}
+          ariaLabel="Bio"
+        />
+      );
+    };
+    render(<Controlled />);
+    await waitForEditor();
+
+    expect(screen.getByRole('button', { name: 'Insert image' })).toBeEnabled();
+  });
+
   it('opens the link dialog from the toolbar', async () => {
     render(<Harness />);
     await waitForEditor();

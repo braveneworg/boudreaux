@@ -327,7 +327,7 @@ export const featuredArtistSchema = z.object({
       firstName: z.string(),
       surname: z.string(),
       slug: z.string(),
-      images: z.array(z.object({ src: nullableString })),
+      bioImages: z.array(z.object({ url: z.string() })),
     })
   ),
   digitalFormat: digitalFormatWithFilesSchema.nullable(),
