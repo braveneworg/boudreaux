@@ -1058,6 +1058,147 @@ describe('BioGenerationService.getGenerationStatus', () => {
   });
 });
 
+describe('BioGenerationService.verifyAndClaimCallback', () => {
+  const claimState = (overrides: Record<string, unknown> = {}) => ({
+    bioStatus: 'processing',
+    bioError: null,
+    bioStartedAt: null,
+    bioJobToken: 'stored-token',
+    bioGeneratedAt: null,
+    slug: 'radiohead',
+    shortBio: null,
+    bio: null,
+    altBio: null,
+    genres: null,
+    bioModel: null,
+    bioImages: [],
+    bioLinks: [],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    getBioGenerationStateMock.mockReset();
+    setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('returns the slug when the token matches', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
+
+    const result = await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
+
+    expect(result).toEqual({ slug: 'radiohead' });
+  });
+
+  it('clears the token (single-use) on a successful claim', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
+
+    await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token');
+
+    expect(setBioJobTokenMock).toHaveBeenCalledWith('a1', null);
+  });
+
+  it('returns null when the artist has no state', async () => {
+    getBioGenerationStateMock.mockResolvedValue(null);
+
+    expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
+  });
+
+  it('returns null when the status is not processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioStatus: 'succeeded' }));
+
+    expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
+  });
+
+  it('returns null when there is no stored token', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: null }));
+
+    expect(await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token')).toBeNull();
+  });
+
+  it('returns null when an equal-length token does not match', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'aaaaaaaaaaaa' }));
+
+    expect(await BioGenerationService.verifyAndClaimCallback('a1', 'bbbbbbbbbbbb')).toBeNull();
+  });
+
+  it('does NOT clear the stored token on a mismatched (forged) callback', async () => {
+    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
+
+    await BioGenerationService.verifyAndClaimCallback('a1', 'forged');
+
+    expect(setBioJobTokenMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('BioGenerationService.completeCallback', () => {
+  const okData: BioGenerationData = {
+    shortBio: 's',
+    longBio: '<p>l</p>',
+    altBio: '<p>a</p>',
+    genres: 'rock',
+    images: [],
+    links: [],
+    model: 'gemini-2.5-pro',
+  };
+
+  beforeEach(() => {
+    setBioStatusMock.mockReset().mockResolvedValue(undefined);
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
+    rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
+  });
+
+  it('persists the bio on an ok result', async () => {
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+
+    expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('flips to succeeded on an ok result', async () => {
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+
+    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
+  });
+
+  it('does not persist on a non-ok result', async () => {
+    await BioGenerationService.completeCallback('a1', { ok: false, error: 'lambda blew up' });
+
+    expect(replaceBioContentMock).not.toHaveBeenCalled();
+  });
+
+  it('flips to failed with the error on a non-ok result', async () => {
+    await BioGenerationService.completeCallback('a1', { ok: false, error: 'lambda blew up' });
+
+    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'lambda blew up' });
+  });
+
+  it('flips to failed when persistence throws', async () => {
+    replaceBioContentMock.mockRejectedValue(new Error('DB down'));
+
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+
+    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'DB down' });
+  });
+
+  it('uses a fallback message when persistence throws a non-Error', async () => {
+    replaceBioContentMock.mockRejectedValue('boom');
+
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+
+    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', {
+      error: 'Bio persistence failed.',
+    });
+  });
+
+  it('falls back to empty releases when the catalog lookup fails', async () => {
+    findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('mongo down'));
+
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+
+    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
+  });
+});
+
 describe('INVOKE_REQUEST_TIMEOUT_MS', () => {
   it('is a short dispatch timeout — the Event invoke returns 202 immediately', async () => {
     const { INVOKE_REQUEST_TIMEOUT_MS } = await import('./bio-generation-service');

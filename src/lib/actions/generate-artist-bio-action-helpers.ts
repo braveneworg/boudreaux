@@ -36,6 +36,21 @@ export const resolveInFlightBioStatus = (
   return null;
 };
 
+/**
+ * Revalidate the four Next.js cache paths a bio change affects: the admin and
+ * public artist lists, plus the artist's detail and bio pages. Shared by the
+ * synchronous fake path here and the async Lambda callback route (Task B7/B8),
+ * so both completion paths invalidate the same set of pages.
+ *
+ * @param slug - The artist slug whose detail/bio pages should be revalidated.
+ */
+export const revalidateArtistBioPaths = (slug: string): void => {
+  revalidatePath('/admin/artists');
+  revalidatePath('/artists');
+  revalidatePath(`/artists/${slug}`);
+  revalidatePath(`/artists/${slug}/bio`);
+};
+
 interface RunBioGenerationParams {
   artistId: string;
   userId: string;
@@ -76,8 +91,5 @@ export const runBioGenerationAfterResponse = async ({
     },
   });
 
-  revalidatePath('/admin/artists');
-  revalidatePath('/artists');
-  revalidatePath(`/artists/${outcome.slug}`);
-  revalidatePath(`/artists/${outcome.slug}/bio`);
+  revalidateArtistBioPaths(outcome.slug);
 };

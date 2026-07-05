@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { timingSafeEqual } from 'node:crypto';
+
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 
@@ -20,6 +22,7 @@ import {
 } from '@/lib/utils/sanitize-bio-html';
 import {
   type BioGenerationData,
+  type BioGenerationResult,
   type BioGenerationStatusResult,
   type BioStatus,
   type GeneratedBioContent,
@@ -491,6 +494,17 @@ const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJo
 };
 
 /**
+ * Constant-time comparison of two token strings. Compares equal-length `Buffer`s
+ * via {@link timingSafeEqual}; the length pre-check leaks nothing meaningful
+ * because the job token is a fixed-length random UUID.
+ */
+const tokensMatch = (a: string, b: string): boolean => {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+};
+
+/**
  * Service boundary for AI bio generation. Owns the full business flow: read the
  * artist, invoke the `bio-generator` Lambda, sanitize the result, and persist
  * it through the repository. The low-level {@link BioGenerationService.generate}
@@ -605,5 +619,61 @@ export class BioGenerationService {
     const content = BioGenerationService.buildBioContent(state, status);
 
     return { status, error: state.bioError ?? null, content };
+  }
+
+  /**
+   * Verifies an async completion callback and atomically claims the job so it can
+   * only be completed once. Returns the artist slug (for revalidation) and clears
+   * the single-use token ONLY when the job is `processing` and the stored token
+   * constant-time-matches the callback's token. Returns `null` — without clearing
+   * the token — when the artist is missing, the job is not in flight, no token is
+   * stored, or the token mismatches (so a forged callback cannot DoS a real one).
+   *
+   * @param artistId - The artist whose in-flight job the callback targets.
+   * @param jobToken - The per-job token the callback presents.
+   */
+  static async verifyAndClaimCallback(
+    artistId: string,
+    jobToken: string
+  ): Promise<{ slug: string } | null> {
+    const state = await ArtistRepository.getBioGenerationState(artistId);
+    if (!state || state.bioStatus !== 'processing' || !state.bioJobToken) {
+      return null;
+    }
+    if (!tokensMatch(state.bioJobToken, jobToken)) {
+      return null; // do NOT clear a valid token on a mismatched/forged callback
+    }
+    await ArtistRepository.setBioJobToken(artistId, null); // single-use
+    return { slug: state.slug };
+  }
+
+  /**
+   * Completes a claimed async job by persisting the Lambda's result and recording
+   * the terminal status. A non-ok result flips the artist to `failed` with the
+   * Lambda's error. An ok result re-fetches the artist's published releases
+   * (non-fatal on failure), persists the sanitized/re-hosted bio, and flips to
+   * `succeeded`; a persistence failure flips to `failed` instead. Never throws —
+   * it runs post-response via `after()`.
+   *
+   * @param artistId - The artist whose job is completing.
+   * @param result - The Lambda's validated generation result.
+   */
+  static async completeCallback(artistId: string, result: BioGenerationResult): Promise<void> {
+    if (!result.ok) {
+      await ArtistRepository.setBioStatus(artistId, 'failed', { error: result.error });
+      return;
+    }
+
+    const releases = await ReleaseRepository.findPublishedByArtistWithCovers(artistId).catch(
+      () => [] as ReleaseCoverSource[]
+    );
+
+    try {
+      await persistGeneratedBio(artistId, result.data, releases);
+      await ArtistRepository.setBioStatus(artistId, 'succeeded', { error: null });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Bio persistence failed.';
+      await ArtistRepository.setBioStatus(artistId, 'failed', { error: message });
+    }
   }
 }

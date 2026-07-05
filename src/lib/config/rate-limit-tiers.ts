@@ -46,3 +46,14 @@ export const clientErrorLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const CLIENT_ERROR_LIMIT = 5;
+
+/**
+ * Bio-generation completion callback (server-to-server) — 20 requests per minute.
+ * One legitimate POST per dispatched job; the modest cap absorbs Lambda retries
+ * while blunting a flood of forged completion callbacks.
+ */
+export const bioCallbackLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const BIO_CALLBACK_LIMIT = 20;
