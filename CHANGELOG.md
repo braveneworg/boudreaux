@@ -92,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.183.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ async bio generation + bounded discovery (#561)\n- feat: ✨ async bio generation + bounded discovery (#561)\n
+
 ## [4.182.0] - 2026-07-05
 
 ### Added
