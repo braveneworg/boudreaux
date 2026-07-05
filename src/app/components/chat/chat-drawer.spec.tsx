@@ -34,10 +34,35 @@ describe('ChatDrawer', () => {
     expect(screen.getByTestId('chat-body')).toBeInTheDocument();
   });
 
+  it('frames the heading wordmark with the zine sketch strokes, matching site headings', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    const title = document.querySelector('[data-slot="drawer-title"]');
+    expect(title?.querySelectorAll('[data-slot="zine-sketch-stroke"]')).toHaveLength(2);
+  });
+
+  it('renders the heading wordmark at the shared strip scale', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    expect(screen.getByRole('img', { name: /live chat/i })).toHaveClass('sm:h-14');
+  });
+
   it('renders a close button with an accessible label', () => {
     useIsMobileMock.mockReturnValue(false);
     renderDrawer();
     expect(screen.getByRole('button', { name: /close chat/i })).toBeInTheDocument();
+  });
+
+  it('lowers the close trigger on desktop so it is not clipped at the viewport top', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    expect(screen.getByRole('button', { name: /close chat/i })).toHaveClass(
+      'md:top-1/2',
+      'md:-translate-y-1/2'
+    );
   });
 
   it('fires onOpenChange(false) when the close button is clicked', () => {

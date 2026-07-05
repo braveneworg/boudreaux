@@ -86,6 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.177.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ zine live-chat drawer heading (#556)\n- feat: ✨ zine live-chat drawer heading (#556)\n
+
 ## [4.176.0] - 2026-07-04
 
 ### Added
