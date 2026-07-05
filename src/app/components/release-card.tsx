@@ -4,11 +4,10 @@
 
 /**
  * ReleaseCard component for the public releases listing page.
- * Displays a release's cover art (with fallback), artist name, title,
- * Bandcamp link (if available), and a "Play" button linking to the
+ * Displays a release's cover art (click to enlarge with details), artist name,
+ * title, Bandcamp link (if available), and a "Play" button linking to the
  * in-app media player at `/releases/{releaseId}`.
  */
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { Music2 } from 'lucide-react';
@@ -16,6 +15,7 @@ import { Music2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { DeferredDownloadDialog } from './deferred-download-dialog';
+import { ReleaseCoverModal } from './release-cover-modal';
 
 interface ReleaseCardProps {
   /** Unique release identifier */
@@ -26,41 +26,35 @@ interface ReleaseCardProps {
   artistName: string | null;
   /** Cover art source and alt text, or null for styled placeholder */
   coverArt: { src: string; alt: string } | null;
+  /** Release date, shown in the cover preview dialog */
+  releasedOn: Date;
   /** Bandcamp URL for external purchase link, or null */
   bandcampUrl: string | null;
 }
 
 /**
  * A card displaying a single release with cover art, artist name, title,
- * and action links (Bandcamp + in-app player).
+ * and action links (Bandcamp + in-app player). On desktop the whole card
+ * scales up slightly on hover.
  */
-export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: ReleaseCardProps) => {
+export const ReleaseCard = ({
+  id,
+  title,
+  artistName,
+  coverArt,
+  releasedOn,
+  bandcampUrl,
+}: ReleaseCardProps) => {
   return (
-    <div className="group shadow-zine-sm flex flex-col gap-2 border-2 border-black bg-white p-3">
-      {/* Cover Art */}
-      <div className="relative aspect-square w-full overflow-hidden border-2 border-black bg-zinc-100">
-        {coverArt ? (
-          <Image
-            src={coverArt.src}
-            alt={coverArt.alt}
-            fill
-            loading="lazy"
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-        ) : (
-          <div
-            data-testid="cover-art-placeholder"
-            className={cn(
-              'flex h-full w-full flex-col items-center justify-center',
-              'bg-zinc-800 p-4 text-center text-white'
-            )}
-          >
-            <span className="text-sm font-medium">{title}</span>
-            {artistName && <span className="text-xs text-zinc-400">{artistName}</span>}
-          </div>
-        )}
-      </div>
+    <div className="shadow-zine-sm relative flex flex-col gap-2 border-2 border-black bg-white p-3 transition-transform duration-200 md:hover:z-10 md:hover:scale-[1.03]">
+      {/* Cover Art — click to enlarge with release info + detail link */}
+      <ReleaseCoverModal
+        id={id}
+        title={title}
+        artistName={artistName}
+        coverArt={coverArt}
+        releasedOn={releasedOn}
+      />
 
       {/* Info */}
       <div className="flex flex-col gap-0.5">

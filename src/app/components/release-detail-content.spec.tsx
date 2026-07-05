@@ -32,8 +32,8 @@ vi.mock('./artist-releases-carousel', () => ({
   ArtistReleasesCarousel: () => <div data-testid="artist-releases-carousel" />,
 }));
 
-vi.mock('./release-description', () => ({
-  ReleaseDescription: () => <div data-testid="release-description" />,
+vi.mock('./release-notes', () => ({
+  ReleaseNotes: () => <div data-testid="release-notes" />,
 }));
 
 vi.mock('./release-player', () => ({
@@ -97,7 +97,7 @@ describe('ReleaseDetailContent', () => {
     expect(panel).toHaveClass('zine-accent-cyan');
     expect(panel).toContainElement(screen.getByTestId('artist-releases-carousel'));
     expect(panel).toContainElement(screen.getByTestId('release-player'));
-    expect(panel).toContainElement(screen.getByTestId('release-description'));
+    expect(panel).toContainElement(screen.getByTestId('release-notes'));
   });
 
   it('should render the detail panel without a tape strip', () => {
