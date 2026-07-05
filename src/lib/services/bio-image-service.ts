@@ -10,6 +10,12 @@ import mime from 'mime';
 import sharp from 'sharp';
 
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import {
+  assessImageQuality,
+  hammingDistance,
+  isBelowQualityFloor,
+  NEAR_DUPLICATE_MAX_DISTANCE,
+} from '@/lib/utils/image-quality';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
@@ -206,6 +212,8 @@ export class BioImageService {
     // lowest-index copy of each distinct hash always survives the dedupe.
     // seenHashes maps content-hash → survivor CDN URL for alias look-ups.
     const seenHashes = new Map<string, string>();
+    // Survivor dHashes paired with their CDN url, for perceptual near-dup checks.
+    const seenPerceptualHashes: Array<{ hash: bigint; url: string }> = [];
     const results: Array<RehostedImage | null> = [];
     const duplicateAliases = new Map<number, string>();
 
@@ -235,8 +243,32 @@ export class BioImageService {
           continue;
         }
 
+        const assessment = await assessImageQuality(buffer);
+
+        if (isBelowQualityFloor(assessment)) {
+          logger.warn('bio_image_low_quality_skipped', {
+            index: image.index,
+            width: assessment.width,
+            height: assessment.height,
+            sharpness: assessment.sharpness,
+          });
+          results.push(null);
+          continue;
+        }
+
+        const nearDuplicate = seenPerceptualHashes.find(
+          (seen) => hammingDistance(seen.hash, assessment.dHash) <= NEAR_DUPLICATE_MAX_DISTANCE
+        );
+        if (nearDuplicate !== undefined) {
+          logger.warn('bio_image_near_duplicate_skipped', { index: image.index });
+          duplicateAliases.set(image.index, nearDuplicate.url);
+          results.push(null);
+          continue;
+        }
+
         const rehosted = await processThumbnail(buffer, artistId, image.index);
         seenHashes.set(hash, rehosted.url);
+        seenPerceptualHashes.push({ hash: assessment.dHash, url: rehosted.url });
         results.push(rehosted);
       } catch (error) {
         logger.warn('Bio image fetch or upload failed', { error });
