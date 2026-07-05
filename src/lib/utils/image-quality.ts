@@ -50,3 +50,81 @@ export const perceptualDHash = async (buffer: Buffer): Promise<bigint> => {
   }
   return hash;
 };
+
+/**
+ * Minimum width AND height (px) an image must have to survive the gate. Below
+ * this it is too small to render acceptably in a bio and is dropped. Tunable.
+ */
+export const MIN_IMAGE_DIMENSION = 200;
+
+/**
+ * Minimum Laplacian-response variance an image must have to survive the gate.
+ * Blurry / out-of-focus images produce weak edges and a low variance; sharp
+ * images produce a high one. Conservative initial floor — raise it if blurry
+ * images slip through, lower it if crisp images are dropped. Tunable.
+ */
+export const MIN_SHARPNESS_VARIANCE = 60;
+
+/** 3x3 discrete Laplacian kernel; convolving with it isolates edge energy. */
+const LAPLACIAN_KERNEL = { width: 3, height: 3, kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0] };
+
+export interface ImageQualityAssessment {
+  width: number;
+  height: number;
+  sharpness: number;
+  dHash: bigint;
+}
+
+/**
+ * Score an image's sharpness as the variance of its Laplacian response over a
+ * greyscale copy. A low score indicates a blurry / out-of-focus image.
+ */
+export const laplacianVarianceSharpness = async (buffer: Buffer): Promise<number> => {
+  const { data } = await sharp(buffer)
+    .greyscale()
+    .convolve(LAPLACIAN_KERNEL)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  if (data.length === 0) {
+    return 0;
+  }
+
+  let sum = 0;
+  for (const value of data) {
+    sum += value;
+  }
+  const mean = sum / data.length;
+
+  let squaredError = 0;
+  for (const value of data) {
+    squaredError += (value - mean) ** 2;
+  }
+  return squaredError / data.length;
+};
+
+/** Decode `buffer` to produce a full quality assessment. */
+export const assessImageQuality = async (buffer: Buffer): Promise<ImageQualityAssessment> => {
+  const metadata = await sharp(buffer).metadata();
+  const [sharpness, dHash] = await Promise.all([
+    laplacianVarianceSharpness(buffer),
+    perceptualDHash(buffer),
+  ]);
+  return {
+    width: metadata.width ?? 0,
+    height: metadata.height ?? 0,
+    sharpness,
+    dHash,
+  };
+};
+
+/**
+ * True when an image fails the absolute quality floor (too small OR too blurry)
+ * and must be dropped regardless of duplicates.
+ */
+export const isBelowQualityFloor = ({
+  width,
+  height,
+  sharpness,
+}: ImageQualityAssessment): boolean =>
+  Math.min(width, height) < MIN_IMAGE_DIMENSION || sharpness < MIN_SHARPNESS_VARIANCE;

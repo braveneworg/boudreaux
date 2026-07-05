@@ -3,7 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import sharp from 'sharp';
 
-import { hammingDistance, perceptualDHash, NEAR_DUPLICATE_MAX_DISTANCE } from './image-quality';
+import {
+  hammingDistance,
+  perceptualDHash,
+  NEAR_DUPLICATE_MAX_DISTANCE,
+  laplacianVarianceSharpness,
+  assessImageQuality,
+  isBelowQualityFloor,
+  MIN_IMAGE_DIMENSION,
+  MIN_SHARPNESS_VARIANCE,
+} from './image-quality';
 
 vi.mock('server-only', () => ({}));
 
@@ -74,5 +83,87 @@ describe('perceptualDHash', () => {
     );
 
     expect(distance).toBeGreaterThan(NEAR_DUPLICATE_MAX_DISTANCE);
+  });
+});
+
+describe('laplacianVarianceSharpness', () => {
+  it('scores a high-contrast checkerboard far above a flat image', async () => {
+    const checkerboard = await makeImage(120, 96, (x, y) => {
+      const on = (Math.floor(x / 4) + Math.floor(y / 4)) % 2 === 0;
+      const v = on ? 255 : 0;
+      return [v, v, v];
+    });
+    const flat = await makeImage(120, 96, () => [128, 128, 128]);
+
+    const sharpScore = await laplacianVarianceSharpness(checkerboard);
+    const flatScore = await laplacianVarianceSharpness(flat);
+
+    expect(sharpScore).toBeGreaterThan(flatScore);
+  });
+
+  it('scores a flat image below the sharpness floor', async () => {
+    const flat = await makeImage(120, 96, () => [128, 128, 128]);
+    expect(await laplacianVarianceSharpness(flat)).toBeLessThan(MIN_SHARPNESS_VARIANCE);
+  });
+
+  it('scores a crisp checkerboard above the sharpness floor', async () => {
+    const checkerboard = await makeImage(120, 96, (x, y) => {
+      const on = (Math.floor(x / 4) + Math.floor(y / 4)) % 2 === 0;
+      const v = on ? 255 : 0;
+      return [v, v, v];
+    });
+    expect(await laplacianVarianceSharpness(checkerboard)).toBeGreaterThan(MIN_SHARPNESS_VARIANCE);
+  });
+});
+
+describe('assessImageQuality', () => {
+  it('reports the original dimensions and populated metrics', async () => {
+    const image = await makeImage(240, 180, (x, y) => {
+      const on = (Math.floor(x / 4) + Math.floor(y / 4)) % 2 === 0;
+      const v = on ? 255 : 0;
+      return [v, v, v];
+    });
+
+    const assessment = await assessImageQuality(image);
+
+    expect(assessment.width).toBe(240);
+    expect(assessment.height).toBe(180);
+    expect(assessment.sharpness).toBeGreaterThan(0);
+    expect(typeof assessment.dHash).toBe('bigint');
+  });
+});
+
+describe('isBelowQualityFloor', () => {
+  it('rejects an image below the minimum dimension', () => {
+    expect(
+      isBelowQualityFloor({
+        width: MIN_IMAGE_DIMENSION - 1,
+        height: 400,
+        sharpness: 500,
+        dHash: 0n,
+      })
+    ).toBe(true);
+  });
+
+  it('rejects an image below the sharpness floor', () => {
+    expect(
+      isBelowQualityFloor({
+        width: 400,
+        height: 400,
+        sharpness: MIN_SHARPNESS_VARIANCE - 1,
+        dHash: 0n,
+      })
+    ).toBe(true);
+  });
+
+  it('passes an image that clears both floors', () => {
+    expect(
+      isBelowQualityFloor({
+        width: 400,
+        height: 400,
+        sharpness: MIN_SHARPNESS_VARIANCE + 1,
+        dHash: 0n,
+      })
+    ).toBe(false);
   });
 });
