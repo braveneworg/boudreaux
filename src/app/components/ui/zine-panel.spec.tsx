@@ -96,6 +96,30 @@ describe('ZinePanel', () => {
     expect(crumbs).not.toHaveClass('left-5');
   });
 
+  it('tightens the top padding so the breadcrumb trail sits snug to the panel top', () => {
+    render(
+      <ZinePanel
+        accent="yellow"
+        breadcrumbs={[{ anchorText: 'Releases', url: '/releases', isActive: true }]}
+      >
+        Panel body
+      </ZinePanel>
+    );
+
+    // Only the top inset shrinks; horizontal/bottom padding is untouched.
+    const content = screen.getByText('Panel body');
+    expect(content).toHaveClass('pt-3', 'sm:pt-4');
+    expect(content).not.toHaveClass('pt-4');
+  });
+
+  it('keeps the default top padding when no breadcrumb trail is present', () => {
+    render(<ZinePanel accent="yellow">Panel body</ZinePanel>);
+
+    const content = screen.getByText('Panel body');
+    expect(content).toHaveClass('pt-4');
+    expect(content).not.toHaveClass('pt-3');
+  });
+
   it('renders children inside the inner content div', () => {
     const { container } = render(<ZinePanel accent="yellow">Panel body</ZinePanel>);
     const content = screen.getByText('Panel body');

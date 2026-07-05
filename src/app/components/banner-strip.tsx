@@ -47,7 +47,7 @@ export const BannerStrip = ({ banners, rotationInterval }: BannerStripProps) => 
     <section
       aria-label="Banners"
       data-testid="banner-strip"
-      className="zine-accent-yellow shadow-zine-sm mx-auto mt-1.5 hidden w-full max-w-7xl border-2 border-black md:block"
+      className="zine-accent-yellow shadow-zine-sm mx-auto mt-4 hidden w-full max-w-7xl border-2 border-black md:block"
     >
       {/* Desktop notifications sit above the stitched image band, rotating on
           their own timer since the desktop banners don't slide. */}
