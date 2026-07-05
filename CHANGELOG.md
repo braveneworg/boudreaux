@@ -89,6 +89,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.180.0] - 2026-07-05
+
+### Added
+
+- feat: ✨ bio-image upload dialog + attribution editing + cutover (1b) (#558)\n- feat: ✨ bio-image upload dialog + attribution editing + cutover (1b) (#558)\n
+
 ## [4.179.0] - 2026-07-05
 
 ### Added
