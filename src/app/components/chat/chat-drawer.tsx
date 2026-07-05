@@ -45,7 +45,7 @@ export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) =>
           'data-[vaul-drawer-direction=right]:max-w-100!'
         )}
       >
-        <header className="bg-background sticky top-0 z-10 flex items-center justify-center border-b">
+        <header className="bg-background sticky top-0 z-10 flex items-center justify-center border-b py-4">
           <DrawerTitle>
             {/* ImageHeading's zine treatment, inlined: DrawerTitle must be the
                 heading element, so we can't nest ImageHeading's own <h*> inside. */}
