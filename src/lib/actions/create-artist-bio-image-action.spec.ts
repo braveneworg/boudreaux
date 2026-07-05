@@ -15,6 +15,7 @@ vi.mock('@/lib/services/artist-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/require-role');
 vi.mock('@/lib/utils/logger', () => ({ loggers: { s3: { error: vi.fn() } } }));
+vi.mock('@/lib/utils/sanitize-bio-html', () => ({ sanitizeBioText: (s: string) => `clean:${s}` }));
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const artistId = '507f1f77bcf86cd799439011';
@@ -58,8 +59,42 @@ describe('createArtistBioImageAction', () => {
   it('creates the bio image via the service and returns it', async () => {
     const result = await createArtistBioImageAction(validInput);
 
-    expect(ArtistService.createBioImage).toHaveBeenCalledWith(validInput);
+    expect(ArtistService.createBioImage).toHaveBeenCalledWith({
+      ...validInput,
+      attribution: 'clean:Uploaded',
+    });
     expect(result).toEqual({ success: true, data: createdRow });
+  });
+
+  it('sanitizes attribution, title, and alt before creating', async () => {
+    const htmlInput = {
+      artistId,
+      url: 'https://cdn.example/x.webp',
+      attribution: 'Photo <b>x</b>',
+      title: 'Title <script>evil</script>',
+      alt: 'Alt <i>text</i>',
+    };
+    vi.mocked(ArtistService.createBioImage).mockResolvedValue({ ...createdRow } as never);
+
+    await createArtistBioImageAction(htmlInput);
+
+    expect(ArtistService.createBioImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attribution: 'clean:Photo <b>x</b>',
+        title: 'clean:Title <script>evil</script>',
+        alt: 'clean:Alt <i>text</i>',
+      })
+    );
+  });
+
+  it('passes null title and alt through without sanitizing', async () => {
+    const nullInput = { ...validInput, title: null as null, alt: null as null };
+
+    await createArtistBioImageAction(nullInput);
+
+    expect(ArtistService.createBioImage).toHaveBeenCalledWith(
+      expect.objectContaining({ title: null, alt: null })
+    );
   });
 
   it('logs a security event on success', async () => {
