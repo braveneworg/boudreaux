@@ -193,6 +193,24 @@ describe('runBioGeneration', () => {
     });
   });
 
+  it('issues targeted bandcamp, discogs, and press-photo image search queries', async () => {
+    const searchArtistSources = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({ searchArtistSources });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchArtistSources).toHaveBeenCalledTimes(6);
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead press photo live performance',
+    });
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead musician site:bandcamp.com',
+    });
+    expect(searchArtistSources).toHaveBeenCalledWith('Radiohead', null, undefined, {
+      query: 'Radiohead musician site:discogs.com',
+    });
+  });
+
   it('uses web search content as grounding when found', async () => {
     const searchArtistSources = vi
       .fn()

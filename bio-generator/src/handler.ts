@@ -286,8 +286,9 @@ const applyMatch = async (
  * Web search (Jina) as additional grounding *context*, not just a fallback:
  * always gathered and MERGED with any Wikipedia/official-site material so both
  * the extensive long bio and the informed short bio draw on the fullest
- * possible material. Runs three searches (biography + two press queries) and
- * merges results. Optional + best-effort (never throws).
+ * possible material. Runs six searches (biography + press queries + targeted
+ * press-photo/bandcamp/discogs image queries) and merges results. Optional +
+ * best-effort (never throws).
  */
 const applyWebSearch = async (
   acc: MetadataAccumulator,
@@ -300,6 +301,9 @@ const applyWebSearch = async (
     undefined,
     `${artist} musician interview review press`,
     `${artist} music press feature profile`,
+    `${artist} press photo live performance`,
+    `${artist} musician site:bandcamp.com`,
+    `${artist} musician site:discogs.com`,
   ];
 
   for (const query of queries) {
