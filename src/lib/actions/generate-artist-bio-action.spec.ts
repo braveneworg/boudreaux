@@ -73,7 +73,7 @@ beforeEach(() => {
   // Default: artist exists, never generated.
   getBioGenerationStateMock.mockResolvedValue({ bioStatus: null, bioStartedAt: null });
   setBioStatusMock.mockResolvedValue(undefined);
-  runGenerationJobMock.mockResolvedValue({ success: true, data: content, slug: 'radiohead' });
+  runGenerationJobMock.mockResolvedValue({ status: 'completed', data: content, slug: 'radiohead' });
 });
 
 describe('generateArtistBioAction', () => {
@@ -158,7 +158,7 @@ describe('generateArtistBioAction', () => {
   });
 
   it('does not audit or revalidate when the background job fails', async () => {
-    runGenerationJobMock.mockResolvedValue({ success: false, error: 'boom' });
+    runGenerationJobMock.mockResolvedValue({ status: 'failed', error: 'boom' });
 
     await generateArtistBioAction({ artistId: VALID_ID });
     await afterCallback?.();

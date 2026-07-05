@@ -46,11 +46,12 @@ interface RunBioGenerationParams {
 /**
  * The heavy read → generate → re-host → persist flow for an artist bio, run via
  * `after()` once the action response has been sent. `runGenerationJob` records
- * its own succeeded/failed status and never throws, so on success this only
- * audit-logs and revalidates the public artist pages; on failure it no-ops.
+ * its own succeeded/failed status and never throws.
  *
- * Extracted verbatim from the prior inline `after()` callback to keep the
- * action's own branching small.
+ * Only the synchronous fake/E2E path (`completed`) finishes in-process, so it is
+ * the only outcome that audit-logs and revalidates here; the real async path
+ * (`dispatched`) is finished — and revalidated — by the Lambda callback route
+ * (Task B8 relocates the audit/revalidate there). `failed` no-ops.
  */
 export const runBioGenerationAfterResponse = async ({
   artistId,
@@ -58,8 +59,8 @@ export const runBioGenerationAfterResponse = async ({
   links,
   description,
 }: RunBioGenerationParams): Promise<void> => {
-  const result = await BioGenerationService.runGenerationJob(artistId, { links, description });
-  if (!result.success) {
+  const outcome = await BioGenerationService.runGenerationJob(artistId, { links, description });
+  if (outcome.status !== 'completed') {
     return;
   }
 
@@ -69,14 +70,14 @@ export const runBioGenerationAfterResponse = async ({
     metadata: {
       artistId,
       action: 'bio-generated',
-      model: result.data.model,
-      imageCount: result.data.images.length,
-      linkCount: result.data.links.length,
+      model: outcome.data.model,
+      imageCount: outcome.data.images.length,
+      linkCount: outcome.data.links.length,
     },
   });
 
   revalidatePath('/admin/artists');
   revalidatePath('/artists');
-  revalidatePath(`/artists/${result.slug}`);
-  revalidatePath(`/artists/${result.slug}/bio`);
+  revalidatePath(`/artists/${outcome.slug}`);
+  revalidatePath(`/artists/${outcome.slug}/bio`);
 };
