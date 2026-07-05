@@ -9,6 +9,7 @@ import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/
 import {
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
+  useUpdateBioImageAttributionMutation,
 } from '@/app/hooks/mutations/use-bio-media-mutations';
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
@@ -37,6 +38,8 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   const status = useArtistBioGenerationStatusQuery(artistId);
   const { deleteBioLink, isDeletingBioLink } = useDeleteBioLinkMutation(artistId);
   const { deleteBioImage, isDeletingBioImage } = useDeleteBioImageMutation(artistId);
+  const { updateBioImageAttribution, isUpdatingBioImageAttribution } =
+    useUpdateBioImageAttributionMutation(artistId);
   const registry = useBioEditorRegistry();
 
   const content = status.data?.content ?? null;
@@ -44,7 +47,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
     return null;
   }
 
-  const isDeleting = isDeletingBioLink || isDeletingBioImage;
+  const isDeleting = isDeletingBioLink || isDeletingBioImage || isUpdatingBioImageAttribution;
 
   const insertLink = (link: BioStatusLink): void => {
     const target = registry.getTarget();
@@ -98,6 +101,9 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
           images={content.images}
           onDelete={deleteBioImage}
           onInsert={insertImage}
+          onEditAttribution={(id, value) =>
+            updateBioImageAttribution({ imageId: id, attribution: value })
+          }
           disabled={isDeleting}
         />
       )}
