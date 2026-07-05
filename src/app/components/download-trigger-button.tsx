@@ -28,7 +28,7 @@ export const DownloadTriggerButton = ({
       onClick?.(e);
     }}
     className={cn(
-      'focus-visible:ring-ring focus-visible:ring-offset-background flex items-center gap-1.5 border border-white bg-zinc-900 px-2 py-1 font-semibold text-white opacity-90 transition-opacity focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+      'focus-visible:ring-ring focus-visible:ring-offset-background flex items-center gap-1.5 border border-white bg-zinc-50 px-2 py-1 font-semibold text-zinc-950 opacity-90 transition-opacity focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
       className
     )}
     aria-label="Download music"
