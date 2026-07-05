@@ -502,8 +502,9 @@ const seedTestDatabase = async () => {
     // (createdAt desc) — the bio-generation spec regenerates the FIRST listed
     // artist, which must never be this one (regeneration replaces the palette
     // rows). Left unpublished so public artist pages are untouched. The
-    // uploaded Image row feeds the bio editors' insert-image picker; the
-    // ArtistBioImage thumbnail is a data URL so the palette thumb (rendered
+    // ArtistBioImage row feeds both the discovered-images palette and the bio
+    // editors' insert-image picker library (the picker sources bioImages after
+    // the cutover); its thumbnail is a data URL so the palette thumb (rendered
     // `unoptimized`) always loads.
     await prisma.artist.create({
       data: {
@@ -522,15 +523,6 @@ const seedTestDatabase = async () => {
           '<p>Seeded bio with an ' +
           '<a href="https://en.wikipedia.org/wiki/Music">E2E bubble link</a>' +
           ' for the bubble menu spec.</p>',
-        images: {
-          create: [
-            {
-              src: 'https://cdn.fakefourrecords.com/media/artists/e2e-bio-palette/photo.jpg',
-              altText: 'E2E palette photo',
-              sortOrder: 0,
-            },
-          ],
-        },
         bioImages: {
           create: [
             {
