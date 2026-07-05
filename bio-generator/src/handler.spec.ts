@@ -84,6 +84,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   getCoverArtImages: vi.fn().mockResolvedValue([]),
   getCommonsCategoryImages: vi.fn().mockResolvedValue([]),
   verifyScrapedImages: vi.fn().mockResolvedValue([]),
+  postCallback: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
@@ -1016,6 +1017,36 @@ describe('lambdaHandler', () => {
 
     expect(result.ok).toBe(false);
     vi.unstubAllGlobals();
+  });
+
+  it('posts the result to the callback when callbackUrl and jobToken are present', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      deps
+    );
+
+    expect(postCallback).toHaveBeenCalledWith({
+      url: 'https://app.example/cb',
+      jobToken: 'tok-1',
+      result: { ok: true, data: expect.objectContaining({ shortBio: 'Short teaser.' }) },
+    });
+  });
+
+  it('does not post a callback when no callbackUrl is present', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await lambdaHandler({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(postCallback).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { getCoverArtImages } from './caa.js';
+import { postBioCallback } from './callback.js';
 import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
@@ -17,6 +18,7 @@ import { getWikidataData } from './wikidata.js';
 import { getCommonsCategoryImages, getCommonsImage } from './wikimedia.js';
 import { getWikipediaExtract } from './wikipedia.js';
 
+import type { BioCallbackPayload } from './callback.js';
 import type { ScrapedImage } from './jina.js';
 import type { ReleaseGroupSummary } from './musicbrainz.js';
 import type {
@@ -47,6 +49,8 @@ export interface BioGeneratorDeps {
   getCoverArtImages: typeof getCoverArtImages;
   getCommonsCategoryImages: typeof getCommonsCategoryImages;
   verifyScrapedImages: typeof verifyScrapedImages;
+  /** Best-effort POST of the result back to the web app's async callback. */
+  postCallback: (payload: BioCallbackPayload) => Promise<void>;
 }
 
 const defaultDeps: BioGeneratorDeps = {
@@ -65,6 +69,7 @@ const defaultDeps: BioGeneratorDeps = {
   getCoverArtImages,
   getCommonsCategoryImages,
   verifyScrapedImages,
+  postCallback: postBioCallback,
 };
 
 const MAX_IMAGES = 100;
@@ -635,11 +640,33 @@ export const runBioGeneration = async (
 };
 
 /**
+ * Runs the generation, converting a thrown error into the `ok: false` envelope
+ * so both branches yield a {@link BioGenerationResult} the caller can inspect.
+ */
+const runToResult = async (
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<BioGenerationResult> => {
+  try {
+    const data = await runBioGeneration(input, deps);
+    return { ok: true, data };
+  } catch (err) {
+    logEvent('warn', 'bio_generation_failed', { error: toErrorMessage(err) });
+    return { ok: false, error: err instanceof Error ? err.message : 'Bio generation failed' };
+  }
+};
+
+/**
  * Lambda entry point. Invoked directly (not via HTTP) by the web app's
  * bio-generation service. Returns a discriminated result envelope so the
  * caller can branch on success without throwing across the invoke boundary.
+ * When the event carries a `callbackUrl` + `jobToken`, the same result is also
+ * POSTed back to that async callback (best-effort) before returning.
  */
-export const lambdaHandler = async (event: unknown): Promise<BioGenerationResult> => {
+export const lambdaHandler = async (
+  event: unknown,
+  deps: BioGeneratorDeps = defaultDeps
+): Promise<BioGenerationResult> => {
   const parsed = bioGenerationInputSchema.safeParse(event);
   if (!parsed.success) {
     return {
@@ -648,11 +675,11 @@ export const lambdaHandler = async (event: unknown): Promise<BioGenerationResult
     };
   }
 
-  try {
-    const data = await runBioGeneration(parsed.data);
-    return { ok: true, data };
-  } catch (err) {
-    logEvent('warn', 'bio_generation_failed', { error: toErrorMessage(err) });
-    return { ok: false, error: err instanceof Error ? err.message : 'Bio generation failed' };
+  const result = await runToResult(parsed.data, deps);
+
+  const { callbackUrl, jobToken } = parsed.data;
+  if (callbackUrl && jobToken) {
+    await deps.postCallback({ url: callbackUrl, jobToken, result });
   }
+  return result;
 };
