@@ -2,7 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { lambdaHandler, MAX_VISION_CANDIDATES, runBioGeneration } from './handler.js';
+import {
+  lambdaHandler,
+  MAX_FOLLOWED_LINKS,
+  MAX_VISION_CANDIDATES,
+  runBioGeneration,
+} from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
@@ -863,6 +868,113 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
     expect(result.links.length).toBe(100);
+  });
+});
+
+describe('followKnownLinksForImages (bounded 1-level link-follow)', () => {
+  const matchWithLinks = (links: Array<{ label: string; url: string; kind: string }>) => ({
+    mbid: 'mbid-1',
+    name: 'Artist',
+    wikidataId: null,
+    artistType: 'Person',
+    area: 'USA',
+    beginDate: '1990',
+    tags: [],
+    links,
+  });
+
+  const bandcampScrape = () => ({
+    content: '',
+    images: [{ url: 'https://img/bc.jpg', alt: null, sourceUrl: 'https://x.bandcamp.com' }],
+  });
+
+  it('routes an image from a followed Bandcamp link into the vision-gate candidates', async () => {
+    const verifyScrapedImages = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      readUrl: vi.fn().mockResolvedValue(bandcampScrape()),
+      verifyScrapedImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const [candidates] = verifyScrapedImages.mock.calls[0] as [
+      Array<{ url: string; sourceUrl: string | null }>,
+    ];
+    expect(candidates.some((candidate) => candidate.sourceUrl === 'https://x.bandcamp.com')).toBe(
+      true
+    );
+  });
+
+  it('reads a discovered Discogs link one level deep for images', async () => {
+    const readUrl = vi.fn().mockResolvedValue({ content: '', images: [] });
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([
+            { label: 'Discogs', url: 'https://www.discogs.com/artist/123', kind: 'other' },
+          ])
+        ),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).toHaveBeenCalledWith('https://www.discogs.com/artist/123', null);
+  });
+
+  it('does not follow links outside the known Bandcamp/Discogs hosts', async () => {
+    const readUrl = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Blog', url: 'https://blog.example.com/post', kind: 'other' }])
+        ),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).not.toHaveBeenCalled();
+  });
+
+  it('caps the number of followed links at MAX_FOLLOWED_LINKS', async () => {
+    const readUrl = vi.fn().mockResolvedValue({ content: '', images: [] });
+    const links = Array.from({ length: MAX_FOLLOWED_LINKS + 2 }, (_, i) => ({
+      label: `Bandcamp ${i}`,
+      url: `https://a${i}.bandcamp.com`,
+      kind: 'streaming',
+    }));
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(matchWithLinks(links)),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).toHaveBeenCalledTimes(MAX_FOLLOWED_LINKS);
+  });
+
+  it('subjects followed images to the vision gate rather than trusting them directly', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      readUrl: vi.fn().mockResolvedValue(bandcampScrape()),
+      verifyScrapedImages: vi.fn().mockResolvedValue([]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.images.some((img) => img.url === 'https://img/bc.jpg')).toBe(false);
   });
 });
 

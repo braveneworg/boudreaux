@@ -77,6 +77,11 @@ const MAX_COVER_ART = 40;
 /** Global cap on scraped candidates entering vision verification. */
 export const MAX_VISION_CANDIDATES = 60;
 
+/** Known link hosts worth following one level deep for additional images. */
+const LINK_FOLLOW_HOSTS = ['bandcamp.com', 'discogs.com'] as const;
+/** Cap the fan-out so expansion stays bounded against the Lambda time budget. */
+export const MAX_FOLLOWED_LINKS = 4;
+
 /** Search-engine result pages and share widgets — never useful bio links. */
 const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
 const isJunkLinkUrl = (url: string): boolean => {
@@ -85,6 +90,20 @@ const isJunkLinkUrl = (url: string): boolean => {
     return JUNK_LINK_HOSTS.some((junk) => host === junk || host.endsWith(`.${junk}`));
   } catch {
     return true;
+  }
+};
+
+/**
+ * True when {@link url}'s registrable host equals {@link host} or is a subdomain
+ * of it (e.g. `x.bandcamp.com` matches `bandcamp.com`). Guards the `URL` parse,
+ * returning `false` on any malformed input.
+ */
+const registrableHostMatches = (url: string, host: string): boolean => {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return hostname === host || hostname.endsWith(`.${host}`);
+  } catch {
+    return false;
   }
 };
 
@@ -336,6 +355,31 @@ const applyWebSearch = async (
   }
 };
 
+/**
+ * Follow a FIXED set of already-discovered high-value links (Bandcamp/Discogs)
+ * one level deep for images, pushing them into `acc.scrapedImages` so they pass
+ * the same vision gate as web-search images. No recursive crawl; deduped
+ * against links already read (`acc.facts.sourceUrls`); capped at
+ * {@link MAX_FOLLOWED_LINKS}. Best-effort — a null read simply contributes
+ * nothing.
+ */
+const followKnownLinksForImages = async (
+  acc: MetadataAccumulator,
+  scrapeKey: string | null,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const alreadyRead = new Set(acc.facts.sourceUrls ?? []);
+  const targets = acc.links
+    .filter((link) => LINK_FOLLOW_HOSTS.some((host) => registrableHostMatches(link.url, host)))
+    .filter((link) => !alreadyRead.has(link.url))
+    .slice(0, MAX_FOLLOWED_LINKS);
+
+  for (const link of targets) {
+    const result = await deps.readUrl(link.url, scrapeKey);
+    if (result) acc.scrapedImages.push(...result.images);
+  }
+};
+
 /** The registrable host of a scraped image's source page, for attribution. */
 const attributionHost = (sourceUrl: string): string => {
   try {
@@ -526,6 +570,7 @@ const gatherMetadata = async (
   }
 
   await applyWebSearch(acc, input, scrapeKey, deps);
+  await followKnownLinksForImages(acc, scrapeKey, deps);
   await finalizeMetadata(acc, input, (candidates, context) =>
     deps.verifyScrapedImages(candidates, context, { apiKey, model })
   );
