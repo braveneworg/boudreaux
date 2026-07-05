@@ -660,6 +660,9 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(tokenId).toBe(artist.id);
       expect(token).toEqual(expect.any(String));
       expect(lastCommand().input.InvocationType).toBe('Event');
+      // Store exactly once on the happy path — guards against a spurious
+      // token clear slipping into the successful-dispatch path.
+      expect(setBioJobTokenMock).toHaveBeenCalledTimes(1);
     });
 
     it('sends a payload carrying the derived callback URL and the stored job token', async () => {
