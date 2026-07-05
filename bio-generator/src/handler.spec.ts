@@ -1040,6 +1040,28 @@ describe('lambdaHandler', () => {
     });
   });
 
+  it('posts the failure result to the callback when generation fails', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      postCallback,
+      getGeminiApiKey: vi.fn().mockRejectedValue(new Error('no api key')),
+    });
+
+    await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      deps
+    );
+
+    expect(postCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ result: expect.objectContaining({ ok: false }) })
+    );
+  });
+
   it('does not post a callback when no callbackUrl is present', async () => {
     const postCallback = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ postCallback });
