@@ -503,11 +503,28 @@ export class BioGenerationService {
     }
   }
 
+  private static buildBioContent(
+    state: NonNullable<Awaited<ReturnType<typeof ArtistRepository.getBioGenerationState>>>,
+    status: BioStatus | null
+  ): GeneratedBioContent | null {
+    const hasPersistedMedia = state.bioImages.length > 0 || state.bioLinks.length > 0;
+    if (status !== 'succeeded' && !hasPersistedMedia) return null;
+    return {
+      shortBio: state.shortBio ?? '',
+      longBio: state.bio ?? '',
+      altBio: state.altBio ?? '',
+      genres: state.genres ?? null,
+      images: state.bioImages,
+      links: state.bioLinks,
+      model: state.bioModel ?? '',
+    };
+  }
+
   /**
    * Reads the current async generation status for an artist, including the
-   * persisted bio content when the job has succeeded (so the admin form can
-   * populate without a second request). Returns `null` when the artist is
-   * missing.
+   * persisted bio content when the job has succeeded or when persisted bio
+   * media (images/links) already exist (so the admin form can populate without
+   * a second request). Returns `null` when the artist is missing.
    *
    * @param artistId - The artist to read the status for.
    */
@@ -518,18 +535,7 @@ export class BioGenerationService {
     }
 
     const status = (state.bioStatus as BioStatus | null) ?? null;
-    const content: GeneratedBioContent | null =
-      status === 'succeeded'
-        ? {
-            shortBio: state.shortBio ?? '',
-            longBio: state.bio ?? '',
-            altBio: state.altBio ?? '',
-            genres: state.genres ?? null,
-            images: state.bioImages,
-            links: state.bioLinks,
-            model: state.bioModel ?? '',
-          }
-        : null;
+    const content = BioGenerationService.buildBioContent(state, status);
 
     return { status, error: state.bioError ?? null, content };
   }

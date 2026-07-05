@@ -9,10 +9,12 @@ import { ArtistRepository, type BioImageRehostRow } from '@/lib/repositories/art
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
+  ArtistBioImageRecord,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistWithPublishedReleases,
+  CreateArtistBioImageData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -862,6 +864,19 @@ export class ArtistService {
     const removed = await ArtistRepository.deleteBioImage(imageId);
     await cleanupBioMediaObject(removed.url);
     await cleanupBioMediaObject(removed.thumbnailUrl);
+  }
+
+  /** Persists one manually-added bio image and returns the created row. */
+  static async createBioImage(input: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
+    return ArtistRepository.createBioImage(input);
+  }
+
+  /** Updates one bio image's attribution text. */
+  static async updateBioImageAttribution(
+    imageId: string,
+    attribution: string | null
+  ): Promise<void> {
+    await ArtistRepository.updateBioImageAttribution(imageId, attribution);
   }
 
   /**

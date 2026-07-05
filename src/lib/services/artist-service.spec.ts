@@ -60,6 +60,8 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     deleteBioImage: vi.fn(),
     findBioImagesForRehost: vi.fn(),
     updateBioImageUrl: vi.fn(),
+    createBioImage: vi.fn(),
+    updateBioImageAttribution: vi.fn(),
   },
 }));
 
@@ -2103,6 +2105,34 @@ describe('ArtistService', () => {
       });
       vi.mocked(deleteS3Object).mockResolvedValue(false);
       await expect(ArtistService.deleteBioImage('img-1')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('createBioImage', () => {
+    it('delegates to the repository and returns the created row', async () => {
+      const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
+      vi.mocked(ArtistRepository.createBioImage).mockResolvedValue(row as never);
+
+      const result = await ArtistService.createBioImage({
+        artistId: 'a1',
+        url: 'https://cdn/x.webp',
+      });
+
+      expect(ArtistRepository.createBioImage).toHaveBeenCalledWith({
+        artistId: 'a1',
+        url: 'https://cdn/x.webp',
+      });
+      expect(result).toBe(row);
+    });
+  });
+
+  describe('updateBioImageAttribution', () => {
+    it('delegates the attribution update to the repository', async () => {
+      vi.mocked(ArtistRepository.updateBioImageAttribution).mockResolvedValue(undefined as never);
+
+      await ArtistService.updateBioImageAttribution('img-1', 'Credit');
+
+      expect(ArtistRepository.updateBioImageAttribution).toHaveBeenCalledWith('img-1', 'Credit');
     });
   });
 

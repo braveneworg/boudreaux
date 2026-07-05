@@ -1012,6 +1012,45 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     expect(result).toEqual({ status: null, error: null, content: null });
   });
+
+  it('surfaces persisted bio images even when the job never succeeded', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: null,
+        bioImages: [
+          {
+            url: 'u',
+            thumbnailUrl: null,
+            title: null,
+            attribution: null,
+            license: null,
+            sourceUrl: null,
+            isPrimary: false,
+          },
+        ],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBeNull();
+    expect(result?.content?.images).toHaveLength(1);
+  });
+
+  it('keeps surfacing persisted media after a failed regeneration', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'failed',
+        bioError: 'boom',
+        bioLinks: [{ label: 'L', url: 'u2', kind: null }],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('failed');
+    expect(result?.content?.links).toHaveLength(1);
+  });
 });
 
 describe('INVOKE_REQUEST_TIMEOUT_MS', () => {

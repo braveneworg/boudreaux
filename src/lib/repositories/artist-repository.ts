@@ -7,11 +7,13 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   Artist,
+  ArtistBioImageRecord,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistScalars,
   ArtistWithPublishedReleases,
+  CreateArtistBioImageData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -580,6 +582,47 @@ export class ArtistRepository {
   /** Points a bio image row at its upgraded (fully re-hosted) CDN URL. */
   static async updateBioImageUrl(imageId: string, url: string): Promise<void> {
     await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { url } }));
+  }
+
+  /** Creates a single bio image row (manual upload / curated addition),
+   *  appending it after the artist's current highest `sortOrder`. */
+  static async createBioImage(data: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
+    const isPrimary = data.isPrimary ?? false;
+    return runQuery(async () => {
+      const { _max } = await prisma.artistBioImage.aggregate({
+        where: { artistId: data.artistId },
+        _max: { sortOrder: true },
+      });
+      const sortOrder = (_max.sortOrder ?? -1) + 1;
+      return prisma.artistBioImage.create({
+        data: {
+          artistId: data.artistId,
+          url: data.url,
+          thumbnailUrl: data.thumbnailUrl,
+          title: data.title,
+          attribution: data.attribution,
+          license: data.license,
+          sourceUrl: data.sourceUrl,
+          originalUrl: data.originalUrl,
+          width: data.width,
+          height: data.height,
+          isPrimary,
+          kind: data.kind,
+          alt: data.alt,
+          sortOrder,
+        },
+      });
+    }) as Promise<ArtistBioImageRecord>;
+  }
+
+  /** Updates a single bio image row's attribution text (admin edit). */
+  static async updateBioImageAttribution(
+    imageId: string,
+    attribution: string | null
+  ): Promise<void> {
+    await runQuery(() =>
+      prisma.artistBioImage.update({ where: { id: imageId }, data: { attribution } })
+    );
   }
 
   /**

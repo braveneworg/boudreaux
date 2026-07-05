@@ -287,6 +287,14 @@ describe('BioMediaPalettes', () => {
     );
   });
 
+  it('renders the palettes when persisted content exists without a succeeded job', () => {
+    mockStatus({ status: null, error: null, content: contentWith([LINK_ROW], [IMAGE_ROW]) });
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('group', { name: 'Discovered images' })).toBeInTheDocument();
+  });
+
   it('insertImage falls back to "Artist photo" when both alt and title are absent', async () => {
     const run = vi.fn();
     const chain = { focus: vi.fn().mockReturnThis(), insertContent: vi.fn().mockReturnThis(), run };
