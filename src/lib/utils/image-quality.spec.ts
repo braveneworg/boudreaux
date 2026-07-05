@@ -8,6 +8,7 @@ import {
   perceptualDHash,
   NEAR_DUPLICATE_MAX_DISTANCE,
   laplacianVarianceSharpness,
+  variance,
   assessImageQuality,
   isBelowQualityFloor,
   MIN_IMAGE_DIMENSION,
@@ -113,6 +114,20 @@ describe('laplacianVarianceSharpness', () => {
       return [v, v, v];
     });
     expect(await laplacianVarianceSharpness(checkerboard)).toBeGreaterThan(MIN_SHARPNESS_VARIANCE);
+  });
+});
+
+describe('variance', () => {
+  it('returns 0 for an empty collection', () => {
+    expect(variance([])).toBe(0);
+  });
+
+  it('returns 0 when every value is identical', () => {
+    expect(variance([5, 5, 5])).toBe(0);
+  });
+
+  it('computes the population variance of a known sample', () => {
+    expect(variance([2, 4, 4, 4, 5, 5, 7, 9])).toBe(4);
   });
 });
 

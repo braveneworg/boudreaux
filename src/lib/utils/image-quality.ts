@@ -76,6 +76,31 @@ export interface ImageQualityAssessment {
 }
 
 /**
+ * Population variance of `values` (mean of squared deviations from the mean).
+ * Returns `0` for an empty collection so callers never divide by zero. Iterates
+ * by index so it accepts any `ArrayLike<number>` (Buffer, Uint8Array, number[]).
+ */
+export const variance = (values: ArrayLike<number>): number => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const samples = Array.from(values);
+
+  let sum = 0;
+  for (const value of samples) {
+    sum += value;
+  }
+  const mean = sum / samples.length;
+
+  let squaredError = 0;
+  for (const value of samples) {
+    squaredError += (value - mean) ** 2;
+  }
+  return squaredError / samples.length;
+};
+
+/**
  * Score an image's sharpness as the variance of its Laplacian response over a
  * greyscale copy. A low score indicates a blurry / out-of-focus image.
  */
@@ -86,21 +111,7 @@ export const laplacianVarianceSharpness = async (buffer: Buffer): Promise<number
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  if (data.length === 0) {
-    return 0;
-  }
-
-  let sum = 0;
-  for (const value of data) {
-    sum += value;
-  }
-  const mean = sum / data.length;
-
-  let squaredError = 0;
-  for (const value of data) {
-    squaredError += (value - mean) ** 2;
-  }
-  return squaredError / data.length;
+  return variance(data);
 };
 
 /** Decode `buffer` to produce a full quality assessment. */
