@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef } from 'react';
-import type { JSX, KeyboardEvent, PointerEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent, PointerEvent } from 'react';
 
 import { NodeViewWrapper } from '@tiptap/react';
-import { AlignCenterVertical, AlignEndVertical, AlignStartVertical, X } from 'lucide-react';
+import { AlignCenterVertical, AlignEndVertical, AlignStartVertical, Pencil, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Input } from '@/ui/input';
 
 import {
   BIO_FIGURE_MAX_WIDTH,
@@ -205,24 +206,107 @@ const useFigureResize = ({ width, updateAttributes }: FigureResizeOptions): Figu
 interface FigureCaptionProps {
   title: string | null;
   subtitle: string | null;
-  attribution: string | null;
 }
 
 /** Caption lines below the image — fixed at 11px, never scaling with width. */
-const FigureCaption = ({
-  title,
-  subtitle,
-  attribution,
-}: FigureCaptionProps): JSX.Element | null => {
-  if (!title && !subtitle && !attribution) return null;
+const FigureCaption = ({ title, subtitle }: FigureCaptionProps): JSX.Element | null => {
+  if (!title && !subtitle) return null;
   return (
     <figcaption className="bio-figure-caption mt-1 space-y-0.5 text-[11px] leading-snug">
       {title ? <span className="bio-figure-title block font-medium">{title}</span> : null}
       {subtitle ? <span className="bio-figure-subtitle block">{subtitle}</span> : null}
-      {attribution ? (
-        <span className="bio-figure-attribution text-muted-foreground block">{attribution}</span>
-      ) : null}
     </figcaption>
+  );
+};
+
+interface AttributionFieldProps {
+  attribution: string | null;
+  isEditable: boolean;
+  updateAttributes: NodeViewProps['updateAttributes'];
+}
+
+/**
+ * Displays the attribution line with an inline edit affordance when the editor
+ * is editable. Pencil triggers a text input; Enter/blur commits (empty → null);
+ * Escape cancels. Read-only when `isEditable` is false.
+ */
+const AttributionField = ({
+  attribution,
+  isEditable,
+  updateAttributes,
+}: AttributionFieldProps): JSX.Element | null => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  if (!isEditable && !attribution) return null;
+
+  const handleEditStart = (): void => {
+    setDraft(attribution ?? '');
+    setEditing(true);
+  };
+
+  const handleCommit = (): void => {
+    updateAttributes({ attribution: draft.trim() || null });
+    setEditing(false);
+  };
+
+  const handleCancel = (): void => {
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-0.5">
+        <Input
+          ref={inputRef}
+          aria-label="Attribution"
+          maxLength={500}
+          value={draft}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+          className="h-6 text-[11px] leading-snug"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-0.5 flex items-center gap-1 text-[11px] leading-snug">
+      {attribution && (
+        <span className="bio-figure-attribution text-muted-foreground">{attribution}</span>
+      )}
+      {isEditable && (
+        <button
+          type="button"
+          aria-label="Edit attribution"
+          onClick={handleEditStart}
+          className={cn(
+            'bg-background/80 text-foreground p-0.5 shadow-sm backdrop-blur-sm',
+            'hover:bg-accent hover:text-accent-foreground',
+            'opacity-0 transition-opacity',
+            'group-hover:opacity-100 group-data-selected:opacity-100'
+          )}
+        >
+          <Pencil className="size-3" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -290,6 +374,7 @@ export const BioFigureNodeView = ({
   updateAttributes,
   deleteNode,
   selected,
+  editor,
 }: NodeViewProps): JSX.Element => {
   const { src, alt, width, float, title, subtitle, attribution } =
     node.attrs as BioFigureAttributes;
@@ -349,7 +434,12 @@ export const BioFigureNodeView = ({
           )}
         />
       </div>
-      <FigureCaption title={title} subtitle={subtitle} attribution={attribution} />
+      <FigureCaption title={title} subtitle={subtitle} />
+      <AttributionField
+        attribution={attribution}
+        isEditable={editor.isEditable}
+        updateAttributes={updateAttributes}
+      />
     </NodeViewWrapper>
   );
 };
