@@ -72,9 +72,10 @@ test.describe('Admin entity delete flows', () => {
     await adminPage.goto('/admin/artists');
 
     // Find the seeded artist via search, then delete it from its own card
-    // (the list can hold other artists, so scope to the matching <li>).
+    // (the list can hold other artists, so scope to the matching <li> —
+    // excluding Sonner toast <li>s, see the restore step below).
     await adminPage.getByPlaceholder(/search artists/i).fill(displayName);
-    const card = adminPage.locator('li').filter({ hasText: displayName });
+    const card = adminPage.locator('li:not([data-sonner-toast])').filter({ hasText: displayName });
     await expect(card).toBeVisible({ timeout: 15_000 });
 
     await card.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -84,9 +85,14 @@ test.describe('Admin entity delete flows', () => {
       timeout: 15_000,
     });
 
-    // Reveal soft-deleted rows and restore it from its card.
+    // Reveal soft-deleted rows and restore it from its card. Exclude Sonner
+    // toasts: the "Successfully deleted artist - {name}" toast is itself an
+    // <li> containing the display name, so a bare `li` filter matches both it
+    // and the card (strict-mode violation). Scope to non-toast list items.
     await adminPage.getByRole('switch', { name: /show deleted/i }).click();
-    const deletedCard = adminPage.locator('li').filter({ hasText: displayName });
+    const deletedCard = adminPage
+      .locator('li:not([data-sonner-toast])')
+      .filter({ hasText: displayName });
     await expect(deletedCard).toBeVisible({ timeout: 15_000 });
 
     await deletedCard.getByRole('button', { name: 'Restore', exact: true }).click();
