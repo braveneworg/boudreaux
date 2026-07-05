@@ -976,6 +976,28 @@ describe('followKnownLinksForImages (bounded 1-level link-follow)', () => {
 
     expect(result.images.some((img) => img.url === 'https://img/bc.jpg')).toBe(false);
   });
+
+  it('skips a followed link whose URL was already read during earlier scraping', async () => {
+    const readUrl = vi.fn().mockResolvedValue(bandcampScrape());
+    const deps = makeDeps({
+      lookupArtist: vi
+        .fn()
+        .mockResolvedValue(
+          matchWithLinks([{ label: 'Bandcamp', url: 'https://x.bandcamp.com', kind: 'streaming' }])
+        ),
+      searchArtistSources: vi.fn().mockResolvedValue({
+        sourceText: '',
+        sourceUrls: ['https://x.bandcamp.com'],
+        images: [],
+        references: [],
+      }),
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(readUrl).not.toHaveBeenCalled();
+  });
 });
 
 describe('lambdaHandler', () => {
