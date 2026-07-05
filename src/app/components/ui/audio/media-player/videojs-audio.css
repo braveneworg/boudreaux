@@ -120,14 +120,15 @@
     & .vjs-play-control .vjs-icon-placeholder {
       position: relative;
       font-size: 1rem;
-      top: -1.3rem;
+      top: -1.5rem;
+      left: -0.25rem;
     }
 
     & .vjs-volume-panel {
       order: 4 !important;
       display: flex;
       position: absolute;
-      top: 1.15rem;
+      top: 1.5rem;
       right: -0.25rem;
       width: calc(var(--audio-control-button-size) - 0.25rem);
       height: calc(var(--audio-control-button-size) - 0.25rem);
