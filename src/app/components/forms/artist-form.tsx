@@ -33,6 +33,7 @@ import {
   useCreateArtistMutation,
   useUpdateArtistMutation,
 } from '@/app/hooks/mutations/use-artist-mutations';
+import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { type ArtistDetail, useArtistQuery } from '@/app/hooks/use-artist-query';
 import { useSession } from '@/hooks/use-session';
 import {
@@ -188,12 +189,14 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
 });
 
 /**
- * Images selectable in the bio editor: uploaded artist images plus re-hosted bio
- * images, deduped by URL (uploaded first).
+ * Images selectable in the bio editor: uploaded artist images, freshly-generated
+ * bio picker images, and persisted library images from the status endpoint —
+ * deduped by URL (uploaded first, then generated, then library; first wins).
  */
 const computeBioEditorImages = (
   images: ImageItem[],
-  bioPickerImages: RichTextEditorImage[]
+  bioPickerImages: RichTextEditorImage[],
+  libraryImages: RichTextEditorImage[]
 ): RichTextEditorImage[] => {
   const seen = new Set<string>();
   const collected: RichTextEditorImage[] = [];
@@ -205,6 +208,12 @@ const computeBioEditorImages = (
     }
   }
   for (const image of bioPickerImages) {
+    if (!seen.has(image.url)) {
+      seen.add(image.url);
+      collected.push(image);
+    }
+  }
+  for (const image of libraryImages) {
     if (!seen.has(image.url)) {
       seen.add(image.url);
       collected.push(image);
@@ -347,6 +356,10 @@ const submitArtistCreate = async (data: ArtistFormData, deps: SubmitArtistDeps):
   images.resetImagesReordered();
 };
 
+/** Breadcrumb label for the artist form — "Edit Artist" in edit mode, "Create Artist" otherwise. */
+const artistFormBreadcrumbTitle = (isEditMode: boolean): string =>
+  isEditMode ? 'Edit Artist' : 'Create Artist';
+
 /** Guard the form ref then dispatch to the create/update submit path. */
 const runArtistSubmit = async (
   formEl: HTMLFormElement | null,
@@ -391,6 +404,12 @@ export const ArtistForm = ({
   const formRef = useRef<HTMLFormElement>(null);
   const queryClient = useQueryClient();
 
+  // Persisted bio-library images from the generation status endpoint. Feeding
+  // this into the RTE picker completes the three-source merge (uploaded →
+  // generated picker → persisted library). The same query key is already
+  // mounted by the sidebar palette so TanStack dedupes the network request.
+  const statusQuery = useArtistBioGenerationStatusQuery(artistId ?? '', { enabled: !!artistId });
+
   const handleUploadBioImage = useCallback<RichTextEditorUploadHandler>(
     async (file, meta) => {
       if (!artistId) return null;
@@ -419,8 +438,16 @@ export const ArtistForm = ({
   });
 
   const bioEditorImages = useMemo(
-    () => computeBioEditorImages(images.images, bioPickerImages),
-    [images.images, bioPickerImages]
+    () =>
+      computeBioEditorImages(
+        images.images,
+        bioPickerImages,
+        (statusQuery.data?.content?.images ?? []).map((image) => ({
+          url: image.url,
+          alt: image.alt ?? image.title ?? '',
+        }))
+      ),
+    [images.images, bioPickerImages, statusQuery.data]
   );
 
   const artistForm = useForm<ArtistFormData>({
@@ -585,7 +612,7 @@ export const ArtistForm = ({
       breadcrumbs={[
         { anchorText: 'Admin', url: '/admin', isActive: false },
         {
-          anchorText: isEditMode ? 'Edit Artist' : 'Create Artist',
+          anchorText: artistFormBreadcrumbTitle(isEditMode),
           url: '/admin/artists',
           isActive: true,
         },

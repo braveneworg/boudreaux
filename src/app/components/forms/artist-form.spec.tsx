@@ -8,6 +8,8 @@ import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
+import { useImageOperations } from '@/app/components/forms/hooks/use-image-operations';
+import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 
 import { ArtistForm } from './artist-form';
@@ -91,13 +93,38 @@ vi.mock('@/app/components/forms/utils/upload-bio-image', () => ({
   uploadBioImage: vi.fn(),
 }));
 
-// Stub ArtistBioSection to capture the onUploadImage prop without rendering
-// the full bio editor tree (which needs next/dynamic + tiptap).
+// useImageOperations is mocked as vi.fn() so individual tests can override
+// the images array (e.g. dedupe tests) without needing real React state.
+vi.mock('@/app/components/forms/hooks/use-image-operations', () => ({
+  useImageOperations: vi.fn(() => ({
+    images: [],
+    isUploadingImages: false,
+    hasPendingImages: false,
+    imagesReordered: false,
+    handleImagesChange: vi.fn(),
+    handleReorder: vi.fn().mockResolvedValue(undefined),
+    handleDeleteImage: vi.fn().mockResolvedValue({ success: true }),
+    uploadImages: vi.fn().mockResolvedValue(undefined),
+    resetImagesReordered: vi.fn(),
+    setImages: vi.fn(),
+  })),
+}));
+
+// Stub ArtistBioSection to capture props without rendering the full bio editor
+// tree (which needs next/dynamic + tiptap). Exposes bioEditorImages so tests
+// can assert which images the picker is seeded with.
 vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
-  ArtistBioSection: ({ onUploadImage }: { onUploadImage?: (...args: unknown[]) => unknown }) => (
+  ArtistBioSection: ({
+    onUploadImage,
+    bioEditorImages,
+  }: {
+    onUploadImage?: (...args: unknown[]) => unknown;
+    bioEditorImages?: { url: string; alt: string }[];
+  }) => (
     <div
       data-testid="artist-bio-section-stub"
       data-has-upload-handler={onUploadImage != null ? 'true' : 'false'}
+      data-bio-editor-images={JSON.stringify(bioEditorImages ?? [])}
     />
   ),
 }));
@@ -105,12 +132,12 @@ vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
 // The bio palettes keep the generation-status query mounted in edit mode;
 // stub the hook so this suite never issues a real fetch and renders no tiles.
 vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
-  useArtistBioGenerationStatusQuery: () => ({
+  useArtistBioGenerationStatusQuery: vi.fn(() => ({
     data: undefined,
     isPending: true,
     error: Error('Unknown error'),
     refetch: vi.fn(),
-  }),
+  })),
 }));
 
 // Mock the artist-detail query hook so edit-mode loading is driven by the
@@ -264,6 +291,79 @@ describe('ArtistForm', () => {
         'data-has-upload-handler',
         'true'
       );
+    });
+  });
+
+  describe('bio editor images from library', () => {
+    /** Minimal succeeded-status response with one library image. */
+    const libraryStatusData = {
+      data: {
+        status: 'succeeded' as const,
+        error: null,
+        content: {
+          shortBio: '',
+          longBio: '',
+          altBio: '',
+          genres: null,
+          images: [
+            {
+              id: 'lib-1',
+              url: 'https://cdn/x.webp',
+              attribution: null,
+              isPrimary: false,
+            },
+          ],
+          links: [],
+          model: 'gemini-2.5-flash',
+        },
+      },
+      isPending: false,
+      error: Error('Unknown error'),
+      refetch: vi.fn(),
+    };
+
+    it('passes persisted library images from the status query to bioEditorImages', () => {
+      vi.mocked(useArtistBioGenerationStatusQuery).mockReturnValue(libraryStatusData);
+
+      render(<ArtistForm artistId="artist-123" />);
+
+      const stub = screen.getByTestId('artist-bio-section-stub');
+      const images = JSON.parse(stub.getAttribute('data-bio-editor-images') ?? '[]') as {
+        url: string;
+      }[];
+      expect(images.some((img) => img.url === 'https://cdn/x.webp')).toBe(true);
+    });
+
+    it('deduplicates a URL present in both uploaded images and the library', () => {
+      vi.mocked(useImageOperations).mockReturnValue({
+        images: [
+          {
+            id: 'img-uploaded',
+            preview: 'https://cdn/x.webp',
+            uploadedUrl: 'https://cdn/x.webp',
+            altText: 'uploaded',
+          },
+        ],
+        isUploadingImages: false,
+        hasPendingImages: false,
+        imagesReordered: false,
+        handleImagesChange: vi.fn(),
+        handleReorder: vi.fn().mockResolvedValue(undefined),
+        handleDeleteImage: vi.fn().mockResolvedValue({ success: true }),
+        uploadImages: vi.fn().mockResolvedValue(undefined),
+        resetImagesReordered: vi.fn(),
+        setImages: vi.fn(),
+      });
+      vi.mocked(useArtistBioGenerationStatusQuery).mockReturnValue(libraryStatusData);
+
+      render(<ArtistForm artistId="artist-123" />);
+
+      const stub = screen.getByTestId('artist-bio-section-stub');
+      const images = JSON.parse(stub.getAttribute('data-bio-editor-images') ?? '[]') as {
+        url: string;
+      }[];
+      const matching = images.filter((img) => img.url === 'https://cdn/x.webp');
+      expect(matching).toHaveLength(1);
     });
   });
 });
