@@ -15,7 +15,10 @@ import {
 } from '@/app/components/forms/bio-editor-registry';
 import { BioMediaPalettes } from '@/app/components/forms/bio-media-palettes';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
+import type {
+  RichTextEditorImage,
+  RichTextEditorUploadHandler,
+} from '@/app/components/ui/rich-text-editor';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
@@ -40,6 +43,7 @@ interface BioEditorFieldProps {
   label: string;
   ariaLabel: string;
   images: RichTextEditorImage[];
+  onUploadImage?: RichTextEditorUploadHandler;
 }
 
 const BioEditorField = ({
@@ -48,6 +52,7 @@ const BioEditorField = ({
   label,
   ariaLabel,
   images,
+  onUploadImage,
 }: BioEditorFieldProps): JSX.Element => {
   const registry = useBioEditorRegistry();
 
@@ -76,6 +81,7 @@ const BioEditorField = ({
               ariaLabel={ariaLabel}
               onEditorReady={handleEditorReady}
               onEditorFocus={handleEditorFocus}
+              onUploadImage={onUploadImage}
             />
           </FormControl>
           <FormMessage />
@@ -91,6 +97,7 @@ interface ArtistBioSectionProps {
   artistId: string | null;
   bioEditorImages: RichTextEditorImage[];
   onBioGenerated: (content: GeneratedBioContent) => void;
+  onUploadImage?: RichTextEditorUploadHandler;
 }
 
 export const ArtistBioSection = ({
@@ -99,6 +106,7 @@ export const ArtistBioSection = ({
   artistId,
   bioEditorImages,
   onBioGenerated,
+  onUploadImage,
 }: ArtistBioSectionProps): JSX.Element => (
   <section className="space-y-4">
     <h2 className="font-semibold">Biography</h2>
@@ -128,6 +136,7 @@ export const ArtistBioSection = ({
             label="Bio"
             ariaLabel="Bio"
             images={bioEditorImages}
+            onUploadImage={onUploadImage}
           />
           <BioEditorField
             control={control}
@@ -135,6 +144,7 @@ export const ArtistBioSection = ({
             label="Short Bio"
             ariaLabel="Short Bio"
             images={bioEditorImages}
+            onUploadImage={onUploadImage}
           />
           <BioEditorField
             control={control}
@@ -142,6 +152,7 @@ export const ArtistBioSection = ({
             label="Alternative Bio"
             ariaLabel="Alternative Bio"
             images={bioEditorImages}
+            onUploadImage={onUploadImage}
           />
         </div>
       </div>

@@ -86,6 +86,22 @@ vi.mock('@/lib/actions/register-image-actions', () => ({ registerArtistImagesAct
 vi.mock('@/lib/utils/direct-upload', () => ({ uploadFilesToS3: vi.fn() }));
 vi.mock('@/lib/utils/console-logger', () => ({ error: vi.fn(), warn: vi.fn(), log: vi.fn() }));
 
+// uploadBioImage pulls in server-only actions transitively; stub it here.
+vi.mock('@/app/components/forms/utils/upload-bio-image', () => ({
+  uploadBioImage: vi.fn(),
+}));
+
+// Stub ArtistBioSection to capture the onUploadImage prop without rendering
+// the full bio editor tree (which needs next/dynamic + tiptap).
+vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
+  ArtistBioSection: ({ onUploadImage }: { onUploadImage?: (...args: unknown[]) => unknown }) => (
+    <div
+      data-testid="artist-bio-section-stub"
+      data-has-upload-handler={onUploadImage != null ? 'true' : 'false'}
+    />
+  ),
+}));
+
 // The bio palettes keep the generation-status query mounted in edit mode;
 // stub the hook so this suite never issues a real fetch and renders no tiles.
 vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
@@ -228,6 +244,26 @@ describe('ArtistForm', () => {
       await waitFor(() => {
         expect(vi.mocked(toast.error)).toHaveBeenCalledWith('An unexpected error occurred');
       });
+    });
+  });
+
+  describe('onUploadImage wiring', () => {
+    it('does not pass onUploadImage to ArtistBioSection in create mode (no artistId)', () => {
+      render(<ArtistForm />);
+
+      expect(screen.getByTestId('artist-bio-section-stub')).toHaveAttribute(
+        'data-has-upload-handler',
+        'false'
+      );
+    });
+
+    it('passes onUploadImage to ArtistBioSection in edit mode (with artistId)', () => {
+      render(<ArtistForm artistId="artist-123" />);
+
+      expect(screen.getByTestId('artist-bio-section-stub')).toHaveAttribute(
+        'data-has-upload-handler',
+        'true'
+      );
     });
   });
 });

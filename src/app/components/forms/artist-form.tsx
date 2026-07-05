@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -19,9 +20,13 @@ import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-
 import { ArtistImagesSection } from '@/app/components/forms/sections/artist-images-section';
 import { ArtistMusicAndDatesSection } from '@/app/components/forms/sections/artist-music-dates-section';
 import { ArtistNameSection } from '@/app/components/forms/sections/artist-name-section';
+import { uploadBioImage } from '@/app/components/forms/utils/upload-bio-image';
 import { Form } from '@/app/components/ui/form';
 import { type ImageItem } from '@/app/components/ui/image-uploader';
-import type { RichTextEditorImage } from '@/app/components/ui/rich-text-editor';
+import type {
+  RichTextEditorImage,
+  RichTextEditorUploadHandler,
+} from '@/app/components/ui/rich-text-editor';
 import { Separator } from '@/app/components/ui/separator';
 import {
   useArchiveArtistMutation,
@@ -35,6 +40,7 @@ import {
   reorderArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
 import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
+import { queryKeys } from '@/lib/query-keys';
 import { error } from '@/lib/utils/console-logger';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
@@ -383,6 +389,27 @@ export const ArtistForm = ({
   const { data: session } = useSession();
   const user = session?.user;
   const formRef = useRef<HTMLFormElement>(null);
+  const queryClient = useQueryClient();
+
+  const handleUploadBioImage = useCallback<RichTextEditorUploadHandler>(
+    async (file, meta) => {
+      if (!artistId) return null;
+      const result = await uploadBioImage(file, {
+        artistId,
+        attribution: meta.attribution,
+        title: meta.title,
+      });
+      if (!result.success || !result.data) {
+        toast.error(result.error ?? 'Failed to upload image');
+        return null;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.artists.bioGeneration(artistId),
+      });
+      return { url: result.data.url, alt: result.data.alt ?? null };
+    },
+    [artistId, queryClient]
+  );
 
   const images = useImageOperations({
     entityType: 'artists',
@@ -591,6 +618,7 @@ export const ArtistForm = ({
                 artistId={artistId}
                 bioEditorImages={bioEditorImages}
                 onBioGenerated={handleBioGenerated}
+                onUploadImage={artistId ? handleUploadBioImage : undefined}
               />
 
               <Separator />
