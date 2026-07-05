@@ -40,7 +40,12 @@ export const featuredArtistInclude = {
       firstName: true,
       surname: true,
       slug: true,
-      images: { select: { src: true } },
+      bioImages: {
+        where: { isPrimary: true },
+        orderBy: { sortOrder: 'asc' },
+        take: 1,
+        select: { url: true },
+      },
     },
   },
   digitalFormat: {

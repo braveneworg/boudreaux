@@ -186,7 +186,7 @@ const featuredArtist = {
   coverArt: null,
   featuredTrackNumber: null,
   releaseId: null,
-  artists: [{ ...artistScalar, images: [image] }],
+  artists: [{ ...artistScalar, bioImages: [{ url: 'https://cdn.example.com/bio.jpg' }] }],
   digitalFormat,
   release: {
     ...releaseScalar,
