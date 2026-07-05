@@ -33,6 +33,7 @@ describe('updateArtistBioImageAttributionAction', () => {
     const result = await updateArtistBioImageAttributionAction({ imageId, attribution: 'x' });
 
     expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(ArtistService.updateBioImageAttribution).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid image id', async () => {
@@ -42,6 +43,7 @@ describe('updateArtistBioImageAttributionAction', () => {
     });
 
     expect(result).toEqual({ success: false, error: 'Invalid artist bio image ID' });
+    expect(ArtistService.updateBioImageAttribution).not.toHaveBeenCalled();
   });
 
   it('sanitizes the attribution and updates via the service', async () => {
@@ -71,5 +73,11 @@ describe('updateArtistBioImageAttributionAction', () => {
       userId: 'user-123',
       metadata: { artistBioImageId: imageId },
     });
+  });
+
+  it('revalidates the admin artists path on success', async () => {
+    await updateArtistBioImageAttributionAction({ imageId, attribution: 'Credit' });
+
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
   });
 });
