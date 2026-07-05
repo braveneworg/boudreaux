@@ -6,8 +6,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 
-import NextImage from 'next/image';
-
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
@@ -23,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/app/components/ui/dialog';
-import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Switch } from '@/app/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -33,6 +30,7 @@ import { isValidBioLinkUrl } from '@/lib/utils/is-valid-bio-link-url';
 import { handleBioEditorDrop } from './bio-editor-drop';
 import { BioFigure } from './bio-figure-extension';
 import { BioLink } from './bio-link-extension';
+import { ImageDialog, LabeledTextField } from './rich-text-editor-image-dialog';
 import { RichTextEditorToolbar } from './rich-text-editor-toolbar';
 
 import type { BioLinkAttributes } from './bio-link-extension';
@@ -46,6 +44,23 @@ export interface RichTextEditorImage {
   width?: number | null;
   height?: number | null;
 }
+
+/** Caption metadata sent alongside an uploaded file to the upload handler. */
+export interface RichTextEditorUploadMeta {
+  attribution: string;
+  title: string | null;
+  subtitle: string | null;
+}
+
+/**
+ * Uploads a chosen file (with its caption metadata) and resolves the inserted
+ * image, or `null` when the upload fails. Supplying it enables the dialog's
+ * Upload tab.
+ */
+export type RichTextEditorUploadHandler = (
+  file: File,
+  meta: RichTextEditorUploadMeta
+) => Promise<RichTextEditorImage | null>;
 
 interface RichTextEditorProps {
   /** Current HTML value (controlled). */
@@ -62,48 +77,9 @@ interface RichTextEditorProps {
   onEditorReady?: (editor: Editor) => void;
   /** Called each time this editor gains focus. */
   onEditorFocus?: () => void;
+  /** When provided, the insert-image dialog gains an Upload tab. */
+  onUploadImage?: RichTextEditorUploadHandler;
 }
-
-interface LabeledTextFieldProps {
-  id: string;
-  label: string;
-  value: string;
-  onValueChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  disabled?: boolean;
-  hint?: string;
-}
-
-/** Label + Input pair used by the link and image dialogs. */
-const LabeledTextField = ({
-  id,
-  label,
-  value,
-  onValueChange,
-  placeholder,
-  type = 'text',
-  disabled = false,
-  hint,
-}: LabeledTextFieldProps): JSX.Element => (
-  <div className="space-y-2">
-    <Label htmlFor={id}>{label}</Label>
-    <Input
-      id={id}
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={(event) => onValueChange(event.target.value)}
-      disabled={disabled}
-      aria-describedby={hint ? `${id}-hint` : undefined}
-    />
-    {hint ? (
-      <p id={`${id}-hint`} className="text-muted-foreground text-xs">
-        {hint}
-      </p>
-    ) : null}
-  </div>
-);
 
 interface LinkDialogProps {
   open: boolean;
@@ -178,81 +154,6 @@ const LinkDialog = ({
   </Dialog>
 );
 
-interface ImageDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  images: RichTextEditorImage[];
-  imageTitle: string;
-  imageSubtitle: string;
-  imageAttribution: string;
-  onImageTitleChange: (v: string) => void;
-  onImageSubtitleChange: (v: string) => void;
-  onImageAttributionChange: (v: string) => void;
-  onInsertImage: (image: RichTextEditorImage) => void;
-}
-
-const ImageDialog = ({
-  open,
-  onOpenChange,
-  images,
-  imageTitle,
-  imageSubtitle,
-  imageAttribution,
-  onImageTitleChange,
-  onImageSubtitleChange,
-  onImageAttributionChange,
-  onInsertImage,
-}: ImageDialogProps): JSX.Element => (
-  <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Insert image</DialogTitle>
-        <DialogDescription>
-          Choose one of this artist&apos;s images. Caption lines are optional.
-        </DialogDescription>
-      </DialogHeader>
-      <LabeledTextField
-        id="rte-image-title"
-        label="Title"
-        value={imageTitle}
-        onValueChange={onImageTitleChange}
-      />
-      <LabeledTextField
-        id="rte-image-subtitle"
-        label="Subtitle"
-        value={imageSubtitle}
-        onValueChange={onImageSubtitleChange}
-      />
-      <LabeledTextField
-        id="rte-image-attribution"
-        label="Attribution"
-        value={imageAttribution}
-        onValueChange={onImageAttributionChange}
-      />
-      <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
-        {images.map((image) => (
-          <li key={image.url}>
-            <button
-              type="button"
-              aria-label={`Insert ${image.alt ?? 'image'}`}
-              className="ring-border focus-visible:ring-primary block overflow-hidden ring-1 focus-visible:ring-2 focus-visible:outline-none"
-              onClick={() => onInsertImage(image)}
-            >
-              <NextImage
-                src={image.url}
-                alt={image.alt ?? ''}
-                width={120}
-                height={120}
-                className="size-full object-cover"
-              />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </DialogContent>
-  </Dialog>
-);
-
 const isActive = (instance: Editor | null, name: string, attrs?: object): boolean =>
   instance?.isActive(name, attrs) ?? false;
 
@@ -309,6 +210,7 @@ export const RichTextEditor = ({
   className,
   onEditorReady,
   onEditorFocus,
+  onUploadImage,
 }: RichTextEditorProps): JSX.Element => {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -507,6 +409,7 @@ export const RichTextEditor = ({
         editor={editor}
         toolbarState={toolbarState ?? INACTIVE_TOOLBAR}
         images={images}
+        canUpload={!!onUploadImage}
         onOpenLink={openLinkDialog}
         onOpenImage={() => setImageOpen(true)}
         isPreview={previewOpen}
@@ -546,6 +449,7 @@ export const RichTextEditor = ({
         onImageSubtitleChange={setImageSubtitle}
         onImageAttributionChange={setImageAttribution}
         onInsertImage={insertImage}
+        onUploadImage={onUploadImage}
       />
     </div>
   );
