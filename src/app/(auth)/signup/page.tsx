@@ -172,7 +172,7 @@ const SignupPage = () => {
   return (
     <PageContainer>
       <ContentContainer>
-        <div className="mt-6 flex flex-col items-center">
+        <div className="flex flex-col items-center">
           {magicLinkError !== null && (
             <Alert variant="destructive" className="mb-4 w-full">
               <AlertDescription>{magicLinkError}</AlertDescription>
