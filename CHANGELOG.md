@@ -90,6 +90,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.181.0] - 2026-07-05
+
+### Added
+
+- feat: 🎨 various design tweaks (#559)\n- feat: 🎨 various design tweaks (#559)\n
+
 ## [4.180.0] - 2026-07-05
 
 ### Added
