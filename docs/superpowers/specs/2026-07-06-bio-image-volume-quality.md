@@ -133,3 +133,13 @@ Two-ish deploys. Lambda deploy first each round (it produces the candidates).
 
 - Of the 52→10 web drop, how much is legitimate culling (dedupe of similar covers,
   genuine blur/low-res) versus recoverable loss (403/fetch failures on good photos)?
+
+## Deferred to Phase 2b (final review, 2026-07-06)
+
+- **`fetch_failed` status-code aggregation.** This spec asked for `fetch_failed`
+  "with status codes"; Phase 1 ships a plain count and leaves each HTTP status in
+  the per-image `logger.warn` output. Aggregating cleanly needs the fetch helper to
+  surface a structured status and the fetch- vs upload-failure buckets split — scope
+  that only pays off when 2b acts on 403 recoverability. Intentionally deferred to 2b.
+- **Upper clamp on `VISION_CANDIDATE_LIMIT`.** No ceiling today; a mis-set huge value
+  could exceed the 900s Lambda budget. Deferred as optional hardening.
