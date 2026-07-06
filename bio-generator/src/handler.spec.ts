@@ -879,10 +879,10 @@ describe('visionCandidateLimit', () => {
     vi.unstubAllEnvs();
   });
 
-  it('defaults to 180 when VISION_CANDIDATE_LIMIT is unset or empty', () => {
+  it('defaults to 60 when VISION_CANDIDATE_LIMIT is unset or empty', () => {
     vi.stubEnv('VISION_CANDIDATE_LIMIT', '');
-    expect(visionCandidateLimit()).toBe(180);
-    expect(DEFAULT_VISION_CANDIDATE_LIMIT).toBe(180);
+    expect(visionCandidateLimit()).toBe(60);
+    expect(DEFAULT_VISION_CANDIDATE_LIMIT).toBe(60);
   });
 
   it('uses VISION_CANDIDATE_LIMIT when it is a positive integer', () => {
