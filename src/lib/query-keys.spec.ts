@@ -263,6 +263,19 @@ describe('queryKeys', () => {
     });
   });
 
+  describe('linkPreview', () => {
+    it('should return linkPreview key with url', () => {
+      const key = queryKeys.linkPreview('https://example.com');
+      expect(key).toEqual(['linkPreview', 'https://example.com']);
+    });
+
+    it('should return different keys for different urls', () => {
+      const key1 = queryKeys.linkPreview('https://example.com');
+      const key2 = queryKeys.linkPreview('https://example.org');
+      expect(key1).not.toEqual(key2);
+    });
+  });
+
   describe('infinite-scroll keys', () => {
     it('normalizes the published-releases infinite key search term', () => {
       expect(queryKeys.releases.publishedInfinite('  Rock  ')).toEqual([

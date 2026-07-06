@@ -156,4 +156,6 @@ export const queryKeys = {
       ] as const,
     userMessages: (userId: string) => [...queryKeys.chat.all, 'userMessages', userId] as const,
   },
+  /** Unfurl preview for a single external bio link, keyed by the requested URL. */
+  linkPreview: (url: string) => ['linkPreview', url] as const,
 } as const;
