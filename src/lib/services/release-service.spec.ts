@@ -777,6 +777,18 @@ describe('ReleaseService', () => {
       expect(withCache).not.toHaveBeenCalled();
       vi.unstubAllEnvs();
     });
+
+    it('should bypass withCache in E2E mode', async () => {
+      const { withCache } = await import('../utils/simple-cache');
+      vi.stubEnv('E2E_MODE', 'true');
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([mockPublishedRelease] as never);
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result.success).toBe(true);
+      expect(withCache).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('getReleaseWithTracks', () => {
