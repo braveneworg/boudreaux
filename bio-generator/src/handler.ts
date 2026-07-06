@@ -79,14 +79,20 @@ const MAX_LINKS = 100;
 const MAX_COMMONS_CATEGORY_IMAGES = 30;
 /** Cover Art Archive front covers resolved per artist. */
 const MAX_COVER_ART = 40;
-/** Default cap on scraped candidates entering vision verification. */
-export const DEFAULT_VISION_CANDIDATE_LIMIT = 180;
+/**
+ * Default cap on scraped candidates entering vision verification. Kept at 60:
+ * each candidate is a Gemini vision call (batched 10 at a time), so raising this
+ * multiplies Gemini load. 180 (from #563) exhausted the project's Gemini quota in
+ * prod and failed generations outright. Raise it only with confirmed quota headroom.
+ */
+export const DEFAULT_VISION_CANDIDATE_LIMIT = 60;
 
 /**
  * Cap on scraped candidates entering vision verification. The default ships in
- * code; `VISION_CANDIDATE_LIMIT` is an optional per-deploy override for tuning
- * (up to ~300) without a code change. Deliberately NOT pinned in template.yaml,
- * so it can never silently drift the way the removed GeminiModel parameter did.
+ * code; `VISION_CANDIDATE_LIMIT` is an optional per-deploy override, but raising it
+ * above the default requires Gemini quota headroom (see above). Deliberately NOT
+ * pinned in template.yaml, so it can never silently drift the way the removed
+ * GeminiModel parameter did.
  */
 export const visionCandidateLimit = (): number => {
   const raw = Number(process.env.VISION_CANDIDATE_LIMIT);
