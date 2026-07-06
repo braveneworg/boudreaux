@@ -9,7 +9,8 @@ import Image from 'next/image';
 
 import videojs from 'video.js';
 
-import 'video.js/dist/video-js.css';
+// video.js base skin CSS is imported globally in globals.css — chunk-level CSS
+// on this `ssr: false` subtree would arrive as a late-inserted stylesheet.
 
 import {
   ensureClasses,

@@ -13,8 +13,9 @@ import {
 
 import type Player from 'video.js/dist/types/player';
 
-import 'video.js/dist/video-js.css';
-import './videojs-audio.css';
+// video.js base skin + ./videojs-audio.css are imported globally in
+// globals.css — chunk-level CSS on this `ssr: false` subtree would arrive as
+// late-inserted stylesheets (unstyled first paint + FontFaceSet re-sync).
 
 /**
  * Interface for accessing player controls from parent components.

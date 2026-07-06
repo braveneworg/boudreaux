@@ -4,6 +4,15 @@
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
+/* Video.js base skin + the project's audio-player overrides (order matters:
+   overrides must follow the base). Global rather than imported from the
+   player chunk: the players are `ssr: false` dynamic imports, so chunk-level
+   CSS arrives as late-inserted stylesheets — the player renders unstyled for
+   a beat and the insertion forces a FontFaceSet re-sync that can re-flash
+   custom-font text. Both rule sets are unlayered, so they still override
+   Tailwind's layered utilities exactly as they did as separate sheets. */
+@import 'video.js/dist/video-js.css';
+@import './components/ui/audio/media-player/videojs-audio.css';
 
 @font-face {
   font-family: 'FakeFourCutout';
