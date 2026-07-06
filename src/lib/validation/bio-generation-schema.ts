@@ -174,6 +174,16 @@ export const isInFlightBioStatus = (status: BioStatus | null | undefined): boole
 export const STALE_JOB_MS = 17 * 60 * 1000;
 
 /**
+ * Client-side poll deadline: how long the admin form keeps polling a triggered
+ * run before giving up and surfacing a timeout. Must exceed {@link STALE_JOB_MS}
+ * so the server's stale-job coercion (which flips the job to `failed`) resolves
+ * the UI first in normal operation; this is the last-resort stop for when the
+ * status endpoint never returns a terminal status at all (e.g. it is
+ * unreachable and every poll fails).
+ */
+export const CLIENT_POLL_DEADLINE_MS = 20 * 60 * 1000;
+
+/**
  * Result of *triggering* async bio generation. Generation now runs in the
  * background (Next.js `after()`); the action returns immediately with the job
  * status, and the client polls {@link BioGenerationStatusResult} for completion.
