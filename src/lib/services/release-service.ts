@@ -288,8 +288,15 @@ export class ReleaseService {
       }
     };
 
-    // Only the default first page (no search, skip 0) is cacheable.
-    if (process.env.NODE_ENV === 'development' || search || skip > 0) {
+    // Only the default first page (no search, skip 0) is cacheable. Disabled
+    // in E2E: the Playwright webServer readiness probe renders `/` pre-seed,
+    // which would poison this cache with an empty listing for the whole run.
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.E2E_MODE === 'true' ||
+      search ||
+      skip > 0
+    ) {
       return fetchReleases();
     }
 

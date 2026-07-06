@@ -33,10 +33,16 @@ describe('HeaderBackdrop', () => {
       expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
     });
 
-    it('switches to a transparent backdrop at xl for the starfield', () => {
+    it('keeps the black base under the xl starfield so the masthead never flashes kraft', () => {
       const { container } = render(<HeaderBackdrop />);
       const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toHaveClass('xl:bg-transparent');
+      // The starfield tile is a network-loaded background-image on ::before —
+      // it is only requested after first paint. Without a black base color the
+      // masthead renders transparent (kraft desk + unreadable nav) until the
+      // tile arrives on cold loads.
+      expect(bgDiv).toHaveClass('bg-black');
+      expect(bgDiv).not.toHaveClass('xl:bg-transparent');
+      expect(bgDiv?.className).toContain('xl:before:bg-[url(/media/ffinc-starfield-tile.png)]');
     });
   });
 

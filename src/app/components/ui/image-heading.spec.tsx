@@ -14,6 +14,7 @@ vi.mock('next/image', () => ({
       className={props.className as string | undefined}
       data-alt={props.alt as string}
       data-height={String(props.height)}
+      data-loading={(props.loading as string | undefined) ?? 'default'}
       data-priority={props.priority ? 'true' : 'false'}
       data-sizes={props.sizes as string}
       data-src={props.src as string}
@@ -117,6 +118,18 @@ describe('ImageHeading', () => {
     render(<ImageHeading {...defaultProps} />);
 
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-priority', 'false');
+  });
+
+  it('forwards an eager loading hint to the image when requested', () => {
+    render(<ImageHeading {...defaultProps} loading="eager" />);
+
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-loading', 'eager');
+  });
+
+  it('leaves the loading strategy to next/image by default', () => {
+    render(<ImageHeading {...defaultProps} />);
+
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-loading', 'default');
   });
 
   it('passes additional heading props through', () => {

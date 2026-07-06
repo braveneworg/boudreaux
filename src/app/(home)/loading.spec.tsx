@@ -41,4 +41,53 @@ describe('HomeLoading', () => {
 
     expect(wrapper).toHaveStyle({ paddingBottom: BANNER_ASPECT_PADDING });
   });
+
+  // The skeleton must mirror the hydrated landing layout per breakpoint —
+  // a mismatched fallback reads as a flash of unstyled/alien content on
+  // every client-side navigation to `/` (the carousel is `md:hidden` on
+  // desktop, where the stitched BannerStrip renders instead).
+  it('scopes the carousel-shaped banner fallback to mobile (md:hidden)', () => {
+    render(<HomeLoading />);
+    const mobileBanner = screen.getByTestId('mobile-banner-skeleton');
+
+    expect(mobileBanner).toHaveClass('md:hidden');
+    expect(mobileBanner).toContainElement(screen.getByTestId('lcp-banner-img'));
+  });
+
+  it('renders a BannerStrip-shaped skeleton for md+ with one cell per slot', () => {
+    render(<HomeLoading />);
+    const strip = screen.getByTestId('banner-strip-skeleton');
+
+    // Same frame classes as the real BannerStrip so the swap is seamless.
+    expect(strip).toHaveClass('hidden', 'md:block', 'zine-accent-yellow', 'border-2');
+
+    const cells = screen.getAllByTestId('banner-strip-skeleton-cell');
+    expect(cells).toHaveLength(BANNER_SLOTS.length);
+    cells.forEach((cell) => expect(cell).toHaveClass('aspect-[1920/1097]'));
+  });
+
+  it('wraps the content skeleton in the real ZinePanel with the landing accent', () => {
+    const { container } = render(<HomeLoading />);
+    const panel = container.querySelector('[data-slot="zine-panel"]');
+
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass('zine-accent-yellow');
+  });
+
+  it('mirrors the landing grid split: player left, wordmark + headlines right', () => {
+    render(<HomeLoading />);
+
+    const grid = screen.getByTestId('home-skeleton-grid');
+    expect(grid).toHaveClass('lg:grid', 'lg:grid-cols-2', 'lg:grid-rows-[auto_1fr]');
+
+    const heading = screen.getByTestId('featured-heading-skeleton');
+    expect(heading).toHaveClass('lg:col-start-2', 'lg:row-start-1');
+
+    const player = screen.getByTestId('player-skeleton');
+    expect(player).toHaveClass('lg:col-start-1', 'lg:row-span-2', 'lg:row-start-1');
+
+    // Headlines are desktop-only in the hydrated layout (`hidden lg:block`).
+    const headlines = screen.getByTestId('headlines-skeleton');
+    expect(headlines).toHaveClass('hidden', 'lg:block', 'lg:col-start-2', 'lg:row-start-2');
+  });
 });

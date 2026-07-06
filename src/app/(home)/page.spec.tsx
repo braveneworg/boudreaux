@@ -34,6 +34,18 @@ const mockPrefetchQuery = vi
       }
     }
   });
+const mockPrefetchInfiniteQuery = vi
+  .fn()
+  .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
+    if (opts.queryFn) {
+      // Same error-swallowing semantics as prefetchQuery above.
+      try {
+        await Promise.resolve(opts.queryFn());
+      } catch {
+        // ignored — matches TanStack prefetchInfiniteQuery semantics
+      }
+    }
+  });
 const mockDehydratedState = { queries: [], mutations: [] };
 const mockGetQueryData = vi.fn();
 
@@ -45,6 +57,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchQuery: mockPrefetchQuery,
+    prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
     getQueryData: mockGetQueryData,
   }),
 }));
@@ -64,6 +77,14 @@ vi.mock('@/lib/services/featured-artists-service', () => ({
 vi.mock('@/lib/services/banner-notification-service', () => ({
   BannerNotificationService: {
     getActiveBanners: () => mockGetActiveBanners(),
+  },
+}));
+
+const mockGetPublishedReleases = vi.fn();
+
+vi.mock('@/lib/services/release-service', () => ({
+  ReleaseService: {
+    getPublishedReleases: (...args: unknown[]) => mockGetPublishedReleases(...args),
   },
 }));
 
@@ -90,6 +111,7 @@ describe('Home Page', () => {
       success: true,
       data: { banners: [], rotationInterval: 5000 },
     });
+    mockGetPublishedReleases.mockResolvedValue({ success: true, data: [] });
   });
 
   afterEach(() => {
@@ -153,6 +175,41 @@ describe('Home Page', () => {
       banners: [],
       rotationInterval: 5000,
     });
+  });
+
+  it('prefetches the first published-releases page for the landing headlines', async () => {
+    mockGetPublishedReleases.mockResolvedValue({
+      success: true,
+      data: [{ id: 'release-1', title: 'Landing Release' }],
+    });
+
+    render(await Home());
+
+    // Same query key + page param as useInfinitePublishedReleasesQuery('') in
+    // ReleaseHeadlines, so the desktop headlines column hydrates server-filled
+    // instead of popping in after a client API roundtrip.
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        queryKey: ['releases', 'publishedInfinite', ''],
+        initialPageParam: 0,
+      })
+    );
+    expect(mockGetPublishedReleases).toHaveBeenCalledWith({ skip: 0, take: 24 });
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({
+      rows: [{ id: 'release-1', title: 'Landing Release' }],
+      nextSkip: null,
+    });
+  });
+
+  it('falls back to an empty first page when the releases service fails', async () => {
+    mockGetPublishedReleases.mockResolvedValue({ success: false, error: 'Database unavailable' });
+
+    render(await Home());
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
   });
 
   it('surfaces service failures as queryFn rejections so the client refetches', async () => {

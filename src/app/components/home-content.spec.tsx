@@ -91,6 +91,10 @@ describe('HomeContent', () => {
 
     const headingImage = screen.getByRole('img', { name: /featured artists/i });
     expect(headingImage).toHaveAttribute('src', '/media/headings/FEATURED.webp');
+    // Eager (not lazy) so the wordmark doesn't linger as an empty sketch frame
+    // after navigation — but not `priority`, which would emit a preload that
+    // goes unused below the fold on mobile.
+    expect(headingImage).toHaveAttribute('loading', 'eager');
     expect(screen.getByTestId('artist-search')).toBeInTheDocument();
   });
 

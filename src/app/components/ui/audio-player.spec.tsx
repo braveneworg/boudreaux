@@ -57,9 +57,6 @@ vi.mock('video.js', () => {
   return { default: videojs };
 });
 
-// Mock CSS imports
-vi.mock('video.js/dist/video-js.css', () => ({}));
-
 // Mock next/image
 vi.mock('next/image', () => ({
   __esModule: true,

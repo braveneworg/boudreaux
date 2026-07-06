@@ -68,7 +68,10 @@ export const HomeContent = () => {
               tall row-spanning player can't inflate the gap beneath it. */}
           <div className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-10">
             {/* No `priority`: this heading sits below the banner and search
-                input, so it's not the LCP — it lazy-loads normally. Extra
+                input, so it's not the LCP — a preload would go unused below
+                the fold on mobile. `loading="eager"` still starts the fetch at
+                render (not viewport intersection) so the wordmark doesn't
+                linger as an empty sketch frame after navigation. Extra
                 vertical air (landing only) separates the search field above
                 from the player below; on desktop the wordmark heads the
                 headlines column with ample air before the feed. */}
@@ -76,6 +79,7 @@ export const HomeContent = () => {
               src="/media/headings/FEATURED.webp"
               alt="featured artists"
               imageHeight={480}
+              loading="eager"
               className="mt-8 mb-6 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:mb-8"
             />
             <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
