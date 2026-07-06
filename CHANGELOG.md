@@ -95,6 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.186.0] - 2026-07-06
+
+### Added
+
+- fix(bio-gen): 🐛 default vision cap back to 60 (#564)\n- fix(bio-gen): 🐛 default vision cap back to 60 (#564)\n
+
 ## [4.185.0] - 2026-07-06
 
 ### Added
