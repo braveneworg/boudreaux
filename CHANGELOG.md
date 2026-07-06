@@ -96,6 +96,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.187.0] - 2026-07-06
+
+### Added
+
+- feat(bio): ✨ link OG-unfurl preview in bio editor (#565)\n- feat(bio): ✨ link OG-unfurl preview in bio editor (#565)\n
+
 ## [4.186.0] - 2026-07-06
 
 ### Added
