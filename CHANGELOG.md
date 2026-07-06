@@ -94,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.185.0] - 2026-07-06
+
+### Added
+
+- feat(bio): ✨ more vision-verified photos (phase 1) (#563)\n- feat(bio): ✨ more vision-verified photos (phase 1) (#563)\n
+
 ## [4.184.0] - 2026-07-06
 
 ### Added
