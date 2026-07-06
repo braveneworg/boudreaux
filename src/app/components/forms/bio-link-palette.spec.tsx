@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import type { ReactNode } from 'react';
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -12,6 +14,34 @@ import { BioLinkPalette } from './bio-link-palette';
 
 vi.mock('@/lib/utils/api-base-url', () => ({
   getApiBaseUrl: () => 'https://fakefourrecords.com',
+}));
+
+const mockIsMobile = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock('@/hooks/use-mobile', () => ({
+  useIsMobile: () => mockIsMobile(),
+}));
+
+vi.mock('./link-preview-card', () => ({
+  LinkPreviewCard: ({ url, enabled }: { url: string; enabled: boolean }) => (
+    <div data-testid="link-preview-card" data-url={url} data-enabled={String(enabled)} />
+  ),
+}));
+
+vi.mock('@/app/components/ui/hover-card', () => ({
+  HoverCard: ({ children }: { children: ReactNode }) => (
+    <div data-testid="mock-hover-card">{children}</div>
+  ),
+  HoverCardTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  HoverCardContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@/app/components/ui/popover', () => ({
+  Popover: ({ children }: { children: ReactNode }) => (
+    <div data-testid="mock-popover">{children}</div>
+  ),
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 const LINKS: BioStatusLink[] = [
@@ -30,6 +60,8 @@ const FILTER_LINKS: BioStatusLink[] = [
 ];
 
 describe('BioLinkPalette', () => {
+  beforeEach(() => mockIsMobile.mockReturnValue(false));
+
   it('renders one tile per link with its kind badge', () => {
     render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByText('Wikipedia')).toBeInTheDocument();
@@ -115,5 +147,59 @@ describe('BioLinkPalette', () => {
   it('disables the insert button when disabled prop is true', () => {
     render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
     expect(screen.getByRole('button', { name: 'Insert link Wikipedia' })).toBeDisabled();
+  });
+
+  it('renders a preview eye trigger for an external link', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Preview link Wikipedia' })).toBeInTheDocument();
+  });
+
+  it('renders no preview eye trigger for an internal link', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(
+      screen.queryByRole('button', { name: 'Preview link Sad, Fat Luck' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('previews external links inside a hover card on desktop', () => {
+    mockIsMobile.mockReturnValue(false);
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByTestId('mock-hover-card')).toBeInTheDocument();
+  });
+
+  it('does not use a popover on desktop', () => {
+    mockIsMobile.mockReturnValue(false);
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.queryByTestId('mock-popover')).not.toBeInTheDocument();
+  });
+
+  it('previews external links inside a popover on mobile', () => {
+    mockIsMobile.mockReturnValue(true);
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByTestId('mock-popover')).toBeInTheDocument();
+  });
+
+  it('does not use a hover card on mobile', () => {
+    mockIsMobile.mockReturnValue(true);
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.queryByTestId('mock-hover-card')).not.toBeInTheDocument();
+  });
+
+  it('passes the external link url to the preview card', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByTestId('link-preview-card')).toHaveAttribute(
+      'data-url',
+      'https://en.wikipedia.org/wiki/X'
+    );
+  });
+
+  it('keeps the preview query idle until the card is opened', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByTestId('link-preview-card')).toHaveAttribute('data-enabled', 'false');
+  });
+
+  it('disables the preview eye trigger when disabled prop is true', () => {
+    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
+    expect(screen.getByRole('button', { name: 'Preview link Wikipedia' })).toBeDisabled();
   });
 });

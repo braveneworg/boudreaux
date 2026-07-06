@@ -1,20 +1,17 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { Agent } from 'undici';
-
 import { POLLING_LIMIT, pollingLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { isDisallowedAddress } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
+import { buildPinnedDispatcher, vetHostname } from '@/lib/utils/ssrf-fetch';
 
-import type { LookupAddress, LookupOptions } from 'node:dns';
+import type { Agent } from 'undici';
 
 // Upper bound on proxied image size. Prevents unbounded memory use from
 // attacker-supplied URLs that return huge bodies. 20 MB is far larger than
@@ -41,53 +38,6 @@ const buildAllowedDomains = (): Set<string> => {
     }
   }
   return domains;
-};
-
-type VettedAddress = { address: string; family: number };
-
-/**
- * Resolves `hostname` via DNS and validates the result against the SSRF
- * blocklist. Returns the vetted address on success, or a NextResponse error
- * (403/502) that the caller should return immediately.
- */
-const resolveAndVetAddress = async (hostname: string): Promise<VettedAddress | NextResponse> => {
-  try {
-    const { address, family } = await lookup(hostname);
-    if (isDisallowedAddress(address)) {
-      loggers.s3.warn('[proxy-image] Blocked request resolving to disallowed IP', { address });
-      return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
-    }
-    return { address, family };
-  } catch (error) {
-    loggers.s3.error('[proxy-image] DNS lookup failed', error);
-    return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
-  }
-};
-
-/**
- * Builds an undici Agent whose DNS lookup is pinned to the already-validated
- * address/family pair, closing the DNS-rebinding window that node's global
- * fetch would otherwise leave open between validation and socket connect.
- * TLS SNI still uses the original hostname so certificate validation is
- * unaffected. (M2)
- */
-const buildPinnedDispatcher = (vettedAddress: string, vettedFamily: number): Agent => {
-  const pinnedLookup = (
-    _hostname: string,
-    options: LookupOptions,
-    callback: (
-      err: NodeJS.ErrnoException | null,
-      address: string | LookupAddress[],
-      family?: number
-    ) => void
-  ): void => {
-    if (options.all) {
-      callback(null, [{ address: vettedAddress, family: vettedFamily }]);
-    } else {
-      callback(null, vettedAddress, vettedFamily);
-    }
-  };
-  return new Agent({ connect: { lookup: pinnedLookup } });
 };
 
 /**
@@ -174,6 +124,28 @@ const fetchAndBuffer = async (url: string, dispatcher: Agent): Promise<NextRespo
   });
 };
 
+// The failure half of vetHostname's result. Kept local (VetResult stays
+// module-private in ssrf-fetch) via the return type of the vet function itself.
+type VetFailure = Extract<Awaited<ReturnType<typeof vetHostname>>, { ok: false }>;
+
+/**
+ * Maps a failed hostname vet to its NextResponse, preserving today's SSRF audit
+ * telemetry byte-for-byte: vetHostname no longer logs, so the route forwards the
+ * blocked address / caught error the result carries.
+ * - disallowed  → 403 { error: 'Domain not allowed' } (+ blocked-IP warn)
+ * - dns_failure → 502 { error: 'DNS lookup failed' }   (+ lookup-error log)
+ */
+const respondToVetFailure = (failure: VetFailure): NextResponse => {
+  if (failure.reason === 'disallowed') {
+    loggers.s3.warn('[proxy-image] Blocked request resolving to disallowed IP', {
+      address: failure.address,
+    });
+    return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
+  }
+  loggers.s3.error('[proxy-image] DNS lookup failed', failure.error);
+  return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
+};
+
 /**
  * Proxy endpoint to fetch remote images and return them as blobs.
  * Used by the image cropper to sidestep CORS on CDN-hosted originals.
@@ -218,8 +190,8 @@ export const GET = withRateLimit(
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
 
-    const vetted = await resolveAndVetAddress(hostname);
-    if (vetted instanceof NextResponse) return vetted;
+    const vetted = await vetHostname(hostname);
+    if (!vetted.ok) return respondToVetFailure(vetted);
 
     const pinnedDispatcher = buildPinnedDispatcher(vetted.address, vetted.family);
 

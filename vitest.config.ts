@@ -29,7 +29,7 @@ const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx', '**/rich-text-editor.spec.tsx
 // Specs that exercise REAL `sharp` (a libvips native addon) must run under the
 // `forks` pool: the default `vmThreads` pool cannot reliably load native
 // addons. Keep this list tight — every other `.spec.ts` stays on `vmThreads`.
-const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts'];
+const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.spec.ts'];
 
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {

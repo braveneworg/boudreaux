@@ -57,3 +57,10 @@ export const bioCallbackLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const BIO_CALLBACK_LIMIT = 20;
+
+/** Link-preview unfurl (admin bio editor) — 30 requests per minute. */
+export const linkPreviewLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const LINK_PREVIEW_LIMIT = 30;

@@ -383,8 +383,14 @@ const eslintConfig = [
   // so `next/image` is genuinely inapplicable — the editor-only plain `<img>`
   // is intentional. global-error likewise replaces the crashed root layout and
   // must stay dependency-light (no next/image) — its heading is a plain <img>.
+  // link-preview-card renders a bounded, self-generated `data:` webp thumbnail
+  // (no remote host to enumerate), so `next/image` adds nothing there either.
   {
-    files: ['src/app/components/ui/bio-figure-node-view.tsx', 'src/app/global-error.tsx'],
+    files: [
+      'src/app/components/ui/bio-figure-node-view.tsx',
+      'src/app/global-error.tsx',
+      'src/app/components/forms/link-preview-card.tsx',
+    ],
     rules: {
       '@next/next/no-img-element': 'off',
     },
