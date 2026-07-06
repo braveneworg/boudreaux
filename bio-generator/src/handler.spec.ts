@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import {
+  DEFAULT_VISION_CANDIDATE_LIMIT,
   lambdaHandler,
   MAX_FOLLOWED_LINKS,
-  MAX_VISION_CANDIDATES,
   runBioGeneration,
+  runLambda,
+  visionCandidateLimit,
 } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
@@ -588,7 +590,7 @@ describe('runBioGeneration', () => {
   });
 
   it('caps total images at 100 when vision returns more than the global limit', async () => {
-    // Verify receives ≤MAX_VISION_CANDIDATES candidates; mock always returns 150 to
+    // Verify receives ≤visionCandidateLimit() candidates; mock always returns 150 to
     // confirm the global MAX_IMAGES=100 cap fires regardless.
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -597,7 +599,7 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: Array.from({ length: MAX_VISION_CANDIDATES + 20 }, (_, i) => ({
+          images: Array.from({ length: visionCandidateLimit() + 20 }, (_, i) => ({
             url: `https://a.example/photo-${i}.jpg`,
             alt: `Photo ${i}`,
             sourceUrl: 'https://a.example/bio',
@@ -821,7 +823,7 @@ describe('runBioGeneration', () => {
     expect(lookupArtist).toHaveBeenNthCalledWith(2, 'Julio Francisco Ramos');
   });
 
-  it('caps scraped candidates at MAX_VISION_CANDIDATES before vision verification', async () => {
+  it('caps scraped candidates at the vision candidate limit before vision verification', async () => {
     const verifyMock = vi.fn().mockResolvedValue([]);
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),
@@ -830,7 +832,7 @@ describe('runBioGeneration', () => {
         .mockResolvedValueOnce({
           sourceText: 'Web context.',
           sourceUrls: ['https://a.example/bio'],
-          images: Array.from({ length: MAX_VISION_CANDIDATES + 5 }, (_, i) => ({
+          images: Array.from({ length: visionCandidateLimit() + 5 }, (_, i) => ({
             url: `https://a.example/photo-${i}.jpg`,
             alt: `Photo ${i}`,
             sourceUrl: 'https://a.example/bio',
@@ -844,7 +846,7 @@ describe('runBioGeneration', () => {
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
 
     const [candidates] = (verifyMock as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown[]];
-    expect(candidates).toHaveLength(MAX_VISION_CANDIDATES);
+    expect(candidates).toHaveLength(visionCandidateLimit());
   });
 
   it('caps links at 100 when many candidates exist', async () => {
@@ -869,6 +871,28 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
     expect(result.links.length).toBe(100);
+  });
+});
+
+describe('visionCandidateLimit', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults to 180 when VISION_CANDIDATE_LIMIT is unset or empty', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', '');
+    expect(visionCandidateLimit()).toBe(180);
+    expect(DEFAULT_VISION_CANDIDATE_LIMIT).toBe(180);
+  });
+
+  it('uses VISION_CANDIDATE_LIMIT when it is a positive integer', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', '250');
+    expect(visionCandidateLimit()).toBe(250);
+  });
+
+  it('falls back to the default when VISION_CANDIDATE_LIMIT is not a positive integer', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', 'nonsense');
+    expect(visionCandidateLimit()).toBe(DEFAULT_VISION_CANDIDATE_LIMIT);
   });
 });
 
@@ -1023,7 +1047,7 @@ describe('lambdaHandler', () => {
     const postCallback = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ postCallback });
 
-    await lambdaHandler(
+    await runLambda(
       {
         artistId: 'a1',
         displayName: 'Radiohead',
@@ -1047,7 +1071,7 @@ describe('lambdaHandler', () => {
       getGeminiApiKey: vi.fn().mockRejectedValue(new Error('no api key')),
     });
 
-    await lambdaHandler(
+    await runLambda(
       {
         artistId: 'a1',
         displayName: 'Radiohead',
@@ -1066,9 +1090,39 @@ describe('lambdaHandler', () => {
     const postCallback = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ postCallback });
 
-    await lambdaHandler({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+    await runLambda({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
     expect(postCallback).not.toHaveBeenCalled();
+  });
+
+  it('ignores an AWS context passed as the second argument (regression: v4.183.0 hang)', async () => {
+    // AWS invokes the handler as (event, context). The context object is NOT a
+    // deps bag — it has no getGeminiApiKey/postCallback — so binding it to `deps`
+    // made every invoke throw at getGeminiApiKey and, worse, the failure callback
+    // (deps.postCallback) also threw unhandled, so no callback was ever sent and
+    // the web job hung forever in `processing`. The handler must ignore arg 2 and
+    // use its real defaultDeps.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network disabled in test')));
+    const awsContext = {
+      functionName: 'bio-generator',
+      awsRequestId: 'req-1',
+      getRemainingTimeInMillis: () => 900_000,
+    };
+
+    const result = await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      awsContext
+    );
+
+    // Resolves cleanly (real getGeminiApiKey throws for lack of SSM env → ok:false)
+    // rather than rejecting with "getGeminiApiKey/postCallback is not a function".
+    expect(result.ok).toBe(false);
+    vi.unstubAllGlobals();
   });
 });
 

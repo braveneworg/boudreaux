@@ -1,9 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type {
   BioGenerationStatusResult,
   GeneratedBioContent,
@@ -232,5 +233,28 @@ describe('ArtistBioGenerationSection', () => {
         screen.getByText(/regenerating replaces the palette images and links/i)
       ).toBeInTheDocument()
     );
+  });
+
+  it('times out the UI when a triggered run never reaches a terminal status', async () => {
+    // Status stays `processing` forever (server never returns a terminal status,
+    // e.g. its endpoint is unreachable). The form must still resolve rather than
+    // show the working state and poll indefinitely.
+    vi.useFakeTimers();
+    try {
+      statusReturn = { status: 'processing', error: null, content: null };
+      render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+      // Flush the fire-and-forget generate() so `active` flips true and arms the timer.
+      await act(async () => {});
+
+      await act(async () => {
+        vi.advanceTimersByTime(CLIENT_POLL_DEADLINE_MS + 1000);
+      });
+
+      expect(toastError).toHaveBeenCalledWith('Bio generation timed out. Please try again.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

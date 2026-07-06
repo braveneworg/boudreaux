@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { STALE_JOB_MS } from '@/lib/validation/bio-generation-schema';
 import type {
   BioGenerationData,
   BioGenerationResult,
@@ -992,6 +993,55 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     expect(result?.status).toBe('processing');
     expect(result?.content).toBeNull();
+  });
+
+  it('coerces a processing job older than STALE_JOB_MS to failed on read', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'processing',
+        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('failed');
+  });
+
+  it('surfaces a timed-out error when coercing a stale in-flight job', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'processing',
+        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.error).toBe('Bio generation timed out. Please try again.');
+  });
+
+  it('coerces a stale pending job (dispatch never started) to failed', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'pending',
+        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('failed');
+  });
+
+  it('leaves a processing job started within STALE_JOB_MS as processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'processing', bioStartedAt: new Date(Date.now() - 60_000) })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('processing');
   });
 
   it('reports a failed job with its error and no content', async () => {

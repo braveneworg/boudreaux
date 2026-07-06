@@ -133,6 +133,84 @@ const processThumbnail = async (
 };
 
 /**
+ * Mutable accumulators threaded through {@link rehostOne} across one
+ * {@link BioImageService.rehostImages} batch: the dedupe indexes, the
+ * duplicate-alias map, and the per-reason drop counters for the summary log.
+ */
+interface RehostBatchState {
+  /** content-hash → survivor CDN URL, for exact-duplicate detection. */
+  seenHashes: Map<string, string>;
+  /** Survivor dHashes paired with their CDN url, for perceptual near-dup checks. */
+  seenPerceptualHashes: Array<{ hash: bigint; url: string }>;
+  /** Each dropped duplicate's input index → surviving copy's CDN URL. */
+  duplicateAliases: Map<number, string>;
+  /** Per-reason tallies emitted by the rehost summary log. */
+  counts: {
+    accepted: number;
+    fetchFailed: number;
+    exactDuplicate: number;
+    lowQuality: number;
+    nearDuplicate: number;
+  };
+}
+
+/**
+ * Dedupe, quality-gate, and re-host one successfully-fetched image buffer.
+ * Mutates `state` (dedupe indexes, alias map, and drop counters) and returns
+ * the re-hosted thumbnail — or `null` when the image is an exact duplicate,
+ * below the quality floor, a perceptual near-duplicate, or fails to process.
+ */
+const rehostOne = async (
+  buffer: Buffer,
+  artistId: string,
+  index: number,
+  state: RehostBatchState
+): Promise<RehostedImage | null> => {
+  try {
+    const hash = createHash('sha256').update(buffer).digest('hex');
+    const survivorUrl = state.seenHashes.get(hash);
+    if (survivorUrl !== undefined) {
+      logger.warn('bio_image_duplicate_skipped', { index });
+      state.duplicateAliases.set(index, survivorUrl);
+      state.counts.exactDuplicate += 1;
+      return null;
+    }
+
+    const assessment = await assessImageQuality(buffer);
+    if (isBelowQualityFloor(assessment)) {
+      logger.warn('bio_image_low_quality_skipped', {
+        index,
+        width: assessment.width,
+        height: assessment.height,
+        sharpness: assessment.sharpness,
+      });
+      state.counts.lowQuality += 1;
+      return null;
+    }
+
+    const nearDuplicateMatch = state.seenPerceptualHashes.find(
+      (seen) => hammingDistance(seen.hash, assessment.dHash) <= NEAR_DUPLICATE_MAX_DISTANCE
+    );
+    if (nearDuplicateMatch !== undefined) {
+      logger.warn('bio_image_near_duplicate_skipped', { index });
+      state.duplicateAliases.set(index, nearDuplicateMatch.url);
+      state.counts.nearDuplicate += 1;
+      return null;
+    }
+
+    const rehosted = await processThumbnail(buffer, artistId, index);
+    state.seenHashes.set(hash, rehosted.url);
+    state.seenPerceptualHashes.push({ hash: assessment.dHash, url: rehosted.url });
+    state.counts.accepted += 1;
+    return rehosted;
+  } catch (error) {
+    logger.warn('Bio image fetch or upload failed', { error });
+    state.counts.fetchFailed += 1;
+    return null;
+  }
+};
+
+/**
  * Re-hosts AI-discovered bio images into our own S3 — no external hotlinks.
  */
 export class BioImageService {
@@ -210,12 +288,13 @@ export class BioImageService {
 
     // Phase 2: hash-check and upload sequentially in INPUT INDEX ORDER so the
     // lowest-index copy of each distinct hash always survives the dedupe.
-    // seenHashes maps content-hash → survivor CDN URL for alias look-ups.
-    const seenHashes = new Map<string, string>();
-    // Survivor dHashes paired with their CDN url, for perceptual near-dup checks.
-    const seenPerceptualHashes: Array<{ hash: bigint; url: string }> = [];
+    const state: RehostBatchState = {
+      seenHashes: new Map(),
+      seenPerceptualHashes: [],
+      duplicateAliases: new Map(),
+      counts: { accepted: 0, fetchFailed: 0, exactDuplicate: 0, lowQuality: 0, nearDuplicate: 0 },
+    };
     const results: Array<RehostedImage | null> = [];
-    const duplicateAliases = new Map<number, string>();
 
     for (const [i, result] of settled.entries()) {
       // images and settled always share the same length; the guard is for TS.
@@ -227,55 +306,16 @@ export class BioImageService {
 
       if (result.status === 'rejected') {
         logger.warn('Bio image fetch or upload failed', { error: result.reason });
+        state.counts.fetchFailed += 1;
         results.push(null);
         continue;
       }
 
-      try {
-        const { buffer } = result.value;
-        const hash = createHash('sha256').update(buffer).digest('hex');
-        const survivorUrl = seenHashes.get(hash);
-
-        if (survivorUrl !== undefined) {
-          logger.warn('bio_image_duplicate_skipped', { index: image.index });
-          duplicateAliases.set(image.index, survivorUrl);
-          results.push(null);
-          continue;
-        }
-
-        const assessment = await assessImageQuality(buffer);
-
-        if (isBelowQualityFloor(assessment)) {
-          logger.warn('bio_image_low_quality_skipped', {
-            index: image.index,
-            width: assessment.width,
-            height: assessment.height,
-            sharpness: assessment.sharpness,
-          });
-          results.push(null);
-          continue;
-        }
-
-        const nearDuplicate = seenPerceptualHashes.find(
-          (seen) => hammingDistance(seen.hash, assessment.dHash) <= NEAR_DUPLICATE_MAX_DISTANCE
-        );
-        if (nearDuplicate !== undefined) {
-          logger.warn('bio_image_near_duplicate_skipped', { index: image.index });
-          duplicateAliases.set(image.index, nearDuplicate.url);
-          results.push(null);
-          continue;
-        }
-
-        const rehosted = await processThumbnail(buffer, artistId, image.index);
-        seenHashes.set(hash, rehosted.url);
-        seenPerceptualHashes.push({ hash: assessment.dHash, url: rehosted.url });
-        results.push(rehosted);
-      } catch (error) {
-        logger.warn('Bio image fetch or upload failed', { error });
-        results.push(null);
-      }
+      results.push(await rehostOne(result.value.buffer, artistId, image.index, state));
     }
 
-    return { results, duplicateAliases };
+    logger.info('bio_image_rehost_summary', { input: images.length, ...state.counts });
+
+    return { results, duplicateAliases: state.duplicateAliases };
   }
 }

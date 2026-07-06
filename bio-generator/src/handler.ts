@@ -79,8 +79,19 @@ const MAX_LINKS = 100;
 const MAX_COMMONS_CATEGORY_IMAGES = 30;
 /** Cover Art Archive front covers resolved per artist. */
 const MAX_COVER_ART = 40;
-/** Global cap on scraped candidates entering vision verification. */
-export const MAX_VISION_CANDIDATES = 60;
+/** Default cap on scraped candidates entering vision verification. */
+export const DEFAULT_VISION_CANDIDATE_LIMIT = 180;
+
+/**
+ * Cap on scraped candidates entering vision verification. The default ships in
+ * code; `VISION_CANDIDATE_LIMIT` is an optional per-deploy override for tuning
+ * (up to ~300) without a code change. Deliberately NOT pinned in template.yaml,
+ * so it can never silently drift the way the removed GeminiModel parameter did.
+ */
+export const visionCandidateLimit = (): number => {
+  const raw = Number(process.env.VISION_CANDIDATE_LIMIT);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_VISION_CANDIDATE_LIMIT;
+};
 
 /** Known link hosts worth following one level deep for additional images. */
 const LINK_FOLLOW_HOSTS = ['bandcamp.com', 'discogs.com'] as const;
@@ -477,7 +488,7 @@ const applyVerifiedScrapedImages = async (
       ...acc.releaseGroups.map((group) => group.title),
     ],
   };
-  const verified = await verify(candidates.slice(0, MAX_VISION_CANDIDATES), context);
+  const verified = await verify(candidates.slice(0, visionCandidateLimit()), context);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
@@ -657,13 +668,15 @@ const runToResult = async (
 };
 
 /**
- * Lambda entry point. Invoked directly (not via HTTP) by the web app's
- * bio-generation service. Returns a discriminated result envelope so the
- * caller can branch on success without throwing across the invoke boundary.
- * When the event carries a `callbackUrl` + `jobToken`, the same result is also
- * POSTed back to that async callback (best-effort) before returning.
+ * The testable core of the Lambda: validate the event, run the generation, and
+ * — when the event carries a `callbackUrl` + `jobToken` — POST the result back
+ * to the web app's async completion callback (best-effort) before returning a
+ * discriminated result envelope. `deps` is the dependency-injection seam used
+ * by unit tests; it must NEVER be wired to a positional handler argument, since
+ * AWS fills the handler's second argument with the Lambda context, not deps
+ * (see {@link lambdaHandler}).
  */
-export const lambdaHandler = async (
+export const runLambda = async (
   event: unknown,
   deps: BioGeneratorDeps = defaultDeps
 ): Promise<BioGenerationResult> => {
@@ -683,3 +696,17 @@ export const lambdaHandler = async (
   }
   return result;
 };
+
+/**
+ * AWS Lambda entry point (registered as `handler.lambdaHandler`). AWS invokes an
+ * async handler as `(event, context)`, so the second argument is the Lambda
+ * context — NOT a dependency bag. It is accepted and deliberately ignored here
+ * so it can never be mistaken for `deps`: binding context to `deps` is exactly
+ * what broke every invocation (and orphaned every job) in v4.183.0. All work —
+ * and the injectable seam — lives in {@link runLambda}, always run against the
+ * real {@link defaultDeps}.
+ */
+export const lambdaHandler = async (
+  event: unknown,
+  _context?: unknown
+): Promise<BioGenerationResult> => runLambda(event);
