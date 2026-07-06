@@ -98,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.189.0] - 2026-07-06
+
+### Added
+
+- fix: 🔨make claude.md reference global agents.md (#567)\n- fix: 🔨make claude.md reference global agents.md (#567)\n
+
 ## [4.188.0] - 2026-07-06
 
 ### Added
