@@ -19,6 +19,7 @@ import { useGenerateArtistBioMutation } from '@/app/hooks/mutations/use-bio-muta
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { cn } from '@/lib/utils';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
+import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
 interface ArtistBioGenerationSectionProps {
@@ -140,6 +141,21 @@ export const ArtistBioGenerationSection = ({
       setActive(false);
     }
   }, [active, status.data, onGenerated]);
+
+  // Last-resort client stop: if a triggered run never reaches a terminal status
+  // (e.g. the status endpoint is unreachable), give up after the deadline so the
+  // form resolves instead of showing the working state and polling forever.
+  // Disabling `active` also stops the status query (it is `enabled: active`). The
+  // server's stale-job coercion normally flips the job to `failed` first (see
+  // STALE_JOB_MS); this only fires when no terminal status ever arrives.
+  useEffect(() => {
+    if (!active) return;
+    const timeoutId = setTimeout(() => {
+      toast.error('Bio generation timed out. Please try again.');
+      setActive(false);
+    }, CLIENT_POLL_DEADLINE_MS);
+    return () => clearTimeout(timeoutId);
+  }, [active]);
 
   // Disable inputs while triggering or while a background job is in flight.
   const isPending = isGeneratingArtistBio || active;

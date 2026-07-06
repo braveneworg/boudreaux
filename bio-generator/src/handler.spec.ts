@@ -7,6 +7,7 @@ import {
   MAX_FOLLOWED_LINKS,
   MAX_VISION_CANDIDATES,
   runBioGeneration,
+  runLambda,
 } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
@@ -1023,7 +1024,7 @@ describe('lambdaHandler', () => {
     const postCallback = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ postCallback });
 
-    await lambdaHandler(
+    await runLambda(
       {
         artistId: 'a1',
         displayName: 'Radiohead',
@@ -1047,7 +1048,7 @@ describe('lambdaHandler', () => {
       getGeminiApiKey: vi.fn().mockRejectedValue(new Error('no api key')),
     });
 
-    await lambdaHandler(
+    await runLambda(
       {
         artistId: 'a1',
         displayName: 'Radiohead',
@@ -1066,9 +1067,39 @@ describe('lambdaHandler', () => {
     const postCallback = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ postCallback });
 
-    await lambdaHandler({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+    await runLambda({ artistId: 'a1', displayName: 'Radiohead' }, deps);
 
     expect(postCallback).not.toHaveBeenCalled();
+  });
+
+  it('ignores an AWS context passed as the second argument (regression: v4.183.0 hang)', async () => {
+    // AWS invokes the handler as (event, context). The context object is NOT a
+    // deps bag — it has no getGeminiApiKey/postCallback — so binding it to `deps`
+    // made every invoke throw at getGeminiApiKey and, worse, the failure callback
+    // (deps.postCallback) also threw unhandled, so no callback was ever sent and
+    // the web job hung forever in `processing`. The handler must ignore arg 2 and
+    // use its real defaultDeps.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network disabled in test')));
+    const awsContext = {
+      functionName: 'bio-generator',
+      awsRequestId: 'req-1',
+      getRemainingTimeInMillis: () => 900_000,
+    };
+
+    const result = await lambdaHandler(
+      {
+        artistId: 'a1',
+        displayName: 'Radiohead',
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      awsContext
+    );
+
+    // Resolves cleanly (real getGeminiApiKey throws for lack of SSM env → ok:false)
+    // rather than rejecting with "getGeminiApiKey/postCallback is not a function".
+    expect(result.ok).toBe(false);
+    vi.unstubAllGlobals();
   });
 });
 

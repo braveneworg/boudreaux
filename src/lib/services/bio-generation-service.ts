@@ -21,6 +21,8 @@ import {
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
 import {
+  isInFlightBioStatus,
+  STALE_JOB_MS,
   type BioGenerationData,
   type BioGenerationResult,
   type BioGenerationStatusResult,
@@ -37,6 +39,12 @@ let lambdaClient: LambdaClient | null = null;
 // 202 immediately (then POSTs its result to the callback route), so the HTTP
 // client only needs a short timeout to cover the dispatch round-trip.
 export const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
+
+/**
+ * User-facing error the status read attaches when it coerces a timed-out
+ * in-flight job (older than {@link STALE_JOB_MS}) to `failed`.
+ */
+const STALE_JOB_ERROR = 'Bio generation timed out. Please try again.';
 
 const getLambdaClient = (): LambdaClient => {
   if (!lambdaClient) {
@@ -617,10 +625,24 @@ export class BioGenerationService {
       return null;
     }
 
-    const status = (state.bioStatus as BioStatus | null) ?? null;
+    const rawStatus = (state.bioStatus as BioStatus | null) ?? null;
+
+    // A job still in flight past STALE_JOB_MS is dead: the Lambda's 15-minute
+    // timeout has elapsed with no completion callback (killed mid-run, or the
+    // callback POST was lost). Coerce it to `failed` on read so the polling UI
+    // resolves instead of hanging on `processing` forever. Non-persistent — a
+    // late callback can still claim and complete the underlying row.
+    const startedAtMs = state.bioStartedAt?.getTime();
+    const isStale =
+      isInFlightBioStatus(rawStatus) &&
+      startedAtMs !== undefined &&
+      Date.now() - startedAtMs > STALE_JOB_MS;
+
+    const status = isStale ? 'failed' : rawStatus;
+    const error = isStale ? STALE_JOB_ERROR : (state.bioError ?? null);
     const content = BioGenerationService.buildBioContent(state, status);
 
-    return { status, error: state.bioError ?? null, content };
+    return { status, error, content };
   }
 
   /**
