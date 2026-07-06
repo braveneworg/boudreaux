@@ -19,8 +19,10 @@ const HeaderBackdrop = () => {
     <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
       {/* Animated background layer — mobile particles below `xl`, the desktop
           starfield tile at `xl`. Driven by viewport width (CSS), not the
-          server's User-Agent guess. */}
-      <div className="header-bg-pulse absolute inset-0 bg-black before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:content-[''] xl:bg-transparent xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-auto xl:before:bg-repeat" />
+          server's User-Agent guess. The black base stays at every breakpoint:
+          the starfield tile on ::before is fetched only after first paint, so
+          without it the masthead flashes transparent (kraft) on cold loads. */}
+      <div className="header-bg-pulse absolute inset-0 bg-black before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:content-[''] xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-auto xl:before:bg-repeat" />
       {/* Sparkle overlay */}
       <div className="pointer-events-none absolute inset-0 z-10">
         {/* Main sparkles */}
