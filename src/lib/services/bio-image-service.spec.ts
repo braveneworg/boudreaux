@@ -5,6 +5,7 @@
 import { createHash } from 'crypto';
 
 import type * as ImageQualityModule from '@/lib/utils/image-quality';
+import { loggers } from '@/lib/utils/logger';
 
 import { BioImageService } from './bio-image-service';
 
@@ -657,5 +658,47 @@ describe('BioImageService.rehostImages', () => {
     expect(results[1]).not.toBeNull();
     expect(duplicateAliases.size).toBe(0);
     expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs a rehost summary counting accepted images and each drop reason', async () => {
+    const infoSpy = vi.spyOn(loggers.media, 'info');
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([4, 5, 6]), {
+            status: 200,
+            headers: { 'Content-Type': 'image/jpeg' },
+          })
+        )
+    );
+
+    await BioImageService.rehostImages(
+      [
+        { url: 'https://x/a.jpg', index: 0 },
+        { url: 'https://x/b.jpg', index: 1 },
+      ],
+      'artist-1'
+    );
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 2,
+        accepted: 2,
+        fetchFailed: 0,
+        exactDuplicate: 0,
+        lowQuality: 0,
+        nearDuplicate: 0,
+      })
+    );
+    infoSpy.mockRestore();
   });
 });
