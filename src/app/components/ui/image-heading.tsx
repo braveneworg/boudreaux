@@ -23,6 +23,14 @@ export interface ImageHeadingProps extends Omit<HeadingProps, 'children'> {
   imageClassName?: string;
   /** Whether to mark the image as a high-priority LCP candidate. */
   priority?: boolean;
+  /**
+   * Browser loading strategy for the image. `eager` starts the fetch at render
+   * instead of on viewport intersection — the middle ground for headings that
+   * aren't the LCP (no `priority` preload) but shouldn't linger as an empty
+   * sketch-stroke frame while a lazy fetch waits. Omit for next/image's
+   * default (lazy unless `priority`).
+   */
+  loading?: 'eager' | 'lazy';
   /** Whether to trace the wordmark with the hand-drawn zine sketch strokes. Defaults to on. */
   sketched?: boolean;
 }
@@ -45,6 +53,7 @@ const ImageHeading = ({
   imageClassName,
   level = 1,
   priority = false,
+  loading,
   sketched = true,
   ...headingProps
 }: ImageHeadingProps) => {
@@ -56,6 +65,7 @@ const ImageHeading = ({
       height={imageHeight}
       sizes="(min-width: 640px) 224px, 100vw"
       priority={priority}
+      loading={loading}
       className={cn('h-auto w-full sm:h-14 sm:w-auto', imageClassName)}
     />
   );
