@@ -164,6 +164,16 @@ export const isInFlightBioStatus = (status: BioStatus | null | undefined): boole
   status === 'pending' || status === 'processing';
 
 /**
+ * A job is considered stale (abandoned — the server restarted mid-run, the
+ * Lambda was killed at its 15-minute timeout, or the completion callback was
+ * lost) once it has been `pending`/`processing` longer than this. Must exceed
+ * the Lambda's 15-minute timeout so a healthy in-flight job is never treated as
+ * dead. Used both to let a new trigger supersede an abandoned run and to resolve
+ * the polling UI — the status read coerces a job older than this to `failed`.
+ */
+export const STALE_JOB_MS = 17 * 60 * 1000;
+
+/**
  * Result of *triggering* async bio generation. Generation now runs in the
  * background (Next.js `after()`); the action returns immediately with the job
  * status, and the client polls {@link BioGenerationStatusResult} for completion.

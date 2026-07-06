@@ -12,6 +12,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
+  STALE_JOB_MS,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -22,14 +23,6 @@ import {
 } from './generate-artist-bio-action-helpers';
 
 const logger = loggers.media;
-
-/**
- * A job is considered stale (abandoned, e.g. the server restarted mid-run) once
- * it has been `pending`/`processing` longer than this, after which a new trigger
- * is allowed to supersede it. Must exceed the Lambda's 15-minute timeout so an
- * in-flight ASYNC job is never superseded mid-run.
- */
-const STALE_JOB_MS = 17 * 60 * 1000;
 
 /**
  * Triggers (or re-triggers) async generation of an artist's bio. Admin-only.
