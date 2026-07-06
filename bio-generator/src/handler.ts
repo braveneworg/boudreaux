@@ -79,8 +79,19 @@ const MAX_LINKS = 100;
 const MAX_COMMONS_CATEGORY_IMAGES = 30;
 /** Cover Art Archive front covers resolved per artist. */
 const MAX_COVER_ART = 40;
-/** Global cap on scraped candidates entering vision verification. */
-export const MAX_VISION_CANDIDATES = 60;
+/** Default cap on scraped candidates entering vision verification. */
+export const DEFAULT_VISION_CANDIDATE_LIMIT = 180;
+
+/**
+ * Cap on scraped candidates entering vision verification. The default ships in
+ * code; `VISION_CANDIDATE_LIMIT` is an optional per-deploy override for tuning
+ * (up to ~300) without a code change. Deliberately NOT pinned in template.yaml,
+ * so it can never silently drift the way the removed GeminiModel parameter did.
+ */
+export const visionCandidateLimit = (): number => {
+  const raw = Number(process.env.VISION_CANDIDATE_LIMIT);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_VISION_CANDIDATE_LIMIT;
+};
 
 /** Known link hosts worth following one level deep for additional images. */
 const LINK_FOLLOW_HOSTS = ['bandcamp.com', 'discogs.com'] as const;
@@ -477,7 +488,7 @@ const applyVerifiedScrapedImages = async (
       ...acc.releaseGroups.map((group) => group.title),
     ],
   };
-  const verified = await verify(candidates.slice(0, MAX_VISION_CANDIDATES), context);
+  const verified = await verify(candidates.slice(0, visionCandidateLimit()), context);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
