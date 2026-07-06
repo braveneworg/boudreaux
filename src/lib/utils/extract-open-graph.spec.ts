@@ -162,4 +162,29 @@ describe('extractOpenGraph', () => {
       `<meta property="og:description" content="Below Cap" />`;
     expect(extractOpenGraph(html, PAGE_URL).description).toBeNull();
   });
+
+  it('does not throw on an out-of-range hex numeric entity', () => {
+    const html = `<head><meta property="og:title" content="X&#x110000;Y" /></head>`;
+    expect(() => extractOpenGraph(html, PAGE_URL)).not.toThrow();
+  });
+
+  it('preserves an out-of-range hex numeric entity as literal text', () => {
+    const html = `<head><meta property="og:title" content="X&#x110000;Y" /></head>`;
+    expect(extractOpenGraph(html, PAGE_URL).title).toContain('&#x110000;');
+  });
+
+  it('does not throw on an out-of-range decimal numeric entity', () => {
+    const html = `<head><meta property="og:title" content="A&#9999999999;B" /></head>`;
+    expect(() => extractOpenGraph(html, PAGE_URL)).not.toThrow();
+  });
+
+  it('preserves an out-of-range decimal numeric entity as literal text', () => {
+    const html = `<head><meta property="og:title" content="A&#9999999999;B" /></head>`;
+    expect(extractOpenGraph(html, PAGE_URL).title).toContain('&#9999999999;');
+  });
+
+  it('decodes a valid hex numeric entity in meta content', () => {
+    const html = `<head><meta property="og:title" content="1 &#x3C; 2" /></head>`;
+    expect(extractOpenGraph(html, PAGE_URL).title).toBe('1 < 2');
+  });
 });

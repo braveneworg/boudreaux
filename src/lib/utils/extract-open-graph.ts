@@ -14,14 +14,23 @@ export interface OpenGraphTags {
 /** Region scanned for meta tags when the document has no `</head>` (~512 KB). */
 const HEAD_BYTE_CAP = 512 * 1024;
 
+/** Convert a numeric character reference's code point to its character, or —
+ *  when the code point is not a valid Unicode scalar value (NaN, above the max
+ *  code point, or a surrogate) — return the raw matched entity unchanged so the
+ *  decode degrades to literal text instead of throwing `RangeError`. */
+const codePointToChar = (cp: number, rawMatch: string): string => {
+  if (Number.isNaN(cp) || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return rawMatch;
+  return String.fromCodePoint(cp);
+};
+
 /** Decode the HTML entities that appear in meta content (`&amp;` decoded last
  *  so an already-decoded `&` is never re-interpreted). */
 const decodeEntities = (text: string): string =>
   text
-    .replace(/&#x([0-9a-fA-F]+);/g, (_full: string, hex: string) =>
-      String.fromCodePoint(parseInt(hex, 16))
+    .replace(/&#x([0-9a-fA-F]+);/g, (full: string, hex: string) =>
+      codePointToChar(parseInt(hex, 16), full)
     )
-    .replace(/&#(\d+);/g, (_full: string, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&#(\d+);/g, (full: string, dec: string) => codePointToChar(parseInt(dec, 10), full))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
