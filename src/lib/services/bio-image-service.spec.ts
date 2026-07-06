@@ -358,6 +358,7 @@ describe('BioImageService.rehostImages', () => {
           })
         )
     );
+    const infoSpy = vi.spyOn(loggers.media, 'info');
 
     const result = await BioImageService.rehostImages(
       [
@@ -370,10 +371,25 @@ describe('BioImageService.rehostImages', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(result.results[0]).not.toBeNull();
     expect(result.results[1]).toBeNull();
+    // Lock the reason -> counter mapping: the second copy is an exact SHA-256
+    // duplicate, so it must increment `exactDuplicate` (and only that drop).
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 2,
+        accepted: 1,
+        fetchFailed: 0,
+        exactDuplicate: 1,
+        lowQuality: 0,
+        nearDuplicate: 0,
+      })
+    );
+    infoSpy.mockRestore();
   });
 
   it('returns null for an image whose fetch fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 404 })));
+    const infoSpy = vi.spyOn(loggers.media, 'info');
 
     const result = await BioImageService.rehostImages(
       [{ url: 'https://x/a.jpg', index: 0 }],
@@ -382,6 +398,19 @@ describe('BioImageService.rehostImages', () => {
 
     expect(sendMock).not.toHaveBeenCalled();
     expect(result.results).toEqual([null]);
+    // A non-200 fetch must increment `fetchFailed` (and only that drop).
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 1,
+        accepted: 0,
+        fetchFailed: 1,
+        exactDuplicate: 0,
+        lowQuality: 0,
+        nearDuplicate: 0,
+      })
+    );
+    infoSpy.mockRestore();
   });
 
   it('earlier-index image survives deduplication even when its fetch resolves last', async () => {
@@ -553,6 +582,7 @@ describe('BioImageService.rehostImages', () => {
       dHash: 1n,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+    const infoSpy = vi.spyOn(loggers.media, 'info');
 
     const { results, duplicateAliases } = await BioImageService.rehostImages(
       [{ url: 'https://x/small.jpg', index: 0 }],
@@ -562,6 +592,19 @@ describe('BioImageService.rehostImages', () => {
     expect(results).toEqual([null]);
     expect(duplicateAliases.size).toBe(0);
     expect(sendMock).not.toHaveBeenCalled();
+    // A sub-resolution image must increment `lowQuality` (and only that drop).
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 1,
+        accepted: 0,
+        fetchFailed: 0,
+        exactDuplicate: 0,
+        lowQuality: 1,
+        nearDuplicate: 0,
+      })
+    );
+    infoSpy.mockRestore();
   });
 
   it('drops a blurry image below the sharpness floor', async () => {
@@ -572,6 +615,7 @@ describe('BioImageService.rehostImages', () => {
       dHash: 1n,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(imageResponse()));
+    const infoSpy = vi.spyOn(loggers.media, 'info');
 
     const { results, duplicateAliases } = await BioImageService.rehostImages(
       [{ url: 'https://x/blurry.jpg', index: 0 }],
@@ -581,6 +625,20 @@ describe('BioImageService.rehostImages', () => {
     expect(results).toEqual([null]);
     expect(duplicateAliases.size).toBe(0);
     expect(sendMock).not.toHaveBeenCalled();
+    // The sharpness floor is also a low-quality drop -> `lowQuality`, not
+    // another counter.
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 1,
+        accepted: 0,
+        fetchFailed: 0,
+        exactDuplicate: 0,
+        lowQuality: 1,
+        nearDuplicate: 0,
+      })
+    );
+    infoSpy.mockRestore();
   });
 
   it('aliases a perceptual near-duplicate to the surviving copy', async () => {
@@ -605,6 +663,7 @@ describe('BioImageService.rehostImages', () => {
         })
       );
     vi.stubGlobal('fetch', fetchMock);
+    const infoSpy = vi.spyOn(loggers.media, 'info');
 
     const { results, duplicateAliases } = await BioImageService.rehostImages(
       [
@@ -618,6 +677,20 @@ describe('BioImageService.rehostImages', () => {
     expect(results[1]).toBeNull();
     expect(duplicateAliases.get(1)).toBe(results[0]?.url);
     expect(sendMock).toHaveBeenCalledTimes(1);
+    // The second copy is a perceptual (dHash) near-duplicate, so it must
+    // increment `nearDuplicate` (and only that drop).
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({
+        input: 2,
+        accepted: 1,
+        fetchFailed: 0,
+        exactDuplicate: 0,
+        lowQuality: 0,
+        nearDuplicate: 1,
+      })
+    );
+    infoSpy.mockRestore();
   });
 
   it('keeps two perceptually-distinct images', async () => {
