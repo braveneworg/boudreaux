@@ -4,12 +4,15 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { HomeContent } from '@/components/home-content';
+import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import {
   type BannersApiResponse,
   BannerNotificationService,
 } from '@/lib/services/banner-notification-service';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { ReleaseService } from '@/lib/services/release-service';
+import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { getQueryClient } from '@/lib/utils/get-query-client';
@@ -86,6 +89,26 @@ export default async function Home() {
           throw new Error(result.error);
         }
         return result.data;
+      },
+    }),
+    // First page of the desktop headlines feed. The query key and
+    // initialPageParam must exactly match useInfinitePublishedReleasesQuery('')
+    // in ReleaseHeadlines or hydration misses and the column renders empty
+    // until a client refetch — the last piece of the landing that used to pop
+    // in after navigation. Same service-direct pattern as /releases/page.tsx.
+    queryClient.prefetchInfiniteQuery({
+      queryKey: queryKeys.releases.publishedInfinite(''),
+      initialPageParam: 0,
+      queryFn: async () => {
+        const result = await ReleaseService.getPublishedReleases({
+          skip: 0,
+          take: PUBLISHED_RELEASES_PAGE_SIZE,
+        });
+        const rows = result.success ? result.data : [];
+        return serializeForResponse({
+          rows,
+          nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_RELEASES_PAGE_SIZE),
+        });
       },
     }),
   ]);
