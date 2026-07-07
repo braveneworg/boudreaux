@@ -5,12 +5,12 @@ import type * as React from 'react';
 
 /**
  * Skeleton mirroring FeaturedArtistsPlayer's stacked internals (carousel row,
- * link row, square cover art, controls, ticker, share row). Shared by the
- * home route's Suspense fallback (`(home)/loading.tsx`) and the player's
- * dynamic-import `loading` fallback (`home-content.tsx`) so route-fallback →
- * chunk-fallback → hydrated player swaps in place at every breakpoint.
- * Directive-free on purpose: server-rendered in the route fallback,
- * client-rendered in the dynamic fallback.
+ * link row, square cover art, controls, ticker, share row), rendered by the
+ * home route's Suspense fallback (`(home)/loading.tsx`) so the fallback →
+ * server-rendered player swap happens in place at every breakpoint. The
+ * player itself is statically imported (its markup ships in the SSR payload
+ * — see home-content.tsx), so this skeleton shows only while the route
+ * segment streams.
  */
 export const FeaturedArtistsPlayerSkeleton = (): React.ReactElement => (
   <div aria-hidden="true" data-testid="featured-artists-player-skeleton">

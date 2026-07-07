@@ -99,10 +99,9 @@ export default function HomeLoading() {
                 <div className="bg-muted aspect-[4/1] w-full animate-pulse sm:aspect-auto sm:h-14 sm:w-56" />
               </div>
               {/* Player skeleton — left column spanning both rows on `lg`.
-                  The shared skeleton matches FeaturedArtistsPlayer's stacked
-                  internals and doubles as the player's dynamic-import
-                  fallback, so route-fallback → chunk-fallback → player is
-                  pixel-stable. */}
+                  The skeleton matches FeaturedArtistsPlayer's stacked
+                  internals, so the fallback → server-rendered player swap
+                  is pixel-stable. */}
               <div
                 data-testid="player-skeleton"
                 className="lg:col-start-1 lg:row-span-2 lg:row-start-1"
