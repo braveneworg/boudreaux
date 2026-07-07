@@ -156,14 +156,30 @@ export class SmsBlastService {
         SMS_BLAST_INTER_CHUNK_DELAY_MS
       );
 
-      const blast = await SmsBlastRepository.create({
-        message: finalMessage,
-        sentById,
-        sentByEmail,
-        recipientCount,
-        sentCount,
-        failedCount,
-      });
+      let blast: SmsBlastRecord;
+      try {
+        blast = await SmsBlastRepository.create({
+          message: finalMessage,
+          sentById,
+          sentByEmail,
+          recipientCount,
+          sentCount,
+          failedCount,
+        });
+      } catch (recordError) {
+        // The fan-out already went out. Surface an unambiguous "do not resend"
+        // so the admin never re-texts everyone over a lost history row.
+        // Log counts only — never any phone number.
+        loggers.notifications.operationFailed('sms_blast_record', recordError, {
+          recipientCount,
+          sentCount,
+          failedCount,
+        });
+        return {
+          success: false,
+          error: `Blast sent (${sentCount} of ${recipientCount}) but history failed to record — do not resend`,
+        };
+      }
 
       loggers.notifications.operationComplete('sms_blast_send', {
         blastId: blast.id,

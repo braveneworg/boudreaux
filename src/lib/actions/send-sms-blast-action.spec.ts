@@ -136,6 +136,11 @@ describe('sendSmsBlastAction', () => {
       const result = await sendSmsBlastAction({ message: validMessage });
 
       expect(result).toEqual({ success: true, recipientCount: 100, sentCount: 98, failedCount: 2 });
+      expect(SmsBlastService.sendBlast).toHaveBeenCalledWith({
+        message: validMessage,
+        sentById: 'user-admin-1',
+        sentByEmail: 'admin@test.com',
+      });
       expect(vi.mocked(logSecurityEvent)).toHaveBeenCalledWith({
         event: 'notification.sms.blast.sent',
         userId: 'user-admin-1',

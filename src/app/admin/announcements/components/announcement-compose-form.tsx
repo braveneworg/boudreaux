@@ -26,6 +26,7 @@ import { Button } from '@/app/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -110,6 +111,9 @@ export const AnnouncementComposeForm = ({
       } else {
         toast.error(result.error);
       }
+    } catch {
+      // A thrown action rejection would otherwise close the dialog silently.
+      toast.error('Something went wrong — check History before retrying');
     } finally {
       setIsSending(false);
       setIsDialogOpen(false);
@@ -133,16 +137,15 @@ export const AnnouncementComposeForm = ({
                     placeholder="Write the announcement to send to subscribers."
                   />
                 </FormControl>
+                <FormDescription className="text-muted-foreground space-y-1">
+                  <span className="block">{`${message.length}/${SMS_BLAST_MESSAGE_MAX}`}</span>
+                  <span className="block">{describeSegments(outgoingLength)}</span>
+                  <span className="block">{`Appended automatically: ${getSmsOptOutLine()}`}</span>
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          <div className="text-muted-foreground space-y-1 text-sm">
-            <p>{`${message.length}/${SMS_BLAST_MESSAGE_MAX}`}</p>
-            <p>{describeSegments(outgoingLength)}</p>
-            <p>{`Appended automatically: ${getSmsOptOutLine()}`}</p>
-          </div>
 
           <div className="space-y-1 text-sm">
             <p>{`Will send to ${recipientCount} subscribers`}</p>

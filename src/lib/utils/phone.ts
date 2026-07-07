@@ -12,7 +12,9 @@
  * counted as failures — this function never throws.
  *
  * Rules, in order:
- * - Already `+`-prefixed → return unchanged (SNS is the arbiter).
+ * - Already `+`-prefixed → strip non-digits and re-prefix `+` (SNS is the
+ *   arbiter of validity, but punctuation like `+1 (555) …` must be removed);
+ *   a `+` with no digits → `null`.
  * - Strip non-digits. 10 digits → `+1` + digits.
  *   11 digits starting with `1` → `+` + digits.
  * - Anything else → `null`.
@@ -21,7 +23,8 @@ export const normalizeUsPhoneToE164 = (raw: string): string | null => {
   const trimmed = raw.trim();
 
   if (trimmed.startsWith('+')) {
-    return trimmed;
+    const digits = trimmed.replace(/\D/g, '');
+    return digits.length > 0 ? `+${digits}` : null;
   }
 
   const digits = trimmed.replace(/\D/g, '');

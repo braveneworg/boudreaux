@@ -151,10 +151,21 @@ describe('SmsBlastService', () => {
       });
     });
 
-    it('returns failure with the standard message when SmsBlastRepository.create throws', async () => {
+    it('returns a do-not-resend message when SmsBlastRepository.create throws post-send', async () => {
       findSmsOptedInUsersMock.mockResolvedValue([{ id: 'u1', phone: '+15551234567' }]);
       smsSendMock.mockResolvedValue({ ok: true, messageId: 'msg-1' });
       createBlastMock.mockRejectedValue(new Error('DB write failed'));
+
+      const result = await SmsBlastService.sendBlast(baseInput);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Blast sent (1 of 1) but history failed to record — do not resend',
+      });
+    });
+
+    it('returns the generic error when fetching recipients throws before any send', async () => {
+      findSmsOptedInUsersMock.mockRejectedValue(new Error('DB read failed'));
 
       const result = await SmsBlastService.sendBlast(baseInput);
 

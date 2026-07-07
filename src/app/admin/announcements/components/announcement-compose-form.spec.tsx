@@ -185,4 +185,28 @@ describe('AnnouncementComposeForm', () => {
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Rate limit exceeded — try again later')
     );
   });
+
+  it('shows an error toast when the action rejects', async () => {
+    vi.mocked(sendSmsBlastAction).mockRejectedValue(new Error('network boom'));
+    render(<AnnouncementComposeForm recipientCount={5} />);
+
+    await composeAndConfirm('Show tonight!');
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        'Something went wrong — check History before retrying'
+      )
+    );
+  });
+
+  it('re-enables sending after the action rejects', async () => {
+    vi.mocked(sendSmsBlastAction).mockRejectedValue(new Error('network boom'));
+    render(<AnnouncementComposeForm recipientCount={5} />);
+
+    await composeAndConfirm('Show tonight!');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send announcement' })).toBeEnabled()
+    );
+  });
 });

@@ -29,6 +29,18 @@ describe('normalizeUsPhoneToE164', () => {
     expect(normalizeUsPhoneToE164('+441632960961')).toBe('+441632960961');
   });
 
+  it('strips punctuation from a +-prefixed US number', () => {
+    expect(normalizeUsPhoneToE164('+1 (555) 123-4567')).toBe('+15551234567');
+  });
+
+  it('strips dashes from a +-prefixed US number', () => {
+    expect(normalizeUsPhoneToE164('+1-555-123-4567')).toBe('+15551234567');
+  });
+
+  it('returns null for a lone + with no digits', () => {
+    expect(normalizeUsPhoneToE164('+')).toBeNull();
+  });
+
   it('returns null for a too-short number', () => {
     expect(normalizeUsPhoneToE164('123')).toBeNull();
   });
