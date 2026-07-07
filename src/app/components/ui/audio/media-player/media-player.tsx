@@ -255,12 +255,18 @@ const FeaturedArtistCarousel = memo(
                     <div className="absolute inset-0 overflow-hidden">
                       {coverArt && !imageError ? (
                         <Image
-                          src={buildCdnImageVariantUrl(coverArt, 384)}
+                          // Raw src → the global CDN loader emits the full
+                          // pinned-variant srcset, so DPR-1 desktops drop to
+                          // _w256 for the ~166px slot while retina keeps
+                          // _w384 sharp. (`unoptimized` + a hardcoded _w384
+                          // shipped ~2× the bytes at 1× DPR.) Slot widths:
+                          // 3-up below sm, 5-up to lg, then a fixed ~166px
+                          // in the landing grid's left column.
+                          src={coverArt}
                           alt={displayName ?? ''}
                           fill
-                          unoptimized
                           className="object-cover transition-transform group-hover:scale-105"
-                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 14vw"
+                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 166px"
                           loading={isSelectedArtist ? 'eager' : undefined}
                           fetchPriority={isSelectedArtist ? 'high' : 'low'}
                           onError={() => {
@@ -747,7 +753,9 @@ const TrackListDrawer = ({
                     {coverArt && (
                       <div className="relative h-10 w-10 shrink-0 overflow-hidden">
                         <Image
-                          src={buildCdnImageVariantUrl(coverArt, 384)}
+                          // 256 is the smallest generated variant — plenty
+                          // for a 40px row thumb (384 shipped ~2× the pixels).
+                          src={buildCdnImageVariantUrl(coverArt, 256)}
                           alt={getTrackDisplayTitle(file.title, file.fileName)}
                           fill
                           unoptimized

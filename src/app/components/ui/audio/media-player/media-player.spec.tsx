@@ -165,10 +165,30 @@ vi.mock('@/components/ui/carousel', () => ({
   CarouselNext: () => <button data-testid="carousel-next">Next</button>,
 }));
 
-// Mock next/image
+// Mock next/image — forwards the delivery-relevant props (sizes/unoptimized)
+// so specs can assert which variant strategy each image uses.
 vi.mock('next/image', () => ({
-  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) =>
-    React.createElement('img', { src, alt, className, 'data-testid': 'next-image' }),
+  default: ({
+    src,
+    alt,
+    className,
+    sizes,
+    unoptimized,
+  }: {
+    src: string;
+    alt: string;
+    className?: string;
+    sizes?: string;
+    unoptimized?: boolean;
+  }) =>
+    React.createElement('img', {
+      src,
+      alt,
+      className,
+      sizes,
+      'data-testid': 'next-image',
+      'data-unoptimized': unoptimized ? 'true' : undefined,
+    }),
 }));
 
 // Mock lucide-react icons
@@ -670,6 +690,37 @@ describe('MediaPlayer', () => {
       expect(screen.getByText('Third Song')).toBeInTheDocument();
     });
 
+    it('should fetch the smallest variant for the 40px row thumbnails', () => {
+      // CDN-origin fixture: buildCdnImageVariantUrl only rewrites CDN/relative
+      // sources (external domains pass through untouched).
+      const cdnRelease = createMockRelease([file1], {
+        title: 'CDN Album',
+        coverArt: 'https://cdn.fakefourrecords.com/media/releases/abc/cover.jpg',
+      });
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
+            artistRelease={{ release: cdnRelease, artist: mockArtist }}
+          />
+        </MediaPlayer>
+      );
+
+      // Rows render h-10 w-10 (40px) thumbs — the 256 variant is the smallest
+      // generated width; 384 shipped ~2× the pixels for the same box.
+      const rowThumbs = screen
+        .getAllByTestId('next-image')
+        .filter((img) => img.getAttribute('src')?.includes('cover_w'));
+      expect(rowThumbs.length).toBeGreaterThan(0);
+      rowThumbs.forEach((img) => {
+        expect(img).toHaveAttribute(
+          'src',
+          'https://cdn.fakefourrecords.com/media/releases/abc/cover_w256.webp'
+        );
+      });
+    });
+
     it('should display track numbers correctly', () => {
       render(
         <MediaPlayer>
@@ -997,6 +1048,41 @@ describe('MediaPlayer', () => {
         expect(item).toHaveClass('pl-6', 'lg:basis-1/3');
         expect(item).not.toHaveClass('pl-2');
       });
+    });
+
+    it('should serve thumbnails via the loader srcset, not a fixed 384 variant', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      // Raw src → the global CDN loader emits the full pinned-variant srcset,
+      // letting DPR-1 desktops drop to _w256 for the ~166px slot while retina
+      // keeps _w384. `unoptimized` + a hardcoded _w384 forced ~2× the bytes.
+      const thumb = screen
+        .getAllByTestId('next-image')
+        .find((img) => img.getAttribute('src')?.includes('cover1'));
+      expect(thumb).toHaveAttribute('src', 'https://example.com/cover1.jpg');
+      expect(thumb).not.toHaveAttribute('data-unoptimized');
+    });
+
+    it('should size thumbnails to their real slot widths per breakpoint', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      // 3-up below sm (33vw), 5-up to lg (20vw), then a fixed ~166px slot in
+      // the landing grid's left column (600px column − arrow gutters, ÷3).
+      const thumb = screen
+        .getAllByTestId('next-image')
+        .find((img) => img.getAttribute('src')?.includes('cover1'));
+      expect(thumb).toHaveAttribute(
+        'sizes',
+        '(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 166px'
+      );
     });
 
     it('should call onSelect when a featured artist is clicked', () => {
