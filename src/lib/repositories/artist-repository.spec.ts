@@ -12,6 +12,7 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $transaction: vi.fn(),
     artist: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -27,10 +28,13 @@ vi.mock('@/lib/prisma', () => ({
     },
     artistBioLink: {
       delete: vi.fn(),
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     artistBioImage: {
       delete: vi.fn(),
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
       update: vi.fn(),
       create: vi.fn(),
       aggregate: vi.fn(),
@@ -513,6 +517,120 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('replaceBioContent', () => {
+    const content = {
+      shortBio: '<p>short</p>',
+      bio: '<p>long</p>',
+      altBio: '<p>alt</p>',
+      genres: 'rock',
+      bioModel: 'gemini-2.5-flash',
+      images: [
+        {
+          url: 'https://cdn.example/gen.webp',
+          thumbnailUrl: null,
+          title: null,
+          attribution: null,
+          license: null,
+          sourceUrl: null,
+          originalUrl: null,
+          width: null,
+          height: null,
+          isPrimary: true,
+          kind: null,
+          alt: null,
+          sortOrder: 0,
+        },
+      ],
+      links: [
+        {
+          label: 'Wikipedia',
+          url: 'https://en.wikipedia.org/wiki/X',
+          kind: 'wikipedia',
+          sortOrder: 0,
+        },
+      ],
+    };
+
+    // A stand-in transaction client whose reads default to "no custom rows".
+    const buildTx = (survivors: {
+      images?: Array<{ url: string }>;
+      links?: Array<{ url: string }>;
+    }) => ({
+      artistBioImage: {
+        findMany: vi.fn().mockResolvedValue(survivors.images ?? []),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      artistBioLink: {
+        findMany: vi.fn().mockResolvedValue(survivors.links ?? []),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      artist: { update: vi.fn().mockResolvedValue({ id: 'a1' }) },
+    });
+
+    it('reads the surviving custom rows inside the transaction', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      expect(tx.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', origin: 'custom' },
+        select: { url: true },
+      });
+      expect(tx.artistBioLink.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', origin: 'custom' },
+        select: { url: true },
+      });
+    });
+
+    it('deletes only generated and legacy rows (Mongo isSet quirk is the contract)', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const legacyOr = {
+        artistId: 'a1',
+        OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
+      };
+      expect(tx.artistBioImage.deleteMany).toHaveBeenCalledWith({ where: legacyOr });
+      expect(tx.artistBioLink.deleteMany).toHaveBeenCalledWith({ where: legacyOr });
+    });
+
+    it('recreates the incoming rows stamped origin generated and updates the scalars', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.where).toEqual({ id: 'a1' });
+      expect(arg.data.shortBio).toBe('<p>short</p>');
+      expect(arg.data.bioImages.create).toEqual([{ ...content.images[0], origin: 'generated' }]);
+      expect(arg.data.bioLinks.create).toEqual([{ ...content.links[0], origin: 'generated' }]);
+    });
+
+    it('does not re-insert a generated image whose url case-insensitively matches a custom survivor', async () => {
+      const tx = buildTx({ images: [{ url: 'HTTPS://CDN.EXAMPLE/GEN.WEBP' }] });
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioImages.create).toEqual([]);
+    });
+
+    it('does not re-insert a generated link whose url case-insensitively matches a custom survivor', async () => {
+      const tx = buildTx({ links: [{ url: 'HTTPS://EN.WIKIPEDIA.ORG/wiki/X' }] });
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioLinks.create).toEqual([]);
+    });
+  });
+
   describe('getBioGenerationState', () => {
     it('selects and returns the bioJobToken', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioJobToken: 'tok' } as never);
@@ -545,6 +663,16 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { id: true } });
       expect(arg?.select?.bioLinks).toMatchObject({ select: { id: true } });
+    });
+
+    it('selects origin on the bioImages and bioLinks selects', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a3');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { origin: true } });
+      expect(arg?.select?.bioLinks).toMatchObject({ select: { origin: true } });
     });
   });
 
@@ -650,6 +778,19 @@ describe('ArtistRepository', () => {
 
       expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ thumbnailUrl: 'https://cdn.example/t.webp' }),
+      });
+    });
+
+    it('stamps origin custom on the created row (manual-upload path)', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.create).mockResolvedValue({ id: 'img-4' } as never);
+
+      await ArtistRepository.createBioImage({ artistId: 'a1', url: 'https://cdn.example/x.webp' });
+
+      expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ origin: 'custom' }),
       });
     });
   });

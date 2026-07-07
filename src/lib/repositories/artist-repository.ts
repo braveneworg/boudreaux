@@ -407,11 +407,18 @@ export class ArtistRepository {
   }
 
   /**
-   * Replace an artist's AI-generated bio content in a single transaction:
-   * overwrite the short/long/alt bio, genres, and provenance fields, then delete
-   * and recreate the discovered images/links. Deleting first means a
-   * regeneration never leaves stale rows behind. Note: `altBio` is now
-   * AI-generated, so regeneration overwrites any hand-authored alt bio.
+   * Replace an artist's AI-generated bio content in a single interactive
+   * transaction: overwrite the short/long/alt bio, genres, and provenance fields,
+   * then delete and recreate ONLY the generated media, preserving admin-authored
+   * (`origin: 'custom'`) images and links so a regeneration never destroys them.
+   *
+   * The transaction (a) reads the surviving custom rows, (b) deletes generated and
+   * legacy rows — legacy rows carry `origin: null`/absent, and on MongoDB
+   * `{ origin: null }` does NOT match absent-field documents, so `{ origin: { isSet:
+   * false } }` is included too — then (c) recreates the incoming rows stamped
+   * `origin: 'generated'`, skipping any whose URL case-insensitively matches a
+   * surviving custom row (the custom copy wins). Note: `altBio` is AI-generated, so
+   * regeneration overwrites any hand-authored alt bio.
    */
   static async replaceBioContent(
     artistId: string,
@@ -440,10 +447,41 @@ export class ArtistRepository {
     }
   ): Promise<void> {
     await runQuery(() =>
-      prisma.$transaction([
-        prisma.artistBioImage.deleteMany({ where: { artistId } }),
-        prisma.artistBioLink.deleteMany({ where: { artistId } }),
-        prisma.artist.update({
+      prisma.$transaction(async (tx) => {
+        // (a) Read surviving custom rows so their URLs can shield matching
+        // generated rows from re-insertion.
+        const [customImages, customLinks] = await Promise.all([
+          tx.artistBioImage.findMany({
+            where: { artistId, origin: 'custom' },
+            select: { url: true },
+          }),
+          tx.artistBioLink.findMany({
+            where: { artistId, origin: 'custom' },
+            select: { url: true },
+          }),
+        ]);
+
+        // (b) Delete generated + legacy rows only. `{ origin: null }` misses
+        // absent-field docs on Mongo, so `{ isSet: false }` is required too.
+        const legacyOrigin = {
+          artistId,
+          OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
+        };
+        await tx.artistBioImage.deleteMany({ where: legacyOrigin });
+        await tx.artistBioLink.deleteMany({ where: legacyOrigin });
+
+        // (c) Recreate incoming rows as generated, dropping any whose URL matches a
+        // surviving custom row (case-insensitive, no normalization beyond lowercasing).
+        const customImageUrls = new Set(customImages.map(({ url }) => url.toLowerCase()));
+        const customLinkUrls = new Set(customLinks.map(({ url }) => url.toLowerCase()));
+        const imagesToCreate = content.images
+          .filter((image) => !customImageUrls.has(image.url.toLowerCase()))
+          .map((image) => ({ ...image, origin: 'generated' }));
+        const linksToCreate = content.links
+          .filter((link) => !customLinkUrls.has(link.url.toLowerCase()))
+          .map((link) => ({ ...link, origin: 'generated' }));
+
+        await tx.artist.update({
           where: { id: artistId },
           data: {
             shortBio: content.shortBio,
@@ -452,11 +490,11 @@ export class ArtistRepository {
             genres: content.genres,
             bioModel: content.bioModel,
             bioGeneratedAt: new Date(),
-            bioImages: { create: content.images },
-            bioLinks: { create: content.links },
+            bioImages: { create: imagesToCreate },
+            bioLinks: { create: linksToCreate },
           },
-        }),
-      ])
+        });
+      })
     );
   }
 
@@ -532,8 +570,15 @@ export class ArtistRepository {
       isPrimary: boolean;
       kind: string | null;
       alt: string | null;
+      origin: string | null;
     }>;
-    bioLinks: Array<{ id: string; label: string; url: string; kind: string | null }>;
+    bioLinks: Array<{
+      id: string;
+      label: string;
+      url: string;
+      kind: string | null;
+      origin: string | null;
+    }>;
   } | null> {
     return runQuery(() =>
       prisma.artist.findUnique({
@@ -564,11 +609,12 @@ export class ArtistRepository {
               isPrimary: true,
               kind: true,
               alt: true,
+              origin: true,
             },
           },
           bioLinks: {
             orderBy: { sortOrder: 'asc' },
-            select: { id: true, label: true, url: true, kind: true },
+            select: { id: true, label: true, url: true, kind: true, origin: true },
           },
         },
       })
@@ -633,6 +679,9 @@ export class ArtistRepository {
           isPrimary,
           kind: data.kind,
           alt: data.alt,
+          // The manual/RTE-upload path only ever creates custom rows, so a
+          // regeneration preserves them (see `replaceBioContent`).
+          origin: data.origin ?? 'custom',
           sortOrder,
         },
       });
