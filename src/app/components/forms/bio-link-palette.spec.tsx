@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { BIO_LINK_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
@@ -220,5 +220,127 @@ describe('BioLinkPalette', () => {
       <BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />
     );
     expect(screen.getByRole('button', { name: 'Preview link Wikipedia' })).toBeDisabled();
+  });
+
+  describe('custom-first ordering and Custom badge', () => {
+    const MIXED_LINKS: BioStatusLink[] = [
+      {
+        id: 'lg1',
+        label: 'Generated Link 1',
+        url: 'https://example.com/g1',
+        kind: null,
+        origin: 'generated',
+      },
+      {
+        id: 'lc1',
+        label: 'Custom Link 1',
+        url: 'https://example.com/c1',
+        kind: null,
+        origin: 'custom',
+      },
+      {
+        id: 'lg2',
+        label: 'Generated Link 2',
+        url: 'https://example.com/g2',
+        kind: null,
+        origin: 'generated',
+      },
+    ];
+
+    it('renders custom-origin rows before generated rows', () => {
+      render(
+        <BioLinkPalette artistId="a1" links={MIXED_LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />
+      );
+      const buttons = screen.getAllByRole('button', { name: /^Delete link / });
+      const names = buttons.map((b) => b.getAttribute('aria-label') ?? '');
+      const customIdx = names.findIndex((n) => n.includes('Custom Link 1'));
+      const gen1Idx = names.findIndex((n) => n.includes('Generated Link 1'));
+      const gen2Idx = names.findIndex((n) => n.includes('Generated Link 2'));
+      expect(customIdx).toBeLessThan(gen1Idx);
+      expect(customIdx).toBeLessThan(gen2Idx);
+    });
+
+    it('preserves the relative order of generated rows after the custom row', () => {
+      render(
+        <BioLinkPalette artistId="a1" links={MIXED_LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />
+      );
+      const buttons = screen.getAllByRole('button', { name: /^Delete link / });
+      const names = buttons.map((b) => b.getAttribute('aria-label') ?? '');
+      const gen1Idx = names.findIndex((n) => n.includes('Generated Link 1'));
+      const gen2Idx = names.findIndex((n) => n.includes('Generated Link 2'));
+      expect(gen1Idx).toBeLessThan(gen2Idx);
+    });
+
+    it('shows a Custom badge on a custom-origin tile', () => {
+      render(
+        <BioLinkPalette artistId="a1" links={MIXED_LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />
+      );
+      const customTile = screen
+        .getByRole('button', { name: 'Delete link Custom Link 1' })
+        .closest('li') as HTMLElement;
+      expect(within(customTile).getByText('Custom')).toBeInTheDocument();
+    });
+
+    it('does not show a Custom badge on a generated-origin tile', () => {
+      render(
+        <BioLinkPalette artistId="a1" links={MIXED_LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />
+      );
+      const genTile = screen
+        .getByRole('button', { name: 'Delete link Generated Link 1' })
+        .closest('li') as HTMLElement;
+      expect(within(genTile).queryByText('Custom')).not.toBeInTheDocument();
+    });
+
+    it('does not show a Custom badge on a null-origin tile', () => {
+      const nullOriginLinks: BioStatusLink[] = [
+        {
+          id: 'ln1',
+          label: 'Null Origin Link',
+          url: 'https://example.com/n1',
+          kind: null,
+          origin: null,
+        },
+      ];
+      render(
+        <BioLinkPalette
+          artistId="a1"
+          links={nullOriginLinks}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+        />
+      );
+      const tile = screen
+        .getByRole('button', { name: 'Delete link Null Origin Link' })
+        .closest('li') as HTMLElement;
+      expect(within(tile).queryByText('Custom')).not.toBeInTheDocument();
+    });
+
+    it('custom rows precede generated rows when a filter is active', async () => {
+      const filterLinks: BioStatusLink[] = [
+        {
+          id: 'fg1',
+          label: 'Example Generated',
+          url: 'https://example.com/fg1',
+          kind: null,
+          origin: 'generated',
+        },
+        {
+          id: 'fc1',
+          label: 'Example Custom',
+          url: 'https://example.com/fc1',
+          kind: null,
+          origin: 'custom',
+        },
+      ];
+      render(
+        <BioLinkPalette artistId="a1" links={filterLinks} onDelete={vi.fn()} onInsert={vi.fn()} />
+      );
+      await userEvent.type(screen.getByLabelText('Filter links'), 'Example');
+      const buttons = screen.getAllByRole('button', { name: /^Delete link / });
+      const names = buttons.map((b) => b.getAttribute('aria-label') ?? '');
+      const customIdx = names.findIndex((n) => n.includes('Example Custom'));
+      const genIdx = names.findIndex((n) => n.includes('Example Generated'));
+      expect(customIdx).toBeLessThan(genIdx);
+    });
   });
 });

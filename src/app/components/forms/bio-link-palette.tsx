@@ -95,13 +95,16 @@ export const BioLinkPalette = ({
   const isMobile = useIsMobile();
 
   const lower = filter.toLowerCase();
-  const visible = lower
+  const filtered = lower
     ? links.filter(
         (link) =>
           link.label.toLowerCase().includes(lower) ||
           (link.kind ?? '').toLowerCase().includes(lower)
       )
     : links;
+  const visible = [...filtered].sort(
+    (a, b) => Number(b.origin === 'custom') - Number(a.origin === 'custom')
+  );
 
   return (
     <div role="group" aria-label="Discovered links" className="space-y-2">
@@ -147,6 +150,11 @@ export const BioLinkPalette = ({
               {link.kind && (
                 <Badge variant="outline" className="shrink-0 text-xs">
                   {link.kind}
+                </Badge>
+              )}
+              {link.origin === 'custom' && (
+                <Badge variant="outline" className="shrink-0 text-xs">
+                  Custom
                 </Badge>
               )}
               <div className="ml-auto flex shrink-0 items-center gap-0.5">
