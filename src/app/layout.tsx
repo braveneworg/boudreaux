@@ -19,10 +19,11 @@ import './globals.css';
 
 // Jost is the body font. We disable next/font's auto-preload because the
 // loader emits a `<link rel=preload>` for every weight/style combination
-// declared below — and at first paint only the regular (400 normal) weight
-// is consumed. The italic + bold-italic variants are only rendered after
-// hydration (e.g. inside `FeaturedArtistsPlayer`'s `NowPlayingHeading`,
-// which is `ssr: false`), so Chrome flags them as "preloaded but not used".
+// declared below — four files — while first paint consumes only one or two
+// (400 normal, plus 400 italic now that the featured player server-renders
+// its NowPlayingHeading). Preloading all four would compete with the LCP
+// image fetch for early bandwidth; with `inlineCss` the `@font-face` rules
+// arrive with the HTML anyway, so discovery is already immediate.
 // `display: 'swap'` lets the page render with the fallback first and swap
 // to Jost when the font is fetched, and `next/font`'s automatic
 // `adjustFontFallback` (size-adjust descriptors on the fallback) prevents

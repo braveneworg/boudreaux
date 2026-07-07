@@ -92,8 +92,18 @@ describe('Logo', () => {
 
     const img = screen.getByTestId('logo-image');
     expect(img).toHaveAttribute('data-alt', 'Fake Four Inc. Hand Logo');
+    // Honest intrinsic ratio: the stardust webp is 800×899, so square 48×48
+    // attrs mis-declared the aspect and squished the hand ~12% in the square
+    // chip (flagged by Lighthouse's image-aspect-ratio audit).
     expect(img).toHaveAttribute('data-width', '48');
-    expect(img).toHaveAttribute('data-height', '48');
+    expect(img).toHaveAttribute('data-height', '54');
+  });
+
+  it('letterboxes the non-square art inside the round chip', () => {
+    render(<Logo isMobile={false} />);
+
+    const img = screen.getByTestId('logo-image');
+    expect(img).toHaveClass('object-contain');
   });
 
   it('has priority loading and unoptimized flags', () => {
