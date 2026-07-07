@@ -6,10 +6,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { createArtistBioLinkAction } from '@/lib/actions/create-artist-bio-link-action';
 import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
 import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
 import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
 import { queryKeys } from '@/lib/query-keys';
+import type { CreateBioLinkInput } from '@/lib/validation/bio-link-input-schema';
 
 interface UseDeleteBioLinkMutationResult {
   /** Deletes one discovered bio link row by id. */
@@ -111,4 +113,43 @@ export const useUpdateBioImageAttributionMutation = (
     });
 
   return { updateBioImageAttribution, isUpdatingBioImageAttribution };
+};
+
+interface UseCreateBioLinkMutationResult {
+  /** Persists one admin-authored custom bio link. */
+  createBioLink: (input: CreateBioLinkInput) => void;
+  /** True while a link create is in flight. */
+  isCreatingBioLink: boolean;
+}
+
+/**
+ * Mutation hook wrapping {@link createArtistBioLinkAction} for the admin custom
+ * link editor. On success it invalidates the artist's bio-generation status
+ * query so the palette shows the new row, then runs the optional `onCreated`
+ * callback (used to clear the editor fields); a failed result surfaces as an
+ * error toast and leaves the form untouched.
+ *
+ * @param artistId - The artist whose bio-generation cache to invalidate.
+ * @param onCreated - Optional callback fired only after a successful create.
+ */
+export const useCreateBioLinkMutation = (
+  artistId: string,
+  onCreated?: () => void
+): UseCreateBioLinkMutationResult => {
+  const queryClient = useQueryClient();
+  const { mutate: createBioLink, isPending: isCreatingBioLink } = useMutation({
+    mutationFn: (input: CreateBioLinkInput) => createArtistBioLinkAction(input),
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to add bio link');
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.artists.bioGeneration(artistId),
+      });
+      onCreated?.();
+    },
+  });
+
+  return { createBioLink, isCreatingBioLink };
 };

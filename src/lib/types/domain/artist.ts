@@ -140,6 +140,16 @@ export interface ArtistBioLinkRecord {
   sortOrder: number;
 }
 
+/** Fields for creating one bio link row (admin-authored custom link). */
+export interface CreateArtistBioLinkData {
+  artistId: string;
+  label: string;
+  url: string;
+  kind?: string | null;
+  /** Always `'custom'` for this admin-authored path; the repository stamps it when absent. */
+  origin?: 'custom';
+}
+
 /**
  * Admin artist payload: scalars plus capped images, label joins, release joins
  * (with release scalars), and platform URLs. Matches the default media `Artist`.

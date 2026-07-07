@@ -30,6 +30,8 @@ vi.mock('@/lib/prisma', () => ({
       delete: vi.fn(),
       findMany: vi.fn(),
       deleteMany: vi.fn(),
+      create: vi.fn(),
+      aggregate: vi.fn(),
     },
     artistBioImage: {
       delete: vi.fn(),
@@ -790,6 +792,87 @@ describe('ArtistRepository', () => {
       await ArtistRepository.createBioImage({ artistId: 'a1', url: 'https://cdn.example/x.webp' });
 
       expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ origin: 'custom' }),
+      });
+    });
+  });
+
+  describe('createBioLink', () => {
+    it('appends a new bio link row after the current max sortOrder', async () => {
+      vi.mocked(prisma.artistBioLink.aggregate).mockResolvedValue({
+        _max: { sortOrder: 4 },
+      } as never);
+      vi.mocked(prisma.artistBioLink.create).mockResolvedValue({ id: 'link-9' } as never);
+
+      const created = await ArtistRepository.createBioLink({
+        artistId: 'a1',
+        label: 'Official site',
+        url: 'https://example.com',
+      });
+
+      expect(prisma.artistBioLink.aggregate).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        _max: { sortOrder: true },
+      });
+      expect(prisma.artistBioLink.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          artistId: 'a1',
+          label: 'Official site',
+          url: 'https://example.com',
+          sortOrder: 5,
+        }),
+      });
+      expect(created).toEqual({ id: 'link-9' });
+    });
+
+    it('starts sortOrder at 0 when the artist has no bio links yet', async () => {
+      vi.mocked(prisma.artistBioLink.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioLink.create).mockResolvedValue({ id: 'link-1' } as never);
+
+      await ArtistRepository.createBioLink({
+        artistId: 'a1',
+        label: 'Site',
+        url: 'https://example.com',
+      });
+
+      expect(prisma.artistBioLink.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ sortOrder: 0 }),
+      });
+    });
+
+    it('forwards a supplied kind to create', async () => {
+      vi.mocked(prisma.artistBioLink.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioLink.create).mockResolvedValue({ id: 'link-2' } as never);
+
+      await ArtistRepository.createBioLink({
+        artistId: 'a1',
+        label: 'Wiki',
+        url: 'https://en.wikipedia.org/wiki/X',
+        kind: 'wikipedia',
+      });
+
+      expect(prisma.artistBioLink.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ kind: 'wikipedia' }),
+      });
+    });
+
+    it('stamps origin custom on the created row (admin-authored path)', async () => {
+      vi.mocked(prisma.artistBioLink.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioLink.create).mockResolvedValue({ id: 'link-3' } as never);
+
+      await ArtistRepository.createBioLink({
+        artistId: 'a1',
+        label: 'Site',
+        url: 'https://example.com',
+      });
+
+      expect(prisma.artistBioLink.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ origin: 'custom' }),
       });
     });

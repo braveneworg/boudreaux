@@ -10,11 +10,13 @@ import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
   ArtistBioImageRecord,
+  ArtistBioLinkRecord,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistWithPublishedReleases,
   CreateArtistBioImageData,
+  CreateArtistBioLinkData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -869,6 +871,11 @@ export class ArtistService {
   /** Persists one manually-added bio image and returns the created row. */
   static async createBioImage(input: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
     return ArtistRepository.createBioImage(input);
+  }
+
+  /** Persists one admin-authored bio link and returns the created row. */
+  static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
+    return ArtistRepository.createBioLink(input);
   }
 
   /** Updates one bio image's attribution text. */

@@ -8,12 +8,14 @@ import { prisma } from '@/lib/prisma';
 import type {
   Artist,
   ArtistBioImageRecord,
+  ArtistBioLinkRecord,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistScalars,
   ArtistWithPublishedReleases,
   CreateArtistBioImageData,
+  CreateArtistBioLinkData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -686,6 +688,30 @@ export class ArtistRepository {
         },
       });
     }) as Promise<ArtistBioImageRecord>;
+  }
+
+  /** Creates a single bio link row (admin-authored custom link), appending it
+   *  after the artist's current highest `sortOrder`. */
+  static async createBioLink(data: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
+    return runQuery(async () => {
+      const { _max } = await prisma.artistBioLink.aggregate({
+        where: { artistId: data.artistId },
+        _max: { sortOrder: true },
+      });
+      const sortOrder = (_max.sortOrder ?? -1) + 1;
+      return prisma.artistBioLink.create({
+        data: {
+          artistId: data.artistId,
+          label: data.label,
+          url: data.url,
+          kind: data.kind,
+          // The admin-authored path only ever creates custom rows, so a
+          // regeneration preserves them (see `replaceBioContent`).
+          origin: data.origin ?? 'custom',
+          sortOrder,
+        },
+      });
+    }) as Promise<ArtistBioLinkRecord>;
   }
 
   /** Updates a single bio image row's attribution text (admin edit). */
