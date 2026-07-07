@@ -12,6 +12,7 @@ import type {
   UserContactRecord,
   UserEmailRecord,
   UserIdRecord,
+  UserSmsRecipientRecord,
   UserUsernameRecord,
 } from '@/lib/types/domain/user';
 
@@ -41,6 +42,12 @@ const _userDrift: _UserDrift = true;
 
 /** Build a Prisma create payload from domain create data. */
 const toPrismaCreate = (data: CreateUserData): Prisma.UserCreateInput => ({ ...data });
+
+/** Opted-in AND phone set, non-null, non-empty. Mongo: absent fields need isSet. */
+const smsOptedInWhere = {
+  allowSmsNotifications: true,
+  AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
+} as const satisfies Prisma.UserWhereInput;
 
 /**
  * Data-access layer for the User model. The only layer that touches Prisma for
@@ -190,5 +197,27 @@ export class UserRepository {
         },
       })
     );
+  }
+
+  /**
+   * Return the id and phone of every user who has opted in to SMS notifications
+   * and has a non-null, non-empty phone number set in the database.
+   * Used by the SMS blast service to build the recipient list.
+   */
+  static async findSmsOptedInUsers(): Promise<UserSmsRecipientRecord[]> {
+    return runQuery(() =>
+      prisma.user.findMany({
+        where: smsOptedInWhere,
+        select: { id: true, phone: true },
+      })
+    );
+  }
+
+  /**
+   * Count users eligible to receive an SMS blast (opted in with a valid phone).
+   * Used by the admin UI to show the estimated recipient count before sending.
+   */
+  static async countSmsOptedIn(): Promise<number> {
+    return runQuery(() => prisma.user.count({ where: smsOptedInWhere }));
   }
 }
