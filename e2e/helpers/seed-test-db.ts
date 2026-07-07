@@ -577,14 +577,18 @@ const seedTestDatabase = async () => {
       },
     });
 
-    // A featured artist so the admin featured-artists list and edit view have a
-    // record to render (linked to E2E Artist + E2E Album One).
+    // A featured artist for the admin featured-artists list/edit views AND the
+    // public homepage player (linked to E2E Artist + E2E Album One).
+    // publishedOn is required by FeaturedArtistRepository.findFeatured — without
+    // it the homepage player renders its empty state in every E2E run and the
+    // SSR'd LCP markup (cover art, now-playing heading) goes unexercised.
     await prisma.featuredArtist.create({
       data: {
         displayName: 'E2E Featured Artist',
         description: 'Seeded featured artist for admin edit e2e coverage.',
         position: 0,
         featuredOn: new Date(),
+        publishedOn: new Date(),
         artists: { connect: { id: e2eArtist.id } },
         release: { connect: { id: e2eRelease1.id } },
       },

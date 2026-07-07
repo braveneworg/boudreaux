@@ -22,8 +22,9 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
-// FeaturedArtistsPlayer is loaded via next/dynamic — mock the module so the
-// loader import resolves to a lightweight stub instead of the video.js bundle.
+// Mock the player module (statically imported — next/dynamic would SSR only
+// its loading fallback, hiding the LCP cover art from the server HTML) so the
+// spec stays lightweight instead of pulling the media-player tree.
 vi.mock('./featured-artists-player', () => ({
   FeaturedArtistsPlayer: ({ featuredArtists }: { featuredArtists: unknown[] }) => (
     <div data-testid="featured-artists-player" data-count={featuredArtists.length} />
@@ -32,30 +33,6 @@ vi.mock('./featured-artists-player', () => ({
 
 vi.mock('./release-headlines', () => ({
   ReleaseHeadlines: () => <aside data-testid="release-headlines" />,
-}));
-
-const capturedDynamicOptions = vi.hoisted(() => ({
-  current: undefined as { ssr?: boolean; loading?: () => React.ReactNode } | undefined,
-}));
-
-// Drive next/dynamic synchronously: exercise the loader (so the dynamic import
-// arrow + its `.then` mapper are covered), capture the options for assertions,
-// and render the `loading` placeholder branch alongside the resolved stub.
-vi.mock('next/dynamic', () => ({
-  default: (
-    loader: () => Promise<unknown>,
-    options?: { ssr?: boolean; loading?: () => React.ReactNode }
-  ) => {
-    capturedDynamicOptions.current = options;
-    void loader();
-    const Dynamic = (props: { featuredArtists: unknown[] }) => (
-      <div data-testid="dynamic-featured">
-        {options?.loading?.()}
-        <span data-testid="featured-count">{props.featuredArtists.length}</span>
-      </div>
-    );
-    return Dynamic;
-  },
 }));
 
 vi.mock('./banner-carousel', () => ({
@@ -162,28 +139,16 @@ describe('HomeContent', () => {
     expect(carousel).toHaveAttribute('data-with-notification', 'true');
   });
 
-  it('keeps SSR enabled on the player dynamic import (LCP discovery)', () => {
+  it('renders the player directly so its markup server-renders (LCP discovery)', () => {
     useBannersQueryMock.mockReturnValue({ data: undefined });
     useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
 
     render(<HomeContent />);
 
-    // `ssr: false` strips the player — and with it the LCP cover art — from
-    // the server HTML, leaving the image undiscoverable until the JS chunk
-    // chain loads. next/dynamic keeps the chunk split either way.
-    expect(capturedDynamicOptions.current?.ssr).not.toBe(false);
-  });
-
-  it('uses the shared player skeleton as the chunk-loading fallback', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
-
-    render(<HomeContent />);
-
-    // The fallback mirrors the player's real footprint so soft navigations
-    // swap skeleton → player in place (the old bare min-h-112 div was ~half
-    // the player's height).
-    expect(screen.getByTestId('featured-artists-player-skeleton')).toBeInTheDocument();
+    // Static import: next/dynamic server-renders only its loading fallback in
+    // the App Router, which kept the LCP cover art out of the server HTML.
+    // video.js stays code-split behind MediaPlayer.Controls (LazyControls).
+    expect(screen.getByTestId('featured-artists-player')).toBeInTheDocument();
   });
 
   it('forwards the featured artists to the player', () => {
@@ -194,7 +159,7 @@ describe('HomeContent', () => {
 
     render(<HomeContent />);
 
-    expect(screen.getByTestId('featured-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('featured-artists-player')).toHaveAttribute('data-count', '3');
   });
 
   it('falls back to an empty featured-artist list when none are returned', () => {
@@ -203,7 +168,7 @@ describe('HomeContent', () => {
 
     render(<HomeContent />);
 
-    expect(screen.getByTestId('featured-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('featured-artists-player')).toHaveAttribute('data-count', '0');
   });
 
   it('wraps the content after the banner in a yellow zine panel', () => {
@@ -253,7 +218,7 @@ describe('HomeContent', () => {
       'lg:items-start',
       'lg:gap-x-10'
     );
-    const playerCell = screen.getByTestId('dynamic-featured').parentElement;
+    const playerCell = screen.getByTestId('featured-artists-player').parentElement;
     expect(playerCell).toHaveClass('lg:col-start-1', 'lg:row-start-1', 'lg:row-span-2');
     const headlinesCell = screen.getByTestId('release-headlines').parentElement;
     expect(headlinesCell).toHaveClass('lg:col-start-2', 'lg:row-start-2');
