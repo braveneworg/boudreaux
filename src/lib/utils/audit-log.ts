@@ -62,6 +62,7 @@ export type AuditEvent =
   | 'notification.banner.deleted'
   | 'notification.banner.published'
   | 'notification.banner.unpublished'
+  | 'notification.sms.blast.sent'
   | 'auth.signin.success'
   | 'auth.signin.failed'
   | 'auth.signout'
