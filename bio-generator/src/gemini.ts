@@ -34,7 +34,7 @@ export interface ProseRequestOptions extends FetchRetryOptions {
 }
 
 /** Which pipeline stage a Gemini call serves — tags the usage telemetry line. */
-type GeminiPurpose = 'draft' | 'synthesis' | 'critic' | 'repair';
+type GeminiPurpose = 'draft' | 'synthesis' | 'critic' | 'repair' | 'vision';
 
 /** Cap on the response-body excerpt echoed into failure messages. */
 const ERROR_BODY_SNIPPET_LENGTH = 300;
@@ -44,7 +44,7 @@ const ERROR_BODY_SNIPPET_LENGTH = 300;
  * optional in practice (the API omits usage on some error-adjacent responses),
  * so cost telemetry must tolerate any of them being absent.
  */
-interface GeminiUsageMetadata {
+export interface GeminiUsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
@@ -61,7 +61,7 @@ interface GeminiResponse {
  * tracked per model and pipeline stage. Each token count defaults to `null`
  * when the API omits it — logging must never throw on absent usage metadata.
  */
-const logGeminiUsage = (
+export const logGeminiUsage = (
   model: string,
   purpose: GeminiPurpose,
   usage: GeminiUsageMetadata | undefined
