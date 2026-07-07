@@ -37,6 +37,7 @@ const stats: AdminStats = {
   notifications: { activeSlots: 2 },
   chat: { flaggedUsers: 4, disabledUsers: 1 },
   tours: { total: 5, upcomingDates: 8 },
+  videos: { total: 6, published: 4, draft: 2 },
 };
 
 describe('AdminDashboardPage', () => {
@@ -70,6 +71,18 @@ describe('AdminDashboardPage', () => {
     render(await AdminDashboardPage());
 
     expect(screen.getByText('8 upcoming dates')).toBeInTheDocument();
+  });
+
+  it('links to the videos section', async () => {
+    render(await AdminDashboardPage());
+
+    expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/admin/videos');
+  });
+
+  it('shows the video totals and breakdown', async () => {
+    render(await AdminDashboardPage());
+
+    expect(screen.getByText('4 published · 2 draft')).toBeInTheDocument();
   });
 
   it('renders the published-vs-unpublished chart', async () => {
