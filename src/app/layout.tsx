@@ -107,8 +107,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
-        {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
-        <link rel="dns-prefetch" href="https://js.stripe.com" />
+        {/* No global Stripe hint: it shipped in every page's head but Stripe
+            only loads at checkout — PurchaseCheckoutStep preconnects where
+            loadStripe actually fires. */}
         {/* crossOrigin is mandatory: font fetches are CORS-mode, so omitting it makes Chrome double-fetch the file. */}
         <link
           rel="preload"
