@@ -468,6 +468,120 @@ const createSampleDigitalFormats = async () => {
   console.info('✅ Sample digital formats created successfully.');
 };
 
+// Video seed data defined at module scope so `createDefaultVideos` stays within
+// the function-length limit; the data is content, not logic.
+const DEFAULT_VIDEOS = [
+  {
+    title: 'E2E Video Alpha',
+    artist: 'E2E Artist One',
+    category: 'MUSIC' as const,
+    releasedOn: new Date('2026-01-07T00:00:00.000Z'),
+    durationSeconds: 125,
+  },
+  {
+    title: 'E2E Video Bravo',
+    artist: 'E2E Artist Two',
+    category: 'INFORMATIONAL' as const,
+    releasedOn: new Date('2026-01-06T00:00:00.000Z'),
+    durationSeconds: 95,
+  },
+  {
+    title: 'E2E Video Charlie',
+    artist: 'E2E Artist One',
+    category: 'MUSIC' as const,
+    releasedOn: new Date('2026-01-05T00:00:00.000Z'),
+    durationSeconds: 210,
+  },
+  {
+    title: 'E2E Video Delta',
+    artist: 'E2E Artist Three',
+    category: 'INFORMATIONAL' as const,
+    releasedOn: new Date('2026-01-04T00:00:00.000Z'),
+    durationSeconds: 60,
+  },
+  {
+    title: 'E2E Video Echo',
+    artist: 'E2E Artist Two',
+    category: 'MUSIC' as const,
+    releasedOn: new Date('2026-01-03T00:00:00.000Z'),
+    durationSeconds: 180,
+  },
+  {
+    title: 'E2E Video Foxtrot',
+    artist: 'E2E Artist One',
+    category: 'MUSIC' as const,
+    releasedOn: new Date('2026-01-02T00:00:00.000Z'),
+    durationSeconds: 145,
+  },
+  {
+    title: 'E2E Video Golf',
+    artist: 'E2E Artist Three',
+    category: 'INFORMATIONAL' as const,
+    releasedOn: new Date('2026-01-01T00:00:00.000Z'),
+    durationSeconds: 75,
+  },
+  {
+    title: 'E2E Video Draft',
+    artist: 'E2E Artist One',
+    category: 'MUSIC' as const,
+    releasedOn: new Date('2026-01-08T00:00:00.000Z'),
+    durationSeconds: 100,
+    publishedAt: null as Date | null,
+  },
+  {
+    title: 'E2E Video Archived',
+    artist: 'E2E Artist Two',
+    category: 'INFORMATIONAL' as const,
+    releasedOn: new Date('2026-01-09T00:00:00.000Z'),
+    durationSeconds: 90,
+    publishedAt: new Date('2026-01-10T00:00:00.000Z') as Date | null,
+    archivedAt: new Date('2026-01-11T00:00:00.000Z'),
+  },
+] as const;
+
+const createDefaultVideos = async (): Promise<void> => {
+  const makeSlug = (title: string) => title.toLowerCase().replace(/\s+/g, '-');
+  const defaultPublishedAt = new Date('2026-01-10T00:00:00.000Z');
+  let created = 0;
+
+  for (const video of DEFAULT_VIDEOS) {
+    const existing = await prisma.video.findFirst({ where: { title: video.title } });
+
+    if (!existing) {
+      const slug = makeSlug(video.title);
+      const isDraft = 'publishedAt' in video && video.publishedAt === null;
+      const isArchived = 'archivedAt' in video;
+
+      await prisma.video.create({
+        data: {
+          title: video.title,
+          artist: video.artist,
+          category: video.category,
+          releasedOn: video.releasedOn,
+          durationSeconds: video.durationSeconds,
+          s3Key: `media/videos/e2e/${slug}.mp4`,
+          fileName: `${slug}.mp4`,
+          mimeType: 'video/mp4',
+          fileSize: BigInt(1048576),
+          posterUrl: null,
+          description: `${video.title} description for E2E.`,
+          publishedAt: isDraft
+            ? null
+            : 'publishedAt' in video
+              ? video.publishedAt
+              : defaultPublishedAt,
+          archivedAt: isArchived ? video.archivedAt : undefined,
+        },
+      });
+      created++;
+    }
+  }
+
+  console.info(
+    `✅ Created ${created} default videos (${DEFAULT_VIDEOS.length - created} already existed).`
+  );
+};
+
 const main = async () => {
   // Check for --drop-database flag
   const shouldDropDatabase = process.argv.includes('--drop-database');
@@ -532,6 +646,9 @@ const main = async () => {
 
     // Create sample digital formats for releases (Feature 004-release-digital-formats)
     await createSampleDigitalFormats();
+
+    // Create default videos for development testing
+    await createDefaultVideos();
 
     console.info('✅ Development database seeded.');
   }

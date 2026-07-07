@@ -12,14 +12,20 @@
  * @returns The full CDN URL (e.g., "https://cdn.example.com/releases/abc/...")
  */
 const E2E_MP3_FALLBACK_PATH = '/e2e/audio/e2e-track-320.mp3';
+const E2E_VIDEO_FALLBACK_PATH = '/e2e/video/e2e-video.mp4';
 
 const isMp3AssetKey = (s3Key: string): boolean => /\.(mp3|mpeg)$/i.test(s3Key);
+const isVideoAssetKey = (s3Key: string): boolean => /\.(mp4|webm)$/i.test(s3Key);
 
 export const buildCdnUrl = (s3Key: string): string => {
   const isE2EMode = process.env.NEXT_PUBLIC_E2E_MODE === 'true' || process.env.E2E_MODE === 'true';
 
   if (isE2EMode && isMp3AssetKey(s3Key)) {
     return E2E_MP3_FALLBACK_PATH;
+  }
+
+  if (isE2EMode && isVideoAssetKey(s3Key)) {
+    return E2E_VIDEO_FALLBACK_PATH;
   }
 
   const raw = process.env.NEXT_PUBLIC_CDN_DOMAIN || process.env.CDN_DOMAIN || '';
