@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { fetchWithRetry, sleep } from './http.js';
+import { RETRY_AFTER_MAX_MS, fetchWithRetry, sleep } from './http.js';
 
 const ok = (): Response => new Response('ok', { status: 200 });
 const status = (code: number, headers?: Record<string, string>): Response =>
@@ -48,6 +48,43 @@ describe('fetchWithRetry', () => {
     await fetchWithRetry('https://x', {}, { fetchFn, sleep: sleepFn });
 
     expect(sleepFn).toHaveBeenCalledWith(2000);
+  });
+
+  it('passes a small Retry-After header through verbatim', async () => {
+    const sleepFn = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(status(429, { 'retry-after': '5' }))
+      .mockResolvedValueOnce(ok());
+
+    await fetchWithRetry('https://x', {}, { fetchFn, sleep: sleepFn });
+
+    // 5 seconds < RETRY_AFTER_MAX_MS → passes through as-is
+    expect(sleepFn).toHaveBeenCalledWith(5000);
+  });
+
+  it('clamps a large Retry-After header to RETRY_AFTER_MAX_MS', async () => {
+    const sleepFn = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(status(429, { 'retry-after': '300' }))
+      .mockResolvedValueOnce(ok());
+
+    await fetchWithRetry('https://x', {}, { fetchFn, sleep: sleepFn });
+
+    // 300s = 300_000ms exceeds the cap; must be clamped to RETRY_AFTER_MAX_MS
+    expect(sleepFn).toHaveBeenCalledWith(RETRY_AFTER_MAX_MS);
+    expect(sleepFn).not.toHaveBeenCalledWith(300_000);
+  });
+
+  it('does not clamp the exponential-backoff path (no Retry-After header)', async () => {
+    const sleepFn = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi.fn().mockResolvedValueOnce(status(429)).mockResolvedValueOnce(ok());
+
+    // baseDelayMs=500, attempt 0 → 500 * 2^0 = 500ms (well under cap)
+    await fetchWithRetry('https://x', {}, { fetchFn, sleep: sleepFn, baseDelayMs: 500 });
+
+    expect(sleepFn).toHaveBeenCalledWith(500);
   });
 
   it('does not retry a non-retryable status and returns it', async () => {

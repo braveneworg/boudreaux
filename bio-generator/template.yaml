@@ -10,7 +10,9 @@ Globals:
     # via API Gateway), so the 29s gateway limit does not apply. The web app's
     # invoke client uses a matching (larger) request timeout so it waits this out.
     Timeout: 900
-    MemorySize: 512
+    # 1024 MB: cap-240 base64 image retention can reach ~480 MB peak; 1 GB gives
+    # safe headroom and also doubles available CPU allocation vs 512 MB.
+    MemorySize: 1024
     Runtime: nodejs24.x
     Architectures:
       - arm64
