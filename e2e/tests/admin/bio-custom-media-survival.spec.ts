@@ -91,12 +91,12 @@ test.describe('Admin custom bio media survives regeneration', () => {
     const wikiTile = tiles.filter({ hasText: 'Wikipedia' });
     await expect(customTile).toBeVisible({ timeout: 15_000 });
     await expect(wikiTile).toBeVisible();
-    const customIdxPre = await customTile.first().evaluate(
-      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
-    );
-    const wikiIdxPre = await wikiTile.first().evaluate(
-      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
-    );
+    const customIdxPre = await customTile
+      .first()
+      .evaluate((el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1));
+    const wikiIdxPre = await wikiTile
+      .first()
+      .evaluate((el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1));
     expect(customIdxPre).toBeGreaterThanOrEqual(0);
     expect(wikiIdxPre).toBeGreaterThanOrEqual(0);
     expect(customIdxPre).toBeLessThan(wikiIdxPre);
@@ -122,12 +122,12 @@ test.describe('Admin custom bio media survives regeneration', () => {
       linksGroup.getByRole('button', { name: `Delete link ${customLabel}` })
     ).toBeVisible();
     await expect(linksGroup.getByRole('button', { name: 'Delete link Wikipedia' })).toBeVisible();
-    const customIdxPost = await customTile.first().evaluate(
-      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
-    );
-    const wikiIdxPost = await wikiTile.first().evaluate(
-      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
-    );
+    const customIdxPost = await customTile
+      .first()
+      .evaluate((el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1));
+    const wikiIdxPost = await wikiTile
+      .first()
+      .evaluate((el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1));
     expect(customIdxPost).toBeGreaterThanOrEqual(0);
     expect(wikiIdxPost).toBeGreaterThanOrEqual(0);
     expect(customIdxPost).toBeLessThan(wikiIdxPost);

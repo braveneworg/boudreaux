@@ -631,6 +631,51 @@ describe('ArtistRepository', () => {
       const arg = tx.artist.update.mock.calls[0][0];
       expect(arg.data.bioLinks.create).toEqual([]);
     });
+
+    it('dedupes per-row: drops a matched link but still inserts a different unmatched link in the same call', async () => {
+      // Wikipedia URL matches a custom survivor; Official Site does not.
+      const tx = buildTx({ links: [{ url: 'HTTPS://EN.WIKIPEDIA.ORG/wiki/X' }] });
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      const contentWithTwoLinks = {
+        ...content,
+        links: [
+          {
+            label: 'Wikipedia',
+            url: 'https://en.wikipedia.org/wiki/X',
+            kind: 'wikipedia',
+            sortOrder: 0,
+          },
+          { label: 'Official Site', url: 'https://artist.com', kind: 'official', sortOrder: 1 },
+        ],
+      };
+
+      await ArtistRepository.replaceBioContent('a1', contentWithTwoLinks);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      // Only the unmatched link should be created; dedupe is per-row, not all-or-nothing.
+      expect(arg.data.bioLinks.create).toEqual([
+        {
+          label: 'Official Site',
+          url: 'https://artist.com',
+          kind: 'official',
+          sortOrder: 1,
+          origin: 'generated',
+        },
+      ]);
+    });
+
+    it('passes extended timeout options to $transaction', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        timeout: 15_000,
+        maxWait: 5_000,
+      });
+    });
   });
 
   describe('getBioGenerationState', () => {

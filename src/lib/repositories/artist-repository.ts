@@ -449,54 +449,58 @@ export class ArtistRepository {
     }
   ): Promise<void> {
     await runQuery(() =>
-      prisma.$transaction(async (tx) => {
-        // (a) Read surviving custom rows so their URLs can shield matching
-        // generated rows from re-insertion.
-        const [customImages, customLinks] = await Promise.all([
-          tx.artistBioImage.findMany({
-            where: { artistId, origin: 'custom' },
-            select: { url: true },
-          }),
-          tx.artistBioLink.findMany({
-            where: { artistId, origin: 'custom' },
-            select: { url: true },
-          }),
-        ]);
+      prisma.$transaction(
+        async (tx) => {
+          // (a) Read surviving custom rows so their URLs can shield matching
+          // generated rows from re-insertion.
+          const [customImages, customLinks] = await Promise.all([
+            tx.artistBioImage.findMany({
+              where: { artistId, origin: 'custom' },
+              select: { url: true },
+            }),
+            tx.artistBioLink.findMany({
+              where: { artistId, origin: 'custom' },
+              select: { url: true },
+            }),
+          ]);
 
-        // (b) Delete generated + legacy rows only. `{ origin: null }` misses
-        // absent-field docs on Mongo, so `{ isSet: false }` is required too.
-        const legacyOrigin = {
-          artistId,
-          OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
-        };
-        await tx.artistBioImage.deleteMany({ where: legacyOrigin });
-        await tx.artistBioLink.deleteMany({ where: legacyOrigin });
+          // (b) Delete generated + legacy rows only. `{ origin: null }` misses
+          // absent-field docs on Mongo, so `{ isSet: false }` is required too.
+          const legacyOrigin = {
+            artistId,
+            OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
+          };
+          await tx.artistBioImage.deleteMany({ where: legacyOrigin });
+          await tx.artistBioLink.deleteMany({ where: legacyOrigin });
 
-        // (c) Recreate incoming rows as generated, dropping any whose URL matches a
-        // surviving custom row (case-insensitive, no normalization beyond lowercasing).
-        const customImageUrls = new Set(customImages.map(({ url }) => url.toLowerCase()));
-        const customLinkUrls = new Set(customLinks.map(({ url }) => url.toLowerCase()));
-        const imagesToCreate = content.images
-          .filter((image) => !customImageUrls.has(image.url.toLowerCase()))
-          .map((image) => ({ ...image, origin: 'generated' }));
-        const linksToCreate = content.links
-          .filter((link) => !customLinkUrls.has(link.url.toLowerCase()))
-          .map((link) => ({ ...link, origin: 'generated' }));
+          // (c) Recreate incoming rows as generated, dropping any whose URL matches a
+          // surviving custom row (case-insensitive, no normalization beyond lowercasing).
+          const customImageUrls = new Set(customImages.map(({ url }) => url.toLowerCase()));
+          const customLinkUrls = new Set(customLinks.map(({ url }) => url.toLowerCase()));
+          const imagesToCreate = content.images
+            .filter((image) => !customImageUrls.has(image.url.toLowerCase()))
+            .map((image) => ({ ...image, origin: 'generated' }));
+          const linksToCreate = content.links
+            .filter((link) => !customLinkUrls.has(link.url.toLowerCase()))
+            .map((link) => ({ ...link, origin: 'generated' }));
 
-        await tx.artist.update({
-          where: { id: artistId },
-          data: {
-            shortBio: content.shortBio,
-            bio: content.bio,
-            altBio: content.altBio,
-            genres: content.genres,
-            bioModel: content.bioModel,
-            bioGeneratedAt: new Date(),
-            bioImages: { create: imagesToCreate },
-            bioLinks: { create: linksToCreate },
-          },
-        });
-      })
+          await tx.artist.update({
+            where: { id: artistId },
+            data: {
+              shortBio: content.shortBio,
+              bio: content.bio,
+              altBio: content.altBio,
+              genres: content.genres,
+              bioModel: content.bioModel,
+              bioGeneratedAt: new Date(),
+              bioImages: { create: imagesToCreate },
+              bioLinks: { create: linksToCreate },
+            },
+          });
+        },
+        // Regen payload scales with image/link volume; default 5s timeout is too tight.
+        { timeout: 15_000, maxWait: 5_000 }
+      )
     );
   }
 

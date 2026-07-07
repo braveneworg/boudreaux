@@ -426,7 +426,7 @@ model ArtistBioImage {
   kind         String? // photo | cover — subject classification from discovery
   alt          String? // Accessible description written by the vision pass
   /// Provenance: "generated" (AI discovery) or "custom" (admin upload). Nullable
-  /// because MongoDB documents predating this field are absent it — a null/missing
+  /// because MongoDB documents predating this field are missing it — a null/missing
   /// value is treated as generated, so regeneration deletes it like a generated row.
   origin       String?
   sortOrder    Int      @default(0)
