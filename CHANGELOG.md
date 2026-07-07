@@ -99,6 +99,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.190.0] - 2026-07-07
+
+### Added
+
+- docs: 📝 add self-correcting LESSONS section to CLAUDE.md (#569)\n- perf: ⚡ desktop Lighthouse ≥95 — SSR the home player (#568)\n- docs: 📝 add self-correcting LESSONS section to CLAUDE.md (#569)\n
+
 ## [4.189.0] - 2026-07-06
 
 ### Added
