@@ -1080,7 +1080,7 @@ describe('FeaturedArtistsPlayer', () => {
       // Select artist with a release
       fireEvent.click(screen.getByTestId('artist-featured-2'));
 
-      const heading = screen.getByRole('heading', { level: 3 });
+      const heading = screen.getByRole('heading', { level: 2 });
       expect(heading).toHaveTextContent('Test Artist 2');
       expect(heading).toHaveAttribute('aria-label', 'Now playing: Test Artist 2 - Test Album');
       expect(screen.getByText('Test Album')).toBeInTheDocument();
@@ -1093,7 +1093,7 @@ describe('FeaturedArtistsPlayer', () => {
 
       fireEvent.click(screen.getByTestId('artist-featured-2'));
 
-      const artistHeading = screen.getByRole('heading', { level: 3 });
+      const artistHeading = screen.getByRole('heading', { level: 2 });
       expect(artistHeading).toBeInTheDocument();
       expect(artistHeading).not.toHaveClass('sr-only');
       expect(artistHeading).toHaveTextContent('Test Artist 2');
@@ -1106,7 +1106,7 @@ describe('FeaturedArtistsPlayer', () => {
 
       // First artist has no release — ArtistReleaseInfo is not rendered
       // because selectedArtist?.release is null
-      const heading = screen.queryByRole('heading', { level: 3 });
+      const heading = screen.queryByRole('heading', { level: 2 });
       expect(heading).not.toBeInTheDocument();
     });
   });

@@ -21,21 +21,21 @@ describe('NowPlayingHeading', () => {
   it('sets the correct aria-label on the heading', () => {
     render(<NowPlayingHeading {...defaultProps} />);
 
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveAttribute('aria-label', 'Now playing: Test Artist - Test Song');
   });
 
   it('applies sr-only class by default when visibleHeading is not set', () => {
     render(<NowPlayingHeading {...defaultProps} />);
 
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveClass('sr-only');
   });
 
   it('does not apply sr-only class when visibleHeading is true', () => {
     render(<NowPlayingHeading {...defaultProps} visibleHeading />);
 
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).not.toHaveClass('sr-only');
     expect(heading).toHaveClass('font-bold');
   });
@@ -43,7 +43,7 @@ describe('NowPlayingHeading', () => {
   it('applies sr-only class when visibleHeading is explicitly false', () => {
     render(<NowPlayingHeading {...defaultProps} visibleHeading={false} />);
 
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveClass('sr-only');
   });
 
