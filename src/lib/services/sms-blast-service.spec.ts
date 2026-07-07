@@ -31,7 +31,7 @@ vi.mock('@/lib/services/get-sms-service', () => ({
 }));
 
 const { loggers } = await import('@/lib/utils/logger');
-const { SmsBlastService, sendInChunks } = await import('./sms-blast-service');
+const { SmsBlastService, sendInChunks, SMS_BLAST_CHUNK_SIZE } = await import('./sms-blast-service');
 
 const baseInput = { message: 'Hello fans!', sentById: 'admin-1', sentByEmail: 'admin@example.com' };
 
@@ -99,7 +99,7 @@ describe('SmsBlastService', () => {
           recipientCount: 2,
           sentCount: 2,
           failedCount: 0,
-          message: expect.stringContaining('/profile'),
+          message: expect.stringMatching(/\/profile$/),
         })
       );
     });
@@ -241,5 +241,73 @@ describe('sendInChunks', () => {
     expect(smsSendMock).toHaveBeenCalledTimes(25);
     expect(sentCount).toBe(25);
     expect(failedCount).toBe(0);
+  });
+
+  it('caps max concurrent sends per chunk at SMS_BLAST_CHUNK_SIZE', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    smsSendMock.mockImplementation(async () => {
+      inFlight++;
+      if (inFlight > maxInFlight) maxInFlight = inFlight;
+      await Promise.resolve();
+      inFlight--;
+      return { ok: true, messageId: 'msg' };
+    });
+    const recipients = Array.from({ length: 25 }, (_, i) => ({
+      id: `u${i}`,
+      phone: `+1555000${String(i).padStart(4, '0')}`,
+    }));
+    const sms = { send: smsSendMock };
+
+    await sendInChunks(
+      sms as Parameters<typeof sendInChunks>[0],
+      recipients,
+      'Test message\n\nhttps://fakefourrecords.com/profile',
+      0
+    );
+
+    expect(maxInFlight).toBe(SMS_BLAST_CHUNK_SIZE);
+  });
+
+  it('calls setTimeout exactly (chunkCount - 1) times with delayMs between chunks', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    smsSendMock.mockResolvedValue({ ok: true, messageId: 'msg' });
+    const recipients = Array.from({ length: 25 }, (_, i) => ({
+      id: `u${i}`,
+      phone: `+1555000${String(i).padStart(4, '0')}`,
+    }));
+    const sms = { send: smsSendMock };
+
+    await sendInChunks(
+      sms as Parameters<typeof sendInChunks>[0],
+      recipients,
+      'Test message\n\nhttps://fakefourrecords.com/profile',
+      5
+    );
+
+    const timedCalls = setTimeoutSpy.mock.calls.filter((args) => args[1] === 5);
+    expect(timedCalls).toHaveLength(2); // 3 chunks → 2 inter-chunk gaps
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('does not call setTimeout when delayMs is 0 (sleep short-circuits)', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    smsSendMock.mockResolvedValue({ ok: true, messageId: 'msg' });
+    const recipients = Array.from({ length: 25 }, (_, i) => ({
+      id: `u${i}`,
+      phone: `+1555000${String(i).padStart(4, '0')}`,
+    }));
+    const sms = { send: smsSendMock };
+
+    await sendInChunks(
+      sms as Parameters<typeof sendInChunks>[0],
+      recipients,
+      'Test message\n\nhttps://fakefourrecords.com/profile',
+      0
+    );
+
+    const zeroCalls = setTimeoutSpy.mock.calls.filter((args) => args[1] === 0);
+    expect(zeroCalls).toHaveLength(0);
+    setTimeoutSpy.mockRestore();
   });
 });
