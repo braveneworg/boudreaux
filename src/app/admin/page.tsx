@@ -44,6 +44,11 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     primary: `${stats.notifications.activeSlots}`,
     secondary: 'active banner slots',
   },
+  '/admin/announcements': {
+    href: '/admin/announcements',
+    primary: '—',
+    secondary: 'send an SMS to subscribers',
+  },
   '/admin/chat': {
     href: '/admin/chat',
     primary: `${stats.chat.flaggedUsers}`,
