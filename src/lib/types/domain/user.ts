@@ -120,6 +120,12 @@ export interface UserAdminRecord {
   allowSmsNotifications: boolean | null;
 }
 
+/** SMS blast recipient projection. */
+export interface UserSmsRecipientRecord {
+  id: string;
+  phone: string | null;
+}
+
 // =============================================================================
 // Input types
 // =============================================================================
