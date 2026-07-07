@@ -34,10 +34,19 @@ vi.mock('./release-headlines', () => ({
   ReleaseHeadlines: () => <aside data-testid="release-headlines" />,
 }));
 
+const capturedDynamicOptions = vi.hoisted(() => ({
+  current: undefined as { ssr?: boolean; loading?: () => React.ReactNode } | undefined,
+}));
+
 // Drive next/dynamic synchronously: exercise the loader (so the dynamic import
-// arrow + its `.then` mapper are covered) and the `loading` placeholder branch.
+// arrow + its `.then` mapper are covered), capture the options for assertions,
+// and render the `loading` placeholder branch alongside the resolved stub.
 vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<unknown>, options?: { loading?: () => React.ReactNode }) => {
+  default: (
+    loader: () => Promise<unknown>,
+    options?: { ssr?: boolean; loading?: () => React.ReactNode }
+  ) => {
+    capturedDynamicOptions.current = options;
     void loader();
     const Dynamic = (props: { featuredArtists: unknown[] }) => (
       <div data-testid="dynamic-featured">
@@ -151,6 +160,30 @@ describe('HomeContent', () => {
     expect(carousel).toHaveAttribute('data-count', '2');
     expect(carousel).toHaveAttribute('data-rotation', '7');
     expect(carousel).toHaveAttribute('data-with-notification', 'true');
+  });
+
+  it('keeps SSR enabled on the player dynamic import (LCP discovery)', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // `ssr: false` strips the player — and with it the LCP cover art — from
+    // the server HTML, leaving the image undiscoverable until the JS chunk
+    // chain loads. next/dynamic keeps the chunk split either way.
+    expect(capturedDynamicOptions.current?.ssr).not.toBe(false);
+  });
+
+  it('uses the shared player skeleton as the chunk-loading fallback', () => {
+    useBannersQueryMock.mockReturnValue({ data: undefined });
+    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+    render(<HomeContent />);
+
+    // The fallback mirrors the player's real footprint so soft navigations
+    // swap skeleton → player in place (the old bare min-h-112 div was ~half
+    // the player's height).
+    expect(screen.getByTestId('featured-artists-player-skeleton')).toBeInTheDocument();
   });
 
   it('forwards the featured artists to the player', () => {

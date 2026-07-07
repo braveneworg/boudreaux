@@ -11,6 +11,7 @@ import { useBannersQuery } from '@/app/hooks/use-banners-query';
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
 import { BannerStrip } from './banner-strip';
+import { FeaturedArtistsPlayerSkeleton } from './featured-artists-player-skeleton';
 import { ReleaseHeadlines } from './release-headlines';
 import { ContentContainer } from './ui/content-container';
 import { ImageHeading } from './ui/image-heading';
@@ -18,13 +19,17 @@ import { ZinePanel } from './ui/zine-panel';
 
 import type { BannerSlotData } from './banner-carousel';
 
-// video.js and the featured-artists player bundle are the bulk of the homepage
-// JS. Defer hydration until after the banner paints (below-the-fold UI).
+// Chunk-split the player but keep SSR on: the server HTML must contain the
+// selected artist's cover art — the desktop LCP element — so the browser's
+// preload scanner discovers it immediately instead of waiting for the chunk
+// chain to hydrate (`ssr: false` here used to cost ~1.4s of LCP load delay).
+// video.js stays out of the initial bundle either way: MediaPlayer.Controls
+// is `LazyControls`, its own `ssr: false` dynamic boundary. The `loading`
+// fallback only shows on client-side navigations while the chunk streams in.
 const FeaturedArtistsPlayer = nextDynamic(
   () => import('./featured-artists-player').then((m) => ({ default: m.FeaturedArtistsPlayer })),
   {
-    ssr: false,
-    loading: () => <div aria-hidden className="min-h-112" />,
+    loading: () => <FeaturedArtistsPlayerSkeleton />,
   }
 );
 
