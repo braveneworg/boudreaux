@@ -11,7 +11,7 @@ import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
 
 import { fetchAndParse } from './fetch-and-parse';
 
-interface ActiveFeaturedArtistsResponse {
+export interface ActiveFeaturedArtistsResponse {
   featuredArtists: FeaturedArtist[];
   count: number;
 }

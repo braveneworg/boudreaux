@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
+import type { ActiveFeaturedArtistsResponse } from '@/app/hooks/use-active-featured-artists-query';
 import { HomeContent } from '@/components/home-content';
 import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
@@ -14,7 +15,13 @@ import { FeaturedArtistsService } from '@/lib/services/featured-artists-service'
 import { ReleaseService } from '@/lib/services/release-service';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
-import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
+import {
+  buildBannerPreloadSrcSet,
+  buildImagePreloadSrcSet,
+  isPreloadableImageSrc,
+} from '@/lib/utils/cloudfront-loader';
+import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
+import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { PageContainer } from '@/ui/page-container';
@@ -36,6 +43,25 @@ import { PageContainer } from '@/ui/page-container';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Resolve the desktop LCP preload target from the prefetched featured-artist
+ * cache: the cover art of the first artist with a displayable name — the same
+ * selection the SSR'd `FeaturedArtistsPlayer` makes. Returns null when there
+ * is nothing preloadable (no artists, no art, or a local `data:`/`blob:`
+ * source such as the seeded placeholder, which has nothing to fetch).
+ */
+const resolveCoverArtPreloadSrc = (
+  artistsData: ActiveFeaturedArtistsResponse | undefined
+): string | null => {
+  const firstDisplayableArtist = artistsData?.featuredArtists?.find(
+    (featured) => getFeaturedArtistDisplayName(featured) !== null
+  );
+  const coverArt = firstDisplayableArtist
+    ? getFeaturedArtistCoverArt(firstDisplayableArtist)
+    : null;
+  return coverArt && isPreloadableImageSrc(coverArt) ? coverArt : null;
+};
+
+/**
  * Home page — Server Component that prefetches banners and featured artists,
  * then hydrates client components for interactivity.
  *
@@ -51,10 +77,16 @@ export const dynamic = 'force-dynamic';
  * mirrors what the carousel's `<Image>` requests (via `buildBannerPreloadSrcSet`,
  * same custom loader), so the preload cache hits the rendered `<img>`.
  *
- * The featured-artist cover art is intentionally NOT preloaded: the
- * `FeaturedArtistsPlayer` is dynamic-imported with `ssr: false`, so the `<img>`
- * that would consume the preload doesn't render until after Video.js's chunk
- * loads — well past `window.load` — which also logs "preloaded but not used".
+ * The featured-artist cover art gets the mirror treatment for desktop: the
+ * player server-renders (see home-content.tsx), so its `<Image>` — the desktop
+ * LCP element — is already in the initial HTML, but as a non-priority lazy
+ * image it wouldn't start fetching until after layout. The
+ * `(min-width: 1024px)` preload below starts that fetch at HTML parse.
+ * The media query matches the `lg` grid split that places the cover above the
+ * fold; below `lg` it sits below the fold, where a preload would be flagged
+ * "preloaded but not used". `imageSizes="576px"` mirrors the img's effective
+ * `sizes` at those viewports so the preload picker and the img choose the
+ * same `_w` variant and the preload cache hits.
  */
 export default async function Home() {
   const queryClient = getQueryClient();
@@ -118,6 +150,11 @@ export default async function Home() {
   const bannersData = queryClient.getQueryData<BannersApiResponse>(queryKeys.banners.active());
   const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
 
+  // Same read-back for the featured artists (see resolveCoverArtPreloadSrc).
+  const coverArtPreloadSrc = resolveCoverArtPreloadSrc(
+    queryClient.getQueryData<ActiveFeaturedArtistsResponse>(queryKeys.featuredArtists.active())
+  );
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       {firstBannerFilename && (
@@ -127,6 +164,16 @@ export default async function Home() {
           media="(max-width: 767.98px)"
           imageSrcSet={buildBannerPreloadSrcSet(firstBannerFilename)}
           imageSizes="100vw"
+          fetchPriority="high"
+        />
+      )}
+      {coverArtPreloadSrc && (
+        <link
+          rel="preload"
+          as="image"
+          media="(min-width: 1024px)"
+          imageSrcSet={buildImagePreloadSrcSet(coverArtPreloadSrc)}
+          imageSizes="576px"
           fetchPriority="high"
         />
       )}

@@ -147,4 +147,69 @@ describe('banner preload helpers', () => {
       expect(result).not.toContain('?');
     });
   });
+
+  describe('buildImagePreloadSrcSet', () => {
+    it('builds a srcset entry per device size for any CDN-relative path', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildImagePreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+      const { IMAGE_VARIANT_DEVICE_SIZES } = await import('@/lib/constants/image-variants');
+
+      const result = buildImagePreloadSrcSet('/media/releases/abc/cover.jpg');
+
+      const expected = IMAGE_VARIANT_DEVICE_SIZES.map(
+        (w) => `https://cdn.fakefourrecords.com/media/releases/abc/cover_w${w}.webp ${w}w`
+      ).join(', ');
+      expect(result).toBe(expected);
+    });
+
+    it('matches the banner helper for banner paths (same URL builder)', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadSrcSet, buildImagePreloadSrcSet } =
+        await import('@/lib/utils/cloudfront-loader');
+
+      expect(buildImagePreloadSrcSet('/media/banners/hero.jpg')).toBe(
+        buildBannerPreloadSrcSet('hero.jpg')
+      );
+    });
+
+    it('replaces a pre-existing width suffix instead of stacking suffixes', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildImagePreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildImagePreloadSrcSet('/media/releases/abc/cover_w828.webp');
+
+      expect(result).toContain('/media/releases/abc/cover_w640.webp 640w');
+      expect(result).not.toContain('_w828_w');
+    });
+  });
+
+  describe('isPreloadableImageSrc', () => {
+    it('accepts CDN-relative and absolute http(s) sources', async () => {
+      const { isPreloadableImageSrc } = await import('@/lib/utils/cloudfront-loader');
+
+      expect(isPreloadableImageSrc('/media/releases/abc/cover.jpg')).toBe(true);
+      expect(isPreloadableImageSrc('https://cdn.fakefourrecords.com/media/x.webp')).toBe(true);
+    });
+
+    it('rejects data: sources (nothing to fetch over the network)', async () => {
+      const { isPreloadableImageSrc } = await import('@/lib/utils/cloudfront-loader');
+
+      expect(isPreloadableImageSrc('data:image/webp;base64,AAAA')).toBe(false);
+    });
+
+    it('rejects blob: sources', async () => {
+      const { isPreloadableImageSrc } = await import('@/lib/utils/cloudfront-loader');
+
+      expect(isPreloadableImageSrc('blob:https://example.com/1234')).toBe(false);
+    });
+  });
 });

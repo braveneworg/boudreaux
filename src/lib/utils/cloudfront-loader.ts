@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Banner preload URL helpers for `<link rel="preload">` tags.
+ * Image preload URL helpers for `<link rel="preload">` tags.
  *
  * These produce URLs that exactly match what the global image loader
  * (`src/lib/image-loader.ts`) generates for `<Image>` components so the
@@ -39,11 +39,25 @@ export const buildBannerPreloadUrl = (imageFilename: string, width?: number): st
 };
 
 /**
+ * True when `src` is fetchable over the network — preloading `data:`/`blob:`
+ * sources is meaningless since their bytes are already local.
+ */
+export const isPreloadableImageSrc = (src: string): boolean =>
+  !src.startsWith('data:') && !src.startsWith('blob:');
+
+/**
+ * Builds a responsive `imagesrcset` string for any image path the global
+ * loader serves, with one entry per device size matching the `_w{width}`
+ * variants. Pair it with an `imageSizes` that mirrors the target `<Image>`'s
+ * effective `sizes` so the browser's preload picker and the rendered img
+ * select the same variant (and the preload cache hits).
+ */
+export const buildImagePreloadSrcSet = (src: string): string =>
+  IMAGE_VARIANT_DEVICE_SIZES.map((w) => `${buildCdnImageVariantUrl(src, w)} ${w}w`).join(', ');
+
+/**
  * Builds a responsive `imagesrcset` string for a banner image, with one
  * entry per device size matching the width variants the image loader produces.
  */
-export const buildBannerPreloadSrcSet = (imageFilename: string): string => {
-  return IMAGE_VARIANT_DEVICE_SIZES.map(
-    (w) => `${buildBannerPreloadUrl(imageFilename, w)} ${w}w`
-  ).join(', ');
-};
+export const buildBannerPreloadSrcSet = (imageFilename: string): string =>
+  buildImagePreloadSrcSet(`/media/banners/${imageFilename}`);
