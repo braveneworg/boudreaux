@@ -357,6 +357,15 @@ describe('presigned-upload-actions', () => {
         expect(result.success).toBe(true);
         expect(result.data?.[0].s3Key).toMatch(/^media\/notifications\//);
       });
+
+      it('should work with videos entity type using the image path', async () => {
+        const result = await getPresignedUploadUrlsAction('videos', 'video-123', [
+          { fileName: 'poster.jpg', contentType: 'image/jpeg', fileSize: 1024 },
+        ]);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.[0].s3Key).toMatch(/^media\/videos\/video-123\//);
+      });
     });
 
     // ─── Security: S3 key path traversal rejection ───

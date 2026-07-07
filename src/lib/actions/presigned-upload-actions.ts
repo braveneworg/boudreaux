@@ -19,7 +19,7 @@ const logger = loggers.presignedUrls;
  * Generate a unique file key for S3
  */
 const generateS3Key = (
-  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists' | 'videos',
   entityId: string,
   fileName: string
 ): string => {
@@ -141,7 +141,13 @@ const validateFile = (
   return { valid: true };
 };
 
-type EntityType = 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
+type EntityType =
+  | 'artists'
+  | 'releases'
+  | 'tracks'
+  | 'notifications'
+  | 'featured-artists'
+  | 'videos';
 
 interface S3UploadContext {
   s3Client: ReturnType<typeof getS3Client>;
