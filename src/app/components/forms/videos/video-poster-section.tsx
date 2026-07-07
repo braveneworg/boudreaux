@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -55,16 +55,18 @@ export const VideoPosterSection = ({
     setValue,
   });
 
-  const candidateUrl = useMemo(
-    () => (candidate ? URL.createObjectURL(candidate) : null),
-    [candidate]
-  );
-  useEffect(
-    () => () => {
-      if (candidateUrl) URL.revokeObjectURL(candidateUrl);
-    },
-    [candidateUrl]
-  );
+  // Create + revoke the candidate object URL in a single effect keyed on the
+  // candidate blob, so StrictMode's dev double-render can't leak an orphan URL.
+  const [candidateUrl, setCandidateUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!candidate) {
+      setCandidateUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(candidate);
+    setCandidateUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [candidate]);
 
   const previewSrc = uploadedPosterUrl ?? candidateUrl ?? existingPosterUrl ?? null;
   const showUseFrame = candidate !== null && uploadedPosterUrl === null;

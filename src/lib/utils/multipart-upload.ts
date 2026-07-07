@@ -285,10 +285,9 @@ const represign = async (session: UploadSession, partNumber: number): Promise<vo
       uploadId: session.uploadId,
       partNumbers: [partNumber],
     });
-  } catch (err) {
+  } catch {
     // RPC rejected — treat the same as an error result: drop the stale URL so
     // the next attempt re-acquires through the normal presign-batch path.
-    void messageFromRejection(err, 'Failed to re-presign part');
     session.urlCache.delete(partNumber);
     return;
   }

@@ -10,6 +10,9 @@
  * marker and imports nothing from the server bundle.
  */
 
+/** Every video object lives under this S3 key namespace (uploader + cleanup). */
+export const VIDEO_KEY_PREFIX = 'media/videos/';
+
 /** MIME types accepted for video uploads. */
 export const VIDEO_ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm'] as const;
 

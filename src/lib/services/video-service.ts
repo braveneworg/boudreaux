@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import type {
   CreateVideoData,
@@ -28,7 +29,9 @@ const collectVideoS3Keys = ({ s3Key, posterUrl }: Video): string[] => {
 
   if (posterUrl) {
     const posterKey = extractS3KeyFromUrl(posterUrl);
-    if (posterKey) keys.push(posterKey);
+    // Only delete poster objects in our own namespace — an admin-supplied
+    // posterUrl could otherwise point cleanup at release audio or artist images.
+    if (posterKey?.startsWith(VIDEO_KEY_PREFIX)) keys.push(posterKey);
   }
 
   return keys;

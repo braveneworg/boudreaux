@@ -387,13 +387,31 @@ describe('VideoService', () => {
       const withPoster = { ...mockVideo, posterUrl: 'https://cdn.example.com/posters/test.jpg' };
       vi.mocked(VideoRepository.findById).mockResolvedValue(withPoster);
       vi.mocked(VideoRepository.delete).mockResolvedValue(withPoster);
-      vi.mocked(extractS3KeyFromUrl).mockReturnValue('posters/test.jpg');
+      vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/videos/video-123/poster.jpg');
 
       const result = await VideoService.deleteVideo('video-123');
 
       expect(result).toMatchObject({ success: true });
       expect(deleteS3Object).toHaveBeenCalledWith('videos/video-123/test.mp4');
-      expect(deleteS3Object).toHaveBeenCalledWith('posters/test.jpg');
+      expect(deleteS3Object).toHaveBeenCalledWith('media/videos/video-123/poster.jpg');
+    });
+
+    it('does not delete a poster key outside the video namespace', async () => {
+      const { deleteS3Object } = await import('../utils/s3-client');
+      const { extractS3KeyFromUrl } = await import('../utils/s3-key-utils');
+      const withPoster = {
+        ...mockVideo,
+        posterUrl: 'https://cdn.example.com/releases/x/cover.jpg',
+      };
+      vi.mocked(VideoRepository.findById).mockResolvedValue(withPoster);
+      vi.mocked(VideoRepository.delete).mockResolvedValue(withPoster);
+      vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/releases/x/cover.jpg');
+
+      const result = await VideoService.deleteVideo('video-123');
+
+      expect(result).toMatchObject({ success: true });
+      expect(deleteS3Object).toHaveBeenCalledTimes(1);
+      expect(deleteS3Object).toHaveBeenCalledWith('videos/video-123/test.mp4');
     });
 
     it('deletes only the s3Key when posterUrl is null', async () => {
@@ -427,7 +445,7 @@ describe('VideoService', () => {
       const { deleteS3Object } = await import('../utils/s3-client');
       vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
       vi.mocked(VideoRepository.delete).mockResolvedValue(mockVideo);
-      vi.mocked(deleteS3Object).mockRejectedValue(new Error('S3 error'));
+      vi.mocked(deleteS3Object).mockRejectedValueOnce(new Error('S3 error'));
 
       const result = await VideoService.deleteVideo('video-123');
 

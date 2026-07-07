@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useId, useRef } from 'react';
+import { useId } from 'react';
 
 import { Film, UploadCloud } from 'lucide-react';
 
@@ -33,7 +33,6 @@ export const VideoDropzone = ({
   onFile,
   compact = false,
 }: VideoDropzoneProps): React.ReactElement => {
-  const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
 
   const forwardFirst = (files: FileList | null): void => {
@@ -66,7 +65,6 @@ export const VideoDropzone = ({
       </label>
       <p className="text-xs text-zinc-700">{hint}</p>
       <input
-        ref={inputRef}
         id={inputId}
         type="file"
         accept={ACCEPT}

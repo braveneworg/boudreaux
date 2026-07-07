@@ -191,6 +191,19 @@ describe('initiateVideoUploadAction', () => {
     expect(result.data?.s3Key).toMatch(/\.mp4$/);
   });
 
+  it('sanitizes a hostile extension so it cannot inject a path segment', async () => {
+    const result = await initiateVideoUploadAction({ ...validInput, fileName: 'clip.mp4/evil' });
+
+    expect(result.data?.s3Key).toMatch(/\.mp4$/);
+  });
+
+  it('keeps the injected key to a single object segment under the video id', async () => {
+    const result = await initiateVideoUploadAction({ ...validInput, fileName: 'clip.mp4/evil' });
+
+    const suffix = result.data?.s3Key?.slice(`media/videos/${VALID_VIDEO_ID}/`.length);
+    expect(suffix).not.toContain('/');
+  });
+
   it('sends the ContentType to S3', async () => {
     await initiateVideoUploadAction(validInput);
 
@@ -336,6 +349,31 @@ describe('presignVideoPartsAction', () => {
 
     const options = mockGetSignedUrl.mock.calls[0][2] as { expiresIn: number };
     expect(options.expiresIn).toBe(900);
+  });
+
+  it('builds each UploadPartCommand with the requested s3 key', async () => {
+    await presignVideoPartsAction(validInput);
+
+    const keys = mockGetSignedUrl.mock.calls.map((call) => (call[1] as CommandParams).params.Key);
+    expect(keys).toEqual([VALID_KEY, VALID_KEY, VALID_KEY]);
+  });
+
+  it('builds each UploadPartCommand with the upload id', async () => {
+    await presignVideoPartsAction(validInput);
+
+    const uploadIds = mockGetSignedUrl.mock.calls.map(
+      (call) => (call[1] as CommandParams).params.UploadId
+    );
+    expect(uploadIds).toEqual(['upload-123', 'upload-123', 'upload-123']);
+  });
+
+  it('builds one UploadPartCommand per requested part number', async () => {
+    await presignVideoPartsAction(validInput);
+
+    const partNumbers = mockGetSignedUrl.mock.calls.map(
+      (call) => (call[1] as CommandParams).params.PartNumber
+    );
+    expect(partNumbers).toEqual([1, 2, 3]);
   });
 
   it('returns an error when signing fails', async () => {

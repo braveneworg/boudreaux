@@ -4,7 +4,6 @@
 import { z } from 'zod';
 
 import type { VideoCategory } from '@/lib/types/domain/video';
-import type { PaginatedResponse } from '@/lib/types/pagination';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 
 /**
@@ -49,8 +48,10 @@ export const videoRowSchema = z.object({
   posterUrl: nullableString,
   publishedAt: nullableDate,
   archivedAt: nullableDate,
-  createdBy: nullableString,
-  updatedBy: nullableString,
+  // Internal audit ObjectIds — stripped from the public listing/SSR payloads, so
+  // they are optional here (the admin detail route may still include them).
+  createdBy: nullableString.optional(),
+  updatedBy: nullableString.optional(),
   createdAt: date,
   updatedAt: date,
   streamUrl: z.string().nullable().optional(),
@@ -61,6 +62,3 @@ export const videoPageSchema = paginatedResponseSchema(videoRowSchema);
 
 /** A single validated `Video` row as it arrives over the wire. */
 export type VideoRow = z.infer<typeof videoRowSchema>;
-
-/** One skip/offset page of videos returned by `/api/videos`. */
-export type VideoPage = PaginatedResponse<VideoRow>;

@@ -20,6 +20,8 @@ vi.mock('@/lib/utils/s3-key-utils');
 
 const videoId = '507f1f77bcf86cd799439011';
 const validKey = `media/videos/${videoId}/clip.mp4`;
+const ownPosterKey = `media/videos/${videoId}/old-poster.jpg`;
+const foreignPosterKey = 'media/releases/other-release/cover.jpg';
 
 const formData: VideoFormData = {
   title: 'Clip',
@@ -48,7 +50,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(verifyS3ObjectExists).mockResolvedValue(true);
   vi.mocked(deleteS3Object).mockResolvedValue(true);
-  vi.mocked(extractS3KeyFromUrl).mockReturnValue('old-poster-key');
+  vi.mocked(extractS3KeyFromUrl).mockReturnValue(ownPosterKey);
 });
 
 describe('confirmVideoUpload', () => {
@@ -204,7 +206,19 @@ describe('deleteReplacedVideoAssets', () => {
       false
     );
 
-    expect(deleteS3Object).toHaveBeenCalledWith('old-poster-key');
+    expect(deleteS3Object).toHaveBeenCalledWith(ownPosterKey);
+  });
+
+  it('does not delete a poster key outside the video namespace', () => {
+    vi.mocked(extractS3KeyFromUrl).mockReturnValue(foreignPosterKey);
+
+    deleteReplacedVideoAssets(
+      currentVideo,
+      { ...formData, posterUrl: 'https://cdn/new.jpg' },
+      false
+    );
+
+    expect(deleteS3Object).not.toHaveBeenCalled();
   });
 
   it('does not delete a poster key when the URL is not extractable', () => {

@@ -3,15 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
 import type { CreateVideoData, UpdateVideoData, Video } from '@/lib/types/domain/video';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
-
-/** Every video object lives under this key namespace (matches the uploader). */
-export const VIDEO_KEY_PREFIX = 'media/videos/';
 
 /** FormData fields the create/update video actions accept (preGeneratedId read raw). */
 export const VIDEO_PERMITTED_FIELD_NAMES = [
@@ -130,7 +128,9 @@ export const deleteReplacedVideoAssets = (
   }
   if (isPosterReplaced(current, data) && current.posterUrl) {
     const oldPosterKey = extractS3KeyFromUrl(current.posterUrl);
-    if (oldPosterKey) keysToDelete.push(oldPosterKey);
+    // Only ever delete poster objects in our own namespace — an admin-supplied
+    // posterUrl could otherwise point cleanup at release audio or artist images.
+    if (oldPosterKey?.startsWith(VIDEO_KEY_PREFIX)) keysToDelete.push(oldPosterKey);
   }
   if (keysToDelete.length === 0) return;
 

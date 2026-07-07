@@ -239,6 +239,30 @@ describe('GET /api/videos', () => {
     expect(data.rows[0].streamUrl).toBeNull();
   });
 
+  it('omits createdBy from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('createdBy');
+  });
+
+  it('omits updatedBy from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('updatedBy');
+  });
+
   it('serializes a BigInt fileSize to a JSON-safe number', async () => {
     vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
       success: true,

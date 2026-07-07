@@ -155,9 +155,11 @@ describe('VideosPage', () => {
 
     await VideosPage();
 
+    // createdBy / updatedBy are internal admin ObjectIds, stripped from the SSR payload.
+    const { createdBy: _createdBy, updatedBy: _updatedBy, ...publicVideo } = mockVideo;
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual({
-      rows: [{ ...mockVideo, streamUrl: 'https://cdn.example.com/signed' }],
+      rows: [{ ...publicVideo, streamUrl: 'https://cdn.example.com/signed' }],
       nextSkip: null,
     });
   });

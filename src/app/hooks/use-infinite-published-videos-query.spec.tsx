@@ -46,8 +46,8 @@ const videoRowResponse = {
   posterUrl: null,
   publishedAt: '2024-02-01T00:00:00.000Z',
   archivedAt: null,
-  createdBy: 'admin-1',
-  updatedBy: null,
+  // createdBy / updatedBy are stripped from the public wire payload; the schema
+  // makes them optional so the row parses fine without them.
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   streamUrl: 'https://cdn.example.com/clip.mp4',

@@ -281,6 +281,27 @@ describe('captureVideoPoster', () => {
     await expect(promise).resolves.toBeNull();
   });
 
+  it('resolves null when rendering the frame throws', async () => {
+    drawImageMock.mockImplementation(() => {
+      throw new Error('draw boom');
+    });
+    const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('seeked'));
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it('revokes the object URL when rendering the frame throws', async () => {
+    drawImageMock.mockImplementation(() => {
+      throw new Error('draw boom');
+    });
+    const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('seeked'));
+    await promise;
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+  });
+
   it('resolves null when the video has zero dimensions', async () => {
     const { promise, video } = startPoster({ width: 0 });
     video.dispatchEvent(new Event('loadedmetadata'));

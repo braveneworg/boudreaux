@@ -16,7 +16,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { auth } from '@/auth';
 import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
-import { VIDEO_PART_SIZE } from '@/lib/constants/video-uploads';
+import { VIDEO_KEY_PREFIX, VIDEO_PART_SIZE } from '@/lib/constants/video-uploads';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
@@ -31,9 +31,6 @@ import type { ActionResult } from '@/types/digital-format';
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
 
 const logger = loggers.s3;
-
-/** Every video object lives under this key namespace. */
-const VIDEO_KEY_PREFIX = 'media/videos/';
 
 /**
  * Untrusted request shapes for the multipart actions. Kept intentionally
@@ -100,7 +97,10 @@ const guardVideoKey = (key: string): ErrorResult | null =>
 const buildVideoS3Key = (videoId: string, fileName: string): string => {
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const extension = fileName.split('.').pop()?.toLowerCase() || 'mp4';
+  // Allowlist the extension so a crafted name (e.g. `clip.mp4/evil`) cannot
+  // inject an extra path segment into the key; fall back to `mp4` otherwise.
+  const rawExtension = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const extension = /^[a-z0-9]{1,8}$/.test(rawExtension) ? rawExtension : 'mp4';
   const sanitizedName = fileName
     .replace(/\.[^/.]+$/, '')
     .toLowerCase()

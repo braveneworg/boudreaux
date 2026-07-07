@@ -60,7 +60,11 @@ export default async function VideosPage() {
         take: PUBLISHED_VIDEOS_PAGE_SIZE,
       });
       const videos = result.success ? result.data : [];
-      const rows = videos.map((video) => ({ ...video, streamUrl: signStreamUrl(video.s3Key) }));
+      // Drop the internal createdBy/updatedBy audit ObjectIds from the SSR payload.
+      const rows = videos.map(({ createdBy: _createdBy, updatedBy: _updatedBy, ...video }) => ({
+        ...video,
+        streamUrl: signStreamUrl(video.s3Key),
+      }));
       return serializeForResponse({
         rows,
         nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_VIDEOS_PAGE_SIZE),

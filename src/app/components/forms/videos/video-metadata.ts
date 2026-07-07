@@ -132,12 +132,18 @@ export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob
       video.currentTime = posterSeekTime(video, atSeconds);
     });
     video.addEventListener('seeked', () => {
-      const canvas = renderFrameToCanvas(video);
-      if (!canvas) {
+      try {
+        const canvas = renderFrameToCanvas(video);
+        if (!canvas) {
+          finish(null);
+          return;
+        }
+        canvas.toBlob(finish, 'image/jpeg', 0.85);
+      } catch {
+        // A throwing getContext/drawImage/toBlob must not strand the promise or
+        // leak the object URL — resolve null and revoke via finish().
         finish(null);
-        return;
       }
-      canvas.toBlob(finish, 'image/jpeg', 0.85);
     });
     video.addEventListener('error', () => finish(null));
     video.src = objectUrl;

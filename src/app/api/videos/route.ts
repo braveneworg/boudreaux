@@ -22,8 +22,11 @@ const MAX_TAKE = 50;
 /** Signed URLs are per-user; never share-cache the listing. */
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
 
-/** A video row with its runtime-only, per-request signed stream URL attached. */
-type VideoRowWithStream = Video & { streamUrl: string | null };
+/**
+ * A public video row: the internal `createdBy`/`updatedBy` audit ObjectIds are
+ * dropped, with the runtime-only, per-request signed stream URL attached.
+ */
+type VideoRowWithStream = Omit<Video, 'createdBy' | 'updatedBy'> & { streamUrl: string | null };
 
 /** Parse and clamp the `skip`/`take` offset-pagination params from a request. */
 const parsePagination = (searchParams: URLSearchParams): { skip: number; take: number } => {
@@ -51,10 +54,13 @@ const parsePublished = (searchParams: URLSearchParams): boolean | null => {
 const errorStatus = (error: string | undefined): number =>
   error === 'Database unavailable' ? 503 : 500;
 
-/** Attach a signed stream URL to each row, then BigInt-serialize for JSON. */
+/** Drop audit fields, attach a signed stream URL, then BigInt-serialize for JSON. */
 const buildRows = (videos: Video[]): VideoRowWithStream[] =>
   serializeForResponse(
-    videos.map((video) => ({ ...video, streamUrl: signStreamUrl(video.s3Key) }))
+    videos.map(({ createdBy: _createdBy, updatedBy: _updatedBy, ...video }) => ({
+      ...video,
+      streamUrl: signStreamUrl(video.s3Key),
+    }))
   );
 
 /** Build the paginated `{ rows, nextSkip }` success response for a page of videos. */

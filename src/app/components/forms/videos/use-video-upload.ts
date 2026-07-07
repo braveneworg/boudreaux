@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { toast } from 'sonner';
 
@@ -96,6 +96,11 @@ export const useVideoUpload = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const lastFileRef = useRef<File | null>(null);
+
+  // Abort any in-flight upload when the form unmounts (e.g. navigating away),
+  // so the XHR pool is cancelled and the best-effort abort action frees the
+  // partial multipart object instead of stranding a multi-GB orphan.
+  useEffect(() => () => controllerRef.current?.abort(), []);
 
   const startUpload = useCallback(
     async (file: File): Promise<void> => {
