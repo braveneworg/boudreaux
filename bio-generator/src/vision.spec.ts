@@ -58,14 +58,12 @@ const geminiRaw = (payload: unknown): Response =>
   );
 
 /** Structured log lines of `event` captured from the given console method's spy. */
-const eventsFrom = (
-  method: 'info' | 'warn',
-  event: string
-): Array<Record<string, unknown>> =>
-  vi
-    .mocked(console[method])
-    .mock.calls.map((call) => JSON.parse(call[0] as string) as Record<string, unknown>)
+const eventsFrom = (method: 'info' | 'warn', event: string): Array<Record<string, unknown>> => {
+  const spy = method === 'info' ? vi.mocked(console.info) : vi.mocked(console.warn);
+  return spy.mock.calls
+    .map((call) => JSON.parse(call[0] as string) as Record<string, unknown>)
     .filter((entry) => entry.event === event);
+};
 
 describe('verifyScrapedImages', () => {
   it('keeps accepted images with kind and alt from the verdict', async () => {
@@ -216,7 +214,9 @@ describe('verifyScrapedImages', () => {
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(imageResponse())
-      .mockResolvedValueOnce(geminiVerdicts([{ index: 0, verdict: 'album_cover', confidence: '0.8' }]));
+      .mockResolvedValueOnce(
+        geminiVerdicts([{ index: 0, verdict: 'album_cover', confidence: '0.8' }])
+      );
     const kept = await verifyScrapedImages([candidate('https://a.com/1.png')], context, config, {
       fetchFn,
       sleep: async () => {},
@@ -312,7 +312,9 @@ describe('verifyScrapedImages', () => {
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(imageResponse())
-      .mockResolvedValueOnce(geminiVerdicts([{ index: 0, verdict: 'artist_photo', confidence: 0.9 }]));
+      .mockResolvedValueOnce(
+        geminiVerdicts([{ index: 0, verdict: 'artist_photo', confidence: 0.9 }])
+      );
     await verifyScrapedImages([candidate('https://a.com/1.png')], context, config, {
       fetchFn,
       sleep: async () => {},
