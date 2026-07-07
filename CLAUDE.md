@@ -1,5 +1,7 @@
 # boudreaux — Claude Code
 
+When I correct you or you catch yourself making a mistake, before continuing, add the lesson as a one-line rule under #LESSONS so it never happens again.
+
 Read from **[AGENTS.md](~/.config/agents/AGENTS.md)** before doing anything
 since that file should govern how to work overall, interact, and manage sessions.
 
@@ -186,3 +188,9 @@ Conventional Commits, enforced by commitlint (`commitlint.config.mjs`, `commit-m
 - Refactor with confidence: tests, type safety, and code review catch mistakes. Make big changes when they improve the codebase.
 - Update or remove tests to match the new structure — no orphaned tests or code.
 - Keep the E2E tests passing, and add more to cover new flows or edge cases uncovered during refactoring.
+
+# LESSONS
+
+- ESLint `complexity` caps functions at 10 repo-wide: when adding branching (optional chains, ternaries, `&&`) to an already-busy component like a page, extract it into a named helper up front instead of inlining it.
+- commitlint counts the gitmoji toward the 50-char subject cap — compose subjects to ≤48 visible characters before the emoji is added.
+- In the App Router, `next/dynamic` server-renders only its `loading` fallback — never the component — even with ssr:true (verified empirically on the webpack prod standalone). When markup must be in the server HTML (LCP elements, SEO content), use a static import and code-split the heavy leaf deeper instead.
