@@ -41,10 +41,13 @@ export type Video = {
 
 /**
  * Data accepted by the repository to create a video: the writable scalars
- * (everything except the DB-managed `id`/`createdAt`/`updatedAt`). Nullable
- * columns stay optional so callers may omit them.
+ * (everything except the DB-managed `createdAt`/`updatedAt`). Nullable columns
+ * stay optional so callers may omit them. `id` is optional so the create action
+ * can thread a client-pre-generated ObjectId (used to namespace the S3 upload)
+ * into the new document.
  */
 export interface CreateVideoData {
+  id?: string;
   title: string;
   artist: string;
   category: VideoCategory;

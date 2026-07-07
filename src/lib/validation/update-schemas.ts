@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { artistBaseSchema } from './create-artist-schema';
 import { createFeaturedArtistSchema } from './create-featured-artist-schema';
 import { releaseBaseSchema } from './create-release-schema';
+import { videoFormSchema } from './create-video-schema';
 import { notificationBannerBaseSchema } from './notification-banner-schema';
 
 // Schemas without .refine() -- .partial() works directly
@@ -19,4 +20,5 @@ export const updateFeaturedArtistSchema = createFeaturedArtistSchema.partial().e
 // This strips cross-field refinements, which is correct for partial updates
 export const updateArtistSchema = artistBaseSchema.partial();
 export const updateReleaseSchema = releaseBaseSchema.partial();
+export const updateVideoSchema = videoFormSchema.partial();
 export const updateNotificationBannerSchema = notificationBannerBaseSchema.partial();

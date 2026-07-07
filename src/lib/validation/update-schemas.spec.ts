@@ -6,6 +6,7 @@ import {
   updateFeaturedArtistSchema,
   updateNotificationBannerSchema,
   updateReleaseSchema,
+  updateVideoSchema,
 } from './update-schemas';
 
 const validObjectId = '507f1f77bcf86cd799439011';
@@ -130,6 +131,40 @@ describe('update-schemas', () => {
     it('should reject description exceeding max length', () => {
       const result = updateReleaseSchema.safeParse({ description: 'x'.repeat(5001) });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('updateVideoSchema', () => {
+    it('should accept an empty object (all fields optional)', () => {
+      const result = updateVideoSchema.safeParse({});
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept a single field update', () => {
+      const result = updateVideoSchema.safeParse({ title: 'Updated Title' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate category as a known enum value', () => {
+      expect(updateVideoSchema.safeParse({ category: 'PODCAST' }).success).toBe(false);
+      expect(updateVideoSchema.safeParse({ category: 'MUSIC' }).success).toBe(true);
+    });
+
+    it('should validate posterUrl as a valid URL', () => {
+      expect(updateVideoSchema.safeParse({ posterUrl: 'not-a-url' }).success).toBe(false);
+      expect(updateVideoSchema.safeParse({ posterUrl: 'https://example.com/p.jpg' }).success).toBe(
+        true
+      );
+    });
+
+    it('should reject title exceeding max length', () => {
+      const result = updateVideoSchema.safeParse({ title: 'x'.repeat(201) });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject a non-positive durationSeconds', () => {
+      expect(updateVideoSchema.safeParse({ durationSeconds: '0' }).success).toBe(false);
+      expect(updateVideoSchema.safeParse({ durationSeconds: '120' }).success).toBe(true);
     });
   });
 
