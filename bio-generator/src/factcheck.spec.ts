@@ -138,4 +138,40 @@ describe('runQualityPasses', () => {
 
     expect(result).toBe(prose);
   });
+
+  it('threads the fallbackModel through to the critic pass', async () => {
+    const deps = {
+      critiqueProse: vi.fn().mockResolvedValue({ violations: [] }),
+      reviseProse: vi.fn(),
+    };
+
+    await runQualityPasses(
+      { prose, facts: factsWithSource, apiKey: 'k', model: 'gemini-2.5-pro', fallbackModel: 'm' },
+      deps
+    );
+
+    expect(deps.critiqueProse).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gemini-2.5-pro', fallbackModel: 'm' })
+    );
+  });
+
+  it('threads the fallbackModel through to the repair pass', async () => {
+    const violations = [
+      { location: 'shortBio' as const, quote: 'born in 1990', issue: 'Year precedes birth date' },
+    ];
+    const revised: BioProse = { shortBio: 'Revised short.', longBio: '<p>Revised long.</p>' };
+    const deps = {
+      critiqueProse: vi.fn().mockResolvedValue({ violations }),
+      reviseProse: vi.fn().mockResolvedValue(revised),
+    };
+
+    await runQualityPasses(
+      { prose, facts: factsWithSource, apiKey: 'k', model: 'gemini-2.5-pro', fallbackModel: 'm' },
+      deps
+    );
+
+    expect(deps.reviseProse).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gemini-2.5-pro', fallbackModel: 'm' })
+    );
+  });
 });
