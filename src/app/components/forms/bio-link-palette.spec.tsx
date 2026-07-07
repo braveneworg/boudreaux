@@ -28,6 +28,12 @@ vi.mock('./link-preview-card', () => ({
   ),
 }));
 
+vi.mock('./custom-link-editor', () => ({
+  CustomLinkEditor: ({ artistId }: { artistId: string }) => (
+    <div data-testid="custom-link-editor" data-artist-id={artistId} />
+  ),
+}));
+
 vi.mock('@/app/components/ui/hover-card', () => ({
   HoverCard: ({ children }: { children: ReactNode }) => (
     <div data-testid="mock-hover-card">{children}</div>
@@ -62,8 +68,13 @@ const FILTER_LINKS: BioStatusLink[] = [
 describe('BioLinkPalette', () => {
   beforeEach(() => mockIsMobile.mockReturnValue(false));
 
+  it('renders the custom link editor wired to the artist id', () => {
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    expect(screen.getByTestId('custom-link-editor')).toHaveAttribute('data-artist-id', 'a1');
+  });
+
   it('renders one tile per link with its kind badge', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByText('Wikipedia')).toBeInTheDocument();
     expect(screen.getByText('Sad, Fat Luck')).toBeInTheDocument();
     expect(screen.getByText('wikipedia')).toBeInTheDocument();
@@ -71,32 +82,32 @@ describe('BioLinkPalette', () => {
   });
 
   it('renders square draggable tiles with no rounded corners', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const tile = screen.getByText('Wikipedia').closest('li') as HTMLElement;
     expect(tile.className).not.toMatch(/rounded/);
   });
 
   it('shows the external icon only for external links', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const internalTile = screen.getByText('Sad, Fat Luck').closest('li');
     expect(internalTile?.querySelector('[data-external-icon]')).toBeNull();
   });
 
   it('shows the external icon for external links', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const externalTile = screen.getByText('Wikipedia').closest('li');
     expect(externalTile?.querySelector('[data-external-icon]')).not.toBeNull();
   });
 
   it('calls onDelete with the row id when X is pressed', async () => {
     const onDelete = vi.fn();
-    render(<BioLinkPalette links={LINKS} onDelete={onDelete} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={onDelete} onInsert={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete link Wikipedia' }));
     expect(onDelete).toHaveBeenCalledWith('l1');
   });
 
   it('sets the link drag payload on dragstart', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const setData = vi.fn();
     fireEvent.dragStart(screen.getByText('Wikipedia').closest('li') as HTMLElement, {
       dataTransfer: { setData, effectAllowed: '' },
@@ -113,7 +124,7 @@ describe('BioLinkPalette', () => {
   });
 
   it('sets isExternal false for an internal link in the drag payload', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     const setData = vi.fn();
     fireEvent.dragStart(screen.getByText('Sad, Fat Luck').closest('li') as HTMLElement, {
       dataTransfer: { setData, effectAllowed: '' },
@@ -130,13 +141,17 @@ describe('BioLinkPalette', () => {
   });
 
   it('disables the delete button when disabled prop is true', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
+    render(
+      <BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />
+    );
     expect(screen.getByRole('button', { name: 'Delete link Wikipedia' })).toBeDisabled();
   });
 
   it('renders the count, filters by text, and inserts on click', async () => {
     const onInsert = vi.fn();
-    render(<BioLinkPalette links={FILTER_LINKS} onDelete={vi.fn()} onInsert={onInsert} />);
+    render(
+      <BioLinkPalette artistId="a1" links={FILTER_LINKS} onDelete={vi.fn()} onInsert={onInsert} />
+    );
     expect(screen.getByText(/Discovered links \(2\)/)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Filter links'), 'bandcamp');
     expect(screen.queryByText('Wikipedia')).not.toBeInTheDocument();
@@ -145,17 +160,19 @@ describe('BioLinkPalette', () => {
   });
 
   it('disables the insert button when disabled prop is true', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
+    render(
+      <BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />
+    );
     expect(screen.getByRole('button', { name: 'Insert link Wikipedia' })).toBeDisabled();
   });
 
   it('renders a preview eye trigger for an external link', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Preview link Wikipedia' })).toBeInTheDocument();
   });
 
   it('renders no preview eye trigger for an internal link', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(
       screen.queryByRole('button', { name: 'Preview link Sad, Fat Luck' })
     ).not.toBeInTheDocument();
@@ -163,30 +180,30 @@ describe('BioLinkPalette', () => {
 
   it('previews external links inside a hover card on desktop', () => {
     mockIsMobile.mockReturnValue(false);
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByTestId('mock-hover-card')).toBeInTheDocument();
   });
 
   it('does not use a popover on desktop', () => {
     mockIsMobile.mockReturnValue(false);
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.queryByTestId('mock-popover')).not.toBeInTheDocument();
   });
 
   it('previews external links inside a popover on mobile', () => {
     mockIsMobile.mockReturnValue(true);
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByTestId('mock-popover')).toBeInTheDocument();
   });
 
   it('does not use a hover card on mobile', () => {
     mockIsMobile.mockReturnValue(true);
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.queryByTestId('mock-hover-card')).not.toBeInTheDocument();
   });
 
   it('passes the external link url to the preview card', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByTestId('link-preview-card')).toHaveAttribute(
       'data-url',
       'https://en.wikipedia.org/wiki/X'
@@ -194,12 +211,14 @@ describe('BioLinkPalette', () => {
   });
 
   it('keeps the preview query idle until the card is opened', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
+    render(<BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} />);
     expect(screen.getByTestId('link-preview-card')).toHaveAttribute('data-enabled', 'false');
   });
 
   it('disables the preview eye trigger when disabled prop is true', () => {
-    render(<BioLinkPalette links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />);
+    render(
+      <BioLinkPalette artistId="a1" links={LINKS} onDelete={vi.fn()} onInsert={vi.fn()} disabled />
+    );
     expect(screen.getByRole('button', { name: 'Preview link Wikipedia' })).toBeDisabled();
   });
 });

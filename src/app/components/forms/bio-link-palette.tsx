@@ -17,9 +17,11 @@ import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
 import { BIO_LINK_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusLink } from '@/lib/validation/bio-generation-schema';
 
+import { CustomLinkEditor } from './custom-link-editor';
 import { LinkPreviewCard } from './link-preview-card';
 
 interface BioLinkPaletteProps {
+  artistId: string;
   links: BioStatusLink[];
   onDelete: (linkId: string) => void;
   onInsert: (link: BioStatusLink) => void;
@@ -83,6 +85,7 @@ const LinkPreviewTrigger = ({
  *  at the focused editor's cursor (touch/keyboard path); X deletes the row.
  *  External links also carry an Eye button that opens an unfurl preview. */
 export const BioLinkPalette = ({
+  artistId,
   links,
   onDelete,
   onInsert,
@@ -102,6 +105,7 @@ export const BioLinkPalette = ({
 
   return (
     <div role="group" aria-label="Discovered links" className="space-y-2">
+      <CustomLinkEditor artistId={artistId} />
       <h3 className="text-sm font-semibold">Discovered links ({links.length})</h3>
       <Input
         aria-label="Filter links"
