@@ -944,3 +944,35 @@ model ChatRateLimitLog {
   // attemptedAt range. Prefix also serves fingerprint-only lookups.
   @@index([fingerprint, attemptedAt])
 }
+
+// Videos feature (admin uploads videos to S3; signed-in users watch at /videos)
+
+enum VideoCategory {
+  MUSIC
+  INFORMATIONAL
+}
+
+model Video {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  artist          String
+  category        VideoCategory
+  description     String?
+  releasedOn      DateTime
+  durationSeconds Int?
+  s3Key           String
+  fileName        String
+  fileSize        BigInt?
+  mimeType        String
+  posterUrl       String?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdBy       String?       @db.ObjectId
+  updatedBy       String?       @db.ObjectId
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([releasedOn])
+  @@index([publishedAt])
+  @@index([archivedAt])
+}
