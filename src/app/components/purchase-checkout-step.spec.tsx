@@ -114,6 +114,24 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseSessionAction.mockResolvedValue({ success: true });
   });
 
+  it('preconnects to the Stripe origin as soon as the step renders', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_secret',
+      sessionId: 'sess_1',
+    });
+
+    await act(async () => {
+      render(<PurchaseCheckoutStep {...buildProps()} />);
+    });
+
+    // Replaces the global dns-prefetch that shipped in every page's head:
+    // the connection warm-up now happens exactly where loadStripe fires.
+    expect(
+      document.head.querySelector('link[rel="preconnect"][href="https://js.stripe.com"]')
+    ).not.toBeNull();
+  });
+
   it('shows error UI when createPurchaseCheckoutSessionAction returns a failure', async () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: false,

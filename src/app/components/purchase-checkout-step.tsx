@@ -12,6 +12,7 @@ import {
 } from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
 import { CheckCircle2Icon, Loader2Icon } from 'lucide-react';
+import { preconnect } from 'react-dom';
 
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
@@ -150,6 +151,11 @@ export const PurchaseCheckoutStep = ({
   onError,
   onCancel,
 }: PurchaseCheckoutStepProps) => {
+  // Warm the Stripe origin the moment the checkout step renders — the
+  // js.stripe.com script and PaymentElement iframe follow within this render
+  // cycle. Replaces the global dns-prefetch that shipped on every page.
+  preconnect('https://js.stripe.com');
+
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);

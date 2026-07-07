@@ -16,7 +16,10 @@ export const NowPlayingHeading = ({
 }: NowPlayingHeadingProps) => {
   return (
     <section className="flex flex-col items-center justify-center gap-1 px-2 text-sm">
-      <h3
+      {/* h2: pages render this directly under their h1 (home FEATURED
+          wordmark, artist-page name) — h3 skipped a level and failed
+          Lighthouse's heading-order audit. */}
+      <h2
         className={
           visibleHeading
             ? 'mt-0 mb-1 pb-0 text-sm font-bold tracking-normal'
@@ -25,7 +28,7 @@ export const NowPlayingHeading = ({
         aria-label={`Now playing: ${artistName} - ${title}`}
       >
         {artistName} - <span className="font-normal italic">{title}</span>
-      </h3>
+      </h2>
     </section>
   );
 };

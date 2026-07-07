@@ -22,8 +22,12 @@ export const Logo = ({ isMobile, priority = true }: Readonly<LogoProps>) => {
     <Link href="/" className="shrink-0 no-underline" unstable_dynamicOnHover>
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="xl:shadow-zine-ink mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-4 xl:left-8 xl:size-24"
-        height={48}
+        // object-contain: both hand logos are taller than wide (stardust webp
+        // 800×899, SVG viewBox ~0.89 ratio), so letterbox them inside the
+        // square chip instead of squishing — square rendering with a
+        // non-square source fails Lighthouse's image-aspect-ratio audit.
+        className="xl:shadow-zine-ink mt-px ml-3 block size-10 rounded-full bg-zinc-50 object-contain xl:absolute xl:top-4 xl:left-8 xl:size-24"
+        height={54}
         priority={priority}
         unoptimized
         src={

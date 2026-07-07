@@ -85,13 +85,16 @@ export const SocialShareWidget = ({
         <TelegramIcon size={iconSize} className="bg-zinc-700" />
       </TelegramShareButton>
 
-      {/* WeChat share link (not available in react-share, using web intent) */}
+      {/* WeChat share link (not available in react-share, using web intent).
+          The accessible name leads with the visible 微信 text (WCAG 2.5.3 /
+          Lighthouse label-content-name-mismatch) so speech-input users can
+          activate the control by saying its label. */}
       <a
         href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(artistUrl)}`}
         target="_blank"
         rel="noopener noreferrer"
         className="relative -top-3 inline-flex size-10"
-        aria-label="Share on WeChat"
+        aria-label="微信 — Share on WeChat (scan QR code)"
         title="Share on WeChat (scan QR code)"
       >
         <span

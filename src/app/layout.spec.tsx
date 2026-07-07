@@ -217,6 +217,24 @@ describe('RootLayout', () => {
       expect(preconnect.props.href).toBe('https://cdn.fakefourrecords.com');
     });
 
+    it('does not hint the Stripe origin globally', async () => {
+      const jsx = await RootLayout({ children: <div>Test</div> });
+      const children = jsx.props.children;
+      const head = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'head')
+        : null;
+
+      expect(head).toBeDefined();
+      const links = head.props.children;
+      // Stripe never loads on public pages — the checkout step preconnects
+      // where loadStripe actually fires. A global hint is dead weight in
+      // every page's head (flagged as an unused preconnect by Chrome).
+      const stripeHint = Array.isArray(links)
+        ? links.find((l: React.JSX.Element) => l.props?.href?.includes?.('js.stripe.com'))
+        : null;
+      expect(stripeHint).toBeUndefined();
+    });
+
     it('renders font preload link for the cutout display font', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
       const children = jsx.props.children;

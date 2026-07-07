@@ -135,7 +135,7 @@ describe('SocialShareWidget', () => {
     it('renders the WeChat share link', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);
 
-      expect(screen.getByLabelText('Share on WeChat')).toBeInTheDocument();
+      expect(screen.getByLabelText('微信 — Share on WeChat (scan QR code)')).toBeInTheDocument();
     });
 
     it('renders the X share button', () => {
@@ -189,10 +189,20 @@ describe('SocialShareWidget', () => {
   });
 
   describe('WeChat link', () => {
+    it('leads the accessible name with the visible 微信 text', () => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+
+      // label-content-name-mismatch (WCAG 2.5.3): speech-input users say the
+      // visible label — the accessible name must contain it, ideally first.
+      const wechatLink = screen.getByRole('link', { name: /^微信/ });
+
+      expect(wechatLink).toHaveTextContent('微信');
+    });
+
     it('has the correct QR code href with encoded url', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);
 
-      const wechatLink = screen.getByLabelText('Share on WeChat');
+      const wechatLink = screen.getByLabelText('微信 — Share on WeChat (scan QR code)');
       const expectedHref = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(TEST_URL)}`;
 
       expect(wechatLink).toHaveAttribute('href', expectedHref);
@@ -201,7 +211,7 @@ describe('SocialShareWidget', () => {
     it('opens in a new tab with target="_blank"', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);
 
-      const wechatLink = screen.getByLabelText('Share on WeChat');
+      const wechatLink = screen.getByLabelText('微信 — Share on WeChat (scan QR code)');
 
       expect(wechatLink).toHaveAttribute('target', '_blank');
     });
@@ -209,7 +219,7 @@ describe('SocialShareWidget', () => {
     it('has rel="noopener noreferrer" for security', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);
 
-      const wechatLink = screen.getByLabelText('Share on WeChat');
+      const wechatLink = screen.getByLabelText('微信 — Share on WeChat (scan QR code)');
 
       expect(wechatLink).toHaveAttribute('rel', 'noopener noreferrer');
     });

@@ -4,7 +4,6 @@
 import React from 'react';
 
 import { render, screen } from '@testing-library/react';
-import ReactDOM from 'react-dom';
 
 import Home, { dynamic as homeDynamic } from './page';
 
@@ -278,29 +277,81 @@ describe('Home Page', () => {
     });
   });
 
-  it('does not emit a manual ReactDOM.preload for the featured-artist cover art', async () => {
-    // The FeaturedArtistsPlayer is dynamic-imported with `ssr: false`, so the
-    // <img> consumer renders well after window.load and a manual preload would
-    // trigger Chrome's "preloaded but not used" warning.
-    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
+  describe('desktop cover-art preload', () => {
+    const coverPreloadSelector = 'link[rel="preload"][as="image"][media="(min-width: 1024px)"]';
 
-    mockGetQueryData.mockReturnValue({
-      featuredArtists: [
+    const seedFeaturedArtists = (artists: unknown[]) =>
+      mockGetQueryData.mockImplementation((key: string[]) =>
+        key[0] === 'featuredArtists'
+          ? { featuredArtists: artists, count: artists.length }
+          : undefined
+      );
+
+    it('emits a desktop-scoped, high-priority preload for the first cover art', async () => {
+      seedFeaturedArtists([
         {
           id: 'featured-1',
-          isActive: true,
-          sortOrder: 1,
           displayName: 'Jane Doe',
-          coverArt: 'https://cdn.example.com/releases/cover.jpg',
+          coverArt: '/media/releases/abc/cover.jpg',
           artists: [],
-          release: { coverArt: 'https://cdn.example.com/releases/cover.jpg' },
         },
-      ],
+      ]);
+
+      render(await Home());
+
+      // The player SSRs, so the selected artist's cover art — the desktop LCP
+      // element — is fetchable as soon as the HTML arrives. `lg` is where the
+      // grid split puts it above the fold; below that it stays lazy.
+      const preload = document.querySelector(coverPreloadSelector);
+      expect(preload).not.toBeNull();
+      expect(preload?.getAttribute('imagesrcset')).toContain(
+        '/media/releases/abc/cover_w640.webp 640w'
+      );
+      expect(preload?.getAttribute('imagesizes')).toBe('576px');
+      expect(preload?.getAttribute('fetchpriority')).toBe('high');
     });
 
-    const HomeComponent = await Home();
-    render(HomeComponent);
+    it('targets the first artist with a displayable name (matching player selection)', async () => {
+      seedFeaturedArtists([
+        // No displayName and no connected artists → the player filters it out,
+        // so the preload must skip it too.
+        { id: 'featured-0', coverArt: '/media/releases/skipped/cover.jpg', artists: [] },
+        {
+          id: 'featured-1',
+          displayName: 'Jane Doe',
+          coverArt: '/media/releases/selected/cover.jpg',
+          artists: [],
+        },
+      ]);
 
-    expect(preloadSpy).not.toHaveBeenCalled();
+      render(await Home());
+
+      const preload = document.querySelector(coverPreloadSelector);
+      expect(preload?.getAttribute('imagesrcset')).toContain('/media/releases/selected/');
+      expect(preload?.getAttribute('imagesrcset')).not.toContain('/media/releases/skipped/');
+    });
+
+    it('emits no cover preload when the cover art is a data: URI', async () => {
+      seedFeaturedArtists([
+        {
+          id: 'featured-1',
+          displayName: 'Jane Doe',
+          coverArt: 'data:image/webp;base64,AAAA',
+          artists: [],
+        },
+      ]);
+
+      render(await Home());
+
+      expect(document.querySelector(coverPreloadSelector)).toBeNull();
+    });
+
+    it('emits no cover preload when no featured artists are cached', async () => {
+      mockGetQueryData.mockReturnValue(undefined);
+
+      render(await Home());
+
+      expect(document.querySelector(coverPreloadSelector)).toBeNull();
+    });
   });
 });

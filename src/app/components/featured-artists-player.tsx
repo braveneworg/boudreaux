@@ -177,13 +177,12 @@ const FeaturedArtistDetails = ({
               alt={displayName}
               isPlaying={isPlaying}
               onTogglePlay={onTogglePlay}
-              // No `priority`: `FeaturedArtistsPlayer` is dynamically
-              // imported with `ssr: false` (see home-content.tsx), so its
-              // `next/image` `priority` preload would be injected client-
-              // side, after `window.load` — guaranteeing Chrome's
-              // "preloaded but not used within a few seconds" warning. The
-              // intent (documented in page.tsx) is for this cover art to
-              // load without a preload link.
+              // No `priority`: on mobile this cover renders below the fold,
+              // so `priority`'s unconditional preload would be flagged
+              // "preloaded but not used". The home page instead emits a
+              // `(min-width: 1024px)`-scoped preload for the initial
+              // artist's cover (see (home)/page.tsx) that cache-feeds this
+              // img on desktop, where it's the LCP element.
             />
           )}
         </div>

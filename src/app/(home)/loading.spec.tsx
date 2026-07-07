@@ -85,6 +85,10 @@ describe('HomeLoading', () => {
 
     const player = screen.getByTestId('player-skeleton');
     expect(player).toHaveClass('lg:col-start-1', 'lg:row-span-2', 'lg:row-start-1');
+    // The cell renders the same shared skeleton the player's dynamic-import
+    // fallback uses, so route-fallback → chunk-fallback → player is
+    // pixel-stable.
+    expect(player).toContainElement(screen.getByTestId('featured-artists-player-skeleton'));
 
     // Headlines are desktop-only in the hydrated layout (`hidden lg:block`).
     const headlines = screen.getByTestId('headlines-skeleton');

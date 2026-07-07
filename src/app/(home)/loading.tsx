@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Image from 'next/image';
 
+import { FeaturedArtistsPlayerSkeleton } from '@/components/featured-artists-player-skeleton';
 import { ContentContainer } from '@/components/ui/content-container';
 import { ZinePanel } from '@/components/ui/zine-panel';
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
@@ -98,30 +99,14 @@ export default function HomeLoading() {
                 <div className="bg-muted aspect-[4/1] w-full animate-pulse sm:aspect-auto sm:h-14 sm:w-56" />
               </div>
               {/* Player skeleton — left column spanning both rows on `lg`.
-                  Inner blocks match FeaturedArtistsPlayer's stacked internals
-                  (carousel row, link row, square cover, controls, ticker,
-                  share row) so mobile keeps its previous fidelity. */}
+                  The skeleton matches FeaturedArtistsPlayer's stacked
+                  internals, so the fallback → server-rendered player swap
+                  is pixel-stable. */}
               <div
                 data-testid="player-skeleton"
                 className="lg:col-start-1 lg:row-span-2 lg:row-start-1"
               >
-                {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper. */}
-                <div className="bg-muted mb-1 min-h-19 w-full animate-pulse" />
-                {/* View / Download link-row + NowPlayingHeading skeleton.
-                    min-h-10 holds the row stable across loading → hydrated states. */}
-                <div className="mb-2 flex min-h-10 flex-col items-center">
-                  <div className="bg-muted h-6 w-72 animate-pulse" />
-                </div>
-                {/* Cover art skeleton — aspect-square with bg-muted */}
-                <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse" />
-                {/* Audio controls skeleton — matches bg-zinc-900 min-h-16 */}
-                <div className="mx-auto min-h-16 w-full max-w-xl animate-pulse bg-zinc-900/20" />
-                {/* InfoTickerTape skeleton — matches bg-zinc-800 min-h-[40px] */}
-                <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse bg-zinc-800/20" />
-                {/* Share widget skeleton */}
-                <div className="mb-2 flex justify-center gap-1">
-                  <div className="bg-muted h-8 w-48 animate-pulse" />
-                </div>
+                <FeaturedArtistsPlayerSkeleton />
               </div>
               {/* Release headlines skeleton — desktop-only column, like the
                   hydrated feed (`hidden lg:block`). */}

@@ -639,7 +639,7 @@ describe('ArtistPlayer', () => {
     it('should render the artist name heading', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      const headings = screen.getAllByRole('heading', { level: 3 });
+      const headings = screen.getAllByRole('heading', { level: 2 });
       const nameHeading = headings.find((h) => h.textContent?.includes('John Doe'));
       expect(nameHeading).toBeInTheDocument();
     });
