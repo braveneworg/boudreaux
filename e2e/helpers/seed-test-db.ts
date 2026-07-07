@@ -580,10 +580,12 @@ const seedTestDatabase = async () => {
     // Dedicated artist for the custom-media-survives-regeneration E2E spec
     // (admin/bio-custom-media-survival.spec.ts). No bioStatus means the palette
     // does not render on load; the spec generates, adds a custom link, then
-    // regenerates. createdAt is pinned after the other palette artists so it
-    // sorts last and never becomes the first artist in the admin list (which the
-    // bio-generation spec targets). No releases are linked, so the fixture
-    // produces exactly 2 links (Wikipedia + press) and 2 images (photo + cover).
+    // regenerates. createdAt is pinned to 2020-01-03 — after the other palette
+    // artists — so it sorts last (admin list sorts createdAt desc → 2020-01-03
+    // stays at the bottom) and never becomes the first artist in the admin list
+    // (which the bio-generation spec targets). No releases are linked, so the
+    // fixture produces exactly 2 links (Wikipedia + press) and 2 images (photo +
+    // cover).
     await prisma.artist.create({
       data: {
         id: BIO_CUSTOM_MEDIA_ARTIST_ID,

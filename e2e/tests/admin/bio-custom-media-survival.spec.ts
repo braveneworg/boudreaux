@@ -45,7 +45,9 @@ const gotoArtistEdit = async (adminPage: Page): Promise<void> => {
 
 /** Generate a bio and resolve once it succeeds (the Regenerate button appears). */
 const generateBioToSuccess = async (adminPage: Page): Promise<Locator> => {
-  await adminPage.getByRole('button', { name: /generate bios/i }).click();
+  const generate = adminPage.getByRole('button', { name: /generate bios/i });
+  await expect(generate).toBeVisible({ timeout: 15_000 });
+  await generate.click();
   const regenerate = adminPage.getByRole('button', { name: /regenerate bios/i });
   await expect(regenerate).toBeVisible({ timeout: 30_000 });
   return regenerate;
@@ -79,10 +81,26 @@ test.describe('Admin custom bio media survives regeneration', () => {
     await customEditor.getByLabel('Link URL').fill(CUSTOM_LINK_URL);
     await customEditor.getByRole('button', { name: /add link/i }).click();
 
-    // It appears pinned FIRST (custom-first sort) with a "Custom" badge.
+    // It appears before the generated links (custom-first sort) with a "Custom" badge.
+    // Retry-safe: uses relative-ordering (customIdx < wikiIdx) rather than
+    // tiles.first() — on a Playwright retry, a surviving lower-sortOrder custom
+    // link from the previous attempt occupies index 0, so tiles.first() would
+    // return the wrong tile and cause a spurious failure.
     const tiles = linksGroup.locator('ul > li');
-    await expect(tiles.first()).toContainText(customLabel, { timeout: 15_000 });
-    await expect(tiles.first().getByText('Custom', { exact: true })).toBeVisible();
+    const customTile = tiles.filter({ hasText: customLabel });
+    const wikiTile = tiles.filter({ hasText: 'Wikipedia' });
+    await expect(customTile).toBeVisible({ timeout: 15_000 });
+    await expect(wikiTile).toBeVisible();
+    const customIdxPre = await customTile.first().evaluate(
+      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
+    );
+    const wikiIdxPre = await wikiTile.first().evaluate(
+      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
+    );
+    expect(customIdxPre).toBeGreaterThanOrEqual(0);
+    expect(wikiIdxPre).toBeGreaterThanOrEqual(0);
+    expect(customIdxPre).toBeLessThan(wikiIdxPre);
+    await expect(customTile.getByText('Custom', { exact: true })).toBeVisible();
 
     // 3. Delete a GENERATED link so its later reappearance is a deterministic
     //    signal that regeneration completed and rewrote the generated rows.
@@ -97,13 +115,22 @@ test.describe('Admin custom bio media survives regeneration', () => {
       linksGroup.getByRole('button', { name: `Delete link ${GENERATED_PRESS_LABEL}` })
     ).toBeVisible({ timeout: 30_000 });
 
-    // 5. The custom link SURVIVED regeneration: still present, still first, still
-    //    badged — while the generated links were torn down and re-created.
+    // 5. The custom link SURVIVED regeneration: still present, still before the
+    //    generated links, still badged — while generated links were torn down and
+    //    re-created.
     await expect(
       linksGroup.getByRole('button', { name: `Delete link ${customLabel}` })
     ).toBeVisible();
-    await expect(tiles.first()).toContainText(customLabel);
-    await expect(tiles.first().getByText('Custom', { exact: true })).toBeVisible();
     await expect(linksGroup.getByRole('button', { name: 'Delete link Wikipedia' })).toBeVisible();
+    const customIdxPost = await customTile.first().evaluate(
+      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
+    );
+    const wikiIdxPost = await wikiTile.first().evaluate(
+      (el) => (el.parentElement ? [...el.parentElement.children].indexOf(el) : -1),
+    );
+    expect(customIdxPost).toBeGreaterThanOrEqual(0);
+    expect(wikiIdxPost).toBeGreaterThanOrEqual(0);
+    expect(customIdxPost).toBeLessThan(wikiIdxPost);
+    await expect(customTile.getByText('Custom', { exact: true })).toBeVisible();
   });
 });
