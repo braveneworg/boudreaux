@@ -100,12 +100,15 @@ test.describe('Videos page — signed-in listing', () => {
 
     await play.click();
 
-    // The facade is replaced by the lazily-imported video.js surface. Headless
-    // Chromium can't decode the H.264 E2E fixture, so the mounted surface
-    // deterministically reaches its own inline error state — which only
-    // VideoPlayerSurface renders, proving the lazy surface mounted and ran.
+    // The facade is replaced by the lazily-imported video.js surface. Whether
+    // the H.264 fixture then decodes depends on the Chromium build's codec
+    // support: builds without it (e.g. macOS Playwright) reach the surface's
+    // inline error fallback and video.js tears its element down, while builds
+    // with it (CI's Linux Chromium) render a live `.video-js` player. The two
+    // terminal states are mutually exclusive; either one proves the lazy
+    // surface mounted and ran video.js.
     await expect(play).toHaveCount(0);
-    await expect(surfaceError).toBeVisible({ timeout: 15_000 });
+    await expect(surfaceError.or(alpha.locator('.video-js'))).toBeVisible({ timeout: 15_000 });
   });
 
   test('infinite scroll loads Foxtrot and Golf for 7 total cards', async ({ userPage }) => {
