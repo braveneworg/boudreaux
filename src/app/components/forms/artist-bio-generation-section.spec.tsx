@@ -109,6 +109,30 @@ describe('ArtistBioGenerationSection', () => {
     expect(onGenerated).not.toHaveBeenCalled();
   });
 
+  it('renders the live stage timeline from the polled progress', async () => {
+    statusReturn = {
+      status: 'processing',
+      error: null,
+      content: null,
+      progress: {
+        stage: 'vision-gating',
+        counts: { candidates: 3 },
+        at: '2026-07-08T00:00:00.000Z',
+      },
+    };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('list', { name: /bio generation progress/i })).toBeInTheDocument()
+    );
+    const active = screen
+      .getByRole('list', { name: /bio generation progress/i })
+      .querySelector('[aria-current="step"]');
+    expect(active).toHaveTextContent('Verifying images');
+  });
+
   it('toasts and does not populate when the job fails', async () => {
     statusReturn = { status: 'failed', error: 'Bio generation failed.', content: null };
     const onGenerated = vi.fn();
