@@ -282,27 +282,29 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
     },
   ] as const;
 
-  await Promise.all(
-    publishedRows.map(({ title, artist, category, releasedOn, durationSeconds }) => {
+  // Single createMany instead of concurrent create() calls: the first-ever
+  // writes to the fresh videos collection intermittently raced Prisma's
+  // per-create read-back in CI ("createOneVideo is required to return data,
+  // but found no record(s)"); createMany has no read-back to race.
+  await prisma.video.createMany({
+    data: publishedRows.map(({ title, artist, category, releasedOn, durationSeconds }) => {
       const slug = makeSlug(title);
-      return prisma.video.create({
-        data: {
-          title,
-          artist,
-          category,
-          releasedOn,
-          durationSeconds,
-          s3Key: `media/videos/e2e/${slug}.mp4`,
-          fileName: `${slug}.mp4`,
-          mimeType: 'video/mp4',
-          fileSize: BigInt(1048576),
-          posterUrl: null,
-          description: `${title} description for E2E.`,
-          publishedAt: PUBLISHED_AT,
-        },
-      });
-    })
-  );
+      return {
+        title,
+        artist,
+        category,
+        releasedOn,
+        durationSeconds,
+        s3Key: `media/videos/e2e/${slug}.mp4`,
+        fileName: `${slug}.mp4`,
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: `${title} description for E2E.`,
+        publishedAt: PUBLISHED_AT,
+      };
+    }),
+  });
 
   const draftSlug = makeSlug('E2E Video Draft');
   await prisma.video.create({
