@@ -10,7 +10,9 @@ Globals:
     # via API Gateway), so the 29s gateway limit does not apply. The web app's
     # invoke client uses a matching (larger) request timeout so it waits this out.
     Timeout: 900
-    MemorySize: 512
+    # 1024 MB: cap-240 base64 image retention can reach ~480 MB peak; 1 GB gives
+    # safe headroom and also doubles available CPU allocation vs 512 MB.
+    MemorySize: 1024
     Runtime: nodejs24.x
     Architectures:
       - arm64
@@ -57,11 +59,12 @@ Resources:
           # Optional Jina (web scrape) key. Jina works keyless at a lower rate
           # limit, so an absent parameter just means unauthenticated scraping.
           SSM_PATH_JINA_API_KEY: '/fakefour/jina/api-key'
-          # The Gemini model id intentionally ships in code (DEFAULT_GEMINI_MODEL,
-          # src/types.ts) rather than a template parameter: CloudFormation keeps a
-          # parameter's previous value across deploys, which once pinned a retired
-          # model id in production. Set GEMINI_MODEL here (or in the console) only
-          # as a temporary emergency override.
+          # The Gemini model ids intentionally ship in code (DEFAULT_GEMINI_MODEL /
+          # DEFAULT_GEMINI_PRO_MODEL, src/types.ts) rather than template parameters:
+          # CloudFormation keeps a parameter's previous value across deploys, which
+          # once pinned a retired model id in production. Set GEMINI_MODEL or
+          # GEMINI_PRO_MODEL here (or in the console) only as temporary emergency
+          # overrides — never as permanent CloudFormation parameters.
     Metadata:
       BuildMethod: esbuild
       BuildProperties:

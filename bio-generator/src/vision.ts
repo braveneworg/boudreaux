@@ -4,15 +4,19 @@
 
 import { z } from 'zod';
 
+import { logGeminiUsage } from './gemini.js';
 import { fetchWithRetry } from './lib/http.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 
+import type { GeminiUsageMetadata } from './gemini.js';
 import type { FetchRetryOptions } from './lib/http.js';
 import type { BioImage } from './types.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export const VISION_BATCH_SIZE = 10;
+/** Concurrent {@link verifyBatch} calls — bounds inline-payload egress and the Lambda budget. */
+export const VISION_BATCH_CONCURRENCY = 3;
 export const VISION_MIN_CONFIDENCE = 0.5;
 export const VISION_FETCH_MAX_BYTES = 1_500_000;
 export const VISION_FETCH_TIMEOUT_MS = 8_000;
@@ -33,16 +37,35 @@ export interface VisionApiConfig {
   model: string;
 }
 
+/**
+ * One model verdict, validated per-item so a single malformed entry is dropped
+ * alone instead of sinking its whole batch. `index` and `verdict` are required
+ * (an item missing either is garbage and fails closed); `confidence` is optional
+ * and string-coercible — a missing value is salvaged to {@link VISION_MIN_CONFIDENCE}
+ * by the caller, since the model still committed to a verdict.
+ */
 const visionVerdictSchema = z.object({
-  verdicts: z.array(
-    z.object({
-      index: z.number().int().nonnegative(),
-      verdict: z.enum(['artist_photo', 'album_cover', 'reject']),
-      confidence: z.number().min(0).max(1),
-      alt: z.string().optional(),
-    })
-  ),
+  index: z.number().int().nonnegative(),
+  verdict: z.enum(['artist_photo', 'album_cover', 'reject']),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+  alt: z.string().optional(),
 });
+
+/**
+ * The response envelope: the `verdicts` array must exist, but each element is
+ * validated individually against {@link visionVerdictSchema}. A response with no
+ * verdicts array is wholly unparseable and fails the batch closed.
+ */
+const visionResponseSchema = z.object({ verdicts: z.array(z.unknown()) });
+
+type VisionVerdict = z.infer<typeof visionVerdictSchema>;
+
+/** Per-item salvage outcome for one batch: kept images plus telemetry counts. */
+interface BatchVerdictResult {
+  kept: BioImage[];
+  defaulted: number;
+  dropped: number;
+}
 
 interface FetchedCandidate {
   image: BioImage;
@@ -123,6 +146,47 @@ const buildVisionParts = (
   },
 ];
 
+/** Maps one gated verdict to its kept image, or nothing when rejected/out-of-range. */
+const keepFromVerdict = (
+  verdict: VisionVerdict,
+  confidence: number,
+  batch: FetchedCandidate[]
+): BioImage[] => {
+  if (verdict.verdict === 'reject' || confidence < VISION_MIN_CONFIDENCE) return [];
+  const entry = batch.at(verdict.index);
+  if (!entry) return [];
+  return [
+    {
+      ...entry.image,
+      kind: verdict.verdict === 'album_cover' ? ('cover' as const) : ('photo' as const),
+      alt: verdict.alt?.trim() || entry.image.title || null,
+    },
+  ];
+};
+
+/**
+ * Validates each raw verdict on its own: a garbage item is dropped without
+ * killing its siblings, and a verdict missing `confidence` is salvaged by
+ * defaulting to {@link VISION_MIN_CONFIDENCE}. Returns the kept images plus the
+ * defaulted/dropped counts for salvage telemetry.
+ */
+const salvageVerdicts = (raw: unknown[], batch: FetchedCandidate[]): BatchVerdictResult => {
+  const kept: BioImage[] = [];
+  let defaulted = 0;
+  let dropped = 0;
+  for (const item of raw) {
+    const parsed = visionVerdictSchema.safeParse(item);
+    if (!parsed.success) {
+      dropped += 1;
+      continue;
+    }
+    if (parsed.data.confidence === undefined) defaulted += 1;
+    const confidence = parsed.data.confidence ?? VISION_MIN_CONFIDENCE;
+    kept.push(...keepFromVerdict(parsed.data, confidence, batch));
+  }
+  return { kept, defaulted, dropped };
+};
+
 const verifyBatch = async (
   batch: FetchedCandidate[],
   context: VisionContext,
@@ -152,26 +216,33 @@ const verifyBatch = async (
   }
   const body = (await response.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    usageMetadata?: GeminiUsageMetadata;
   };
+  logGeminiUsage(model, 'vision', body.usageMetadata);
   const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini vision returned an empty completion');
-  const { verdicts } = visionVerdictSchema.parse(JSON.parse(text));
+  const { verdicts } = visionResponseSchema.parse(JSON.parse(text));
 
-  return verdicts
-    .filter(
-      (verdict) => verdict.verdict !== 'reject' && verdict.confidence >= VISION_MIN_CONFIDENCE
-    )
-    .flatMap((verdict) => {
-      const entry = batch.at(verdict.index);
-      if (!entry) return [];
-      return [
-        {
-          ...entry.image,
-          kind: verdict.verdict === 'album_cover' ? ('cover' as const) : ('photo' as const),
-          alt: verdict.alt?.trim() || entry.image.title || null,
-        },
-      ];
-    });
+  const { kept, defaulted, dropped } = salvageVerdicts(verdicts, batch);
+  if (defaulted > 0 || dropped > 0) {
+    logEvent('info', 'vision_verdict_salvaged', { defaulted, dropped, batchSize: batch.length });
+  }
+  return kept;
+};
+
+/** Runs {@link verifyBatch} fail-closed: an unverifiable batch logs and ships nothing. */
+const verifyBatchSafely = async (
+  batch: FetchedCandidate[],
+  context: VisionContext,
+  config: VisionApiConfig,
+  options: FetchRetryOptions
+): Promise<BioImage[]> => {
+  try {
+    return await verifyBatch(batch, context, config, options);
+  } catch (err) {
+    logEvent('warn', 'vision_batch_failed', { size: batch.length, error: toErrorMessage(err) });
+    return [];
+  }
 };
 
 /**
@@ -194,15 +265,21 @@ export const verifyScrapedImages = async (
   logEvent('info', 'vision_candidates', { total: candidates.length, fetched: fetched.length });
   if (!fetched.length) return [];
 
-  const kept: BioImage[] = [];
+  const batches: FetchedCandidate[][] = [];
   for (let i = 0; i < fetched.length; i += VISION_BATCH_SIZE) {
-    const batch = fetched.slice(i, i + VISION_BATCH_SIZE);
-    try {
-      kept.push(...(await verifyBatch(batch, context, config, options)));
-    } catch (err) {
-      // Fail closed: an unverifiable batch ships nothing from that batch.
-      logEvent('warn', 'vision_batch_failed', { size: batch.length, error: toErrorMessage(err) });
-    }
+    batches.push(fetched.slice(i, i + VISION_BATCH_SIZE));
+  }
+
+  // Verify batches through a small concurrency pool. Within each pooled slice
+  // Promise.all preserves array order, so survivors aggregate in batch order
+  // regardless of which batch's request completes first.
+  const kept: BioImage[] = [];
+  for (let i = 0; i < batches.length; i += VISION_BATCH_CONCURRENCY) {
+    const slice = batches.slice(i, i + VISION_BATCH_CONCURRENCY);
+    const settled = await Promise.all(
+      slice.map((batch) => verifyBatchSafely(batch, context, config, options))
+    );
+    for (const batchKept of settled) kept.push(...batchKept);
   }
   logEvent('info', 'vision_verified', { kept: kept.length });
   return kept;

@@ -25,6 +25,8 @@ export interface QualityPassArgs {
   facts: ArtistFacts;
   apiKey: string;
   model: string;
+  /** Paid-tier fallback model passed through to the critic/repair passes (Task 3 wires it). */
+  fallbackModel?: string;
 }
 
 export interface QualityPassDeps {
@@ -39,7 +41,7 @@ export interface QualityPassDeps {
  * unchanged rather than costing the artist their bio.
  */
 export const runQualityPasses = async (
-  { prose, facts, apiKey, model }: QualityPassArgs,
+  { prose, facts, apiKey, model, fallbackModel }: QualityPassArgs,
   deps: QualityPassDeps
 ): Promise<BioProse> => {
   const combined = [prose.shortBio, prose.longBio, prose.altBio].join('\n');
@@ -52,7 +54,14 @@ export const runQualityPasses = async (
 
   let violations: BioCritiqueViolation[] = [];
   try {
-    ({ violations } = await deps.critiqueProse({ facts, prose, suspectYears, apiKey, model }));
+    ({ violations } = await deps.critiqueProse({
+      facts,
+      prose,
+      suspectYears,
+      apiKey,
+      model,
+      fallbackModel,
+    }));
   } catch (err) {
     logEvent('warn', 'critic_pass_failed', { error: toErrorMessage(err) });
   }
@@ -65,7 +74,15 @@ export const runQualityPasses = async (
   if (!violations.length && !plagiarizedSegments.length) return prose;
 
   try {
-    return await deps.reviseProse({ facts, prose, violations, plagiarizedSegments, apiKey, model });
+    return await deps.reviseProse({
+      facts,
+      prose,
+      violations,
+      plagiarizedSegments,
+      apiKey,
+      model,
+      fallbackModel,
+    });
   } catch (err) {
     logEvent('warn', 'repair_pass_failed', { error: toErrorMessage(err) });
     return prose;
