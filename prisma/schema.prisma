@@ -281,6 +281,7 @@ model Artist {
   bioError              String? // Error message from the last failed bio generation, if any
   bioStartedAt          DateTime? // When the current/last bio generation job started (for stale-job detection)
   bioJobToken           String? // Opaque per-job token for the async callback; set at dispatch, cleared on completion (guards stale/overtaken writes)
+  bioProgress           Json? // Latest async-generation progress checkpoint { stage, detail?, counts?, at }; cleared when a new run is marked pending
   slug                  String                 @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
   genres                String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
   bornOn                DateTime? // Always feature artist on their birthday if known
