@@ -101,6 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.192.0] - 2026-07-08
+
+### Added
+
+- feat(bio): ✨ regen-proof custom bio media (#570)\n- feat(bio): ✨ regen-proof custom bio media (#570)\n
+
 ## [4.191.0] - 2026-07-08
 
 ### Added
