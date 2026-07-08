@@ -10,6 +10,12 @@ const DEFAULT_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 /** Statuses worth retrying — rate limit / temporarily unavailable. */
 const RETRYABLE_STATUSES = new Set([429, 503]);
+/**
+ * Hard ceiling on a server-provided `Retry-After` delay. Gemini pro-tier 429s
+ * can return very large values; honoring them verbatim would sleep a Lambda run
+ * past the 900s timeout, so cap at 60s to stay within budget.
+ */
+export const RETRY_AFTER_MAX_MS = 60_000;
 
 /** Promise-based delay; injectable in callers so tests never wait for real time. */
 export const sleep = (ms: number): Promise<void> =>
@@ -32,7 +38,12 @@ const retryAfterMs = (response: Response, fallbackMs: number): number => {
     return fallbackMs;
   }
   const seconds = Number(header);
-  return Number.isFinite(seconds) ? seconds * 1000 : fallbackMs;
+  if (!Number.isFinite(seconds)) {
+    return fallbackMs;
+  }
+  // Clamp to RETRY_AFTER_MAX_MS so a large server value cannot sleep a Lambda
+  // invocation past the 900s timeout (pro-model 429s can return 300s+).
+  return Math.min(seconds * 1000, RETRY_AFTER_MAX_MS);
 };
 
 /**

@@ -7,6 +7,7 @@ import {
   bioGenerationImageSchema,
   bioGenerationLinkSchema,
   bioGenerationStatusResponseSchema,
+  bioStatusImageSchema,
   bioStatusLinkSchema,
   isInFlightBioStatus,
 } from './bio-generation-schema';
@@ -242,5 +243,47 @@ describe('media v2 wire additions', () => {
       bioStatusLinkSchema.parse({ id: 'x', label: 'Review', url: 'https://z.net/r', kind: 'press' })
         .kind
     ).toBe('press');
+  });
+});
+
+describe('bio status schemas origin field', () => {
+  const image = {
+    id: '665f1f77bcf86cd799439011',
+    url: 'https://cdn.example/a.webp',
+    attribution: null,
+    isPrimary: false,
+  };
+  const link = {
+    id: '665f1f77bcf86cd799439012',
+    label: 'Wikipedia',
+    url: 'https://en.wikipedia.org/wiki/X',
+  };
+
+  it('retains a generated origin on a parsed image row', () => {
+    expect(bioStatusImageSchema.parse({ ...image, origin: 'generated' }).origin).toBe('generated');
+  });
+
+  it('retains a custom origin on a parsed image row', () => {
+    expect(bioStatusImageSchema.parse({ ...image, origin: 'custom' }).origin).toBe('custom');
+  });
+
+  it('accepts a null origin on an image row', () => {
+    expect(bioStatusImageSchema.safeParse({ ...image, origin: null }).success).toBe(true);
+  });
+
+  it('accepts an absent origin on an image row', () => {
+    expect(bioStatusImageSchema.safeParse(image).success).toBe(true);
+  });
+
+  it('rejects an unknown origin string on an image row', () => {
+    expect(bioStatusImageSchema.safeParse({ ...image, origin: 'imported' }).success).toBe(false);
+  });
+
+  it('retains a custom origin on a parsed link row', () => {
+    expect(bioStatusLinkSchema.parse({ ...link, origin: 'custom' }).origin).toBe('custom');
+  });
+
+  it('rejects an unknown origin string on a link row', () => {
+    expect(bioStatusLinkSchema.safeParse({ ...link, origin: 'imported' }).success).toBe(false);
   });
 });

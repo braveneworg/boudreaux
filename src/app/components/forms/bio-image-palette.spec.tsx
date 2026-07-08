@@ -338,4 +338,142 @@ describe('BioImagePalette', () => {
     const input = screen.getByRole('textbox', { name: /attribution/i });
     expect(input).toHaveAttribute('maxLength', '500');
   });
+
+  describe('custom-first ordering and Custom badge', () => {
+    const MIXED_IMAGES: BioStatusImage[] = [
+      {
+        id: 'ig1',
+        url: 'https://example.com/g1.jpg',
+        thumbnailUrl: null,
+        title: 'Generated Image 1',
+        attribution: null,
+        license: null,
+        sourceUrl: null,
+        width: null,
+        height: null,
+        isPrimary: false,
+        origin: 'generated',
+      },
+      {
+        id: 'ic1',
+        url: 'https://example.com/c1.jpg',
+        thumbnailUrl: null,
+        title: 'Custom Image 1',
+        attribution: null,
+        license: null,
+        sourceUrl: null,
+        width: null,
+        height: null,
+        isPrimary: false,
+        origin: 'custom',
+      },
+      {
+        id: 'ig2',
+        url: 'https://example.com/g2.jpg',
+        thumbnailUrl: null,
+        title: 'Generated Image 2',
+        attribution: null,
+        license: null,
+        sourceUrl: null,
+        width: null,
+        height: null,
+        isPrimary: false,
+        origin: 'generated',
+      },
+    ];
+
+    it('renders custom-origin tiles before generated tiles', () => {
+      render(
+        <BioImagePalette
+          images={MIXED_IMAGES}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      const buttons = screen.getAllByRole('button', { name: /^Delete image / });
+      const names = buttons.map((b) => b.getAttribute('aria-label') ?? '');
+      const customIdx = names.findIndex((n) => n.includes('Custom Image 1'));
+      const gen1Idx = names.findIndex((n) => n.includes('Generated Image 1'));
+      const gen2Idx = names.findIndex((n) => n.includes('Generated Image 2'));
+      expect(customIdx).toBeLessThan(gen1Idx);
+      expect(customIdx).toBeLessThan(gen2Idx);
+    });
+
+    it('preserves the relative order of generated tiles after the custom tile', () => {
+      render(
+        <BioImagePalette
+          images={MIXED_IMAGES}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      const buttons = screen.getAllByRole('button', { name: /^Delete image / });
+      const names = buttons.map((b) => b.getAttribute('aria-label') ?? '');
+      const gen1Idx = names.findIndex((n) => n.includes('Generated Image 1'));
+      const gen2Idx = names.findIndex((n) => n.includes('Generated Image 2'));
+      expect(gen1Idx).toBeLessThan(gen2Idx);
+    });
+
+    it('shows a Custom badge on a custom-origin tile', () => {
+      render(
+        <BioImagePalette
+          images={MIXED_IMAGES}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      const customTile = screen
+        .getByRole('button', { name: 'Delete image Custom Image 1' })
+        .closest('li') as HTMLElement;
+      expect(within(customTile).getByText('Custom')).toBeInTheDocument();
+    });
+
+    it('does not show a Custom badge on a generated-origin tile', () => {
+      render(
+        <BioImagePalette
+          images={MIXED_IMAGES}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      const genTile = screen
+        .getByRole('button', { name: 'Delete image Generated Image 1' })
+        .closest('li') as HTMLElement;
+      expect(within(genTile).queryByText('Custom')).not.toBeInTheDocument();
+    });
+
+    it('does not show a Custom badge on a null-origin tile', () => {
+      const nullOriginImage: BioStatusImage[] = [
+        {
+          id: 'in1',
+          url: 'https://example.com/n1.jpg',
+          thumbnailUrl: null,
+          title: 'Null Origin Image',
+          attribution: null,
+          license: null,
+          sourceUrl: null,
+          width: null,
+          height: null,
+          isPrimary: false,
+          origin: null,
+        },
+      ];
+      render(
+        <BioImagePalette
+          images={nullOriginImage}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      const tile = screen
+        .getByRole('button', { name: 'Delete image Null Origin Image' })
+        .closest('li') as HTMLElement;
+      expect(within(tile).queryByText('Custom')).not.toBeInTheDocument();
+    });
+  });
 });

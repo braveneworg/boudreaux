@@ -25,6 +25,15 @@ const geminiResponse = (content: unknown): Response =>
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 
+const geminiResponseWithUsage = (content: unknown, usage: Record<string, number>): Response =>
+  new Response(
+    JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify(content) }] } }],
+      usageMetadata: usage,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+
 const proseResponse = (): Response => geminiResponse({ shortBio: 's', longBio: 'l' });
 const critiqueResponse = (): Response => geminiResponse({ violations: [] });
 
@@ -462,7 +471,7 @@ describe('generateProse', () => {
     const rateLimited = (headers?: HeadersInit): Response =>
       new Response('{"error":{"status":"RESOURCE_EXHAUSTED"}}', { status: 429, headers });
 
-    it('pauses 30s then retries a rate-limited request', async () => {
+    it('pauses 4s then retries a rate-limited request', async () => {
       const fetchFn = vi.fn().mockResolvedValueOnce(rateLimited()).mockResolvedValue(prose());
       const sleep = vi.fn().mockResolvedValue(undefined);
 
@@ -470,10 +479,10 @@ describe('generateProse', () => {
 
       expect(result.shortBio).toBe('s');
       expect(fetchFn).toHaveBeenCalledTimes(2);
-      expect(sleep).toHaveBeenCalledWith(30000);
+      expect(sleep).toHaveBeenCalledWith(4000);
     });
 
-    it('backs off 30s then 60s across consecutive 429s', async () => {
+    it('backs off 4s then 8s across consecutive 429s', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(rateLimited())
@@ -483,11 +492,11 @@ describe('generateProse', () => {
 
       await generateProse(facts, 'k', undefined, { fetchFn, sleep });
 
-      expect(sleep).toHaveBeenNthCalledWith(1, 30000);
-      expect(sleep).toHaveBeenNthCalledWith(2, 60000);
+      expect(sleep).toHaveBeenNthCalledWith(1, 4000);
+      expect(sleep).toHaveBeenNthCalledWith(2, 8000);
     });
 
-    it('prefers a server-provided Retry-After over the 30s default', async () => {
+    it('prefers a server-provided Retry-After over the 4s default', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(rateLimited({ 'retry-after': '45' }))
@@ -499,14 +508,15 @@ describe('generateProse', () => {
       expect(sleep).toHaveBeenCalledWith(45000);
     });
 
-    it('throws the quota detail once retries are exhausted', async () => {
+    it('backs off 4s, 8s, then 16s across three retries before throwing', async () => {
       const fetchFn = vi.fn().mockResolvedValue(rateLimited());
       const sleep = vi.fn().mockResolvedValue(undefined);
 
       await expect(generateProse(facts, 'k', undefined, { fetchFn, sleep })).rejects.toThrow(
         'Gemini request failed (429): {"error":{"status":"RESOURCE_EXHAUSTED"}}'
       );
-      expect(fetchFn).toHaveBeenCalledTimes(3);
+      expect(fetchFn).toHaveBeenCalledTimes(4);
+      expect(sleep.mock.calls).toEqual([[4000], [8000], [16000]]);
     });
   });
 
@@ -657,64 +667,71 @@ describe('generateProse', () => {
       geminiResponse({ shortBio: 'Draft A short.', longBio: '<p>Draft A long.</p>' });
     const draftB = (): Response =>
       geminiResponse({ shortBio: 'Draft B short.', longBio: '<p>Draft B long.</p>' });
+    const draftC = (): Response =>
+      geminiResponse({ shortBio: 'Draft C short.', longBio: '<p>Draft C long.</p>' });
     const definitive = (): Response =>
       geminiResponse({ shortBio: 'Definitive short.', longBio: '<p>Definitive long.</p>' });
 
-    it('makes two draft calls and one synthesis call, returning the synthesis', async () => {
+    it('makes three draft calls and one synthesis call, returning the synthesis', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(draftA())
         .mockResolvedValueOnce(draftB())
+        .mockResolvedValueOnce(draftC())
         .mockResolvedValueOnce(definitive());
 
       const result = await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn });
 
-      expect(fetchFn).toHaveBeenCalledTimes(3);
+      expect(fetchFn).toHaveBeenCalledTimes(4);
       expect(result.shortBio).toBe('Definitive short.');
     });
 
-    it('varies temperature and style directive across the drafts', async () => {
+    it('varies temperature and style directive across all three drafts', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(draftA())
         .mockResolvedValueOnce(draftB())
+        .mockResolvedValueOnce(draftC())
         .mockResolvedValueOnce(definitive());
 
       await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn });
 
-      const bodies = fetchFn.mock.calls.slice(0, 2).map(([, init]) => JSON.parse(init.body));
+      const bodies = fetchFn.mock.calls.slice(0, 3).map(([, init]) => JSON.parse(init.body));
       const temperatures = bodies.map((body) => body.generationConfig.temperature);
       const systems = bodies.map((body) => body.systemInstruction.parts[0].text);
-      expect(new Set(temperatures).size).toBe(2);
-      expect(systems[0]).not.toBe(systems[1]);
+      expect(new Set(temperatures).size).toBe(3);
+      expect(new Set(systems).size).toBe(3);
     });
 
-    it('feeds both drafts, but not the raw source text, to the synthesis call', async () => {
+    it('feeds all drafts, but not the raw source text, to the synthesis call', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(draftA())
         .mockResolvedValueOnce(draftB())
+        .mockResolvedValueOnce(draftC())
         .mockResolvedValueOnce(definitive());
 
       await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn });
 
-      const synthesisBody = fetchFn.mock.calls[2][1].body as string;
+      const synthesisBody = fetchFn.mock.calls[3][1].body as string;
       expect(synthesisBody).toContain('Draft A long.');
       expect(synthesisBody).toContain('Draft B long.');
+      expect(synthesisBody).toContain('Draft C long.');
       expect(synthesisBody).not.toContain('Radiohead formed in Abingdon in 1985.');
     });
 
-    it('synthesizes from the surviving draft when the other draft fails', async () => {
+    it('synthesizes from the surviving drafts when one draft fails', async () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(new Response('boom', { status: 400 }))
         .mockResolvedValueOnce(draftB())
+        .mockResolvedValueOnce(draftC())
         .mockResolvedValueOnce(definitive());
 
       const result = await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn });
 
       expect(result.shortBio).toBe('Definitive short.');
-      const synthesisBody = fetchFn.mock.calls[2][1].body as string;
+      const synthesisBody = fetchFn.mock.calls[3][1].body as string;
       expect(synthesisBody).toContain('Draft B long.');
       expect(synthesisBody).not.toContain('Draft A long.');
     });
@@ -724,6 +741,7 @@ describe('generateProse', () => {
         .fn()
         .mockResolvedValueOnce(draftA())
         .mockResolvedValueOnce(draftB())
+        .mockResolvedValueOnce(draftC())
         .mockResolvedValueOnce(new Response('boom', { status: 400 }));
 
       const result = await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn });
@@ -737,7 +755,64 @@ describe('generateProse', () => {
       await expect(draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn })).rejects.toThrow(
         'Gemini request failed (400)'
       );
-      expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
+
+    describe('synthesis model split', () => {
+      it('runs synthesis on the provided synthesisModel while drafts stay on the base model', async () => {
+        const fetchFn = vi
+          .fn()
+          .mockResolvedValueOnce(draftA())
+          .mockResolvedValueOnce(draftB())
+          .mockResolvedValueOnce(draftC())
+          .mockResolvedValueOnce(definitive());
+
+        await draftAndSynthesizeProse(grounded, 'k', 'gemini-2.5-flash', {
+          fetchFn,
+          synthesisModel: 'gemini-2.5-pro',
+        });
+
+        expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-flash:generateContent');
+        expect(fetchFn.mock.calls[3][0]).toContain('/models/gemini-2.5-pro:generateContent');
+      });
+
+      it('retries synthesis once on the draft model when the pro synthesis fails', async () => {
+        const fetchFn = vi
+          .fn()
+          .mockResolvedValueOnce(draftA())
+          .mockResolvedValueOnce(draftB())
+          .mockResolvedValueOnce(draftC())
+          .mockResolvedValueOnce(new Response('boom', { status: 400 }))
+          .mockResolvedValueOnce(definitive());
+
+        const result = await draftAndSynthesizeProse(grounded, 'k', 'gemini-2.5-flash', {
+          fetchFn,
+          synthesisModel: 'gemini-2.5-pro',
+        });
+
+        expect(result.shortBio).toBe('Definitive short.');
+        expect(fetchFn.mock.calls[3][0]).toContain('/models/gemini-2.5-pro:generateContent');
+        expect(fetchFn.mock.calls[4][0]).toContain('/models/gemini-2.5-flash:generateContent');
+        expect(fetchFn).toHaveBeenCalledTimes(5);
+      });
+
+      it('falls back to the first draft when both pro and flash synthesis fail', async () => {
+        const fetchFn = vi
+          .fn()
+          .mockResolvedValueOnce(draftA())
+          .mockResolvedValueOnce(draftB())
+          .mockResolvedValueOnce(draftC())
+          .mockResolvedValueOnce(new Response('boom', { status: 400 }))
+          .mockResolvedValueOnce(new Response('boom', { status: 400 }));
+
+        const result = await draftAndSynthesizeProse(grounded, 'k', 'gemini-2.5-flash', {
+          fetchFn,
+          synthesisModel: 'gemini-2.5-pro',
+        });
+
+        expect(result.shortBio).toBe('Draft A short.');
+        expect(fetchFn).toHaveBeenCalledTimes(5);
+      });
     });
   });
 
@@ -833,6 +908,178 @@ describe('reviseProse', () => {
     const text = body.contents[0].parts[0].text;
     expect(text).not.toContain('FACT VIOLATIONS');
     expect(text).not.toContain('PLAGIARIZED PHRASING');
+  });
+});
+
+describe('quality-pass model fallback', () => {
+  it('retries the critic on the fallback model when the primary model fails', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('boom', { status: 400 }))
+      .mockResolvedValueOnce(geminiResponse({ violations: [] }));
+
+    const result = await critiqueProse(
+      {
+        facts,
+        prose: fakeProse,
+        suspectYears: [],
+        apiKey: 'k',
+        model: 'gemini-2.5-pro',
+        fallbackModel: 'gemini-2.5-flash',
+      },
+      { fetchFn }
+    );
+
+    expect(result.violations).toHaveLength(0);
+    expect(fetchFn.mock.calls[0][0]).toContain('/models/gemini-2.5-pro:generateContent');
+    expect(fetchFn.mock.calls[1][0]).toContain('/models/gemini-2.5-flash:generateContent');
+  });
+
+  it('throws when both the primary and fallback critic calls fail', async () => {
+    const fetchFn = vi.fn().mockImplementation(async () => new Response('boom', { status: 400 }));
+
+    await expect(
+      critiqueProse(
+        {
+          facts,
+          prose: fakeProse,
+          suspectYears: [],
+          apiKey: 'k',
+          model: 'gemini-2.5-pro',
+          fallbackModel: 'gemini-2.5-flash',
+        },
+        { fetchFn }
+      )
+    ).rejects.toThrow('Gemini request failed (400)');
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry the critic when no fallbackModel is given', async () => {
+    const fetchFn = vi.fn().mockImplementation(async () => new Response('boom', { status: 400 }));
+
+    await expect(
+      critiqueProse(
+        { facts, prose: fakeProse, suspectYears: [], apiKey: 'k', model: 'gemini-2.5-pro' },
+        { fetchFn }
+      )
+    ).rejects.toThrow('Gemini request failed (400)');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries the repair pass on the fallback model when the primary model fails', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('boom', { status: 400 }))
+      .mockResolvedValueOnce(geminiResponse(fakeProse));
+
+    const result = await reviseProse(
+      {
+        facts,
+        prose: fakeProse,
+        violations: [],
+        plagiarizedSegments: [],
+        apiKey: 'k',
+        model: 'gemini-2.5-pro',
+        fallbackModel: 'gemini-2.5-flash',
+      },
+      { fetchFn }
+    );
+
+    expect(result.longBio).toBe(fakeProse.longBio);
+    expect(fetchFn.mock.calls[1][0]).toContain('/models/gemini-2.5-flash:generateContent');
+  });
+});
+
+describe('gemini usage telemetry', () => {
+  const usage = {
+    promptTokenCount: 1200,
+    candidatesTokenCount: 3400,
+    totalTokenCount: 4600,
+    thoughtsTokenCount: 512,
+  };
+
+  const usageEvents = (info: ReturnType<typeof vi.spyOn>): Array<Record<string, unknown>> =>
+    info.mock.calls
+      .map((call: unknown[]) => JSON.parse(call[0] as string) as Record<string, unknown>)
+      .filter((event: Record<string, unknown>) => event.event === 'gemini_usage');
+
+  it('emits a gemini_usage event carrying the model and token counts', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponseWithUsage({ shortBio: 's', longBio: 'l' }, usage));
+
+    await generateProse(facts, 'k', 'gemini-2.5-flash', { fetchFn });
+
+    expect(usageEvents(info)[0]).toMatchObject({
+      model: 'gemini-2.5-flash',
+      promptTokens: 1200,
+      outputTokens: 3400,
+      totalTokens: 4600,
+      thoughtsTokens: 512,
+    });
+    info.mockRestore();
+  });
+
+  it('tags a draft call with purpose "draft"', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    expect(usageEvents(info)[0]).toMatchObject({ purpose: 'draft' });
+    info.mockRestore();
+  });
+
+  it('tags a synthesis call with purpose "synthesis"', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await synthesizeProse(
+      { facts, drafts: [{ shortBio: 's', longBio: 'l' }], apiKey: 'k' },
+      { fetchFn }
+    );
+
+    expect(usageEvents(info)[0]).toMatchObject({ purpose: 'synthesis' });
+    info.mockRestore();
+  });
+
+  it('tags a critic call with purpose "critic"', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ violations: [] }));
+
+    await critiqueProse({ facts, prose: fakeProse, suspectYears: [], apiKey: 'k' }, { fetchFn });
+
+    expect(usageEvents(info)[0]).toMatchObject({ purpose: 'critic' });
+    info.mockRestore();
+  });
+
+  it('tags a repair call with purpose "repair"', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse(fakeProse));
+
+    await reviseProse(
+      { facts, prose: fakeProse, violations: [], plagiarizedSegments: [], apiKey: 'k' },
+      { fetchFn }
+    );
+
+    expect(usageEvents(info)[0]).toMatchObject({ purpose: 'repair' });
+    info.mockRestore();
+  });
+
+  it('emits gemini_usage with null token fields when usageMetadata is absent', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+
+    await generateProse(facts, 'k', undefined, { fetchFn });
+
+    expect(usageEvents(info)[0]).toMatchObject({
+      promptTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      thoughtsTokens: null,
+    });
+    info.mockRestore();
   });
 });
 

@@ -995,6 +995,47 @@ describe('BioGenerationService.getGenerationStatus', () => {
     expect(result?.content).toBeNull();
   });
 
+  it('carries the image origin through to the status content', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'succeeded',
+        bioImages: [
+          {
+            id: 'i1',
+            url: 'u',
+            thumbnailUrl: null,
+            title: null,
+            attribution: null,
+            license: null,
+            sourceUrl: null,
+            originalUrl: null,
+            isPrimary: false,
+            kind: null,
+            alt: null,
+            origin: 'custom',
+          },
+        ],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.content?.images[0].origin).toBe('custom');
+  });
+
+  it('carries the link origin through to the status content', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'succeeded',
+        bioLinks: [{ id: 'l1', label: 'L', url: 'u2', kind: null, origin: 'generated' }],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.content?.links[0].origin).toBe('generated');
+  });
+
   it('coerces a processing job older than STALE_JOB_MS to failed on read', async () => {
     getBioGenerationStateMock.mockResolvedValue(
       state({
