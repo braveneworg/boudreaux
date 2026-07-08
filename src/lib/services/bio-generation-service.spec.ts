@@ -596,6 +596,7 @@ describe('BioGenerationService.runGenerationJob', () => {
   beforeEach(() => {
     setBioStatusMock.mockReset().mockResolvedValue(undefined);
     setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
+    setBioProgressMock.mockReset().mockResolvedValue(undefined);
     findByIdMock.mockReset().mockResolvedValue(artist);
     findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
     replaceBioContentMock.mockReset().mockResolvedValue(undefined);
@@ -611,6 +612,8 @@ describe('BioGenerationService.runGenerationJob', () => {
   describe('fake path', () => {
     beforeEach(() => {
       vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+      // Keep unit runs instant — the observable delay is proven separately.
+      vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
     });
 
     it('completes synchronously and returns the persisted content', async () => {
@@ -645,6 +648,72 @@ describe('BioGenerationService.runGenerationJob', () => {
         { error: 'fixture down' },
       ]);
       expect(replaceBioContentMock).not.toHaveBeenCalled();
+    });
+
+    it('writes one synthetic vision-gating checkpoint with a candidate count', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(setBioProgressMock).toHaveBeenCalledTimes(1);
+      const [id, progress] = setBioProgressMock.mock.calls[0];
+      expect(id).toBe(artist.id);
+      expect(progress).toEqual(
+        expect.objectContaining({ stage: 'vision-gating', counts: { candidates: 3 } })
+      );
+      expect(progress.at).toEqual(expect.any(String));
+    });
+
+    it('records the checkpoint before flipping to succeeded', async () => {
+      // Capture whether a succeeded flip had already happened at the instant the
+      // checkpoint is written — behaviour-focused ordering proof (no index math).
+      let succeededBeforeCheckpoint: boolean | null = null;
+      setBioProgressMock.mockImplementation(() => {
+        succeededBeforeCheckpoint = setBioStatusMock.mock.calls.some(
+          ([, status]) => status === 'succeeded'
+        );
+        return Promise.resolve();
+      });
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(succeededBeforeCheckpoint).toBe(false);
+    });
+
+    it('does not write a synthetic checkpoint when the fixture fails', async () => {
+      fakeBioGenerationMock.mockReturnValue({ ok: false, error: 'fixture down' });
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(setBioProgressMock).not.toHaveBeenCalled();
+    });
+
+    it('does not arm a timer when the fake delay is zero', async () => {
+      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      setTimeoutSpy.mockRestore();
+    });
+
+    it('waits the configured fake delay before flipping to succeeded', async () => {
+      vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '4000');
+      vi.useFakeTimers();
+      try {
+        const promise = BioGenerationService.runGenerationJob(artist.id);
+        // Let the synchronous prep + checkpoint microtasks settle; the run then
+        // parks on the delay timer, so no success flip has happened yet.
+        await vi.advanceTimersByTimeAsync(0);
+        expect(setBioProgressMock).toHaveBeenCalledTimes(1);
+        expect(setBioStatusMock.mock.calls.some(([, status]) => status === 'succeeded')).toBe(
+          false
+        );
+
+        await vi.advanceTimersByTimeAsync(4000);
+        await promise;
+        expect(setBioStatusMock.mock.calls.some(([, status]) => status === 'succeeded')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -707,6 +776,12 @@ describe('BioGenerationService.runGenerationJob', () => {
       const statuses = setBioStatusMock.mock.calls.map(([, status]) => status);
       expect(statuses).toEqual(['processing']);
       expect(replaceBioContentMock).not.toHaveBeenCalled();
+    });
+
+    it('does not write a synthetic progress checkpoint (the Lambda owns progress)', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(setBioProgressMock).not.toHaveBeenCalled();
     });
   });
 

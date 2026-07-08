@@ -45,6 +45,27 @@ let lambdaClient: LambdaClient | null = null;
 export const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
 
 /**
+ * Default observable in-flight window for the fake/E2E generation path only.
+ * The real Lambda streams stage checkpoints through the progress channel, but
+ * the in-process fixture completes instantly — so the fake path emits one
+ * synthetic checkpoint and pauses this long before persisting, giving the admin
+ * timeline (polled every 2.5s) a window to render and E2E a deterministic stage
+ * to assert. Overridable via `BIO_GENERATOR_FAKE_DELAY_MS` (unit tests set `0`
+ * so they never wait). Never used on the real dispatch path.
+ */
+export const DEFAULT_BIO_GENERATOR_FAKE_DELAY_MS = 4000;
+
+/** Resolve the fake-path delay from the env, falling back to the default. */
+const resolveFakeDelayMs = (): number => {
+  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_BIO_GENERATOR_FAKE_DELAY_MS;
+};
+
+/** Resolve after `ms`; short-circuits to an already-resolved promise for `ms <= 0`. */
+const sleep = (ms: number): Promise<void> =>
+  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+/**
  * User-facing error the status read attaches when it coerces a timed-out
  * in-flight job (older than {@link STALE_JOB_MS}) to `failed`.
  */
@@ -475,6 +496,17 @@ const runFakeGeneration = async (prep: GenerationPrep): Promise<RunGenerationJob
     await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error: result.error });
     return { status: 'failed', error: result.error };
   }
+
+  // Fake/E2E observability only: emit ONE synthetic checkpoint (the artist is
+  // already `processing`) and pause briefly so the polled admin timeline is
+  // visibly exercised before the run resolves. The real Lambda owns real
+  // checkpoints via the progress channel, so this block never runs there.
+  await ArtistRepository.setBioProgress(prep.artist.id, {
+    stage: 'vision-gating',
+    counts: { candidates: 3 },
+    at: new Date().toISOString(),
+  });
+  await sleep(resolveFakeDelayMs());
 
   const data = await persistGeneratedBio(prep.artist.id, result.data, prep.releases);
   await ArtistRepository.setBioStatus(prep.artist.id, 'succeeded', { error: null });
