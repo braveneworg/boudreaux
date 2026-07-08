@@ -61,6 +61,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findBioImagesForRehost: vi.fn(),
     updateBioImageUrl: vi.fn(),
     createBioImage: vi.fn(),
+    createBioLink: vi.fn(),
     updateBioImageAttribution: vi.fn(),
   },
 }));
@@ -2122,6 +2123,26 @@ describe('ArtistService', () => {
       expect(ArtistRepository.createBioImage).toHaveBeenCalledWith({
         artistId: 'a1',
         url: 'https://cdn/x.webp',
+      });
+      expect(result).toBe(row);
+    });
+  });
+
+  describe('createBioLink', () => {
+    it('delegates to the repository and returns the created row', async () => {
+      const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
+      vi.mocked(ArtistRepository.createBioLink).mockResolvedValue(row as never);
+
+      const result = await ArtistService.createBioLink({
+        artistId: 'a1',
+        label: 'Site',
+        url: 'https://cdn/x',
+      });
+
+      expect(ArtistRepository.createBioLink).toHaveBeenCalledWith({
+        artistId: 'a1',
+        label: 'Site',
+        url: 'https://cdn/x',
       });
       expect(result).toBe(row);
     });

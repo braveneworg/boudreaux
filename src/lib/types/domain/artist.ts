@@ -103,6 +103,8 @@ export interface ArtistBioImageRecord {
   isPrimary: boolean;
   kind: string | null;
   alt: string | null;
+  /** Provenance: `'generated'` (AI discovery) or `'custom'` (admin upload); `null`/missing on legacy rows, read as generated. */
+  origin: string | null;
   sortOrder: number;
   createdAt: Date;
 }
@@ -122,6 +124,8 @@ export interface CreateArtistBioImageData {
   isPrimary?: boolean;
   kind?: string | null;
   alt?: string | null;
+  /** Always `'custom'` for this manual-upload path; the repository stamps it when absent. */
+  origin?: 'custom';
 }
 
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
@@ -131,7 +135,19 @@ export interface ArtistBioLinkRecord {
   label: string;
   url: string;
   kind: string | null;
+  /** Provenance: `'generated'` (AI discovery) or `'custom'` (admin-authored); `null`/missing on legacy rows, read as generated. */
+  origin: string | null;
   sortOrder: number;
+}
+
+/** Fields for creating one bio link row (admin-authored custom link). */
+export interface CreateArtistBioLinkData {
+  artistId: string;
+  label: string;
+  url: string;
+  kind?: string | null;
+  /** Always `'custom'` for this admin-authored path; the repository stamps it when absent. */
+  origin?: 'custom';
 }
 
 /**

@@ -92,6 +92,7 @@ const artistBioImageSchema = z.object({
   isPrimary: z.boolean(),
   kind: nullableString,
   alt: nullableString,
+  origin: nullableString,
   sortOrder: z.number(),
   createdAt: date,
 });
@@ -103,6 +104,7 @@ const artistBioLinkSchema = z.object({
   label: z.string(),
   url: z.string(),
   kind: nullableString,
+  origin: nullableString,
   sortOrder: z.number(),
 });
 

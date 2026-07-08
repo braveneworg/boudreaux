@@ -158,6 +158,11 @@ const BioImageTile = ({
           {image.kind}
         </Badge>
       )}
+      {image.origin === 'custom' && (
+        <Badge variant="outline" className="bg-background/80 absolute top-1 right-1 text-[10px]">
+          Custom
+        </Badge>
+      )}
       <Image
         src={thumbSrc}
         alt={alt}
@@ -265,7 +270,7 @@ export const BioImagePalette = ({
   const [filter, setFilter] = useState('');
 
   const lower = filter.toLowerCase();
-  const visible = lower
+  const filtered = lower
     ? images.filter(
         (image) =>
           (image.title ?? '').toLowerCase().includes(lower) ||
@@ -273,6 +278,9 @@ export const BioImagePalette = ({
           (image.kind ?? '').toLowerCase().includes(lower)
       )
     : images;
+  const visible = [...filtered].sort(
+    (a, b) => Number(b.origin === 'custom') - Number(a.origin === 'custom')
+  );
 
   return (
     <div role="group" aria-label="Discovered images" className="space-y-2">

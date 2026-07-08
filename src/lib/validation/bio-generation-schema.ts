@@ -66,10 +66,14 @@ export const bioStatusLinkUrlSchema = z
     { message: 'Must be an http(s) URL or a site-relative path' }
   );
 
+/** Row provenance: AI-discovered (`generated`) or admin-authored (`custom`). */
+export const bioOriginSchema = z.enum(['generated', 'custom']).nullable().optional();
+
 /** Persisted bio image row as returned by the status endpoint (DB row id included). */
 export const bioStatusImageSchema = bioGenerationImageSchema.extend({
   id: z.string(),
   attribution: z.string().nullable(),
+  origin: bioOriginSchema,
 });
 
 /** Persisted bio link row as returned by the status endpoint (DB row id included). */
@@ -90,6 +94,7 @@ export const bioStatusLinkSchema = z.object({
     ])
     .nullable()
     .optional(),
+  origin: bioOriginSchema,
 });
 
 /** Inferred type for a persisted bio image row (has DB id). */
@@ -143,6 +148,8 @@ export interface GeneratedBioContent {
     isPrimary: boolean;
     kind?: string | null;
     alt?: string | null;
+    /** Provenance from the status endpoint (`generated`/`custom`); absent on the lambda path. */
+    origin?: string | null;
   }>;
   links: Array<{
     /** DB row id — present when content comes from the status endpoint; absent on the lambda path. */
@@ -151,6 +158,8 @@ export interface GeneratedBioContent {
     url: string;
     /** `null` when the lambda did not classify the link; absent when the link has no kind field. */
     kind?: string | null;
+    /** Provenance from the status endpoint (`generated`/`custom`); absent on the lambda path. */
+    origin?: string | null;
   }>;
   model: string;
 }

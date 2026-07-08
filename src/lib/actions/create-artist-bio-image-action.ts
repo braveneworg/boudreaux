@@ -53,6 +53,8 @@ export const createArtistBioImageAction = async (
     const { attribution, title, alt } = parsed.data;
     const created = await ArtistService.createBioImage({
       ...parsed.data,
+      // Manually-uploaded media is custom, so regeneration preserves it.
+      origin: 'custom',
       attribution: sanitizeBioText(attribution),
       title: title == null ? title : sanitizeBioText(title),
       alt: alt == null ? alt : sanitizeBioText(alt),

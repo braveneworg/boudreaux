@@ -115,6 +115,16 @@ const BIO_PALETTE_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a1';
 const BIO_FILTER_INSERT_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a2';
 
 /**
+ * Deterministic id of the dedicated artist used by
+ * `admin/bio-custom-media-survival.spec.ts`. Left without a bioStatus so the
+ * palettes do not render on load — the spec triggers a fresh generation, adds a
+ * custom link, then regenerates to prove the custom row survives. A DEDICATED
+ * artist keeps that (destructive, DB-mutating) regenerate off the artists other
+ * bio specs target, so the specs stay parallel-safe under CI workers.
+ */
+const BIO_CUSTOM_MEDIA_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a3';
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -567,6 +577,26 @@ const seedTestDatabase = async () => {
       },
     });
 
+    // Dedicated artist for the custom-media-survives-regeneration E2E spec
+    // (admin/bio-custom-media-survival.spec.ts). No bioStatus means the palette
+    // does not render on load; the spec generates, adds a custom link, then
+    // regenerates. createdAt is pinned to 2020-01-03 — after the other palette
+    // artists — so it sorts last (admin list sorts createdAt desc → 2020-01-03
+    // stays at the bottom) and never becomes the first artist in the admin list
+    // (which the bio-generation spec targets). No releases are linked, so the
+    // fixture produces exactly 2 links (Wikipedia + press) and 2 images (photo +
+    // cover).
+    await prisma.artist.create({
+      data: {
+        id: BIO_CUSTOM_MEDIA_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Custom Media',
+        slug: 'e2e-bio-custom-media-artist',
+        displayName: 'E2E Custom Media Artist',
+        createdAt: new Date('2020-01-03T00:00:00Z'),
+      },
+    });
+
     const e2eRelease1 = await prisma.release.create({
       data: {
         title: 'E2E Album One',
@@ -945,6 +975,7 @@ const seedTestDatabase = async () => {
 };
 
 export {
+  BIO_CUSTOM_MEDIA_ARTIST_ID,
   BIO_FILTER_INSERT_ARTIST_ID,
   BIO_PALETTE_ARTIST_ID,
   createBioPaletteLinkRow,

@@ -90,6 +90,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
       {content.links.length > 0 && (
         <BioLinkPalette
+          artistId={artistId}
           links={content.links}
           onDelete={deleteBioLink}
           onInsert={insertLink}

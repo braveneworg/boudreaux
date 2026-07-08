@@ -17,9 +17,11 @@ import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
 import { BIO_LINK_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusLink } from '@/lib/validation/bio-generation-schema';
 
+import { CustomLinkEditor } from './custom-link-editor';
 import { LinkPreviewCard } from './link-preview-card';
 
 interface BioLinkPaletteProps {
+  artistId: string;
   links: BioStatusLink[];
   onDelete: (linkId: string) => void;
   onInsert: (link: BioStatusLink) => void;
@@ -83,6 +85,7 @@ const LinkPreviewTrigger = ({
  *  at the focused editor's cursor (touch/keyboard path); X deletes the row.
  *  External links also carry an Eye button that opens an unfurl preview. */
 export const BioLinkPalette = ({
+  artistId,
   links,
   onDelete,
   onInsert,
@@ -92,91 +95,102 @@ export const BioLinkPalette = ({
   const isMobile = useIsMobile();
 
   const lower = filter.toLowerCase();
-  const visible = lower
+  const filtered = lower
     ? links.filter(
         (link) =>
           link.label.toLowerCase().includes(lower) ||
           (link.kind ?? '').toLowerCase().includes(lower)
       )
     : links;
+  const visible = [...filtered].sort(
+    (a, b) => Number(b.origin === 'custom') - Number(a.origin === 'custom')
+  );
 
   return (
-    <div role="group" aria-label="Discovered links" className="space-y-2">
-      <h3 className="text-sm font-semibold">Discovered links ({links.length})</h3>
-      <Input
-        aria-label="Filter links"
-        placeholder="Filter…"
-        value={filter}
-        onChange={(event) => setFilter(event.target.value)}
-        className="h-7 text-xs"
-      />
-      <ul className="max-h-80 space-y-1 overflow-y-auto pr-1">
-        {visible.map((link) => {
-          const isExternal = !isInternalBioUrl(link.url);
-          const onDragStart = (event: DragEvent<HTMLLIElement>): void => {
-            event.dataTransfer.setData(
-              BIO_LINK_DRAG_MIME,
-              JSON.stringify({
-                label: link.label,
-                url: link.url,
-                kind: link.kind ?? null,
-                isExternal,
-              })
-            );
-            event.dataTransfer.effectAllowed = 'copy';
-          };
-          return (
-            <li
-              key={link.id}
-              draggable
-              onDragStart={onDragStart}
-              className="border-border bg-background flex cursor-grab items-center gap-2 border px-2 py-1.5 text-sm active:cursor-grabbing"
-            >
-              {isExternal && (
-                <ExternalLink
-                  data-external-icon
-                  className="text-muted-foreground size-3.5 shrink-0"
-                  aria-hidden
-                />
-              )}
-              <span className="truncate">{link.label}</span>
-              {link.kind && (
-                <Badge variant="outline" className="shrink-0 text-xs">
-                  {link.kind}
-                </Badge>
-              )}
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
+    <div className="space-y-2">
+      <CustomLinkEditor artistId={artistId} />
+      <div role="group" aria-label="Discovered links" className="space-y-2">
+        <h3 className="text-sm font-semibold">Discovered links ({links.length})</h3>
+        <Input
+          aria-label="Filter links"
+          placeholder="Filter…"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          className="h-7 text-xs"
+        />
+        <ul className="max-h-80 space-y-1 overflow-y-auto pr-1">
+          {visible.map((link) => {
+            const isExternal = !isInternalBioUrl(link.url);
+            const onDragStart = (event: DragEvent<HTMLLIElement>): void => {
+              event.dataTransfer.setData(
+                BIO_LINK_DRAG_MIME,
+                JSON.stringify({
+                  label: link.label,
+                  url: link.url,
+                  kind: link.kind ?? null,
+                  isExternal,
+                })
+              );
+              event.dataTransfer.effectAllowed = 'copy';
+            };
+            return (
+              <li
+                key={link.id}
+                draggable
+                onDragStart={onDragStart}
+                className="border-border bg-background flex cursor-grab items-center gap-2 border px-2 py-1.5 text-sm active:cursor-grabbing"
+              >
                 {isExternal && (
-                  <LinkPreviewTrigger
-                    url={link.url}
-                    label={link.label}
-                    disabled={disabled}
-                    isMobile={isMobile}
+                  <ExternalLink
+                    data-external-icon
+                    className="text-muted-foreground size-3.5 shrink-0"
+                    aria-hidden
                   />
                 )}
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onInsert(link)}
-                  aria-label={`Insert link ${link.label}`}
-                  className="hover:text-primary p-0.5"
-                >
-                  <Plus className="size-3.5" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onDelete(link.id)}
-                  aria-label={`Delete link ${link.label}`}
-                  className="hover:text-destructive p-0.5"
-                >
-                  <X className="size-3.5" aria-hidden />
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                <span className="truncate">{link.label}</span>
+                {link.kind && (
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    {link.kind}
+                  </Badge>
+                )}
+                {link.origin === 'custom' && (
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    Custom
+                  </Badge>
+                )}
+                <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                  {isExternal && (
+                    <LinkPreviewTrigger
+                      url={link.url}
+                      label={link.label}
+                      disabled={disabled}
+                      isMobile={isMobile}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onInsert(link)}
+                    aria-label={`Insert link ${link.label}`}
+                    className="hover:text-primary p-0.5"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onDelete(link.id)}
+                    aria-label={`Delete link ${link.label}`}
+                    className="hover:text-destructive p-0.5"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 };
