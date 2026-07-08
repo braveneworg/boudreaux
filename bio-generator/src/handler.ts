@@ -12,7 +12,11 @@ import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
 import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
-import { bioGenerationInputSchema, DEFAULT_GEMINI_MODEL } from './types.js';
+import {
+  bioGenerationInputSchema,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_PRO_MODEL,
+} from './types.js';
 import { verifyScrapedImages } from './vision.js';
 import { getWikidataData } from './wikidata.js';
 import { getCommonsCategoryImages, getCommonsImage } from './wikimedia.js';
@@ -75,34 +79,64 @@ const defaultDeps: BioGeneratorDeps = {
 const MAX_IMAGES = 100;
 const MAX_PRIMARY = 3;
 const MAX_LINKS = 100;
-/** Commons category members resolved per artist (P373). */
-const MAX_COMMONS_CATEGORY_IMAGES = 30;
-/** Cover Art Archive front covers resolved per artist. */
-const MAX_COVER_ART = 40;
 /**
- * Default cap on scraped candidates entering vision verification. Kept at 60:
- * each candidate is a Gemini vision call (batched 10 at a time), so raising this
- * multiplies Gemini load. 180 (from #563) exhausted the project's Gemini quota in
- * prod and failed generations outright. Raise it only with confirmed quota headroom.
+ * Commons category members resolved per artist (P373). Raised to 60 in Tier 1
+ * to widen the candidate pool for Commons-rich artists.
  */
-export const DEFAULT_VISION_CANDIDATE_LIMIT = 60;
+const MAX_COMMONS_CATEGORY_IMAGES = 60;
+/**
+ * Cover Art Archive front covers resolved per artist. Raised to 60 in Tier 1
+ * to improve image variety for prolific artists.
+ */
+const MAX_COVER_ART = 60;
 
 /**
- * Cap on scraped candidates entering vision verification. The default ships in
- * code; `VISION_CANDIDATE_LIMIT` is an optional per-deploy override, but raising it
- * above the default requires Gemini quota headroom (see above). Deliberately NOT
- * pinned in template.yaml, so it can never silently drift the way the removed
- * GeminiModel parameter did.
+ * Parses an env-var string value as an integer clamped to `[min, max]`. Returns
+ * `def` when `raw` is absent (`undefined`), empty, or non-integer; **clamps**
+ * (not defaults) when the parsed value falls outside the `[min, max]` range.
+ *
+ * @example
+ *   boundedEnvInt(process.env.VISION_CANDIDATE_LIMIT, 240, 10, 300)
  */
-export const visionCandidateLimit = (): number => {
-  const raw = Number(process.env.VISION_CANDIDATE_LIMIT);
-  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_VISION_CANDIDATE_LIMIT;
+export const boundedEnvInt = (
+  raw: string | undefined,
+  def: number,
+  min: number,
+  max: number
+): number => {
+  if (!raw) return def;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed)) return def;
+  return Math.min(max, Math.max(min, parsed));
 };
+
+/**
+ * Default cap on scraped candidates entering vision verification. Raised to 240
+ * in Tier 1 (from the free-tier 60) to allow pro-quality image selection on
+ * billed projects. Each candidate is a batched vision call, so raising this
+ * multiplies Gemini load — size accordingly. Override per-deploy via
+ * `VISION_CANDIDATE_LIMIT` (clamped to [10, 300]). Deliberately NOT pinned in
+ * template.yaml, so it can never silently drift the way the removed GeminiModel
+ * parameter did.
+ */
+export const DEFAULT_VISION_CANDIDATE_LIMIT = 240;
+
+/**
+ * Cap on scraped candidates entering vision verification. The default (240) ships
+ * in code; `VISION_CANDIDATE_LIMIT` overrides it but is clamped to [10, 300] so a
+ * misconfiguration can never drive the value to zero (0 → 10) or to runaway cost.
+ */
+export const visionCandidateLimit = (): number =>
+  boundedEnvInt(process.env.VISION_CANDIDATE_LIMIT, DEFAULT_VISION_CANDIDATE_LIMIT, 10, 300);
 
 /** Known link hosts worth following one level deep for additional images. */
 const LINK_FOLLOW_HOSTS = ['bandcamp.com', 'discogs.com'] as const;
-/** Cap the fan-out so expansion stays bounded against the Lambda time budget. */
-export const MAX_FOLLOWED_LINKS = 4;
+/**
+ * Cap the fan-out so expansion stays bounded against the Lambda time budget.
+ * Raised to 8 in Tier 1 (from the free-tier 4) to improve coverage for artists
+ * with multiple Bandcamp/Discogs presences.
+ */
+export const MAX_FOLLOWED_LINKS = 8;
 
 /** Search-engine result pages and share widgets — never useful bio links. */
 const JUNK_LINK_HOSTS = ['google.com', 'bing.com', 'duckduckgo.com', 'search.yahoo.com'];
@@ -628,12 +662,17 @@ export const runBioGeneration = async (
   deps: BioGeneratorDeps = defaultDeps
 ): Promise<BioGenerationData> => {
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  // Synthesis and quality passes run on the Pro model (pro→flash ladder built in
+  // Tasks 1–2). When GEMINI_PRO_MODEL is unset the code default is used; billing
+  // not yet enabled → the ladder auto-degrades to flash. Vision and drafts stay
+  // on the base flash model so the vision pool concurrency (Task 2) is unaffected.
+  const synthesisModel = process.env.GEMINI_PRO_MODEL || DEFAULT_GEMINI_PRO_MODEL;
   const apiKey = await deps.getGeminiApiKey();
   const { images, links, facts } = await gatherMetadata(input, apiKey, model, deps);
 
-  const prose = await deps.generateProse(facts, apiKey, model);
+  const prose = await deps.generateProse(facts, apiKey, model, { synthesisModel });
   const checked = await runQualityPasses(
-    { prose, facts, apiKey, model },
+    { prose, facts, apiKey, model: synthesisModel, fallbackModel: model },
     { critiqueProse: deps.critiqueProse, reviseProse: deps.reviseProse }
   );
 

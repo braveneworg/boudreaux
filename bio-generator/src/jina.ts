@@ -26,8 +26,13 @@ const MAX_RESULTS = 10;
 const MAX_SOURCE_CHARS = 14_000;
 /** Upper bound on a single reader (e.g. official site) extract. */
 const MAX_READER_CHARS = 12_000;
-/** Upper bound on scraped image candidates returned per call. */
-const MAX_SCRAPED_IMAGES = 60;
+/**
+ * Upper bound on scraped image candidates returned per Jina call. Raised to 120
+ * in Tier 1 to widen the raw scrape pool; the vision candidate limit
+ * (`VISION_CANDIDATE_LIMIT`, default 240) is the real global gate applied after
+ * all sources are merged — this cap only prevents a single call from dominating.
+ */
+const MAX_SCRAPED_IMAGES = 120;
 
 /** An images-summary map: `"Image N[,M][: alt]"` keys to absolute image URLs. */
 type JinaImagesSummary = Record<string, string>;

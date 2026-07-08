@@ -18,6 +18,15 @@ export const USER_AGENT = 'FakeFourRecords-BioGenerator/1.0 ( https://fakefourre
  */
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
+/**
+ * Higher-reasoning Gemini model — Gemini 2.5 Pro — for the paid-tier synthesis
+ * and quality passes, where its stronger merging and fact-checking justify the
+ * cost. The free tier grants it ZERO quota (`limit: 0`), so it only runs once
+ * billing is enabled; every Pro call falls back to {@link DEFAULT_GEMINI_MODEL}
+ * on failure. Overridable per environment once the project is billed.
+ */
+export const DEFAULT_GEMINI_PRO_MODEL = 'gemini-2.5-pro';
+
 /** ISO calendar-date string in the form YYYY-MM-DD. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 

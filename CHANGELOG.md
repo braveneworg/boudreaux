@@ -100,6 +100,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.191.0] - 2026-07-08
+
+### Added
+
+- feat(bio): ✨ gemini tier-1 capacity + pro synth (#572)\n- feat(bio): ✨ gemini tier-1 capacity + pro synth (#572)\n
+
 ## [4.190.0] - 2026-07-07
 
 ### Added
