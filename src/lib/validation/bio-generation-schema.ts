@@ -130,6 +130,58 @@ export const bioGenerationCallbackSchema = z.object({
 
 export type BioGenerationCallback = z.infer<typeof bioGenerationCallbackSchema>;
 
+/**
+ * Ordered generation stages the Lambda checkpoints through. This exact order is
+ * the admin timeline's display order AND the Lambda's wire contract — keep the
+ * two projects in lockstep (they cannot share a module).
+ */
+export const BIO_PROGRESS_STAGES = [
+  'musicbrainz',
+  'wikidata',
+  'commons',
+  'cover-art',
+  'web-search',
+  'link-follow',
+  'vision-gating',
+  'drafting',
+  'synthesizing',
+  'quality-pass',
+  'finalizing',
+] as const;
+
+export type BioProgressStage = (typeof BIO_PROGRESS_STAGES)[number];
+
+/**
+ * A single generation progress checkpoint as persisted on the artist and served
+ * by the status endpoint. `at` is a server-stamped ISO datetime; `counts` maps
+ * arbitrary labels (e.g. `images`, `candidates`) to non-negative integers.
+ */
+export const bioProgressSchema = z.object({
+  stage: z.enum(BIO_PROGRESS_STAGES),
+  detail: z.string().max(300).optional(),
+  counts: z.record(z.string(), z.number().int().min(0)).optional(),
+  at: z.string().datetime(),
+});
+
+export type BioProgress = z.infer<typeof bioProgressSchema>;
+
+/** The progress payload minus the server-stamped `at` — what a recorder supplies. */
+export type BioProgressPayload = Omit<BioProgress, 'at'>;
+
+/**
+ * Body the bio-generator Lambda POSTs to the progress route. Carries the per-job
+ * token (verified, never claimed) and the checkpoint fields; the server stamps
+ * `at` on write, so it is intentionally absent here.
+ */
+export const bioProgressPostSchema = z.object({
+  jobToken: z.string().min(1),
+  stage: z.enum(BIO_PROGRESS_STAGES),
+  detail: z.string().max(300).optional(),
+  counts: z.record(z.string(), z.number().int().min(0)).optional(),
+});
+
+export type BioProgressPost = z.infer<typeof bioProgressPostSchema>;
+
 /** Sanitized content the Server Action returns to the admin form for preview. */
 export interface GeneratedBioContent {
   shortBio: string;
@@ -207,6 +259,12 @@ export interface BioGenerationStatusResult {
   error: string | null;
   /** Persisted, sanitized content — present only when `status` is `'succeeded'`. */
   content: GeneratedBioContent | null;
+  /**
+   * Latest progress checkpoint. The service sets it on every read — the newest
+   * checkpoint while the job is in flight, `null` once terminal. Optional so
+   * existing consumers/fixtures need not construct it, mirroring the wire schema.
+   */
+  progress?: BioProgress | null;
 }
 
 /** Wire schema for the bio-generation status route, validated on the client. */
@@ -224,6 +282,7 @@ export const bioGenerationStatusResponseSchema = z.object({
       model: z.string(),
     })
     .nullable(),
+  progress: bioProgressSchema.nullable().optional(),
 });
 
 /**

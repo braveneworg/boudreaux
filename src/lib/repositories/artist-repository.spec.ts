@@ -457,7 +457,7 @@ describe('ArtistRepository', () => {
       });
     });
 
-    it('writes the error and startedAt when provided', async () => {
+    it('writes the error and startedAt when provided, clearing progress for the new pending run', async () => {
       vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
       const startedAt = new Date('2026-06-20T00:00:00Z');
 
@@ -465,7 +465,55 @@ describe('ArtistRepository', () => {
 
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'a1' },
-        data: { bioStatus: 'pending', bioError: null, bioStartedAt: startedAt },
+        data: {
+          bioStatus: 'pending',
+          bioError: null,
+          bioStartedAt: startedAt,
+          bioProgress: null,
+        },
+      });
+    });
+
+    it('clears bioProgress when marking a run pending (a new run never shows the old stage)', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioStatus('a1', 'pending');
+
+      const arg = vi.mocked(prisma.artist.update).mock.calls[0][0];
+      expect(arg?.data?.bioProgress).toBeNull();
+    });
+
+    it('does not touch bioProgress when marking a run processing', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioStatus('a1', 'processing');
+
+      const arg = vi.mocked(prisma.artist.update).mock.calls[0][0];
+      expect(arg?.data && 'bioProgress' in arg.data).toBe(false);
+    });
+  });
+
+  describe('setBioProgress', () => {
+    it('writes a progress checkpoint object to the artist', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+      const progress = { stage: 'drafting' as const, at: '2026-07-08T00:00:00.000Z' };
+
+      await ArtistRepository.setBioProgress('a1', progress);
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioProgress: progress },
+      });
+    });
+
+    it('clears the progress to a DB null when given null', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.setBioProgress('a1', null);
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { bioProgress: null },
       });
     });
   });
@@ -720,6 +768,15 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { origin: true } });
       expect(arg?.select?.bioLinks).toMatchObject({ select: { origin: true } });
+    });
+
+    it('selects bioProgress so the status endpoint can surface it', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'processing' } as never);
+
+      await ArtistRepository.getBioGenerationState('a4');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioProgress).toBe(true);
     });
   });
 

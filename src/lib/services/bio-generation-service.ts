@@ -11,6 +11,7 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type { ReleaseCoverSource } from '@/lib/types/domain/release';
+import type { Json } from '@/lib/types/domain/shared';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { loggers } from '@/lib/utils/logger';
@@ -21,11 +22,14 @@ import {
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
 import {
+  bioProgressSchema,
   isInFlightBioStatus,
   STALE_JOB_MS,
   type BioGenerationData,
   type BioGenerationResult,
   type BioGenerationStatusResult,
+  type BioProgress,
+  type BioProgressPayload,
   type BioStatus,
   type GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
@@ -398,17 +402,17 @@ type GenerationPrep = {
 };
 
 /**
- * Build the absolute callback URL the Lambda POSTs its result to, derived from
- * the app's canonical public origin (`NEXT_PUBLIC_BASE_URL` — the same env every
- * publicly-reachable absolute link uses, e.g. email/notification URLs). A
- * trailing slash on the base is trimmed so the path has exactly one separator.
- * Returns `null` when the base URL is unconfigured, so the caller can fail the
- * job rather than dispatch an un-answerable invoke (fake/E2E never reach here).
+ * Resolve the app's canonical public origin (`NEXT_PUBLIC_BASE_URL` — the same
+ * env every publicly-reachable absolute link uses, e.g. email/notification
+ * URLs), with any trailing slash trimmed so appended paths have exactly one
+ * separator. Returns `null` when the base URL is unconfigured, so the caller can
+ * fail the job rather than dispatch an un-answerable invoke (fake/E2E never
+ * reach here). Both the completion callback and the progress channel derive
+ * their absolute URLs from this base.
  */
-const buildBioCallbackUrl = (artistId: string): string | null => {
+const resolveBioBaseUrl = (): string | null => {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (!base) return null;
-  return `${base.replace(/\/$/, '')}/api/artists/${artistId}/bio-generation/callback`;
+  return base ? base.replace(/\/$/, '') : null;
 };
 
 /**
@@ -485,15 +489,23 @@ const runFakeGeneration = async (prep: GenerationPrep): Promise<RunGenerationJob
  */
 const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJobResult> => {
   const jobToken = randomUUID();
-  const callbackUrl = buildBioCallbackUrl(prep.artist.id);
-  if (!callbackUrl) {
+  const base = resolveBioBaseUrl();
+  if (!base) {
     const error = 'Bio generator callback URL is not configured';
     await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error });
     return { status: 'failed', error };
   }
 
+  const callbackUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/callback`;
+  const progressUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/progress`;
+
   await ArtistRepository.setBioJobToken(prep.artist.id, jobToken);
-  const ack = await BioGenerationService.generate({ ...prep.input, callbackUrl, jobToken });
+  const ack = await BioGenerationService.generate({
+    ...prep.input,
+    callbackUrl,
+    progressUrl,
+    jobToken,
+  });
   if (!ack.ok) {
     await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error: ack.error });
     await ArtistRepository.setBioJobToken(prep.artist.id, null);
@@ -512,6 +524,16 @@ const tokensMatch = (a: string, b: string): boolean => {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+};
+
+/**
+ * Coerce a stored (loosely-typed JSON) progress value into a validated
+ * {@link BioProgress}, returning `null` for absent or malformed data so the
+ * timeline degrades to "no stage" rather than surfacing a garbage checkpoint.
+ */
+const parseStoredProgress = (value: Json | null): BioProgress | null => {
+  const parsed = bioProgressSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 };
 
 /**
@@ -642,7 +664,12 @@ export class BioGenerationService {
     const error = isStale ? STALE_JOB_ERROR : (state.bioError ?? null);
     const content = BioGenerationService.buildBioContent(state, status);
 
-    return { status, error, content };
+    // Surface progress only while the (post-coercion) status is in flight; once
+    // terminal — succeeded, failed, or stale-coerced to failed — there is no
+    // live stage to show, so the timeline resolves rather than lingering.
+    const progress = isInFlightBioStatus(status) ? parseStoredProgress(state.bioProgress) : null;
+
+    return { status, error, content, progress };
   }
 
   /**
@@ -676,6 +703,51 @@ export class BioGenerationService {
       return null; // a concurrent callback already won the atomic claim
     }
     return { slug: state.slug };
+  }
+
+  /**
+   * Records a per-stage progress checkpoint for an in-flight generation job. The
+   * progress channel VERIFIES the per-job token (constant-time, via the same
+   * {@link tokensMatch} the callback uses) but NEVER claims it — claiming is
+   * exclusive to {@link verifyAndClaimCallback}, so a stream of progress POSTs
+   * can never consume the single-use token and lock out the real completion.
+   * Writes only when the artist exists, has a stored token that matches, AND the
+   * job is `processing`; any gate failure returns `false` without writing. The
+   * server stamps `at` so the client cannot forge the checkpoint time.
+   * Repository errors are caught and logged, never thrown — a lost checkpoint is
+   * cosmetic and must not break the generation run.
+   *
+   * @param artistId - The artist whose in-flight job the checkpoint targets.
+   * @param jobToken - The per-job token presented by the checkpoint (verified, not claimed).
+   * @param payload - The stage/detail/counts checkpoint; the server stamps `at`.
+   * @returns `true` iff the checkpoint was persisted.
+   */
+  static async recordProgress(
+    artistId: string,
+    jobToken: string,
+    payload: BioProgressPayload
+  ): Promise<boolean> {
+    try {
+      const state = await ArtistRepository.getBioGenerationState(artistId);
+      if (!state || !state.bioJobToken) {
+        return false;
+      }
+      if (!tokensMatch(state.bioJobToken, jobToken)) {
+        return false; // verify only — a mismatched token records nothing
+      }
+      if (state.bioStatus !== 'processing') {
+        return false;
+      }
+
+      await ArtistRepository.setBioProgress(artistId, {
+        ...payload,
+        at: new Date().toISOString(),
+      });
+      return true;
+    } catch (error) {
+      loggers.media.error('bio_progress_record_failed', error);
+      return false;
+    }
   }
 
   /**

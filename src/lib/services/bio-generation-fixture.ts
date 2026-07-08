@@ -17,6 +17,8 @@ export interface BioGenerationLambdaInput {
   formedOn?: string;
   releases?: Array<{ title: string; releasedOn?: string; url: string }>;
   callbackUrl?: string;
+  /** Absolute URL the Lambda POSTs per-stage progress checkpoints to (verify-only, never claims). */
+  progressUrl?: string;
   jobToken?: string;
 }
 

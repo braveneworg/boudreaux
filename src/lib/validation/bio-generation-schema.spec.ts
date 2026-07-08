@@ -3,10 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import {
+  BIO_PROGRESS_STAGES,
   bioGenerationCallbackSchema,
   bioGenerationImageSchema,
   bioGenerationLinkSchema,
   bioGenerationStatusResponseSchema,
+  bioProgressPostSchema,
+  bioProgressSchema,
   bioStatusImageSchema,
   bioStatusLinkSchema,
   isInFlightBioStatus,
@@ -243,6 +246,100 @@ describe('media v2 wire additions', () => {
       bioStatusLinkSchema.parse({ id: 'x', label: 'Review', url: 'https://z.net/r', kind: 'press' })
         .kind
     ).toBe('press');
+  });
+});
+
+describe('bioProgressSchema', () => {
+  const validAt = '2026-07-08T00:00:00.000Z';
+
+  it.each(BIO_PROGRESS_STAGES)('accepts the stage %s', (stage) => {
+    expect(bioProgressSchema.safeParse({ stage, at: validAt }).success).toBe(true);
+  });
+
+  it('rejects an unknown stage', () => {
+    expect(bioProgressSchema.safeParse({ stage: 'mastering', at: validAt }).success).toBe(false);
+  });
+
+  it('accepts an optional detail within the length cap', () => {
+    expect(
+      bioProgressSchema.safeParse({ stage: 'drafting', detail: 'x'.repeat(300), at: validAt })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects a detail longer than 300 characters', () => {
+    expect(
+      bioProgressSchema.safeParse({ stage: 'drafting', detail: 'x'.repeat(301), at: validAt })
+        .success
+    ).toBe(false);
+  });
+
+  it('accepts non-negative integer counts', () => {
+    expect(
+      bioProgressSchema.safeParse({ stage: 'commons', counts: { images: 12 }, at: validAt }).success
+    ).toBe(true);
+  });
+
+  it('rejects a negative count', () => {
+    expect(
+      bioProgressSchema.safeParse({ stage: 'commons', counts: { images: -1 }, at: validAt }).success
+    ).toBe(false);
+  });
+
+  it('rejects a fractional count', () => {
+    expect(
+      bioProgressSchema.safeParse({ stage: 'commons', counts: { images: 1.5 }, at: validAt })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a non-ISO at timestamp', () => {
+    expect(bioProgressSchema.safeParse({ stage: 'finalizing', at: 'not-a-date' }).success).toBe(
+      false
+    );
+  });
+});
+
+describe('bioProgressPostSchema', () => {
+  it('accepts a valid post body without an at timestamp (server stamps it)', () => {
+    const parsed = bioProgressPostSchema.safeParse({ jobToken: 'tok', stage: 'drafting' });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a missing jobToken', () => {
+    expect(bioProgressPostSchema.safeParse({ stage: 'drafting' }).success).toBe(false);
+  });
+
+  it('rejects an empty jobToken', () => {
+    expect(bioProgressPostSchema.safeParse({ jobToken: '', stage: 'drafting' }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects an unknown stage', () => {
+    expect(bioProgressPostSchema.safeParse({ jobToken: 'tok', stage: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('bioGenerationStatusResponseSchema progress field', () => {
+  const base = { status: 'processing' as const, error: null, content: null };
+
+  it('accepts a populated progress checkpoint', () => {
+    const parsed = bioGenerationStatusResponseSchema.safeParse({
+      ...base,
+      progress: { stage: 'drafting', detail: 'Writing', at: '2026-07-08T00:00:00.000Z' },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a null progress', () => {
+    expect(bioGenerationStatusResponseSchema.safeParse({ ...base, progress: null }).success).toBe(
+      true
+    );
+  });
+
+  it('accepts an absent progress', () => {
+    expect(bioGenerationStatusResponseSchema.safeParse(base).success).toBe(true);
   });
 });
 

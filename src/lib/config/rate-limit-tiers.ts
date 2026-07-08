@@ -58,6 +58,18 @@ export const bioCallbackLimiter = rateLimit({
 });
 export const BIO_CALLBACK_LIMIT = 20;
 
+/**
+ * Bio-generation progress channel (server-to-server) — 60 requests per minute.
+ * A single run POSTs one checkpoint per stage (~11 stages), so the higher cap
+ * absorbs the stage cadence plus Lambda retries while still blunting a flood of
+ * forged progress POSTs. Verify-only — it never claims the job token.
+ */
+export const bioProgressLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const BIO_PROGRESS_LIMIT = 60;
+
 /** Link-preview unfurl (admin bio editor) — 30 requests per minute. */
 export const linkPreviewLimiter = rateLimit({
   interval: 60 * 1000,

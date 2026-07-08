@@ -22,6 +22,7 @@ const replaceBioContentMock = vi.hoisted(() => vi.fn());
 const setBioStatusMock = vi.hoisted(() => vi.fn());
 const setBioJobTokenMock = vi.hoisted(() => vi.fn());
 const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
+const setBioProgressMock = vi.hoisted(() => vi.fn());
 const getBioGenerationStateMock = vi.hoisted(() => vi.fn());
 const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
 const fakeBioGenerationMock = vi.hoisted(() => vi.fn());
@@ -46,6 +47,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     setBioStatus: (id: string, status: string, opts: unknown) => setBioStatusMock(id, status, opts),
     setBioJobToken: (id: string, token: string | null) => setBioJobTokenMock(id, token),
     claimBioJobToken: (id: string, token: string) => claimBioJobTokenMock(id, token),
+    setBioProgress: (id: string, progress: unknown) => setBioProgressMock(id, progress),
     getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
   },
 }));
@@ -677,6 +679,15 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(payload.jobToken).toBe(token);
     });
 
+    it('sends a payload carrying the derived progress URL', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const payload = decodePayload(lastCommand());
+      expect(payload.progressUrl).toBe(
+        `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/progress`
+      );
+    });
+
     it('trims a trailing slash on the base URL so the path has exactly one slash', async () => {
       // A base URL configured WITH a trailing slash must not double the slash
       // before `/api/...` (closes a B6 coverage gap on the derivation).
@@ -937,6 +948,8 @@ describe('BioGenerationService.getGenerationStatus', () => {
     bioStatus: null,
     bioError: null,
     bioStartedAt: null,
+    bioJobToken: null,
+    bioProgress: null,
     bioGeneratedAt: null,
     slug: 'x',
     shortBio: null,
@@ -947,6 +960,62 @@ describe('BioGenerationService.getGenerationStatus', () => {
     bioImages: [],
     bioLinks: [],
     ...overrides,
+  });
+
+  const checkpoint = { stage: 'drafting', at: '2026-07-08T00:00:00.000Z' };
+
+  it('returns the latest progress checkpoint while processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'processing', bioProgress: checkpoint })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.progress).toEqual(checkpoint);
+  });
+
+  it('returns null progress once the job has succeeded', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'succeeded', bioProgress: checkpoint })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.progress).toBeNull();
+  });
+
+  it('returns null progress when a failed job still holds a stale checkpoint', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'failed', bioError: 'boom', bioProgress: checkpoint })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.progress).toBeNull();
+  });
+
+  it('returns null progress when an in-flight job is stale-coerced to failed', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'processing',
+        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
+        bioProgress: checkpoint,
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.progress).toBeNull();
+  });
+
+  it('discards a malformed stored progress blob', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'processing', bioProgress: { stage: 'not-a-real-stage' } })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.progress).toBeNull();
   });
 
   it('returns null when the artist is missing', async () => {
@@ -1090,7 +1159,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     const result = await BioGenerationService.getGenerationStatus('a1');
 
-    expect(result).toEqual({ status: 'failed', error: 'boom', content: null });
+    expect(result).toEqual({ status: 'failed', error: 'boom', content: null, progress: null });
   });
 
   it('defaults succeeded content fields when the persisted columns are null', async () => {
@@ -1124,7 +1193,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     const result = await BioGenerationService.getGenerationStatus('a1');
 
-    expect(result).toEqual({ status: null, error: null, content: null });
+    expect(result).toEqual({ status: null, error: null, content: null, progress: null });
   });
 
   it('surfaces persisted bio images even when the job never succeeded', async () => {
@@ -1269,6 +1338,144 @@ describe('BioGenerationService.verifyAndClaimCallback', () => {
     await BioGenerationService.verifyAndClaimCallback('a1', 'forged');
 
     expect(claimBioJobTokenMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('BioGenerationService.recordProgress', () => {
+  const progressState = (overrides: Record<string, unknown> = {}) => ({
+    bioStatus: 'processing',
+    bioError: null,
+    bioStartedAt: null,
+    bioJobToken: 'stored-token',
+    bioProgress: null,
+    bioGeneratedAt: null,
+    slug: 'radiohead',
+    shortBio: null,
+    bio: null,
+    altBio: null,
+    genres: null,
+    bioModel: null,
+    bioImages: [],
+    bioLinks: [],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    getBioGenerationStateMock.mockReset();
+    setBioProgressMock.mockReset().mockResolvedValue(undefined);
+    claimBioJobTokenMock.mockReset();
+    mockLoggerError.mockReset();
+  });
+
+  it('returns true on a valid processing job with a matching token', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState());
+
+    const result = await BioGenerationService.recordProgress('a1', 'stored-token', {
+      stage: 'drafting',
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('writes the checkpoint payload with a server-stamped ISO at timestamp', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState());
+
+    await BioGenerationService.recordProgress('a1', 'stored-token', {
+      stage: 'commons',
+      detail: 'Wikimedia Commons',
+      counts: { images: 4 },
+    });
+
+    const [artistId, progress] = setBioProgressMock.mock.calls[0];
+    expect(artistId).toBe('a1');
+    expect(progress).toMatchObject({
+      stage: 'commons',
+      detail: 'Wikimedia Commons',
+      counts: { images: 4 },
+    });
+    expect(new Date(progress.at).toISOString()).toBe(progress.at);
+  });
+
+  it('never claims the token (claiming is exclusive to the completion callback)', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState());
+
+    await BioGenerationService.recordProgress('a1', 'stored-token', { stage: 'drafting' });
+
+    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the token does not match', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: 'stored-token' }));
+
+    const result = await BioGenerationService.recordProgress('a1', 'forged-token', {
+      stage: 'drafting',
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('does not write when the token does not match', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: 'stored-token' }));
+
+    await BioGenerationService.recordProgress('a1', 'forged-token', { stage: 'drafting' });
+
+    expect(setBioProgressMock).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the status is not processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState({ bioStatus: 'pending' }));
+
+    const result = await BioGenerationService.recordProgress('a1', 'stored-token', {
+      stage: 'drafting',
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('does not write when the status is not processing', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState({ bioStatus: 'pending' }));
+
+    await BioGenerationService.recordProgress('a1', 'stored-token', { stage: 'drafting' });
+
+    expect(setBioProgressMock).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the artist has no state', async () => {
+    getBioGenerationStateMock.mockResolvedValue(null);
+
+    expect(
+      await BioGenerationService.recordProgress('a1', 'stored-token', { stage: 'drafting' })
+    ).toBe(false);
+  });
+
+  it('returns false when there is no stored token', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: null }));
+
+    const result = await BioGenerationService.recordProgress('a1', 'stored-token', {
+      stage: 'drafting',
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false and logs without throwing when the repo write fails', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState());
+    setBioProgressMock.mockRejectedValue(new Error('DB down'));
+
+    const result = await BioGenerationService.recordProgress('a1', 'stored-token', {
+      stage: 'drafting',
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('logs the failure when the repo write throws', async () => {
+    getBioGenerationStateMock.mockResolvedValue(progressState());
+    setBioProgressMock.mockRejectedValue(new Error('DB down'));
+
+    await BioGenerationService.recordProgress('a1', 'stored-token', { stage: 'drafting' });
+
+    expect(mockLoggerError).toHaveBeenCalled();
   });
 });
 
