@@ -758,6 +758,78 @@ describe('generateProse', () => {
       expect(fetchFn).toHaveBeenCalledTimes(3);
     });
 
+    describe('onPhase synthesis hook', () => {
+      it('invokes onPhase exactly once for a successful run', async () => {
+        const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+        const onPhase = vi.fn();
+
+        await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn, onPhase });
+
+        expect(onPhase).toHaveBeenCalledTimes(1);
+      });
+
+      it('passes the "synthesizing" phase to onPhase', async () => {
+        const fetchFn = vi.fn().mockResolvedValue(geminiResponse({ shortBio: 's', longBio: 'l' }));
+        const onPhase = vi.fn();
+
+        await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn, onPhase });
+
+        expect(onPhase).toHaveBeenCalledWith('synthesizing');
+      });
+
+      it('fires onPhase after the three drafts and immediately before the synthesis call', async () => {
+        const events: string[] = [];
+        const fetchFn = vi.fn().mockImplementation(async () => {
+          events.push('fetch');
+          return geminiResponse({ shortBio: 's', longBio: 'l' });
+        });
+        const onPhase = () => {
+          events.push('onPhase');
+        };
+
+        await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn, onPhase });
+
+        expect(events).toEqual(['fetch', 'fetch', 'fetch', 'onPhase', 'fetch']);
+      });
+
+      it('awaits a promise-returning onPhase before starting synthesis', async () => {
+        const events: string[] = [];
+        const fetchFn = vi.fn().mockImplementation(async () => {
+          events.push('fetch');
+          return geminiResponse({ shortBio: 's', longBio: 'l' });
+        });
+        const onPhase = (): Promise<void> =>
+          new Promise((resolve) => {
+            events.push('onPhase:start');
+            setTimeout(() => {
+              events.push('onPhase:end');
+              resolve();
+            }, 0);
+          });
+
+        await draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn, onPhase });
+
+        expect(events).toEqual([
+          'fetch',
+          'fetch',
+          'fetch',
+          'onPhase:start',
+          'onPhase:end',
+          'fetch',
+        ]);
+      });
+
+      it('does not fire onPhase when every draft fails', async () => {
+        const fetchFn = vi.fn().mockResolvedValue(new Response('boom', { status: 400 }));
+        const onPhase = vi.fn();
+
+        await expect(
+          draftAndSynthesizeProse(grounded, 'k', undefined, { fetchFn, onPhase })
+        ).rejects.toThrow();
+        expect(onPhase).not.toHaveBeenCalled();
+      });
+    });
+
     describe('synthesis model split', () => {
       it('runs synthesis on the provided synthesisModel while drafts stay on the base model', async () => {
         const fetchFn = vi
