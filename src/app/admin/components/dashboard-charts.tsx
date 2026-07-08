@@ -39,6 +39,11 @@ export const DashboardCharts = ({ stats }: DashboardChartsProps): React.ReactEle
       pending: stats.releases.draft,
     },
     {
+      category: 'Videos',
+      published: stats.videos.published,
+      pending: stats.videos.draft,
+    },
+    {
       category: 'Artists',
       published: stats.artists.published,
       pending: stats.artists.total - stats.artists.published,

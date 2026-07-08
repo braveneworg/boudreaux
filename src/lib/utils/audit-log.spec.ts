@@ -272,6 +272,27 @@ describe('Audit Log', () => {
       expect(auditInfo).toHaveBeenCalledTimes(mediaEventTypes.length);
     });
 
+    it('should support all video audit event types', () => {
+      const videoEventTypes: AuditEvent[] = [
+        'media.video.created',
+        'media.video.updated',
+        'media.video.published',
+        'media.video.unpublished',
+        'media.video.archived',
+        'media.video.restored',
+        'media.video.deleted',
+      ];
+
+      videoEventTypes.forEach((eventType) => {
+        logSecurityEvent({
+          event: eventType,
+          userId: 'test-user',
+        });
+      });
+
+      expect(auditInfo).toHaveBeenCalledTimes(videoEventTypes.length);
+    });
+
     it('should support notification banner audit event types', () => {
       const notificationEventTypes: AuditEvent[] = [
         'notification.banner.created',

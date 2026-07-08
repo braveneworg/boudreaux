@@ -8,6 +8,7 @@ import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-rep
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { VideoRepository } from '@/lib/repositories/video-repository';
 
 import { AdminStatsService } from './admin-stats-service';
 
@@ -34,6 +35,9 @@ vi.mock('@/lib/repositories/tours/tour-repository', () => ({
 vi.mock('@/lib/repositories/tours/tour-date-repository', () => ({
   TourDateRepository: { countUpcoming: vi.fn() },
 }));
+vi.mock('@/lib/repositories/video-repository', () => ({
+  VideoRepository: { count: vi.fn() },
+}));
 
 describe('AdminStatsService.getStats', () => {
   beforeEach(() => {
@@ -47,6 +51,8 @@ describe('AdminStatsService.getStats', () => {
     vi.mocked(ChatUserRepository.countDisabled).mockResolvedValue(1);
     vi.mocked(TourRepository.count).mockResolvedValue(5);
     vi.mocked(TourDateRepository.countUpcoming).mockResolvedValue(8);
+    // VideoRepository.count: first call = total, second = published
+    vi.mocked(VideoRepository.count).mockResolvedValueOnce(6).mockResolvedValueOnce(4);
   });
 
   it('reports release totals and derives the draft count', async () => {
@@ -89,5 +95,17 @@ describe('AdminStatsService.getStats', () => {
     await AdminStatsService.getStats();
 
     expect(ReleaseRepository.count).toHaveBeenNthCalledWith(2, { published: true });
+  });
+
+  it('reports video totals and derives the draft count', async () => {
+    const stats = await AdminStatsService.getStats();
+
+    expect(stats.videos).toEqual({ total: 6, published: 4, draft: 2 });
+  });
+
+  it('queries published videos with the published domain filter', async () => {
+    await AdminStatsService.getStats();
+
+    expect(VideoRepository.count).toHaveBeenNthCalledWith(2, { published: true });
   });
 });

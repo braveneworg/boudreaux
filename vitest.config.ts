@@ -289,6 +289,9 @@ export default defineConfig((): ViteUserConfig => {
           '**/components/ui/playlist-player.tsx',
           '**/components/ui/audio-player.tsx',
           '**/components/ui/audio/carousel-number-up.tsx',
+          // Dynamically-imported video.js surface wrapper (next/dynamic, ssr:false)
+          // that unit tests mock away — requires E2E testing.
+          '**/components/ui/video/lazy-video-surface.tsx',
 
           // TODO: add S3 integration testing with upload utility
           // Direct upload utility requires S3 integration testing

@@ -10,6 +10,7 @@ import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-rep
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { VideoRepository } from '@/lib/repositories/video-repository';
 
 /** Aggregated counts powering the admin dashboard overview. */
 export interface AdminStats {
@@ -19,6 +20,7 @@ export interface AdminStats {
   notifications: { activeSlots: number };
   chat: { flaggedUsers: number; disabledUsers: number };
   tours: { total: number; upcomingDates: number };
+  videos: { total: number; published: number; draft: number };
 }
 
 /**
@@ -40,6 +42,8 @@ export class AdminStatsService {
       disabledUsers,
       toursTotal,
       upcomingDates,
+      videosTotal,
+      videosPublished,
     ] = await Promise.all([
       ReleaseRepository.count(),
       ReleaseRepository.count({ published: true }),
@@ -51,6 +55,8 @@ export class AdminStatsService {
       ChatUserRepository.countDisabled(),
       TourRepository.count(),
       TourDateRepository.countUpcoming(),
+      VideoRepository.count(),
+      VideoRepository.count({ published: true }),
     ]);
 
     return {
@@ -64,6 +70,11 @@ export class AdminStatsService {
       notifications: { activeSlots },
       chat: { flaggedUsers, disabledUsers },
       tours: { total: toursTotal, upcomingDates },
+      videos: {
+        total: videosTotal,
+        published: videosPublished,
+        draft: videosTotal - videosPublished,
+      },
     };
   }
 }
