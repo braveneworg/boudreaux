@@ -25,6 +25,7 @@ const stats: AdminStats = {
   notifications: { activeSlots: 2 },
   chat: { flaggedUsers: 4, disabledUsers: 1 },
   tours: { total: 5, upcomingDates: 8 },
+  videos: { total: 6, published: 4, draft: 2 },
 };
 
 describe('DashboardCharts', () => {
@@ -48,6 +49,7 @@ describe('DashboardCharts', () => {
       notifications: { activeSlots: 0 },
       chat: { flaggedUsers: 0, disabledUsers: 0 },
       tours: { total: 0, upcomingDates: 0 },
+      videos: { total: 0, published: 0, draft: 0 },
     };
 
     expect(() => render(<DashboardCharts stats={empty} />)).not.toThrow();

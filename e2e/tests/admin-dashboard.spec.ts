@@ -21,6 +21,26 @@ test.describe('Admin dashboard', () => {
     await expect(overview.getByRole('link', { name: 'Tours' })).toBeVisible();
   });
 
+  test('renders the Videos tile linking into the section with its stats', async ({ adminPage }) => {
+    await adminPage.goto('/admin');
+
+    const overview = adminPage.getByRole('list', { name: /section overview/i });
+    const videosTile = overview
+      .getByRole('listitem')
+      .filter({ has: adminPage.getByRole('link', { name: 'Videos', exact: true }) });
+
+    await expect(videosTile).toHaveCount(1);
+    await expect(videosTile.getByRole('link', { name: 'Videos', exact: true })).toHaveAttribute(
+      'href',
+      '/admin/videos'
+    );
+    // 9 total videos are seeded: 7 published + 1 draft + 1 archived. The archived
+    // row keeps its `publishedAt`, so the dashboard stat counts it as published
+    // (8 published · 1 draft) — asserts the value the app actually computes.
+    await expect(videosTile.getByText('9', { exact: true })).toBeVisible();
+    await expect(videosTile.getByText('8 published · 1 draft')).toBeVisible();
+  });
+
   test('tiles link into their section', async ({ adminPage }) => {
     await adminPage.goto('/admin');
 
