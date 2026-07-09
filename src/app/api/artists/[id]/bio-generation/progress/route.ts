@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server';
 import { BIO_PROGRESS_LIMIT, bioProgressLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
+import { loggers } from '@/lib/utils/logger';
 import { bioProgressPostSchema } from '@/lib/validation/bio-generation-schema';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,13 @@ export const POST = withRateLimit<{ id: string }>(
     // recordProgress verifies the token and no-ops on any gate failure; it never
     // throws and never claims the job, so we ignore its boolean outcome here.
     await BioGenerationService.recordProgress(id, jobToken, payload);
+  } else {
+    // Log the Zod issue summary (code + path + message only — never the raw body)
+    // so malformed or drifted Lambda payloads surface in observability without
+    // leaking input data or revealing job existence to the caller.
+    loggers.media.warn('bio_progress_schema_rejected', {
+      issues: parsed.error.issues.map(({ code, path, message }) => ({ code, path, message })),
+    });
   }
 
   // Always 202 — never reveal whether the checkpoint was recorded.

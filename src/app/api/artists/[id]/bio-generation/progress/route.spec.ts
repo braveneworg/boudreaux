@@ -11,6 +11,7 @@ import { POST } from './route';
 
 const limiterCheckMock = vi.hoisted(() => vi.fn());
 const recordProgressMock = vi.hoisted(() => vi.fn());
+const mediaWarnMock = vi.hoisted(() => vi.fn());
 
 // A next/server stub mirroring the global setup: a NextRequest that carries
 // `nextUrl`, and a NextResponse whose `json` helper returns a status-bearing
@@ -45,12 +46,10 @@ vi.mock('@/lib/services/bio-generation-service', () => ({
   },
 }));
 
-vi.mock('@/lib/utils/logger', () => ({
-  loggers: new Proxy(
-    {},
-    { get: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }
-  ),
-}));
+vi.mock('@/lib/utils/logger', () => {
+  const logger = { debug: vi.fn(), info: vi.fn(), warn: mediaWarnMock, error: vi.fn() };
+  return { loggers: new Proxy({}, { get: () => logger }) };
+});
 
 const ARTIST_ID = 'a'.repeat(24);
 
@@ -131,6 +130,25 @@ describe('POST /api/artists/[id]/bio-generation/progress', () => {
     await callRoute(JSON.stringify({ jobToken: 'tok', stage: 'not-a-stage' }));
 
     expect(recordProgressMock).not.toHaveBeenCalled();
+  });
+
+  it('logs a warn with the Zod issue summary on schema rejection', async () => {
+    await callRoute(JSON.stringify({ jobToken: 'tok', stage: 'not-a-stage' }));
+
+    expect(mediaWarnMock).toHaveBeenCalledWith(
+      'bio_progress_schema_rejected',
+      expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ code: expect.any(String), message: expect.any(String) }),
+        ]),
+      })
+    );
+  });
+
+  it('does not log a warn on a valid checkpoint', async () => {
+    await callRoute(JSON.stringify(validBody));
+
+    expect(mediaWarnMock).not.toHaveBeenCalled();
   });
 
   it('returns 429 when the rate limit is exceeded', async () => {

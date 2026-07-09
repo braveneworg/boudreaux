@@ -37,8 +37,7 @@ test.describe('Admin AI bio generation', () => {
     // renders once a checkpoint arrives — web-first, no sleeps.
     const timeline = adminPage.getByRole('list', { name: /bio generation progress/i });
     const activeStage = timeline.locator('[aria-current="step"]');
-    await expect(activeStage).toContainText('Verifying images', { timeout: 20_000 });
-    await expect(activeStage).toContainText('3 candidates');
+    await expect(activeStage).toContainText('Verifying images — 3 candidates', { timeout: 20_000 });
 
     // Generation now runs in the background (server `after()`); the client polls
     // for completion, so allow extra time. It succeeded once the button flips to
