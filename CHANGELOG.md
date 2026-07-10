@@ -103,6 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.194.0] - 2026-07-10
+
+### Added
+
+- feat: ✨ add admin announcements sms blast (#571)\n- feat: ✨ add admin announcements sms blast (#571)\n
+
 ## [4.193.0] - 2026-07-08
 
 ### Added
