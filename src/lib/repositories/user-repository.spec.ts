@@ -11,6 +11,7 @@ const findUniqueMock = vi.fn();
 const findManyMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
+const countMock = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -19,6 +20,7 @@ vi.mock('@/lib/prisma', () => ({
       findMany: findManyMock,
       create: createMock,
       update: updateMock,
+      count: countMock,
     },
   },
 }));
@@ -34,6 +36,7 @@ describe('UserRepository', () => {
     findManyMock.mockReset();
     createMock.mockReset();
     updateMock.mockReset();
+    countMock.mockReset();
   });
 
   describe('findByEmail', () => {
@@ -232,6 +235,48 @@ describe('UserRepository', () => {
           allowSmsNotifications: true,
         },
       });
+    });
+  });
+
+  describe('findSmsOptedInUsers', () => {
+    it('queries users with allowSmsNotifications true and all three phone clauses', async () => {
+      const rows = [{ id: 'u1', phone: '+15550001234' }];
+      findManyMock.mockResolvedValue(rows);
+
+      await expect(UserRepository.findSmsOptedInUsers()).resolves.toBe(rows);
+      expect(findManyMock).toHaveBeenCalledWith({
+        where: {
+          allowSmsNotifications: true,
+          AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
+        },
+        select: { id: true, phone: true },
+      });
+    });
+
+    it('wraps a Prisma error as a DataError', async () => {
+      findManyMock.mockRejectedValue(new Error('boom'));
+
+      await expect(UserRepository.findSmsOptedInUsers()).rejects.toBeInstanceOf(DataError);
+    });
+  });
+
+  describe('countSmsOptedIn', () => {
+    it('counts users with the shared smsOptedInWhere (same shape as findSmsOptedInUsers)', async () => {
+      countMock.mockResolvedValue(42);
+
+      await expect(UserRepository.countSmsOptedIn()).resolves.toBe(42);
+      expect(countMock).toHaveBeenCalledWith({
+        where: {
+          allowSmsNotifications: true,
+          AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
+        },
+      });
+    });
+
+    it('wraps a Prisma error as a DataError', async () => {
+      countMock.mockRejectedValue(new Error('boom'));
+
+      await expect(UserRepository.countSmsOptedIn()).rejects.toBeInstanceOf(DataError);
     });
   });
 

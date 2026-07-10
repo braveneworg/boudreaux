@@ -952,6 +952,22 @@ model ChatRateLimitLog {
   @@index([fingerprint, attemptedAt])
 }
 
+// Admin SMS blast history (announcements feature).
+// Sender is denormalized (id + email), NOT a relation — history rows must be
+// immutable and survive sender deletion; the list view only needs the email.
+model SmsBlast {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  message        String // Full message as sent, including the appended opt-out line
+  sentById       String   @db.ObjectId
+  sentByEmail    String
+  recipientCount Int // Opted-in users targeted at send time
+  sentCount      Int
+  failedCount    Int
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)]) // History list sort
+}
+
 // Videos feature (admin uploads videos to S3; signed-in users watch at /videos)
 
 enum VideoCategory {
