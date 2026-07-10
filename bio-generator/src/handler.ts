@@ -8,11 +8,12 @@ import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
-import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
+import { getGeminiApiKey, getScrapeApiKey, getSerperApiKey } from './lib/secrets.js';
 import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { postBioProgress } from './progress.js';
+import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
   DEFAULT_GEMINI_MODEL,
@@ -49,7 +50,9 @@ export interface BioGeneratorDeps {
   reviseProse: typeof reviseProse;
   getGeminiApiKey: () => Promise<string>;
   getScrapeApiKey: typeof getScrapeApiKey;
+  getSerperApiKey: typeof getSerperApiKey;
   searchArtistSources: typeof searchArtistSources;
+  searchSerperImages: typeof searchSerperImages;
   readUrl: typeof readUrl;
   listReleaseGroups: typeof listReleaseGroups;
   getCoverArtImages: typeof getCoverArtImages;
@@ -71,7 +74,9 @@ const defaultDeps: BioGeneratorDeps = {
   reviseProse,
   getGeminiApiKey,
   getScrapeApiKey,
+  getSerperApiKey,
   searchArtistSources,
+  searchSerperImages,
   readUrl,
   listReleaseGroups,
   getCoverArtImages,
@@ -460,6 +465,27 @@ const applyWebSearch = async (
 };
 
 /**
+ * Adds a Google-Images source via Serper.dev: four targeted image searches whose
+ * results join `acc.scrapedImages` to pass the same vision gate as every other
+ * scraped candidate. Strictly key-gated — unlike Jina, Serper has no keyless
+ * mode, so an absent key skips the stage entirely (a run with no key behaves
+ * byte-identically to before). Best-effort; never throws.
+ */
+const applySerperImages = async (
+  acc: MetadataAccumulator,
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const key = await deps.getSerperApiKey();
+  if (!key) {
+    logEvent('info', 'serper_skipped', { reason: 'no api key' });
+    return;
+  }
+  const found = await deps.searchSerperImages(searchNameFor(input), key);
+  if (found) acc.scrapedImages.push(...found);
+};
+
+/**
  * Follow a FIXED set of already-discovered high-value links (Bandcamp/Discogs)
  * one level deep for images, pushing them into `acc.scrapedImages` so they pass
  * the same vision gate as web-search images. No recursive crawl; deduped
@@ -679,6 +705,7 @@ const gatherMetadata = async (
 
   await acc.report('web-search');
   await applyWebSearch(acc, input, scrapeKey, deps);
+  await applySerperImages(acc, input, deps);
 
   await acc.report('link-follow');
   await followKnownLinksForImages(acc, scrapeKey, deps);

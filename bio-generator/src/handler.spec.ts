@@ -81,7 +81,9 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   reviseProse: vi.fn(),
   getGeminiApiKey: vi.fn().mockResolvedValue('test-key'),
   getScrapeApiKey: vi.fn().mockResolvedValue(null),
+  getSerperApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
+  searchSerperImages: vi.fn().mockResolvedValue(null),
   readUrl: vi.fn().mockResolvedValue(null),
   listReleaseGroups: vi.fn().mockResolvedValue([]),
   getCoverArtImages: vi.fn().mockResolvedValue([]),
@@ -932,6 +934,112 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
     expect(result.links.length).toBe(100);
+  });
+});
+
+describe('Serper image source', () => {
+  it('feeds Serper images into the vision gate candidates', async () => {
+    const serperImage = {
+      url: 'https://serper.example/press.jpg',
+      alt: 'Press photo',
+      sourceUrl: 'https://serper.example',
+    };
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages: vi.fn().mockResolvedValue([serperImage]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(result.images.map((img) => img.url)).toContain('https://serper.example/press.jpg');
+  });
+
+  it('calls searchSerperImages with the search name and resolved key', async () => {
+    const searchSerperImages = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchSerperImages).toHaveBeenCalledWith('Radiohead', 'serper-key');
+  });
+
+  it('never calls searchSerperImages when no Serper key is configured', async () => {
+    const searchSerperImages = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue(null),
+      searchSerperImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchSerperImages).not.toHaveBeenCalled();
+  });
+
+  it('produces identical output whether or not the Serper key is configured', async () => {
+    const withoutKey = await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead' },
+      makeDeps({ getSerperApiKey: vi.fn().mockResolvedValue(null) })
+    );
+    const withKeyNoResults = await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead' },
+      makeDeps({
+        getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+        searchSerperImages: vi.fn().mockResolvedValue(null),
+      })
+    );
+
+    expect(withKeyNoResults.images).toEqual(withoutKey.images);
+  });
+
+  it('proceeds when searchSerperImages returns null', async () => {
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages: vi.fn().mockResolvedValue(null),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.shortBio).toBe('Short teaser.');
+  });
+
+  it('runs Serper after web-search and before link-follow', async () => {
+    const order: string[] = [];
+    const searchArtistSources = vi.fn().mockImplementation(async () => {
+      order.push('web-search');
+      return {
+        sourceText: 'text',
+        sourceUrls: ['https://a.example/bio'],
+        images: [],
+        references: [{ url: 'https://artist.bandcamp.com', title: 'Bandcamp' }],
+      };
+    });
+    const searchSerperImages = vi.fn().mockImplementation(async () => {
+      order.push('serper');
+      return null;
+    });
+    // readUrl is the follow-known-links reader: a Bandcamp reference above makes
+    // it fire, marking the link-follow boundary that Serper must precede.
+    const readUrl = vi.fn().mockImplementation(async () => {
+      order.push('link-follow');
+      return null;
+    });
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchArtistSources,
+      searchSerperImages,
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(order.indexOf('serper')).toBeGreaterThan(order.lastIndexOf('web-search'));
+    expect(order.indexOf('serper')).toBeLessThan(order.indexOf('link-follow'));
   });
 });
 

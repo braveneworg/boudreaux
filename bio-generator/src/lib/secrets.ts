@@ -14,6 +14,9 @@ let cachedGeminiApiKey: string | null = null;
 /** Cached once per cold start — the optional Jina (web scrape) key. */
 let cachedScrapeApiKey: string | null = null;
 
+/** Cached once per cold start — the optional Serper (Google Images) key. */
+let cachedSerperApiKey: string | null = null;
+
 const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({ Name: path, WithDecryption: true });
   const result = await ssmClient.send(command);
@@ -75,8 +78,39 @@ export const getScrapeApiKey = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Resolves the optional Serper (Google Images) API key from SSM. Unlike the
+ * Gemini key this is non-fatal: when `SSM_PATH_SERPER_API_KEY` is unset (or the
+ * lookup fails) it returns `null` and the Serper image search is skipped
+ * entirely — Serper requires a key, so there is no keyless fallback.
+ *
+ * @returns The decrypted key, or `null` when no key is configured.
+ */
+export const getSerperApiKey = async (): Promise<string | null> => {
+  if (cachedSerperApiKey) {
+    return cachedSerperApiKey;
+  }
+
+  const path = process.env.SSM_PATH_SERPER_API_KEY;
+  if (!path) {
+    logEvent('warn', 'serper_key_unset', {
+      hint: 'set SSM_PATH_SERPER_API_KEY; serper image search skipped',
+    });
+    return null;
+  }
+
+  try {
+    cachedSerperApiKey = await fetchSsmParameter(path);
+    return cachedSerperApiKey;
+  } catch (err) {
+    logEvent('warn', 'serper_key_unavailable', { error: toErrorMessage(err) });
+    return null;
+  }
+};
+
 /** Test-only reset of the cold-start cache. */
 export const __resetSecretsCacheForTests = (): void => {
   cachedGeminiApiKey = null;
   cachedScrapeApiKey = null;
+  cachedSerperApiKey = null;
 };
