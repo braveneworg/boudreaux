@@ -6,6 +6,7 @@ import {
   DEFAULT_VISION_CANDIDATE_LIMIT,
   boundedEnvInt,
   lambdaHandler,
+  licenseRank,
   MAX_FOLLOWED_LINKS,
   runBioGeneration,
   runLambda,
@@ -433,6 +434,7 @@ describe('runBioGeneration', () => {
         title: 'Artist in 2015',
         attribution: 'a.example',
         license: null,
+        licenseUrl: null,
         sourceUrl: 'https://a.example/bio',
         width: null,
         height: null,
@@ -1040,6 +1042,66 @@ describe('Serper image source', () => {
 
     expect(order.indexOf('serper')).toBeGreaterThan(order.lastIndexOf('web-search'));
     expect(order.indexOf('serper')).toBeLessThan(order.indexOf('link-follow'));
+  });
+});
+
+describe('licenseRank', () => {
+  it('ranks public-domain licenses in the top tier', () => {
+    expect(licenseRank({ license: 'Public Domain' })).toBe(2);
+  });
+
+  it('ranks CC0 licenses in the top tier', () => {
+    expect(licenseRank({ license: 'CC0 1.0' })).toBe(2);
+  });
+
+  it('ranks an attribution-required license in the middle tier', () => {
+    expect(licenseRank({ license: 'CC BY-SA 4.0' })).toBe(1);
+  });
+
+  it('ranks a null license in the bottom tier', () => {
+    expect(licenseRank({ license: null })).toBe(0);
+  });
+
+  it('ranks an undefined license in the bottom tier', () => {
+    expect(licenseRank({ license: undefined })).toBe(0);
+  });
+
+  it('ranks an empty-string license in the bottom tier', () => {
+    expect(licenseRank({ license: '' })).toBe(0);
+  });
+});
+
+describe('resolveImages license-aware ranking', () => {
+  it('orders attribution-free above licensed above unknown, stable within a tier', async () => {
+    // fileName → license, so the mock stays a URL-derived builder (no dynamic
+    // object indexing). Input order is `imageFileNames` below; the two `CC BY`
+    // entries share a tier, so a stable sort must keep 1 before 2.
+    const licenseFor = (fileName: string): string | null =>
+      new Map<string, string | null>([
+        ['licensed-1.jpg', 'CC BY-SA 4.0'],
+        ['pd.jpg', 'Public Domain'],
+        ['unknown.jpg', null],
+        ['licensed-2.jpg', 'CC BY 3.0'],
+      ]).get(fileName) ?? null;
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: ['licensed-1.jpg', 'pd.jpg', 'unknown.jpg', 'licensed-2.jpg'],
+      }),
+      getCommonsImage: vi
+        .fn()
+        .mockImplementation(async (fileName: string) =>
+          image({ url: `https://upload.wikimedia.org/${fileName}`, license: licenseFor(fileName) })
+        ),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images.map((img) => img.url)).toEqual([
+      'https://upload.wikimedia.org/pd.jpg',
+      'https://upload.wikimedia.org/licensed-1.jpg',
+      'https://upload.wikimedia.org/licensed-2.jpg',
+      'https://upload.wikimedia.org/unknown.jpg',
+    ]);
   });
 });
 

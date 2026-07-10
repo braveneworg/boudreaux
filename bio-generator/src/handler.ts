@@ -188,6 +188,16 @@ const isAttributionFree = (license: string | null | undefined): boolean => {
   );
 };
 
+/**
+ * License preference tier for image ranking — 2 for attribution-free (PD/CC0),
+ * 1 for a known attribution-required license, 0 for unknown rights. Ranking
+ * only; never a drop filter — no image is excluded for lacking a license.
+ */
+export const licenseRank = (image: Pick<BioImage, 'license'>): number => {
+  if (isAttributionFree(image.license)) return 2;
+  return image.license ? 1 : 0;
+};
+
 const dedupeLinks = (links: BioLink[]): BioLink[] => {
   const seen = new Set<string>();
   return links.filter((link) => {
@@ -310,9 +320,7 @@ const resolveImages = async (fileNames: string[], deps: BioGeneratorDeps): Promi
     })
   );
   const candidates = resolved.filter((image): image is BioImage => image !== null);
-  candidates.sort(
-    (a, b) => Number(isAttributionFree(b.license)) - Number(isAttributionFree(a.license))
-  );
+  candidates.sort((a, b) => licenseRank(b) - licenseRank(a));
   return candidates.slice(0, MAX_IMAGES);
 };
 
@@ -526,6 +534,7 @@ const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
   title: image.alt,
   attribution: attributionHost(image.sourceUrl),
   license: null,
+  licenseUrl: null,
   sourceUrl: image.sourceUrl,
   width: null,
   height: null,

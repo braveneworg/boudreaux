@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { logEvent } from './lib/log.js';
 import { USER_AGENT } from './types.js';
 
 import type { BioImage } from './types.js';
@@ -38,32 +39,68 @@ type CommonsImageInfo = NonNullable<
 >[number];
 
 /**
- * Derives the attribution + license from the Commons `extmetadata`. Falls back
- * to a generic attribution when the artist/credit fields are absent.
+ * Reads the Commons `LicenseUrl`, keeping only real `http` URLs — the field is
+ * occasionally junk (e.g. free-text), so non-`http` values collapse to `null`.
+ */
+const readLicenseUrl = (meta: NonNullable<CommonsImageInfo['extmetadata']>): string | null => {
+  const rawLicenseUrl = meta.LicenseUrl?.value ? stripHtml(meta.LicenseUrl.value) : '';
+  return rawLicenseUrl.startsWith('http') ? rawLicenseUrl : null;
+};
+
+/**
+ * Derives the attribution, license, and machine-readable license URL from the
+ * Commons `extmetadata`. Falls back to a generic attribution when the
+ * artist/credit fields are absent.
  */
 const readAttribution = (
   meta: NonNullable<CommonsImageInfo['extmetadata']>
-): { attribution: string; license: string | null } => {
+): { attribution: string; license: string | null; licenseUrl: string | null } => {
   const artist = meta.Artist?.value ? stripHtml(meta.Artist.value) : 'Wikimedia Commons';
   const credit = meta.Credit?.value ? stripHtml(meta.Credit.value) : undefined;
   const license = meta.LicenseShortName?.value ? stripHtml(meta.LicenseShortName.value) : null;
-  return { attribution: credit ? `${artist} (${credit})` : artist, license };
+  const licenseUrl = readLicenseUrl(meta);
+  return { attribution: credit ? `${artist} (${credit})` : artist, license, licenseUrl };
+};
+
+/**
+ * True when a Commons file is flagged with personality (image) rights, which we
+ * must not re-host without the depicted person's consent. Trademark/insignia
+ * restrictions stay usable — only personality rights trigger the skip.
+ */
+const isRestrictedForPersonalityRights = (
+  meta: NonNullable<CommonsImageInfo['extmetadata']>
+): boolean => {
+  const restrictions = meta.Restrictions?.value ? stripHtml(meta.Restrictions.value) : '';
+  return restrictions.toLowerCase().includes('personality');
 };
 
 /** Maps a single Commons imageinfo entry to the displayable {@link BioImage}. */
 const toBioImage = (info: CommonsImageInfo, title: string): BioImage => {
-  const { attribution, license } = readAttribution(info.extmetadata ?? {});
+  const { attribution, license, licenseUrl } = readAttribution(info.extmetadata ?? {});
   return {
     url: info.url ?? '',
     thumbnailUrl: info.thumburl ?? null,
     title: stripHtml(title.replace(/^File:/, '')),
     attribution,
     license,
+    licenseUrl,
     sourceUrl: info.descriptionurl ?? null,
     width: info.width ?? null,
     height: info.height ?? null,
     isPrimary: false,
   };
+};
+
+/**
+ * Maps a usable imageinfo entry to a {@link BioImage}, or `null` (with a warn)
+ * when the file is personality-rights restricted and must not be re-hosted.
+ */
+const toUsableBioImage = (info: CommonsImageInfo, title: string): BioImage | null => {
+  if (isRestrictedForPersonalityRights(info.extmetadata ?? {})) {
+    logEvent('warn', 'commons_restricted_skipped', { title });
+    return null;
+  }
+  return toBioImage(info, title);
 };
 
 /**
@@ -104,7 +141,7 @@ export const getCommonsImage = async (
     return null;
   }
 
-  return toBioImage(info, title);
+  return toUsableBioImage(info, title);
 };
 
 type CommonsPage = NonNullable<NonNullable<CommonsResponse['query']>['pages']>[string];
@@ -113,7 +150,8 @@ type CommonsPage = NonNullable<NonNullable<CommonsResponse['query']>['pages']>[s
 const categoryPageToImage = (page: CommonsPage): BioImage | null => {
   const info = page.imageinfo?.[0];
   if (!info?.url || !page.title) return null;
-  return { ...toBioImage(info, page.title), kind: 'photo' as const };
+  const image = toUsableBioImage(info, page.title);
+  return image ? { ...image, kind: 'photo' as const } : null;
 };
 
 /**

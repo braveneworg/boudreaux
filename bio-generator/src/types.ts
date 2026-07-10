@@ -107,6 +107,8 @@ export const bioImageSchema = z.object({
   title: z.string().nullable().optional(),
   attribution: z.string(),
   license: z.string().nullable().optional(),
+  /** Machine-readable license page from Commons `extmetadata.LicenseUrl`, when known. */
+  licenseUrl: z.string().url().nullable().optional(),
   sourceUrl: z.string().url().nullable().optional(),
   width: z.number().int().positive().nullable().optional(),
   height: z.number().int().positive().nullable().optional(),
