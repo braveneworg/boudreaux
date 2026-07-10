@@ -73,6 +73,11 @@ services:
       BIO_GENERATOR_LAMBDA_NAME: ${BIO_GENERATOR_LAMBDA_NAME:-fakefour-bio-generator}
       # Structured logging (winston → stdout JSON → Alloy → Loki)
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # SMS (admin announcements blasts + abuse-report alerts). 'noop' logs
+      # instead of sending; set to 'sns' in prod (needs sns:Publish on the
+      # AWS credentials above).
+      SMS_PROVIDER: ${SMS_PROVIDER:-noop}
+      SNS_SMS_ORIGINATION_NUMBER: ${SNS_SMS_ORIGINATION_NUMBER}
     expose:
       - "3000"
     networks:
