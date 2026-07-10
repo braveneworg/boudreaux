@@ -61,6 +61,7 @@ describe('createArtistBioImageAction', () => {
 
     expect(ArtistService.createBioImage).toHaveBeenCalledWith({
       ...validInput,
+      origin: 'custom',
       attribution: 'clean:Uploaded',
     });
     expect(result).toEqual({ success: true, data: createdRow });

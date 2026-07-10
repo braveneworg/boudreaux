@@ -4,6 +4,7 @@
 import {
   Bell,
   CalendarDays,
+  Clapperboard,
   Disc,
   MessageSquare,
   MessageSquareText,
@@ -34,6 +35,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: '/admin/releases',
     icon: Disc,
     help: 'Create, publish, and manage music releases and their digital formats.',
+  },
+  {
+    label: 'Videos',
+    href: '/admin/videos',
+    icon: Clapperboard,
+    help: 'Upload, publish, and manage music and informational videos.',
   },
   {
     label: 'Featured Artists',

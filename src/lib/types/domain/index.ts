@@ -16,3 +16,4 @@ export * from './banner-notification';
 export * from './purchase';
 export * from './visitor-identity';
 export * from './sms-blast';
+export * from './video';

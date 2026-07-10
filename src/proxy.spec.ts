@@ -209,6 +209,29 @@ describe('proxy middleware', () => {
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
     });
+
+    it('redirects unauthenticated users from videos to signin', async () => {
+      signedOut();
+      const request = createMockRequest('/videos');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.redirect).toHaveBeenCalled();
+      const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
+      expect(redirectCall.pathname).toBe('/signin');
+      expect(redirectCall.searchParams.get('callbackUrl')).toBe('/videos');
+      expect(result).toMatchObject({ type: 'redirect' });
+    });
+
+    it('allows authenticated users to access videos', async () => {
+      signedIn();
+      const request = createMockRequest('/videos');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
+    });
   });
 
   describe('callback URL handling', () => {
@@ -481,5 +504,10 @@ describe('proxy config', () => {
     expect(config.matcher).toContain('/admin');
     expect(config.matcher).toContain('/admin/:path*');
     expect(config.matcher).toContain('/api/admin/:path*');
+  });
+
+  it('covers the videos routes so the private-route guard runs', () => {
+    expect(config.matcher).toContain('/videos');
+    expect(config.matcher).toContain('/videos/:path*');
   });
 });

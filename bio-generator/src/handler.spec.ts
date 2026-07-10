@@ -4,6 +4,7 @@
 
 import {
   DEFAULT_VISION_CANDIDATE_LIMIT,
+  boundedEnvInt,
   lambdaHandler,
   MAX_FOLLOWED_LINKS,
   runBioGeneration,
@@ -849,6 +850,65 @@ describe('runBioGeneration', () => {
     expect(candidates).toHaveLength(visionCandidateLimit());
   });
 
+  it('threads synthesisModel=gemini-2.5-pro into generateProse by default', async () => {
+    const deps = makeDeps();
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const call = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 4th arg is options; synthesisModel must be the pro model
+    expect(call[3]).toMatchObject({ synthesisModel: 'gemini-2.5-pro' });
+  });
+
+  it('uses GEMINI_PRO_MODEL env override as synthesisModel when set', async () => {
+    vi.stubEnv('GEMINI_PRO_MODEL', 'gemini-2.5-pro-preview');
+    const deps = makeDeps();
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const call = (deps.generateProse as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[3]).toMatchObject({ synthesisModel: 'gemini-2.5-pro-preview' });
+    vi.unstubAllEnvs();
+  });
+
+  it('quality passes receive pro as primary model and flash as fallback', async () => {
+    const deps = makeDeps({
+      critiqueProse: vi.fn().mockResolvedValue({ violations: [] }),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const critiqueCall = (deps.critiqueProse as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      model: string;
+      fallbackModel: string;
+    };
+    expect(critiqueCall.model).toBe('gemini-2.5-pro');
+    expect(critiqueCall.fallbackModel).toBe('gemini-2.5-flash');
+  });
+
+  it('vision verification still uses the base flash model, not the pro model', async () => {
+    const verifyScrapedImages = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'text',
+          sourceUrls: ['https://a.example'],
+          images: [{ url: 'https://a.example/p.jpg', alt: null, sourceUrl: 'https://a.example' }],
+          references: [],
+        })
+        .mockResolvedValueOnce(null),
+      verifyScrapedImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    const verifyCall = (verifyScrapedImages as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 3rd arg is options: { apiKey, model }
+    expect(verifyCall[2]).toMatchObject({ model: 'gemini-2.5-flash' });
+  });
+
   it('caps links at 100 when many candidates exist', async () => {
     const manyRefs = Array.from({ length: 130 }, (_, i) => ({
       url: `https://source-${i}.example/page`,
@@ -874,23 +934,59 @@ describe('runBioGeneration', () => {
   });
 });
 
+describe('boundedEnvInt', () => {
+  it('returns the default when raw is undefined (env var absent)', () => {
+    expect(boundedEnvInt(undefined, 50, 10, 100)).toBe(50);
+  });
+
+  it('returns the default when raw is an empty string', () => {
+    expect(boundedEnvInt('', 50, 10, 100)).toBe(50);
+  });
+
+  it('returns the default when raw is non-numeric garbage', () => {
+    expect(boundedEnvInt('abc', 50, 10, 100)).toBe(50);
+  });
+
+  it('clamps an over-max value to max (not the default)', () => {
+    expect(boundedEnvInt('99999', 50, 10, 100)).toBe(100);
+  });
+
+  it('clamps a zero value to min (not the default)', () => {
+    expect(boundedEnvInt('0', 50, 10, 100)).toBe(10);
+  });
+
+  it('passes through a valid in-range value unchanged', () => {
+    expect(boundedEnvInt('75', 50, 10, 100)).toBe(75);
+  });
+});
+
 describe('visionCandidateLimit', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('defaults to 60 when VISION_CANDIDATE_LIMIT is unset or empty', () => {
+  it('defaults to 240 when VISION_CANDIDATE_LIMIT is unset or empty', () => {
     vi.stubEnv('VISION_CANDIDATE_LIMIT', '');
-    expect(visionCandidateLimit()).toBe(60);
-    expect(DEFAULT_VISION_CANDIDATE_LIMIT).toBe(60);
+    expect(visionCandidateLimit()).toBe(240);
+    expect(DEFAULT_VISION_CANDIDATE_LIMIT).toBe(240);
   });
 
-  it('uses VISION_CANDIDATE_LIMIT when it is a positive integer', () => {
-    vi.stubEnv('VISION_CANDIDATE_LIMIT', '250');
-    expect(visionCandidateLimit()).toBe(250);
+  it('uses VISION_CANDIDATE_LIMIT when it is a valid in-range integer', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', '200');
+    expect(visionCandidateLimit()).toBe(200);
   });
 
-  it('falls back to the default when VISION_CANDIDATE_LIMIT is not a positive integer', () => {
+  it('clamps VISION_CANDIDATE_LIMIT above max (300) to 300', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', '99999');
+    expect(visionCandidateLimit()).toBe(300);
+  });
+
+  it('clamps VISION_CANDIDATE_LIMIT of 0 to min (10), not the default', () => {
+    vi.stubEnv('VISION_CANDIDATE_LIMIT', '0');
+    expect(visionCandidateLimit()).toBe(10);
+  });
+
+  it('falls back to the default when VISION_CANDIDATE_LIMIT is not an integer', () => {
     vi.stubEnv('VISION_CANDIDATE_LIMIT', 'nonsense');
     expect(visionCandidateLimit()).toBe(DEFAULT_VISION_CANDIDATE_LIMIT);
   });

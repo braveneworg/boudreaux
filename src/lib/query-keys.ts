@@ -42,6 +42,26 @@ export const queryKeys = {
         String(params.take ?? ''),
       ] as const,
   },
+  videos: {
+    all: ['videos'] as const,
+    publishedInfinite: (sort: 'asc' | 'desc') =>
+      [...queryKeys.videos.all, 'publishedInfinite', sort] as const,
+    adminInfinite: (params: {
+      search: string;
+      published: boolean | null;
+      archived: boolean;
+      sort: 'asc' | 'desc';
+    }) =>
+      [
+        ...queryKeys.videos.all,
+        'adminInfinite',
+        params.search.trim().toLowerCase(),
+        params.published,
+        params.archived,
+        params.sort,
+      ] as const,
+    detail: (id: string) => [...queryKeys.videos.all, 'detail', id] as const,
+  },
   artists: {
     all: ['artists'] as const,
     adminInfinite: (params: { search: string; published: boolean | null; deleted: boolean }) =>

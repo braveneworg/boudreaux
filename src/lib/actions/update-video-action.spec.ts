@@ -1,0 +1,370 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { revalidatePath } from 'next/cache';
+
+import { VideoService } from '@/lib/services/video-service';
+import type { FormState } from '@/lib/types/form-state';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { requireRole } from '@/lib/utils/auth/require-role';
+import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
+import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+
+import { updateVideoAction } from './update-video-action';
+
+vi.mock('server-only', () => ({}));
+vi.mock('next/cache');
+vi.mock('@/lib/services/video-service');
+vi.mock('@/lib/utils/audit-log');
+vi.mock('@/lib/utils/auth/auth-utils');
+vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/utils/s3-client');
+vi.mock('@/lib/utils/s3-key-utils');
+
+const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const videoId = '507f1f77bcf86cd799439011';
+const currentS3Key = `media/videos/${videoId}/current.mp4`;
+const replacementS3Key = `media/videos/${videoId}/replacement.mp4`;
+
+const currentVideo = {
+  id: videoId,
+  title: 'Old Title',
+  artist: 'The Band',
+  category: 'MUSIC',
+  description: null,
+  releasedOn: new Date('2024-01-01'),
+  durationSeconds: 100,
+  s3Key: currentS3Key,
+  fileName: 'current.mp4',
+  fileSize: BigInt(1000),
+  mimeType: 'video/mp4',
+  posterUrl: 'https://cdn.example.com/old-poster.jpg',
+  publishedAt: null,
+  archivedAt: null,
+  createdBy: 'user-123',
+  updatedBy: null,
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+};
+
+const mockFormData = new FormData();
+const initialFormState: FormState = { fields: {}, success: false };
+
+const parsedData = {
+  title: 'New Title',
+  artist: 'The Band',
+  category: 'MUSIC',
+  description: 'Updated',
+  releasedOn: '2024-02-01',
+  durationSeconds: '212',
+  s3Key: currentS3Key,
+  fileName: 'current.mp4',
+  fileSize: '2000',
+  mimeType: 'video/mp4',
+  posterUrl: 'https://cdn.example.com/old-poster.jpg',
+  publishedAt: '',
+};
+
+const mockParsedSuccess = (data: Record<string, unknown> = parsedData): void => {
+  vi.mocked(getActionState).mockReturnValue({
+    formState: { fields: {}, success: false },
+    parsed: { success: true, data },
+  } as never);
+};
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(revalidatePath).mockImplementation(() => {});
+  vi.mocked(verifyS3ObjectExists).mockResolvedValue(true);
+  vi.mocked(deleteS3Object).mockResolvedValue(true);
+  vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/videos/old-poster-key.jpg');
+  vi.mocked(VideoService.getVideoById).mockResolvedValue({
+    success: true,
+    data: currentVideo,
+  } as never);
+  vi.mocked(VideoService.updateVideo).mockResolvedValue({
+    success: true,
+    data: { id: videoId },
+  } as never);
+});
+
+describe('updateVideoAction', () => {
+  describe('Authorization', () => {
+    it('should require admin role', async () => {
+      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+
+      await expect(updateVideoAction(videoId, initialFormState, mockFormData)).rejects.toThrow(
+        'Unauthorized'
+      );
+    });
+
+    it('should reject an invalid video id', async () => {
+      const result = await updateVideoAction('invalid-id', initialFormState, mockFormData);
+
+      expect(result).toEqual({
+        fields: {},
+        success: false,
+        errors: { general: ['Invalid video ID'] },
+      });
+    });
+
+    it('should not validate the body when the id is invalid', async () => {
+      await updateVideoAction('invalid-id', initialFormState, mockFormData);
+
+      expect(getActionState).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Validation', () => {
+    it('should apply zod issues to the form state and not update', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: false,
+          error: { issues: [{ path: ['title'], message: 'Title is required' }] },
+        },
+      } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.errors?.title).toEqual(['Title is required']);
+    });
+
+    it('should not call the service when validation fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: false,
+          error: { issues: [{ path: ['title'], message: 'Title is required' }] },
+        },
+      } as never);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Current video lookup', () => {
+    it('should error when the current video cannot be loaded', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.getVideoById).mockResolvedValue({
+        success: false,
+        error: 'Video not found',
+      } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Video not found']);
+    });
+
+    it('should not update when the current video cannot be loaded', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.getVideoById).mockResolvedValue({
+        success: false,
+        error: 'Video not found',
+      } as never);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Update without file replacement', () => {
+    it('should update the video stamping updatedBy', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({
+          title: 'New Title',
+          releasedOn: expect.any(Date),
+          durationSeconds: 212,
+          fileSize: BigInt(2000),
+          updatedBy: 'user-123',
+        })
+      );
+    });
+
+    it('should not confirm S3 when the s3Key is unchanged', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(verifyS3ObjectExists).not.toHaveBeenCalled();
+    });
+
+    it('should not delete any S3 object when nothing was replaced', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(deleteS3Object).not.toHaveBeenCalled();
+    });
+
+    it('should return the video id in the form state on success', async () => {
+      mockParsedSuccess();
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.videoId).toBe(videoId);
+    });
+  });
+
+  describe('Update with file replacement', () => {
+    it('should confirm the replacement key before updating', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(verifyS3ObjectExists).toHaveBeenCalledWith(replacementS3Key);
+    });
+
+    it('should delete the old video key after a successful update', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(deleteS3Object).toHaveBeenCalledWith(currentS3Key);
+    });
+
+    it('should error and not update when the replacement key fails confirmation', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+      vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(VideoService.updateVideo).not.toHaveBeenCalled();
+    });
+
+    it('should still succeed when the old-key delete rejects', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+      vi.mocked(deleteS3Object).mockRejectedValue(new Error('S3 down'));
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Poster replacement', () => {
+    it('should delete the old poster key when the poster changed', async () => {
+      mockParsedSuccess({ ...parsedData, posterUrl: 'https://cdn.example.com/new-poster.jpg' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(deleteS3Object).toHaveBeenCalledWith('media/videos/old-poster-key.jpg');
+    });
+
+    it('should not delete a poster key when the poster is unchanged', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(deleteS3Object).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Service failure', () => {
+    it('should map a generic update failure to a general error', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.errors?.general).toEqual(['Failed to update video']);
+    });
+
+    it('should not delete any S3 object when the update fails', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(deleteS3Object).not.toHaveBeenCalled();
+    });
+
+    it('should map a not-found update failure to a not-found error', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+        success: false,
+        error: 'Video not found',
+      } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.errors?.general).toEqual(['Video not found']);
+    });
+
+    it('should map a failure without a message to a general error', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({ success: false } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.errors?.general).toEqual(['Failed to update video']);
+    });
+
+    it('should preserve a pre-existing errors object on a not-found failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: { prior: ['stale'] } },
+        parsed: { success: true, data: parsedData },
+      } as never);
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+        success: false,
+        error: 'Video not found',
+      } as never);
+
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result.errors?.prior).toEqual(['stale']);
+      expect(result.errors?.general).toEqual(['Video not found']);
+    });
+
+    it('should handle an unexpected error', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.updateVideo).mockRejectedValue(Error('boom'));
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(setUnknownError).toHaveBeenCalled();
+    });
+  });
+
+  describe('Security logging and revalidation', () => {
+    it('should log the update event', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(logSecurityEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'media.video.updated', userId: 'user-123' })
+      );
+    });
+
+    it('should revalidate the admin and public video paths on success', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/videos');
+      expect(revalidatePath).toHaveBeenCalledWith('/videos');
+    });
+  });
+});

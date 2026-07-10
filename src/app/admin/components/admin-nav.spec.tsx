@@ -50,6 +50,22 @@ describe('AdminNav', () => {
     expect(labels[0]).toBe('Releases');
   });
 
+  it('places the Videos section immediately after Releases', () => {
+    mockPathname = '/admin';
+    render(<AdminNav />);
+
+    const labels = screen.getAllByRole('link').map((link) => link.textContent);
+
+    expect(labels[1]).toBe('Videos');
+  });
+
+  it('links the Videos section to the videos admin route', () => {
+    mockPathname = '/admin';
+    render(<AdminNav />);
+
+    expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/admin/videos');
+  });
+
   it('is labelled as the admin sections navigation', () => {
     mockPathname = '/admin';
     render(<AdminNav />);

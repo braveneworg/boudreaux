@@ -45,6 +45,14 @@ vi.mock('./bio-editor-registry', () => ({
   useBioEditorRegistry: () => ({ getTarget: mockGetTarget }),
 }));
 
+// The custom link editor owns its own create mutation; stub it here so these
+// wiring tests stay focused on the palettes and never touch TanStack Query.
+vi.mock('./custom-link-editor', () => ({
+  CustomLinkEditor: ({ artistId }: { artistId: string }) => (
+    <div data-testid="custom-link-editor" data-artist-id={artistId} />
+  ),
+}));
+
 const LINK_ROW: BioStatusLink = {
   id: 'l1',
   label: 'Wikipedia',

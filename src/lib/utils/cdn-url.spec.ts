@@ -90,6 +90,35 @@ describe('buildCdnUrl', () => {
 
     expect(buildCdnUrl(s3Key)).toBe(`https://cdn.example.com/${s3Key}`);
   });
+
+  it('should return the E2E video fallback for mp4 assets when E2E_MODE is true', () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    expect(buildCdnUrl('media/videos/e2e/e2e-video-alpha.mp4')).toBe('/e2e/video/e2e-video.mp4');
+  });
+
+  it('should return the E2E video fallback for webm assets when E2E_MODE is true', () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    expect(buildCdnUrl('media/videos/e2e/e2e-video-alpha.webm')).toBe('/e2e/video/e2e-video.mp4');
+  });
+
+  it('should keep non-video non-mp3 assets unchanged in E2E mode', () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.public.com');
+
+    expect(buildCdnUrl('releases/abc/audio/track.flac')).toBe(
+      'https://cdn.public.com/releases/abc/audio/track.flac'
+    );
+  });
+
+  it('should not return E2E video fallback for mp4 assets when not in E2E mode', () => {
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.public.com');
+
+    expect(buildCdnUrl('media/videos/e2e/e2e-video-alpha.mp4')).toBe(
+      'https://cdn.public.com/media/videos/e2e/e2e-video-alpha.mp4'
+    );
+  });
 });
 
 describe('resolveStreamUrl', () => {

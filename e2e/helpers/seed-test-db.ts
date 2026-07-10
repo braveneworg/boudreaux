@@ -115,6 +115,16 @@ const BIO_PALETTE_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a1';
 const BIO_FILTER_INSERT_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a2';
 
 /**
+ * Deterministic id of the dedicated artist used by
+ * `admin/bio-custom-media-survival.spec.ts`. Left without a bioStatus so the
+ * palettes do not render on load — the spec triggers a fresh generation, adds a
+ * custom link, then regenerates to prove the custom row survives. A DEDICATED
+ * artist keeps that (destructive, DB-mutating) regenerate off the artists other
+ * bio specs target, so the specs stay parallel-safe under CI workers.
+ */
+const BIO_CUSTOM_MEDIA_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a3';
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -210,6 +220,130 @@ const waitForReplicaSet = async (prisma: PrismaClient, maxWaitMs = 30_000): Prom
   );
 };
 
+const PUBLISHED_AT = new Date('2026-01-10T00:00:00.000Z');
+const ARCHIVED_AT = new Date('2026-01-11T00:00:00.000Z');
+
+/**
+ * Seed deterministic video rows for E2E tests.
+ * Values are pinned — Task-13 Playwright specs assert against them verbatim.
+ */
+const seedVideos = async (prisma: PrismaClient): Promise<void> => {
+  const makeSlug = (title: string) => title.toLowerCase().replace(/\s+/g, '-');
+
+  const publishedRows = [
+    {
+      title: 'E2E Video Alpha',
+      artist: 'E2E Artist One',
+      category: 'MUSIC' as const,
+      releasedOn: new Date('2026-01-07T00:00:00.000Z'),
+      durationSeconds: 125,
+    },
+    {
+      title: 'E2E Video Bravo',
+      artist: 'E2E Artist Two',
+      category: 'INFORMATIONAL' as const,
+      releasedOn: new Date('2026-01-06T00:00:00.000Z'),
+      durationSeconds: 95,
+    },
+    {
+      title: 'E2E Video Charlie',
+      artist: 'E2E Artist One',
+      category: 'MUSIC' as const,
+      releasedOn: new Date('2026-01-05T00:00:00.000Z'),
+      durationSeconds: 210,
+    },
+    {
+      title: 'E2E Video Delta',
+      artist: 'E2E Artist Three',
+      category: 'INFORMATIONAL' as const,
+      releasedOn: new Date('2026-01-04T00:00:00.000Z'),
+      durationSeconds: 60,
+    },
+    {
+      title: 'E2E Video Echo',
+      artist: 'E2E Artist Two',
+      category: 'MUSIC' as const,
+      releasedOn: new Date('2026-01-03T00:00:00.000Z'),
+      durationSeconds: 180,
+    },
+    {
+      title: 'E2E Video Foxtrot',
+      artist: 'E2E Artist One',
+      category: 'MUSIC' as const,
+      releasedOn: new Date('2026-01-02T00:00:00.000Z'),
+      durationSeconds: 145,
+    },
+    {
+      title: 'E2E Video Golf',
+      artist: 'E2E Artist Three',
+      category: 'INFORMATIONAL' as const,
+      releasedOn: new Date('2026-01-01T00:00:00.000Z'),
+      durationSeconds: 75,
+    },
+  ] as const;
+
+  // Single createMany instead of concurrent create() calls: the first-ever
+  // writes to the fresh videos collection intermittently raced Prisma's
+  // per-create read-back in CI ("createOneVideo is required to return data,
+  // but found no record(s)"); createMany has no read-back to race.
+  await prisma.video.createMany({
+    data: publishedRows.map(({ title, artist, category, releasedOn, durationSeconds }) => {
+      const slug = makeSlug(title);
+      return {
+        title,
+        artist,
+        category,
+        releasedOn,
+        durationSeconds,
+        s3Key: `media/videos/e2e/${slug}.mp4`,
+        fileName: `${slug}.mp4`,
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: `${title} description for E2E.`,
+        publishedAt: PUBLISHED_AT,
+      };
+    }),
+  });
+
+  const draftSlug = makeSlug('E2E Video Draft');
+  await prisma.video.create({
+    data: {
+      title: 'E2E Video Draft',
+      artist: 'E2E Artist One',
+      category: 'MUSIC',
+      releasedOn: new Date('2026-01-08T00:00:00.000Z'),
+      durationSeconds: 100,
+      s3Key: `media/videos/e2e/${draftSlug}.mp4`,
+      fileName: `${draftSlug}.mp4`,
+      mimeType: 'video/mp4',
+      fileSize: BigInt(1048576),
+      posterUrl: null,
+      description: 'E2E Video Draft description for E2E.',
+      publishedAt: null,
+    },
+  });
+
+  const archivedSlug = makeSlug('E2E Video Archived');
+  await prisma.video.create({
+    data: {
+      title: 'E2E Video Archived',
+      artist: 'E2E Artist Two',
+      category: 'INFORMATIONAL',
+      releasedOn: new Date('2026-01-09T00:00:00.000Z'),
+      durationSeconds: 90,
+      s3Key: `media/videos/e2e/${archivedSlug}.mp4`,
+      fileName: `${archivedSlug}.mp4`,
+      mimeType: 'video/mp4',
+      fileSize: BigInt(1048576),
+      posterUrl: null,
+      description: 'E2E Video Archived description for E2E.',
+      publishedAt: PUBLISHED_AT,
+      archivedAt: ARCHIVED_AT,
+    },
+  });
+};
+
 /**
  * Idempotent seed script for the E2E test database. Clears all collections
  * and creates deterministic test data.
@@ -270,6 +404,7 @@ const seedTestDatabase = async () => {
     await prisma.featuredArtist.deleteMany({});
     await prisma.release.deleteMany({});
     await prisma.artist.deleteMany({});
+    await prisma.video.deleteMany({});
     await prisma.authenticator.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.account.deleteMany({});
@@ -648,6 +783,26 @@ const seedTestDatabase = async () => {
       },
     });
 
+    // Dedicated artist for the custom-media-survives-regeneration E2E spec
+    // (admin/bio-custom-media-survival.spec.ts). No bioStatus means the palette
+    // does not render on load; the spec generates, adds a custom link, then
+    // regenerates. createdAt is pinned to 2020-01-03 — after the other palette
+    // artists — so it sorts last (admin list sorts createdAt desc → 2020-01-03
+    // stays at the bottom) and never becomes the first artist in the admin list
+    // (which the bio-generation spec targets). No releases are linked, so the
+    // fixture produces exactly 2 links (Wikipedia + press) and 2 images (photo +
+    // cover).
+    await prisma.artist.create({
+      data: {
+        id: BIO_CUSTOM_MEDIA_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Custom Media',
+        slug: 'e2e-bio-custom-media-artist',
+        displayName: 'E2E Custom Media Artist',
+        createdAt: new Date('2020-01-03T00:00:00Z'),
+      },
+    });
+
     const e2eRelease1 = await prisma.release.create({
       data: {
         title: 'E2E Album One',
@@ -1019,6 +1174,8 @@ const seedTestDatabase = async () => {
       },
     });
 
+    await seedVideos(prisma);
+
     console.info('E2E test database seeded successfully.');
   } finally {
     await prisma.$disconnect();
@@ -1026,6 +1183,7 @@ const seedTestDatabase = async () => {
 };
 
 export {
+  BIO_CUSTOM_MEDIA_ARTIST_ID,
   BIO_FILTER_INSERT_ARTIST_ID,
   BIO_PALETTE_ARTIST_ID,
   createBioPaletteLinkRow,

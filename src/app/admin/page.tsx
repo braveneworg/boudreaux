@@ -29,6 +29,11 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     primary: `${stats.releases.total}`,
     secondary: `${stats.releases.published} published · ${stats.releases.draft} draft`,
   },
+  '/admin/videos': {
+    href: '/admin/videos',
+    primary: `${stats.videos.total}`,
+    secondary: `${stats.videos.published} published · ${stats.videos.draft} draft`,
+  },
   '/admin/featured-artists': {
     href: '/admin/featured-artists',
     primary: `${stats.featuredArtists.total}`,

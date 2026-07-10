@@ -31,6 +31,17 @@ test.describe('Admin persistent navigation', () => {
     expect(labels.map((label) => label.trim())).toEqual(NAV_ORDER);
   });
 
+  test('places Videos immediately after Releases', async ({ adminPage }) => {
+    await adminPage.goto('/admin');
+
+    const labels = (await adminNav(adminPage).getByRole('link').allTextContents()).map((label) =>
+      label.trim()
+    );
+
+    expect(labels).toContain('Videos');
+    expect(labels.indexOf('Videos')).toBe(labels.indexOf('Releases') + 1);
+  });
+
   test('persists across section pages and subpages', async ({ adminPage }) => {
     await adminPage.goto('/admin/releases');
     await expect(adminNav(adminPage)).toBeVisible();

@@ -425,6 +425,10 @@ model ArtistBioImage {
   isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images
   kind         String? // photo | cover — subject classification from discovery
   alt          String? // Accessible description written by the vision pass
+  /// Provenance: "generated" (AI discovery) or "custom" (admin upload). Nullable
+  /// because MongoDB documents predating this field are missing it — a null/missing
+  /// value is treated as generated, so regeneration deletes it like a generated row.
+  origin       String?
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 
@@ -442,6 +446,9 @@ model ArtistBioLink {
   label     String // Display label, e.g. "Wikipedia"
   url       String
   kind      String? // wikipedia | official | musicbrainz | social | other
+  /// Provenance: "generated" (AI discovery) or "custom" (admin-authored). Nullable
+  /// so legacy rows without the field read as generated and regeneration prunes them.
+  origin    String?
   sortOrder Int     @default(0)
 
   @@index([artistId])
@@ -959,4 +966,36 @@ model SmsBlast {
   createdAt      DateTime @default(now())
 
   @@index([createdAt(sort: Desc)]) // History list sort
+}
+
+// Videos feature (admin uploads videos to S3; signed-in users watch at /videos)
+
+enum VideoCategory {
+  MUSIC
+  INFORMATIONAL
+}
+
+model Video {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  artist          String
+  category        VideoCategory
+  description     String?
+  releasedOn      DateTime
+  durationSeconds Int?
+  s3Key           String
+  fileName        String
+  fileSize        BigInt?
+  mimeType        String
+  posterUrl       String?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdBy       String?       @db.ObjectId
+  updatedBy       String?       @db.ObjectId
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([releasedOn])
+  @@index([publishedAt])
+  @@index([archivedAt])
 }

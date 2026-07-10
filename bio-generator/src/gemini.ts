@@ -12,14 +12,13 @@ import type { ArtistFacts, BioCritique, BioCritiqueViolation, BioProse } from '.
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
- * Backoff between rate-limited attempts: 30s, doubling to 60s — the free-tier
- * Gemini quota window recovers on that scale, and a server `Retry-After` still
- * takes precedence. Two retries keep the ensemble worst case (parallel drafts
- * then synthesis: two sequential phases of three generations plus 90s of waits
- * each) inside the Lambda's 900s timeout.
+ * Backoff between rate-limited attempts: 4s, doubling to 8s then 16s — on the
+ * paid Tier 1 quota a 429 clears in seconds rather than the free tier's minute,
+ * and a server `Retry-After` still takes precedence. Three retries ride out a
+ * brief burst-limit blip while staying well inside the Lambda's 900s timeout.
  */
-const GEMINI_RETRY_BASE_DELAY_MS = 30_000;
-const GEMINI_RETRIES = 2;
+const GEMINI_RETRY_BASE_DELAY_MS = 4_000;
+const GEMINI_RETRIES = 3;
 
 /** Default sampling temperature for a single generation. */
 const DEFAULT_TEMPERATURE = 0.6;
@@ -34,12 +33,47 @@ export interface ProseRequestOptions extends FetchRetryOptions {
   styleDirective?: string;
 }
 
+/** Which pipeline stage a Gemini call serves — tags the usage telemetry line. */
+type GeminiPurpose = 'draft' | 'synthesis' | 'critic' | 'repair' | 'vision';
+
 /** Cap on the response-body excerpt echoed into failure messages. */
 const ERROR_BODY_SNIPPET_LENGTH = 300;
 
+/**
+ * Token accounting Gemini returns alongside the completion. Every field is
+ * optional in practice (the API omits usage on some error-adjacent responses),
+ * so cost telemetry must tolerate any of them being absent.
+ */
+export interface GeminiUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  thoughtsTokenCount?: number;
+}
+
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  usageMetadata?: GeminiUsageMetadata;
 }
+
+/**
+ * Emits a `gemini_usage` telemetry line after a successful call so cost can be
+ * tracked per model and pipeline stage. Each token count defaults to `null`
+ * when the API omits it — logging must never throw on absent usage metadata.
+ */
+export const logGeminiUsage = (
+  model: string,
+  purpose: GeminiPurpose,
+  usage: GeminiUsageMetadata | undefined
+): void =>
+  logEvent('info', 'gemini_usage', {
+    model,
+    purpose,
+    promptTokens: usage?.promptTokenCount ?? null,
+    outputTokens: usage?.candidatesTokenCount ?? null,
+    totalTokens: usage?.totalTokenCount ?? null,
+    thoughtsTokens: usage?.thoughtsTokenCount ?? null,
+  });
 
 /**
  * Allowed inline HTML in the bios — must stay within the web app's sanitizer
@@ -275,6 +309,7 @@ interface ProseRequest {
   apiKey: string;
   model: string;
   temperature: number;
+  purpose: GeminiPurpose;
 }
 
 /**
@@ -285,7 +320,7 @@ interface ProseRequest {
  */
 const requestJson = async <T>(
   schema: { parse: (value: unknown) => T },
-  { systemPrompt, userPrompt, apiKey, model, temperature }: ProseRequest,
+  { systemPrompt, userPrompt, apiKey, model, temperature, purpose }: ProseRequest,
   options: FetchRetryOptions = {}
 ): Promise<T> => {
   const response = await fetchWithRetry(
@@ -313,7 +348,9 @@ const requestJson = async <T>(
     throw new Error(await failureMessage(response));
   }
 
-  return schema.parse(parseJsonContent((await response.json()) as GeminiResponse));
+  const body = (await response.json()) as GeminiResponse;
+  logGeminiUsage(model, purpose, body.usageMetadata);
+  return schema.parse(parseJsonContent(body));
 };
 
 /**
@@ -348,7 +385,14 @@ export const generateProse = async (
     ? `${buildSystemPrompt(facts)} ${styleDirective}`
     : buildSystemPrompt(facts);
   return requestProse(
-    { systemPrompt, userPrompt: buildUserPrompt(facts), apiKey, model, temperature },
+    {
+      systemPrompt,
+      userPrompt: buildUserPrompt(facts),
+      apiKey,
+      model,
+      temperature,
+      purpose: 'draft',
+    },
     retryOptions
   );
 };
@@ -426,6 +470,7 @@ export const synthesizeProse = async (
       apiKey,
       model,
       temperature: SYNTHESIS_TEMPERATURE,
+      purpose: 'synthesis',
     },
     options
   );
@@ -443,6 +488,31 @@ const REVISE_TEMPERATURE = 0.4;
  */
 const QUALITY_PASS_RETRIES = 1;
 
+/**
+ * Runs a Gemini call on `primaryModel`, and on failure retries ONCE on
+ * `fallbackModel` when one is provided and distinct. This keeps the paid-tier
+ * Pro→Flash degradation ladder inside gemini.ts so callers (e.g. factcheck)
+ * stay model-agnostic. With no `fallbackModel`, behavior is a single attempt —
+ * byte-for-byte the pre-Tier-1 path.
+ */
+const withModelFallback = async <T>(
+  primaryModel: string,
+  fallbackModel: string | undefined,
+  run: (model: string) => Promise<T>
+): Promise<T> => {
+  try {
+    return await run(primaryModel);
+  } catch (err) {
+    if (!fallbackModel || fallbackModel === primaryModel) throw err;
+    logEvent('warn', 'gemini_model_fallback', {
+      from: primaryModel,
+      to: fallbackModel,
+      error: toErrorMessage(err),
+    });
+    return run(fallbackModel);
+  }
+};
+
 /** Inputs for {@link critiqueProse}, destructured to keep the call site readable. */
 export interface CritiqueProseArgs {
   facts: ArtistFacts;
@@ -450,55 +520,71 @@ export interface CritiqueProseArgs {
   suspectYears: number[];
   apiKey: string;
   model?: string;
+  /** Paid-tier fallback: retry once on this model if `model` fails (e.g. Pro→Flash). */
+  fallbackModel?: string;
 }
 
 /**
  * Fact-checker pass: posts the generated bios plus authoritative facts to
  * Gemini and asks it to report any concrete violations. Returns a
  * {@link BioCritique} with zero or more violations — an empty array is the
- * correct answer for clean bios.
+ * correct answer for clean bios. Retries once on `fallbackModel` when the
+ * primary model fails, if one is supplied.
  *
- * @param args - Facts, prose, suspect years, API key, and optional model id.
+ * @param args - Facts, prose, suspect years, API key, and optional model ids.
  * @param options - Injectable fetch/sleep and retry tuning for testability.
  */
 export const critiqueProse = (
-  { facts, prose, suspectYears, apiKey, model = DEFAULT_GEMINI_MODEL }: CritiqueProseArgs,
+  {
+    facts,
+    prose,
+    suspectYears,
+    apiKey,
+    model = DEFAULT_GEMINI_MODEL,
+    fallbackModel,
+  }: CritiqueProseArgs,
   options: FetchRetryOptions = {}
-): Promise<BioCritique> =>
-  requestJson(
-    bioCritiqueSchema,
-    {
-      systemPrompt: [
-        'You are a meticulous fact-checker for artist biographies. Compare the bios against the',
-        'verified facts, the chronology, and the source material. Report ONLY concrete violations:',
-        'claims contradicted by the facts or chronology, dates preceding the authoritative',
-        'birth/formation dates, and specific checkable claims (dates, chart positions, label names,',
-        'collaborations, awards) with no support in the source material, facts, or chronology.',
-        'An empty violations array is the correct answer for clean bios.',
-        'Respond with a single JSON object and nothing else.',
-      ].join(' '),
-      userPrompt: [
-        ...factLines(facts),
-        '',
-        chronologyLine(facts),
-        '',
-        sourceMaterialLine(facts),
-        '',
-        suspectYears.length
-          ? `SUSPECT YEARS (earlier than the artist's authoritative birth date — verify each): ${suspectYears.join(', ')}`
-          : '',
-        `BIOS (JSON): ${JSON.stringify(prose)}`,
-        '',
-        'Return JSON: {"violations": [{"location": "shortBio"|"longBio"|"altBio", "quote": "exact offending text", "issue": "why it is wrong"}]}',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      apiKey,
-      model,
-      temperature: CRITIC_TEMPERATURE,
-    },
-    { retries: QUALITY_PASS_RETRIES, ...options }
+): Promise<BioCritique> => {
+  const systemPrompt = [
+    'You are a meticulous fact-checker for artist biographies. Compare the bios against the',
+    'verified facts, the chronology, and the source material. Report ONLY concrete violations:',
+    'claims contradicted by the facts or chronology, dates preceding the authoritative',
+    'birth/formation dates, and specific checkable claims (dates, chart positions, label names,',
+    'collaborations, awards) with no support in the source material, facts, or chronology.',
+    'An empty violations array is the correct answer for clean bios.',
+    'Respond with a single JSON object and nothing else.',
+  ].join(' ');
+  const userPrompt = [
+    ...factLines(facts),
+    '',
+    chronologyLine(facts),
+    '',
+    sourceMaterialLine(facts),
+    '',
+    suspectYears.length
+      ? `SUSPECT YEARS (earlier than the artist's authoritative birth date — verify each): ${suspectYears.join(', ')}`
+      : '',
+    `BIOS (JSON): ${JSON.stringify(prose)}`,
+    '',
+    'Return JSON: {"violations": [{"location": "shortBio"|"longBio"|"altBio", "quote": "exact offending text", "issue": "why it is wrong"}]}',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return withModelFallback(model, fallbackModel, (activeModel) =>
+    requestJson(
+      bioCritiqueSchema,
+      {
+        systemPrompt,
+        userPrompt,
+        apiKey,
+        model: activeModel,
+        temperature: CRITIC_TEMPERATURE,
+        purpose: 'critic',
+      },
+      { retries: QUALITY_PASS_RETRIES, ...options }
+    )
   );
+};
 
 /** Inputs for {@link reviseProse}, destructured to keep the call site readable. */
 export interface ReviseProseArgs {
@@ -508,14 +594,17 @@ export interface ReviseProseArgs {
   plagiarizedSegments: Array<{ text: string }>;
   apiKey: string;
   model?: string;
+  /** Paid-tier fallback: retry once on this model if `model` fails (e.g. Pro→Flash). */
+  fallbackModel?: string;
 }
 
 /**
  * Repair pass: given a set of fact violations and/or plagiarized segments,
  * rewrites only the affected sentences while keeping everything else verbatim.
  * Returns the full corrected {@link BioProse} ready for downstream assembly.
+ * Retries once on `fallbackModel` when the primary model fails, if one is supplied.
  *
- * @param args - Facts, current prose, violations, plagiarised segments, API key, and model.
+ * @param args - Facts, current prose, violations, plagiarised segments, API key, and model ids.
  * @param options - Injectable fetch/sleep and retry tuning for testability.
  */
 export const reviseProse = (
@@ -526,49 +615,57 @@ export const reviseProse = (
     plagiarizedSegments,
     apiKey,
     model = DEFAULT_GEMINI_MODEL,
+    fallbackModel,
   }: ReviseProseArgs,
   options: FetchRetryOptions = {}
-): Promise<BioProse> =>
-  requestJson(
-    bioProseSchema,
-    {
-      systemPrompt: [
-        buildSystemPrompt(facts),
-        'You are repairing existing bios, not writing new ones.',
-      ].join(' '),
-      userPrompt: [
-        ...factLines(facts),
-        '',
-        chronologyLine(facts),
-        '',
-        referenceUrlsLine(referenceUrls(facts)),
-        '',
-        `CURRENT BIOS (JSON): ${JSON.stringify(prose)}`,
-        violations.length
-          ? `FACT VIOLATIONS to fix:\n${violations.map((v) => `- [${v.location}] "${v.quote}" — ${v.issue}`).join('\n')}`
-          : '',
-        plagiarizedSegments.length
-          ? `PLAGIARIZED PHRASING to reword in fresh words:\n${plagiarizedSegments.map((s) => `- "${s.text}"`).join('\n')}`
-          : '',
-        'Rewrite ONLY the affected sentences; keep everything else verbatim, including every inline',
-        '<a> link and <img src="image:N"> placeholder. Return the FULL corrected JSON.',
-        '',
-        ...OUTPUT_SPEC_LINES,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      apiKey,
-      model,
-      temperature: REVISE_TEMPERATURE,
-    },
-    { retries: QUALITY_PASS_RETRIES, ...options }
+): Promise<BioProse> => {
+  const systemPrompt = [
+    buildSystemPrompt(facts),
+    'You are repairing existing bios, not writing new ones.',
+  ].join(' ');
+  const userPrompt = [
+    ...factLines(facts),
+    '',
+    chronologyLine(facts),
+    '',
+    referenceUrlsLine(referenceUrls(facts)),
+    '',
+    `CURRENT BIOS (JSON): ${JSON.stringify(prose)}`,
+    violations.length
+      ? `FACT VIOLATIONS to fix:\n${violations.map((v) => `- [${v.location}] "${v.quote}" — ${v.issue}`).join('\n')}`
+      : '',
+    plagiarizedSegments.length
+      ? `PLAGIARIZED PHRASING to reword in fresh words:\n${plagiarizedSegments.map((s) => `- "${s.text}"`).join('\n')}`
+      : '',
+    'Rewrite ONLY the affected sentences; keep everything else verbatim, including every inline',
+    '<a> link and <img src="image:N"> placeholder. Return the FULL corrected JSON.',
+    '',
+    ...OUTPUT_SPEC_LINES,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return withModelFallback(model, fallbackModel, (activeModel) =>
+    requestJson(
+      bioProseSchema,
+      {
+        systemPrompt,
+        userPrompt,
+        apiKey,
+        model: activeModel,
+        temperature: REVISE_TEMPERATURE,
+        purpose: 'repair',
+      },
+      { retries: QUALITY_PASS_RETRIES, ...options }
+    )
   );
+};
 
 /**
- * The ensemble's draft variants: one precision-leaning pass at the default
- * temperature and one higher-variety narrative pass. Two drafts (three Gemini
- * calls per bio with synthesis) balance variety against the free-tier
- * per-day/per-minute quotas and the Lambda timeout.
+ * The ensemble's draft variants: a precision-leaning pass at the default
+ * temperature, a scene/context-led pass in the middle, and a higher-variety
+ * narrative pass. Three drafts (four Gemini calls per bio with synthesis) give
+ * the paid Tier-1 editor a wider spread of angles to merge, and the shorter
+ * paid-tier backoffs keep the added call inside the Lambda timeout.
  */
 const DRAFT_VARIANTS: ReadonlyArray<Pick<ProseRequestOptions, 'temperature' | 'styleDirective'>> = [
   {
@@ -576,6 +673,12 @@ const DRAFT_VARIANTS: ReadonlyArray<Pick<ProseRequestOptions, 'temperature' | 's
     styleDirective:
       'For this draft, prioritize factual precision and chronology: anchor every section to ' +
       'verifiable milestones, dates, and named works.',
+  },
+  {
+    temperature: 0.8,
+    styleDirective:
+      'For this draft, prioritize scene and context: situate the artist within their era, place, ' +
+      'movement, and collaborators, tracing how their surroundings shaped the work — staying strictly factual.',
   },
   {
     temperature: 0.95,
@@ -589,12 +692,62 @@ const DRAFT_VARIANTS: ReadonlyArray<Pick<ProseRequestOptions, 'temperature' | 's
 const isFulfilled = <T>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> =>
   result.status === 'fulfilled';
 
+/** Retry/injection tuning plus the optional paid-tier synthesis model split. */
+export interface DraftAndSynthesizeOptions extends FetchRetryOptions {
+  /**
+   * When set, the editor synthesis runs on this (typically Pro) model, retrying
+   * once on the draft `model` before degrading to the first draft. Unset →
+   * synthesis stays on the draft `model`, exactly the pre-Tier-1 behavior.
+   */
+  synthesisModel?: string;
+}
+
+/**
+ * The editor pass with the paid-tier model ladder: synthesis runs on
+ * `synthesisModel` when set, retrying ONCE on the draft `model`; if both fail
+ * (or no split was requested and the single pass fails) it degrades to the
+ * first draft so the artist always gets a bio.
+ */
+const synthesizeWithFallback = async (
+  args: { facts: ArtistFacts; drafts: BioProse[]; apiKey: string },
+  model: string,
+  synthesisModel: string | undefined,
+  options: FetchRetryOptions
+): Promise<BioProse> => {
+  const { facts, drafts, apiKey } = args;
+  try {
+    return await synthesizeProse(
+      { facts, drafts, apiKey, model: synthesisModel ?? model },
+      options
+    );
+  } catch (primaryErr) {
+    if (synthesisModel && synthesisModel !== model) {
+      logEvent('warn', 'prose_synthesis_fallback', {
+        from: synthesisModel,
+        to: model,
+        error: toErrorMessage(primaryErr),
+      });
+      try {
+        return await synthesizeProse({ facts, drafts, apiKey, model }, options);
+      } catch (fallbackErr) {
+        logEvent('warn', 'prose_synthesis_failed', { error: toErrorMessage(fallbackErr) });
+        return drafts[0];
+      }
+    }
+    // A lost editor pass must not cost the artist their bio — ship a draft.
+    logEvent('warn', 'prose_synthesis_failed', { error: toErrorMessage(primaryErr) });
+    return drafts[0];
+  }
+};
+
 /**
  * The full draft-and-synthesize pipeline: generates {@link DRAFT_VARIANTS}
  * independent drafts in parallel, then has an editor pass merge them into one
  * definitive result. Degrades gracefully — a failed draft is dropped (any one
  * draft suffices), and a failed synthesis falls back to the first draft so a
  * bio is still produced. Only when every draft fails does the pipeline throw.
+ * Drafts always run on `model`; pass `options.synthesisModel` to run the editor
+ * pass on a stronger model (with a one-shot fallback to `model`).
  *
  * Signature-compatible with {@link generateProse} so the handler can treat
  * either as its prose dependency.
@@ -602,17 +755,20 @@ const isFulfilled = <T>(result: PromiseSettledResult<T>): result is PromiseFulfi
  * @param facts - Grounding facts assembled by the handler.
  * @param apiKey - Gemini API key (resolved from SSM), sent via `x-goog-api-key`.
  * @param model - Gemini model id; defaults to {@link DEFAULT_GEMINI_MODEL}.
- * @param options - Injectable fetch/sleep and retry tuning for testability.
+ * @param options - Injectable fetch/sleep, retry tuning, and optional synthesis model.
  * @returns Validated synthesized prose plus the model's image ranking.
  */
 export const draftAndSynthesizeProse = async (
   facts: ArtistFacts,
   apiKey: string,
   model: string = DEFAULT_GEMINI_MODEL,
-  options: FetchRetryOptions = {}
+  options: DraftAndSynthesizeOptions = {}
 ): Promise<BioProse> => {
+  const { synthesisModel, ...retryOptions } = options;
   const settled = await Promise.allSettled(
-    DRAFT_VARIANTS.map((variant) => generateProse(facts, apiKey, model, { ...options, ...variant }))
+    DRAFT_VARIANTS.map((variant) =>
+      generateProse(facts, apiKey, model, { ...retryOptions, ...variant })
+    )
   );
   const drafts = settled.filter(isFulfilled).map((result) => result.value);
   if (!drafts.length) {
@@ -621,11 +777,5 @@ export const draftAndSynthesizeProse = async (
   }
   logEvent('info', 'prose_drafts', { requested: DRAFT_VARIANTS.length, fulfilled: drafts.length });
 
-  try {
-    return await synthesizeProse({ facts, drafts, apiKey, model }, options);
-  } catch (err) {
-    // A lost editor pass must not cost the artist their bio — ship a draft.
-    logEvent('warn', 'prose_synthesis_failed', { error: toErrorMessage(err) });
-    return drafts[0];
-  }
+  return synthesizeWithFallback({ facts, drafts, apiKey }, model, synthesisModel, retryOptions);
 };

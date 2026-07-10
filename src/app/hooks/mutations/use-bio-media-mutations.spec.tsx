@@ -6,12 +6,14 @@
 import { renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 
+import { createArtistBioLinkAction } from '@/lib/actions/create-artist-bio-link-action';
 import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
 import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
 import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
 import { queryKeys } from '@/lib/query-keys';
 
 import {
+  useCreateBioLinkMutation,
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
   useUpdateBioImageAttributionMutation,
@@ -37,6 +39,10 @@ vi.mock('@/lib/actions/update-artist-bio-image-attribution-action', () => ({
   updateArtistBioImageAttributionAction: vi.fn(),
 }));
 
+vi.mock('@/lib/actions/create-artist-bio-link-action', () => ({
+  createArtistBioLinkAction: vi.fn(),
+}));
+
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
@@ -59,6 +65,16 @@ const getOptions = (renderFn: () => unknown): MutationOptions => {
 const getAttributionOptions = (renderFn: () => unknown): AttributionMutationOptions => {
   renderHook(renderFn);
   return useMutationMock.mock.calls.at(-1)?.[0] as AttributionMutationOptions;
+};
+
+interface CreateLinkMutationOptions {
+  mutationFn: (input: { artistId: string; label: string; url: string }) => Promise<unknown>;
+  onSuccess: (result: { success: boolean; error?: string }) => void;
+}
+
+const getCreateLinkOptions = (renderFn: () => unknown): CreateLinkMutationOptions => {
+  renderHook(renderFn);
+  return useMutationMock.mock.calls.at(-1)?.[0] as CreateLinkMutationOptions;
 };
 
 beforeEach(() => {
@@ -170,6 +186,79 @@ describe('useDeleteBioImageMutation', () => {
     const { result } = renderHook(() => useDeleteBioImageMutation('artist-1'));
 
     expect(result.current.isDeletingBioImage).toBe(true);
+  });
+});
+
+describe('useCreateBioLinkMutation', () => {
+  const linkInput = { artistId: 'artist-1', label: 'Official', url: 'https://example.com' };
+
+  it('calls createArtistBioLinkAction with the input', async () => {
+    vi.mocked(createArtistBioLinkAction).mockResolvedValue({ success: true });
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1'));
+
+    await opts.mutationFn(linkInput);
+
+    expect(createArtistBioLinkAction).toHaveBeenCalledWith(linkInput);
+  });
+
+  it('invalidates the bio-generation query on success', () => {
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1'));
+
+    opts.onSuccess({ success: true });
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.artists.bioGeneration('artist-1'),
+    });
+  });
+
+  it('invokes the onCreated callback on success', () => {
+    const onCreated = vi.fn();
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1', onCreated));
+
+    opts.onSuccess({ success: true });
+
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  it('surfaces a failed create as an error toast', () => {
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'nope' });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('nope');
+  });
+
+  it('falls back to a generic message when the failure has no error', () => {
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1'));
+
+    opts.onSuccess({ success: false });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to add bio link');
+  });
+
+  it('does not invalidate the query on a failed create', () => {
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'nope' });
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+
+  it('does not invoke onCreated on a failed create', () => {
+    const onCreated = vi.fn();
+    const opts = getCreateLinkOptions(() => useCreateBioLinkMutation('artist-1', onCreated));
+
+    opts.onSuccess({ success: false });
+
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it('exposes the pending state from the mutation', () => {
+    useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: true });
+
+    const { result } = renderHook(() => useCreateBioLinkMutation('artist-1'));
+
+    expect(result.current.isCreatingBioLink).toBe(true);
   });
 });
 

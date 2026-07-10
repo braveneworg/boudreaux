@@ -321,9 +321,9 @@ describe('searchArtistSources', () => {
     expect(result?.images).toHaveLength(1);
   });
 
-  it('does not truncate beyond the new cap of 60 images per call', async () => {
+  it('does not truncate beyond the new cap of 120 images per call', async () => {
     const images: Record<string, string> = {};
-    for (let i = 0; i < 61; i++) {
+    for (let i = 0; i < 121; i++) {
       images[`Image ${i}: Photo ${i}`] = `https://a.example/photo-${i}.jpg`;
     }
     const fetchFn = vi
@@ -334,7 +334,7 @@ describe('searchArtistSources', () => {
 
     const result = await searchArtistSources('Artist', 'k', fetchFn);
 
-    expect(result?.images).toHaveLength(60);
+    expect(result?.images).toHaveLength(120);
   });
 
   it('collects images from listening-service result pages (album covers wanted)', async () => {
