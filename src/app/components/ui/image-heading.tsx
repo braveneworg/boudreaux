@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import { Heading } from './heading';
-import { ZineSketchStrokes } from './zine-sketch-strokes';
 
 import type { HeadingProps } from './heading';
 
@@ -27,12 +26,10 @@ export interface ImageHeadingProps extends Omit<HeadingProps, 'children'> {
    * Browser loading strategy for the image. `eager` starts the fetch at render
    * instead of on viewport intersection — the middle ground for headings that
    * aren't the LCP (no `priority` preload) but shouldn't linger as an empty
-   * sketch-stroke frame while a lazy fetch waits. Omit for next/image's
-   * default (lazy unless `priority`).
+   * gap while a lazy fetch waits. Omit for next/image's default (lazy unless
+   * `priority`).
    */
   loading?: 'eager' | 'lazy';
-  /** Whether to trace the wordmark with the hand-drawn zine sketch strokes. Defaults to on. */
-  sketched?: boolean;
 }
 
 /**
@@ -54,10 +51,9 @@ const ImageHeading = ({
   level = 1,
   priority = false,
   loading,
-  sketched = true,
   ...headingProps
-}: ImageHeadingProps) => {
-  const image = (
+}: ImageHeadingProps) => (
+  <Heading level={level} className={cn('mt-1 mb-1.5 h-auto', className)} {...headingProps}>
     <Image
       src={src}
       alt={alt}
@@ -68,22 +64,7 @@ const ImageHeading = ({
       loading={loading}
       className={cn('h-auto w-full sm:h-14 sm:w-auto', imageClassName)}
     />
-  );
-
-  return (
-    <Heading level={level} className={cn('mt-1 mb-1.5 h-auto', className)} {...headingProps}>
-      {sketched ? (
-        // The strokes anchor to an inline-block wrapper hugging the image
-        // box — the heading element itself spans the full content width.
-        <span className="relative inline-block w-full sm:w-auto">
-          <ZineSketchStrokes />
-          {image}
-        </span>
-      ) : (
-        image
-      )}
-    </Heading>
-  );
-};
+  </Heading>
+);
 
 export { ImageHeading };

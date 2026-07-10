@@ -45,23 +45,6 @@ describe('ZineHeading', () => {
     expect(heading).not.toHaveClass('h-[52px]');
   });
 
-  it('sketches two skewed hand-drawn strokes around the strip', () => {
-    const { container } = render(<ZineHeading>Releases</ZineHeading>);
-
-    // The strip anchors two decorative zinc-950 frames, each nudged and
-    // skewed differently so the strokes never quite line up — the
-    // hand-drawn double border.
-    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass('relative');
-    const strokes = container.querySelectorAll('[data-slot="zine-sketch-stroke"]');
-    expect(strokes).toHaveLength(2);
-    strokes.forEach((stroke) => {
-      expect(stroke).toHaveAttribute('aria-hidden', 'true');
-      expect(stroke).toHaveClass('absolute', 'border-zinc-950');
-      expect(stroke.className).toMatch(/skew-x-/);
-      expect(stroke.className).toMatch(/rotate-/);
-    });
-  });
-
   it('cn-merges a custom className onto the heading element', () => {
     render(<ZineHeading className="mb-0">Releases</ZineHeading>);
     const heading = screen.getByRole('heading', { level: 1 });
