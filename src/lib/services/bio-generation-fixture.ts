@@ -49,6 +49,7 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
         // Attribution metadata is kept through re-host (PR #547).
         attribution: 'Public domain',
         license: 'Public domain',
+        licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
         sourceUrl: null,
         width: 1200,
         height: 800,

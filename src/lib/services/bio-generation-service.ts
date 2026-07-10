@@ -119,6 +119,7 @@ type RehostedImage = {
   title: string | null;
   attribution: string | null;
   license: string | null;
+  licenseUrl: string | null;
   sourceUrl: string | null;
   originalUrl: string | null;
   width: number | null;
@@ -166,6 +167,8 @@ const buildRehostedRecord = (
   title: sanitizeOptional(image.title),
   attribution: sanitizeOptional(image.attribution),
   license: image.license ?? null,
+  // Schema-validated as a URL, so no sanitizeOptional (mirrors sourceUrl).
+  licenseUrl: image.licenseUrl ?? null,
   sourceUrl: image.sourceUrl ?? null,
   originalUrl: image.url,
   width: result.width ?? image.width ?? null,
@@ -220,6 +223,19 @@ const buildImageUrlIndex = (
     if (!map.has(duplicateIndex)) map.set(duplicateIndex, survivorUrl);
   });
   return map;
+};
+
+/**
+ * Persist-order comparator: primaries first, then licensed images before
+ * unlicensed ones (an image is "licensed" when it carries any `license` string).
+ * Returns 0 within a tier so `Array.prototype.sort` — spec-stable — preserves the
+ * incoming order there. Extracted as a named helper to stay within the
+ * cyclomatic-complexity limit.
+ */
+const compareByLicenseRank = (a: RehostedImage, b: RehostedImage): number => {
+  const primaryDelta = Number(b.isPrimary) - Number(a.isPrimary);
+  if (primaryDelta !== 0) return primaryDelta;
+  return Number(Boolean(b.license)) - Number(Boolean(a.license));
 };
 
 /**
@@ -291,6 +307,7 @@ const appendInternalCoverImages = (
       title: release.title,
       attribution: `${release.title} — label release`,
       license: null,
+      licenseUrl: null,
       sourceUrl: null,
       originalUrl: null,
       width: null,
@@ -364,11 +381,17 @@ export const persistGeneratedBio = async (
   // retains the picture instead of having the sanitizer drop the placeholder.
   const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
 
-  // Re-index sortOrder after dropping failed images. The Lambda already caps
-  // the number of primaries (and which images are primary is its choice, not
-  // a function of array position), so preserve isPrimary as-is.
+  // Rank survivors `isPrimary desc, licensed desc` (stable within a tier) then
+  // re-index sortOrder over the sorted result. The Lambda already caps the
+  // number of primaries (and which images are primary is its choice, not a
+  // function of array position), so preserve isPrimary as-is.
+  //
+  // Placeholder-safe: `imageUrlByIndex` (built above at buildImageUrlIndex) keys
+  // by the ORIGINAL, pre-sort index, so re-ordering the persisted rows here does
+  // not disturb `image:N` placeholder resolution.
   const persistedImages = rehosted
     .filter((image): image is RehostedImage => image !== null)
+    .sort(compareByLicenseRank)
     .map((image, index) => ({ ...image, sortOrder: index }));
 
   // Drop any link whose URL is not http(s); streaming links are kept (2026-07).

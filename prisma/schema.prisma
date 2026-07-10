@@ -417,6 +417,7 @@ model ArtistBioImage {
   title        String? // Human-readable image title/caption
   attribution  String? // Optional source attribution (unused for re-hosted images)
   license      String? // e.g. "CC BY-SA 4.0"
+  licenseUrl   String? // Machine-readable license page from Commons, when known
   sourceUrl    String? // Original page the image came from
   /// Original external image URL, kept so save-time re-hosting can fetch the
   /// full-resolution source after the generation-time thumbnail pass.

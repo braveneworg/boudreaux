@@ -246,6 +246,7 @@ const artistWithPublishedReleases = {
       title: 'Portrait',
       attribution: 'Wikimedia Commons',
       license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
       sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
       originalUrl: null,
       width: 1200,

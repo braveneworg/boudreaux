@@ -560,6 +560,155 @@ describe('persistGeneratedBio', () => {
     const matching = content.images.filter((image) => image.url === coverUrl);
     expect(matching).toHaveLength(1);
   });
+
+  it('threads a licenseUrl from the discovered image through to the persisted row', async () => {
+    const content = await persistGeneratedBio(
+      artistId,
+      withData({
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: 'Portrait',
+            attribution: 'Photographer',
+            license: 'CC BY-SA 4.0',
+            licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+            sourceUrl: null,
+            isPrimary: true,
+          },
+        ],
+      }),
+      []
+    );
+
+    expect(content.images[0].licenseUrl).toBe('https://creativecommons.org/licenses/by-sa/4.0/');
+  });
+
+  it('defaults licenseUrl to null when the discovered image omits it', async () => {
+    const content = await persistGeneratedBio(artistId, baseData, []);
+
+    expect(content.images[0].licenseUrl).toBeNull();
+  });
+});
+
+describe('persistGeneratedBio license-aware sort', () => {
+  const artistId = 'a'.repeat(24);
+
+  // A discovered image whose fields default to a non-primary, unlicensed row.
+  const image = (
+    overrides: Partial<BioGenerationData['images'][number]> & { url: string }
+  ): BioGenerationData['images'][number] => ({
+    thumbnailUrl: null,
+    title: null,
+    attribution: 'src',
+    license: null,
+    sourceUrl: null,
+    isPrimary: false,
+    ...overrides,
+  });
+
+  const buildData = (images: BioGenerationData['images']): BioGenerationData => ({
+    shortBio: '<p>s</p>',
+    longBio: '<p>l</p>',
+    altBio: '<p>a</p>',
+    genres: 'rock',
+    images,
+    links: [],
+    model: 'gemini-2.5-pro',
+  });
+
+  // A CDN URL that survives HTML sanitization, derived from a per-image token.
+  const cdn = (token: string): string => `https://cdn.example.com/media/artists/a/bio/${token}.jpg`;
+
+  // Re-host mock that echoes each input URL as its CDN URL, preserving order so
+  // the persist sort (not the re-host) is what reorders the survivors.
+  const mockRehostEcho = (tokens: string[]): void => {
+    rehostImagesMock.mockResolvedValue({
+      results: tokens.map((token) => ({ url: cdn(token), width: null, height: null })),
+      duplicateAliases: new Map(),
+    });
+  };
+
+  beforeEach(() => {
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    rehostImagesMock.mockReset();
+  });
+
+  it('orders primaries first, then licensed non-primaries before unlicensed ones', async () => {
+    // Input deliberately interleaves tiers so a stable sort must reorder them:
+    // [unlicensed non-primary, licensed non-primary, primary].
+    const urls = ['u', 'l', 'p'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData([
+        image({ url: 'u' }),
+        image({ url: 'l', license: 'CC BY 4.0' }),
+        image({ url: 'p', isPrimary: true }),
+      ]),
+      []
+    );
+
+    expect(content.images.map((img) => img.url)).toEqual([cdn('p'), cdn('l'), cdn('u')]);
+  });
+
+  it('re-indexes sortOrder to 0..n after the license-aware sort', async () => {
+    const urls = ['u', 'l', 'p'];
+    mockRehostEcho(urls);
+
+    await persistGeneratedBio(
+      artistId,
+      buildData([
+        image({ url: 'u' }),
+        image({ url: 'l', license: 'CC BY 4.0' }),
+        image({ url: 'p', isPrimary: true }),
+      ]),
+      []
+    );
+
+    const persisted = replaceBioContentMock.mock.calls[0][1].images;
+    expect(persisted.map((img: { sortOrder: number }) => img.sortOrder)).toEqual([0, 1, 2]);
+  });
+
+  it('keeps stable order among non-adjacent same-tier (unlicensed) images', async () => {
+    // Two unlicensed rows straddle a licensed one; the licensed row jumps ahead
+    // but the two unlicensed rows must keep their original relative order.
+    const urls = ['u1', 'l', 'u2'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData([
+        image({ url: 'u1' }),
+        image({ url: 'l', license: 'CC BY 4.0' }),
+        image({ url: 'u2' }),
+      ]),
+      []
+    );
+
+    expect(content.images.map((img) => img.url)).toEqual([cdn('l'), cdn('u1'), cdn('u2')]);
+  });
+
+  it('resolves an image:N placeholder for an image the sort moves to a later slot', async () => {
+    // image:0 is the unlicensed row that the license-aware sort demotes to last;
+    // the placeholder index is the ORIGINAL index, so it must still resolve to
+    // that image's CDN url even though its persisted position changed.
+    const urls = ['u', 'l'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      {
+        ...buildData([image({ url: 'u' }), image({ url: 'l', license: 'CC BY 4.0' })]),
+        longBio: '<p>Here: <img src="image:0" alt="x"></p>',
+      },
+      []
+    );
+
+    expect(content.longBio).toContain(`src="${cdn('u')}"`);
+    expect(content.longBio).not.toContain('image:0');
+  });
 });
 
 describe('BioGenerationService.runGenerationJob', () => {
