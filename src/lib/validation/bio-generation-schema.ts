@@ -36,6 +36,7 @@ export const bioGenerationImageSchema = z.object({
   title: z.string().nullable().optional(),
   attribution: z.string(),
   license: z.string().nullable().optional(),
+  licenseUrl: z.string().url().nullable().optional(),
   sourceUrl: z.string().url().nullable().optional(),
   width: z.number().int().positive().nullable().optional(),
   height: z.number().int().positive().nullable().optional(),
@@ -196,6 +197,7 @@ export interface GeneratedBioContent {
     title?: string | null;
     attribution?: string | null;
     license?: string | null;
+    licenseUrl?: string | null;
     sourceUrl?: string | null;
     isPrimary: boolean;
     kind?: string | null;

@@ -121,6 +121,32 @@ test.describe('Admin bio media palettes', () => {
     await expect(imagesGroup).toBeVisible({ timeout: 15_000 });
     await expect(imagesGroup.getByText('cover', { exact: true })).toBeVisible();
     await adminPage.getByRole('button', { name: 'Preview Fixture Album' }).click();
-    await expect(adminPage.getByRole('dialog', { name: 'Fixture Album' })).toBeVisible();
+    const previewDialog = adminPage.getByRole('dialog', { name: 'Fixture Album' });
+    await expect(previewDialog).toBeVisible();
+
+    // Close the preview dialog before the license assertions: while a Radix
+    // Dialog is open it marks the rest of the page aria-hidden, which would hide
+    // the palette tiles from role-based queries below.
+    await adminPage.keyboard.press('Escape');
+    await expect(previewDialog).toBeHidden();
+
+    // 8. License provenance per tile (tile-scoped so a hidden/other tile's badge
+    //    cannot poison the assertion). The fixture portrait carries a license
+    //    with a machine-readable licenseUrl (→ linked badge); the cover carries
+    //    no license (→ muted "Rights unknown").
+    const portraitTile = imagesGroup.locator('li').filter({
+      has: adminPage.getByRole('button', { name: 'Delete image E2E Bio Media Artist portrait' }),
+    });
+    const licenseLink = portraitTile.getByRole('link', { name: /Public domain/ });
+    await expect(licenseLink).toBeVisible();
+    await expect(licenseLink).toHaveAttribute(
+      'href',
+      'https://creativecommons.org/publicdomain/mark/1.0/'
+    );
+
+    const coverTile = imagesGroup.locator('li').filter({
+      has: adminPage.getByRole('button', { name: 'Delete image Fixture Album' }),
+    });
+    await expect(coverTile.getByText('Rights unknown')).toBeVisible();
   });
 });

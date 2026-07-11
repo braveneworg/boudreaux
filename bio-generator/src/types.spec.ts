@@ -115,6 +115,47 @@ describe('bio media discovery v2 wire types', () => {
     expect(bioImageSchema.safeParse(image).success).toBe(false);
   });
 
+  it('accepts a machine-readable licenseUrl', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    };
+    expect(bioImageSchema.parse(image).licenseUrl).toBe(
+      'https://creativecommons.org/licenses/by-sa/4.0/'
+    );
+  });
+
+  it('accepts a null licenseUrl', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      licenseUrl: null,
+    };
+    expect(bioImageSchema.parse(image).licenseUrl).toBeNull();
+  });
+
+  it('accepts an absent licenseUrl', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+    };
+    expect(bioImageSchema.parse(image).licenseUrl).toBeUndefined();
+  });
+
+  it('rejects a non-URL licenseUrl', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      licenseUrl: 'not-a-url',
+    };
+    expect(bioImageSchema.safeParse(image).success).toBe(false);
+  });
+
   it('accepts the press link kind', () => {
     const link = { label: 'Interview', url: 'https://example.com/i', kind: 'press' };
     expect(bioLinkSchema.parse(link).kind).toBe('press');
