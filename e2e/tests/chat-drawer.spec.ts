@@ -75,6 +75,36 @@ test.describe('Chat drawer — authenticated', () => {
     await expect(composer).toHaveValue('');
   });
 
+  test('keeps a sent message visible after closing and reopening the drawer', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/');
+    await userPage.getByRole('button', { name: /open chat/i }).click();
+
+    const composer = userPage.getByLabel('Chat message');
+    const body = `e2e-reopen-${Date.now()}`;
+    await composer.fill(body);
+    await expect(composer).toHaveValue(body);
+    await composer.press('Enter');
+    await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
+    // Wait for the send cycle to settle (composer re-enabled + cleared) so
+    // the server echo — not just the optimistic row — has been applied
+    // before the drawer closes.
+    await expect(composer).toBeEnabled({ timeout: 10_000 });
+    await expect(composer).toHaveValue('');
+
+    // Close the drawer and wait for the exit animation to unmount the body.
+    await userPage.getByLabel('Close chat').click();
+    await expect(userPage.getByRole('img', { name: 'live chat' })).toBeHidden();
+
+    // Reopen within the query staleTime: the sent message must be visible
+    // immediately — the cached history now carries it instead of a stale
+    // first page that predates the send.
+    await userPage.getByRole('button', { name: /open chat/i }).click();
+    await expect(userPage.getByRole('img', { name: 'live chat' })).toBeVisible();
+    await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
+  });
+
   test('preserves a newline on Shift+Enter without sending', async ({ userPage }) => {
     await userPage.goto('/');
     await userPage.getByRole('button', { name: /open chat/i }).click();
