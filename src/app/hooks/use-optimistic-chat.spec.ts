@@ -141,6 +141,19 @@ describe('useOptimisticChat', () => {
       expect(getCached(client)?.pages[0].messages.map((m) => m.id)).toEqual(['msg-1']);
     });
 
+    it('keeps a local message without a tempId when an echo lands', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      // No tempId: reconciliation must never drop such an entry, even
+      // when the echo matches its author and body.
+      act(() => result.current.appendOptimistic(makeMsg('local-plain', 'hello')));
+      act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hello')));
+
+      expect(result.current.messages.some((m) => m.id === 'local-plain')).toBe(true);
+    });
+
     it('keeps a failed placeholder around even after an echo lands', () => {
       const { client, wrapper } = buildHarness();
       seedPages(client, [[]]);
