@@ -9,9 +9,10 @@ import dynamic from 'next/dynamic';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// emoji-mart ships a ~200KB picker — lazy load so the chat bundle isn't
-// inflated for users who never react. SSR is disabled because the picker
-// is keyboard/touch-driven and has no useful server output.
+// Lazy-load the frimousse picker so users who never react don't pay for
+// it; the emoji dataset itself loads on demand from /api/emoji-data. SSR
+// is disabled because the picker is keyboard/touch-driven and has no
+// useful server output.
 const EmojiPicker = dynamic(
   () => import('./chat-emoji-picker-inner').then((mod) => mod.ChatEmojiPickerInner),
   {
