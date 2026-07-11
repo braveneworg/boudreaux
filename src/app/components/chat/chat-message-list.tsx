@@ -151,6 +151,7 @@ export const ChatMessageList = ({
   scrollToMentionUsername,
 }: ChatMessageListProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<HTMLUListElement>(null);
   const prevFirstIdRef = useRef<string | undefined>(undefined);
   const prevLastIdRef = useRef<string | undefined>(undefined);
   const prevScrollHeightRef = useRef(0);
@@ -228,6 +229,23 @@ export const ChatMessageList = ({
     });
   }, [messages, pinnedById]);
 
+  // Late layout shifts land AFTER the one-shot first-paint anchor above:
+  // iOS Safari's URL-bar collapse changes the drawer's dvh height, the
+  // on-screen keyboard resizes the viewport, and avatar images grow rows
+  // as they load. Re-pin to the bottom on any container/stream resize
+  // until the viewer deliberately scrolls up (wasAtBottomRef flips false).
+  const isEmpty = visibleRows.length === 0;
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (wasAtBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    if (streamRef.current) observer.observe(streamRef.current);
+    return () => observer.disconnect();
+  }, [isEmpty]);
+
   return (
     <div
       ref={containerRef}
@@ -260,7 +278,7 @@ export const ChatMessageList = ({
           No messages yet — say hi 👋
         </div>
       ) : (
-        <ul className="divide-y">
+        <ul ref={streamRef} className="divide-y">
           {visibleRows.map(({ message, align }) => (
             <li key={message.tempId ?? message.id}>
               <MemoizedMessageRow

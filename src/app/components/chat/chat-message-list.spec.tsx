@@ -126,6 +126,82 @@ describe('ChatMessageList', () => {
     expect(screen.getByTestId('bar-p1')).toBeInTheDocument();
   });
 
+  describe('bottom pin on resize', () => {
+    class FakeResizeObserver {
+      static instances: FakeResizeObserver[] = [];
+      observed: Element[] = [];
+      private readonly callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        FakeResizeObserver.instances.push(this);
+      }
+      observe(el: Element): void {
+        this.observed.push(el);
+      }
+      unobserve(): void {}
+      disconnect(): void {
+        this.observed = [];
+      }
+      trigger(): void {
+        this.callback([], this as unknown as ResizeObserver);
+      }
+    }
+
+    beforeEach(() => {
+      FakeResizeObserver.instances = [];
+      vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const renderWithGeometry = (scrollTop: number) => {
+      const { container } = render(
+        <ChatMessageList {...baseProps} messages={[makeMsg('a'), makeMsg('b')]} />
+      );
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      Object.defineProperty(list, 'scrollHeight', { configurable: true, value: 500 });
+      Object.defineProperty(list, 'clientHeight', { configurable: true, value: 100 });
+      Object.defineProperty(list, 'scrollTop', {
+        configurable: true,
+        writable: true,
+        value: scrollTop,
+      });
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(list));
+      return { list, observer };
+    };
+
+    it('re-pins to the bottom when the container resizes while the viewer is at the bottom', () => {
+      const { list, observer } = renderWithGeometry(400);
+
+      expect(observer).toBeDefined();
+      observer?.trigger();
+
+      // iOS URL-bar collapse / keyboard resize: the pin must follow.
+      expect(list.scrollTop).toBe(500);
+    });
+
+    it('does not re-pin when the viewer has deliberately scrolled up', () => {
+      const { list, observer } = renderWithGeometry(0);
+      // distance from bottom = 400 → flips wasAtBottom to false.
+      list.dispatchEvent(new Event('scroll'));
+
+      observer?.trigger();
+
+      expect(list.scrollTop).toBe(0);
+    });
+
+    it('also observes the message stream so late-loading rows keep the tail visible', () => {
+      const { container } = render(<ChatMessageList {...baseProps} messages={[makeMsg('a')]} />);
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      const stream = list.querySelector('ul') as HTMLElement;
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(list));
+
+      expect(observer?.observed).toContain(stream);
+    });
+  });
+
   it('updates the wasAtBottom flag in response to scroll events', () => {
     const { container } = render(<ChatMessageList {...baseProps} messages={[makeMsg('a')]} />);
     const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
