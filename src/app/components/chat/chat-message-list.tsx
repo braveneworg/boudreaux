@@ -63,6 +63,14 @@ interface ChatMessageListProps {
 
 const SCROLL_BOTTOM_THRESHOLD_PX = 50;
 
+/**
+ * How long after the last touch/wheel input a scroll event is still
+ * attributed to the user. Momentum scrolling emits events every frame,
+ * and each one refreshes the window, so a fling stays classified as user
+ * input until it actually stops.
+ */
+const USER_SCROLL_WINDOW_MS = 200;
+
 interface ScrollFlags {
   firstId: string | undefined;
   lastId: string | undefined;
@@ -152,11 +160,18 @@ export const ChatMessageList = ({
 }: ChatMessageListProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<HTMLUListElement>(null);
+  const pinnedStripRef = useRef<HTMLDivElement>(null);
   const prevFirstIdRef = useRef<string | undefined>(undefined);
   const prevLastIdRef = useRef<string | undefined>(undefined);
   const prevScrollHeightRef = useRef(0);
-  const wasAtBottomRef = useRef(true);
+  const isPinnedRef = useRef(true);
+  const lastUserInputTsRef = useRef(0);
+  const isCoarsePointerRef = useRef(false);
   const mentionScrollDoneRef = useRef(false);
+
+  useLayoutEffect(() => {
+    isCoarsePointerRef.current = globalThis.matchMedia('(pointer: coarse)').matches;
+  }, []);
 
   // Admin-pinned announcements (caller already enforces the 3-cap),
   // newest pin first. Filtered out of the regular stream so they only
@@ -166,11 +181,41 @@ export const ChatMessageList = ({
     [pinnedMessages]
   );
 
+  /** Marks the next scroll events as user-driven (touch drag / wheel). */
+  const handleUserInput = useCallback(() => {
+    lastUserInputTsRef.current = Date.now();
+  }, []);
+
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    wasAtBottomRef.current = distance < SCROLL_BOTTOM_THRESHOLD_PX;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_BOTTOM_THRESHOLD_PX;
+
+    // Fine pointers (desktop): every scroll is user intent — scrollbar
+    // drags and keyboard scrolling never emit touch/wheel events.
+    if (!isCoarsePointerRef.current) {
+      isPinnedRef.current = atBottom;
+      return;
+    }
+
+    // Coarse pointers (iOS/Android): the browser itself fires scroll
+    // events — WebKit resets scrollTop inside transformed containers when
+    // the drawer transition ends, and clamps it on viewport changes. Only
+    // recent touch/wheel input may unpin; anything else while pinned is a
+    // displacement to undo.
+    const now = Date.now();
+    if (now - lastUserInputTsRef.current < USER_SCROLL_WINDOW_MS) {
+      lastUserInputTsRef.current = now;
+      isPinnedRef.current = atBottom;
+      return;
+    }
+    if (atBottom) {
+      isPinnedRef.current = true;
+      return;
+    }
+    if (isPinnedRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -203,7 +248,7 @@ export const ChatMessageList = ({
     applyScrollAnchor({
       el,
       flags,
-      wasAtBottom: wasAtBottomRef.current,
+      wasAtBottom: isPinnedRef.current,
       prevScrollHeight: prevScrollHeightRef.current,
       newScrollHeight,
     });
@@ -231,31 +276,39 @@ export const ChatMessageList = ({
 
   // Late layout shifts land AFTER the one-shot first-paint anchor above:
   // iOS Safari's URL-bar collapse changes the drawer's dvh height, the
-  // on-screen keyboard resizes the viewport, and avatar images grow rows
-  // as they load. Re-pin to the bottom on any container/stream resize
-  // until the viewer deliberately scrolls up (wasAtBottomRef flips false).
+  // on-screen keyboard resizes the viewport, avatar images grow rows as
+  // they load, and the pinned strip pops in from its own query. Re-pin to
+  // the bottom on any of their resizes until the viewer deliberately
+  // scrolls up (isPinnedRef flips false). The strip needs observing
+  // directly: it shifts the stream down without resizing the container
+  // or the stream box.
   const isEmpty = visibleRows.length === 0;
+  const hasPinnedStrip = (pinnedMessages?.length ?? 0) > 0;
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      if (wasAtBottomRef.current) el.scrollTop = el.scrollHeight;
+      if (isPinnedRef.current) el.scrollTop = el.scrollHeight;
     });
     observer.observe(el);
     if (streamRef.current) observer.observe(streamRef.current);
+    if (pinnedStripRef.current) observer.observe(pinnedStripRef.current);
     return () => observer.disconnect();
-  }, [isEmpty]);
+  }, [isEmpty, hasPinnedStrip]);
 
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      onTouchMove={handleUserInput}
+      onWheel={handleUserInput}
       className="flex flex-1 flex-col overflow-y-auto"
       style={{ touchAction: 'pan-y' }}
       data-testid="chat-message-list"
     >
       {pinnedMessages && pinnedMessages.length > 0 && (
         <div
+          ref={pinnedStripRef}
           data-testid="chat-pinned-messages"
           className="sticky top-0 z-10 border-y border-zinc-500 bg-transparent shadow-[0_4px_12px_rgba(0,0,0,0.22)] backdrop-blur-sm"
         >

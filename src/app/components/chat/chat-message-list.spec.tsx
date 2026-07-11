@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
@@ -199,6 +199,117 @@ describe('ChatMessageList', () => {
       const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(list));
 
       expect(observer?.observed).toContain(stream);
+    });
+
+    it('observes the pinned strip so a late-arriving strip keeps the tail visible', () => {
+      const pinned = makeMsg('p1');
+      const { container, rerender } = render(
+        <ChatMessageList {...baseProps} messages={[makeMsg('a')]} />
+      );
+      // The strip arrives from its own query after first paint: it shifts
+      // the stream down without resizing the container or the stream box,
+      // so it must be observed itself once it mounts.
+      rerender(
+        <ChatMessageList
+          {...baseProps}
+          messages={[makeMsg('a'), pinned]}
+          pinnedMessages={[pinned]}
+        />
+      );
+
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      const strip = list.querySelector('[data-testid="chat-pinned-messages"]') as HTMLElement;
+      expect(strip).not.toBeNull();
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(strip));
+      expect(observer?.observed).toContain(strip);
+    });
+
+    describe('coarse-pointer pin protection (iOS)', () => {
+      // setupTests defines window.matchMedia as writable but not
+      // configurable, so swap it by assignment rather than vi.stubGlobal.
+      let originalMatchMedia: typeof window.matchMedia;
+
+      const stubCoarsePointer = (): void => {
+        window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+          matches: query === '(pointer: coarse)',
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })) as typeof window.matchMedia;
+      };
+
+      beforeEach(() => {
+        originalMatchMedia = window.matchMedia;
+      });
+
+      afterEach(() => {
+        window.matchMedia = originalMatchMedia;
+        vi.useRealTimers();
+      });
+
+      it('snaps back when the browser displaces a pinned list without user input', () => {
+        stubCoarsePointer();
+        // scrollTop 0 with scrollHeight 500 = displaced far from the bottom,
+        // e.g. WebKit resetting scroll when the drawer transition ends.
+        const { list } = renderWithGeometry(0);
+
+        list.dispatchEvent(new Event('scroll'));
+
+        expect(list.scrollTop).toBe(500);
+      });
+
+      it('lets a touch-driven scroll unpin (no snap back, no resize re-pin)', () => {
+        stubCoarsePointer();
+        const { list, observer } = renderWithGeometry(0);
+
+        fireEvent.touchMove(list);
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(0);
+
+        observer?.trigger();
+        expect(list.scrollTop).toBe(0);
+      });
+
+      it('re-arms the pin when a user scroll returns to the bottom', () => {
+        vi.useFakeTimers();
+        stubCoarsePointer();
+        const { list } = renderWithGeometry(0);
+
+        // User drags up: unpinned at the top.
+        fireEvent.touchMove(list);
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(0);
+
+        // User scrolls back down to the bottom: pin re-arms.
+        list.scrollTop = 450;
+        list.dispatchEvent(new Event('scroll'));
+
+        // A later browser-initiated reset (past the momentum window) snaps back.
+        vi.advanceTimersByTime(1_000);
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(500);
+      });
+
+      it('keeps momentum scrolls classified as user input past the initial window', () => {
+        vi.useFakeTimers();
+        stubCoarsePointer();
+        const { list } = renderWithGeometry(0);
+
+        fireEvent.touchMove(list);
+        // Momentum events keep arriving after touch input; each one refreshes
+        // the user window so the chain never gets misread as a browser reset.
+        vi.advanceTimersByTime(150);
+        list.dispatchEvent(new Event('scroll'));
+        vi.advanceTimersByTime(150);
+        list.dispatchEvent(new Event('scroll'));
+
+        expect(list.scrollTop).toBe(0);
+      });
     });
   });
 
