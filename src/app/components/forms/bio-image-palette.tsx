@@ -143,6 +143,41 @@ const LicenseBadge = ({ license, licenseUrl }: LicenseBadgeProps): JSX.Element =
   );
 };
 
+interface FaceBadgeProps {
+  hasFace: boolean | null | undefined;
+  faceScore: number | null | undefined;
+}
+
+/**
+ * Positive face-detection signal for a discovered image: a "Face NN%" badge when
+ * Rekognition returned a confidence score, or a bare "Face" badge when a face was
+ * detected without a score. Renders nothing for a false/absent signal — the badge
+ * is never a negative marker, so the absence of a face is simply the absence of a
+ * badge.
+ */
+const FaceBadge = ({ hasFace, faceScore }: FaceBadgeProps): JSX.Element | null => {
+  if (faceScore != null) {
+    const percent = Math.round(faceScore);
+    return (
+      <Badge
+        variant="outline"
+        aria-label={`Face match ${percent}%`}
+        className="bg-background/80 text-[10px]"
+      >
+        {`Face ${percent}%`}
+      </Badge>
+    );
+  }
+  if (hasFace === true) {
+    return (
+      <Badge variant="outline" aria-label="Face detected" className="bg-background/80 text-[10px]">
+        Face
+      </Badge>
+    );
+  }
+  return null;
+};
+
 interface BioImageTileProps {
   image: BioStatusImage;
   onDelete: (id: string) => void;
@@ -234,7 +269,10 @@ const BioImageTile = ({
           </button>
         </div>
       )}
-      <LicenseBadge license={image.license} licenseUrl={image.licenseUrl} />
+      <div className="flex flex-wrap items-center gap-1">
+        <LicenseBadge license={image.license} licenseUrl={image.licenseUrl} />
+        <FaceBadge hasFace={image.hasFace} faceScore={image.faceScore} />
+      </div>
       <div className="flex gap-1">
         <Dialog>
           <DialogTrigger asChild>

@@ -107,6 +107,10 @@ export interface ArtistBioImageRecord {
   isPrimary: boolean;
   kind: string | null;
   alt: string | null;
+  /** Rekognition face signal: `true`/`false` once analyzed, `null` when not analyzed. */
+  hasFace: boolean | null;
+  /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
+  faceScore: number | null;
   /** Provenance: `'generated'` (AI discovery) or `'custom'` (admin upload); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;

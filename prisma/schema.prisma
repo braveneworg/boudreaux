@@ -427,6 +427,8 @@ model ArtistBioImage {
   isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images
   kind         String? // photo | cover — subject classification from discovery
   alt          String? // Accessible description written by the vision pass
+  hasFace      Boolean? // Rekognition face signal; null = not analyzed
+  faceScore    Float? // Rekognition face-match confidence 0–100; null = not analyzed
   /// Provenance: "generated" (AI discovery) or "custom" (admin upload). Nullable
   /// because MongoDB documents predating this field are missing it — a null/missing
   /// value is treated as generated, so regeneration deletes it like a generated row.

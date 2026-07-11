@@ -293,6 +293,50 @@ describe('licenseUrl wire additions', () => {
   });
 });
 
+describe('face-signal wire additions', () => {
+  const image = {
+    url: 'https://cdn.example.com/a.jpg',
+    attribution: 'CAA',
+    isPrimary: false,
+  };
+
+  it('retains hasFace and faceScore on the wire image schema', () => {
+    const parsed = bioGenerationImageSchema.parse({ ...image, hasFace: true, faceScore: 97.4 });
+    expect(parsed.hasFace).toBe(true);
+    expect(parsed.faceScore).toBe(97.4);
+  });
+
+  it('accepts null hasFace and faceScore on the wire image schema', () => {
+    expect(
+      bioGenerationImageSchema.safeParse({ ...image, hasFace: null, faceScore: null }).success
+    ).toBe(true);
+  });
+
+  it('accepts absent hasFace and faceScore on the wire image schema', () => {
+    expect(bioGenerationImageSchema.safeParse(image).success).toBe(true);
+  });
+
+  it('rejects a faceScore above 100', () => {
+    expect(bioGenerationImageSchema.safeParse({ ...image, faceScore: 101 }).success).toBe(false);
+  });
+
+  it('rejects a negative faceScore', () => {
+    expect(bioGenerationImageSchema.safeParse({ ...image, faceScore: -1 }).success).toBe(false);
+  });
+
+  it('inherits the face fields on the status image schema', () => {
+    const parsed = bioStatusImageSchema.parse({
+      ...image,
+      id: '665f1f77bcf86cd799439011',
+      attribution: null,
+      hasFace: true,
+      faceScore: 88.2,
+    });
+    expect(parsed.hasFace).toBe(true);
+    expect(parsed.faceScore).toBe(88.2);
+  });
+});
+
 describe('bioProgressSchema', () => {
   const validAt = '2026-07-08T00:00:00.000Z';
 

@@ -418,6 +418,31 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('findCustomBioImageUrls', () => {
+    it('queries custom-origin rows for the artist, ordered by sortOrder, url-only', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findCustomBioImageUrls('a1');
+
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', origin: 'custom' },
+        orderBy: { sortOrder: 'asc' },
+        select: { url: true },
+      });
+    });
+
+    it('maps the rows to their url strings', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([
+        { url: 'https://cdn.example/1.webp' },
+        { url: 'https://cdn.example/2.webp' },
+      ] as never);
+
+      const result = await ArtistRepository.findCustomBioImageUrls('a1');
+
+      expect(result).toEqual(['https://cdn.example/1.webp', 'https://cdn.example/2.webp']);
+    });
+  });
+
   describe('updateBioImageUrl', () => {
     it('updates the image row url by id', async () => {
       vi.mocked(prisma.artistBioImage.update).mockResolvedValue({} as never);
@@ -589,6 +614,8 @@ describe('ArtistRepository', () => {
           isPrimary: true,
           kind: null,
           alt: null,
+          hasFace: null,
+          faceScore: null,
           sortOrder: 0,
         },
       ],
@@ -659,6 +686,21 @@ describe('ArtistRepository', () => {
       expect(arg.data.shortBio).toBe('<p>short</p>');
       expect(arg.data.bioImages.create).toEqual([{ ...content.images[0], origin: 'generated' }]);
       expect(arg.data.bioLinks.create).toEqual([{ ...content.links[0], origin: 'generated' }]);
+    });
+
+    it('carries the face signal fields into the recreated generated image rows', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      const contentWithFace = {
+        ...content,
+        images: [{ ...content.images[0], hasFace: true, faceScore: 97.4 }],
+      };
+
+      await ArtistRepository.replaceBioContent('a1', contentWithFace);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioImages.create[0]).toMatchObject({ hasFace: true, faceScore: 97.4 });
     });
 
     it('does not re-insert a generated image whose url case-insensitively matches a custom survivor', async () => {
@@ -778,6 +820,24 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { licenseUrl: true } });
+    });
+
+    it('selects hasFace on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a6');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { hasFace: true } });
+    });
+
+    it('selects faceScore on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a7');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { faceScore: true } });
     });
 
     it('selects bioProgress so the status endpoint can surface it', async () => {

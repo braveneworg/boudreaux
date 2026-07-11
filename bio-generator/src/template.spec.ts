@@ -35,6 +35,18 @@ describe('template.yaml Serper wiring', () => {
   });
 });
 
+describe('template.yaml Rekognition wiring', () => {
+  // Byte-based Rekognition ops (DetectFaces/CompareFaces) take image bytes
+  // inline, so they have no resource ARN — '*' is the only valid scope.
+  it('grants DetectFaces', () => {
+    expect(template).toContain('rekognition:DetectFaces');
+  });
+
+  it('grants CompareFaces', () => {
+    expect(template).toContain('rekognition:CompareFaces');
+  });
+});
+
 describe('template.yaml function timeout', () => {
   // The draft-and-synthesize pipeline runs two parallel drafts plus an editor
   // pass, each with up to 90s of 429 backoff — the worst case no longer fits

@@ -43,6 +43,8 @@ export const bioGenerationImageSchema = z.object({
   isPrimary: z.boolean(),
   kind: z.enum(['photo', 'cover']).nullable().optional(),
   alt: z.string().nullable().optional(),
+  hasFace: z.boolean().nullable().optional(),
+  faceScore: z.number().min(0).max(100).nullable().optional(),
 });
 
 export const bioGenerationLinkSchema = z.object({
@@ -202,6 +204,10 @@ export interface GeneratedBioContent {
     isPrimary: boolean;
     kind?: string | null;
     alt?: string | null;
+    /** Rekognition face signal; `null`/absent when the image was not analyzed. */
+    hasFace?: boolean | null;
+    /** Rekognition face-match confidence 0–100; `null`/absent when not analyzed. */
+    faceScore?: number | null;
     /** Provenance from the status endpoint (`generated`/`custom`); absent on the lambda path. */
     origin?: string | null;
   }>;

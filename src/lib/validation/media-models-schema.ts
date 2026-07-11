@@ -93,6 +93,8 @@ const artistBioImageSchema = z.object({
   isPrimary: z.boolean(),
   kind: nullableString,
   alt: nullableString,
+  hasFace: z.boolean().nullable(),
+  faceScore: z.number().nullable(),
   origin: nullableString,
   sortOrder: z.number(),
   createdAt: date,

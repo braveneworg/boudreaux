@@ -60,14 +60,26 @@ const visionResponseSchema = z.object({ verdicts: z.array(z.unknown()) });
 
 type VisionVerdict = z.infer<typeof visionVerdictSchema>;
 
-/** Per-item salvage outcome for one batch: kept images plus telemetry counts. */
+/** Per-item salvage outcome for one batch: kept survivors plus telemetry counts. */
 interface BatchVerdictResult {
-  kept: BioImage[];
+  kept: VerifiedScrapedImage[];
   defaulted: number;
   dropped: number;
 }
 
 interface FetchedCandidate {
+  image: BioImage;
+  mimeType: string;
+  base64: string;
+}
+
+/**
+ * A vision-verified survivor carrying the bytes fetched during gating, so a
+ * downstream stage (e.g. Rekognition face annotation) never refetches. The
+ * `image` is the verdict-enriched {@link BioImage}; `mimeType`/`base64` are the
+ * exact values {@link fetchCandidate} produced for it.
+ */
+export interface VerifiedScrapedImage {
   image: BioImage;
   mimeType: string;
   base64: string;
@@ -146,20 +158,27 @@ const buildVisionParts = (
   },
 ];
 
-/** Maps one gated verdict to its kept image, or nothing when rejected/out-of-range. */
+/**
+ * Maps one gated verdict to its kept survivor (verdict-enriched image plus the
+ * bytes its fetch produced), or nothing when rejected/out-of-range.
+ */
 const keepFromVerdict = (
   verdict: VisionVerdict,
   confidence: number,
   batch: FetchedCandidate[]
-): BioImage[] => {
+): VerifiedScrapedImage[] => {
   if (verdict.verdict === 'reject' || confidence < VISION_MIN_CONFIDENCE) return [];
   const entry = batch.at(verdict.index);
   if (!entry) return [];
   return [
     {
-      ...entry.image,
-      kind: verdict.verdict === 'album_cover' ? ('cover' as const) : ('photo' as const),
-      alt: verdict.alt?.trim() || entry.image.title || null,
+      image: {
+        ...entry.image,
+        kind: verdict.verdict === 'album_cover' ? ('cover' as const) : ('photo' as const),
+        alt: verdict.alt?.trim() || entry.image.title || null,
+      },
+      mimeType: entry.mimeType,
+      base64: entry.base64,
     },
   ];
 };
@@ -171,7 +190,7 @@ const keepFromVerdict = (
  * defaulted/dropped counts for salvage telemetry.
  */
 const salvageVerdicts = (raw: unknown[], batch: FetchedCandidate[]): BatchVerdictResult => {
-  const kept: BioImage[] = [];
+  const kept: VerifiedScrapedImage[] = [];
   let defaulted = 0;
   let dropped = 0;
   for (const item of raw) {
@@ -192,7 +211,7 @@ const verifyBatch = async (
   context: VisionContext,
   config: VisionApiConfig,
   options: FetchRetryOptions
-): Promise<BioImage[]> => {
+): Promise<VerifiedScrapedImage[]> => {
   const { apiKey, model } = config;
   const response = await fetchWithRetry(
     `${GEMINI_API_BASE}/${model}:generateContent`,
@@ -236,7 +255,7 @@ const verifyBatchSafely = async (
   context: VisionContext,
   config: VisionApiConfig,
   options: FetchRetryOptions
-): Promise<BioImage[]> => {
+): Promise<VerifiedScrapedImage[]> => {
   try {
     return await verifyBatch(batch, context, config, options);
   } catch (err) {
@@ -258,7 +277,7 @@ export const verifyScrapedImages = async (
   context: VisionContext,
   config: VisionApiConfig,
   options: FetchRetryOptions = {}
-): Promise<BioImage[]> => {
+): Promise<VerifiedScrapedImage[]> => {
   if (!candidates.length) return [];
   const fetchFn = options.fetchFn ?? fetch;
   const fetched = await fetchCandidates(candidates, fetchFn);
@@ -273,7 +292,7 @@ export const verifyScrapedImages = async (
   // Verify batches through a small concurrency pool. Within each pooled slice
   // Promise.all preserves array order, so survivors aggregate in batch order
   // regardless of which batch's request completes first.
-  const kept: BioImage[] = [];
+  const kept: VerifiedScrapedImage[] = [];
   for (let i = 0; i < batches.length; i += VISION_BATCH_CONCURRENCY) {
     const slice = batches.slice(i, i + VISION_BATCH_CONCURRENCY);
     const settled = await Promise.all(

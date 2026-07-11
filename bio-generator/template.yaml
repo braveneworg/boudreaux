@@ -54,6 +54,13 @@ Resources:
               Action:
                 - kms:Decrypt
               Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
+            # Byte-based Rekognition ops (DetectFaces/CompareFaces) take image
+            # bytes inline, so they have no resource ARN — '*' is the only valid scope.
+            - Effect: Allow
+              Action:
+                - rekognition:DetectFaces
+                - rekognition:CompareFaces
+              Resource: '*'
       Environment:
         Variables:
           SSM_PATH_GEMINI_API_KEY: '/fakefour/gemini/api-key'

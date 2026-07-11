@@ -127,6 +127,8 @@ type RehostedImage = {
   isPrimary: boolean;
   kind: string | null;
   alt: string | null;
+  hasFace: boolean | null;
+  faceScore: number | null;
 };
 
 /** Re-hosted image with its final sort position for persistence. */
@@ -185,6 +187,10 @@ const buildRehostedRecord = (
   isPrimary: image.isPrimary,
   kind: image.kind ?? null,
   alt: sanitizeOptional(image.alt),
+  // Face fields are numbers/booleans validated by the schema — pass them
+  // through unchanged (no href/text sanitizer applies).
+  hasFace: image.hasFace ?? null,
+  faceScore: image.faceScore ?? null,
 });
 
 /**
@@ -235,15 +241,18 @@ const buildImageUrlIndex = (
 };
 
 /**
- * Persist-order comparator: primaries first, then licensed images before
- * unlicensed ones (an image is "licensed" when it carries any `license` string).
- * Returns 0 within a tier so `Array.prototype.sort` — spec-stable — preserves the
- * incoming order there. Extracted as a named helper to stay within the
- * cyclomatic-complexity limit.
+ * Persist-order comparator, tiered top to bottom: primaries first, then higher
+ * Rekognition face scores (a null/unscored image sorts last within this tier),
+ * then licensed images before unlicensed ones (an image is "licensed" when it
+ * carries any `license` string). Returns 0 within a tier so `Array.prototype.sort`
+ * — spec-stable — preserves the incoming order there. Extracted as a named helper
+ * to stay within the cyclomatic-complexity limit.
  */
-const compareByLicenseRank = (a: RehostedImage, b: RehostedImage): number => {
+const compareByImageRank = (a: RehostedImage, b: RehostedImage): number => {
   const primaryDelta = Number(b.isPrimary) - Number(a.isPrimary);
   if (primaryDelta !== 0) return primaryDelta;
+  const faceDelta = (b.faceScore ?? -1) - (a.faceScore ?? -1);
+  if (faceDelta !== 0) return faceDelta;
   return Number(Boolean(b.license)) - Number(Boolean(a.license));
 };
 
@@ -324,6 +333,8 @@ const appendInternalCoverImages = (
       isPrimary: false,
       kind: 'cover',
       alt: `${release.title} album cover`,
+      hasFace: null,
+      faceScore: null,
       sortOrder: result.length,
     });
   }
@@ -390,17 +401,17 @@ export const persistGeneratedBio = async (
   // retains the picture instead of having the sanitizer drop the placeholder.
   const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
 
-  // Rank survivors `isPrimary desc, licensed desc` (stable within a tier) then
-  // re-index sortOrder over the sorted result. The Lambda already caps the
-  // number of primaries (and which images are primary is its choice, not a
-  // function of array position), so preserve isPrimary as-is.
+  // Rank survivors `isPrimary desc, faceScore desc (nulls last), licensed desc`
+  // (stable within a tier) then re-index sortOrder over the sorted result. The
+  // Lambda already caps the number of primaries (and which images are primary is
+  // its choice, not a function of array position), so preserve isPrimary as-is.
   //
   // Placeholder-safe: `imageUrlByIndex` (built above at buildImageUrlIndex) keys
   // by the ORIGINAL, pre-sort index, so re-ordering the persisted rows here does
   // not disturb `image:N` placeholder resolution.
   const persistedImages = rehosted
     .filter((image): image is RehostedImage => image !== null)
-    .sort(compareByLicenseRank)
+    .sort(compareByImageRank)
     .map((image, index) => ({ ...image, sortOrder: index }));
 
   // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
@@ -469,6 +480,36 @@ const resolveBioBaseUrl = (): string | null => {
 };
 
 /**
+ * Cap on how many reference images the Lambda receives per run — enough to give
+ * Rekognition a strong face signal without inflating the invoke payload.
+ */
+const MAX_REFERENCE_IMAGES = 3;
+
+/**
+ * Build the Lambda's `referenceImageUrls`: the artist's own image sources first,
+ * then admin-uploaded custom bio image URLs, keeping only absolute http(s) URLs,
+ * deduped case-insensitively, capped at {@link MAX_REFERENCE_IMAGES}. Order is
+ * preserved so the artist's canonical images take priority when the cap trims.
+ */
+const buildReferenceImageUrls = (
+  artistImageSrcs: Array<string | null>,
+  customBioImageUrls: string[]
+): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const candidate of [...artistImageSrcs, ...customBioImageUrls]) {
+    const url = sanitizeUrl(candidate ?? '');
+    if (!url) continue;
+    const key = url.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(url);
+    if (result.length === MAX_REFERENCE_IMAGES) break;
+  }
+  return result;
+};
+
+/**
  * Read the artist, guard it has a usable name, prefetch its published releases
  * (non-fatal on failure), and assemble the Lambda input. Shared by the fake and
  * real generation paths. Returns a typed error when the artist is missing or has
@@ -500,6 +541,23 @@ const prepareGeneration = async (
     }
   );
 
+  // Admin-uploaded custom bio images round out the artist's own images as face
+  // references. A lookup failure degrades to artist images only (never fatal).
+  const customBioImageUrls = await ArtistRepository.findCustomBioImageUrls(artist.id).catch(
+    (error) => {
+      loggers.media.warn('bio_custom_reference_images_failed', {
+        artistId: artist.id,
+        error: String(error),
+      });
+      return [] as string[];
+    }
+  );
+
+  const referenceImageUrls = buildReferenceImageUrls(
+    artist.images.map((image) => image.src),
+    customBioImageUrls
+  );
+
   const input: BioGenerationLambdaInput = {
     artistId: artist.id,
     displayName,
@@ -512,6 +570,7 @@ const prepareGeneration = async (
     diedOn: toIsoDate(artist.diedOn),
     formedOn: toIsoDate(artist.formedOn),
     releases: releases.length ? toLambdaReleases(releases) : undefined,
+    referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
   };
 
   return { ok: true, prep: { artist, releases, input } };

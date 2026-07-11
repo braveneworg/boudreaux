@@ -24,6 +24,7 @@ const setBioJobTokenMock = vi.hoisted(() => vi.fn());
 const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
 const setBioProgressMock = vi.hoisted(() => vi.fn());
 const getBioGenerationStateMock = vi.hoisted(() => vi.fn());
+const findCustomBioImageUrlsMock = vi.hoisted(() => vi.fn());
 const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
 const fakeBioGenerationMock = vi.hoisted(() => vi.fn());
 
@@ -49,6 +50,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     claimBioJobToken: (id: string, token: string) => claimBioJobTokenMock(id, token),
     setBioProgress: (id: string, progress: unknown) => setBioProgressMock(id, progress),
     getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
+    findCustomBioImageUrls: (id: string) => findCustomBioImageUrlsMock(id),
   },
 }));
 
@@ -635,12 +637,45 @@ describe('persistGeneratedBio', () => {
 
     expect(content.images[0].sourceUrl).toBeNull();
   });
+
+  it('threads hasFace and faceScore from the discovered image through to the persisted row', async () => {
+    const content = await persistGeneratedBio(
+      artistId,
+      withData({
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: 'Portrait',
+            attribution: 'Photographer',
+            license: null,
+            sourceUrl: null,
+            hasFace: true,
+            faceScore: 97.4,
+            isPrimary: true,
+          },
+        ],
+      }),
+      []
+    );
+
+    expect(content.images[0].hasFace).toBe(true);
+    expect(content.images[0].faceScore).toBe(97.4);
+  });
+
+  it('defaults hasFace and faceScore to null when the discovered image omits them', async () => {
+    const content = await persistGeneratedBio(artistId, baseData, []);
+
+    expect(content.images[0].hasFace).toBeNull();
+    expect(content.images[0].faceScore).toBeNull();
+  });
 });
 
-describe('persistGeneratedBio license-aware sort', () => {
+describe('persistGeneratedBio image-rank sort', () => {
   const artistId = 'a'.repeat(24);
 
-  // A discovered image whose fields default to a non-primary, unlicensed row.
+  // A discovered image whose fields default to a non-primary, unlicensed,
+  // face-unscored row.
   const image = (
     overrides: Partial<BioGenerationData['images'][number]> & { url: string }
   ): BioGenerationData['images'][number] => ({
@@ -682,7 +717,9 @@ describe('persistGeneratedBio license-aware sort', () => {
 
   it('orders primaries first, then licensed non-primaries before unlicensed ones', async () => {
     // Input deliberately interleaves tiers so a stable sort must reorder them:
-    // [unlicensed non-primary, licensed non-primary, primary].
+    // [unlicensed non-primary, licensed non-primary, primary]. Neither the
+    // licensed nor unlicensed row carries a face score, so they fall through the
+    // face tier and are separated by the license tier.
     const urls = ['u', 'l', 'p'];
     mockRehostEcho(urls);
 
@@ -699,7 +736,56 @@ describe('persistGeneratedBio license-aware sort', () => {
     expect(content.images.map((img) => img.url)).toEqual([cdn('p'), cdn('l'), cdn('u')]);
   });
 
-  it('re-indexes sortOrder to 0..n after the license-aware sort', async () => {
+  it('ranks a higher face score ahead of a lower one, both ahead of an unscored row', async () => {
+    // face 95 beats face 60 beats null-face (nulls sort last within the tier).
+    const urls = ['f60', 'none', 'f95'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData([
+        image({ url: 'f60', faceScore: 60 }),
+        image({ url: 'none' }),
+        image({ url: 'f95', faceScore: 95 }),
+      ]),
+      []
+    );
+
+    expect(content.images.map((img) => img.url)).toEqual([cdn('f95'), cdn('f60'), cdn('none')]);
+  });
+
+  it('breaks a face-score tie of nulls by license, keeping licensed ahead of unlicensed', async () => {
+    // Both rows are non-primary and face-unscored; the license tier decides.
+    const urls = ['unlicensed', 'licensed'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData([image({ url: 'unlicensed' }), image({ url: 'licensed', license: 'CC BY 4.0' })]),
+      []
+    );
+
+    expect(content.images.map((img) => img.url)).toEqual([cdn('licensed'), cdn('unlicensed')]);
+  });
+
+  it('keeps a primary ahead of a higher-scored non-primary', async () => {
+    // isPrimary is the top tier, so it wins even against a strong face score.
+    const urls = ['face99', 'primary'];
+    mockRehostEcho(urls);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData([
+        image({ url: 'face99', faceScore: 99 }),
+        image({ url: 'primary', isPrimary: true }),
+      ]),
+      []
+    );
+
+    expect(content.images.map((img) => img.url)).toEqual([cdn('primary'), cdn('face99')]);
+  });
+
+  it('re-indexes sortOrder to 0..n after the image-rank sort', async () => {
     const urls = ['u', 'l', 'p'];
     mockRehostEcho(urls);
 
@@ -737,7 +823,7 @@ describe('persistGeneratedBio license-aware sort', () => {
   });
 
   it('resolves an image:N placeholder for an image the sort moves to a later slot', async () => {
-    // image:0 is the unlicensed row that the license-aware sort demotes to last;
+    // image:0 is the unlicensed row that the image-rank sort demotes to last;
     // the placeholder index is the ORIGINAL index, so it must still resolve to
     // that image's CDN url even though its persisted position changed.
     const urls = ['u', 'l'];
@@ -773,6 +859,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     bornOn: null as Date | null,
     diedOn: null as Date | null,
     formedOn: null as Date | null,
+    images: [] as Array<{ src: string | null }>,
   };
 
   const fakeOk: BioGenerationResult = {
@@ -793,6 +880,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
     setBioProgressMock.mockReset().mockResolvedValue(undefined);
     findByIdMock.mockReset().mockResolvedValue(artist);
+    findCustomBioImageUrlsMock.mockReset().mockResolvedValue([]);
     findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
     replaceBioContentMock.mockReset().mockResolvedValue(undefined);
     rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
@@ -1108,6 +1196,88 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(input.releases).toBeUndefined();
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         'bio_release_covers_failed',
+        expect.objectContaining({ artistId: artist.id })
+      );
+    });
+
+    it('builds referenceImageUrls from artist images first, then custom bio images', async () => {
+      findByIdMock.mockResolvedValue({
+        ...artist,
+        images: [{ src: 'https://cdn.fakefour.com/artist/a.jpg' }],
+      });
+      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/custom/b.jpg']);
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.referenceImageUrls).toEqual([
+        'https://cdn.fakefour.com/artist/a.jpg',
+        'https://cdn.fakefour.com/custom/b.jpg',
+      ]);
+    });
+
+    it('keeps only absolute http(s) reference URLs and caps the list at three', async () => {
+      findByIdMock.mockResolvedValue({
+        ...artist,
+        images: [
+          { src: 'https://cdn.fakefour.com/1.jpg' },
+          { src: '/relative/2.jpg' },
+          { src: null },
+          { src: 'javascript:alert(1)' },
+          { src: 'https://cdn.fakefour.com/3.jpg' },
+        ],
+      });
+      findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/4.jpg',
+        'https://cdn.fakefour.com/5.jpg',
+      ]);
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.referenceImageUrls).toEqual([
+        'https://cdn.fakefour.com/1.jpg',
+        'https://cdn.fakefour.com/3.jpg',
+        'https://cdn.fakefour.com/4.jpg',
+      ]);
+    });
+
+    it('dedupes reference URLs case-insensitively', async () => {
+      findByIdMock.mockResolvedValue({
+        ...artist,
+        images: [{ src: 'https://cdn.fakefour.com/A.jpg' }],
+      });
+      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/a.jpg']);
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.referenceImageUrls).toEqual(['https://cdn.fakefour.com/A.jpg']);
+    });
+
+    it('omits referenceImageUrls entirely when no absolute URLs are available', async () => {
+      findByIdMock.mockResolvedValue({ ...artist, images: [{ src: null }] });
+      findCustomBioImageUrlsMock.mockResolvedValue([]);
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.referenceImageUrls).toBeUndefined();
+    });
+
+    it('degrades to artist images only and warns when the custom-image lookup fails', async () => {
+      findByIdMock.mockResolvedValue({
+        ...artist,
+        images: [{ src: 'https://cdn.fakefour.com/artist.jpg' }],
+      });
+      findCustomBioImageUrlsMock.mockRejectedValue(new Error('db down'));
+
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.referenceImageUrls).toEqual(['https://cdn.fakefour.com/artist.jpg']);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'bio_custom_reference_images_failed',
         expect.objectContaining({ artistId: artist.id })
       );
     });
