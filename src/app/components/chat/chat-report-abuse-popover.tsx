@@ -103,7 +103,12 @@ export const ChatReportAbusePopover = () => {
 
   return (
     <div className="bg-background sticky top-0 z-10 flex justify-center border-b py-2">
-      <Popover open={open} onOpenChange={handleOpenChange}>
+      {/* The content portals outside the (modal) chat drawer, whose trapped
+          FocusScope yanks focus out of the username input unless this
+          popover's scope pauses it (needs the deduped single
+          @radix-ui/react-focus-scope instance — see chat-emoji-picker.tsx).
+          `modal` adds outside-pointer-event isolation while open. */}
+      <Popover modal open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <button
             type="button"

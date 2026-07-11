@@ -698,18 +698,29 @@ describe('ChatBody — list + input plumbing', () => {
     expect(fetchNextPage).toHaveBeenCalled();
   });
 
-  it('routes onSendResolved from ChatInput into addReceivedMessage (no-throw)', () => {
+  it('routes onSendResolved from ChatInput into the cached history (tempId stripped)', () => {
+    queryClient.setQueryData(queryKeys.chat.messages(), {
+      pages: [{ messages: [] }],
+      pageParams: [undefined],
+    });
     render(<ChatBody session={buildSession()} enabled />);
     expect(lastInputProps).not.toBeNull();
-    expect(() =>
+    act(() =>
       lastInputProps?.onSendResolved('tmp-1', {
         id: 'msg-99',
         body: 'after-send',
         reactions: [],
         createdAt: '2026-05-01T12:00:00Z',
         user: { id: 'user-9', username: 'fan', gravatarHash: 'h', role: null },
+        tempId: 'tmp-1',
       })
-    ).not.toThrow();
+    );
+
+    const cached = queryClient.getQueryData<{ pages: { messages: OptimisticChatMessage[] }[] }>(
+      queryKeys.chat.messages()
+    );
+    expect(cached?.pages[0].messages.map((m) => m.id)).toEqual(['msg-99']);
+    expect(cached?.pages[0].messages[0].tempId).toBeUndefined();
   });
 
   it('handles an undefined meStatus by defaulting blocked to false', () => {
@@ -827,5 +838,40 @@ describe('ChatBody — session fallbacks', () => {
     );
     expect(lastListProps).not.toBeNull();
     expect(lastListProps?.scrollToMentionUsername).toBeNull();
+  });
+});
+
+describe('ChatBody — reopen refresh', () => {
+  it('trims the cached history to the newest page and invalidates messages + pinned on mount', () => {
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData(queryKeys.chat.messages(), {
+      pages: [
+        { messages: [makeMessage({ id: 'new-1' })] },
+        { messages: [makeMessage({ id: 'old-1' })] },
+      ],
+      pageParams: [undefined, 'cursor-2'],
+    });
+
+    render(<ChatBody session={buildSession()} enabled />);
+
+    expect(queryClient.getQueryData(queryKeys.chat.messages())).toEqual({
+      pages: [{ messages: [makeMessage({ id: 'new-1' })] }],
+      pageParams: [undefined],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.chat.messages() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.chat.pinned() });
+  });
+
+  it('skips the refresh entirely for a blocked viewer', () => {
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    useChatMeQueryMock.mockReturnValue({ data: { blocked: true } });
+    queryClient.setQueryData(queryKeys.chat.messages(), {
+      pages: [{ messages: [] }, { messages: [] }],
+      pageParams: [undefined, 'cursor-2'],
+    });
+
+    render(<ChatBody session={buildSession()} enabled />);
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

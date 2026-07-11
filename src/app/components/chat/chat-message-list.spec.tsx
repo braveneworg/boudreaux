@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
@@ -124,6 +124,193 @@ describe('ChatMessageList', () => {
       />
     );
     expect(screen.getByTestId('bar-p1')).toBeInTheDocument();
+  });
+
+  describe('bottom pin on resize', () => {
+    class FakeResizeObserver {
+      static instances: FakeResizeObserver[] = [];
+      observed: Element[] = [];
+      private readonly callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        FakeResizeObserver.instances.push(this);
+      }
+      observe(el: Element): void {
+        this.observed.push(el);
+      }
+      unobserve(): void {}
+      disconnect(): void {
+        this.observed = [];
+      }
+      trigger(): void {
+        this.callback([], this as unknown as ResizeObserver);
+      }
+    }
+
+    beforeEach(() => {
+      FakeResizeObserver.instances = [];
+      vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const renderWithGeometry = (scrollTop: number) => {
+      const { container } = render(
+        <ChatMessageList {...baseProps} messages={[makeMsg('a'), makeMsg('b')]} />
+      );
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      Object.defineProperty(list, 'scrollHeight', { configurable: true, value: 500 });
+      Object.defineProperty(list, 'clientHeight', { configurable: true, value: 100 });
+      Object.defineProperty(list, 'scrollTop', {
+        configurable: true,
+        writable: true,
+        value: scrollTop,
+      });
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(list));
+      return { list, observer };
+    };
+
+    it('re-pins to the bottom when the container resizes while the viewer is at the bottom', () => {
+      const { list, observer } = renderWithGeometry(400);
+
+      expect(observer).toBeDefined();
+      observer?.trigger();
+
+      // iOS URL-bar collapse / keyboard resize: the pin must follow.
+      expect(list.scrollTop).toBe(500);
+    });
+
+    it('does not re-pin when the viewer has deliberately scrolled up', () => {
+      const { list, observer } = renderWithGeometry(0);
+      // distance from bottom = 400 → flips wasAtBottom to false.
+      list.dispatchEvent(new Event('scroll'));
+
+      observer?.trigger();
+
+      expect(list.scrollTop).toBe(0);
+    });
+
+    it('also observes the message stream so late-loading rows keep the tail visible', () => {
+      const { container } = render(<ChatMessageList {...baseProps} messages={[makeMsg('a')]} />);
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      const stream = list.querySelector('ul') as HTMLElement;
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(list));
+
+      expect(observer?.observed).toContain(stream);
+    });
+
+    it('observes the pinned strip so a late-arriving strip keeps the tail visible', () => {
+      const pinned = makeMsg('p1');
+      const { container, rerender } = render(
+        <ChatMessageList {...baseProps} messages={[makeMsg('a')]} />
+      );
+      // The strip arrives from its own query after first paint: it shifts
+      // the stream down without resizing the container or the stream box,
+      // so it must be observed itself once it mounts.
+      rerender(
+        <ChatMessageList
+          {...baseProps}
+          messages={[makeMsg('a'), pinned]}
+          pinnedMessages={[pinned]}
+        />
+      );
+
+      const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
+      const strip = list.querySelector('[data-testid="chat-pinned-messages"]') as HTMLElement;
+      expect(strip).not.toBeNull();
+      const observer = FakeResizeObserver.instances.find((o) => o.observed.includes(strip));
+      expect(observer?.observed).toContain(strip);
+    });
+
+    describe('coarse-pointer pin protection (iOS)', () => {
+      // setupTests defines window.matchMedia as writable but not
+      // configurable, so swap it by assignment rather than vi.stubGlobal.
+      let originalMatchMedia: typeof window.matchMedia;
+
+      const stubCoarsePointer = (): void => {
+        window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+          matches: query === '(pointer: coarse)',
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })) as typeof window.matchMedia;
+      };
+
+      beforeEach(() => {
+        originalMatchMedia = window.matchMedia;
+      });
+
+      afterEach(() => {
+        window.matchMedia = originalMatchMedia;
+        vi.useRealTimers();
+      });
+
+      it('snaps back when the browser displaces a pinned list without user input', () => {
+        stubCoarsePointer();
+        // scrollTop 0 with scrollHeight 500 = displaced far from the bottom,
+        // e.g. WebKit resetting scroll when the drawer transition ends.
+        const { list } = renderWithGeometry(0);
+
+        list.dispatchEvent(new Event('scroll'));
+
+        expect(list.scrollTop).toBe(500);
+      });
+
+      it('lets a touch-driven scroll unpin (no snap back, no resize re-pin)', () => {
+        stubCoarsePointer();
+        const { list, observer } = renderWithGeometry(0);
+
+        fireEvent.touchMove(list);
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(0);
+
+        observer?.trigger();
+        expect(list.scrollTop).toBe(0);
+      });
+
+      it('re-arms the pin when a user scroll returns to the bottom', () => {
+        vi.useFakeTimers();
+        stubCoarsePointer();
+        const { list } = renderWithGeometry(0);
+
+        // User drags up: unpinned at the top.
+        fireEvent.touchMove(list);
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(0);
+
+        // User scrolls back down to the bottom: pin re-arms.
+        list.scrollTop = 450;
+        list.dispatchEvent(new Event('scroll'));
+
+        // A later browser-initiated reset (past the momentum window) snaps back.
+        vi.advanceTimersByTime(1_000);
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event('scroll'));
+        expect(list.scrollTop).toBe(500);
+      });
+
+      it('keeps momentum scrolls classified as user input past the initial window', () => {
+        vi.useFakeTimers();
+        stubCoarsePointer();
+        const { list } = renderWithGeometry(0);
+
+        fireEvent.touchMove(list);
+        // Momentum events keep arriving after touch input; each one refreshes
+        // the user window so the chain never gets misread as a browser reset.
+        vi.advanceTimersByTime(150);
+        list.dispatchEvent(new Event('scroll'));
+        vi.advanceTimersByTime(150);
+        list.dispatchEvent(new Event('scroll'));
+
+        expect(list.scrollTop).toBe(0);
+      });
+    });
   });
 
   it('updates the wasAtBottom flag in response to scroll events', () => {
