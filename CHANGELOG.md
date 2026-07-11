@@ -5,842 +5,793 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.202.0] - 2026-07-11
 
+### Fixed
 
+- fix(ci): release push race + changelog generation (#584)
 
+## [4.201.0] - 2026-07-11
 
+### Added
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- feat(bio): serper images + license-aware ranking (#577)
 
 ## [4.200.0] - 2026-07-11
 
 ### Added
 
-- fix: 🐛 gate chat scroll pin on real user input (iOS) (#582)\n- feat(videos): ✨ best-quality auto poster capture (#576)\n- fix: 🐛 gate chat scroll pin on real user input (iOS) (#582)\n
+- feat(videos): ✨ best-quality auto poster capture (#576)
+
+### Fixed
+
+- fix: 🐛 gate chat scroll pin on real user input (iOS) (#582)
 
 ## [4.199.0] - 2026-07-11
 
-### Added
+### Fixed
 
-- fix(ui): 🐛 restore datepicker calendar popover (#575)\n- fix(ui): 🐛 restore datepicker calendar popover (#575)\n
+- fix(ui): 🐛 restore datepicker calendar popover (#575)
 
 ## [4.198.0] - 2026-07-11
 
-### Added
+### Fixed
 
-- fix: 🐛 chat drawer reopen scroll pinned to latest message (#581)\n- fix: 🐛 chat drawer reopen scroll pinned to latest message (#581)\n
+- fix: 🐛 chat drawer reopen scroll pinned to latest message (#581)
 
 ## [4.197.0] - 2026-07-11
 
-### Added
+### Fixed
 
-- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n
+- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)
 
 ## [4.196.0] - 2026-07-11
 
 ### Added
 
-- feat(bio): ✨ live bio generation progress (#574)\n- feat(bio): ✨ live bio generation progress (#574)\n
+- feat(bio): ✨ live bio generation progress (#574)
 
 ## [4.195.0] - 2026-07-11
 
 ### Added
 
-- feat: ✨ update zine heading designs (#578)\n- feat: ✨ update zine heading designs (#578)\n
+- feat: ✨ update zine heading designs (#578)
 
 ## [4.194.0] - 2026-07-10
 
 ### Added
 
-- feat: ✨ add admin announcements sms blast (#571)\n- feat: ✨ add admin announcements sms blast (#571)\n
+- feat: ✨ add admin announcements sms blast (#571)
 
 ## [4.193.0] - 2026-07-08
 
 ### Added
 
-- feat(videos): ✨ admin uploads + videos page (#573)\n- feat(videos): ✨ admin uploads + videos page (#573)\n
+- feat(videos): ✨ admin uploads + videos page (#573)
 
 ## [4.192.0] - 2026-07-08
 
 ### Added
 
-- feat(bio): ✨ regen-proof custom bio media (#570)\n- feat(bio): ✨ regen-proof custom bio media (#570)\n
+- feat(bio): ✨ regen-proof custom bio media (#570)
 
 ## [4.191.0] - 2026-07-08
 
 ### Added
 
-- feat(bio): ✨ gemini tier-1 capacity + pro synth (#572)\n- feat(bio): ✨ gemini tier-1 capacity + pro synth (#572)\n
+- feat(bio): ✨ gemini tier-1 capacity + pro synth (#572)
 
 ## [4.190.0] - 2026-07-07
 
-### Added
+### Changed
 
-- docs: 📝 add self-correcting LESSONS section to CLAUDE.md (#569)\n- perf: ⚡ desktop Lighthouse ≥95 — SSR the home player (#568)\n- docs: 📝 add self-correcting LESSONS section to CLAUDE.md (#569)\n
+- docs: 📝 add self-correcting LESSONS section to CLAUDE.md (#569)
+- perf: ⚡ desktop Lighthouse ≥95 — SSR the home player (#568)
 
 ## [4.189.0] - 2026-07-06
 
-### Added
+### Fixed
 
-- fix: 🔨make claude.md reference global agents.md (#567)\n- fix: 🔨make claude.md reference global agents.md (#567)\n
+- fix: 🔨make claude.md reference global agents.md (#567)
 
 ## [4.188.0] - 2026-07-06
 
-### Added
+### Fixed
 
-- fix(home): align loading state with the zine UI (#566)\n- fix(home): align loading state with the zine UI (#566)\n
+- fix(home): align loading state with the zine UI (#566)
 
 ## [4.187.0] - 2026-07-06
 
 ### Added
 
-- feat(bio): ✨ link OG-unfurl preview in bio editor (#565)\n- feat(bio): ✨ link OG-unfurl preview in bio editor (#565)\n
+- feat(bio): ✨ link OG-unfurl preview in bio editor (#565)
 
 ## [4.186.0] - 2026-07-06
 
-### Added
+### Fixed
 
-- fix(bio-gen): 🐛 default vision cap back to 60 (#564)\n- fix(bio-gen): 🐛 default vision cap back to 60 (#564)\n
+- fix(bio-gen): 🐛 default vision cap back to 60 (#564)
 
 ## [4.185.0] - 2026-07-06
 
 ### Added
 
-- feat(bio): ✨ more vision-verified photos (phase 1) (#563)\n- feat(bio): ✨ more vision-verified photos (phase 1) (#563)\n
+- feat(bio): ✨ more vision-verified photos (phase 1) (#563)
 
 ## [4.184.0] - 2026-07-06
 
-### Added
+### Fixed
 
-- fix(bio): 🐛 restore generation + resolve hung UI (#562)\n- fix(bio): 🐛 restore generation + resolve hung UI (#562)\n
+- fix(bio): 🐛 restore generation + resolve hung UI (#562)
 
 ## [4.183.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ async bio generation + bounded discovery (#561)\n- feat: ✨ async bio generation + bounded discovery (#561)\n
+- feat: ✨ async bio generation + bounded discovery (#561)
 
 ## [4.182.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ discovery image quality gate (2a) (#560)\n- feat: ✨ discovery image quality gate (2a) (#560)\n
+- feat: ✨ discovery image quality gate (2a) (#560)
 
 ## [4.181.0] - 2026-07-05
 
 ### Added
 
-- feat: 🎨 various design tweaks (#559)\n- feat: 🎨 various design tweaks (#559)\n
+- feat: 🎨 various design tweaks (#559)
 
 ## [4.180.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ bio-image upload dialog + attribution editing + cutover (1b) (#558)\n- feat: ✨ bio-image upload dialog + attribution editing + cutover (1b) (#558)\n
+- feat: ✨ bio-image upload dialog + attribution editing + cutover (1b) (#558)
 
 ## [4.179.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ persistent bio palette + bio-image write backend (1a) (#557)\n- feat: ✨ persistent bio palette + bio-image write backend (1a) (#557)\n
+- feat: ✨ persistent bio palette + bio-image write backend (1a) (#557)
 
 ## [4.178.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ releases cover modal + release notes section (#555)\n- feat: ✨ releases cover modal + release notes section (#555)\n
+- feat: ✨ releases cover modal + release notes section (#555)
 
 ## [4.177.0] - 2026-07-05
 
 ### Added
 
-- feat: ✨ zine live-chat drawer heading (#556)\n- feat: ✨ zine live-chat drawer heading (#556)\n
+- feat: ✨ zine live-chat drawer heading (#556)
 
 ## [4.176.0] - 2026-07-04
 
 ### Added
 
-- feat: ✨ desktop punk-zine site chrome (#554)\n- feat: ✨ desktop punk-zine site chrome (#554)\n
+- feat: ✨ desktop punk-zine site chrome (#554)
 
 ## [4.175.0] - 2026-07-04
 
 ### Added
 
-- feat: ✨ bio editor image resize/border + click-to-edit links (#553)\n- feat: ✨ bio editor image resize/border + click-to-edit links (#553)\n
+- feat: ✨ bio editor image resize/border + click-to-edit links (#553)
 
 ## [4.174.0] - 2026-07-04
 
 ### Added
 
-- feat: ✨ bio media discovery v2 — verified palettes, atom links, wrap (#552)\n- feat: ✨ bio media discovery v2 — verified palettes, atom links, wrap (#552)\n
+- feat: ✨ bio media discovery v2 — verified palettes, atom links, wrap (#552)
 
 ## [4.173.0] - 2026-07-04
 
-### Added
+### Fixed
 
-- fix: 🐛 scope home banner fallback to home route (#551)\n- fix: 🐛 scope home banner fallback to home route (#551)\n
+- fix: 🐛 scope home banner fallback to home route (#551)
 
 ## [4.172.0] - 2026-07-03
 
 ### Added
 
-- feat: punk-zine site-wide redesign (#550)\n- feat: punk-zine site-wide redesign (#550)\n
+- feat: punk-zine site-wide redesign (#550)
 
 ## [4.171.0] - 2026-07-03
 
 ### Added
 
-- feat: admin bio palettes, editor DnD figures, save-time re-host (#549)\n- feat: admin bio palettes, editor DnD figures, save-time re-host (#549)\n
+- feat: admin bio palettes, editor DnD figures, save-time re-host (#549)
 
 ## [4.170.0] - 2026-07-02
 
-### Added
+### Fixed
 
-- fix(bio): image quality, thumbs 403, name search (#548)\n- fix(bio): image quality, thumbs 403, name search (#548)\n
+- fix(bio): image quality, thumbs 403, name search (#548)
 
 ## [4.169.0] - 2026-07-02
 
 ### Added
 
-- feat(bio-generator): quality passes, streaming links, volume caps (#547)\n- feat(bio-generator): quality passes, streaming links, volume caps (#547)\n
+- feat(bio-generator): quality passes, streaming links, volume caps (#547)
 
 ## [4.168.0] - 2026-07-02
 
 ### Added
 
-- feat(bio-generator): scraped-image fallback + prompt fixes (#546)\n- feat(bio-generator): scraped-image fallback + prompt fixes (#546)\n
+- feat(bio-generator): scraped-image fallback + prompt fixes (#546)
 
 ## [4.167.0] - 2026-07-02
 
 ### Added
 
-- feat: bio links over bold, tasteful images, editor preview (#545)\n- feat: bio links over bold, tasteful images, editor preview (#545)\n
+- feat: bio links over bold, tasteful images, editor preview (#545)
 
 ## [4.166.0] - 2026-07-02
 
-### Added
+### Fixed
 
-- fix(bio-generator): gemini-2.5-flash + draft-and-synthesize ensemble (#544)\n- fix(bio-generator): gemini-2.5-flash + draft-and-synthesize ensemble (#544)\n
+- fix(bio-generator): gemini-2.5-flash + draft-and-synthesize ensemble (#544)
 
 ## [4.165.0] - 2026-07-02
 
-### Added
+### Fixed
 
-- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)\n
+- fix: 🐛 retry Gemini 429s with a 30–60s backoff (#543)
 
 ## [4.164.0] - 2026-07-02
 
-### Added
+### Fixed
 
-- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)\n
+- fix: 🐛 pin Gemini model id in code so deploys actually apply it (#542)
 
 ## [4.163.0] - 2026-07-01
 
-### Added
+### Changed
 
-- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)\n
+- docs: 📝 make AGENTS.md the source of truth; CLAUDE.md imports it (#540)
 
 ## [4.162.0] - 2026-07-01
 
-### Added
+### Fixed
 
-- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)\n
+- fix: 🐛 use a valid Gemini model id (fixes 404 in bio generation) (#539)
 
 ## [4.161.0] - 2026-06-30
 
 ### Added
 
-- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)\n
+- feat: ✨ fix missing bio images/links + richer bios with alt bio (#538)
 
 ## [4.160.0] - 2026-06-30
 
 ### Added
 
-- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n- feat(profile): ✨ email opt-in + punk-zine restyle (#537)\n
+- feat(profile): ✨ email opt-in + punk-zine restyle (#537)
 
 ## [4.159.0] - 2026-06-30
 
 ### Added
 
-- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)\n
+- feat(auth): ✨ migrate to better-auth with signups pause + redesign (#536)
 
 ## [4.158.0] - 2026-06-25
 
-### Added
+### Changed
 
-- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n- refactor: ♻️ enforce function-length & complexity limits (#535)\n
+- refactor: ♻️ enforce function-length & complexity limits (#535)
 
 ## [4.157.0] - 2026-06-23
 
-### Added
+### Changed
 
-- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)\n
+- chore: 🔧 ESLint 10 upgrade, Tailwind cleanup, e2e coverage (#534)
 
 ## [4.156.0] - 2026-06-23
 
-### Added
+### Changed
 
-- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n- refactor: ♻️ confine Prisma to the repository layer (#533)\n
+- refactor: ♻️ confine Prisma to the repository layer (#533)
 
 ## [4.155.0] - 2026-06-23
 
-### Added
+### Changed
 
-- refactor: ♻️ decompose DataView into subcomponents (#532)\n- refactor: ♻️ decompose DataView into subcomponents (#532)\n- refactor: ♻️ decompose DataView into subcomponents (#532)\n- refactor: ♻️ decompose DataView into subcomponents (#532)\n
+- refactor: ♻️ decompose DataView into subcomponents (#532)
 
 ## [4.154.0] - 2026-06-22
 
-### Added
+### Changed
 
-- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n- refactor: ♻️ route server-only logging through the logger (#531)\n
+- refactor: ♻️ route server-only logging through the logger (#531)
 
 ## [4.153.0] - 2026-06-22
 
-### Added
+### Changed
 
-- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n- docs: 📝 add data-mutation-stack architecture diagrams (#530)\n
+- docs: 📝 add data-mutation-stack architecture diagrams (#530)
 
 ## [4.152.0] - 2026-06-22
 
-### Added
+### Changed
 
-- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n- refactor: ♻️ unify admin action results as AdminActionResult (#529)\n
+- refactor: ♻️ unify admin action results as AdminActionResult (#529)
 
 ## [4.151.0] - 2026-06-21
 
-### Added
+### Fixed
 
-- fix: 🐛 restore artists index image heading (#528)\n- fix: 🐛 restore artists index image heading (#528)\n- fix: 🐛 restore artists index image heading (#528)\n
+- fix: 🐛 restore artists index image heading (#528)
 
 ## [4.150.0] - 2026-06-21
 
 ### Added
 
-- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n- feat: ✨ admin entity delete/publish/restore flows (#527)\n
+- feat: ✨ admin entity delete/publish/restore flows (#527)
 
 ## [4.149.0] - 2026-06-21
 
-### Added
+### Changed
 
-- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)\n
+- refactor: ♻️ idiomatic typed + destructured mutation hooks (#526)
 
 ## [4.148.0] - 2026-06-21
 
 ### Added
 
-- style(auth): align mobile nav account links beside avatar (#525)\n- style(auth): align mobile nav account links beside avatar (#525)\n- feat(contact): ✨ accessible email links (#524)\n- style(auth): align mobile nav account links beside avatar (#525)\n- feat(contact): ✨ accessible email links (#524)\n- style(auth): align mobile nav account links beside avatar (#525)\n
+- feat(contact): ✨ accessible email links (#524)
+
+### Changed
+
+- style(auth): align mobile nav account links beside avatar (#525)
 
 ## [4.147.0] - 2026-06-21
 
-### Added
+### Changed
 
-- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)\n
+- refactor: ♻️ destructure mutation hooks, add query hooks for form reads (#522)
 
 ## [4.146.0] - 2026-06-21
 
-### Added
+### Changed
 
-- chore: 🔧 patch Dependabot security advisories (#523)\n- chore: 🔧 patch Dependabot security advisories (#523)\n- chore: 🔧 patch Dependabot security advisories (#523)\n
+- chore: 🔧 patch Dependabot security advisories (#523)
 
 ## [4.145.0] - 2026-06-20
 
 ### Added
 
-- feat: ✨ richer artist bios via Gemini + Jina (#521)\n- feat: ✨ richer artist bios via Gemini + Jina (#521)\n- feat: ✨ richer artist bios via Gemini + Jina (#521)\n- feat: ✨ richer artist bios via Gemini + Jina (#521)\n- feat: ✨ richer artist bios via Gemini + Jina (#521)\n
+- feat: ✨ richer artist bios via Gemini + Jina (#521)
 
 ## [4.144.0] - 2026-06-20
 
-### Added
+### Fixed
 
-- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)\n
+- fix: 🐛 cap Groq bio prompt to TPM ceiling (#520)
 
 ## [4.143.0] - 2026-06-20
 
 ### Added
 
-- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n- feat: ✨ async (non-blocking) artist bio generation (#519)\n
+- feat: ✨ async (non-blocking) artist bio generation (#519)
 
 ## [4.142.0] - 2026-06-20
 
 ### Added
 
-- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n- feat: ✨ image-rich bios, inline links, editor lists (#518)\n
+- feat: ✨ image-rich bios, inline links, editor lists (#518)
 
 ## [4.141.0] - 2026-06-20
 
-### Added
+### Changed
 
-- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)\n
+- docs: 📝 document deploy-role SNS/CloudWatch perms (#510)
 
 ## [4.140.0] - 2026-06-20
 
 ### Added
 
-- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n- feat: ✨ Tavily web-search fallback for bio grounding (#517)\n
+- feat: ✨ Tavily web-search fallback for bio grounding (#517)
 
 ## [4.139.0] - 2026-06-20
 
 ### Added
 
-- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n- feat: ✨ richer grounded artist bios with section headings (#516)\n
+- feat: ✨ richer grounded artist bios with section headings (#516)
 
 ## [4.138.0] - 2026-06-20
 
-### Added
+### Fixed
 
-- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n- fix: 🐛 pass bio lambda name to prod container env (#515)\n
+- fix: 🐛 pass bio lambda name to prod container env (#515)
 
 ## [4.137.0] - 2026-06-20
 
-### Added
+### Fixed
 
-- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp in Alpine runner image (#513)\n- fix: 🐛 install musl sharp via isolated temp dir (#514)\n
+- fix: 🐛 install musl sharp via isolated temp dir (#514)
+- fix: 🐛 install musl sharp in Alpine runner image (#513)
 
 ## [4.136.0] - 2026-06-20
 
-### Added
+### Fixed
 
-- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n- fix: 🐛 catch bio-gen action throws (no 500) (#512)\n
+- fix: 🐛 catch bio-gen action throws (no 500) (#512)
 
 ## [4.135.0] - 2026-06-20
 
 ### Added
 
-- test: ✅ polyfill jsdom Range getClientRects (#511)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- feat: ✨ generate AI artist bios with rich-text editing (#509)\n- test: ✅ polyfill jsdom Range getClientRects (#511)\n
+- feat: ✨ generate AI artist bios with rich-text editing (#509)
+
+### Changed
+
+- test: ✅ polyfill jsdom Range getClientRects (#511)
 
 ## [4.134.0] - 2026-06-19
 
 ### Added
 
-- test: ✅ fix artist-from-release e2e hydration double (#508)\n- test: ✅ fix artist-from-release e2e hydration double (#508)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- feat: ✨ TanStack Query mutations with cache invalidation (#507)\n- test: ✅ fix artist-from-release e2e hydration double (#508)\n
+- feat: ✨ TanStack Query mutations with cache invalidation (#507)
+
+### Changed
+
+- test: ✅ fix artist-from-release e2e hydration double (#508)
 
 ## [4.133.0] - 2026-06-19
 
 ### Added
 
-- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n- feat: ✨ revamp and reorganize the admin area (#506)\n
+- feat: ✨ revamp and reorganize the admin area (#506)
 
 ## [4.132.0] - 2026-06-18
 
-### Added
+### Changed
 
-- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)\n
+- perf: ⚡ eliminate slow >200ms queries and slim carousel payload (#505)
 
 ## [4.131.0] - 2026-06-18
 
-### Added
+### Changed
 
-- refactor: ♻️ ban eslint disables, audit config (#504)\n- refactor: ♻️ ban eslint disables, audit config (#504)\n- refactor: ♻️ ban eslint disables, audit config (#504)\n
+- refactor: ♻️ ban eslint disables, audit config (#504)
 
 ## [4.130.0] - 2026-06-17
 
-### Added
+### Changed
 
-- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n- refactor: ♻️ prefer arrow functions codebase-wide (#502)\n
+- refactor: ♻️ prefer arrow functions codebase-wide (#502)
 
 ## [4.129.0] - 2026-06-16
 
-### Added
+### Changed
 
-- Refactor/rename fetch page to fetch entity (#503)\n- Refactor/rename fetch page to fetch entity (#503)\n- Refactor/rename fetch page to fetch entity (#503)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)\n- Refactor/rename fetch page to fetch entity (#503)\n
+- Refactor/rename fetch page to fetch entity (#503)
+- refactor: ♻️ rename infinite query hooks and drop Page suffix from fetch helpers (#501)
 
 ## [4.128.0] - 2026-06-16
 
-### Added
+### Changed
 
-- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n- refactor: migrate services to the repository pattern (#500)\n
+- refactor: migrate services to the repository pattern (#500)
 
 ## [4.127.0] - 2026-06-15
 
-### Added
+### Changed
 
-- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n- refactor: ♻️ validate remaining query hook responses (#499)\n
+- refactor: ♻️ validate remaining query hook responses (#499)
 
 ## [4.126.0] - 2026-06-15
 
 ### Added
 
-- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n- feat: ✨ report response-validation errors to logs (#498)\n
+- feat: ✨ report response-validation errors to logs (#498)
 
 ## [4.125.0] - 2026-06-15
 
-### Added
+### Changed
 
-- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n- refactor: ♻️ validate query hook responses with Zod (#497)\n
+- refactor: ♻️ validate query hook responses with Zod (#497)
 
 ## [4.124.0] - 2026-06-14
 
-### Added
+### Fixed
 
-- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)\n
+- fix(deps): 🐛 bump stripe-webhook esbuild range to ^0.28.1 (#496)
 
 ## [4.123.0] - 2026-06-14
 
-### Added
+### Changed
 
-- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)\n
+- docs: 📝 document commit and git-hook conventions in CLAUDE.md (#495)
 
 ## [4.122.0] - 2026-06-14
 
-### Added
+### Changed
 
-- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n- refactor: ♻️ add query option overrides and rename page types (#494)\n
+- refactor: ♻️ add query option overrides and rename page types (#494)
 
 ## [4.121.0] - 2026-06-14
 
-### Added
+### Fixed
 
-- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)\n
+- fix(deps): bump esbuild to >=0.28.1 to resolve Dependabot alerts (#493)
 
 ## [4.120.0] - 2026-06-14
 
-### Added
+### Changed
 
-- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n- perf: ⚡ cut re-renders across client UI (#492)\n
+- perf: ⚡ cut re-renders across client UI (#492)
 
 ## [4.119.0] - 2026-06-14
 
-### Added
+### Changed
 
-- docs: 📝 add architecture diagrams,rename docs dir (#491)\n- docs: 📝 add architecture diagrams,rename docs dir (#491)\n- docs: 📝 add architecture diagrams,rename docs dir (#491)\n
+- docs: 📝 add architecture diagrams,rename docs dir (#491)
 
 ## [4.118.0] - 2026-06-14
 
-### Added
+### Changed
 
-- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)\n
+- chore: 🔧 remove spec-kit and fold its constitution into CLAUDE.md (#490)
 
 ## [4.117.0] - 2026-06-14
 
-### Added
+### Changed
 
-- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n- docs: 📝 refine fetching and client-storage guidelines (#489)\n
+- docs: 📝 refine fetching and client-storage guidelines (#489)
 
 ## [4.116.0] - 2026-06-13
 
 ### Added
 
-- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)\n
+- feat: TanStack Query optimization — infinite scroll, signal, caching (#488)
 
 ## [4.115.0] - 2026-06-13
 
-### Added
+### Changed
 
-- perf: parallelize independent fetches with Promise.all (#487)\n- perf: parallelize independent fetches with Promise.all (#487)\n- perf: parallelize independent fetches with Promise.all (#487)\n
+- perf: parallelize independent fetches with Promise.all (#487)
 
 ## [4.114.0] - 2026-06-12
 
-### Added
+### Fixed
 
-- fix: 🐛 raise nginx rate limit for Grafana UI (#486)\n- fix: 🐛 raise nginx rate limit for Grafana UI (#486)\n- fix: 🐛 raise nginx rate limit for Grafana UI (#486)\n
+- fix: 🐛 raise nginx rate limit for Grafana UI (#486)
 
 ## [4.113.0] - 2026-06-12
 
-### Added
+### Fixed
 
-- fix: 🐛 recreate Loki datasource with stable uid (#485)\n- fix: 🐛 recreate Loki datasource with stable uid (#485)\n- fix: 🐛 recreate Loki datasource with stable uid (#485)\n
+- fix: 🐛 recreate Loki datasource with stable uid (#485)
 
 ## [4.112.0] - 2026-06-12
 
 ### Added
 
-- Feature/add logging and observability (#484)\n- Feature/add logging and observability (#484)\n- Feature/add logging and observability (#484)\n- docs: add SNS policy to deploy-role IAM setup (#483)\n- docs: add SNS policy to deploy-role IAM setup (#483)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)\n- Feature/add logging and observability (#484)\n
+- feat: expand observability — correlation IDs, alerting, metrics, and external monitoring (#482)
+
+### Changed
+
+- Feature/add logging and observability (#484)
+- docs: add SNS policy to deploy-role IAM setup (#483)
 
 ## [4.111.0] - 2026-06-11
 
 ### Added
 
-- feat: add structured logging and observability (#481)\n- feat: add structured logging and observability (#481)\n- feat: add structured logging and observability (#481)\n
+- feat: add structured logging and observability (#481)
 
 ## [4.110.0] - 2026-06-10
 
-### Added
+### Changed
 
-- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n- Code review optimizations: performance, security, and test stability (#480)\n
+- Code review optimizations: performance, security, and test stability (#480)
 
 ## [4.109.0] - 2026-06-09
 
-### Added
+### Changed
 
-- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n- Feature/add desktop banner image (#479)\n
+- Feature/add desktop banner image (#479)
 
 ## [4.108.0] - 2026-06-09
 
 ### Added
 
-- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n
+- feat: scope nav menu colors to hover/active states with a fade transition (#478)
 
 ## [4.107.0] - 2026-06-08
 
-### Added
+### Changed
 
-- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n
+- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)
 
 ## [4.106.0] - 2026-06-07
 
-### Added
+### Changed
 
-- Refactor header into composable components (#476)\n- Refactor header into composable components (#476)\n- Refactor header into composable components (#476)\n- Refactor header into composable components (#476)\n- Refactor header into composable components (#476)\n- Refactor header into composable components (#476)\n
+- Refactor header into composable components (#476)
 
 ## [4.105.0] - 2026-06-07
 
-### Added
+### Fixed
 
-- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n
+- fix: header too short on iPhone 16 Pro Max (#475)
 
 ## [4.104.0] - 2026-06-07
 
-### Added
+### Changed
 
-- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n
+- Feature/create xl device header for desktops: fix mobile header regression (#474)
 
 ## [4.103.0] - 2026-06-06
 
 ### Added
 
-- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n
+- feat: add desktop auth menu and revamp site header (#473)
 
 ## [4.102.0] - 2026-06-06
 
-### Added
+### Changed
 
-- fix: update broken pnpm scripts (#470)\n- fix: update broken pnpm scripts (#470)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- fix: update broken pnpm scripts (#470)\n
+- Feature/update signup heading (#471)
+
+### Fixed
+
+- fix: update broken pnpm scripts (#470)
 
 ## [4.101.0] - 2026-06-05
 
-### Added
+### Changed
 
-- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n
+- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)
 
 ## [4.98.0] - 2026-06-03
 
-### Added
+### Fixed
 
-- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n
+- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)
 
 ## [4.97.0] - 2026-06-02
 
-### Added
+### Changed
 
-- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- Develop/chore/comprehensive code review redux (#464)\n
+- Develop/chore/comprehensive code review redux (#464)
+- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)
 
 ## [4.96.0] - 2026-06-01
 
 ### Added
 
-- feat: add graphic image headings across pages (#462)\n- feat: add graphic image headings across pages (#462)\n- feat: add graphic image headings across pages (#462)\n- feat: add graphic image headings across pages (#462)\n- feat: add graphic image headings across pages (#462)\n
+- feat: add graphic image headings across pages (#462)
 
 ## [4.95.0] - 2026-05-31
 
 ### Added
 
-- Develop/feature/improve claude instructions (#461)\n- Develop/feature/improve claude instructions (#461)\n- Develop/feature/improve claude instructions (#461)\n- feat: improve claude instructions for Opus 4.8 (#460)\n- feat: improve claude instructions for Opus 4.8 (#460)\n- Develop/feature/improve claude instructions (#461)\n
+- feat: improve claude instructions for Opus 4.8 (#460)
+
+### Changed
+
+- Develop/feature/improve claude instructions (#461)
 
 ## [4.94.0] - 2026-05-30
 
-### Added
+### Fixed
 
-- fix(ci): allow stripe-webhook build scripts (#459)\n- fix(ci): allow stripe-webhook build scripts (#459)\n- fix(deps): remediate security vulnerabilities (#458)\n- fix(deps): remediate security vulnerabilities (#458)\n- fix(ci): allow stripe-webhook build scripts (#459)\n
+- fix(ci): allow stripe-webhook build scripts (#459)
+- fix(deps): remediate security vulnerabilities (#458)
 
 ## [4.93.0] - 2026-05-29
 
 ### Added
 
-- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- feat: present install instructions for iOS (#456)\n- feat: present install instructions for iOS (#456)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n
+- feat: present install instructions for iOS (#456)
+
+### Changed
+
+- Develop/feature/convert to pwa: fix flaky e2e test (#457)
 
 ## [4.92.0] - 2026-05-28
 
 ### Added
 
-- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n
+- feat: create basic pwa app (#455)
 
 ## [4.91.0] - 2026-05-27
 
 ### Added
 
-- feat: improve chat accessibility and fix chat regression (#454)\n- feat: improve chat accessibility and fix chat regression (#454)\n- feat: improve chat accessibility and fix chat regression (#454)\n
+- feat: improve chat accessibility and fix chat regression (#454)
 
 ## [4.90.0] - 2026-05-27
 
-### Added
+### Changed
 
-- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- fix: update chat trigger a11y issue (#453)\n- fix: update chat trigger a11y issue (#453)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n
+- chore: make changes related to code review (#452)
+
+### Fixed
+
+- fix: update chat trigger a11y issue (#453)
 
 ## [4.89.0] - 2026-05-26
 
-### Added
+### Changed
 
-- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n
+- Create centralized config for setup actions for node.js and pnpm (#451)
+- chore: update-packages with vulnerabilities (#450)
 
 ## [4.88.0] - 2026-05-23
 
-### Added
+### Changed
 
-- chore: clean up globals css (#449)\n- chore: clean up globals css (#449)\n- chore: clean up globals css (#449)\n
+- chore: clean up globals css (#449)
 
 ## [4.87.0] - 2026-05-22
 
-### Added
+### Fixed
 
-- fix: autocomplete email in inputs (#448)\n- fix: autocomplete email in inputs (#448)\n- fix: autocomplete email in inputs (#448)\n
+- fix: autocomplete email in inputs (#448)
 
 ## [4.86.0] - 2026-05-22
 
-### Added
+### Fixed
 
-- fix: increase font-size in chat input (#447)\n- fix: increase font-size in chat input (#447)\n- fix: increase font-size in chat input (#447)\n
+- fix: increase font-size in chat input (#447)
 
 ## [4.85.0] - 2026-05-21
 
-### Added
+### Changed
 
-- chore: reorg styles in globals (#446)\n- chore: reorg styles in globals (#446)\n- chore: reorg styles in globals (#446)\n
+- chore: reorg styles in globals (#446)
 
 ## [4.84.0] - 2026-05-19
 
-### Added
+### Changed
 
-- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n
+- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)
 
 ## [4.83.0] - 2026-05-18
 
-### Added
+### Changed
 
-- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n
+- Make security audit, code review, and style updates to chat (#444)
 
 ## [4.82.0] - 2026-05-18
 
-### Added
+### Changed
 
-- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n
+- Update deploy with env args for pusher and upstash (#443)
 
 ## [4.81.0] - 2026-05-18
 
-### Added
+### Changed
 
-- Develop/feature/create live chat (#442)\n- Develop/feature/create live chat (#442)\n- Develop/feature/create live chat (#442)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Develop/feature/create live chat (#442)\n
+- Develop/feature/create live chat (#442)
+- Implement ban evasion service and enhance chat admin features (#441)
 
 ## [4.80.0] - 2026-05-14
 
-### Added
+### Changed
 
-- Develop/fix/failing e2e tests (#440)\n- Develop/fix/failing e2e tests (#440)\n- Develop/fix/failing e2e tests (#440)\n- Develop/fix/failing e2e tests (#440)\n
+- Develop/fix/failing e2e tests (#440)
 
 ## [4.79.0] - 2026-05-11
 
 ### Added
 
-- feat: remove subscription flow entirely (#438)\n- feat: remove subscription flow entirely (#438)\n- feat: remove subscription flow entirely (#438)\n
+- feat: remove subscription flow entirely (#438)
 
 ## [4.78.0] - 2026-05-11
 
-### Added
+### Changed
 
-- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n- Fix up type errors in webhook, tests, and pre-push (#437)\n
+- Fix up type errors in webhook, tests, and pre-push (#437)
 
 ## [4.77.0] - 2026-05-11
 
-### Added
+### Changed
 
-- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n- 007 free digital downloads (#436)\n
+- 007 free digital downloads (#436)
 
 ## [Unreleased]
 
@@ -850,705 +801,863 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.76.0] - 2026-05-06
 
-### Added
+### Changed
 
-- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n
+- Develop/improve performance (#435)
 
 ## [4.75.0] - 2026-05-06
 
-### Added
+### Fixed
 
-- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n
+- fix: update LCP banner preload strategy (#434)
 
 ## [4.74.0] - 2026-05-04
 
-### Added
+### Fixed
 
-- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n
+- fix(ui): make mp3 320 urls unsigned but cached (#433)
 
 ## [4.73.0] - 2026-05-04
 
 ### Added
 
-- feat: enhance CI/CD and commit message validation (#432)\n- feat: enhance CI/CD and commit message validation (#432)\n- feat: enhance CI/CD and commit message validation (#432)\n- Fix bad merge for deploy to ec2 (#431)\n- Fix bad merge for deploy to ec2 (#431)\n- Fix deploy to EC2 job (#430)\n- Fix deploy to EC2 job (#430)\n- Fix deploy to EC2 job (#430)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- feat: enhance security measures and deployment scripts (#428)\n- feat: enhance security measures and deployment scripts (#428)\n- Develop/update deployment (#429)\n- feat: enhance security measures and deployment scripts (#428)\n- feat: enhance CI/CD and commit message validation (#432)\n
+- feat: enhance CI/CD and commit message validation (#432)
+- feat: enhance security measures and deployment scripts (#428)
+
+### Changed
+
+- Fix bad merge for deploy to ec2 (#431)
+- Fix deploy to EC2 job (#430)
+- Develop/update deployment (#429)
 
 ## [4.72.0] - 2026-05-02
 
-### Added
+### Changed
 
-- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n
+- Develop/fix media player file loading from cdn (#427)
 
 ## [4.71.0] - 2026-05-02
 
-### Added
+### Changed
 
-- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n
+- Develop/use cloudfront signed urls and cache (#426)
 
 ## [4.70.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Develop/remove experimental css from next (#425)\n- Develop/remove experimental css from next (#425)\n- Develop/remove experimental css from next (#425)\n- Develop/remove experimental css from next (#425)\n- Develop/remove experimental css from next (#425)\n
+- Develop/remove experimental css from next (#425)
 
 ## [4.69.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n
+- Remove experimental css optimizations (#424)
 
 ## [4.68.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Develop/make misc style changes (#423)\n- Develop/make misc style changes (#423)\n- Develop/make misc style changes (#423)\n- Develop/make misc style changes (#423)\n
+- Develop/make misc style changes (#423)
 
 ## [4.67.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Fix image variant srcset for smaller devices (#422)\n- Fix image variant srcset for smaller devices (#422)\n- Fix image variant srcset for smaller devices (#422)\n- Fix image variant srcset for smaller devices (#422)\n
+- Fix image variant srcset for smaller devices (#422)
 
 ## [4.66.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Fix broken stripe deploy webhook (#421)\n- Fix broken stripe deploy webhook (#421)\n- Fix broken stripe deploy webhook (#421)\n- Fix broken stripe deploy webhook (#421)\n
+- Fix broken stripe deploy webhook (#421)
 
 ## [4.65.0] - 2026-04-28
 
-### Added
+### Changed
 
-- Develop/make misc style changes (#420)\n- Develop/make misc style changes (#420)\n- Develop/make misc style changes (#420)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes (#420)\n
+- Develop/make misc style changes (#420)
+- Develop/make misc style changes and subscription rules (#419)
 
 ## [4.64.0] - 2026-04-27
 
-### Added
+### Changed
 
-- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n
+- Chore/code review batch 1 to 4 (#418)
 
 ## [4.63.0] - 2026-04-27
 
-### Added
+### Changed
 
-- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n
+- Develop/fix cls search styling and fa carousel (#417)
 
 ## [4.62.0] - 2026-04-26
 
-### Added
+### Changed
 
-- Develop/perform maintenance and update ai slop (#416)\n- Develop/perform maintenance and update ai slop (#416)\n- Develop/perform maintenance and update ai slop (#416)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#415)\n- Develop/perform maintenance and update ai slop (#416)\n
+- Develop/perform maintenance and update ai slop (#416)
+- Develop/perform maintenance and update ai slop (#415)
 
 ## [4.61.0] - 2026-04-26
 
-### Added
+### Changed
 
-- Refactor banner-carousel code and dry it up a bit (#414)\n- Refactor banner-carousel code and dry it up a bit (#414)\n- Refactor banner-carousel code and dry it up a bit (#414)\n- Refactor banner-carousel code and dry it up a bit (#414)\n- Refactor banner-carousel code and dry it up a bit (#414)\n- Refactor banner-carousel code and dry it up a bit (#414)\n
+- Refactor banner-carousel code and dry it up a bit (#414)
 
 ## [4.60.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Fix aspect ratio on banner images (#413)\n- Fix aspect ratio on banner images (#413)\n- Fix aspect ratio on banner images (#413)\n
+- Fix aspect ratio on banner images (#413)
 
 ## [4.59.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Add low priority fetch and lazy loading to banners (#412)\n- Add low priority fetch and lazy loading to banners (#412)\n- Add low priority fetch and lazy loading to banners (#412)\n
+- Add low priority fetch and lazy loading to banners (#412)
 
 ## [4.58.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Gate build bump version and update version (#411)\n- Gate build bump version and update version (#411)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Gate build bump version and update version (#411)\n
+- Gate build bump version and update version (#411)
+- Develop/fix console warnings and lcp (#410)
 
 ## [4.57.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Fix lint and type errors (#409)\n- Fix lint and type errors (#409)\n- Fix lint and type errors (#409)\n- Develop/fix console warnings and lcp (#408)\n- Develop/fix console warnings and lcp (#408)\n- Develop/fix console warnings and lcp (#408)\n- Fix lint and type errors (#409)\n
+- Fix lint and type errors (#409)
+- Develop/fix console warnings and lcp (#408)
 
 ## [4.56.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Improve LCP, add image conversion, and fix image loading (#407)\n- Improve LCP, add image conversion, and fix image loading (#407)\n- Improve LCP, add image conversion, and fix image loading (#407)\n- Improve LCP, add image conversion, and fix image loading (#407)\n- Improve LCP, add image conversion, and fix image loading (#407)\n
+- Improve LCP, add image conversion, and fix image loading (#407)
 
 ## [4.55.0] - 2026-04-25
 
-### Added
+### Changed
 
-- Develop/fix console warnings and lcp (#406)\n- Develop/fix console warnings and lcp (#406)\n- Develop/fix console warnings and lcp (#406)\n- Develop/fix console warnings and lcp (#406)\n
+- Develop/fix console warnings and lcp (#406)
 
 ## [4.54.0] - 2026-04-24
 
-### Added
+### Changed
 
-- Develop/fix console warnings and lcp (#405)\n- Develop/fix console warnings and lcp (#405)\n- Develop/fix console warnings and lcp (#405)\n- Develop/fix console warnings and lcp (#405)\n- Develop/fix console warnings and lcp (#405)\n- Develop/fix console warnings and lcp (#405)\n
+- Develop/fix console warnings and lcp (#405)
 
 ## [4.53.0] - 2026-04-24
 
-### Added
+### Fixed
 
-- fix: enhance image loader to encode paths and update user status quer… (#404)\n- fix: enhance image loader to encode paths and update user status quer… (#404)\n- fix: enhance image loader to encode paths and update user status quer… (#404)\n
+- fix: enhance image loader to encode paths and update user status quer… (#404)
 
 ## [4.52.0] - 2026-04-23
 
-### Added
+### Changed
 
-- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n
+- Develop/fix download bundle limit messaging (#403)
 
 ## [4.51.0] - 2026-04-23
 
-### Added
+### Changed
 
-- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n
+- Develop/make email template logos consistent (#402)
 
 ## [4.50.0] - 2026-04-22
 
-### Added
+### Changed
 
-- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n
+- Develop/fix setup ssm params script (#401)
 
 ## [4.49.0] - 2026-04-22
 
-### Added
+### Changed
 
-- Update setup-ssm-params.sh (#400)\n- Update setup-ssm-params.sh (#400)\n- Develop/update s3 secret setting env (#399)\n- Develop/update s3 secret setting env (#399)\n- Develop/update s3 secret setting env (#399)\n- Update setup-ssm-params.sh (#400)\n
+- Update setup-ssm-params.sh (#400)
+- Develop/update s3 secret setting env (#399)
 
 ## [4.48.0] - 2026-04-21
 
-### Added
+### Changed
 
-- Fix secret not being set on EC2 (#398)\n- Fix secret not being set on EC2 (#398)\n- Fix secret not being set on EC2 (#398)\n
+- Fix secret not being set on EC2 (#398)
 
 ## [4.47.0] - 2026-04-21
 
-### Added
+### Changed
 
-- Update LCP (#397)\n- Update LCP (#397)\n- Update LCP (#397)\n- Update LCP (#397)\n
+- Update LCP (#397)
 
 ## [4.46.0] - 2026-04-21
 
-### Added
+### Changed
 
-- Develop/fix notification banners and lcp (#396)\n- Develop/fix notification banners and lcp (#396)\n- Develop/fix notification banners and lcp (#396)\n- Develop/fix notification banners and lcp (#396)\n
+- Develop/fix notification banners and lcp (#396)
 
 ## [4.45.0] - 2026-04-21
 
-### Added
+### Changed
 
-- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n
+- Develop/fix notification banners and lcp (#395)
 
 ## [4.44.0] - 2026-04-21
 
-### Added
+### Changed
 
-- Develop/fix notification banners and lcp (#394)\n- Develop/fix notification banners and lcp (#394)\n- Develop/fix notification banners and lcp (#394)\n- Develop/fix notification banners and lcp (#394)\n
+- Develop/fix notification banners and lcp (#394)
 
 ## [4.43.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Fix LCP and banner notifications (#393)\n- Fix LCP and banner notifications (#393)\n- Fix LCP and banner notifications (#393)\n
+- Fix LCP and banner notifications (#393)
 
 ## [4.42.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n
+- Develop/improve lighthouse metrics (#392)
 
 ## [4.41.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n
+- Develop/improve lighthouse metrics (#391)
 
 ## [4.40.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Improve LCP and FCP (#390)\n- Improve LCP and FCP (#390)\n- Improve LCP and FCP (#390)\n
+- Improve LCP and FCP (#390)
 
 ## [4.39.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Fix missing env variables (#389)\n- Fix missing env variables (#389)\n- Fix missing env variables (#389)\n
+- Fix missing env variables (#389)
 
 ## [4.38.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Fix image loader to support data URIs and update seed database cover … (#388)\n- Fix image loader to support data URIs and update seed database cover … (#388)\n- Develop/fix broken images by security audit (#387)\n- Develop/fix broken images by security audit (#387)\n- Develop/fix broken images by security audit (#387)\n- Fix image loader to support data URIs and update seed database cover … (#388)\n
+- Fix image loader to support data URIs and update seed database cover … (#388)
+- Develop/fix broken images by security audit (#387)
 
 ## [4.37.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Fix the broken images caused by bad next config (#386)\n- Fix the broken images caused by bad next config (#386)\n- Fix the broken images caused by bad next config (#386)\n
+- Fix the broken images caused by bad next config (#386)
 
 ## [4.36.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n
+- Develop/fix zip file naming for mixed and single downloads (#385)
 
 ## [4.35.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Develop/fix zip file naming for mixed and single downloads (#384)\n- Develop/fix zip file naming for mixed and single downloads (#384)\n- Develop/fix zip file naming for mixed and single downloads (#384)\n- Develop/fix zip file naming for mixed and single downloads (#384)\n
+- Develop/fix zip file naming for mixed and single downloads (#384)
 
 ## [4.34.0] - 2026-04-20
 
-### Added
+### Changed
 
-- Develop/fix zip file naming for mixed and single downloads (#383)\n- Develop/fix zip file naming for mixed and single downloads (#383)\n- Develop/fix zip file naming for mixed and single downloads (#383)\n- Develop/fix zip file naming for mixed and single downloads (#383)\n
+- Develop/fix zip file naming for mixed and single downloads (#383)
 
 ## [4.33.0] - 2026-04-19
 
-### Added
+### Changed
 
-- Develop/update UI styles (#382)\n- Develop/update UI styles (#382)\n- Develop/update UI styles (#382)\n- Develop/update UI styles (#382)\n- Develop/update UI styles (#382)\n- Develop/update UI styles (#382)\n
+- Develop/update UI styles (#382)
 
 ## [4.32.0] - 2026-04-19
 
-### Added
+### Changed
 
-- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n
+- Develop/fix admin release uploads (#381)
 
 ## [4.31.0] - 2026-04-19
 
-### Added
+### Changed
 
-- Fix admin release uploads and add aiff format comments (#380)\n- Fix admin release uploads and add aiff format comments (#380)\n- Fix admin release uploads and add aiff format comments (#380)\n- Fix admin release uploads and add aiff format comments (#380)\n
+- Fix admin release uploads and add aiff format comments (#380)
 
 ## [4.30.0] - 2026-04-19
 
-### Added
+### Changed
 
-- Fix rate limiting for sigin (#379)\n- Fix rate limiting for sigin (#379)\n- Fix rate limiting for sigin (#379)\n
+- Fix rate limiting for sigin (#379)
 
 ## [4.29.0] - 2026-04-19
 
 ### Added
 
-- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n
+- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)
 
 ## [4.28.0] - 2026-04-18
 
-### Added
+### Changed
 
-- Fix download regression (#377)\n- Fix download regression (#377)\n- Fix download regression (#377)\n
+- Fix download regression (#377)
 
 ## [4.27.0] - 2026-04-18
 
-### Added
+### Changed
 
-- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n- Fix error in download success and auto-dismiss dialog (#376)\n
+- Fix error in download success and auto-dismiss dialog (#376)
 
 ## [4.26.0] - 2026-04-18
 
-### Added
+### Changed
 
-- Fix downloads (in particular for iOS 26 Safari) (#375)\n- Fix downloads (in particular for iOS 26 Safari) (#375)\n- Fix downloads (in particular for iOS 26 Safari) (#375)\n- Fix downloads (in particular for iOS 26 Safari) (#375)\n- Fix downloads (in particular for iOS 26 Safari) (#375)\n- Fix downloads (in particular for iOS 26 Safari) (#375)\n
+- Fix downloads (in particular for iOS 26 Safari) (#375)
 
 ## [4.25.0] - 2026-04-18
 
-### Added
+### Changed
 
-- Develop/fix downloads getting stuck (#374)\n- Develop/fix downloads getting stuck (#374)\n- Develop/fix downloads getting stuck (#374)\n- Develop/fix downloads getting stuck (#374)\n- Develop/fix downloads getting stuck (#374)\n
+- Develop/fix downloads getting stuck (#374)
 
 ## [4.24.0] - 2026-04-18
 
-### Added
+### Changed
 
-- Develop/fix downloads getting stuck (#373)\n- Develop/fix downloads getting stuck (#373)\n- Develop/fix downloads getting stuck (#373)\n- Fix downloads getting stuck (#372)\n- Fix downloads getting stuck (#372)\n- Develop/fix downloads getting stuck (#373)\n
+- Develop/fix downloads getting stuck (#373)
+- Fix downloads getting stuck (#372)
 
 ## [4.23.0] - 2026-04-18
 
 ### Added
 
-- Remove google fonts and unnecessary sharp dependencies (#371)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- Develop/feature/improve security and test coverage (#370)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n
+- feat(api): enhance proxy image handling with security checks and size… (#369)
+
+### Changed
+
+- Remove google fonts and unnecessary sharp dependencies (#371)
+- Develop/feature/improve security and test coverage (#370)
 
 ## [4.22.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n- Develop/feature/allow download more than one format (#368)\n
+- Develop/feature/allow download more than one format (#368)
 
 ## [4.21.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n- Develop/update download implementation for ios (#367)\n
+- Develop/update download implementation for ios (#367)
 
 ## [4.20.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Update download dialog and functionality (#366)\n- Update download dialog and functionality (#366)\n- Update download dialog and functionality (#366)\n
+- Update download dialog and functionality (#366)
 
 ## [4.19.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Develop/fix merge failing tests (#365)\n- Develop/fix merge failing tests (#365)\n- Develop/fix merge failing tests (#365)\n- Develop/fix merge failing tests (#365)\n- Develop/fix merge failing tests (#365)\n
+- Develop/fix merge failing tests (#365)
 
 ## [4.18.0] - 2026-04-17
 
 ### Added
 
-- test: add fake timers for soft delete grace period boundary check (#364)\n- test: add fake timers for soft delete grace period boundary check (#364)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- test: add fake timers for soft delete grace period boundary check (#364)\n
+- feat: implement bundle download endpoint with rate limiting and optim… (#363)
+
+### Changed
+
+- test: add fake timers for soft delete grace period boundary check (#364)
 
 ## [4.17.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Develop/fix download all formats (#362)\n- Develop/fix download all formats (#362)\n- Develop/fix download all formats (#362)\n- Develop/fix download all formats (#362)\n
+- Develop/fix download all formats (#362)
 
 ## [4.16.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Fix download all formats and download using Tanstack (#361)\n- Fix download all formats and download using Tanstack (#361)\n- Fix download all formats and download using Tanstack (#361)\n- Fix download all formats and download using Tanstack (#361)\n- Fix download all formats and download using Tanstack (#361)\n
+- Fix download all formats and download using Tanstack (#361)
 
 ## [4.15.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Update carousel to change release selection upon the swipe settling (#360)\n- Update carousel to change release selection upon the swipe settling (#360)\n- Update carousel to change release selection upon the swipe settling (#360)\n- Update carousel to change release selection upon the swipe settling (#360)\n
+- Update carousel to change release selection upon the swipe settling (#360)
 
 ## [4.14.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Fix pnpm for stripe webhook lambda (#359)\n- Fix pnpm for stripe webhook lambda (#359)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Fix pnpm for stripe webhook lambda (#359)\n
+- Fix pnpm for stripe webhook lambda (#359)
+- Develop/fix vulnerabilities (#358)
 
 ## [4.13.0] - 2026-04-17
 
-### Added
+### Changed
 
-- Develop/fix vulnerabilities reported by dependabot (#357)\n- Develop/fix vulnerabilities reported by dependabot (#357)\n- Develop/fix vulnerabilities reported by dependabot (#357)\n- Develop/fix vulnerabilities reported by dependabot (#357)\n- Develop/fix vulnerabilities reported by dependabot (#357)\n- Develop/fix vulnerabilities reported by dependabot (#357)\n
+- Develop/fix vulnerabilities reported by dependabot (#357)
 
 ## [4.12.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Update package-lock.json for webhook (#356)\n- Update package-lock.json for webhook (#356)\n- Update package-lock.json for webhook (#356)\n
+- Update package-lock.json for webhook (#356)
 
 ## [4.11.0] - 2026-04-16
 
 ### Added
 
-- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n
+- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)
 
 ## [4.10.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n
+- Add external dependencies to webhook template (#354)
 
 ## [4.9.0] - 2026-04-16
 
-### Added
+### Fixed
 
-- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n
+- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)
 
 ## [4.8.0] - 2026-04-16
 
-### Added
+### Fixed
 
-- fix: add pnpm installation step in Stripe webhook deployment workflow (#352)\n- fix: add pnpm installation step in Stripe webhook deployment workflow (#352)\n- fix: add pnpm installation step in Stripe webhook deployment workflow (#352)\n- fix: add pnpm installation step in Stripe webhook deployment workflow (#352)\n
+- fix: add pnpm installation step in Stripe webhook deployment workflow (#352)
 
 ## [4.7.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n
+- Update prisma configuration (#351)
 
 ## [4.6.0] - 2026-04-16
 
-### Added
+### Fixed
 
-- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: update Prisma client copying process and add schema path in pack… (#350)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: update Prisma client copying process and add schema path in pack… (#350)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n
+- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)
+- fix: update Prisma client copying process and add schema path in pack… (#350)
 
 ## [4.5.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Develop/improve lcp (#348)\n- Develop/improve lcp (#348)\n- Bump next from 16.2.1 to 16.2.3 (#344)\n- Develop/improve lcp (#348)\n- Develop/improve lcp (#348)\n- Bump next from 16.2.1 to 16.2.3 (#344)\n- Develop/improve lcp (#348)\n
+- Develop/improve lcp (#348)
+- Bump next from 16.2.1 to 16.2.3 (#344)
 
 ## [4.4.0] - 2026-04-16
 
-### Added
+### Fixed
 
-- fix: add ResponseContentType to presigned download URL for binary dow… (#347)\n- fix: add ResponseContentType to presigned download URL for binary dow… (#347)\n- fix: add ResponseContentType to presigned download URL for binary dow… (#347)\n- fix: add ResponseContentType to presigned download URL for binary dow… (#347)\n
+- fix: add ResponseContentType to presigned download URL for binary dow… (#347)
 
 ## [4.3.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Develop/optimize unit tests run (#346)\n- Develop/optimize unit tests run (#346)\n- Develop/optimize unit tests run (#346)\n- Develop/optimize unit tests run (#346)\n- Develop/optimize unit tests run (#346)\n
+- Develop/optimize unit tests run (#346)
 
 ## [4.2.0] - 2026-04-16
 
-### Added
+### Changed
 
-- Fix download digital format for returning users as well as single downloads (#345)\n- Fix download digital format for returning users as well as single downloads (#345)\n- Fix download digital format for returning users as well as single downloads (#345)\n- Fix download digital format for returning users as well as single downloads (#345)\n- Fix download digital format for returning users as well as single downloads (#345)\n- Fix download digital format for returning users as well as single downloads (#345)\n
+- Fix download digital format for returning users as well as single downloads (#345)
 
 ## [4.1.0] - 2026-04-15
 
-### Added
+### Changed
 
-- Feature/fix setup sam action version (#343)\n- Feature/fix setup sam action version (#343)\n- Feature/fix setup sam action version (#343)\n- Feature/fix setup sam action version (#343)\n
+- Feature/fix setup sam action version (#343)
 
 ## [4.0.0] - 2026-04-15
 
 ### Changed
 
-- Update already purchased flow for returning users (#342)\n- Update already purchased flow for returning users (#342)\n- Update already purchased flow for returning users (#342)\n- null (#null)\n- Update already purchased flow for returning users (#342)\n- Update already purchased flow for returning users (#342)\n- Update already purchased flow for returning users (#342)\n
+- Update already purchased flow for returning users (#342)
+- null (#null)
 
 ## [3.21.0] - 2026-04-14
 
-### Added
+### Changed
 
-- Optimize for LCP, CLS, and other lighthouse metrics (#340)\n- Optimize for LCP, CLS, and other lighthouse metrics (#340)\n- Optimize for LCP, CLS, and other lighthouse metrics (#340)\n- Optimize for LCP, CLS, and other lighthouse metrics (#340)\n- Optimize for LCP, CLS, and other lighthouse metrics (#340)\n
+- Optimize for LCP, CLS, and other lighthouse metrics (#340)
 
 ## [3.20.0] - 2026-04-14
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#339)\n- Develop/fix deployment and outdated actions (#339)\n- Develop/fix deployment and outdated actions (#339)\n- Develop/fix deployment and outdated actions (#339)\n
+- Develop/fix deployment and outdated actions (#339)
 
 ## [3.19.0] - 2026-04-14
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n
+- Develop/fix deployment and outdated actions (#338)
 
 ## [3.18.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#337)\n- Develop/fix deployment and outdated actions (#337)\n- Develop/fix deployment and outdated actions (#337)\n- Develop/fix deployment and outdated actions (#337)\n- Develop/fix deployment and outdated actions (#337)\n- Develop/fix deployment and outdated actions (#337)\n
+- Develop/fix deployment and outdated actions (#337)
 
 ## [3.17.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n- Develop/fix deployment and outdated actions (#336)\n
+- Develop/fix deployment and outdated actions (#336)
 
 ## [3.16.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#335)\n- Develop/fix deployment and outdated actions (#335)\n- Develop/fix deployment and outdated actions (#335)\n- Develop/fix deployment and outdated actions (#335)\n- Develop/fix deployment and outdated actions (#335)\n
+- Develop/fix deployment and outdated actions (#335)
 
 ## [3.15.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Update README to trigger deploy (#334)\n- Update README to trigger deploy (#334)\n- Update README to trigger deploy (#334)\n- Develop/fix deployment and outdated actions (#333)\n- Develop/fix deployment and outdated actions (#333)\n- Develop/fix deployment and outdated actions (#333)\n- Update README to trigger deploy (#334)\n
+- Update README to trigger deploy (#334)
+- Develop/fix deployment and outdated actions (#333)
 
 ## [3.14.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Update capability iam and add debugging (#331)\n- Update capability iam and add debugging (#331)\n- Update capability iam and add debugging (#331)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Add step to install esbuild globally (#329)\n- Add step to install esbuild globally (#329)\n- Add step to install esbuild globally (#329)\n- Add npm lockfile for stripe webhook (#328)\n- Add npm lockfile for stripe webhook (#328)\n- Add npm lockfile for stripe webhook (#328)\n- Develop/fix deployment and outdated actions (#327)\n- Develop/fix deployment and outdated actions (#327)\n- Develop/fix deployment and outdated actions (#327)\n- Refactor code structure for improved readability and maintainability (#326)\n- Refactor code structure for improved readability and maintainability (#326)\n- Refactor code structure for improved readability and maintainability (#326)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#324)\n- Develop/fix deployment and outdated actions (#324)\n- Develop/fix deployment and outdated actions (#324)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n
+- Add clean up step for ROLLBACK_COMPLETE errors (#332)
+- Update capability iam and add debugging (#331)
+- Create and use managed s3 bucket for stripe webhook (#330)
+- Add step to install esbuild globally (#329)
+- Add npm lockfile for stripe webhook (#328)
+- Develop/fix deployment and outdated actions (#327)
+- Refactor code structure for improved readability and maintainability (#326)
+- Develop/fix deployment and outdated actions (#325)
+- Develop/fix deployment and outdated actions (#324)
 
 ## [3.13.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Develop/fix deployment and outdated actions (#323)\n- Develop/fix deployment and outdated actions (#323)\n- Develop/fix deployment and outdated actions (#323)\n- Develop/fix deployment and outdated actions (#323)\n- Update stripe webhook actions (#322)\n- Update stripe webhook actions (#322)\n- Update stripe webhook actions (#322)\n- Update stripe webhook actions (#322)\n- Update stripe webhook actions (#322)\n- Develop/fix deployment and outdated actions (#323)\n
+- Develop/fix deployment and outdated actions (#323)
+- Update stripe webhook actions (#322)
 
 ## [3.12.0] - 2026-04-13
 
-### Added
+### Changed
 
-- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n- Make first deploy for stripe-webhook lambda (#321)\n
+- Make first deploy for stripe-webhook lambda (#321)
 
 ## [3.11.0] - 2026-04-12
 
-### Added
+### Fixed
 
-- fix: optimize banner carousel image rendering and improve artist disp… (#320)\n- fix: optimize banner carousel image rendering and improve artist disp… (#320)\n- fix: optimize banner carousel image rendering and improve artist disp… (#320)\n- fix: optimize banner carousel image rendering and improve artist disp… (#320)\n
+- fix: optimize banner carousel image rendering and improve artist disp… (#320)
 
 ## [3.10.0] - 2026-04-12
 
-### Added
+### Changed
 
-- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n- Develop/feature/convert simple fetch to tanstack query (#319)\n
+- Develop/feature/convert simple fetch to tanstack query (#319)
 
 ## [3.9.0] - 2026-04-12
 
 ### Added
 
-- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n- feat: optimize performance, queries, and caching (#318)\n
+- feat: optimize performance, queries, and caching (#318)
 
 ## [3.8.0] - 2026-04-09
 
 ### Added
 
-- Chore/security audit (#317)\n- Chore/security audit (#317)\n- Chore/security audit (#317)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- fix: address security audit review feedback (#316)\n- chore: update GitHub Actions to use latest action versions (#315)\n- chore: update GitHub Actions to use latest action versions (#315)\n- fix: replace public-ip action with curl command to retrieve runner IP (#314)\n- fix: replace public-ip action with curl command to retrieve runner IP (#314)\n- fix: replace public-ip action with curl command to retrieve runner IP (#314)\n- Fix deployment workflow (#313)\n- Fix deployment workflow (#313)\n- Fix deployment workflow (#313)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)\n- feat: increase max upload size for digital formats to 500MB and update related limits to 48MB (#311)\n- feat: increase max upload size for digital formats to 500MB and update related limits to 48MB (#311)\n- feat: increase max upload size for digital formats to 500MB and update related limits to 48MB (#311)\n- feat: enhance purchase confirmation email handling and idempotency logic (#310)\n- feat: enhance purchase confirmation email handling and idempotency logic (#310)\n- feat: enhance purchase confirmation email handling and idempotency logic (#310)\n- feat: enhance purchase confirmation email handling and idempotency logic (#310)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Feature/confirm and download purchase (#309)\n- Fix playwright tests (#308)\n- Fix playwright tests (#308)\n- Fix playwright tests (#308)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Update README for playwright tests (#307)\n- Fix and add playwright tests (#306)\n- Fix and add playwright tests (#306)\n- feat: implement audio tag editing service (#305)\n- feat: implement audio tag editing service (#305)\n- feat: implement audio tag editing service (#305)\n- feat: implement audio tag editing service (#305)\n- feat: implement PWYW downloads with format selection (#304)\n- feat: implement PWYW downloads with format selection (#304)\n- feat: implement audio tag editing service (#305)\n- feat: implement PWYW downloads with format selection (#304)\n- feat: implement PWYW downloads with format selection (#304)\n- feat: implement PWYW downloads with format selection (#304)\n- feat: implement PWYW downloads with format selection (#304)\n- Fix CDN issue with the built NextJS on CI (#303)\n- Fix CDN issue with the built NextJS on CI (#303)\n- Fix CDN issue with the built NextJS on CI (#303)\n- Fix CDN issue with the built NextJS on CI (#303)\n- Update github actions and pnpm versions (#302)\n- Update github actions and pnpm versions (#302)\n- Update github actions and pnpm versions (#302)\n- Update github actions and pnpm versions (#302)\n- Update github actions and pnpm versions (#302)\n- Update github actions and pnpm versions (#302)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- fix(e2e): replace undefined `loginAsAdmin` with `adminPage` fixture in upload spec (#301)\n- fix: move @aws-sdk/lib-storage to dependencies (#300)\n- fix(e2e): replace undefined `loginAsAdmin` with `adminPage` fixture in upload spec (#301)\n- fix: move @aws-sdk/lib-storage to dependencies (#300)\n- fix(e2e): replace undefined `loginAsAdmin` with `adminPage` fixture in upload spec (#301)\n- fix: move @aws-sdk/lib-storage to dependencies (#300)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Create ability to upload all digital premium formats in the admin (#299)\n- Develop/feature/download freemium music (#292)\n- Use DB-resolved title for Stripe product name in checkout session (#298)\n- Use DB-resolved title for Stripe product name in checkout session (#298)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#292)\n- fix: resolve userId server-side in purchase checkout action (#297)\n- fix: resolve userId server-side in purchase checkout action (#297)\n- fix: guard against NaN amountCents in download-dialog handleSubmit (#296)\n- fix: map server action error codes to user-friendly messages in PurchaseCheckoutStep (#295)\n- fix: strict IPv4 validation in Stripe webhook IP allowlist (#294)\n- fix: strict IPv4 validation in Stripe webhook IP allowlist (#294)\n- fix: use DB-sourced release title for Stripe product_data.name (#293)\n- fix: resolve userId server-side in purchase checkout action (#297)\n- fix: resolve userId server-side in purchase checkout action (#297)\n- fix: guard against NaN amountCents in download-dialog handleSubmit (#296)\n- fix: strict IPv4 validation in Stripe webhook IP allowlist (#294)\n- fix: use DB-sourced release title for Stripe product_data.name (#293)\n- fix: map server action error codes to user-friendly messages in PurchaseCheckoutStep (#295)\n- fix: resolve userId server-side in purchase checkout action (#297)\n- fix: guard against NaN amountCents in download-dialog handleSubmit (#296)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#292)\n- fix: map server action error codes to user-friendly messages in PurchaseCheckoutStep (#295)\n- fix: strict IPv4 validation in Stripe webhook IP allowlist (#294)\n- fix: use DB-sourced release title for Stripe product_data.name (#293)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#292)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- [WIP] [WIP] Address feedback on freemium music download feature implementation (#291)\n- [WIP] [WIP] Address feedback on download freemium music feature implementation (#288)\n- [WIP] [WIP] Address feedback on download freemium music feature implementation (#288)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)\n- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Fix IP allowlist helpers: explicit IPv4 octet validation and prefix-length bounds checking (#285)\n- Use MAX_RELEASE_DOWNLOAD_COUNT constant in purchase confirmation email copy (#284)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Remove unreachable `amountCents < 50` runtime check (#289)\n- [WIP] [WIP] Address feedback on download freemium music feature implementation (#288)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- [WIP] [WIP] Address feedback on freemium music download feature implementation (#291)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)\n- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Remove unreachable `amountCents < 50` runtime check (#289)\n- Fix IP allowlist helpers: explicit IPv4 octet validation and prefix-length bounds checking (#285)\n- Fix IP allowlist helpers: explicit IPv4 octet validation and prefix-length bounds checking (#285)\n- [WIP] [WIP] Address feedback on freemium music download feature implementation (#291)\n- Use MAX_RELEASE_DOWNLOAD_COUNT constant in purchase confirmation email copy (#284)\n- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)\n- Remove unreachable `amountCents < 50` runtime check (#289)\n- [WIP] [WIP] Address feedback on download freemium music feature implementation (#288)\n- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)\n- Add comprehensive unit tests for amountInputSchema (#286)\n- Fix IP allowlist helpers: explicit IPv4 octet validation and prefix-length bounds checking (#285)\n- Use MAX_RELEASE_DOWNLOAD_COUNT constant in purchase confirmation email copy (#284)\n- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Develop/feature/download freemium music (#281)\n- Chore/security audit (#317)\n
+- feat: increase max upload size for digital formats to 500MB and update related limits to 48MB (#311)
+- feat: enhance purchase confirmation email handling and idempotency logic (#310)
+- feat: implement audio tag editing service (#305)
+- feat: implement PWYW downloads with format selection (#304)
+
+### Changed
+
+- Chore/security audit (#317)
+- chore: update GitHub Actions to use latest action versions (#315)
+- Fix deployment workflow (#313)
+- Feature/confirm and download purchase (#309)
+- Fix playwright tests (#308)
+- Update README for playwright tests (#307)
+- Fix and add playwright tests (#306)
+- Fix CDN issue with the built NextJS on CI (#303)
+- Update github actions and pnpm versions (#302)
+- Create ability to upload all digital premium formats in the admin (#299)
+- Develop/feature/download freemium music (#292)
+- Use DB-resolved title for Stripe product name in checkout session (#298)
+- Develop/feature/download freemium music (#281)
+- [WIP] [WIP] Address feedback on freemium music download feature implementation (#291)
+- [WIP] [WIP] Address feedback on download freemium music feature implementation (#288)
+- [WIP] [WIP] Address feedback on 'Develop/feature/download freemium music' PR (#287)
+- Use canonical DB title for Stripe product_data.name instead of client-supplied value (#290)
+- Add comprehensive unit tests for amountInputSchema (#286)
+- Fix IP allowlist helpers: explicit IPv4 octet validation and prefix-length bounds checking (#285)
+- Use MAX_RELEASE_DOWNLOAD_COUNT constant in purchase confirmation email copy (#284)
+- Fix account/purchase enumeration vulnerability in checkGuestPurchaseAction (#283)
+- Remove unreachable `amountCents < 50` runtime check (#289)
+
+### Fixed
+
+- fix: address security audit review feedback (#316)
+- fix: replace public-ip action with curl command to retrieve runner IP (#314)
+- fix: address PR review - XSS hardening, CSS typos, Tailwind arbitrary values, atomic upsert, URL encoding (#312)
+- fix(e2e): replace undefined `loginAsAdmin` with `adminPage` fixture in upload spec (#301)
+- fix: move @aws-sdk/lib-storage to dependencies (#300)
+- fix: resolve userId server-side in purchase checkout action (#297)
+- fix: guard against NaN amountCents in download-dialog handleSubmit (#296)
+- fix: map server action error codes to user-friendly messages in PurchaseCheckoutStep (#295)
+- fix: strict IPv4 validation in Stripe webhook IP allowlist (#294)
+- fix: use DB-sourced release title for Stripe product_data.name (#293)
 
 ## [3.7.0] - 2026-03-21
 
 ### Added
 
-- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Address feedback on freemium music download feature implementation (#277)\n- Address feedback on freemium music download feature implementation (#277)\n- Address feedback on freemium music download feature implementation (#277)\n- Develop/feature/download freemium music (#275)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n
+- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)
+
+### Changed
+
+- Develop/feature/download freemium music (#275)
+- Address feedback on freemium music download feature implementation (#277)
+- Move confirmation email sending from success page to Stripe webhook handler (#276)
+
+### Fixed
+
+- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)
 
 ## [3.6.0] - 2026-03-20
 
-### Added
+### Changed
 
-- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n
+- Develop/feature/download freemium music (#274)
 
 ## [3.5.0] - 2026-03-16
 
-### Added
+### Changed
 
-- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n- Develop/feature/download freemium music (#273)\n
+- Develop/feature/download freemium music (#273)
 
 ## [3.4.0] - 2026-03-14
 
-### Added
+### Changed
 
-- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n- Develop/feature/download freemium music (#272)\n
+- Develop/feature/download freemium music (#272)
 
 ## [3.3.0] - 2026-03-14
 
-### Added
+### Changed
 
-- Update social share icons alignment and styles (#271)\n- Update social share icons alignment and styles (#271)\n- Update social share icons alignment and styles (#271)\n- Update social share icons alignment and styles (#271)\n
+- Update social share icons alignment and styles (#271)
 
 ## [3.2.0] - 2026-03-14
 
 ### Added
 
-- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n
+- feat: update Content-Security-Policy and add ShareThis script to layout (#270)
 
 ## [3.1.0] - 2026-03-13
 
-### Added
+### Changed
 
-- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n- 002 tour management (#269)\n
+- 002 tour management (#269)
 
 ## [3.0.0] - 2026-03-11
 
 ### Changed
 
-- Start tour management feature (#263)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Start tour management feature (#263)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Start tour management feature (#263)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Start tour management feature (#263)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Start tour management feature (#263)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n
+- Start tour management feature (#263)
+- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)
+- Remove non-existent fields from createTourAction permittedFieldNames (#266)
+- Fix conditional expect masking failures in public tours search e2e test (#265)
+
+### Fixed
+
+- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)
+- fix: use absolute imports in tour-repository.ts (#264)
 
 ## [2.8.0] - 2026-03-07
 
-### Added
+### Changed
 
-- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n
+- Add some padding to featured artist (#262)
 
 ## [2.7.0] - 2026-03-07
 
-### Added
+### Changed
 
-- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n
+- Develop/feature/search artists (#261)
 
 ## [2.6.0] - 2026-03-07
 
-### Added
+### Changed
 
-- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n
+- Fix tests and update artist and release search (#260)
 
 ## [2.5.0] - 2026-03-06
 
-### Added
+### Changed
 
-- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Address feedback on artist releases test fixes (#259)\n- Address feedback on artist releases test fixes (#259)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n
+- Fix tests for artist releases and related (#258)
+- Address feedback on artist releases test fixes (#259)
 
 ## [2.4.0] - 2026-03-05
 
-### Added
+### Changed
 
-- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n
+- Update the associations made when uploading tracks (#257)
 
 ## [2.3.0] - 2026-03-05
 
-### Added
+### Changed
 
-- Update admin create release track (#256)\n- Update admin create release track (#256)\n- Update admin create release track (#256)\n- Update admin create release track (#256)\n
+- Update admin create release track (#256)
 
 ## [2.2.0] - 2026-03-04
 
-### Added
+### Changed
 
-- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n
+- Update artist search result page (#255)
 
 ## [2.1.0] - 2026-03-04
 
-### Added
+### Changed
 
-- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n
+- Update search feature to find artists (#254)
 
 ## [2.0.0] - 2026-03-04
 
 ### Changed
 
-- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n
+- Add search all artists feature (#251)
+- [WIP] Address feedback on 'Add search all artists feature' PR (#253)
+- [WIP] Address feedback on search all artists feature PR (#252)
 
 ## [1.7.0] - 2026-02-24
 
-### Added
+### Changed
 
-- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n
+- Develop/bugfix/fix misc admin (#246)
 
 ## [1.6.0] - 2026-02-22
 
-### Added
+### Changed
 
-- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n
+- 001 release search player (#245)
 
 ## [1.5.0] - 2026-02-19
 
-### Added
+### Changed
 
-- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n
+- Update readme purpose section (#243)
 
 ## [1.4.1] - 2026-02-19
 
-### Fixed
+### Changed
 
-- Add version badge update to CI workflow and update README (#242)\n- Add version badge update to CI workflow and update README (#242)\n- Add version badge update to CI workflow and update README (#242)\n- null (#null)\n- Add version badge update to CI workflow and update README (#242)\n
+- Add version badge update to CI workflow and update README (#242)
+- null (#null)
 
 ## [1.4.0] - 2026-02-18
 
-### Added
+### Changed
 
-- Fix the build! permission! CI! (#241)\n- Fix the build! permission! CI! (#241)\n- Fix the build! permission! CI! (#241)\n- Update code coverage badge (#240)\n- Update code coverage badge (#240)\n- Update code coverage badge (#240)\n- Fix the build! permission! CI! (#241)\n
+- Fix the build! permission! CI! (#241)
+- Update code coverage badge (#240)
 
 ## [1.3.0] - 2026-02-18
 
-### Added
+### Changed
 
-- Update badges (#239)\n- Update badges (#239)\n- Update badges (#239)\n
+- Update badges (#239)
 
 ## [1.2.0] - 2026-02-18
 
-### Added
+### Changed
 
-- Fix coverage badge update to use git worktree (#238)\n- Fix coverage badge update to use git worktree (#238)\n- Fix coverage badge update to use git worktree (#238)\n- Update coverage badge (#237)\n- Update coverage badge (#237)\n- Update coverage badge (#237)\n- Fix playwright sign out test (#236)\n- Fix playwright sign out test (#236)\n- Fix playwright sign out test (#236)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add moar badges (#233)\n- Add moar badges (#233)\n- Add moar badges (#233)\n- Update coverage badge (#232)\n- Update coverage badge (#232)\n- Update coverage badge (#232)\n- Added code coverage badge (#231)\n- Added code coverage badge (#231)\n- Fix coverage badge update to use git worktree (#238)\n
+- Fix coverage badge update to use git worktree (#238)
+- Update coverage badge (#237)
+- Fix playwright sign out test (#236)
+- Add permissions for badges (#234)
+- Add moar badges (#233)
+- Update coverage badge (#232)
+- Added code coverage badge (#231)
 
 ## [1.1.0] - 2026-02-18
 
-### Added
+### Changed
 
-- Update license badge in README.md (#230)\n- Update license badge in README.md (#230)\n- Update license badge in README.md (#230)\n
+- Update license badge in README.md (#230)
 
 ## [1.0.0] - 2026-02-18
 
 ### Changed
 
-- Update deployment secret handling for bump version (#229)\n- Update deployment secret handling for bump version (#229)\n- Update deployment secret handling for bump version (#229)\n- Update deployment secret handling for bump version (#229)\n- Updated to used pat fg secret to deploy (#228)\n- Updated to used pat fg secret to deploy (#228)\n- Updated to used pat fg secret to deploy (#228)\n- Made media player enhancements (#227)\n- Made media player enhancements (#227)\n- Made media player enhancements (#227)\n- Made media player enhancements (#227)\n- Made media player enhancements (#227)\n- Add server-only import to contact-action.ts (#225)\n- Add server-only import to contact-action.ts (#225)\n- Add server-only guard to ses-client (#224)\n- Add server-only guard to ses-client (#224)\n- Wait for build before running tests and quality jobs (#226)\n- Wait for build before running tests and quality jobs (#226)\n- Wait for build before running tests and quality jobs (#226)\n- Wait for build before running tests and quality jobs (#226)\n- Add server-only guard to ses-client (#224)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add workflow context validation before version bumping (#221)\n- Add workflow context validation before version bumping (#221)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Add validation for PR metadata extraction in version bump workflow (#219)\n- Add validation for PR metadata extraction in version bump workflow (#219)\n- Add health verification before automatic version bumping (#218)\n- Add health verification before automatic version bumping (#218)\n- Add health verification before automatic version bumping (#218)\n- Add health verification before automatic version bumping (#218)\n- Add health verification before automatic version bumping (#218)\n- Add health verification before automatic version bumping (#218)\n- Fix shell portability issues in PR tracking with array-based implementation (#217)\n- Fix shell portability issues in PR tracking with array-based implementation (#217)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Add beforeEach block to prevent test pollution in carousel tests (#196)\n- Add beforeEach block to prevent test pollution in carousel tests (#196)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Fix carousel test mocks to properly verify disabled state at boundaries (#194)\n- Fix carousel test mocks to properly verify disabled state at boundaries (#194)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Add server-only guard to ses-client (#224)\n- Add server-only import to contact-action.ts (#225)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Add server-only import to contact-action.ts (#225)\n- Add server-only guard to ses-client (#224)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Develop/feature/add mobile contact form (#223)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Fix test pollution in carousel loop cycling tests (#193)\n- Fix test pollution in carousel loop cycling tests (#193)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Add setup action for Node.js environment and refactor CI workflow (#222)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Enhance carousel functionality to support looping behavior for navigation (#191)\n- Enhance carousel functionality to support looping behavior for navigation (#191)\n- Automatically bump version upon successful deployment (#216)\n- Add workflow context validation before version bumping (#221)\n- Automatically bump version upon successful deployment (#216)\n- Automatically bump version upon successful deployment (#216)\n- Add workflow context validation before version bumping (#221)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Automatically bump version upon successful deployment (#216)\n- Fix shell portability issues in PR tracking with array-based implementation (#217)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Add health verification before automatic version bumping (#218)\n- Automatically bump version upon successful deployment (#216)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Fix shell portability issues in PR tracking with array-based implementation (#217)\n- Add health verification before automatic version bumping (#218)\n- Automatically bump version upon successful deployment (#216)\n- Add validation for PR metadata extraction in version bump workflow (#219)\n- Automatically bump version upon successful deployment (#216)\n- Fix changelog generation to collect all PRs when no tags exist (#220)\n- Add validation for PR metadata extraction in version bump workflow (#219)\n- Add health verification before automatic version bumping (#218)\n- Fix shell portability issues in PR tracking with array-based implementation (#217)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Automatically bump version upon successful deployment (#216)\n- Automatically bump version upon successful deployment (#216)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Fix duplicate CloudFront invalidations in deploy workflow (#215)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Fix duplicate CloudFront invalidations in deploy workflow (#215)\n- Fix Vitest environment pragma placement in test files (#212)\n- Fix Vitest environment pragma placement in test files (#212)\n- Optimize Docker and CI/CD workflows for improved build efficiency, clarity, and speed (#214)\n- Fix duplicate CloudFront invalidations in deploy workflow (#215)\n- Fix duplicate CloudFront invalidations in deploy workflow (#215)\n- Optimize Docker and CI/CD workflows for improved build efficiency, clarity, and speed (#214)\n- Optimize Playwright tests through parallelization and other improvements (#213)\n- Optimize Playwright tests through parallelization and other improvements (#213)\n- Fix Windows path handling in generateS3Key (#159)\n- Optimize Playwright tests through parallelization and other improvements (#213)\n- Fix Windows path handling in generateS3Key (#159)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Fix Vitest environment pragma placement in test files (#212)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Update social icons based on review feedback (#164)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Fix test pollution in carousel loop cycling tests (#193)\n- Fix carousel test mocks to properly verify disabled state at boundaries (#194)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Add beforeEach block to prevent test pollution in carousel tests (#196)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Fix Windows path handling in generateS3Key (#159)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Fix Vitest environment pragma placement in test files (#212)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Update social icons based on review feedback (#164)\n- Add copyleft MPL 2.0 license to project (#211)\n- Add copyleft MPL 2.0 license to project (#211)\n- Fix Vitest environment pragma placement in test files (#212)\n- Add copyleft MPL 2.0 license to project (#211)\n- Add copyleft MPL 2.0 license to project (#211)\n- Add copyleft MPL 2.0 license to project (#211)\n- Fix Vitest environment pragma placement in test files (#212)\n- Add copyleft MPL 2.0 license to project (#211)\n- Add copyleft MPL 2.0 license to project (#211)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add copyleft MPL 2.0 license to project (#211)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Enhance carousel functionality to support looping behavior for navigation (#191)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Fix Windows path handling in generateS3Key (#159)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add FeaturedArtistForm and TrackSelect components with tests (#200)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Add setValue spy assertion to test for undefined releaseTracks (#210)\n- Increase test coverage across all metrics, fix, and optimize performance (#209)\n- Add UI assertions to TrackSelect error handling tests (#208)\n- Add UI error assertions to TrackSelect fetch error tests (#207)\n- Add setValue spy to test releaseId clearing on track deselect (#206)\n- Add setValue spy assertion for multi-release track selection test (#205)\n- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)\n- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)\n- Add FeaturedArtistForm and TrackSelect components with tests (#200)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Fix test assertions to verify setValue calls and error messages (#202)\n- Update FeaturedArtistForm and TrackSelect components (#201)\n- Add FeaturedArtistForm and TrackSelect components with tests (#200)\n- Add FeaturedArtistForm and TrackSelect components with tests (#200)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Add releaseId parameter support in Tracks API and related components (#198)\n- Clear trackId when releaseId changes in featured artist form (#199)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Add releaseId parameter support in Tracks API and related components (#198)\n- Add beforeEach block to prevent test pollution in carousel tests (#196)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Fix carousel test mocks to properly verify disabled state at boundaries (#194)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Fix test pollution in carousel loop cycling tests (#193)\n- Develop/feature/audit and improve security (#184)\n- Document fireEvent.keyDown usage for carousel keyboard tests (#197)\n- Add beforeEach block to prevent test pollution in carousel tests (#196)\n- Add guard for empty scrollSnapList in carousel loop navigation (#195)\n- Fix carousel test mocks to properly verify disabled state at boundaries (#194)\n- Fix test pollution in carousel loop cycling tests (#193)\n- Use userEvent.keyboard() in carousel keyboard loop tests (#192)\n- Develop/feature/audit and improve security (#184)\n- Enhance carousel functionality to support looping behavior for navigation (#191)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Develop/feature/audit and improve security (#184)\n- Validate session.user.id after requireRole in update-group-action (#190)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)\n- Remove ESLint disable by renaming Playwright fixture parameter (#188)\n- Add E2E_MODE gate to Turnstile test secret bypass (#187)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Add playwright e2e tests covering happy paths (#186)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Fix Windows path handling in generateS3Key (#159)\n- Develop/feature/audit and improve security (#184)\n- Develop/feature/audit and improve security (#184)\n- Strengthen requireRole to validate session.user.id for audit logging (#185)\n- Fix auto-cycle interval documentation mismatch in NotificationBanner (#166)\n- Fix auto-cycle interval documentation mismatch in NotificationBanner (#166)\n- Update social icons based on review feedback (#164)\n- Update social icons based on review feedback (#164)\n- Fix Windows path handling in generateS3Key (#159)\n- Develop/feature/audit and improve security (#184)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Update social icons based on review feedback (#164)\n- Address feedback on audit and improve security implementation (#179)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Configure Copilot instructions with current stack version and workflow context (#182)\n- Address feedback on audit and improve security implementation (#179)\n- Address feedback on audit and improve security implementation (#179)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix cert renewal to handle both webroot and standalone authenticators (#169)\n- Fix Windows path handling in generateS3Key (#159)\n- Fix Windows path handling in generateS3Key (#159)\n- Update social icons based on review feedback (#164)\n- Fix auto-cycle interval documentation mismatch in NotificationBanner (#166)\n- Fix auto-cycle interval documentation mismatch in NotificationBanner (#166)\n- Update social icons based on review feedback (#164)\n- Fix Windows path handling in generateS3Key (#159)\n- Fix Windows path handling in generateS3Key (#159)\n- Update deployment secret handling for bump version (#229)\n
+- Update deployment secret handling for bump version (#229)
+- Updated to used pat fg secret to deploy (#228)
+- Made media player enhancements (#227)
+- Add server-only import to contact-action.ts (#225)
+- Add server-only guard to ses-client (#224)
+- Wait for build before running tests and quality jobs (#226)
+- Add setup action for Node.js environment and refactor CI workflow (#222)
+- Add workflow context validation before version bumping (#221)
+- Fix changelog generation to collect all PRs when no tags exist (#220)
+- Add validation for PR metadata extraction in version bump workflow (#219)
+- Add health verification before automatic version bumping (#218)
+- Fix shell portability issues in PR tracking with array-based implementation (#217)
+- Add UI error assertions to TrackSelect fetch error tests (#207)
+- Add setValue spy to test releaseId clearing on track deselect (#206)
+- Add setValue spy assertion for multi-release track selection test (#205)
+- Remove misleading mock setup comment in FeaturedArtistForm tests (#204)
+- Spy on setValue calls in FeaturedArtistForm tests instead of checking variable existence (#203)
+- Fix test assertions to verify setValue calls and error messages (#202)
+- Clear trackId when releaseId changes in featured artist form (#199)
+- Document fireEvent.keyDown usage for carousel keyboard tests (#197)
+- Add beforeEach block to prevent test pollution in carousel tests (#196)
+- Add guard for empty scrollSnapList in carousel loop navigation (#195)
+- Develop/feature/add mobile contact form (#223)
+- Fix carousel test mocks to properly verify disabled state at boundaries (#194)
+- Fix test pollution in carousel loop cycling tests (#193)
+- Use userEvent.keyboard() in carousel keyboard loop tests (#192)
+- Enhance carousel functionality to support looping behavior for navigation (#191)
+- Automatically bump version upon successful deployment (#216)
+- Validate session.user.id after requireRole in update-group-action (#190)
+- Replace fixed timeouts with assertion-based waits in notification banner E2E tests (#189)
+- Increase test coverage across all metrics, fix, and optimize performance (#209)
+- Remove ESLint disable by renaming Playwright fixture parameter (#188)
+- Add E2E_MODE gate to Turnstile test secret bypass (#187)
+- Strengthen requireRole to validate session.user.id for audit logging (#185)
+- Add UI assertions to TrackSelect error handling tests (#208)
+- Add setValue spy assertion to test for undefined releaseTracks (#210)
+- Fix duplicate CloudFront invalidations in deploy workflow (#215)
+- Fix Vitest environment pragma placement in test files (#212)
+- Optimize Docker and CI/CD workflows for improved build efficiency, clarity, and speed (#214)
+- Optimize Playwright tests through parallelization and other improvements (#213)
+- Fix Windows path handling in generateS3Key (#159)
+- Update FeaturedArtistForm and TrackSelect components (#201)
+- Update social icons based on review feedback (#164)
+- Add copyleft MPL 2.0 license to project (#211)
+- Add FeaturedArtistForm and TrackSelect components with tests (#200)
+- Add releaseId parameter support in Tracks API and related components (#198)
+- Develop/feature/audit and improve security (#184)
+- Add playwright e2e tests covering happy paths (#186)
+- Fix auto-cycle interval documentation mismatch in NotificationBanner (#166)
+- Fix cert renewal to handle both webroot and standalone authenticators (#169)
+- Configure Copilot instructions with current stack version and workflow context (#182)
+- Address feedback on audit and improve security implementation (#179)
 
 ## [0.5.1] - 2026-02-14
 
