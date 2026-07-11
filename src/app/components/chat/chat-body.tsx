@@ -14,6 +14,7 @@ import type { ClientSessionData } from '@/app/hooks/use-session';
 import { useChatChannel } from '@/hooks/use-chat-channel';
 import { useChatMeQuery } from '@/hooks/use-chat-me-query';
 import { useChatPinnedMessagesQuery } from '@/hooks/use-chat-pinned-messages-query';
+import { useChatReopenRefresh } from '@/hooks/use-chat-reopen-refresh';
 import { useChatTyping } from '@/hooks/use-chat-typing';
 import { useFingerprint } from '@/hooks/use-fingerprint';
 import { useInfiniteChatMessagesQuery } from '@/hooks/use-infinite-chat-messages-query';
@@ -156,6 +157,9 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
   const { data: meStatus } = useChatMeQuery({ enabled });
   const isBlocked = getIsBlocked(meStatus);
   const enabledWithAccess = enabled && !isBlocked;
+  // The drawer unmounts this component on close, so a fresh mount means
+  // the drawer (re)opened — refresh the possibly stale cached history.
+  useChatReopenRefresh({ enabled: enabledWithAccess });
   const {
     messages: baseMessages,
     isPending,
