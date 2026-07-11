@@ -12,12 +12,22 @@ import type { ChatMessageDto } from '@/lib/services/chat-service';
 
 import { useOptimisticChat } from './use-optimistic-chat';
 
-// useOptimisticChat now patches the chat infinite-query cache on
-// updateMessage, so it needs a QueryClient in scope.
-const buildWrapper = () => {
+interface CachedPages {
+  pages: { messages: ChatMessageDto[] }[];
+  pageParams: unknown[];
+}
+
+// useOptimisticChat writes received echoes, reaction updates, and
+// deletions into the chat infinite-query cache, so every render needs a
+// QueryClient the test can also read back from.
+const buildHarness = (): {
+  client: QueryClient;
+  wrapper: ({ children }: { children: ReactNode }) => React.ReactElement;
+} => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: ReactNode }) =>
+  const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client }, children);
+  return { client, wrapper };
 };
 
 const makeMsg = (id: string, body: string, userId = 'user-1'): ChatMessageDto => ({
@@ -28,18 +38,29 @@ const makeMsg = (id: string, body: string, userId = 'user-1'): ChatMessageDto =>
   user: { id: userId, username: 'octo', gravatarHash: 'abc' },
 });
 
+/** Seed the infinite-query cache with one page per inner array (newest page first). */
+const seedPages = (client: QueryClient, pages: ChatMessageDto[][]): void => {
+  client.setQueryData(['chat', 'messages'], {
+    pages: pages.map((messages) => ({ messages })),
+    pageParams: pages.map(() => null),
+  });
+};
+
+const getCached = (client: QueryClient): CachedPages | undefined =>
+  client.getQueryData<CachedPages>(['chat', 'messages']);
+
 describe('useOptimisticChat', () => {
   it('returns base messages on first render', () => {
     const base = [makeMsg('msg-1', 'hi')];
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: base }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
     expect(result.current.messages.map((m) => m.id)).toEqual(['msg-1']);
   });
 
   it('appends optimistic placeholders at the tail', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
     act(() => {
       result.current.appendOptimistic({
@@ -50,77 +71,163 @@ describe('useOptimisticChat', () => {
     expect(result.current.messages.map((m) => m.tempId)).toEqual(['tmp-1']);
   });
 
-  it('drops a placeholder when the server echo carries the matching tempId (precise)', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+  describe('addReceivedMessage → cache append', () => {
+    it('drops the placeholder and appends the tempId-matched echo to the newest page tail', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[makeMsg('persisted-1', 'historic')]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() =>
+        result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' })
+      );
+      act(() =>
+        result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-1' })
+      );
+
+      // Placeholder reconciled away; persisted echo lives in the cache.
+      expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(false);
+      const cached = getCached(client);
+      expect(cached?.pages[0].messages.map((m) => m.id)).toEqual(['persisted-1', 'msg-1']);
     });
 
-    act(() => result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' }));
-    act(() => result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-1' }));
+    it('strips the client tempId from the cached copy', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
-    // The optimistic placeholder (id 'temp-id') should be gone; the
-    // server-persisted message ('msg-1') replaces it. The server echo
-    // itself carries the same tempId for matching, so we check the id
-    // collection rather than presence of the tempId field.
-    expect(result.current.messages.map((m) => m.id)).toEqual(['msg-1']);
-    expect(result.current.messages.some((m) => m.id === 'temp-id')).toBe(false);
-  });
+      act(() =>
+        result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-1' })
+      );
 
-  it('does NOT drop a placeholder when the server echo carries a different tempId', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      const cached = getCached(client);
+      expect(cached?.pages[0].messages[0].id).toBe('msg-1');
+      expect(cached?.pages[0].messages[0].tempId).toBeUndefined();
     });
 
-    act(() => result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' }));
-    // A second user sends the same body — echo has tempId 'tmp-other'.
-    // Under tempId-precise matching, our placeholder must survive.
-    act(() =>
-      result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-other' })
-    );
+    it('does NOT drop a placeholder when the server echo carries a different tempId', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
-    expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(true);
-  });
+      act(() =>
+        result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' })
+      );
+      // A second user sends the same body — echo has tempId 'tmp-other'.
+      // Under tempId-precise matching, our placeholder must survive.
+      act(() =>
+        result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-other' })
+      );
 
-  it('drops the optimistic placeholder when the server echo matches user+body', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(true);
+      expect(getCached(client)?.pages[0].messages.map((m) => m.id)).toEqual(['msg-1']);
     });
 
-    act(() => {
-      result.current.appendOptimistic({
-        ...makeMsg('temp-id', 'hello'),
-        tempId: 'tmp-1',
+    it('drops the optimistic placeholder when the server echo matches user+body', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => {
+        result.current.appendOptimistic({
+          ...makeMsg('temp-id', 'hello'),
+          tempId: 'tmp-1',
+        });
       });
-    });
-    act(() => {
-      result.current.addReceivedMessage(makeMsg('msg-1', 'hello'));
-    });
-
-    const ids = result.current.messages.map((m) => m.id);
-    expect(ids).toContain('msg-1');
-    expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(false);
-  });
-
-  it('keeps a failed placeholder around even after an echo lands', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
-    });
-
-    act(() => {
-      result.current.appendOptimistic({
-        ...makeMsg('temp-id', 'hello'),
-        tempId: 'tmp-1',
+      act(() => {
+        result.current.addReceivedMessage(makeMsg('msg-1', 'hello'));
       });
-    });
-    act(() => result.current.markFailed('tmp-1'));
-    act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hello')));
 
-    expect(result.current.messages.some((m) => m.tempId === 'tmp-1' && m.failed)).toBe(true);
+      expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(false);
+      expect(getCached(client)?.pages[0].messages.map((m) => m.id)).toEqual(['msg-1']);
+    });
+
+    it('keeps a failed placeholder around even after an echo lands', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => {
+        result.current.appendOptimistic({
+          ...makeMsg('temp-id', 'hello'),
+          tempId: 'tmp-1',
+        });
+      });
+      act(() => result.current.markFailed('tmp-1'));
+      act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hello')));
+
+      expect(result.current.messages.some((m) => m.tempId === 'tmp-1' && m.failed)).toBe(true);
+    });
+
+    it('leaves the cache untouched (same reference) when the id exists in an older page', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[makeMsg('newest-1', 'a')], [makeMsg('older-1', 'b')]]);
+      const before = getCached(client);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => result.current.addReceivedMessage(makeMsg('older-1', 'b')));
+
+      expect(getCached(client)).toBe(before);
+    });
+
+    it('deduplicates duplicate live broadcasts of the same id', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[]]);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
+      act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
+
+      expect(getCached(client)?.pages[0].messages.filter((m) => m.id === 'msg-1')).toHaveLength(1);
+    });
+
+    it('is safe (and still reconciles) when the cache is empty', () => {
+      const { client, wrapper } = buildHarness();
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() =>
+        result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' })
+      );
+      expect(() =>
+        act(() =>
+          result.current.addReceivedMessage({ ...makeMsg('msg-1', 'hello'), tempId: 'tmp-1' })
+        )
+      ).not.toThrow();
+
+      expect(getCached(client)).toBeUndefined();
+      expect(result.current.messages.some((m) => m.tempId === 'tmp-1')).toBe(false);
+    });
+
+    it('leaves a pageless cache entry untouched (same reference)', () => {
+      const { client, wrapper } = buildHarness();
+      client.setQueryData(['chat', 'messages'], { pages: [], pageParams: [] });
+      const before = getCached(client);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
+
+      expect(getCached(client)).toBe(before);
+    });
+
+    it('appends to the end of the newest page and leaves older pages by reference', () => {
+      const { client, wrapper } = buildHarness();
+      seedPages(client, [[makeMsg('new-1', 'a'), makeMsg('new-2', 'b')], [makeMsg('old-1', 'z')]]);
+      const before = getCached(client);
+      const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
+
+      act(() => result.current.addReceivedMessage(makeMsg('msg-3', 'c')));
+
+      const cached = getCached(client);
+      expect(cached?.pages[0].messages.map((m) => m.id)).toEqual(['new-1', 'new-2', 'msg-3']);
+      expect(cached).not.toBe(before);
+      expect(cached?.pages[0]).not.toBe(before?.pages[0]);
+      expect(cached?.pages[1]).toBe(before?.pages[1]);
+      expect(cached?.pageParams).toBe(before?.pageParams);
+    });
   });
 
   it('removeByTempId clears the placeholder (used for retry/dismiss)', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
 
     act(() => result.current.appendOptimistic({ ...makeMsg('temp-id', 'hello'), tempId: 'tmp-1' }));
@@ -129,41 +236,11 @@ describe('useOptimisticChat', () => {
     expect(result.current.messages).toHaveLength(0);
   });
 
-  it('ignores a Pusher echo whose id is already in the persisted history', () => {
-    const base = [makeMsg('msg-1', 'persisted')];
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: base }), {
-      wrapper: buildWrapper(),
-    });
+  it('removeMessage drops appended, local, and historic rows across layers', () => {
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[makeMsg('persisted-1', 'historic')]]);
 
-    act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'persisted')));
-
-    expect(result.current.messages.filter((m) => m.id === 'msg-1')).toHaveLength(1);
-  });
-
-  it('deduplicates duplicate live broadcasts of the same id', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
-    });
-
-    act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
-    act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
-
-    expect(result.current.messages.filter((m) => m.id === 'msg-1')).toHaveLength(1);
-  });
-
-  it('removeMessage drops a live message, a local optimistic placeholder, and patches the infinite-query cache', async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
-
-    client.setQueryData(['chat', 'messages'], {
-      pages: [{ messages: [makeMsg('persisted-1', 'historic')] }],
-      pageParams: [null],
-    });
-
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper,
-    });
+    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
     act(() => result.current.addReceivedMessage(makeMsg('live-1', 'live')));
     act(() => result.current.appendOptimistic({ ...makeMsg('local-1', 'local'), tempId: 'tmp-1' }));
@@ -172,42 +249,25 @@ describe('useOptimisticChat', () => {
     act(() => result.current.removeMessage('local-1'));
     act(() => result.current.removeMessage('persisted-1'));
 
-    expect(result.current.messages.some((m) => m.id === 'live-1')).toBe(false);
     expect(result.current.messages.some((m) => m.id === 'local-1')).toBe(false);
-    const cached = client.getQueryData<{ pages: { messages: ChatMessageDto[] }[] }>([
-      'chat',
-      'messages',
-    ]);
-    expect(cached?.pages[0].messages.some((m) => m.id === 'persisted-1')).toBe(false);
+    expect(getCached(client)?.pages[0].messages).toEqual([]);
   });
 
   it('removeMessage is a no-op when the id is not in any layer', () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[makeMsg('persisted-1', 'historic')]]);
 
-    client.setQueryData(['chat', 'messages'], {
-      pages: [{ messages: [makeMsg('persisted-1', 'historic')] }],
-      pageParams: [null],
-    });
-
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper,
-    });
+    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
     act(() => result.current.removeMessage('does-not-exist'));
 
-    const cached = client.getQueryData<{ pages: { messages: ChatMessageDto[] }[] }>([
-      'chat',
-      'messages',
-    ]);
-    expect(cached?.pages[0].messages.map((m) => m.id)).toEqual(['persisted-1']);
+    expect(getCached(client)?.pages[0].messages.map((m) => m.id)).toEqual(['persisted-1']);
   });
 
-  it('updateMessage swaps a live message in place', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
-    });
+  it('updateMessage patches a previously appended echo in the cache', () => {
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[]]);
+    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
     act(() => result.current.addReceivedMessage(makeMsg('msg-1', 'hi')));
     act(() =>
@@ -217,19 +277,13 @@ describe('useOptimisticChat', () => {
       })
     );
 
-    const updated = result.current.messages.find((m) => m.id === 'msg-1');
+    const updated = getCached(client)?.pages[0].messages.find((m) => m.id === 'msg-1');
     expect(updated?.reactions).toEqual([{ emoji: '🔥', userIds: ['user-2'] }]);
   });
 
   it('updateMessage patches a row inside the persisted infinite-query cache', () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
-
-    client.setQueryData(['chat', 'messages'], {
-      pages: [{ messages: [makeMsg('persisted-1', 'historic')] }],
-      pageParams: [null],
-    });
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[makeMsg('persisted-1', 'historic')]]);
 
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
@@ -240,18 +294,12 @@ describe('useOptimisticChat', () => {
       })
     );
 
-    const cached = client.getQueryData<{ pages: { messages: ChatMessageDto[] }[] }>([
-      'chat',
-      'messages',
-    ]);
+    const cached = getCached(client);
     expect(cached?.pages[0].messages[0].reactions).toEqual([{ emoji: '🔥', userIds: ['user-2'] }]);
   });
 
   it('updateMessage leaves the cache untouched when no page contains the id', () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
-
+    const { client, wrapper } = buildHarness();
     const initial = {
       pages: [{ messages: [makeMsg('persisted-1', 'historic')] }],
       pageParams: [null],
@@ -268,12 +316,12 @@ describe('useOptimisticChat', () => {
     );
 
     // Same reference returned when `changed` stays false.
-    expect(client.getQueryData(['chat', 'messages'])).toBe(initial);
+    expect(getCached(client)).toBe(initial);
   });
 
   it('updateMessage is a no-op when the infinite-query cache is empty', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
 
     expect(() => act(() => result.current.updateMessage(makeMsg('msg-1', 'hi')))).not.toThrow();
@@ -281,7 +329,7 @@ describe('useOptimisticChat', () => {
 
   it('markFailed only flips the matching placeholder when multiple are queued', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
 
     act(() => result.current.appendOptimistic({ ...makeMsg('t1', 'a'), tempId: 'tmp-1' }));
@@ -292,10 +340,10 @@ describe('useOptimisticChat', () => {
     expect(result.current.messages.find((m) => m.tempId === 'tmp-2')?.failed).toBe(true);
   });
 
-  it('updateMessage skips live messages whose ids do not match', () => {
-    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
-    });
+  it('updateMessage leaves other appended echoes untouched', () => {
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[]]);
+    const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
     act(() => result.current.addReceivedMessage(makeMsg('keep-1', 'a')));
     act(() => result.current.addReceivedMessage(makeMsg('target', 'b')));
@@ -307,25 +355,16 @@ describe('useOptimisticChat', () => {
       })
     );
 
-    const keep = result.current.messages.find((m) => m.id === 'keep-1');
-    const updated = result.current.messages.find((m) => m.id === 'target');
+    const cached = getCached(client);
+    const keep = cached?.pages[0].messages.find((m) => m.id === 'keep-1');
+    const updated = cached?.pages[0].messages.find((m) => m.id === 'target');
     expect(keep?.reactions).toEqual([]);
     expect(updated?.reactions).toEqual([{ emoji: '🔥', userIds: ['user-2'] }]);
   });
 
   it('updateMessage leaves sibling messages in the same page untouched', () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
-
-    client.setQueryData(['chat', 'messages'], {
-      pages: [
-        {
-          messages: [makeMsg('sibling', 'a'), makeMsg('target', 'b')],
-        },
-      ],
-      pageParams: [null],
-    });
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[makeMsg('sibling', 'a'), makeMsg('target', 'b')]]);
 
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
@@ -336,27 +375,14 @@ describe('useOptimisticChat', () => {
       })
     );
 
-    const cached = client.getQueryData<{ pages: { messages: ChatMessageDto[] }[] }>([
-      'chat',
-      'messages',
-    ]);
-    const [sibling, target] = cached?.pages[0].messages ?? [];
+    const [sibling, target] = getCached(client)?.pages[0].messages ?? [];
     expect(sibling?.reactions).toEqual([]);
     expect(target?.reactions).toEqual([{ emoji: '🔥', userIds: ['x'] }]);
   });
 
   it('updateMessage only patches pages that actually contain the updated id', () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client }, children);
-
-    client.setQueryData(['chat', 'messages'], {
-      pages: [
-        { messages: [makeMsg('other', 'historic')] },
-        { messages: [makeMsg('target', 'historic')] },
-      ],
-      pageParams: [null, null],
-    });
+    const { client, wrapper } = buildHarness();
+    seedPages(client, [[makeMsg('other', 'historic')], [makeMsg('target', 'historic')]]);
 
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), { wrapper });
 
@@ -367,17 +393,14 @@ describe('useOptimisticChat', () => {
       })
     );
 
-    const cached = client.getQueryData<{ pages: { messages: ChatMessageDto[] }[] }>([
-      'chat',
-      'messages',
-    ]);
+    const cached = getCached(client);
     expect(cached?.pages[0].messages[0].reactions).toEqual([]);
     expect(cached?.pages[1].messages[0].reactions).toEqual([{ emoji: '🔥', userIds: ['x'] }]);
   });
 
   it('reconcileEcho keeps a placeholder when the body differs even though the user matches', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
 
     act(() =>
@@ -394,7 +417,7 @@ describe('useOptimisticChat', () => {
 
   it('reconcileEcho keeps a placeholder when the echo carries no tempId and differs by user', () => {
     const { result } = renderHook(() => useOptimisticChat({ baseMessages: [] }), {
-      wrapper: buildWrapper(),
+      wrapper: buildHarness().wrapper,
     });
 
     act(() =>

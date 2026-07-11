@@ -338,8 +338,8 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
         fingerprint={fingerprint}
         currentUser={currentUser}
         onOptimisticAppend={appendOptimistic}
-        // addReceivedMessage handles both: it inserts the persisted DTO
-        // into the live list AND reconciles the matching optimistic
+        // addReceivedMessage handles both: it appends the persisted DTO
+        // to the newest cached page AND reconciles the matching optimistic
         // placeholder via tempId. Works whether or not Pusher echoes.
         onSendResolved={(_tempId, server) => addReceivedMessage(server)}
         onSendFailed={markFailed}
