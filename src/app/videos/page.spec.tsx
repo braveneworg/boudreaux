@@ -188,6 +188,15 @@ describe('VideosPage', () => {
     expect(panel).toHaveClass('zine-accent-kraft');
   });
 
+  it('should frame the video list inside the zine content rule', async () => {
+    const Page = await VideosPage();
+    const { container } = render(Page);
+
+    const rule = container.querySelector('[data-slot="zine-content-rule"]');
+    expect(rule).not.toBeNull();
+    expect(rule).toContainElement(screen.getByTestId('videos-content'));
+  });
+
   it('should render the videos heading as the wordmark image', async () => {
     const Page = await VideosPage();
     render(Page);

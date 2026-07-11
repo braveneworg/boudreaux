@@ -15,6 +15,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ZineContentRule } from '@/app/components/ui/zine-content-rule';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { VideosContent } from '@/app/components/videos-content';
 import { PUBLISHED_VIDEOS_PAGE_SIZE } from '@/app/hooks/use-infinite-published-videos-query';
@@ -83,7 +84,9 @@ export default async function VideosPage() {
               imageHeight={480}
               priority
             />
-            <VideosContent />
+            <ZineContentRule>
+              <VideosContent />
+            </ZineContentRule>
           </ZinePanel>
         </ContentContainer>
       </PageContainer>
