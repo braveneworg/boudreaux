@@ -22,7 +22,7 @@ export const ZineHeading = ({
     {/* Explicit `uppercase` deliberately beats the base `h1 { text-transform: capitalize }`. */}
     <span
       data-slot="zine-heading"
-      className="font-fake-four-cutout shadow-zine-ink relative inline-block w-full -rotate-1 border-2 border-black bg-[var(--card-accent-soft)] px-3 py-1 text-3xl tracking-wide text-black uppercase sm:w-auto sm:text-4xl"
+      className="font-fake-four-cutout relative inline-block w-full px-3 py-1 text-3xl tracking-wide text-black uppercase sm:w-auto sm:text-4xl"
     >
       {children}
     </span>

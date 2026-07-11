@@ -16,14 +16,15 @@ describe('ZineHeading', () => {
     expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
   });
 
-  it('renders the cutout strip classes on the zine-heading span', () => {
+  it('renders the bare cutout strip classes on the zine-heading span', () => {
     const { container } = render(<ZineHeading>Releases</ZineHeading>);
-    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass(
-      'font-fake-four-cutout',
+    const strip = container.querySelector('[data-slot="zine-heading"]');
+    expect(strip).toHaveClass('font-fake-four-cutout', 'uppercase', 'px-3', 'py-1');
+    // The strip lost its box chrome: no border, tint, ink shadow, or tilt.
+    expect(strip).not.toHaveClass(
       'border-2',
       'border-black',
       'bg-[var(--card-accent-soft)]',
-      'uppercase',
       'shadow-zine-ink',
       '-rotate-1'
     );
