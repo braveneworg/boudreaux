@@ -202,6 +202,83 @@ describe('annotateFaces', () => {
     expect(result[1].hasFace).toBe(true);
   });
 
+  it('skips a failing reference and scores against the surviving one', async () => {
+    // Ref r1 has no detectable face → InvalidParameterException; r2 scores 88.
+    routeSend({
+      detect: () => ({ FaceDetails: [{}] }),
+      compare: (input) => {
+        if (Buffer.from(input.SourceImage?.Bytes ?? []).toString() === 'r1') {
+          throw new Error('InvalidParameterException');
+        }
+        return { FaceMatches: [{ Similarity: 88 }] };
+      },
+    });
+    const refs = [Buffer.from('r1'), Buffer.from('r2')];
+    const [only] = await annotateFaces([survivor('cand')], refs, client);
+    expect(only).toEqual({ hasFace: true, faceScore: 88 });
+  });
+
+  it('keeps hasFace true with a null faceScore when every reference fails', async () => {
+    routeSend({
+      detect: () => ({ FaceDetails: [{}] }),
+      compare: () => {
+        throw new Error('InvalidImageFormatException');
+      },
+    });
+    const refs = [Buffer.from('r1'), Buffer.from('r2')];
+    const [only] = await annotateFaces([survivor('cand')], refs, client);
+    expect(only).toEqual({ hasFace: true, faceScore: null });
+  });
+
+  it('does not degrade a sibling candidate when a reference fails', async () => {
+    routeSend({
+      detect: () => ({ FaceDetails: [{}] }),
+      compare: (input) => {
+        if (Buffer.from(input.SourceImage?.Bytes ?? []).toString() === 'bad') {
+          throw new Error('InvalidParameterException');
+        }
+        return { FaceMatches: [{ Similarity: 60 }] };
+      },
+    });
+    const refs = [Buffer.from('bad')];
+    const result = await annotateFaces([survivor('a'), survivor('b')], refs, client);
+    expect(result[0].hasFace).toBe(true);
+    expect(result[1].hasFace).toBe(true);
+  });
+
+  it('skips an unsupported-format candidate without any client call and returns nulls', async () => {
+    routeSend({ detect: () => ({ FaceDetails: [{}] }) });
+    const webp: VerifiedScrapedImage = {
+      ...survivor('webp'),
+      mimeType: 'image/webp',
+    };
+    const [only] = await annotateFaces([webp], [Buffer.from('ref')], client);
+    expect(only).toEqual({ hasFace: null, faceScore: null });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('still analyzes jpeg and png candidates alongside a skipped webp', async () => {
+    routeSend({ detect: () => ({ FaceDetails: [{}] }) });
+    const png: VerifiedScrapedImage = { ...survivor('png'), mimeType: 'image/png' };
+    const webp: VerifiedScrapedImage = { ...survivor('webp'), mimeType: 'image/webp' };
+    const result = await annotateFaces([survivor('jpg'), png, webp], [], client);
+    expect(result[0].hasFace).toBe(true);
+    expect(result[1].hasFace).toBe(true);
+    expect(result[2]).toEqual({ hasFace: null, faceScore: null });
+  });
+
+  it('counts unsupported-format candidates as skipped in rekognition_annotated', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    routeSend({ detect: () => ({ FaceDetails: [{}] }) });
+    const webp: VerifiedScrapedImage = { ...survivor('webp'), mimeType: 'image/webp' };
+    await annotateFaces([survivor('jpg'), webp], [], client);
+    expect(eventsFrom('info', 'rekognition_annotated')[0]).toMatchObject({
+      candidates: 2,
+      skipped: 1,
+    });
+    info.mockRestore();
+  });
+
   it('logs one rekognition_failed warn for the failing candidate', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     routeSend({
@@ -328,5 +405,62 @@ describe('fetchReferenceBytes', () => {
     const fetchFn = vi.fn(async () => new Response('nope', { status: 404 }));
     const result = await fetchReferenceBytes(['https://x/1'], fetchFn);
     expect(result).toEqual([]);
+  });
+
+  it('logs reference_images_fetched at info when every attempted url is fetched', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn(async () => imageResponse([1]));
+    await fetchReferenceBytes(['https://x/1', 'https://x/2'], fetchFn);
+    expect(eventsFrom('info', 'reference_images_fetched')[0]).toMatchObject({
+      requested: 2,
+      fetched: 2,
+    });
+    info.mockRestore();
+  });
+
+  it('logs reference_images_fetched at warn when an oversized reference is dropped', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(imageResponse([1]))
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1]), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Content-Length': String(VISION_FETCH_MAX_BYTES + 1),
+          },
+        })
+      );
+    await fetchReferenceBytes(['https://x/1', 'https://x/2'], fetchFn);
+    expect(eventsFrom('warn', 'reference_images_fetched')[0]).toMatchObject({
+      requested: 2,
+      fetched: 1,
+    });
+    warn.mockRestore();
+  });
+
+  it('caps the reference_images_fetched requested count at three', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetchFn = vi.fn(async () => imageResponse([1]));
+    await fetchReferenceBytes(
+      ['https://x/1', 'https://x/2', 'https://x/3', 'https://x/4'],
+      fetchFn
+    );
+    expect(eventsFrom('info', 'reference_images_fetched')[0]).toMatchObject({
+      requested: 3,
+      fetched: 3,
+    });
+    info.mockRestore();
+  });
+
+  it('does not log reference_images_fetched when no urls are supplied', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await fetchReferenceBytes([], vi.fn());
+    expect(eventsFrom('info', 'reference_images_fetched')).toHaveLength(0);
+    expect(eventsFrom('warn', 'reference_images_fetched')).toHaveLength(0);
+    info.mockRestore();
+    warn.mockRestore();
   });
 });

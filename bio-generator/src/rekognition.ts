@@ -21,6 +21,12 @@ const ANNOTATE_CONCURRENCY = 4;
 const REFERENCE_FETCH_TIMEOUT_MS = 8_000;
 /** CompareFaces returns every match at or above this similarity, so we take the max ourselves. */
 const COMPARE_SIMILARITY_THRESHOLD = 0;
+/** Rekognition accepts only JPEG/PNG bytes; any other format is skipped without an API call. */
+const SUPPORTED_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
+
+/** True when a candidate's bytes are a format Rekognition can analyze (JPEG/PNG). */
+const isRekognizableFormat = (mimeType: string): boolean =>
+  (SUPPORTED_MIME_TYPES as readonly string[]).includes(mimeType);
 
 /**
  * The Rekognition face signal for one candidate. `hasFace`/`faceScore` are
@@ -73,7 +79,8 @@ const fetchReference = async (url: string, fetchFn: typeof fetch): Promise<Buffe
  * Fetches up to {@link REFERENCE_LIMIT} admin reference images (the first three
  * of the supplied URLs), each fail-closed exactly like the vision candidate
  * fetch (timeout, `image/*` only, ≤ {@link VISION_FETCH_MAX_BYTES}). Failures are
- * skipped, never thrown, so 0..3 buffers return.
+ * skipped, never thrown, so 0..3 buffers return. Logs one `reference_images_fetched`
+ * event (warn when any attempted ref dropped, else info) so silent loss is visible.
  *
  * @param urls - Admin-supplied reference image URLs (already URL-validated).
  * @param fetchFn - Injectable fetch (defaults to global) for testability.
@@ -83,37 +90,61 @@ export const fetchReferenceBytes = async (
   urls: string[],
   fetchFn: typeof fetch = fetch
 ): Promise<Buffer[]> => {
-  const fetched = await Promise.all(
-    urls.slice(0, REFERENCE_LIMIT).map((url) => fetchReference(url, fetchFn))
-  );
-  return fetched.filter((buffer): buffer is Buffer => buffer !== null);
+  const attempted = urls.slice(0, REFERENCE_LIMIT);
+  const fetched = await Promise.all(attempted.map((url) => fetchReference(url, fetchFn)));
+  const buffers = fetched.filter((buffer): buffer is Buffer => buffer !== null);
+  // Surface silent reference loss (oversize originals, transient CDN failures) so
+  // `scored: 0` can be told apart from no-refs-supplied; skip when none attempted.
+  if (attempted.length > 0) {
+    logEvent(buffers.length < attempted.length ? 'warn' : 'info', 'reference_images_fetched', {
+      requested: attempted.length,
+      fetched: buffers.length,
+    });
+  }
+  return buffers;
 };
 
-/** Runs CompareFaces for one candidate against every reference, taking the max similarity. */
+/**
+ * Runs CompareFaces for one candidate against every reference, taking the max
+ * similarity. Each reference is isolated: a faceless or unsupported reference
+ * throws (`InvalidParameterException` / `InvalidImageFormatException`), so a
+ * single bad admin upload must not null the face signal for every candidate.
+ * A failing reference is skipped (one warn per failing ref per candidate); the
+ * max is taken across the survivors. `null` when EVERY reference failed — no
+ * comparison happened, so the score is unknown, not zero.
+ */
 const scoreAgainstReferences = async (
   client: RekognitionClient,
   candidateBytes: Buffer,
   referenceBytes: Buffer[]
-): Promise<number> => {
+): Promise<number | null> => {
   let best = 0;
+  let compared = 0;
   for (const reference of referenceBytes) {
-    const response = await client.send(
-      new CompareFacesCommand({
-        SourceImage: { Bytes: reference },
-        TargetImage: { Bytes: candidateBytes },
-        SimilarityThreshold: COMPARE_SIMILARITY_THRESHOLD,
-      })
-    );
-    for (const match of response.FaceMatches ?? []) {
-      best = Math.max(best, match.Similarity ?? 0);
+    try {
+      const response = await client.send(
+        new CompareFacesCommand({
+          SourceImage: { Bytes: reference },
+          TargetImage: { Bytes: candidateBytes },
+          SimilarityThreshold: COMPARE_SIMILARITY_THRESHOLD,
+        })
+      );
+      compared += 1;
+      for (const match of response.FaceMatches ?? []) {
+        best = Math.max(best, match.Similarity ?? 0);
+      }
+    } catch (err) {
+      logEvent('warn', 'rekognition_reference_failed', { error: toErrorMessage(err) });
     }
   }
-  return best;
+  return compared > 0 ? best : null;
 };
 
 /**
  * Annotates one candidate: DetectFaces decides `hasFace`; a detected face with
- * references scores `faceScore` via CompareFaces (null with no references). ANY
+ * references scores `faceScore` via CompareFaces (null with no references, or
+ * when every reference failed). An unsupported format (not JPEG/PNG) is skipped
+ * to nulls WITHOUT any API call — "not analyzed", never a negative verdict. ANY
  * AWS error degrades this candidate to nulls, logged once — a sibling is never
  * affected and nothing throws.
  */
@@ -122,6 +153,7 @@ const annotateOne = async (
   candidate: VerifiedScrapedImage,
   referenceBytes: Buffer[]
 ): Promise<FaceAnnotation> => {
+  if (!isRekognizableFormat(candidate.mimeType)) return { hasFace: null, faceScore: null };
   const candidateBytes = Buffer.from(candidate.base64, 'base64');
   try {
     const detected = await client.send(
@@ -170,6 +202,7 @@ export const annotateFaces = async (
     candidates: candidates.length,
     withFace: annotations.filter((annotation) => annotation.hasFace === true).length,
     scored: annotations.filter((annotation) => annotation.faceScore !== null).length,
+    skipped: candidates.filter((candidate) => !isRekognizableFormat(candidate.mimeType)).length,
   });
   return annotations;
 };
