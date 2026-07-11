@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.196.0] - 2026-07-11
+
+### Added
+
+- feat(bio): ✨ live bio generation progress (#574)\n- feat(bio): ✨ live bio generation progress (#574)\n
+
 ## [4.195.0] - 2026-07-11
 
 ### Added

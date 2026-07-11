@@ -700,6 +700,13 @@ export interface DraftAndSynthesizeOptions extends FetchRetryOptions {
    * synthesis stays on the draft `model`, exactly the pre-Tier-1 behavior.
    */
   synthesisModel?: string;
+  /**
+   * Best-effort progress hook fired exactly once after the drafts settle and
+   * immediately before the synthesis call — the handler uses it to checkpoint
+   * the `synthesizing` stage. Awaited if it returns a promise. Never fires when
+   * every draft fails, since the pipeline throws before synthesis.
+   */
+  onPhase?: (phase: 'synthesizing') => Promise<void> | void;
 }
 
 /**
@@ -764,7 +771,7 @@ export const draftAndSynthesizeProse = async (
   model: string = DEFAULT_GEMINI_MODEL,
   options: DraftAndSynthesizeOptions = {}
 ): Promise<BioProse> => {
-  const { synthesisModel, ...retryOptions } = options;
+  const { synthesisModel, onPhase, ...retryOptions } = options;
   const settled = await Promise.allSettled(
     DRAFT_VARIANTS.map((variant) =>
       generateProse(facts, apiKey, model, { ...retryOptions, ...variant })
@@ -776,6 +783,8 @@ export const draftAndSynthesizeProse = async (
     throw first.status === 'rejected' ? first.reason : new Error('All bio drafts failed');
   }
   logEvent('info', 'prose_drafts', { requested: DRAFT_VARIANTS.length, fulfilled: drafts.length });
+
+  await onPhase?.('synthesizing');
 
   return synthesizeWithFallback({ facts, drafts, apiKey }, model, synthesisModel, retryOptions);
 };

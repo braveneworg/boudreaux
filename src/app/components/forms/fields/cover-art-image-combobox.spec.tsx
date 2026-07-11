@@ -67,6 +67,7 @@ const buildArtist = (overrides: {
     bioError: null,
     bioStartedAt: null,
     bioJobToken: null,
+    bioProgress: null,
     slug: `slug-${overrides.id}`,
     genres: null,
     bornOn: null,
