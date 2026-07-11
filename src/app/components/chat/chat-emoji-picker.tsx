@@ -29,7 +29,11 @@ export const ChatEmojiPicker = ({ trigger, onSelect }: ChatEmojiPickerProps) => 
   const [open, setOpen] = useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // modal: the content portals outside the (modal) chat drawer, whose
+    // trapped FocusScope would otherwise yank focus out of the picker's
+    // search input and cascade into dismissing the picker (mobile) or the
+    // whole drawer (desktop). A modal popover pauses that scope while open.
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
         <EmojiPicker
