@@ -27,6 +27,31 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
  */
 export const DEFAULT_GEMINI_PRO_MODEL = 'gemini-2.5-pro';
 
+/**
+ * Ordered generation stages the Lambda checkpoints through as it works, POSTed
+ * best-effort to the web app's progress endpoint so the admin timeline can show
+ * live status. This list AND its order are a wire contract: it MUST stay in
+ * lockstep with the web counterpart `BIO_PROGRESS_STAGES` in
+ * `src/lib/validation/bio-generation-schema.ts` (the two projects cannot share a
+ * module).
+ */
+export const PROGRESS_STAGES = [
+  'musicbrainz',
+  'wikidata',
+  'commons',
+  'cover-art',
+  'web-search',
+  'link-follow',
+  'vision-gating',
+  'drafting',
+  'synthesizing',
+  'quality-pass',
+  'finalizing',
+] as const;
+
+/** A single generation checkpoint stage name (see {@link PROGRESS_STAGES}). */
+export type ProgressStage = (typeof PROGRESS_STAGES)[number];
+
 /** ISO calendar-date string in the form YYYY-MM-DD. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
@@ -50,6 +75,12 @@ export const bioGenerationInputSchema = z.object({
   callbackUrl: z.string().url().optional(),
   /** Opaque per-job token echoed back in the callback so the web app can match the in-flight job. */
   jobToken: z.string().min(1).optional(),
+  /**
+   * Best-effort progress endpoint the Lambda POSTs stage checkpoints to as it
+   * works (verified with the same per-job `jobToken`). Absent → no progress
+   * reporting, and generation behaves byte-identically to before.
+   */
+  progressUrl: z.string().url().optional(),
   /**
    * The label's own published releases for this artist — authoritative
    * chronology anchors AND allow-listed internal link targets

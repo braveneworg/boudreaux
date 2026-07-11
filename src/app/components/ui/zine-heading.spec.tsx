@@ -16,14 +16,15 @@ describe('ZineHeading', () => {
     expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
   });
 
-  it('renders the cutout strip classes on the zine-heading span', () => {
+  it('renders the bare cutout strip classes on the zine-heading span', () => {
     const { container } = render(<ZineHeading>Releases</ZineHeading>);
-    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass(
-      'font-fake-four-cutout',
+    const strip = container.querySelector('[data-slot="zine-heading"]');
+    expect(strip).toHaveClass('font-fake-four-cutout', 'uppercase', 'px-3', 'py-1');
+    // The strip lost its box chrome: no border, tint, ink shadow, or tilt.
+    expect(strip).not.toHaveClass(
       'border-2',
       'border-black',
       'bg-[var(--card-accent-soft)]',
-      'uppercase',
       'shadow-zine-ink',
       '-rotate-1'
     );
@@ -43,23 +44,6 @@ describe('ZineHeading', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveClass('h-auto');
     expect(heading).not.toHaveClass('h-[52px]');
-  });
-
-  it('sketches two skewed hand-drawn strokes around the strip', () => {
-    const { container } = render(<ZineHeading>Releases</ZineHeading>);
-
-    // The strip anchors two decorative zinc-950 frames, each nudged and
-    // skewed differently so the strokes never quite line up — the
-    // hand-drawn double border.
-    expect(container.querySelector('[data-slot="zine-heading"]')).toHaveClass('relative');
-    const strokes = container.querySelectorAll('[data-slot="zine-sketch-stroke"]');
-    expect(strokes).toHaveLength(2);
-    strokes.forEach((stroke) => {
-      expect(stroke).toHaveAttribute('aria-hidden', 'true');
-      expect(stroke).toHaveClass('absolute', 'border-zinc-950');
-      expect(stroke.className).toMatch(/skew-x-/);
-      expect(stroke.className).toMatch(/rotate-/);
-    });
   });
 
   it('cn-merges a custom className onto the heading element', () => {

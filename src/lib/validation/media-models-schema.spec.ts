@@ -61,6 +61,7 @@ const artistScalar = {
   bioError: null,
   bioStartedAt: null,
   bioJobToken: null,
+  bioProgress: null,
   slug: 'john-doe',
   genres: null,
   bornOn: ISO,

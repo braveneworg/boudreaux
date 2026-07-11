@@ -188,11 +188,13 @@ describe('VideosPage', () => {
     expect(panel).toHaveClass('zine-accent-kraft');
   });
 
-  it('should render the cutout heading with the page name', async () => {
+  it('should render the videos heading as the wordmark image', async () => {
     const Page = await VideosPage();
     render(Page);
 
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('Videos');
+    const headingImage = screen.getByRole('img', { name: /fake four inc videos/i });
+    expect(heading).toContainElement(headingImage);
+    expect(headingImage).toHaveAttribute('alt', 'fake four inc videos');
   });
 });

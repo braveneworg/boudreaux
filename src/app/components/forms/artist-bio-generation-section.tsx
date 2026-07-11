@@ -20,7 +20,9 @@ import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-ge
 import { cn } from '@/lib/utils';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
-import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
+import type { BioProgress, GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
+
+import { BioGenerationProgressTimeline } from './bio-generation-progress-timeline';
 
 interface ArtistBioGenerationSectionProps {
   artistId: string;
@@ -71,12 +73,14 @@ const GenerateBioButton = ({ hasResult, isPending, onGenerate }: GenerateBioButt
   </Button>
 );
 
-const BioGeneratingSkeleton = () => (
-  <div className="space-y-2">
-    <p className="text-muted-foreground text-sm" role="status">
-      Researching the web and writing the bio — this can take a few minutes. You can keep working;
-      the results will appear here when ready.
-    </p>
+interface BioGeneratingSkeletonProps {
+  /** Latest polled progress checkpoint driving the live stage timeline. */
+  progress: BioProgress | null | undefined;
+}
+
+const BioGeneratingSkeleton = ({ progress }: BioGeneratingSkeletonProps) => (
+  <div className="space-y-3">
+    <BioGenerationProgressTimeline progress={progress} />
     <div className="space-y-2" aria-hidden>
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-20 w-full" />
@@ -252,7 +256,7 @@ export const ArtistBioGenerationSection = ({
         onGenerate={() => void generate()}
       />
 
-      {isPending && <BioGeneratingSkeleton />}
+      {isPending && <BioGeneratingSkeleton progress={status.data?.progress} />}
 
       {result && !isPending && <BioResultPreview result={result} />}
     </section>
