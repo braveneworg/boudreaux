@@ -4,6 +4,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import type { NavMenuEntry } from '@/hooks/use-nav-menu-groups';
+
 import { HamburgerMenuSheet } from './hamburger-menu-sheet';
 
 vi.mock('../auth/auth-toolbar', () => ({
@@ -16,11 +18,33 @@ vi.mock('../auth/auth-toolbar', () => ({
   ),
 }));
 
+const linkEntry = (name: string, href: string, color: string): NavMenuEntry => ({
+  kind: 'link',
+  item: { name, href, color },
+});
+
 describe('HamburgerMenuSheet', () => {
-  const defaultMenuItems = [
-    { name: 'Home', href: '/' },
-    { name: 'About', href: '/about' },
-    { name: 'Contact', href: '/contact' },
+  // The global next/navigation mock resolves usePathname() to '/'.
+  const defaultEntries: NavMenuEntry[] = [
+    linkEntry('Home', '/', 'aria-[current=page]:text-menu-item-yellow-400'),
+    linkEntry('About', '/about', 'aria-[current=page]:text-menu-item-pink-400'),
+    linkEntry('Contact', '/contact', 'aria-[current=page]:text-menu-item-orange-300'),
+  ];
+  const groupedEntries: NavMenuEntry[] = [
+    linkEntry('Home', '/', 'aria-[current=page]:text-menu-item-yellow-400'),
+    {
+      kind: 'group',
+      group: {
+        label: 'Music',
+        items: [
+          {
+            name: 'Releases',
+            href: '/releases',
+            color: 'aria-[current=page]:text-menu-item-cyan-400',
+          },
+        ],
+      },
+    },
   ];
   const mockOnOpenChange = vi.fn();
 
@@ -39,7 +63,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders when open', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -49,7 +73,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders menu items', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -61,7 +85,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders children', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button data-testid="trigger">Open Menu</button>
       </HamburgerMenuSheet>
     );
@@ -71,7 +95,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('menu items have correct href', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -83,7 +107,7 @@ describe('HamburgerMenuSheet', () => {
   it('calls onOpenChange when menu item is clicked', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -93,9 +117,34 @@ describe('HamburgerMenuSheet', () => {
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('renders a category group as a collapsed trigger inside the sheet', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={groupedEntries}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Releases' })).not.toBeInTheDocument();
+  });
+
+  it('closes the sheet when an expanded category link is clicked', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={groupedEntries}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Music' }));
+    await user.click(screen.getByRole('link', { name: 'Releases' }));
+
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('has accessible navigation structure', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -107,7 +156,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders social media links', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -119,7 +168,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('has sr-only title', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -129,7 +178,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders auth toolbar with text-zinc-50 class', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -141,7 +190,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders social media links before auth toolbar', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -163,9 +212,9 @@ describe('HamburgerMenuSheet', () => {
     expect(socialIndex).toBeLessThan(authIndex);
   });
 
-  it('renders empty menu list when no items provided', () => {
+  it('renders empty menu list when no entries provided', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={[]}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={[]}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -176,7 +225,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('menu links have correct styling classes', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -186,12 +235,12 @@ describe('HamburgerMenuSheet', () => {
     expect(homeLink).toHaveClass('text-xl');
   });
 
-  it('applies a per-item color when provided', () => {
+  it('lets an unscoped per-item color override the white base', () => {
     render(
       <HamburgerMenuSheet
         isOpen
         onOpenChange={mockOnOpenChange}
-        menuItems={[{ name: 'Tours', href: '/tours', color: 'text-menu-item-tan-200' }]}
+        entries={[linkEntry('Tours', '/tours', 'text-menu-item-tan-200')]}
       >
         <button>Open</button>
       </HamburgerMenuSheet>
@@ -203,9 +252,8 @@ describe('HamburgerMenuSheet', () => {
   });
 
   it('marks the active link with aria-current=page', () => {
-    // The global next/navigation mock resolves usePathname() to '/'.
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -215,7 +263,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('does not mark inactive links with aria-current', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -225,7 +273,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('underlines the active link', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -236,7 +284,7 @@ describe('HamburgerMenuSheet', () => {
   it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -248,7 +296,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders menu items as keyboard-focusable anchors with an href', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -263,7 +311,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('renders the sr-only sheet description', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -275,7 +323,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('sets an accessible aria-label on the navigation menu dialog', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -285,7 +333,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('applies the menu-item-stagger class to each menu list item', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -298,7 +346,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('starts the first menu item with no animation delay', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -308,7 +356,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('staggers each subsequent menu item by index via animation delay', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
@@ -320,7 +368,7 @@ describe('HamburgerMenuSheet', () => {
 
   it('applies focus-visible styling to menu links', () => {
     render(
-      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} entries={defaultEntries}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
