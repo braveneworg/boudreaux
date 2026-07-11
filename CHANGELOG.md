@@ -108,6 +108,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.199.0] - 2026-07-11
+
+### Added
+
+- fix(ui): 🐛 restore datepicker calendar popover (#575)\n- fix(ui): 🐛 restore datepicker calendar popover (#575)\n
+
 ## [4.198.0] - 2026-07-11
 
 ### Added
