@@ -7,6 +7,7 @@ import {
   Clapperboard,
   Disc,
   MessageSquare,
+  MessageSquareText,
   ScrollText,
   Settings,
   Star,
@@ -58,6 +59,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: '/admin/notifications',
     icon: Bell,
     help: 'Manage site-wide banner notifications and their rotation interval.',
+  },
+  {
+    label: 'Announcements',
+    href: '/admin/announcements',
+    icon: MessageSquareText,
+    help: 'Compose and send a text message to every subscriber opted in to SMS.',
   },
   {
     label: 'Chat',
