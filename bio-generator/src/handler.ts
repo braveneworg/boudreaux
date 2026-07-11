@@ -12,6 +12,7 @@ import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
 import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
+import { postBioProgress } from './progress.js';
 import {
   bioGenerationInputSchema,
   DEFAULT_GEMINI_MODEL,
@@ -32,6 +33,7 @@ import type {
   BioGenerationResult,
   BioImage,
   BioLink,
+  ProgressStage,
 } from './types.js';
 import type { VisionContext } from './vision.js';
 
@@ -55,6 +57,8 @@ export interface BioGeneratorDeps {
   verifyScrapedImages: typeof verifyScrapedImages;
   /** Best-effort POST of the result back to the web app's async callback. */
   postCallback: (payload: BioCallbackPayload) => Promise<void>;
+  /** Best-effort POST of a single stage checkpoint to the web app's progress endpoint. */
+  postProgress: typeof postBioProgress;
 }
 
 const defaultDeps: BioGeneratorDeps = {
@@ -74,6 +78,7 @@ const defaultDeps: BioGeneratorDeps = {
   getCommonsCategoryImages,
   verifyScrapedImages,
   postCallback: postBioCallback,
+  postProgress: postBioProgress,
 };
 
 const MAX_IMAGES = 100;
@@ -192,7 +197,25 @@ const dedupeLinks = (links: BioLink[]): BioLink[] => {
 const appendSourceText = (existing: string | undefined, addition: string): string =>
   existing ? `${existing}\n\n${addition}` : addition;
 
-/** Mutable accumulators threaded through the best-effort gathering steps. */
+/**
+ * Emits a best-effort progress checkpoint for a stage. Resolves without throwing
+ * (see {@link buildReport}); an optional `counts` map carries per-stage tallies
+ * such as the number of candidates entering the vision gate.
+ */
+type Report = (stage: ProgressStage, counts?: Record<string, number>) => Promise<void>;
+
+/** Resolved Gemini call config for a run: the API key and the base draft/vision model. */
+interface GeminiRunConfig {
+  apiKey: string;
+  model: string;
+}
+
+/**
+ * Mutable accumulators — plus the run's progress reporter — threaded through the
+ * best-effort gathering steps. Co-locating `report` here lets every gathering
+ * helper checkpoint its boundary without widening each signature past the
+ * parameter cap.
+ */
 interface MetadataAccumulator {
   images: BioImage[];
   links: BioLink[];
@@ -200,7 +223,29 @@ interface MetadataAccumulator {
   /** Web-page image candidates, used only when Commons yields no images. */
   scrapedImages: ScrapedImage[];
   releaseGroups: ReleaseGroupSummary[];
+  /** Best-effort progress reporter (a no-op when the run has no progress URL). */
+  report: Report;
 }
+
+/**
+ * Builds the run's progress reporter. When the invoke event carries BOTH a
+ * `progressUrl` and a `jobToken` it POSTs each checkpoint via `deps.postProgress`
+ * (best-effort, time-capped, never throwing); otherwise it returns a no-op so a
+ * run without progress plumbing behaves byte-identically to before. A dep that
+ * (contrary to contract) rejects is swallowed here so progress can never fail
+ * the generation it merely reports on.
+ */
+const buildReport = (input: BioGenerationInput, deps: BioGeneratorDeps): Report => {
+  const { progressUrl, jobToken } = input;
+  if (!progressUrl || !jobToken) return () => Promise.resolve();
+  return async (stage, counts) => {
+    try {
+      await deps.postProgress({ progressUrl, jobToken, stage, counts });
+    } catch {
+      // Progress is a pure side channel — never let a checkpoint failure surface.
+    }
+  };
+};
 
 /** The display/real name used to drive both the MusicBrainz and web searches. */
 const searchNameFor = (input: BioGenerationInput): string =>
@@ -284,6 +329,7 @@ const applyWikidataFacts = async (
   scrapeKey: string | null,
   deps: BioGeneratorDeps
 ): Promise<void> => {
+  await acc.report('wikidata');
   let wd: Awaited<ReturnType<BioGeneratorDeps['getWikidataData']>>;
   try {
     wd = await deps.getWikidataData(wikidataId);
@@ -315,6 +361,7 @@ const applyWikidataFacts = async (
   });
 
   if (wd.commonsCategory) {
+    await acc.report('commons');
     const categoryImages = await deps.getCommonsCategoryImages(
       wd.commonsCategory,
       MAX_COMMONS_CATEGORY_IMAGES
@@ -348,6 +395,7 @@ const applyMatch = async (
 
   acc.releaseGroups = await deps.listReleaseGroups(match.mbid);
   if (acc.releaseGroups.length) {
+    await acc.report('cover-art');
     const covers = await deps.getCoverArtImages(acc.releaseGroups, MAX_COVER_ART);
     acc.images.push(...covers);
     logEvent('info', 'cover_art_images', {
@@ -528,7 +576,9 @@ const applyVerifiedScrapedImages = async (
       ...acc.releaseGroups.map((group) => group.title),
     ],
   };
-  const verified = await verify(candidates.slice(0, visionCandidateLimit()), context);
+  const gated = candidates.slice(0, visionCandidateLimit());
+  await acc.report('vision-gating', { candidates: gated.length });
+  const verified = await verify(gated, context);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
@@ -581,15 +631,16 @@ const finalizeMetadata = async (
  */
 const gatherMetadata = async (
   input: BioGenerationInput,
-  apiKey: string,
-  model: string,
-  deps: BioGeneratorDeps
+  gemini: GeminiRunConfig,
+  deps: BioGeneratorDeps,
+  report: Report
 ): Promise<{ images: BioImage[]; links: BioLink[]; facts: ArtistFacts }> => {
   const acc: MetadataAccumulator = {
     images: [],
     links: [],
     scrapedImages: [],
     releaseGroups: [],
+    report,
     facts: {
       displayName: input.displayName,
       realName: input.realName,
@@ -609,6 +660,7 @@ const gatherMetadata = async (
   const scrapeKey = await deps.getScrapeApiKey();
   logEvent('info', 'enrichment_start', { artist, jinaKey: Boolean(scrapeKey) });
 
+  await acc.report('musicbrainz');
   try {
     const match = await lookupMatch(input, deps);
     if (match) {
@@ -625,10 +677,14 @@ const gatherMetadata = async (
     logEvent('warn', 'musicbrainz_failed', { artist, error: toErrorMessage(err) });
   }
 
+  await acc.report('web-search');
   await applyWebSearch(acc, input, scrapeKey, deps);
+
+  await acc.report('link-follow');
   await followKnownLinksForImages(acc, scrapeKey, deps);
+
   await finalizeMetadata(acc, input, (candidates, context) =>
-    deps.verifyScrapedImages(candidates, context, { apiKey, model })
+    deps.verifyScrapedImages(candidates, context, gemini)
   );
 
   logEvent('info', 'enrichment_complete', {
@@ -661,6 +717,7 @@ export const runBioGeneration = async (
   input: BioGenerationInput,
   deps: BioGeneratorDeps = defaultDeps
 ): Promise<BioGenerationData> => {
+  const report = buildReport(input, deps);
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   // Synthesis and quality passes run on the Pro model (pro→flash ladder built in
   // Tasks 1–2). When GEMINI_PRO_MODEL is unset the code default is used; billing
@@ -668,14 +725,23 @@ export const runBioGeneration = async (
   // on the base flash model so the vision pool concurrency (Task 2) is unaffected.
   const synthesisModel = process.env.GEMINI_PRO_MODEL || DEFAULT_GEMINI_PRO_MODEL;
   const apiKey = await deps.getGeminiApiKey();
-  const { images, links, facts } = await gatherMetadata(input, apiKey, model, deps);
+  const { images, links, facts } = await gatherMetadata(input, { apiKey, model }, deps, report);
 
-  const prose = await deps.generateProse(facts, apiKey, model, { synthesisModel });
+  await report('drafting');
+  // `onPhase` fires the `synthesizing` checkpoint from inside the ensemble, once
+  // the drafts settle and only when a synthesis will actually run.
+  const prose = await deps.generateProse(facts, apiKey, model, {
+    synthesisModel,
+    onPhase: () => report('synthesizing'),
+  });
+
+  await report('quality-pass');
   const checked = await runQualityPasses(
     { prose, facts, apiKey, model: synthesisModel, fallbackModel: model },
     { critiqueProse: deps.critiqueProse, reviseProse: deps.reviseProse }
   );
 
+  await report('finalizing');
   // applyImageRanking already caps the COUNT of primaries to MAX_PRIMARY via the
   // selected indexes; the primaries can sit at any position, so we must NOT
   // re-cap by array index here — that would zero out a primary the model picked

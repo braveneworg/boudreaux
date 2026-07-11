@@ -30,6 +30,15 @@ test.describe('Admin AI bio generation', () => {
     await expect(generate).toBeVisible({ timeout: 15_000 });
     await generate.click();
 
+    // The fake path emits one synthetic `vision-gating` checkpoint and pauses
+    // ~4s (BIO_GENERATOR_FAKE default) before completing, so the polled live
+    // timeline (2.5s cadence) is observable at least once. Assert the active
+    // stage surfaces "Verifying images" with its candidate count. The list only
+    // renders once a checkpoint arrives — web-first, no sleeps.
+    const timeline = adminPage.getByRole('list', { name: /bio generation progress/i });
+    const activeStage = timeline.locator('[aria-current="step"]');
+    await expect(activeStage).toContainText('Verifying images — 3 candidates', { timeout: 20_000 });
+
     // Generation now runs in the background (server `after()`); the client polls
     // for completion, so allow extra time. It succeeded once the button flips to
     // "Regenerate" and the discovered link + populated short-bio editor appear.

@@ -34,14 +34,6 @@ describe('ChatDrawer', () => {
     expect(screen.getByTestId('chat-body')).toBeInTheDocument();
   });
 
-  it('frames the heading wordmark with the zine sketch strokes, matching site headings', () => {
-    useIsMobileMock.mockReturnValue(false);
-    renderDrawer();
-
-    const title = document.querySelector('[data-slot="drawer-title"]');
-    expect(title?.querySelectorAll('[data-slot="zine-sketch-stroke"]')).toHaveLength(2);
-  });
-
   it('renders the heading wordmark at the shared strip scale', () => {
     useIsMobileMock.mockReturnValue(false);
     renderDrawer();

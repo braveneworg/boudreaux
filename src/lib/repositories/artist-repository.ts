@@ -19,7 +19,8 @@ import type {
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
-import type { BioStatus } from '@/lib/validation/bio-generation-schema';
+import type { Json } from '@/lib/types/domain/shared';
+import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 
 import { runQuery } from './_internal/map-prisma-error';
 
@@ -45,6 +46,47 @@ export interface BioImageRehostRow {
   url: string;
   thumbnailUrl: string | null;
   originalUrl: string | null;
+}
+
+/**
+ * Projection returned by {@link ArtistRepository.getBioGenerationState}: the
+ * async lifecycle fields (incl. the latest `bioProgress` checkpoint) plus the
+ * persisted bio content the admin form populates from.
+ */
+export interface BioGenerationStateRecord {
+  bioStatus: string | null;
+  bioError: string | null;
+  bioStartedAt: Date | null;
+  bioJobToken: string | null;
+  bioProgress: Json | null;
+  bioGeneratedAt: Date | null;
+  slug: string;
+  shortBio: string | null;
+  bio: string | null;
+  altBio: string | null;
+  genres: string | null;
+  bioModel: string | null;
+  bioImages: Array<{
+    id: string;
+    url: string;
+    thumbnailUrl: string | null;
+    title: string | null;
+    attribution: string | null;
+    license: string | null;
+    sourceUrl: string | null;
+    originalUrl: string | null;
+    isPrimary: boolean;
+    kind: string | null;
+    alt: string | null;
+    origin: string | null;
+  }>;
+  bioLinks: Array<{
+    id: string;
+    label: string;
+    url: string;
+    kind: string | null;
+    origin: string | null;
+  }>;
 }
 
 // =============================================================================
@@ -507,6 +549,8 @@ export class ArtistRepository {
   /**
    * Update the async bio-generation lifecycle fields. `error`/`startedAt` are
    * only written when explicitly provided so a status flip can leave them alone.
+   * Marking a run `pending` also clears any prior `bioProgress` so a new run
+   * never surfaces the previous run's stage in the polled timeline.
    */
   static async setBioStatus(
     artistId: string,
@@ -520,7 +564,23 @@ export class ArtistRepository {
           bioStatus: status,
           ...(opts.error !== undefined ? { bioError: opts.error } : {}),
           ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
+          ...(status === 'pending' ? { bioProgress: null } : {}),
         },
+      })
+    );
+  }
+
+  /**
+   * Persist (or clear, with `null`) the latest async-generation progress
+   * checkpoint. Written by the progress channel once it has verified the per-job
+   * token; that channel never claims the token (only the completion callback
+   * does). `null` clears the field to a DB null.
+   */
+  static async setBioProgress(artistId: string, progress: BioProgress | null): Promise<void> {
+    await runQuery(() =>
+      prisma.artist.update({
+        where: { id: artistId },
+        data: { bioProgress: progress },
       })
     );
   }
@@ -552,40 +612,7 @@ export class ArtistRepository {
    * status endpoint can report progress and hand back the finished bio for the
    * admin form to populate. Returns `null` when the artist does not exist.
    */
-  static async getBioGenerationState(artistId: string): Promise<{
-    bioStatus: string | null;
-    bioError: string | null;
-    bioStartedAt: Date | null;
-    bioJobToken: string | null;
-    bioGeneratedAt: Date | null;
-    slug: string;
-    shortBio: string | null;
-    bio: string | null;
-    altBio: string | null;
-    genres: string | null;
-    bioModel: string | null;
-    bioImages: Array<{
-      id: string;
-      url: string;
-      thumbnailUrl: string | null;
-      title: string | null;
-      attribution: string | null;
-      license: string | null;
-      sourceUrl: string | null;
-      originalUrl: string | null;
-      isPrimary: boolean;
-      kind: string | null;
-      alt: string | null;
-      origin: string | null;
-    }>;
-    bioLinks: Array<{
-      id: string;
-      label: string;
-      url: string;
-      kind: string | null;
-      origin: string | null;
-    }>;
-  } | null> {
+  static async getBioGenerationState(artistId: string): Promise<BioGenerationStateRecord | null> {
     return runQuery(() =>
       prisma.artist.findUnique({
         where: { id: artistId },
@@ -594,6 +621,7 @@ export class ArtistRepository {
           bioError: true,
           bioStartedAt: true,
           bioJobToken: true,
+          bioProgress: true,
           bioGeneratedAt: true,
           slug: true,
           shortBio: true,

@@ -16,7 +16,6 @@ import {
   DrawerDescription,
   DrawerTitle,
 } from '@/components/ui/drawer';
-import { ZineSketchStrokes } from '@/components/ui/zine-sketch-strokes';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -47,20 +46,17 @@ export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) =>
       >
         <header className="bg-background sticky top-0 z-10 flex items-center justify-center border-b py-4">
           <DrawerTitle>
-            {/* ImageHeading's zine treatment, inlined: DrawerTitle must be the
+            {/* ImageHeading's rendering, inlined: DrawerTitle must be the
                 heading element, so we can't nest ImageHeading's own <h*> inside. */}
-            <span className="relative inline-block w-full sm:w-auto">
-              <ZineSketchStrokes />
-              <Image
-                src="/media/headings/LIVE-CHAT.webp"
-                alt="live chat"
-                width={1920}
-                height={480}
-                sizes="(min-width: 640px) 224px, 100vw"
-                priority
-                className="h-auto w-full sm:h-14 sm:w-auto"
-              />
-            </span>
+            <Image
+              src="/media/headings/LIVE-CHAT.webp"
+              alt="live chat"
+              width={1920}
+              height={480}
+              sizes="(min-width: 640px) 224px, 100vw"
+              priority
+              className="h-auto w-full sm:h-14 sm:w-auto"
+            />
           </DrawerTitle>
           <DrawerClose
             aria-label="Close chat"

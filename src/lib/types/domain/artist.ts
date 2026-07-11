@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { ImageRecord } from './image';
 import type { ArtistReleaseScalars, Release, ReleaseScalars } from './release';
+import type { Json } from './shared';
 import type { UrlRecord } from './url';
 
 /**
@@ -47,6 +48,7 @@ export type ArtistScalars = {
   bioError: string | null;
   bioStartedAt: Date | null;
   bioJobToken: string | null;
+  bioProgress: Json | null;
   slug: string;
   genres: string | null;
   bornOn: Date | null;

@@ -88,6 +88,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   getCommonsCategoryImages: vi.fn().mockResolvedValue([]),
   verifyScrapedImages: vi.fn().mockResolvedValue([]),
   postCallback: vi.fn().mockResolvedValue(undefined),
+  postProgress: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
@@ -1219,6 +1220,139 @@ describe('lambdaHandler', () => {
     // rather than rejecting with "getGeminiApiKey/postCallback is not a function".
     expect(result.ok).toBe(false);
     vi.unstubAllGlobals();
+  });
+});
+
+describe('progress checkpoints', () => {
+  const progressInput = () => ({
+    artistId: 'a1',
+    displayName: 'Radiohead',
+    progressUrl: 'https://app.example/progress',
+    jobToken: 'tok-1',
+  });
+
+  // Deps that exercise EVERY stage boundary: a MusicBrainz match with a Wikidata
+  // id + Commons category, release groups with cover art, and scraped images so
+  // the vision gate runs. The prose mock invokes the injected `onPhase` hook to
+  // simulate the real ensemble reaching the synthesis phase.
+  const fullRunDeps = (): BioGeneratorDeps =>
+    makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: ['a.jpg'],
+        commonsCategory: 'Radiohead',
+        wikipediaUrl: 'https://en.wikipedia.org/wiki/Radiohead',
+        officialUrl: 'https://radiohead.com',
+      }),
+      getCommonsCategoryImages: vi
+        .fn()
+        .mockResolvedValue([commonsImage('https://commons/cat.jpg')]),
+      listReleaseGroups: vi.fn().mockResolvedValue([
+        {
+          rgMbid: 'rg-1',
+          title: 'OK Computer',
+          firstReleaseDate: '1997-05-21',
+          primaryType: 'Album',
+        },
+      ]),
+      getCoverArtImages: vi
+        .fn()
+        .mockResolvedValue([
+          { ...commonsImage('https://caa/okc.jpg'), kind: 'cover', alt: 'OK Computer' },
+        ]),
+      searchArtistSources: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sourceText: 'Web context.',
+          sourceUrls: ['https://zine.net/a'],
+          references: [],
+          images: [
+            { url: 'https://zine.net/p1.jpg', alt: 'live', sourceUrl: 'https://zine.net/a' },
+            { url: 'https://zine.net/p2.jpg', alt: 'studio', sourceUrl: 'https://zine.net/a' },
+          ],
+        })
+        .mockResolvedValue(null),
+      verifyScrapedImages: vi.fn().mockResolvedValue([]),
+      generateProse: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _facts: ArtistFacts,
+            _apiKey: string,
+            _model: string,
+            options?: { onPhase?: (phase: 'synthesizing') => Promise<void> | void }
+          ) => {
+            await options?.onPhase?.('synthesizing');
+            return { shortBio: 's', longBio: 'l', altBio: 'a', primaryImageIndexes: [0] };
+          }
+        ),
+    });
+
+  const reportedStages = (deps: BioGeneratorDeps): string[] =>
+    (deps.postProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => (call[0] as { stage: string }).stage
+    );
+
+  it('reports every stage in the exact wire-contract order on a full run', async () => {
+    const deps = fullRunDeps();
+
+    await runBioGeneration(progressInput(), deps);
+
+    expect(reportedStages(deps)).toEqual([
+      'musicbrainz',
+      'wikidata',
+      'commons',
+      'cover-art',
+      'web-search',
+      'link-follow',
+      'vision-gating',
+      'drafting',
+      'synthesizing',
+      'quality-pass',
+      'finalizing',
+    ]);
+  });
+
+  it('tags the vision-gating checkpoint with the candidate count about to be gated', async () => {
+    const deps = fullRunDeps();
+
+    await runBioGeneration(progressInput(), deps);
+
+    expect(deps.postProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        progressUrl: 'https://app.example/progress',
+        jobToken: 'tok-1',
+        stage: 'vision-gating',
+        counts: { candidates: 2 },
+      })
+    );
+  });
+
+  it('makes zero progress calls when no progressUrl is provided', async () => {
+    const deps = fullRunDeps();
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead', jobToken: 'tok-1' }, deps);
+
+    expect(deps.postProgress).not.toHaveBeenCalled();
+  });
+
+  it('makes zero progress calls when no jobToken is provided', async () => {
+    const deps = fullRunDeps();
+
+    await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead', progressUrl: 'https://app.example/progress' },
+      deps
+    );
+
+    expect(deps.postProgress).not.toHaveBeenCalled();
+  });
+
+  it('still completes generation when the progress dep rejects', async () => {
+    const deps = fullRunDeps();
+    deps.postProgress = vi.fn().mockRejectedValue(new Error('progress endpoint down'));
+
+    const result = await runBioGeneration(progressInput(), deps);
+
+    expect(result.shortBio).toBe('s');
   });
 });
 

@@ -13,8 +13,8 @@ import { redirect } from 'next/navigation';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ContentContainer } from '@/app/components/ui/content-container';
+import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
-import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { VideosContent } from '@/app/components/videos-content';
 import { PUBLISHED_VIDEOS_PAGE_SIZE } from '@/app/hooks/use-infinite-published-videos-query';
@@ -77,7 +77,12 @@ export default async function VideosPage() {
       <PageContainer>
         <ContentContainer>
           <ZinePanel chat accent="kraft" breadcrumbs={breadcrumbItems}>
-            <ZineHeading level={1}>Videos</ZineHeading>
+            <ImageHeading
+              src="/media/headings/VIDEOS.webp"
+              alt="fake four inc videos"
+              imageHeight={480}
+              priority
+            />
             <VideosContent />
           </ZinePanel>
         </ContentContainer>

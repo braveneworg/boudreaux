@@ -104,6 +104,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
+
+
+## [4.199.0] - 2026-07-11
+
+### Added
+
+- fix(ui): 🐛 restore datepicker calendar popover (#575)\n- fix(ui): 🐛 restore datepicker calendar popover (#575)\n
+
+## [4.198.0] - 2026-07-11
+
+### Added
+
+- fix: 🐛 chat drawer reopen scroll pinned to latest message (#581)\n- fix: 🐛 chat drawer reopen scroll pinned to latest message (#581)\n
+
+## [4.197.0] - 2026-07-11
+
+### Added
+
+- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n
+
+## [4.196.0] - 2026-07-11
+
+### Added
+
+- feat(bio): ✨ live bio generation progress (#574)\n- feat(bio): ✨ live bio generation progress (#574)\n
+
+## [4.195.0] - 2026-07-11
+
+### Added
+
+- feat: ✨ update zine heading designs (#578)\n- feat: ✨ update zine heading designs (#578)\n
+
 ## [4.194.0] - 2026-07-10
 
 ### Added
