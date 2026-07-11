@@ -104,6 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.195.0] - 2026-07-11
+
+### Added
+
+- feat: ✨ update zine heading designs (#578)\n- feat: ✨ update zine heading designs (#578)\n
+
 ## [4.194.0] - 2026-07-10
 
 ### Added
