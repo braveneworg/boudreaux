@@ -87,8 +87,12 @@ test.describe('Admin bio media palettes', () => {
     //    The image palette is independent of the link filter — no need to clear it.
     //    The BioFigure NodeView renders a plain <img> (not next/image); assert on
     //    the alt attribute surfaced from the fixture ("Fixture Album cover art").
+    //    The generated long bio already composed the fixture's image:1 cover
+    //    placeholder into a figure, so the insert takes the count from 1 to 2.
+    const coverFigureImages = bioEditor.locator('img[alt="Fixture Album cover art"]');
+    await expect(coverFigureImages).toHaveCount(1);
     await adminPage.getByRole('button', { name: 'Insert image Fixture Album' }).click();
-    await expect(bioEditor.locator('img[alt="Fixture Album cover art"]')).toBeVisible();
+    await expect(coverFigureImages).toHaveCount(2);
 
     // 6. Save the artist and reload to verify that the inserted bio link and
     //    figure survived the sanitizer round-trip and are re-parsed from HTML.
@@ -107,9 +111,8 @@ test.describe('Admin bio media palettes', () => {
         hasText: 'An interview with the artist',
       })
     ).toHaveCount(1, { timeout: 15_000 });
-    await expect(bioEditor.locator('img[alt="Fixture Album cover art"]')).toBeVisible({
-      timeout: 15_000,
-    });
+    // Both cover figures persist: the generated one and the inserted one.
+    await expect(coverFigureImages).toHaveCount(2, { timeout: 15_000 });
 
     // 7. Cover badge visible on the cover tile; eye preview dialog still opens.
     //    The palette re-renders from the persisted rows (bioStatus 'succeeded' is

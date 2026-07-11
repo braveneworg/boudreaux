@@ -19,12 +19,48 @@ const openFirstArtistEdit = async (adminPage: Page): Promise<void> => {
   await expect(adminPage).toHaveURL(/\/admin\/artists\/[a-f0-9]{24}$/);
 };
 
+/**
+ * Asserts the public full-bio page renders BOTH fixture placeholders as
+ * floated, captioned figures: the fixture's image 0 (titled/attributed
+ * portrait) composes to a right float and image 1 (cover) to a left float.
+ * Assertions target what the BioHtml renderer actually emits — the
+ * `bio-figure` class plus Tailwind float utilities — scoped to the long-bio
+ * article so the discovered-image gallery can never satisfy them.
+ */
+const assertPublicBioFigures = async (page: Page, slug: string): Promise<void> => {
+  await page.goto(`/artists/${slug}/bio`);
+  const figures = page.locator('article figure.bio-figure');
+  await expect(figures).toHaveCount(2, { timeout: 15_000 });
+  await expect(figures.first()).toHaveClass(/float-right/);
+  await expect(figures.nth(1)).toHaveClass(/float-left/);
+  // Captions carry the fixture's title/attribution metadata through
+  // compose → sanitize → persist → render.
+  await expect(figures.first().locator('.bio-figure-title')).toHaveText(/portrait$/);
+  await expect(figures.first().locator('.bio-figure-attribution')).toHaveText('Public domain');
+  await expect(figures.nth(1).locator('.bio-figure-title')).toHaveText('Fixture Album');
+  await expect(figures.nth(1).locator('.bio-figure-attribution')).toHaveText('Cover Art Archive');
+  // The images resolve to the fixture URLs with their metadata alts intact.
+  await expect(figures.first().locator('img')).toHaveAttribute('alt', /portrait photo$/);
+  await expect(figures.nth(1).locator('img')).toHaveAttribute('alt', 'Fixture Album cover art');
+};
+
 test.describe('Admin AI bio generation', () => {
-  // One end-to-end flow (generate → preview → regenerate → edit → save). Kept as
-  // a single test because each step mutates the same artist, so splitting it
-  // would make the steps order-dependent.
-  test('generates, regenerates, edits, and saves a bio', async ({ adminPage }) => {
+  // One end-to-end flow (generate → public floats → no-edit save round-trip →
+  // regenerate → edit → save). Kept as a single test because each step mutates
+  // the same artist, so splitting it would make the steps order-dependent (and
+  // fullyParallel could race two generations against the same first-listed
+  // artist).
+  test('generates, floats figures, round-trips, and saves', async ({ adminPage }) => {
+    // Generate + regenerate each pause ~4s (fake-path delay) and the flow adds
+    // two public-page visits; triple the budget so CI never clips the tail.
+    test.slow();
+
     await openFirstArtistEdit(adminPage);
+
+    // The public bio page for the artist under edit is derived from its slug.
+    const slugField = adminPage.getByRole('textbox', { name: /slug/i });
+    await expect(slugField).not.toHaveValue('');
+    const slug = await slugField.inputValue();
 
     const generate = adminPage.getByRole('button', { name: /generate bios/i });
     await expect(generate).toBeVisible({ timeout: 15_000 });
@@ -56,8 +92,40 @@ test.describe('Admin AI bio generation', () => {
       /boundary-pushing artist on the roster/
     );
 
-    // Regenerate replaces the preview (also async — poll again).
+    // The fixture's two image:N placeholders composed into floated figures at
+    // persist time; the Bio editor renders them via the BioFigure NodeView.
+    const longBioEditor = adminPage.getByRole('textbox', { name: 'Bio' });
+    await expect(longBioEditor.locator('figure.bio-figure')).toHaveCount(2);
+
+    // Public page (a second tab, so the dirty admin form survives): both
+    // floated figures render with captions — the persisted generation output.
+    const publicPage = await adminPage.context().newPage();
+    await assertPublicBioFigures(publicPage, slug);
+
+    // Round-trip: save WITHOUT edits (generation itself dirtied the form),
+    // then re-visit the public page — the figures must survive the
+    // editor-backed form → server sanitize → DB → renderer loop with no drift.
+    const save = adminPage.getByRole('button', { name: 'Save', exact: true });
+    await expect(save).toBeEnabled({ timeout: 10_000 });
+    await save.click();
+    const savedToast = adminPage.getByText(/saved successfully/i);
+    await expect(savedToast).toBeVisible({ timeout: 15_000 });
+    // Let the toast auto-dismiss so the post-regenerate save's toast assertion
+    // below cannot match this stale one.
+    await expect(savedToast).not.toBeVisible({ timeout: 15_000 });
+    await assertPublicBioFigures(publicPage, slug);
+    await publicPage.close();
+
+    // Regenerate replaces the preview (also async — poll again). Wait for the
+    // completion toast — it fires in the SAME effect that populates the form
+    // (onGenerated) — before editing below. The palette tiles re-render from a
+    // separate media query and can appear BEFORE that effect runs; editing on
+    // the palette signal alone races a late onGenerated overwrite that would
+    // revert the edit and un-dirty the form (disabling Save).
     await regenerate.click();
+    await expect(adminPage.getByText(/bios generated — review below/i)).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(
       discoveredLinks.getByRole('button', { name: 'Delete link Wikipedia' })
     ).toBeVisible({ timeout: 30_000 });
@@ -68,7 +136,6 @@ test.describe('Admin AI bio generation', () => {
       .getByRole('textbox', { name: 'Short Bio' })
       .fill('Edited short bio for the save flow.');
 
-    const save = adminPage.getByRole('button', { name: 'Save', exact: true });
     await expect(save).toBeEnabled({ timeout: 10_000 });
     await save.click();
 
