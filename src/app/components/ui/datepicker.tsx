@@ -11,7 +11,7 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { Input } from './input';
 
@@ -114,8 +114,17 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
-          <div className="flex w-full items-center" role="group">
-            <CalendarIcon className="absolute ml-3.5 size-4" />
+          <div className="relative flex w-full items-center" role="group">
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Open calendar"
+                className="absolute left-1 size-7 p-0"
+              >
+                <CalendarIcon className="size-4" />
+              </Button>
+            </PopoverTrigger>
             <Input
               id={a11yId}
               ref={dateInputRef}
@@ -127,7 +136,12 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
             />
           </div>
         </PopoverAnchor>
-        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+        <PopoverContent
+          className="w-auto overflow-hidden p-0"
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onFocusOutside={(e) => e.preventDefault()}
+        >
           <Calendar
             onDayFocus={() => dateInputRef.current?.focus}
             mode="single"
