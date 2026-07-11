@@ -649,12 +649,12 @@ jobs:
           steps.version.outputs.skip_remainder != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          PR_TITLE: ${{ steps.bump-type.outputs.pr_title }}
+          PR_NUMBER: ${{ steps.bump-type.outputs.pr_number }}
         run: |
-          VERSION="${{ steps.version.outputs.new }}"
           DATE=$(date +%Y-%m-%d)
-          PR_TITLE="${{ steps.bump-type.outputs.pr_title }}"
-          PR_NUMBER="${{ steps.bump-type.outputs.pr_number }}"
-          BUMP_TYPE="${{ steps.bump-type.outputs.bump }}"
+          NL=$'\n'
 
           # Get all merged PR titles since the last tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -665,50 +665,56 @@ jobs:
             COMMITS_RANGE="HEAD"
           fi
 
-          # Collect unique PR entries from merge commits
-          MERGED_PRS=""
+          # Collect unique PR entries, sectioned by conventional-commit prefix
+          ADDED=""
+          CHANGED=""
+          FIXED=""
           SEEN_PRS=""
+
+          append_entry() {
+            local num="$1" title="$2"
+            # Commits without a PR make the API call yield "null|null" — skip them
+            if [ -z "$num" ] || [ "$num" = "null" ]; then
+              return 0
+            fi
+            if grep -q "^${num}$" <<< "$SEEN_PRS"; then
+              return 0
+            fi
+            SEEN_PRS="${SEEN_PRS}${num}${NL}"
+            case "$title" in
+              feat*) ADDED="${ADDED}- ${title} (#${num})${NL}" ;;
+              fix*) FIXED="${FIXED}- ${title} (#${num})${NL}" ;;
+              *) CHANGED="${CHANGED}- ${title} (#${num})${NL}" ;;
+            esac
+          }
+
           while IFS= read -r sha; do
             [ -z "$sha" ] && continue
             PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
               --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
-            if [ -n "$PR_INFO" ]; then
-              PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
-              PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
-              if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
-                SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
-                MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
-              fi
-            fi
+            [ -z "$PR_INFO" ] && continue
+            append_entry "$(cut -d'|' -f1 <<< "$PR_INFO")" "$(cut -d'|' -f2- <<< "$PR_INFO")"
           done < <(git log "${COMMITS_RANGE}" --format='%H' 2>/dev/null)
 
           # Always include the triggering PR if not already in the list
-          if ! echo "$SEEN_PRS" | grep -q "^${PR_NUMBER}$"; then
-            MERGED_PRS="${MERGED_PRS}- ${PR_TITLE} (#${PR_NUMBER})\n"
-            SEEN_PRS="${SEEN_PRS}${PR_NUMBER}\n"
+          append_entry "$PR_NUMBER" "$PR_TITLE"
+
+          # Build the new changelog entry, omitting empty sections
+          ENTRY="## [${NEW_VERSION}] - ${DATE}${NL}"
+          if [ -n "$ADDED" ]; then
+            ENTRY="${ENTRY}${NL}### Added${NL}${NL}${ADDED}"
           fi
-
-          # Final fallback: if still no PR entries (e.g., PR_NUMBER/PR_TITLE are empty)
-          # This should rarely happen since we always add the triggering PR above
-          if [ -z "$MERGED_PRS" ]; then
-            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
+          if [ -n "$CHANGED" ]; then
+            ENTRY="${ENTRY}${NL}### Changed${NL}${NL}${CHANGED}"
           fi
-
-          # Determine section header based on bump type
-          case "$BUMP_TYPE" in
-            major) SECTION="### Changed" ;;
-            minor) SECTION="### Added" ;;
-            patch) SECTION="### Fixed" ;;
-          esac
-
-          # Build the new changelog entry
-          # Join array elements with newlines
-          MERGED_PRS_TEXT=$(printf '%s\n' "${MERGED_PRS[@]}")
-          # Build entry using printf for proper newline handling
-          ENTRY=$(printf "## [%s] - %s\n\n%s\n\n%s" "${VERSION}" "${DATE}" "${SECTION}" "${MERGED_PRS_TEXT}")
+          if [ -n "$FIXED" ]; then
+            ENTRY="${ENTRY}${NL}### Fixed${NL}${NL}${FIXED}"
+          fi
 
           # Prepend to CHANGELOG.md after the header block, detected dynamically.
-          # The header is considered everything before the first '## [' version heading.
+          # The header is everything before the first '## [' version heading;
+          # its trailing blank lines are dropped so they don't accumulate one
+          # per release.
           if [ -f CHANGELOG.md ]; then
             HEADER_END_LINE=$(awk '/^## \[/{print NR; exit}' CHANGELOG.md)
             if [ -n "$HEADER_END_LINE" ]; then
@@ -717,16 +723,18 @@ jobs:
               HEADER_LINES=$(wc -l < CHANGELOG.md)
             fi
 
-            head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
+            head -n "$HEADER_LINES" CHANGELOG.md \
+              | awk '/[^[:space:]]/{for (i = 0; i < blanks; i++) print ""; blanks = 0; print; next} {blanks++}' \
+              > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            printf '%s\n' "$ENTRY" >> CHANGELOG.tmp
+            printf '%s' "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
 
             TAIL_START=$((HEADER_LINES + 1))
             tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
-            printf '%s\n\n%s\n\n%s\n' \
+            printf '%s\n\n%s\n\n%s' \
               "# Changelog" \
               "All notable changes to this project will be documented in this file." \
               "$ENTRY" > CHANGELOG.md
