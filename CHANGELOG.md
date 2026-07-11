@@ -109,6 +109,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.200.0] - 2026-07-11
+
+### Added
+
+- fix: 🐛 gate chat scroll pin on real user input (iOS) (#582)\n- feat(videos): ✨ best-quality auto poster capture (#576)\n- fix: 🐛 gate chat scroll pin on real user input (iOS) (#582)\n
+
 ## [4.199.0] - 2026-07-11
 
 ### Added
