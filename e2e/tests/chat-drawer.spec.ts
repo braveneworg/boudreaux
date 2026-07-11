@@ -112,6 +112,52 @@ test.describe('Chat drawer — authenticated', () => {
     await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
   });
 
+  test('reopen scrolls to the latest message and stays pinned through resizes', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/');
+    await userPage.getByRole('button', { name: /open chat/i }).click();
+    const composer = userPage.getByLabel('Chat message');
+    await expect(composer).toBeVisible();
+
+    // Ensure the list overflows its viewport so scroll position is meaningful.
+    const stamp = Date.now();
+    for (let i = 0; i < 8; i++) {
+      const body = `scroll-fill-${stamp}-${i} — lorem ipsum dolor sit amet`;
+      await composer.fill(body);
+      await expect(composer).toHaveValue(body);
+      await composer.press('Enter');
+      await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
+      await expect(composer).toBeEnabled({ timeout: 10_000 });
+    }
+
+    const distanceFromBottom = () =>
+      userPage.evaluate(() => {
+        const el = document.querySelector('[data-testid="chat-message-list"]');
+        if (!el) return Number.POSITIVE_INFINITY;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+      });
+
+    await userPage.getByLabel('Close chat').click();
+    await expect(userPage.getByRole('img', { name: 'live chat' })).toBeHidden();
+    await userPage.getByRole('button', { name: /open chat/i }).click();
+    await expect(userPage.getByText(`scroll-fill-${stamp}-7`, { exact: false })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // The reopened list anchors to the latest message once layout settles.
+    await expect.poll(distanceFromBottom, { timeout: 5_000 }).toBeLessThan(60);
+
+    // A viewport-height change after the anchor (iOS Safari URL-bar
+    // collapse / on-screen keyboard) must re-pin the tail while the
+    // viewer hasn't scrolled away.
+    const viewport = userPage.viewportSize();
+    if (viewport) {
+      await userPage.setViewportSize({ width: viewport.width, height: viewport.height - 120 });
+    }
+    await expect.poll(distanceFromBottom, { timeout: 5_000 }).toBeLessThan(60);
+  });
+
   test('emoji picker search filters and reacts without dismissing the drawer', async ({
     userPage,
   }) => {
