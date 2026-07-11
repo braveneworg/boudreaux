@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { logEvent } from './lib/log.js';
 import { getCommonsImage, getCommonsCategoryImages } from './wikimedia.js';
+
+vi.mock('./lib/log.js', () => ({ logEvent: vi.fn() }));
 
 const commonsResponse = (imageinfo: unknown): Response =>
   new Response(
@@ -63,6 +66,94 @@ describe('getCommonsImage', () => {
 
     expect(result?.attribution).toBe('Wikimedia Commons');
   });
+
+  it('captures the machine-readable licenseUrl from extmetadata', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      commonsResponse([
+        {
+          url: 'https://upload.wikimedia.org/Art.jpg',
+          extmetadata: {
+            LicenseShortName: { value: 'CC BY-SA 4.0' },
+            LicenseUrl: { value: 'https://creativecommons.org/licenses/by-sa/4.0/' },
+          },
+        },
+      ])
+    );
+
+    const result = await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(result?.licenseUrl).toBe('https://creativecommons.org/licenses/by-sa/4.0/');
+  });
+
+  it('returns a null licenseUrl when the field is absent', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(commonsResponse([{ url: 'https://x/Art.jpg' }]));
+
+    const result = await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(result?.licenseUrl).toBeNull();
+  });
+
+  it('returns a null licenseUrl when the field is junk (non-http)', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      commonsResponse([
+        {
+          url: 'https://x/Art.jpg',
+          extmetadata: { LicenseUrl: { value: 'see license page' } },
+        },
+      ])
+    );
+
+    const result = await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(result?.licenseUrl).toBeNull();
+  });
+
+  it('returns null and warns when a file is personality-rights restricted', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      commonsResponse([
+        {
+          url: 'https://x/Art.jpg',
+          extmetadata: { Restrictions: { value: 'personality|trademarked' } },
+        },
+      ])
+    );
+
+    const result = await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(result).toBeNull();
+  });
+
+  it('logs a warn event when skipping a personality-rights file', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      commonsResponse([
+        {
+          url: 'https://x/Art.jpg',
+          extmetadata: { Restrictions: { value: 'personality-rights' } },
+        },
+      ])
+    );
+
+    await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(logEvent).toHaveBeenCalledWith('warn', 'commons_restricted_skipped', {
+      title: 'File:Art.jpg',
+    });
+  });
+
+  it('does not skip a file whose only restriction is trademark', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      commonsResponse([
+        {
+          url: 'https://x/Art.jpg',
+          extmetadata: { Restrictions: { value: 'trademarked|insignia' } },
+        },
+      ])
+    );
+
+    const result = await getCommonsImage('Art.jpg', fetchFn);
+
+    expect(result?.url).toBe('https://x/Art.jpg');
+  });
 });
 
 describe('getCommonsCategoryImages', () => {
@@ -103,5 +194,37 @@ describe('getCommonsCategoryImages', () => {
   it('returns [] when the category request fails', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(new Response('nope', { status: 500 }));
     await expect(getCommonsCategoryImages('Ceschi', 30, fetchFn)).resolves.toEqual([]);
+  });
+
+  it('skips a personality-rights member but keeps the others', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          query: {
+            pages: {
+              '1': {
+                title: 'File:Ceschi restricted.jpg',
+                imageinfo: [
+                  {
+                    url: 'https://upload.wikimedia.org/restricted.jpg',
+                    extmetadata: { Restrictions: { value: 'personality' } },
+                  },
+                ],
+              },
+              '2': {
+                title: 'File:Ceschi live.jpg',
+                imageinfo: [{ url: 'https://upload.wikimedia.org/live.jpg' }],
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const images = await getCommonsCategoryImages('Ceschi', 30, fetchFn);
+
+    expect(images).toHaveLength(1);
+    expect(images[0].url).toBe('https://upload.wikimedia.org/live.jpg');
   });
 });

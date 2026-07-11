@@ -50,6 +50,7 @@ const makeBioImageRecord = (): ArtistBioImageRecord => ({
   title: 'Test title',
   attribution: ATTRIBUTION,
   license: null,
+  licenseUrl: null,
   sourceUrl: null,
   originalUrl: null,
   width: null,

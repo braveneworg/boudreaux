@@ -6,6 +6,7 @@ import {
   DEFAULT_VISION_CANDIDATE_LIMIT,
   boundedEnvInt,
   lambdaHandler,
+  licenseRank,
   MAX_FOLLOWED_LINKS,
   runBioGeneration,
   runLambda,
@@ -81,7 +82,9 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   reviseProse: vi.fn(),
   getGeminiApiKey: vi.fn().mockResolvedValue('test-key'),
   getScrapeApiKey: vi.fn().mockResolvedValue(null),
+  getSerperApiKey: vi.fn().mockResolvedValue(null),
   searchArtistSources: vi.fn().mockResolvedValue(null),
+  searchSerperImages: vi.fn().mockResolvedValue(null),
   readUrl: vi.fn().mockResolvedValue(null),
   listReleaseGroups: vi.fn().mockResolvedValue([]),
   getCoverArtImages: vi.fn().mockResolvedValue([]),
@@ -431,6 +434,7 @@ describe('runBioGeneration', () => {
         title: 'Artist in 2015',
         attribution: 'a.example',
         license: null,
+        licenseUrl: null,
         sourceUrl: 'https://a.example/bio',
         width: null,
         height: null,
@@ -932,6 +936,208 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
     expect(result.links.length).toBe(100);
+  });
+});
+
+describe('Serper image source', () => {
+  it('feeds Serper images into the vision gate candidates', async () => {
+    const serperImage = {
+      url: 'https://serper.example/press.jpg',
+      alt: 'Press photo',
+      sourceUrl: 'https://serper.example',
+    };
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages: vi.fn().mockResolvedValue([serperImage]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
+
+    expect(result.images.map((img) => img.url)).toContain('https://serper.example/press.jpg');
+  });
+
+  it('calls searchSerperImages with the search name and resolved key', async () => {
+    const searchSerperImages = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchSerperImages).toHaveBeenCalledWith('Radiohead', 'serper-key');
+  });
+
+  it('never calls searchSerperImages when no Serper key is configured', async () => {
+    const searchSerperImages = vi.fn().mockResolvedValue(null);
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue(null),
+      searchSerperImages,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(searchSerperImages).not.toHaveBeenCalled();
+  });
+
+  it('produces identical output whether or not the Serper key is configured', async () => {
+    const withoutKey = await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead' },
+      makeDeps({ getSerperApiKey: vi.fn().mockResolvedValue(null) })
+    );
+    const withKeyNoResults = await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead' },
+      makeDeps({
+        getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+        searchSerperImages: vi.fn().mockResolvedValue(null),
+      })
+    );
+
+    expect(withKeyNoResults.images).toEqual(withoutKey.images);
+  });
+
+  it('proceeds when searchSerperImages returns null', async () => {
+    const deps = makeDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchSerperImages: vi.fn().mockResolvedValue(null),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.shortBio).toBe('Short teaser.');
+  });
+
+  it('runs Serper after web-search and before link-follow', async () => {
+    const order: string[] = [];
+    const searchArtistSources = vi.fn().mockImplementation(async () => {
+      order.push('web-search');
+      return {
+        sourceText: 'text',
+        sourceUrls: ['https://a.example/bio'],
+        images: [],
+        references: [{ url: 'https://artist.bandcamp.com', title: 'Bandcamp' }],
+      };
+    });
+    const searchSerperImages = vi.fn().mockImplementation(async () => {
+      order.push('serper');
+      return null;
+    });
+    // readUrl is the follow-known-links reader: a Bandcamp reference above makes
+    // it fire, marking the link-follow boundary that Serper must precede.
+    const readUrl = vi.fn().mockImplementation(async () => {
+      order.push('link-follow');
+      return null;
+    });
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
+      searchArtistSources,
+      searchSerperImages,
+      readUrl,
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(order.indexOf('serper')).toBeGreaterThan(order.lastIndexOf('web-search'));
+    expect(order.indexOf('serper')).toBeLessThan(order.indexOf('link-follow'));
+  });
+});
+
+describe('licenseRank', () => {
+  it('ranks public-domain licenses in the top tier', () => {
+    expect(licenseRank({ license: 'Public Domain' })).toBe(2);
+  });
+
+  it('ranks CC0 licenses in the top tier', () => {
+    expect(licenseRank({ license: 'CC0 1.0' })).toBe(2);
+  });
+
+  it('ranks an attribution-required license in the middle tier', () => {
+    expect(licenseRank({ license: 'CC BY-SA 4.0' })).toBe(1);
+  });
+
+  it('ranks a null license in the bottom tier', () => {
+    expect(licenseRank({ license: null })).toBe(0);
+  });
+
+  it('ranks an undefined license in the bottom tier', () => {
+    expect(licenseRank({ license: undefined })).toBe(0);
+  });
+
+  it('ranks an empty-string license in the bottom tier', () => {
+    expect(licenseRank({ license: '' })).toBe(0);
+  });
+});
+
+describe('resolveImages license-aware ranking', () => {
+  it('orders attribution-free above licensed above unknown, stable within a tier', async () => {
+    // fileName → license, so the mock stays a URL-derived builder (no dynamic
+    // object indexing). Input order is `imageFileNames` below; the two `CC BY`
+    // entries share a tier, so a stable sort must keep 1 before 2.
+    const licenseFor = (fileName: string): string | null =>
+      new Map<string, string | null>([
+        ['licensed-1.jpg', 'CC BY-SA 4.0'],
+        ['pd.jpg', 'Public Domain'],
+        ['unknown.jpg', null],
+        ['licensed-2.jpg', 'CC BY 3.0'],
+      ]).get(fileName) ?? null;
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: ['licensed-1.jpg', 'pd.jpg', 'unknown.jpg', 'licensed-2.jpg'],
+      }),
+      getCommonsImage: vi
+        .fn()
+        .mockImplementation(async (fileName: string) =>
+          image({ url: `https://upload.wikimedia.org/${fileName}`, license: licenseFor(fileName) })
+        ),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images.map((img) => img.url)).toEqual([
+      'https://upload.wikimedia.org/pd.jpg',
+      'https://upload.wikimedia.org/licensed-1.jpg',
+      'https://upload.wikimedia.org/licensed-2.jpg',
+      'https://upload.wikimedia.org/unknown.jpg',
+    ]);
+  });
+});
+
+describe('Commons category image license-aware ranking', () => {
+  it('orders category images attribution-free above licensed above unknown, stable within a tier', async () => {
+    // Empty portrait file list so `resolveImages` contributes nothing and the
+    // category-image path is the sole source of `acc.images`. Two `CC BY`
+    // entries at non-adjacent input positions share a tier, so a stable sort
+    // must keep licensed-1 before licensed-2.
+    const withLicense = (url: string, license: string | null): BioImage => ({
+      ...commonsImage(url),
+      license,
+    });
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: [],
+        commonsCategory: 'Radiohead',
+      }),
+      getCommonsCategoryImages: vi
+        .fn()
+        .mockResolvedValue([
+          withLicense('https://commons/licensed-1.jpg', 'CC BY-SA 4.0'),
+          withLicense('https://commons/unknown.jpg', null),
+          withLicense('https://commons/pd.jpg', 'Public Domain'),
+          withLicense('https://commons/licensed-2.jpg', 'CC BY 3.0'),
+        ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images.map((img) => img.url)).toEqual([
+      'https://commons/pd.jpg',
+      'https://commons/licensed-1.jpg',
+      'https://commons/licensed-2.jpg',
+      'https://commons/unknown.jpg',
+    ]);
   });
 });
 

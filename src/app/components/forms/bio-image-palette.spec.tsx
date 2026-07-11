@@ -476,4 +476,73 @@ describe('BioImagePalette', () => {
       expect(within(tile).queryByText('Custom')).not.toBeInTheDocument();
     });
   });
+
+  describe('license badge', () => {
+    const buildImage = (overrides: Partial<BioStatusImage>): BioStatusImage => ({
+      id: 'lic1',
+      url: 'https://example.com/lic.jpg',
+      thumbnailUrl: null,
+      title: 'Licensed Image',
+      attribution: null,
+      license: null,
+      sourceUrl: null,
+      width: null,
+      height: null,
+      isPrimary: false,
+      ...overrides,
+    });
+
+    const renderTile = (image: BioStatusImage): HTMLElement => {
+      render(
+        <BioImagePalette
+          images={[image]}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      return screen
+        .getByRole('button', { name: `Delete image ${image.title}` })
+        .closest('li') as HTMLElement;
+    };
+
+    it('renders the license badge as a link when a licenseUrl is present', () => {
+      const tile = renderTile(
+        buildImage({
+          license: 'CC BY-SA 4.0',
+          licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        })
+      );
+      const link = within(tile).getByRole('link', { name: /CC BY-SA 4\.0/ });
+      expect(link).toHaveAttribute('href', 'https://creativecommons.org/licenses/by-sa/4.0/');
+    });
+
+    it('opens the license link in a new tab safely', () => {
+      const tile = renderTile(
+        buildImage({
+          license: 'CC BY-SA 4.0',
+          licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        })
+      );
+      const link = within(tile).getByRole('link', { name: /CC BY-SA 4\.0/ });
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
+    it('renders a plain license badge (no link) when only the license name is present', () => {
+      const tile = renderTile(buildImage({ license: 'Public domain', licenseUrl: null }));
+      expect(within(tile).getByText('Public domain')).toBeInTheDocument();
+      expect(within(tile).queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders "Rights unknown" when neither license nor licenseUrl is present', () => {
+      const tile = renderTile(buildImage({ license: null, licenseUrl: null }));
+      expect(within(tile).getByText('Rights unknown')).toBeInTheDocument();
+    });
+
+    it('does not render "Rights unknown" when a license name is present', () => {
+      const tile = renderTile(buildImage({ license: 'Public domain', licenseUrl: null }));
+      expect(within(tile).queryByText('Rights unknown')).not.toBeInTheDocument();
+    });
+  });
 });

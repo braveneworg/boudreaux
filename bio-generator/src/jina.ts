@@ -104,7 +104,7 @@ const JUNK_IMAGE_URL_PATTERN =
 const NON_PHOTO_EXTENSION_PATTERN = /\.(svg|gif|ico)$/i;
 
 /** True when the URL plausibly points at a hosted photograph. */
-const isPlausiblePhotoUrl = (url: string): boolean => {
+export const isPlausiblePhotoUrl = (url: string): boolean => {
   if (!/^https?:\/\//i.test(url)) return false;
   // Quotes/whitespace mark scraping artifacts (e.g. an onerror handler's
   // `this.src='…'` captured mid-attribute), never a real image URL.
@@ -127,6 +127,9 @@ const altFromImageKey = (key: string): string | null => {
 const JUNK_IMAGE_ALT_PATTERN =
   /\b(logo|icon|flag|avatar|banner|badge|button|sprite|placeholder|thumbnail|advert(isement)?|ad|sponsor(ed)?|subscription|subscribe|sign[ -]?(up|in)|default profile|profile photo missing|cookie|tracking pixel)\b/i;
 
+/** True when alt text marks page chrome or ads rather than artist photography. */
+export const isJunkImageAlt = (alt: string): boolean => JUNK_IMAGE_ALT_PATTERN.test(alt);
+
 /**
  * Maps a page's images summary to filtered {@link ScrapedImage} candidates,
  * dropping site chrome (by URL), non-photo formats, and page-chrome alt text.
@@ -138,7 +141,7 @@ const collectPageImages = (
   Object.entries(images ?? {})
     .filter(([, url]) => isPlausiblePhotoUrl(url))
     .map(([key, url]) => ({ url, alt: altFromImageKey(key), sourceUrl }))
-    .filter(({ alt }) => alt === null || !JUNK_IMAGE_ALT_PATTERN.test(alt));
+    .filter(({ alt }) => alt === null || !isJunkImageAlt(alt));
 
 /** Dedupes scraped images by URL, keeping first occurrence, capped. */
 const dedupeScrapedImages = (images: ScrapedImage[]): ScrapedImage[] => {

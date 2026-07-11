@@ -107,6 +107,42 @@ const AttributionEditor = ({
   );
 };
 
+interface LicenseBadgeProps {
+  license: string | null | undefined;
+  licenseUrl: string | null | undefined;
+}
+
+/**
+ * License provenance for a discovered image: the license short name as a Badge
+ * (linked to its machine-readable license page when known), or muted
+ * "Rights unknown" text when the discovery captured no license at all.
+ */
+const LicenseBadge = ({ license, licenseUrl }: LicenseBadgeProps): JSX.Element => {
+  if (!license) {
+    return <span className="text-muted-foreground text-[10px]">Rights unknown</span>;
+  }
+
+  const badge = (
+    <Badge variant="outline" className="bg-background/80 text-[10px]">
+      {license}
+    </Badge>
+  );
+
+  if (!licenseUrl) return badge;
+
+  return (
+    <a
+      href={licenseUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${license} license (opens in a new tab)`}
+      className="hover:opacity-80"
+    >
+      {badge}
+    </a>
+  );
+};
+
 interface BioImageTileProps {
   image: BioStatusImage;
   onDelete: (id: string) => void;
@@ -198,6 +234,7 @@ const BioImageTile = ({
           </button>
         </div>
       )}
+      <LicenseBadge license={image.license} licenseUrl={image.licenseUrl} />
       <div className="flex gap-1">
         <Dialog>
           <DialogTrigger asChild>

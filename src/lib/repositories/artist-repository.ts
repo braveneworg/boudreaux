@@ -73,6 +73,7 @@ export interface BioGenerationStateRecord {
     title: string | null;
     attribution: string | null;
     license: string | null;
+    licenseUrl: string | null;
     sourceUrl: string | null;
     originalUrl: string | null;
     isPrimary: boolean;
@@ -478,6 +479,7 @@ export class ArtistRepository {
         title: string | null;
         attribution: string | null;
         license: string | null;
+        licenseUrl: string | null;
         sourceUrl: string | null;
         originalUrl: string | null;
         width: number | null;
@@ -638,6 +640,7 @@ export class ArtistRepository {
               title: true,
               attribution: true,
               license: true,
+              licenseUrl: true,
               sourceUrl: true,
               originalUrl: true,
               isPrimary: true,
@@ -706,6 +709,7 @@ export class ArtistRepository {
           title: data.title,
           attribution: data.attribution,
           license: data.license,
+          licenseUrl: data.licenseUrl,
           sourceUrl: data.sourceUrl,
           originalUrl: data.originalUrl,
           width: data.width,
