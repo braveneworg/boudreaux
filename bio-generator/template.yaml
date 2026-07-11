@@ -49,6 +49,7 @@ Resources:
               Resource:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/gemini/api-key'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/jina/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/serper/api-key'
             - Effect: Allow
               Action:
                 - kms:Decrypt
@@ -59,6 +60,9 @@ Resources:
           # Optional Jina (web scrape) key. Jina works keyless at a lower rate
           # limit, so an absent parameter just means unauthenticated scraping.
           SSM_PATH_JINA_API_KEY: '/fakefour/jina/api-key'
+          # Optional Serper (Google Images) key. Serper requires a key, so an
+          # absent parameter simply skips the Serper image search entirely.
+          SSM_PATH_SERPER_API_KEY: '/fakefour/serper/api-key'
           # The Gemini model ids intentionally ship in code (DEFAULT_GEMINI_MODEL /
           # DEFAULT_GEMINI_PRO_MODEL, src/types.ts) rather than template parameters:
           # CloudFormation keeps a parameter's previous value across deploys, which

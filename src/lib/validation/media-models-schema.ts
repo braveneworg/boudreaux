@@ -85,6 +85,7 @@ const artistBioImageSchema = z.object({
   title: nullableString,
   attribution: nullableString,
   license: nullableString,
+  licenseUrl: nullableString,
   sourceUrl: nullableString,
   originalUrl: nullableString,
   width: z.number().nullable(),

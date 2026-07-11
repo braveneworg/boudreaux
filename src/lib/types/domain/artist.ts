@@ -97,6 +97,8 @@ export interface ArtistBioImageRecord {
   title: string | null;
   attribution: string | null;
   license: string | null;
+  /** Machine-readable license page from Commons, when known. */
+  licenseUrl: string | null;
   sourceUrl: string | null;
   /** Original external image URL kept so save-time re-hosting can fetch the full-resolution source. */
   originalUrl: string | null;
@@ -119,6 +121,7 @@ export interface CreateArtistBioImageData {
   title?: string | null;
   attribution?: string | null;
   license?: string | null;
+  licenseUrl?: string | null;
   sourceUrl?: string | null;
   originalUrl?: string | null;
   width?: number | null;

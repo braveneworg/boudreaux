@@ -2,7 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { __resetSecretsCacheForTests, getGeminiApiKey, getScrapeApiKey } from './secrets.js';
+import {
+  __resetSecretsCacheForTests,
+  getGeminiApiKey,
+  getScrapeApiKey,
+  getSerperApiKey,
+} from './secrets.js';
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
 
@@ -91,5 +96,55 @@ describe('getScrapeApiKey', () => {
     const result = await getScrapeApiKey();
 
     expect(result).toBeNull();
+  });
+});
+
+describe('getSerperApiKey', () => {
+  beforeEach(() => {
+    __resetSecretsCacheForTests();
+    send.mockReset();
+    delete process.env.SSM_PATH_SERPER_API_KEY;
+  });
+
+  it('returns null and logs when the SSM path env var is unset', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await getSerperApiKey();
+
+    expect(result).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('returns the decrypted parameter value when configured', async () => {
+    process.env.SSM_PATH_SERPER_API_KEY = '/fakefour/serper/api-key';
+    send.mockResolvedValue({ Parameter: { Value: 'serper-123' } });
+
+    const result = await getSerperApiKey();
+
+    expect(result).toBe('serper-123');
+  });
+
+  it('caches the value across calls (one SSM fetch per cold start)', async () => {
+    process.env.SSM_PATH_SERPER_API_KEY = '/fakefour/serper/api-key';
+    send.mockResolvedValue({ Parameter: { Value: 'serper-123' } });
+
+    await getSerperApiKey();
+    await getSerperApiKey();
+
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null (degrades) when the SSM lookup fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.SSM_PATH_SERPER_API_KEY = '/fakefour/serper/api-key';
+    send.mockRejectedValue(new Error('AccessDenied'));
+
+    const result = await getSerperApiKey();
+
+    expect(result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

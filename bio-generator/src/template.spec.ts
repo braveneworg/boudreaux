@@ -25,6 +25,16 @@ describe('template.yaml Gemini model wiring', () => {
   });
 });
 
+describe('template.yaml Serper wiring', () => {
+  it('grants read access to the Serper API-key SSM parameter', () => {
+    expect(template).toContain(':parameter/fakefour/serper/api-key');
+  });
+
+  it('wires the Serper SSM path into the Lambda environment', () => {
+    expect(template).toContain("SSM_PATH_SERPER_API_KEY: '/fakefour/serper/api-key'");
+  });
+});
+
 describe('template.yaml function timeout', () => {
   // The draft-and-synthesize pipeline runs two parallel drafts plus an editor
   // pass, each with up to 90s of 429 backoff — the worst case no longer fits

@@ -8,11 +8,12 @@ import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
-import { getGeminiApiKey, getScrapeApiKey } from './lib/secrets.js';
+import { getGeminiApiKey, getScrapeApiKey, getSerperApiKey } from './lib/secrets.js';
 import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { postBioProgress } from './progress.js';
+import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
   DEFAULT_GEMINI_MODEL,
@@ -49,7 +50,9 @@ export interface BioGeneratorDeps {
   reviseProse: typeof reviseProse;
   getGeminiApiKey: () => Promise<string>;
   getScrapeApiKey: typeof getScrapeApiKey;
+  getSerperApiKey: typeof getSerperApiKey;
   searchArtistSources: typeof searchArtistSources;
+  searchSerperImages: typeof searchSerperImages;
   readUrl: typeof readUrl;
   listReleaseGroups: typeof listReleaseGroups;
   getCoverArtImages: typeof getCoverArtImages;
@@ -71,7 +74,9 @@ const defaultDeps: BioGeneratorDeps = {
   reviseProse,
   getGeminiApiKey,
   getScrapeApiKey,
+  getSerperApiKey,
   searchArtistSources,
+  searchSerperImages,
   readUrl,
   listReleaseGroups,
   getCoverArtImages,
@@ -181,6 +186,16 @@ const isAttributionFree = (license: string | null | undefined): boolean => {
     normalized.includes('pd-') ||
     normalized === 'pd'
   );
+};
+
+/**
+ * License preference tier for image ranking — 2 for attribution-free (PD/CC0),
+ * 1 for a known attribution-required license, 0 for unknown rights. Ranking
+ * only; never a drop filter — no image is excluded for lacking a license.
+ */
+export const licenseRank = (image: Pick<BioImage, 'license'>): number => {
+  if (isAttributionFree(image.license)) return 2;
+  return image.license ? 1 : 0;
 };
 
 const dedupeLinks = (links: BioLink[]): BioLink[] => {
@@ -305,9 +320,7 @@ const resolveImages = async (fileNames: string[], deps: BioGeneratorDeps): Promi
     })
   );
   const candidates = resolved.filter((image): image is BioImage => image !== null);
-  candidates.sort(
-    (a, b) => Number(isAttributionFree(b.license)) - Number(isAttributionFree(a.license))
-  );
+  candidates.sort((a, b) => licenseRank(b) - licenseRank(a));
   return candidates.slice(0, MAX_IMAGES);
 };
 
@@ -366,6 +379,10 @@ const applyWikidataFacts = async (
       wd.commonsCategory,
       MAX_COMMONS_CATEGORY_IMAGES
     );
+    // License-aware rank (attribution-free > known license > unknown), mirroring
+    // `resolveImages`. Stable within a tier (spec-stable sort) so equal-license
+    // images keep their incoming order.
+    categoryImages.sort((a, b) => licenseRank(b) - licenseRank(a));
     acc.images.push(...categoryImages);
     logEvent('info', 'commons_category_images', {
       category: wd.commonsCategory,
@@ -460,6 +477,27 @@ const applyWebSearch = async (
 };
 
 /**
+ * Adds a Google-Images source via Serper.dev: four targeted image searches whose
+ * results join `acc.scrapedImages` to pass the same vision gate as every other
+ * scraped candidate. Strictly key-gated — unlike Jina, Serper has no keyless
+ * mode, so an absent key skips the stage entirely (a run with no key behaves
+ * byte-identically to before). Best-effort; never throws.
+ */
+const applySerperImages = async (
+  acc: MetadataAccumulator,
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<void> => {
+  const key = await deps.getSerperApiKey();
+  if (!key) {
+    logEvent('info', 'serper_skipped', { reason: 'no api key' });
+    return;
+  }
+  const found = await deps.searchSerperImages(searchNameFor(input), key);
+  if (found) acc.scrapedImages.push(...found);
+};
+
+/**
  * Follow a FIXED set of already-discovered high-value links (Bandcamp/Discogs)
  * one level deep for images, pushing them into `acc.scrapedImages` so they pass
  * the same vision gate as web-search images. No recursive crawl; deduped
@@ -500,6 +538,7 @@ const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
   title: image.alt,
   attribution: attributionHost(image.sourceUrl),
   license: null,
+  licenseUrl: null,
   sourceUrl: image.sourceUrl,
   width: null,
   height: null,
@@ -679,6 +718,7 @@ const gatherMetadata = async (
 
   await acc.report('web-search');
   await applyWebSearch(acc, input, scrapeKey, deps);
+  await applySerperImages(acc, input, deps);
 
   await acc.report('link-follow');
   await followKnownLinksForImages(acc, scrapeKey, deps);

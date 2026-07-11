@@ -253,6 +253,46 @@ describe('media v2 wire additions', () => {
   });
 });
 
+describe('licenseUrl wire additions', () => {
+  const image = {
+    url: 'https://cdn.example.com/a.jpg',
+    attribution: 'CAA',
+    isPrimary: false,
+  };
+
+  it('retains a licenseUrl on the wire image schema', () => {
+    const parsed = bioGenerationImageSchema.parse({
+      ...image,
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    });
+    expect(parsed.licenseUrl).toBe('https://creativecommons.org/licenses/by-sa/4.0/');
+  });
+
+  it('accepts a null licenseUrl on the wire image schema', () => {
+    expect(bioGenerationImageSchema.safeParse({ ...image, licenseUrl: null }).success).toBe(true);
+  });
+
+  it('accepts an absent licenseUrl on the wire image schema', () => {
+    expect(bioGenerationImageSchema.safeParse(image).success).toBe(true);
+  });
+
+  it('rejects a non-URL licenseUrl on the wire image schema', () => {
+    expect(bioGenerationImageSchema.safeParse({ ...image, licenseUrl: 'not-a-url' }).success).toBe(
+      false
+    );
+  });
+
+  it('retains a licenseUrl on the status image schema', () => {
+    const parsed = bioStatusImageSchema.parse({
+      ...image,
+      id: '665f1f77bcf86cd799439011',
+      attribution: null,
+      licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    });
+    expect(parsed.licenseUrl).toBe('https://creativecommons.org/publicdomain/mark/1.0/');
+  });
+});
+
 describe('bioProgressSchema', () => {
   const validAt = '2026-07-08T00:00:00.000Z';
 

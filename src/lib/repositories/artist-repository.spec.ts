@@ -581,6 +581,7 @@ describe('ArtistRepository', () => {
           title: null,
           attribution: null,
           license: null,
+          licenseUrl: null,
           sourceUrl: null,
           originalUrl: null,
           width: null,
@@ -770,6 +771,15 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.bioLinks).toMatchObject({ select: { origin: true } });
     });
 
+    it('selects licenseUrl on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a5');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { licenseUrl: true } });
+    });
+
     it('selects bioProgress so the status endpoint can surface it', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'processing' } as never);
 
@@ -883,6 +893,37 @@ describe('ArtistRepository', () => {
       expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ thumbnailUrl: 'https://cdn.example/t.webp' }),
       });
+    });
+
+    it('forwards a supplied licenseUrl to create', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.create).mockResolvedValue({ id: 'img-5' } as never);
+
+      await ArtistRepository.createBioImage({
+        artistId: 'a1',
+        url: 'https://cdn.example/x.webp',
+        licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      });
+
+      expect(prisma.artistBioImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+        }),
+      });
+    });
+
+    it('creates a row with an undefined licenseUrl when the custom upload omits it', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.create).mockResolvedValue({ id: 'img-6' } as never);
+
+      await ArtistRepository.createBioImage({ artistId: 'a1', url: 'https://cdn.example/x.webp' });
+
+      const arg = vi.mocked(prisma.artistBioImage.create).mock.calls[0][0];
+      expect(arg.data.licenseUrl).toBeUndefined();
     });
 
     it('stamps origin custom on the created row (manual-upload path)', async () => {
