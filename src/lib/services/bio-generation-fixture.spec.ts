@@ -16,6 +16,15 @@ describe('fakeBioGeneration', () => {
     expect(result.data.shortBio).toContain('Test Artist');
   });
 
+  it('weaves both image placeholders into the long bio for the float composer', () => {
+    const result = fakeBioGeneration({ artistId: 'a', displayName: 'Test Artist' });
+    if (!result.ok) throw new Error('fixture must succeed');
+    // Between paragraphs (not trailing) so the composed figures sit at block
+    // level and the admin-editor round-trip stays lossless.
+    expect(result.data.longBio).toContain('</p><img src="image:0" alt=""><p>');
+    expect(result.data.longBio).toContain('</p><img src="image:1" alt=""><p>');
+  });
+
   it('returns media v2 fields for palette e2e coverage', () => {
     const result = fakeBioGeneration({ artistId: 'a', displayName: 'Test Artist' });
     if (!result.ok) throw new Error('fixture must succeed');

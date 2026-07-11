@@ -75,6 +75,16 @@ vi.mock('./bio-image-service', () => ({
   },
 }));
 
+// Baked-in passthrough: `mockReset()` restores this original implementation,
+// so every test starts from "the validator keeps everything" unless it opts in
+// to a drop via `mockImplementationOnce`.
+const validateBioLinksMock = vi.fn(
+  async <T extends { url: string }>(links: T[]): Promise<T[]> => links
+);
+vi.mock('@/lib/utils/validate-bio-links', () => ({
+  validateBioLinks: (links: Array<{ url: string }>) => validateBioLinksMock(links),
+}));
+
 /** Shape of a captured `InvokeCommand` instance (our mock stores its input). */
 type SentCommand = {
   input: { InvocationType?: string; FunctionName?: string; Payload?: Uint8Array };
@@ -840,6 +850,312 @@ describe('persistGeneratedBio image-rank sort', () => {
 
     expect(content.longBio).toContain(`src="${cdn('u')}"`);
     expect(content.longBio).not.toContain('image:0');
+  });
+});
+
+describe('persistGeneratedBio figure composition', () => {
+  const artistId = 'a'.repeat(24);
+
+  // A discovered image with minimal caption metadata (schema requires a
+  // non-null attribution).
+  const image = (
+    overrides: Partial<BioGenerationData['images'][number]> & { url: string }
+  ): BioGenerationData['images'][number] => ({
+    thumbnailUrl: null,
+    title: null,
+    attribution: 'src',
+    license: null,
+    sourceUrl: null,
+    isPrimary: false,
+    ...overrides,
+  });
+
+  const buildData = (
+    overrides: Partial<BioGenerationData> & Pick<BioGenerationData, 'longBio' | 'images'>
+  ): BioGenerationData => ({
+    shortBio: '<p>s</p>',
+    altBio: '<p>a</p>',
+    genres: 'rock',
+    links: [],
+    model: 'gemini-2.5-pro',
+    ...overrides,
+  });
+
+  // A CDN URL that survives HTML sanitization, derived from a per-image token.
+  const cdn = (token: string): string =>
+    `https://cdn.example.com/media/artists/a/bio/${token}.webp`;
+
+  // Re-host mock echoing one CDN URL per token, position-preserving.
+  const mockRehostEcho = (tokens: string[]): void => {
+    rehostImagesMock.mockResolvedValue({
+      results: tokens.map((token) => ({ url: cdn(token), width: null, height: null })),
+      duplicateAliases: new Map(),
+    });
+  };
+
+  beforeEach(() => {
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    rehostImagesMock.mockReset();
+  });
+
+  it('composes mapped placeholders into alternating right/left captioned figures', async () => {
+    mockRehostEcho(['p0', 'p1']);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData({
+        images: [
+          image({
+            url: 'https://src.example.com/a.jpg',
+            title: 'Portrait',
+            attribution: 'Photographer',
+            alt: 'Portrait photo',
+            isPrimary: true,
+          }),
+          image({
+            url: 'https://src.example.com/b.jpg',
+            title: 'Album',
+            attribution: 'Cover Art Archive',
+            alt: 'Album cover',
+          }),
+        ],
+        longBio:
+          '<p>Intro</p><img src="image:0" alt=""><p>Middle</p><img src="image:1" alt=""><p>End</p>',
+      }),
+      []
+    );
+
+    const rightAt = content.longBio.indexOf('bio-figure--right');
+    const leftAt = content.longBio.indexOf('bio-figure--left');
+    expect(rightAt).toBeGreaterThan(-1);
+    expect(leftAt).toBeGreaterThan(rightAt);
+    expect(content.longBio).toContain(`src="${cdn('p0')}"`);
+    expect(content.longBio).toContain(`src="${cdn('p1')}"`);
+    expect(content.longBio).toContain('<span class="bio-figure-title">Portrait</span>');
+    expect(content.longBio).toContain('<span class="bio-figure-attribution">Photographer</span>');
+    expect(content.longBio).toContain('<span class="bio-figure-title">Album</span>');
+    expect(content.longBio).toContain(
+      '<span class="bio-figure-attribution">Cover Art Archive</span>'
+    );
+  });
+
+  it('plain-swaps placeholders past the five-figure cap (fallback order proof)', async () => {
+    const tokens = ['t0', 't1', 't2', 't3', 't4', 't5'];
+    mockRehostEcho(tokens);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData({
+        images: tokens.map((token, index) =>
+          image({ url: `https://src.example.com/${token}.jpg`, title: `Title ${index}` })
+        ),
+        longBio:
+          tokens.map((_, index) => `<p>x</p><img src="image:${index}" alt="">`).join('') +
+          '<p>end</p>',
+      }),
+      []
+    );
+
+    expect(content.longBio.match(/<figure\b/g)).toHaveLength(5);
+    // The sixth placeholder fell through to the plain src-swap fallback: its
+    // CDN url renders as a bare <img> AFTER the last composed figure.
+    expect(content.longBio).not.toContain('image:5');
+    expect(content.longBio.indexOf(`<img src="${cdn('t5')}"`)).toBeGreaterThan(
+      content.longBio.lastIndexOf('</figure>')
+    );
+  });
+
+  it('composes a duplicate-aliased placeholder with the survivor meta', async () => {
+    const survivorUrl = cdn('surv');
+    rehostImagesMock.mockResolvedValue({
+      results: [{ url: survivorUrl, width: null, height: null }, null],
+      duplicateAliases: new Map([[1, survivorUrl]]),
+    });
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData({
+        images: [
+          image({
+            url: 'https://src.example.com/a.jpg',
+            title: 'Survivor Title',
+            attribution: 'Survivor Credit',
+            isPrimary: true,
+          }),
+          image({ url: 'https://src.example.com/b.jpg' }),
+        ],
+        longBio: '<p>Intro</p><img src="image:1" alt=""><p>End</p>',
+      }),
+      []
+    );
+
+    expect(content.longBio).toContain('bio-figure--right');
+    expect(content.longBio).toContain(`src="${survivorUrl}"`);
+    expect(content.longBio).toContain('<span class="bio-figure-title">Survivor Title</span>');
+    expect(content.longBio).toContain(
+      '<span class="bio-figure-attribution">Survivor Credit</span>'
+    );
+  });
+
+  it('keeps the short bio image-free while the long bio composes figures', async () => {
+    mockRehostEcho(['p0']);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData({
+        images: [image({ url: 'https://src.example.com/a.jpg', title: 'Portrait' })],
+        shortBio: '<p>Teaser <img src="image:0" alt=""> end.</p>',
+        longBio: '<p>Long</p><img src="image:0" alt="">',
+      }),
+      []
+    );
+
+    expect(content.shortBio).not.toContain('<img');
+    expect(content.shortBio).not.toContain('<figure');
+  });
+
+  it('plain-swaps the alt bio placeholder without composing a figure', async () => {
+    mockRehostEcho(['p0']);
+
+    const content = await persistGeneratedBio(
+      artistId,
+      buildData({
+        images: [image({ url: 'https://src.example.com/a.jpg', title: 'Portrait' })],
+        longBio: '<p>Long</p>',
+        altBio: '<p>Alt <img src="image:0" alt="x"></p>',
+      }),
+      []
+    );
+
+    expect(content.altBio).toContain(`<img src="${cdn('p0')}"`);
+    expect(content.altBio).not.toContain('<figure');
+  });
+});
+
+describe('persistGeneratedBio link validation', () => {
+  const artistId = 'a'.repeat(24);
+
+  const link = (label: string, url: string): BioGenerationData['links'][number] => ({
+    label,
+    url,
+    kind: 'other',
+  });
+
+  const buildData = (links: BioGenerationData['links']): BioGenerationData => ({
+    shortBio: '<p>s</p>',
+    longBio: '<p>l</p>',
+    altBio: '<p>a</p>',
+    genres: 'rock',
+    images: [],
+    links,
+    model: 'gemini-2.5-pro',
+  });
+
+  const release = {
+    id: '665f1f77bcf86cd799439021',
+    title: 'Sad, Fat Luck',
+    releasedOn: null,
+    coverUrl: null,
+  };
+
+  /** The links array persisted through the repository on the first call. */
+  const persistedLinks = (): Array<{ url: string; sortOrder: number }> =>
+    replaceBioContentMock.mock.calls[0][1].links;
+
+  beforeEach(() => {
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
+    validateBioLinksMock.mockReset();
+  });
+
+  it('probes only the sanitized external links — never internal release links', async () => {
+    await persistGeneratedBio(
+      artistId,
+      buildData([
+        link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead'),
+        link('Evil', 'javascript:alert(1)'),
+      ]),
+      [release]
+    );
+
+    expect(validateBioLinksMock).toHaveBeenCalledTimes(1);
+    const probed = validateBioLinksMock.mock.calls[0][0] as Array<{ url: string }>;
+    expect(probed.map(({ url }) => url)).toEqual(['https://en.wikipedia.org/wiki/Radiohead']);
+  });
+
+  it('appends release links after validation, past the kept external links', async () => {
+    await persistGeneratedBio(
+      artistId,
+      buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
+      [release]
+    );
+
+    expect(persistedLinks().map(({ url }) => url)).toEqual([
+      'https://en.wikipedia.org/wiki/Radiohead',
+      '/releases/665f1f77bcf86cd799439021',
+    ]);
+  });
+
+  it('drops validator-rejected links and re-indexes sortOrder densely', async () => {
+    validateBioLinksMock.mockImplementationOnce(async (links) =>
+      links.filter(({ url }) => !url.includes('dead'))
+    );
+
+    await persistGeneratedBio(
+      artistId,
+      buildData([
+        link('Alive', 'https://alive.example.com/'),
+        link('Dead', 'https://dead.example.com/'),
+        link('Also alive', 'https://also.example.com/'),
+      ]),
+      [release]
+    );
+
+    expect(persistedLinks().map(({ url }) => url)).toEqual([
+      'https://alive.example.com/',
+      'https://also.example.com/',
+      '/releases/665f1f77bcf86cd799439021',
+    ]);
+    expect(persistedLinks().map(({ sortOrder }) => sortOrder)).toEqual([0, 1, 2]);
+  });
+
+  it('skips validation when BIO_GENERATOR_FAKE=true', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    await persistGeneratedBio(
+      artistId,
+      buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
+      []
+    );
+
+    expect(validateBioLinksMock).not.toHaveBeenCalled();
+    expect(persistedLinks().map(({ url }) => url)).toEqual([
+      'https://en.wikipedia.org/wiki/Radiohead',
+    ]);
+  });
+
+  it('skips validation when E2E_MODE=true', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    await persistGeneratedBio(
+      artistId,
+      buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
+      []
+    );
+
+    expect(validateBioLinksMock).not.toHaveBeenCalled();
+  });
+
+  it('skips validation when NEXT_PUBLIC_E2E_MODE=true', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
+
+    await persistGeneratedBio(
+      artistId,
+      buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
+      []
+    );
+
+    expect(validateBioLinksMock).not.toHaveBeenCalled();
   });
 });
 
