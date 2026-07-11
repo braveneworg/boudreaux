@@ -42,6 +42,21 @@ describe('ChatReportAbusePopover', () => {
     expect(screen.getByRole('button', { name: /^report$/i })).toBeInTheDocument();
   });
 
+  it('is modal while open: outside pointer events are disabled, then restored', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(<ChatReportAbusePopover />);
+
+    await user.click(screen.getByRole('button', { name: /report abuse \(anonymously\)/i }));
+    await screen.findByPlaceholderText('Type username');
+    // Radix modal popovers disable pointer events outside the layer, which
+    // also pauses the chat drawer's focus trap so it can't steal focus
+    // from the username input (the popover portals outside the drawer).
+    expect(document.body.style.pointerEvents).toBe('none');
+
+    await user.click(screen.getByRole('button', { name: /close report dialog/i }));
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
+  });
+
   it('disables submit until a non-empty username is typed', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<ChatReportAbusePopover />);

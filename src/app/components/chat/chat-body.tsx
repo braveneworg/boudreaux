@@ -14,6 +14,7 @@ import type { ClientSessionData } from '@/app/hooks/use-session';
 import { useChatChannel } from '@/hooks/use-chat-channel';
 import { useChatMeQuery } from '@/hooks/use-chat-me-query';
 import { useChatPinnedMessagesQuery } from '@/hooks/use-chat-pinned-messages-query';
+import { useChatReopenRefresh } from '@/hooks/use-chat-reopen-refresh';
 import { useChatTyping } from '@/hooks/use-chat-typing';
 import { useFingerprint } from '@/hooks/use-fingerprint';
 import { useInfiniteChatMessagesQuery } from '@/hooks/use-infinite-chat-messages-query';
@@ -156,6 +157,9 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
   const { data: meStatus } = useChatMeQuery({ enabled });
   const isBlocked = getIsBlocked(meStatus);
   const enabledWithAccess = enabled && !isBlocked;
+  // The drawer unmounts this component on close, so a fresh mount means
+  // the drawer (re)opened — refresh the possibly stale cached history.
+  useChatReopenRefresh({ enabled: enabledWithAccess });
   const {
     messages: baseMessages,
     isPending,
@@ -338,8 +342,8 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
         fingerprint={fingerprint}
         currentUser={currentUser}
         onOptimisticAppend={appendOptimistic}
-        // addReceivedMessage handles both: it inserts the persisted DTO
-        // into the live list AND reconciles the matching optimistic
+        // addReceivedMessage handles both: it appends the persisted DTO
+        // to the newest cached page AND reconciles the matching optimistic
         // placeholder via tempId. Works whether or not Pusher echoes.
         onSendResolved={(_tempId, server) => addReceivedMessage(server)}
         onSendFailed={markFailed}

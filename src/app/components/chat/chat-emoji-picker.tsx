@@ -9,9 +9,10 @@ import dynamic from 'next/dynamic';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// emoji-mart ships a ~200KB picker — lazy load so the chat bundle isn't
-// inflated for users who never react. SSR is disabled because the picker
-// is keyboard/touch-driven and has no useful server output.
+// Lazy-load the frimousse picker so users who never react don't pay for
+// it; the emoji dataset itself loads on demand from /api/emoji-data. SSR
+// is disabled because the picker is keyboard/touch-driven and has no
+// useful server output.
 const EmojiPicker = dynamic(
   () => import('./chat-emoji-picker-inner').then((mod) => mod.ChatEmojiPickerInner),
   {
@@ -29,7 +30,14 @@ export const ChatEmojiPicker = ({ trigger, onSelect }: ChatEmojiPickerProps) => 
   const [open, setOpen] = useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // The content portals outside the (modal) chat drawer, whose trapped
+    // FocusScope yanks focus out of the picker's search input unless the
+    // popover's own scope pauses it — which requires vaul and the popover
+    // to share ONE @radix-ui/react-focus-scope instance (kept deduped in
+    // the lockfile; e2e chat-drawer.spec.ts guards this). `modal` adds
+    // outside-pointer-event isolation so stray clicks can't hit the
+    // drawer overlay behind the picker and dismiss the drawer.
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
         <EmojiPicker
