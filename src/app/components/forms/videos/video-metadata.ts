@@ -110,13 +110,81 @@ const renderFrameToCanvas = (video: HTMLVideoElement): HTMLCanvasElement | null 
   return canvas;
 };
 
-/** Seconds to seek to for the poster frame; guards non-finite durations. */
-const posterSeekTime = (video: HTMLVideoElement, atSeconds?: number): number =>
-  atSeconds ?? (Number.isFinite(video.duration) ? Math.min(1, video.duration / 2) : 0);
+/** How many early frames to sample when auto-picking a poster. */
+const POSTER_CANDIDATE_COUNT = 5;
+/** Candidates come from the first seconds of the video (clamped to duration). */
+const POSTER_SAMPLE_WINDOW_SECONDS = 3;
+/** Width of the downscaled copy each candidate is scored on. */
+const SCORE_SAMPLE_WIDTH = 96;
 
 /**
- * Capture a JPEG poster frame from a video file. Resolves the Blob, or `null`
- * for an unrenderable frame or undecodable file — never rejects.
+ * Rate a frame's visual quality as its mean squared luma difference between
+ * horizontal and vertical pixel neighbors. Flat frames (fade-in black/white)
+ * score 0 and blurry frames score low, so the sharpest candidate wins.
+ */
+export const scoreFrameQuality = ({ data, width, height }: ImageData): number => {
+  const lumaAt = (x: number, y: number): number => {
+    const i = (y * width + x) * 4;
+    return (
+      0.299 * (data.at(i) ?? 0) + 0.587 * (data.at(i + 1) ?? 0) + 0.114 * (data.at(i + 2) ?? 0)
+    );
+  };
+  let energy = 0;
+  let edges = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const luma = lumaAt(x, y);
+      if (x + 1 < width) {
+        energy += (luma - lumaAt(x + 1, y)) ** 2;
+        edges += 1;
+      }
+      if (y + 1 < height) {
+        energy += (luma - lumaAt(x, y + 1)) ** 2;
+        edges += 1;
+      }
+    }
+  }
+  return edges ? energy / edges : 0;
+};
+
+/** Score a captured frame on a small downscaled copy; 0 when scoring fails. */
+const scoreCanvasQuality = (source: HTMLCanvasElement): number => {
+  try {
+    const height = Math.max(1, Math.round((SCORE_SAMPLE_WIDTH * source.height) / source.width));
+    const sampler = document.createElement('canvas');
+    sampler.width = SCORE_SAMPLE_WIDTH;
+    sampler.height = height;
+    const context = sampler.getContext('2d');
+    if (!context) {
+      return 0;
+    }
+    context.drawImage(source, 0, 0, SCORE_SAMPLE_WIDTH, height);
+    return scoreFrameQuality(context.getImageData(0, 0, SCORE_SAMPLE_WIDTH, height));
+  } catch {
+    // Scoring is best-effort — an unscorable frame just never beats a scored one.
+    return 0;
+  }
+};
+
+/** Evenly spaced sample times inside the opening window; [0] when unknowable. */
+const posterCandidateTimes = (duration: number): number[] => {
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return [0];
+  }
+  const window = Math.min(POSTER_SAMPLE_WINDOW_SECONDS, duration);
+  return Array.from(
+    { length: POSTER_CANDIDATE_COUNT },
+    (_, index) => (window * (index + 0.5)) / POSTER_CANDIDATE_COUNT
+  );
+};
+
+/**
+ * Capture a JPEG poster frame from a video file. Without `atSeconds` it
+ * samples several frames from the video's opening seconds and encodes the
+ * one scoring highest on `scoreFrameQuality` (skipping fade-in black frames
+ * and blur). With `atSeconds` it captures exactly that frame. Resolves the
+ * Blob, or `null` for an unrenderable frame or undecodable file — never
+ * rejects.
  */
 export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob | null> =>
   new Promise((resolve) => {
@@ -127,9 +195,14 @@ export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob
       resolve(poster);
     };
 
+    let times: number[] = [0];
+    let index = 0;
+    let best: { canvas: HTMLCanvasElement; score: number } | null = null;
+
     video.preload = 'metadata';
     video.addEventListener('loadedmetadata', () => {
-      video.currentTime = posterSeekTime(video, atSeconds);
+      times = atSeconds === undefined ? posterCandidateTimes(video.duration) : [atSeconds];
+      video.currentTime = times[0];
     });
     video.addEventListener('seeked', () => {
       try {
@@ -138,7 +211,17 @@ export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob
           finish(null);
           return;
         }
-        canvas.toBlob(finish, 'image/jpeg', 0.85);
+        const score = scoreCanvasQuality(canvas);
+        if (!best || score > best.score) {
+          best = { canvas, score };
+        }
+        index += 1;
+        const nextTime = times.at(index);
+        if (nextTime !== undefined) {
+          video.currentTime = nextTime;
+          return;
+        }
+        best.canvas.toBlob(finish, 'image/jpeg', 0.85);
       } catch {
         // A throwing getContext/drawImage/toBlob must not strand the promise or
         // leak the object URL — resolve null and revoke via finish().
