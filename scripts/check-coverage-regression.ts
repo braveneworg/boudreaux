@@ -24,6 +24,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface CoverageMetrics {
   statements: number;
@@ -326,26 +327,35 @@ const checkForRegressions = (baseline: CoverageMetrics, current: CoverageMetrics
 };
 
 /**
+ * Rewrite the Current Coverage Summary percentages and the Last Updated date
+ * in the metrics file content. Pure — exported for tests. Only the first
+ * occurrence of each metric row is replaced, which is the summary table;
+ * Coverage History rows are never touched (their cells don't follow a metric
+ * label).
+ */
+export const refreshMetricsContent = (
+  content: string,
+  current: CoverageMetrics,
+  today: string
+): string =>
+  content
+    .replace(/(\|\s*Statements\s*\|\s*)\d+\.?\d*%/, `$1${current.statements.toFixed(2)}%`)
+    .replace(/(\|\s*Branches\s*\|\s*)\d+\.?\d*%/, `$1${current.branches.toFixed(2)}%`)
+    .replace(/(\|\s*Functions\s*\|\s*)\d+\.?\d*%/, `$1${current.functions.toFixed(2)}%`)
+    .replace(/(\|\s*Lines\s*\|\s*)\d+\.?\d*%/, `$1${current.lines.toFixed(2)}%`)
+    // Match the whole rest of the line — the file carries ISO dates, and the
+    // previous "July 4, 2026"-style pattern silently skipped them, leaving
+    // stale dates behind refreshed percentages.
+    .replace(/\*\*Last Updated:\*\*.*$/m, `**Last Updated:** ${today}`);
+
+/**
  * Update COVERAGE_METRICS.md with new values if coverage improved
  */
 const updateMetricsFile = (current: CoverageMetrics): void => {
   const content = fs.readFileSync(METRICS_FILE, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
 
-  // Update the current coverage summary table
-  let updatedContent = content
-    .replace(/(\|\s*Statements\s*\|\s*)\d+\.?\d*%/, `$1${current.statements.toFixed(2)}%`)
-    .replace(/(\|\s*Branches\s*\|\s*)\d+\.?\d*%/, `$1${current.branches.toFixed(2)}%`)
-    .replace(/(\|\s*Functions\s*\|\s*)\d+\.?\d*%/, `$1${current.functions.toFixed(2)}%`)
-    .replace(/(\|\s*Lines\s*\|\s*)\d+\.?\d*%/, `$1${current.lines.toFixed(2)}%`);
-
-  // Update the last updated date
-  updatedContent = updatedContent.replace(
-    /\*\*Last Updated:\*\*\s*\w+\s+\d+,\s+\d+/,
-    `**Last Updated:** ${today}`
-  );
-
-  fs.writeFileSync(METRICS_FILE, updatedContent);
+  fs.writeFileSync(METRICS_FILE, refreshMetricsContent(content, current, today));
   console.info(`📝 Updated COVERAGE_METRICS.md with new baseline (${today})\n`);
 };
 
@@ -374,4 +384,9 @@ const main = (): void => {
   process.exit(passed ? 0 : 1);
 };
 
-main();
+// True when this file is executed directly, not imported (ESM-safe require.main === module)
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+  main();
+}
