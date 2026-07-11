@@ -379,6 +379,10 @@ const applyWikidataFacts = async (
       wd.commonsCategory,
       MAX_COMMONS_CATEGORY_IMAGES
     );
+    // License-aware rank (attribution-free > known license > unknown), mirroring
+    // `resolveImages`. Stable within a tier (spec-stable sort) so equal-license
+    // images keep their incoming order.
+    categoryImages.sort((a, b) => licenseRank(b) - licenseRank(a));
     acc.images.push(...categoryImages);
     logEvent('info', 'commons_category_images', {
       category: wd.commonsCategory,

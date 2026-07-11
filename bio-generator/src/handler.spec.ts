@@ -1105,6 +1105,42 @@ describe('resolveImages license-aware ranking', () => {
   });
 });
 
+describe('Commons category image license-aware ranking', () => {
+  it('orders category images attribution-free above licensed above unknown, stable within a tier', async () => {
+    // Empty portrait file list so `resolveImages` contributes nothing and the
+    // category-image path is the sole source of `acc.images`. Two `CC BY`
+    // entries at non-adjacent input positions share a tier, so a stable sort
+    // must keep licensed-1 before licensed-2.
+    const withLicense = (url: string, license: string | null): BioImage => ({
+      ...commonsImage(url),
+      license,
+    });
+    const deps = makeDeps({
+      getWikidataData: vi.fn().mockResolvedValue({
+        imageFileNames: [],
+        commonsCategory: 'Radiohead',
+      }),
+      getCommonsCategoryImages: vi
+        .fn()
+        .mockResolvedValue([
+          withLicense('https://commons/licensed-1.jpg', 'CC BY-SA 4.0'),
+          withLicense('https://commons/unknown.jpg', null),
+          withLicense('https://commons/pd.jpg', 'Public Domain'),
+          withLicense('https://commons/licensed-2.jpg', 'CC BY 3.0'),
+        ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
+
+    expect(result.images.map((img) => img.url)).toEqual([
+      'https://commons/pd.jpg',
+      'https://commons/licensed-1.jpg',
+      'https://commons/licensed-2.jpg',
+      'https://commons/unknown.jpg',
+    ]);
+  });
+});
+
 describe('boundedEnvInt', () => {
   it('returns the default when raw is undefined (env var absent)', () => {
     expect(boundedEnvInt(undefined, 50, 10, 100)).toBe(50);
