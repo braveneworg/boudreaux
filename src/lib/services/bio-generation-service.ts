@@ -430,10 +430,10 @@ const assembleContent = ({
 });
 
 /**
- * Re-host + sanitize + assemble raw generation data and persist it, replacing
- * the artist's bio content. Shared by the synchronous fake path
- * ({@link runFakeGeneration}) and the async callback route (which persists on
- * the Lambda's out-of-band completion). Returns the assembled
+ * Re-host + sanitize + dead-link-validate + assemble raw generation data and
+ * persist it, replacing the artist's bio content. Shared by the synchronous
+ * fake path ({@link runFakeGeneration}) and the async callback route (which
+ * persists on the Lambda's out-of-band completion). Returns the assembled
  * {@link GeneratedBioContent}; callers pair it with the artist slug to
  * revalidate pages. Throws on a DB error (callers map that to `failed`).
  */
