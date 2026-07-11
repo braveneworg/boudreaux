@@ -6,12 +6,12 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Metric     | Coverage |
 | ---------- | -------- |
-| Statements | 98.98%   |
-| Branches   | 96.01%   |
-| Functions  | 99.17%   |
-| Lines      | 99.39%   |
+| Statements | 98.65%   |
+| Branches   | 95.31%   |
+| Functions  | 98.85%   |
+| Lines      | 99.13%   |
 
-**Last Updated:** 2026-07-04
+**Last Updated:** 2026-07-11
 
 ---
 
@@ -19,6 +19,7 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Date       | Statements | Branches | Functions | Lines  | Notes                                                                         |
 | ---------- | ---------- | -------- | --------- | ------ | ----------------------------------------------------------------------------- |
+| 2026-07-11 | 98.65%     | 95.31%   | 98.85%    | 99.13% | Baseline refresh to actual main — drift from within-tolerance decreases       |
 | 2026-04-04 | 99.24%     | 96.13%   | 99.67%    | 99.44% | Coverage improvement: +1.07% stmts, +2.33% branches, +1.04% fns, +1.04% lines |
 | 2026-02-14 | 99.23%     | 95.64%   | 98.93%    | 99.40% | Previous baseline                                                             |
 | 2026-02-07 | 95.00%     | 92.00%   | 95.00%    | 95.00% | Updated baseline                                                              |
