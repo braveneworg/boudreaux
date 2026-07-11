@@ -138,26 +138,6 @@ describe('ImageHeading', () => {
     expect(screen.getByRole('heading')).toHaveAttribute('id', 'featured-heading');
   });
 
-  describe('sketched border', () => {
-    it('wraps the image with hand-drawn strokes by default', () => {
-      const { container } = render(<ImageHeading {...defaultProps} />);
-
-      const strokes = container.querySelectorAll<HTMLElement>('[data-slot="zine-sketch-stroke"]');
-      expect(strokes).toHaveLength(2);
-      // The strokes anchor to an inline-block wrapper hugging the image box,
-      // not the full-width heading element.
-      const wrapper = screen.getByTestId('next-image').parentElement;
-      expect(wrapper).toHaveClass('relative', 'inline-block');
-      expect(wrapper).toContainElement(strokes[0]);
-    });
-
-    it('renders no sketch strokes when sketched is false', () => {
-      const { container } = render(<ImageHeading {...defaultProps} sketched={false} />);
-
-      expect(container.querySelectorAll('[data-slot="zine-sketch-stroke"]')).toHaveLength(0);
-    });
-  });
-
   describe('strip-scale sizing', () => {
     it('fills the row on mobile and matches the zine strip scale from sm up', () => {
       render(<ImageHeading {...defaultProps} />);

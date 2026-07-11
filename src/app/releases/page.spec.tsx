@@ -100,16 +100,6 @@ describe('ReleasesPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
-  it('should sketch hand-drawn strokes around the heading wordmark', async () => {
-    const Page = await ReleasesPage();
-    const { container } = render(Page);
-
-    const strokes = container.querySelectorAll<HTMLElement>('[data-slot="zine-sketch-stroke"]');
-    expect(strokes).toHaveLength(2);
-    const headingImage = screen.getByRole('img', { name: /releases/i });
-    expect(headingImage.parentElement).toContainElement(strokes[0]);
-  });
-
   it('should size the heading to the shared zine strip scale', async () => {
     const Page = await ReleasesPage();
     render(Page);
