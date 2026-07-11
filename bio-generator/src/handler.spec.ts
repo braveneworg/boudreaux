@@ -5,6 +5,7 @@
 import {
   DEFAULT_VISION_CANDIDATE_LIMIT,
   boundedEnvInt,
+  FACE_MATCH_TITLE_THRESHOLD,
   lambdaHandler,
   licenseRank,
   MAX_FOLLOWED_LINKS,
@@ -99,6 +100,8 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   getCoverArtImages: vi.fn().mockResolvedValue([]),
   getCommonsCategoryImages: vi.fn().mockResolvedValue([]),
   verifyScrapedImages: vi.fn().mockResolvedValue([]),
+  fetchReferenceBytes: vi.fn().mockResolvedValue([]),
+  annotateFaces: vi.fn().mockResolvedValue([]),
   postCallback: vi.fn().mockResolvedValue(undefined),
   postProgress: vi.fn().mockResolvedValue(undefined),
   ...overrides,
@@ -947,6 +950,254 @@ describe('runBioGeneration', () => {
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
 
     expect(result.links.length).toBe(100);
+  });
+});
+
+describe('runBioGeneration face annotation', () => {
+  /**
+   * Wraps images as vision survivors carrying each image's `kind`, so the
+   * handler's photo/non-photo partition sees realistic verdict-enriched output.
+   */
+  const survivorsWithKind = (images: BioImage[]): VerifiedScrapedImage[] =>
+    images.map((image) => ({ image, mimeType: 'image/jpeg', base64: '' }));
+
+  /** A scraped web-search source whose images enter the vision gate. */
+  const scrapedSource = (images: Array<{ url: string; alt: string | null }>) =>
+    vi
+      .fn()
+      .mockResolvedValueOnce({
+        sourceText: 'Web context.',
+        sourceUrls: ['https://a.example/bio'],
+        images: images.map(({ url, alt }) => ({ url, alt, sourceUrl: 'https://a.example/bio' })),
+        references: [],
+      })
+      .mockResolvedValueOnce(null);
+
+  const annotationsArg = (deps: BioGeneratorDeps): VerifiedScrapedImage[] =>
+    (deps.annotateFaces as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+  it('passes only photo survivors (not covers) to annotateFaces', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/photo.jpg', alt: 'A photo' },
+        { url: 'https://a.example/cover.jpg', alt: 'A cover' },
+      ]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates: BioImage[]) =>
+        survivorsWithKind([
+          { ...candidates[0], kind: 'photo' },
+          { ...candidates[1], kind: 'cover' },
+        ])
+      ),
+      annotateFaces: vi.fn().mockResolvedValue([{ hasFace: true, faceScore: 80 }]),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const passed = annotationsArg(deps);
+    expect(passed).toHaveLength(1);
+    expect(passed[0].image.url).toBe('https://a.example/photo.jpg');
+  });
+
+  it('merges each annotation onto its photo by input order', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/one.jpg', alt: 'One' },
+        { url: 'https://a.example/two.jpg', alt: 'Two' },
+      ]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: true, faceScore: 95 },
+        { hasFace: false, faceScore: null },
+      ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const byUrl = new Map(result.images.map((image) => [image.url, image]));
+    expect(byUrl.get('https://a.example/one.jpg')).toMatchObject({ hasFace: true, faceScore: 95 });
+    expect(byUrl.get('https://a.example/two.jpg')).toMatchObject({
+      hasFace: false,
+      faceScore: null,
+    });
+  });
+
+  it('sorts a face-scored photo ahead of a cover and an unscored photo', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/cover.jpg', alt: 'Cover' },
+        { url: 'https://a.example/unscored.jpg', alt: 'Unscored' },
+        { url: 'https://a.example/scored.jpg', alt: 'Scored' },
+      ]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates: BioImage[]) =>
+        survivorsWithKind([
+          { ...candidates[0], kind: 'cover' },
+          { ...candidates[1], kind: 'photo' },
+          { ...candidates[2], kind: 'photo' },
+        ])
+      ),
+      // photos in partition order: [unscored, scored]
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: false, faceScore: null },
+        { hasFace: true, faceScore: 88 },
+      ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.images[0].url).toBe('https://a.example/scored.jpg');
+  });
+
+  it('fetches reference bytes when referenceImageUrls are supplied', async () => {
+    const fetchReferenceBytes = vi.fn().mockResolvedValue([Buffer.from('ref')]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([{ url: 'https://a.example/photo.jpg', alt: 'Photo' }]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      fetchReferenceBytes,
+      annotateFaces: vi.fn().mockResolvedValue([{ hasFace: true, faceScore: 91 }]),
+    });
+
+    await runBioGeneration(
+      {
+        artistId: 'a1',
+        displayName: 'Artist',
+        referenceImageUrls: ['https://a.example/ref.jpg'],
+      },
+      deps
+    );
+
+    expect(fetchReferenceBytes).toHaveBeenCalledWith(['https://a.example/ref.jpg']);
+    expect((deps.annotateFaces as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual([
+      Buffer.from('ref'),
+    ]);
+  });
+
+  it('skips the reference fetch but still runs DetectFaces when refs are absent', async () => {
+    const fetchReferenceBytes = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([{ url: 'https://a.example/photo.jpg', alt: 'Photo' }]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      fetchReferenceBytes,
+      annotateFaces: vi.fn().mockResolvedValue([{ hasFace: true, faceScore: null }]),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(fetchReferenceBytes).not.toHaveBeenCalled();
+    expect((deps.annotateFaces as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual([]);
+  });
+
+  it('makes zero face calls when the vision gate returns nothing', async () => {
+    const fetchReferenceBytes = vi.fn().mockResolvedValue([]);
+    const annotateFaces = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([{ url: 'https://a.example/photo.jpg', alt: 'Photo' }]),
+      verifyScrapedImages: vi.fn().mockResolvedValue([]),
+      fetchReferenceBytes,
+      annotateFaces,
+    });
+
+    await runBioGeneration(
+      { artistId: 'a1', displayName: 'Artist', referenceImageUrls: ['https://a.example/ref.jpg'] },
+      deps
+    );
+
+    expect(annotateFaces).not.toHaveBeenCalled();
+    expect(fetchReferenceBytes).not.toHaveBeenCalled();
+  });
+
+  it('preserves the pre-face merge order when every annotation is null (Rekognition down)', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/one.jpg', alt: 'One' },
+        { url: 'https://a.example/two.jpg', alt: 'Two' },
+        { url: 'https://a.example/three.jpg', alt: 'Three' },
+      ]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: null, faceScore: null },
+        { hasFace: null, faceScore: null },
+        { hasFace: null, faceScore: null },
+      ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    expect(result.images.map((image) => image.url)).toEqual([
+      'https://a.example/one.jpg',
+      'https://a.example/two.jpg',
+      'https://a.example/three.jpg',
+    ]);
+  });
+
+  it('marks image titles for photos at or above the face-match threshold only', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/strong.jpg', alt: 'Strong' },
+        { url: 'https://a.example/weak.jpg', alt: 'Weak' },
+      ]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: true, faceScore: 90 },
+        { hasFace: true, faceScore: 89.9 },
+      ]),
+    });
+
+    await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    const imageTitles = factsArg(deps).imageTitles as string[];
+    expect(imageTitles).toEqual(['Strong (verified face match)', 'Weak']);
+  });
+
+  it('exports the face-match title threshold at 90', () => {
+    expect(FACE_MATCH_TITLE_THRESHOLD).toBe(90);
+  });
+
+  it('does not persist the face-match marker on the image title itself', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([{ url: 'https://a.example/strong.jpg', alt: 'Strong' }]),
+      verifyScrapedImages: vi
+        .fn()
+        .mockImplementation(async (candidates: BioImage[]) =>
+          survivorsWithKind(candidates.map((image) => ({ ...image, kind: 'photo' as const })))
+        ),
+      annotateFaces: vi.fn().mockResolvedValue([{ hasFace: true, faceScore: 95 }]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+    const imageTitles = factsArg(deps).imageTitles as string[];
+
+    // The marker lives on the prompt title list, never on the persisted image.
+    expect(imageTitles[0]).toContain('verified face match');
+    expect(result.images[0].title).not.toContain('verified face match');
   });
 });
 

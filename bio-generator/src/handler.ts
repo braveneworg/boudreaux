@@ -13,6 +13,7 @@ import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
 import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { postBioProgress } from './progress.js';
+import { annotateFaces, fetchReferenceBytes } from './rekognition.js';
 import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
@@ -58,6 +59,10 @@ export interface BioGeneratorDeps {
   getCoverArtImages: typeof getCoverArtImages;
   getCommonsCategoryImages: typeof getCommonsCategoryImages;
   verifyScrapedImages: typeof verifyScrapedImages;
+  /** Fetches admin reference image bytes (≤3) for the CompareFaces stage. */
+  fetchReferenceBytes: typeof fetchReferenceBytes;
+  /** Annotates vision-verified photo survivors with the Rekognition face signal. */
+  annotateFaces: typeof annotateFaces;
   /** Best-effort POST of the result back to the web app's async callback. */
   postCallback: (payload: BioCallbackPayload) => Promise<void>;
   /** Best-effort POST of a single stage checkpoint to the web app's progress endpoint. */
@@ -82,6 +87,8 @@ const defaultDeps: BioGeneratorDeps = {
   getCoverArtImages,
   getCommonsCategoryImages,
   verifyScrapedImages,
+  fetchReferenceBytes,
+  annotateFaces,
   postCallback: postBioCallback,
   postProgress: postBioProgress,
 };
@@ -89,6 +96,14 @@ const defaultDeps: BioGeneratorDeps = {
 const MAX_IMAGES = 100;
 const MAX_PRIMARY = 3;
 const MAX_LINKS = 100;
+/**
+ * A CompareFaces similarity (0..100) at or above this marks the image's title in
+ * the LLM's image-title list with a "verified face match" hint, nudging the
+ * model's primary-image pick toward a confirmed likeness of the artist. The
+ * marker is title-list-only — it signals ranking and is NEVER persisted on the
+ * image itself.
+ */
+export const FACE_MATCH_TITLE_THRESHOLD = 90;
 /**
  * Commons category members resolved per artist (P373). Raised to 60 in Tier 1
  * to widen the candidate pool for Commons-rich artists.
@@ -581,15 +596,56 @@ const buildChronology = (
 };
 
 /**
- * Vision-verifies the scraped candidates, then merges survivors AFTER the
- * provenance-guaranteed tiers (Commons portrait/category, Cover Art Archive),
- * deduped by URL, up to MAX_IMAGES. Fail-closed: an unverifiable candidate
- * never ships.
+ * Stable descending comparator by Rekognition face score: a scored photo ranks
+ * ahead of an unscored one, and null-signal images (`faceScore` absent → `-1`)
+ * tie so `Array.prototype.sort`'s stability preserves their incoming order — the
+ * whole reason a down or reference-less Rekognition changes nothing.
+ */
+const compareByFaceScore = (a: BioImage, b: BioImage): number =>
+  (b.faceScore ?? -1) - (a.faceScore ?? -1);
+
+/**
+ * Annotates the photo survivors with the Rekognition face signal and returns the
+ * combined survivor images (photos merged with `hasFace`/`faceScore`, non-photos
+ * untouched). Photos only: covers never reach Rekognition. References are fetched
+ * only when supplied — DetectFaces still runs without them, yielding `faceScore:
+ * null`. A down Rekognition returns all-null annotations, so the merge is inert.
+ */
+const annotatePhotoSurvivors = async (
+  survivors: VerifiedScrapedImage[],
+  input: BioGenerationInput,
+  deps: BioGeneratorDeps
+): Promise<BioImage[]> => {
+  const photos = survivors.filter((survivor) => survivor.image.kind === 'photo');
+  const nonPhotos = survivors.filter((survivor) => survivor.image.kind !== 'photo');
+  if (!photos.length) return survivors.map((survivor) => survivor.image);
+
+  const referenceUrls = input.referenceImageUrls ?? [];
+  const refs = referenceUrls.length ? await deps.fetchReferenceBytes(referenceUrls) : [];
+  const annotations = await deps.annotateFaces(photos, refs);
+  const annotatedPhotos = photos.map((survivor, i) => {
+    const annotation = annotations.at(i);
+    return {
+      ...survivor.image,
+      hasFace: annotation?.hasFace ?? null,
+      faceScore: annotation?.faceScore ?? null,
+    };
+  });
+  return [...annotatedPhotos, ...nonPhotos.map((survivor) => survivor.image)];
+};
+
+/**
+ * Vision-verifies the scraped candidates, annotates the photo survivors with the
+ * Rekognition face signal, then merges them AFTER the provenance-guaranteed tiers
+ * (Commons portrait/category, Cover Art Archive), face-scored photos first,
+ * deduped by URL, up to MAX_IMAGES. Fail-closed: an unverifiable candidate never
+ * ships.
  */
 const applyVerifiedScrapedImages = async (
   acc: MetadataAccumulator,
   input: BioGenerationInput,
-  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>,
+  deps: BioGeneratorDeps
 ): Promise<void> => {
   if (!acc.scrapedImages.length) return;
   const seen = new Set(acc.images.map((image) => image.url.toLowerCase()));
@@ -617,9 +673,8 @@ const applyVerifiedScrapedImages = async (
   };
   const gated = candidates.slice(0, visionCandidateLimit());
   await acc.report('vision-gating', { candidates: gated.length });
-  // Task 2 will consume the survivors' bytes/mimeType for the face stage; here
-  // we take only the enriched image so the merge behaves exactly as before.
-  const verified = (await verify(gated, context)).map((survivor) => survivor.image);
+  const survivors = await verify(gated, context);
+  const verified = (await annotatePhotoSurvivors(survivors, input, deps)).sort(compareByFaceScore);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
@@ -629,6 +684,19 @@ const applyVerifiedScrapedImages = async (
     verified: verified.length,
     total: acc.images.length,
   });
+};
+
+/**
+ * The prompt-facing title for one image: its alt/title (falling back to a
+ * generic `Photo of {name}`), plus a ` (verified face match)` marker when the
+ * Rekognition similarity clears {@link FACE_MATCH_TITLE_THRESHOLD}. The marker
+ * signals the LLM's primary-image ranking; it lives on the title list only and
+ * is never persisted on the image.
+ */
+const imageTitleFor = (image: BioImage, displayName: string): string => {
+  const base = image.alt?.trim() || image.title?.trim() || `Photo of ${displayName}`;
+  const matched = (image.faceScore ?? -1) >= FACE_MATCH_TITLE_THRESHOLD;
+  return matched ? `${base} (verified face match)` : base;
 };
 
 /**
@@ -642,7 +710,8 @@ const applyVerifiedScrapedImages = async (
 const finalizeMetadata = async (
   acc: MetadataAccumulator,
   input: BioGenerationInput,
-  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>,
+  deps: BioGeneratorDeps
 ): Promise<void> => {
   for (const url of input.links ?? []) {
     acc.links.push({ label: 'Reference', url, kind: 'other' });
@@ -655,14 +724,12 @@ const finalizeMetadata = async (
     )
     .slice(0, MAX_LINKS);
 
-  await applyVerifiedScrapedImages(acc, input, verify);
+  await applyVerifiedScrapedImages(acc, input, verify, deps);
   acc.images = acc.images.slice(0, MAX_IMAGES);
 
   acc.facts.chronology = buildChronology(input.releases, acc.releaseGroups);
   acc.facts.internalReleaseUrls = input.releases?.map((release) => release.url);
-  acc.facts.imageTitles = acc.images.map(
-    (image) => image.alt?.trim() || image.title?.trim() || `Photo of ${input.displayName}`
-  );
+  acc.facts.imageTitles = acc.images.map((image) => imageTitleFor(image, input.displayName));
 };
 
 /**
@@ -725,8 +792,11 @@ const gatherMetadata = async (
   await acc.report('link-follow');
   await followKnownLinksForImages(acc, scrapeKey, deps);
 
-  await finalizeMetadata(acc, input, (candidates, context) =>
-    deps.verifyScrapedImages(candidates, context, gemini)
+  await finalizeMetadata(
+    acc,
+    input,
+    (candidates, context) => deps.verifyScrapedImages(candidates, context, gemini),
+    deps
   );
 
   logEvent('info', 'enrichment_complete', {
