@@ -1152,6 +1152,71 @@ describe('runBioGeneration face annotation', () => {
     ]);
   });
 
+  it('keeps interleaved covers in place when every annotation is null (no face signal)', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/photo-a.jpg', alt: 'Photo A' },
+        { url: 'https://a.example/cover.jpg', alt: 'Cover' },
+        { url: 'https://a.example/photo-b.jpg', alt: 'Photo B' },
+      ]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates: BioImage[]) =>
+        survivorsWithKind([
+          { ...candidates[0], kind: 'photo' },
+          { ...candidates[1], kind: 'cover' },
+          { ...candidates[2], kind: 'photo' },
+        ])
+      ),
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: null, faceScore: null },
+        { hasFace: null, faceScore: null },
+      ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    // Null face signal contributes nothing: the raw vision order (photo, cover,
+    // photo) survives byte-for-byte — the cover is NOT demoted behind the photos.
+    expect(result.images.map((image) => image.url)).toEqual([
+      'https://a.example/photo-a.jpg',
+      'https://a.example/cover.jpg',
+      'https://a.example/photo-b.jpg',
+    ]);
+  });
+
+  it('floats a scored photo first while an interleaved cover keeps its relative order', async () => {
+    const deps = makeDeps({
+      lookupArtist: vi.fn().mockResolvedValue(null),
+      searchArtistSources: scrapedSource([
+        { url: 'https://a.example/photo-a.jpg', alt: 'Photo A' },
+        { url: 'https://a.example/cover.jpg', alt: 'Cover' },
+        { url: 'https://a.example/photo-b.jpg', alt: 'Photo B' },
+      ]),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates: BioImage[]) =>
+        survivorsWithKind([
+          { ...candidates[0], kind: 'photo' },
+          { ...candidates[1], kind: 'cover' },
+          { ...candidates[2], kind: 'photo' },
+        ])
+      ),
+      // Photos in original order: [photo-a (unscored), photo-b (95)].
+      annotateFaces: vi.fn().mockResolvedValue([
+        { hasFace: false, faceScore: null },
+        { hasFace: true, faceScore: 95 },
+      ]),
+    });
+
+    const result = await runBioGeneration({ artistId: 'a1', displayName: 'Artist' }, deps);
+
+    // The 95-scored photo floats first; the unscored photo and the cover tie
+    // (faceScore −1) and keep their raw relative order (photo-a before cover).
+    expect(result.images.map((image) => image.url)).toEqual([
+      'https://a.example/photo-b.jpg',
+      'https://a.example/photo-a.jpg',
+      'https://a.example/cover.jpg',
+    ]);
+  });
+
   it('marks image titles for photos at or above the face-match threshold only', async () => {
     const deps = makeDeps({
       lookupArtist: vi.fn().mockResolvedValue(null),

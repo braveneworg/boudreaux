@@ -605,11 +605,16 @@ const compareByFaceScore = (a: BioImage, b: BioImage): number =>
   (b.faceScore ?? -1) - (a.faceScore ?? -1);
 
 /**
- * Annotates the photo survivors with the Rekognition face signal and returns the
- * combined survivor images (photos merged with `hasFace`/`faceScore`, non-photos
- * untouched). Photos only: covers never reach Rekognition. References are fetched
- * only when supplied — DetectFaces still runs without them, yielding `faceScore:
- * null`. A down Rekognition returns all-null annotations, so the merge is inert.
+ * Annotates the photo survivors with the Rekognition face signal, merging each
+ * annotation back onto its photo IN THE ORIGINAL survivor sequence (covers stay
+ * interleaved exactly where the vision gate returned them). Photos only: covers
+ * never reach Rekognition — they're partitioned out solely to build the
+ * `annotateFaces` argument, not to reorder the output. References are fetched only
+ * when supplied — DetectFaces still runs without them, yielding `faceScore: null`.
+ * A down Rekognition returns all-null annotations, so the merge is inert and the
+ * pre-existing vision order is preserved; the sole reordering step is the stable
+ * {@link compareByFaceScore} sort at the call site, where all-null ties collapse
+ * to the incoming order.
  */
 const annotatePhotoSurvivors = async (
   survivors: VerifiedScrapedImage[],
@@ -617,21 +622,25 @@ const annotatePhotoSurvivors = async (
   deps: BioGeneratorDeps
 ): Promise<BioImage[]> => {
   const photos = survivors.filter((survivor) => survivor.image.kind === 'photo');
-  const nonPhotos = survivors.filter((survivor) => survivor.image.kind !== 'photo');
   if (!photos.length) return survivors.map((survivor) => survivor.image);
 
   const referenceUrls = input.referenceImageUrls ?? [];
   const refs = referenceUrls.length ? await deps.fetchReferenceBytes(referenceUrls) : [];
   const annotations = await deps.annotateFaces(photos, refs);
-  const annotatedPhotos = photos.map((survivor, i) => {
-    const annotation = annotations.at(i);
+  // Index each photo's annotation by its position in the photos-only slice, then
+  // walk the ORIGINAL survivor order — merging the face signal onto photos and
+  // leaving covers untouched and in place.
+  let photoIndex = 0;
+  return survivors.map((survivor) => {
+    if (survivor.image.kind !== 'photo') return survivor.image;
+    const annotation = annotations.at(photoIndex);
+    photoIndex += 1;
     return {
       ...survivor.image,
       hasFace: annotation?.hasFace ?? null,
       faceScore: annotation?.faceScore ?? null,
     };
   });
-  return [...annotatedPhotos, ...nonPhotos.map((survivor) => survivor.image)];
 };
 
 /**
