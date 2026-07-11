@@ -86,11 +86,32 @@ describe('verifyScrapedImages', () => {
       { fetchFn, sleep: async () => {} }
     );
     expect(kept).toHaveLength(1);
-    expect(kept[0]).toMatchObject({
+    expect(kept[0].image).toMatchObject({
       url: 'https://a.com/1.png',
       kind: 'photo',
       alt: 'Ceschi performing live',
     });
+  });
+
+  it('carries the survivor’s fetched base64 and mimeType through to the caller', async () => {
+    const pngBytes = new Uint8Array([137, 80, 78, 71]);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(pngBytes, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png', 'Content-Length': '4' },
+        })
+      )
+      .mockResolvedValueOnce(
+        geminiVerdicts([{ index: 0, verdict: 'artist_photo', confidence: 0.9 }])
+      );
+    const kept = await verifyScrapedImages([candidate('https://a.com/1.png')], context, config, {
+      fetchFn,
+      sleep: async () => {},
+    });
+    expect(kept[0].mimeType).toBe('image/png');
+    expect(kept[0].base64).toBe(Buffer.from(pngBytes).toString('base64'));
   });
 
   it('drops verdicts below the confidence floor', async () => {
@@ -185,7 +206,7 @@ describe('verifyScrapedImages', () => {
         sleep: async () => {},
       }
     );
-    expect(kept[0]).toMatchObject({ kind: 'cover', alt: 'BBB cover' });
+    expect(kept[0].image).toMatchObject({ kind: 'cover', alt: 'BBB cover' });
   });
 
   it('salvages a verdict missing confidence by defaulting it to the confidence floor', async () => {
@@ -207,7 +228,7 @@ describe('verifyScrapedImages', () => {
     );
     expect(kept).toHaveLength(2);
     // The confidence-less verdict survives: its default equals the floor and passes the `>=` gate.
-    expect(kept[0].url).toBe('https://a.com/1.png');
+    expect(kept[0].image.url).toBe('https://a.com/1.png');
   });
 
   it('coerces a stringified confidence and keeps the image', async () => {
@@ -222,7 +243,7 @@ describe('verifyScrapedImages', () => {
       sleep: async () => {},
     });
     expect(kept).toHaveLength(1);
-    expect(kept[0].kind).toBe('cover');
+    expect(kept[0].image.kind).toBe('cover');
   });
 
   it('drops verdicts missing verdict or index while keeping the batch’s valid items', async () => {
@@ -249,7 +270,7 @@ describe('verifyScrapedImages', () => {
       { fetchFn, sleep: async () => {} }
     );
     expect(kept).toHaveLength(1);
-    expect(kept[0].url).toBe('https://a.com/3.png');
+    expect(kept[0].image.url).toBe('https://a.com/3.png');
   });
 
   it('fails closed on a wholly-unparseable response body: the whole batch is dropped', async () => {
@@ -374,7 +395,7 @@ describe('verifyScrapedImages', () => {
       sleep: async () => {},
     });
     expect(maxInFlight).toBe(3);
-    expect(kept.map((image) => image.url)).toEqual(
+    expect(kept.map((survivor) => survivor.image.url)).toEqual(
       Array.from({ length: totalBatches }, (_, k) => `https://a.com/${k * VISION_BATCH_SIZE}.png`)
     );
   });

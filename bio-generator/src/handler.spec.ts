@@ -15,6 +15,15 @@ import {
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
+import type { VerifiedScrapedImage } from './vision.js';
+
+/**
+ * Wraps verified images in the {@link VerifiedScrapedImage} envelope the vision
+ * gate now returns (survivors carry their fetched bytes). The bytes are
+ * placeholders — the handler only reads `.image` when merging.
+ */
+const verified = (images: BioImage[]): VerifiedScrapedImage[] =>
+  images.map((image) => ({ image, mimeType: 'image/jpeg', base64: '' }));
 
 const image = (overrides: Partial<BioImage> = {}): BioImage => ({
   url: 'https://upload.wikimedia.org/a.jpg',
@@ -422,7 +431,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -461,7 +470,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -490,7 +499,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -521,7 +530,7 @@ describe('runBioGeneration', () => {
           },
         ],
       }),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -550,7 +559,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -583,7 +592,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Radiohead' }, deps);
@@ -616,7 +625,9 @@ describe('runBioGeneration', () => {
       verifyScrapedImages: vi
         .fn()
         .mockResolvedValue(
-          Array.from({ length: 150 }, (_, i) => commonsImage(`https://a.example/photo-${i}.jpg`))
+          verified(
+            Array.from({ length: 150 }, (_, i) => commonsImage(`https://a.example/photo-${i}.jpg`))
+          )
         ),
     });
 
@@ -644,7 +655,7 @@ describe('runBioGeneration', () => {
           references: [],
         })
         .mockResolvedValueOnce(null),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     await runBioGeneration({ artistId: 'a1', displayName: 'Test Artist' }, deps);
@@ -950,7 +961,7 @@ describe('Serper image source', () => {
       lookupArtist: vi.fn().mockResolvedValue(null),
       getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
       searchSerperImages: vi.fn().mockResolvedValue([serperImage]),
-      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => candidates),
+      verifyScrapedImages: vi.fn().mockImplementation(async (candidates) => verified(candidates)),
     });
 
     const result = await runBioGeneration({ artistId: 'a1', displayName: 'Obscure Act' }, deps);
@@ -1593,13 +1604,15 @@ describe('media discovery v2 orchestration', () => {
         { url: 'https://zine.net/live.jpg', alt: 'Ceschi live', sourceUrl: 'https://zine.net/a' },
       ],
     });
-    deps.verifyScrapedImages = vi.fn().mockResolvedValue([
-      {
-        ...commonsImage('https://zine.net/live.jpg'),
-        kind: 'photo',
-        alt: 'Ceschi live on stage',
-      },
-    ]);
+    deps.verifyScrapedImages = vi.fn().mockResolvedValue(
+      verified([
+        {
+          ...commonsImage('https://zine.net/live.jpg'),
+          kind: 'photo',
+          alt: 'Ceschi live on stage',
+        },
+      ])
+    );
 
     const data = await runBioGeneration(baseInput(), deps);
 

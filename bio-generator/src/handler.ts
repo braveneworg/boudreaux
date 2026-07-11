@@ -36,7 +36,7 @@ import type {
   BioLink,
   ProgressStage,
 } from './types.js';
-import type { VisionContext } from './vision.js';
+import type { VerifiedScrapedImage, VisionContext } from './vision.js';
 
 /** Injectable collaborators so the orchestration can be unit-tested in full. */
 export interface BioGeneratorDeps {
@@ -589,7 +589,7 @@ const buildChronology = (
 const applyVerifiedScrapedImages = async (
   acc: MetadataAccumulator,
   input: BioGenerationInput,
-  verify: (candidates: BioImage[], context: VisionContext) => Promise<BioImage[]>
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>
 ): Promise<void> => {
   if (!acc.scrapedImages.length) return;
   const seen = new Set(acc.images.map((image) => image.url.toLowerCase()));
@@ -617,7 +617,9 @@ const applyVerifiedScrapedImages = async (
   };
   const gated = candidates.slice(0, visionCandidateLimit());
   await acc.report('vision-gating', { candidates: gated.length });
-  const verified = await verify(gated, context);
+  // Task 2 will consume the survivors' bytes/mimeType for the face stage; here
+  // we take only the enriched image so the merge behaves exactly as before.
+  const verified = (await verify(gated, context)).map((survivor) => survivor.image);
   for (const image of verified) {
     if (acc.images.length >= MAX_IMAGES) break;
     acc.images.push(image);
@@ -640,7 +642,7 @@ const applyVerifiedScrapedImages = async (
 const finalizeMetadata = async (
   acc: MetadataAccumulator,
   input: BioGenerationInput,
-  verify: (candidates: BioImage[], context: VisionContext) => Promise<BioImage[]>
+  verify: (candidates: BioImage[], context: VisionContext) => Promise<VerifiedScrapedImage[]>
 ): Promise<void> => {
   for (const url of input.links ?? []) {
     acc.links.push({ label: 'Reference', url, kind: 'other' });
