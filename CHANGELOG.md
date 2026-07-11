@@ -106,6 +106,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.197.0] - 2026-07-11
+
+### Added
+
+- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n- fix: 🐛 chat emoji picker focus loss and stale reopen history (#580)\n
+
 ## [4.196.0] - 2026-07-11
 
 ### Added
