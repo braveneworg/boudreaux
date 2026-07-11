@@ -30,10 +30,13 @@ export const ChatEmojiPicker = ({ trigger, onSelect }: ChatEmojiPickerProps) => 
   const [open, setOpen] = useState(false);
 
   return (
-    // modal: the content portals outside the (modal) chat drawer, whose
-    // trapped FocusScope would otherwise yank focus out of the picker's
-    // search input and cascade into dismissing the picker (mobile) or the
-    // whole drawer (desktop). A modal popover pauses that scope while open.
+    // The content portals outside the (modal) chat drawer, whose trapped
+    // FocusScope yanks focus out of the picker's search input unless the
+    // popover's own scope pauses it — which requires vaul and the popover
+    // to share ONE @radix-ui/react-focus-scope instance (kept deduped in
+    // the lockfile; e2e chat-drawer.spec.ts guards this). `modal` adds
+    // outside-pointer-event isolation so stray clicks can't hit the
+    // drawer overlay behind the picker and dismiss the drawer.
     <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
