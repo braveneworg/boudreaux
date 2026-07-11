@@ -16,6 +16,8 @@ export interface BioGenerationLambdaInput {
   diedOn?: string;
   formedOn?: string;
   releases?: Array<{ title: string; releasedOn?: string; url: string }>;
+  /** Absolute http(s) reference-image URLs the Lambda face-matches against (≤3). */
+  referenceImageUrls?: string[];
   callbackUrl?: string;
   /** Absolute URL the Lambda POSTs per-stage progress checkpoints to (verify-only, never claims). */
   progressUrl?: string;
@@ -56,6 +58,8 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
         isPrimary: true,
         kind: 'photo',
         alt: `${input.displayName} portrait photo`,
+        hasFace: true,
+        faceScore: 97.4,
       },
       {
         url: 'https://picsum.photos/seed/e2e-cover/1000/1000',

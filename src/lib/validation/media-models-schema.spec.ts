@@ -254,6 +254,8 @@ const artistWithPublishedReleases = {
       isPrimary: true,
       kind: null,
       alt: null,
+      hasFace: true,
+      faceScore: 97.4,
       origin: 'generated',
       sortOrder: 0,
       createdAt: ISO,
@@ -411,5 +413,19 @@ describe('artistWithPublishedReleasesSchema', () => {
   it('rejects a payload missing the members relation', () => {
     const { members: _omit, ...invalid } = artistWithPublishedReleases;
     expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
+  });
+
+  it('retains the bio image face signal fields through the scalar mirror', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
+    expect(parsed.bioImages[0].hasFace).toBe(true);
+    expect(parsed.bioImages[0].faceScore).toBe(97.4);
+  });
+
+  it('accepts a null face signal on a bio image row', () => {
+    const withNullFace = {
+      ...artistWithPublishedReleases,
+      bioImages: [{ ...artistWithPublishedReleases.bioImages[0], hasFace: null, faceScore: null }],
+    };
+    expect(() => artistWithPublishedReleasesSchema.parse(withNullFace)).not.toThrow();
   });
 });

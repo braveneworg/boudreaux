@@ -79,6 +79,8 @@ export interface BioGenerationStateRecord {
     isPrimary: boolean;
     kind: string | null;
     alt: string | null;
+    hasFace: boolean | null;
+    faceScore: number | null;
     origin: string | null;
   }>;
   bioLinks: Array<{
@@ -487,6 +489,8 @@ export class ArtistRepository {
         isPrimary: boolean;
         kind: string | null;
         alt: string | null;
+        hasFace: boolean | null;
+        faceScore: number | null;
         sortOrder: number;
       }>;
       links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;
@@ -646,6 +650,8 @@ export class ArtistRepository {
               isPrimary: true,
               kind: true,
               alt: true,
+              hasFace: true,
+              faceScore: true,
               origin: true,
             },
           },
@@ -684,6 +690,19 @@ export class ArtistRepository {
         select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
       })
     );
+  }
+
+  /** Lists an artist's admin-uploaded (`origin: 'custom'`) bio image URLs in
+   *  sort order — used to seed the Lambda's face-matching reference images. */
+  static async findCustomBioImageUrls(artistId: string): Promise<string[]> {
+    const rows = await runQuery(() =>
+      prisma.artistBioImage.findMany({
+        where: { artistId, origin: 'custom' },
+        orderBy: { sortOrder: 'asc' },
+        select: { url: true },
+      })
+    );
+    return rows.map(({ url }) => url);
   }
 
   /** Points a bio image row at its upgraded (fully re-hosted) CDN URL. */
