@@ -745,27 +745,47 @@ jobs:
           steps.version.outputs.skip_remainder != 'true'
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          NEW_TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add package.json pnpm-lock.yaml CHANGELOG.md
-          git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
-          git tag "${{ steps.version.outputs.tag }}"
+          git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
 
           max_retries=3
           attempt=1
 
-          until git push origin main --follow-tags; do
+          # The tag is (re)created inside the loop: a retry rebases onto the
+          # moved main tip, and the tag must follow the release commit.
+          until git tag --force "$NEW_TAG" && git push origin main --follow-tags; do
             if [ "$attempt" -ge "$max_retries" ]; then
               echo "Error: Failed to push main with tags after $max_retries attempts."
-              echo "The local commit and tag '${{ steps.version.outputs.tag }}' were created but not pushed to origin."
-              echo "Please resolve any issues (e.g., non-fast-forward, permissions, or network problems) and push manually or re-run this workflow."
+              echo "The local commit and tag '$NEW_TAG' were created but not pushed to origin."
+              echo "Please resolve any issues (e.g., permissions or network problems) and push manually or re-run this workflow."
               exit 1
             fi
 
-            echo "git push failed (attempt $attempt of $max_retries). Retrying in 5 seconds..."
+            echo "git push failed (attempt $attempt of $max_retries)."
             attempt=$((attempt + 1))
+
+            # Non-fast-forward is the expected failure: main moved while this
+            # job ran (another PR merged). Rebase the release commit onto the
+            # new tip and retry.
+            git fetch origin main
+
+            if git ls-remote --exit-code --tags origin "refs/tags/$NEW_TAG" > /dev/null 2>&1; then
+              echo "::warning::Tag $NEW_TAG already exists on origin — another run released this version. Skipping push."
+              exit 0
+            fi
+
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo "Error: rebase onto origin/main conflicted — another release likely landed. Re-run this workflow."
+              exit 1
+            fi
+
             sleep 5
           done
       - name: Create GitHub Release
