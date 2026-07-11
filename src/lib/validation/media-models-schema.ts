@@ -182,6 +182,7 @@ export const artistScalarSchema = z.object({
   bioError: nullableString,
   bioStartedAt: nullableDate,
   bioJobToken: nullableString,
+  bioProgress: jsonValueSchema,
   slug: z.string(),
   genres: nullableString,
   bornOn: nullableDate,
