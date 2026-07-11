@@ -458,6 +458,8 @@ jobs:
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ALERT_EMAIL=${{ secrets.GRAFANA_ALERT_EMAIL }}
           LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+          SMS_PROVIDER=${{ vars.SMS_PROVIDER || 'noop' }}
+          SNS_SMS_ORIGINATION_NUMBER=${{ vars.SNS_SMS_ORIGINATION_NUMBER }}
           EOF
 
       - name: Upload compose + env

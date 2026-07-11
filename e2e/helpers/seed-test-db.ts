@@ -372,6 +372,7 @@ const seedTestDatabase = async () => {
 
     // Clear all collections in dependency-safe order
     await prisma.abuseReport.deleteMany({});
+    await prisma.smsBlast.deleteMany({});
     await prisma.chatMessage.deleteMany({});
     await prisma.chatUser.deleteMany({});
     await prisma.bannedIdentity.deleteMany({});
@@ -481,6 +482,86 @@ const seedTestDatabase = async () => {
         termsAcceptedAt: now,
       },
     });
+
+    // Dedicated SMS-blast recipient fixtures for the admin Announcements e2e
+    // flow. They never sign in (no session rows) — the admin page only counts
+    // and texts them. Together they exercise every recipient branch:
+    //   • two opted-in users WITH a phone  → counted (the deterministic N = 2)
+    //   • one opted-OUT user (phone present) → excluded by allowSmsNotifications
+    //   • one opted-in user with NO phone field → excluded by the Mongo `isSet`
+    //     clause in UserRepository.countSmsOptedIn (the only real-DB proof of it)
+    // The phoneless user intentionally omits `phone` entirely (absent, not null
+    // or ''), so the field is genuinely unset in Mongo.
+    await Promise.all([
+      prisma.user.create({
+        data: {
+          id: '65a1b2c3d4e5f6a7b8c9d0e5',
+          email: 'sms-optin-1@example.com',
+          name: 'SMS Optin One',
+          username: 'smsoptin1',
+          role: 'user',
+          firstName: 'SMS',
+          lastName: 'Optin One',
+          emailVerified: true,
+          banned: false,
+          termsAndConditions: true,
+          termsAcceptedAt: now,
+          allowSmsNotifications: true,
+          phone: '+15550000001',
+        },
+      }),
+      prisma.user.create({
+        data: {
+          id: '65a1b2c3d4e5f6a7b8c9d0e6',
+          email: 'sms-optin-2@example.com',
+          name: 'SMS Optin Two',
+          username: 'smsoptin2',
+          role: 'user',
+          firstName: 'SMS',
+          lastName: 'Optin Two',
+          emailVerified: true,
+          banned: false,
+          termsAndConditions: true,
+          termsAcceptedAt: now,
+          allowSmsNotifications: true,
+          phone: '+15550000002',
+        },
+      }),
+      prisma.user.create({
+        data: {
+          id: '65a1b2c3d4e5f6a7b8c9d0e7',
+          email: 'sms-optout@example.com',
+          name: 'SMS Optout',
+          username: 'smsoptout',
+          role: 'user',
+          firstName: 'SMS',
+          lastName: 'Optout',
+          emailVerified: true,
+          banned: false,
+          termsAndConditions: true,
+          termsAcceptedAt: now,
+          allowSmsNotifications: false,
+          phone: '+15550000003',
+        },
+      }),
+      prisma.user.create({
+        data: {
+          id: '65a1b2c3d4e5f6a7b8c9d0e8',
+          email: 'sms-optin-nophone@example.com',
+          name: 'SMS Optin No Phone',
+          username: 'smsoptinnophone',
+          role: 'user',
+          firstName: 'SMS',
+          lastName: 'No Phone',
+          emailVerified: true,
+          banned: false,
+          termsAndConditions: true,
+          termsAcceptedAt: now,
+          allowSmsNotifications: true,
+          // phone intentionally omitted — must stay ABSENT to exercise `isSet`.
+        },
+      }),
+    ]);
 
     // Insert a better-auth session row per user. The signed session cookie
     // minted in global-setup carries the same token; the server resolves it via
