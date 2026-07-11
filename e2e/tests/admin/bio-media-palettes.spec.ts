@@ -148,5 +148,12 @@ test.describe('Admin bio media palettes', () => {
       has: adminPage.getByRole('button', { name: 'Delete image Fixture Album' }),
     });
     await expect(coverTile.getByText('Rights unknown')).toBeVisible();
+
+    // 9. Face signal per tile (tile-scoped so a hidden/other tile's badge cannot
+    //    poison the assertion). The fixture portrait carries a face score
+    //    (→ "Face 97%" badge); the cover carries no face signal (→ no badge,
+    //    never a negative marker). Scope the count-0 to the cover tile.
+    await expect(portraitTile.getByText('Face 97%')).toBeVisible();
+    await expect(coverTile.getByText(/^Face/)).toHaveCount(0);
   });
 });

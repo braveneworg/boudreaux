@@ -545,4 +545,69 @@ describe('BioImagePalette', () => {
       expect(within(tile).queryByText('Rights unknown')).not.toBeInTheDocument();
     });
   });
+
+  describe('face badge', () => {
+    const buildImage = (overrides: Partial<BioStatusImage>): BioStatusImage => ({
+      id: 'face1',
+      url: 'https://example.com/face.jpg',
+      thumbnailUrl: null,
+      title: 'Face Image',
+      attribution: null,
+      license: null,
+      sourceUrl: null,
+      width: null,
+      height: null,
+      isPrimary: false,
+      ...overrides,
+    });
+
+    const renderTile = (image: BioStatusImage): HTMLElement => {
+      render(
+        <BioImagePalette
+          images={[image]}
+          onDelete={vi.fn()}
+          onInsert={vi.fn()}
+          onEditAttribution={vi.fn()}
+        />
+      );
+      return screen
+        .getByRole('button', { name: `Delete image ${image.title}` })
+        .closest('li') as HTMLElement;
+    };
+
+    it('renders a "Face NN%" badge when a faceScore is present', () => {
+      const tile = renderTile(buildImage({ hasFace: true, faceScore: 88 }));
+      expect(within(tile).getByText('Face 88%')).toBeInTheDocument();
+    });
+
+    it('rounds the faceScore to the nearest whole percent', () => {
+      const tile = renderTile(buildImage({ hasFace: true, faceScore: 97.4 }));
+      expect(within(tile).getByText('Face 97%')).toBeInTheDocument();
+    });
+
+    it('exposes an accessible face-match label with the rounded percent', () => {
+      const tile = renderTile(buildImage({ hasFace: true, faceScore: 97.4 }));
+      expect(within(tile).getByLabelText('Face match 97%')).toBeInTheDocument();
+    });
+
+    it('renders a bare "Face" badge when hasFace is true but the score is null', () => {
+      const tile = renderTile(buildImage({ hasFace: true, faceScore: null }));
+      expect(within(tile).getByText('Face', { exact: true })).toBeInTheDocument();
+    });
+
+    it('renders no face badge when hasFace is false', () => {
+      const tile = renderTile(buildImage({ hasFace: false, faceScore: null }));
+      expect(within(tile).queryByText(/^Face/)).not.toBeInTheDocument();
+    });
+
+    it('renders no face badge when the face signal is absent (null)', () => {
+      const tile = renderTile(buildImage({ hasFace: null, faceScore: null }));
+      expect(within(tile).queryByText(/^Face/)).not.toBeInTheDocument();
+    });
+
+    it('renders no face badge when the face signal is undefined', () => {
+      const tile = renderTile(buildImage({}));
+      expect(within(tile).queryByText(/^Face/)).not.toBeInTheDocument();
+    });
+  });
 });
