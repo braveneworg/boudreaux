@@ -82,7 +82,9 @@ export const MobileMenuGroup = ({
     <AccordionPrimitive.Item asChild value={group.label}>
       <li
         className="menu-item-stagger font-fake-four-cutout"
-        style={{ animationDelay: `${index * 0.1}s` }}
+        // index / 10 (not index * 0.1) keeps the delay an exact decimal — 3 * 0.1
+        // floats to 0.30000000000000004.
+        style={{ animationDelay: `${index / 10}s` }}
       >
         <AccordionPrimitive.Trigger
           className={cn(

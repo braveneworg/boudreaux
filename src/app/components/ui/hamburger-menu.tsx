@@ -8,17 +8,17 @@ import { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { HamburgerMenuSheet } from '@/app/components/ui/hamburger-menu-sheet';
 import { HamburgerPatty } from '@/app/components/ui/hamburger-patty';
-import { useNavMenuItems } from '@/hooks/use-nav-menu-items';
+import { useNavMenuGroups } from '@/hooks/use-nav-menu-groups';
 
 import { SheetTrigger } from './sheet';
 
 export const HamburgerMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const menuItems = useNavMenuItems();
+  const entries = useNavMenuGroups();
 
   return (
     <div className="pointer-events-none flex items-center justify-end">
-      <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
+      <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} entries={entries}>
         <SheetTrigger className="relative" asChild>
           <Button
             size="icon"

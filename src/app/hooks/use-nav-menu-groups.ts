@@ -41,11 +41,11 @@ const pickLink = (href: string, byHref: Map<string, NavMenuItem>): NavMenuEntry[
 };
 
 /**
- * Desktop projection of the primary nav: Home · Music ▾ · Label ▾ ·
+ * Grouped projection of the primary nav: Home · Music ▾ · Label ▾ ·
  * [My Collection] · Contact Us. Built on top of `useNavMenuItems` so the flat
- * list stays the single source of truth (the mobile sheet keeps consuming it
- * directly); conditional items (My Collection) appear here exactly when they
- * appear there.
+ * list stays the single source of truth; the desktop menu renders the groups
+ * as drawers and the mobile sheet as accordion categories. Conditional items
+ * (My Collection) appear in both exactly when they appear in the flat list.
  */
 export const useNavMenuGroups = (): NavMenuEntry[] => {
   const items = useNavMenuItems();

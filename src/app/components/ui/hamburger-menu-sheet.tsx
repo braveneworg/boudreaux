@@ -3,10 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/app/components/ui/sheet';
+import type { NavMenuEntry } from '@/hooks/use-nav-menu-groups';
 
-import { MobileMenu, type MenuItem } from './mobile-menu';
-
-export type { MenuItem };
+import { MobileMenu } from './mobile-menu';
 
 export interface HamburgerMenuSheetProps {
   /**
@@ -18,16 +17,16 @@ export interface HamburgerMenuSheetProps {
    */
   onOpenChange: (open: boolean) => void;
   /**
-   * Array of menu items to display
+   * Projected nav entries (top-level links and accordion groups) to display
    */
-  menuItems: MenuItem[];
+  entries: NavMenuEntry[];
   children?: React.ReactNode;
 }
 
 export const HamburgerMenuSheet = ({
   isOpen,
   onOpenChange,
-  menuItems,
+  entries,
   children,
 }: HamburgerMenuSheetProps) => (
   <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -41,7 +40,7 @@ export const HamburgerMenuSheet = ({
       <SheetDescription className="sr-only">
         Site navigation links and account actions.
       </SheetDescription>
-      <MobileMenu menuItems={menuItems} onNavigate={() => onOpenChange(false)} />
+      <MobileMenu entries={entries} onNavigate={() => onOpenChange(false)} />
     </SheetContent>
   </Sheet>
 );

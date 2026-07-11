@@ -125,13 +125,24 @@ describe('HamburgerMenu', () => {
     expect(screen.getByText('Open menu')).toBeInTheDocument();
   });
 
-  it('shares the full nav item set with the desktop menu', async () => {
+  it('renders the desktop nav categories as accordion triggers', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(<HamburgerMenu />);
     await user.click(screen.getByRole('button'));
 
-    // Artists, Videos and Playlists used to be desktop-only — they must now
-    // appear in the mobile sheet because both pull from the same source.
+    expect(screen.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Label' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shares the grouped nav projection with the desktop menu', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(<HamburgerMenu />);
+    await user.click(screen.getByRole('button'));
+
+    // Artists, Videos and Playlists live inside the Music category — same
+    // projection the desktop drawers render, one tap deeper on mobile.
+    await user.click(screen.getByRole('button', { name: 'Music' }));
+
     expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute('href', '/artists');
     expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/videos');
     expect(screen.getByRole('link', { name: 'Playlists' })).toHaveAttribute('href', '/playlists');
