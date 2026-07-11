@@ -90,6 +90,46 @@ describe('bioGenerationInputSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('parses input with up to five referenceImageUrls', () => {
+    const data = bioGenerationInputSchema.parse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      referenceImageUrls: [
+        'https://x/1.jpg',
+        'https://x/2.jpg',
+        'https://x/3.jpg',
+        'https://x/4.jpg',
+        'https://x/5.jpg',
+      ],
+    });
+    expect(data.referenceImageUrls).toHaveLength(5);
+  });
+
+  it('rejects more than five referenceImageUrls', () => {
+    const result = bioGenerationInputSchema.safeParse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      referenceImageUrls: [
+        'https://x/1.jpg',
+        'https://x/2.jpg',
+        'https://x/3.jpg',
+        'https://x/4.jpg',
+        'https://x/5.jpg',
+        'https://x/6.jpg',
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-URL referenceImageUrls entry', () => {
+    const result = bioGenerationInputSchema.safeParse({
+      artistId: 'a1',
+      displayName: 'Test Artist',
+      referenceImageUrls: ['not-a-url'],
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('bio media discovery v2 wire types', () => {
@@ -152,6 +192,50 @@ describe('bio media discovery v2 wire types', () => {
       attribution: 'Someone',
       isPrimary: false,
       licenseUrl: 'not-a-url',
+    };
+    expect(bioImageSchema.safeParse(image).success).toBe(false);
+  });
+
+  it('accepts a hasFace boolean and a faceScore in 0..100', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      hasFace: true,
+      faceScore: 91.2,
+    };
+    expect(bioImageSchema.parse(image).hasFace).toBe(true);
+    expect(bioImageSchema.parse(image).faceScore).toBe(91.2);
+  });
+
+  it('accepts null hasFace and faceScore (not analyzed)', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      hasFace: null,
+      faceScore: null,
+    };
+    expect(bioImageSchema.parse(image).hasFace).toBeNull();
+    expect(bioImageSchema.parse(image).faceScore).toBeNull();
+  });
+
+  it('rejects a faceScore above 100', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      faceScore: 101,
+    };
+    expect(bioImageSchema.safeParse(image).success).toBe(false);
+  });
+
+  it('rejects a negative faceScore', () => {
+    const image = {
+      url: 'https://example.com/a.jpg',
+      attribution: 'Someone',
+      isPrimary: false,
+      faceScore: -1,
     };
     expect(bioImageSchema.safeParse(image).success).toBe(false);
   });

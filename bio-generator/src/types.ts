@@ -66,6 +66,11 @@ export const bioGenerationInputSchema = z.object({
   realName: z.string().optional(),
   akaNames: z.string().optional(),
   links: z.array(z.string().url()).max(20).optional(),
+  /**
+   * Admin-supplied reference photos of the artist — used by the Rekognition
+   * face stage to score how strongly a candidate matches the known subject.
+   */
+  referenceImageUrls: z.array(z.string().url()).max(5).optional(),
   description: z.string().max(2000).optional(),
   existingGenres: z.string().optional(),
   bornOn: isoDate.optional(),
@@ -117,6 +122,17 @@ export const bioImageSchema = z.object({
   kind: z.enum(['photo', 'cover']).nullable().optional(),
   /** Short accessible description, written by the vision pass when available. */
   alt: z.string().nullable().optional(),
+  /**
+   * Rekognition face signal: whether a face was detected in the image. `null`
+   * means the image was not analyzed. Ranking signal only — never a hard gate.
+   */
+  hasFace: z.boolean().nullable().optional(),
+  /**
+   * Rekognition face signal: the max CompareFaces similarity (0..100) against
+   * the admin reference images. `null` means not analyzed (or no face detected).
+   * Ranking signal only — never a hard gate.
+   */
+  faceScore: z.number().min(0).max(100).nullable().optional(),
 });
 
 export type BioImage = z.infer<typeof bioImageSchema>;
