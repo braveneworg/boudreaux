@@ -589,6 +589,52 @@ describe('persistGeneratedBio', () => {
 
     expect(content.images[0].licenseUrl).toBeNull();
   });
+
+  it('drops a non-http(s) licenseUrl (javascript:) to null before persistence', async () => {
+    const content = await persistGeneratedBio(
+      artistId,
+      withData({
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: 'Portrait',
+            attribution: 'Photographer',
+            license: 'CC BY-SA 4.0',
+            licenseUrl: 'javascript:alert(1)',
+            sourceUrl: null,
+            isPrimary: true,
+          },
+        ],
+      }),
+      []
+    );
+
+    expect(content.images[0].licenseUrl).toBeNull();
+  });
+
+  it('drops a non-http(s) sourceUrl (javascript:) to null before persistence', async () => {
+    const content = await persistGeneratedBio(
+      artistId,
+      withData({
+        images: [
+          {
+            url: 'https://upload.wikimedia.org/a.jpg',
+            thumbnailUrl: null,
+            title: 'Portrait',
+            attribution: 'Photographer',
+            license: 'CC BY-SA 4.0',
+            licenseUrl: null,
+            sourceUrl: 'javascript:alert(1)',
+            isPrimary: true,
+          },
+        ],
+      }),
+      []
+    );
+
+    expect(content.images[0].sourceUrl).toBeNull();
+  });
 });
 
 describe('persistGeneratedBio license-aware sort', () => {

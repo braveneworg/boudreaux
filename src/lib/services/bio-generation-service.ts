@@ -154,6 +154,15 @@ const sanitizeOptional = (text: string | null | undefined): string | null =>
   text ? sanitizeBioText(text) : null;
 
 /**
+ * Sanitize an optional URL destined for an `href`, enforcing an http(s) scheme.
+ * `sanitizeUrl` returns `''` for a non-http(s) scheme (e.g. `javascript:`/`data:`),
+ * which this coerces to `null`. Zod's `z.string().url()` validates URL *shape*
+ * only, so this guard — not the schema — is what keeps XSS schemes off the badge.
+ */
+const sanitizeHref = (url: string | null | undefined): string | null =>
+  url ? sanitizeUrl(url) || null : null;
+
+/**
  * Builds the rich {@link RehostedImage} record from a raw re-host result and
  * the original image metadata returned by the Lambda. Extracted to keep
  * {@link rehostImages} under the cyclomatic-complexity limit.
@@ -167,9 +176,9 @@ const buildRehostedRecord = (
   title: sanitizeOptional(image.title),
   attribution: sanitizeOptional(image.attribution),
   license: image.license ?? null,
-  // Schema-validated as a URL, so no sanitizeOptional (mirrors sourceUrl).
-  licenseUrl: image.licenseUrl ?? null,
-  sourceUrl: image.sourceUrl ?? null,
+  // Both reach an `href`; `sanitizeHref` enforces http(s) (schema validates shape only).
+  licenseUrl: sanitizeHref(image.licenseUrl),
+  sourceUrl: sanitizeHref(image.sourceUrl),
   originalUrl: image.url,
   width: result.width ?? image.width ?? null,
   height: result.height ?? image.height ?? null,
