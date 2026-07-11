@@ -29,9 +29,13 @@ export interface BioGenerationLambdaInput {
  * (E2E and local dev without a deployed Lambda). Echoes the artist name so
  * tests can assert the content rendered end-to-end. The long bio weaves a valid
  * inline `<a>` (must render as a Next Link) and a `javascript:` link (must be
- * stripped) so sanitization + Link mapping are exercised by the real flow. The
- * image uses a `picsum.photos` URL (allowed in `next.config` remotePatterns) so
- * it renders through next/image when re-hosting is skipped in fake mode.
+ * stripped) so sanitization + Link mapping are exercised by the real flow, plus
+ * two `<img src="image:N">` placeholders between the paragraphs so the float
+ * composer is exercised end-to-end: index 0 (the titled/attributed portrait)
+ * composes to a captioned right-float figure, index 1 (the cover) to a
+ * left-float figure. The images use `picsum.photos` URLs (allowed in
+ * `next.config` remotePatterns) so they render through next/image when
+ * re-hosting is skipped in fake mode.
  */
 export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGenerationResult => ({
   ok: true,
@@ -39,7 +43,10 @@ export const fakeBioGeneration = (input: BioGenerationLambdaInput): BioGeneratio
     shortBio: `${input.displayName} is a boundary-pushing artist on the roster.`,
     longBio:
       `<p><strong>${input.displayName}</strong> builds immersive soundscapes that blur genre lines.</p>` +
+      `<img src="image:0" alt="">` +
       `<p>Read more on <a href="https://en.wikipedia.org/wiki/Music">their Wikipedia page</a>.</p>` +
+      `<img src="image:1" alt="">` +
+      `<p>Their catalog rewards a deep listen, from the earliest tapes onward.</p>` +
       `<a href="javascript:alert(1)">unsafe</a>`,
     altBio: `<p><strong>${input.displayName}</strong> — essential listening. Dive in on <a href="https://en.wikipedia.org/wiki/Music">Wikipedia</a>.</p>`,
     genres: input.existingGenres?.trim() || 'experimental, electronic',

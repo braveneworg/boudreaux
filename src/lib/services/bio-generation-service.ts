@@ -14,6 +14,7 @@ import type { ReleaseCoverSource } from '@/lib/types/domain/release';
 import type { Json } from '@/lib/types/domain/shared';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
+import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
@@ -21,6 +22,7 @@ import {
   sanitizeBioHtmlNoImages,
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
+import { validateBioLinks } from '@/lib/utils/validate-bio-links';
 import {
   bioProgressSchema,
   isInFlightBioStatus,
@@ -240,6 +242,39 @@ const buildImageUrlIndex = (
   return map;
 };
 
+/** Projects a re-hosted record onto the figure composer's meta shape. */
+const toFigureMeta = (image: RehostedImage): BioFigureImageMeta => ({
+  url: image.url,
+  alt: image.alt,
+  title: image.title,
+  attribution: image.attribution,
+});
+
+/**
+ * Builds a Map from each ORIGINAL image index to the figure composer's meta
+ * (url/alt/title/attribution — already sanitized by {@link buildRehostedRecord})
+ * so the long bio's first placeholders can be composed into floated, captioned
+ * `figure.bio-figure` blocks. Deduped indices are aliased to the SURVIVING
+ * copy's meta, looked up by the alias URL among the non-null survivors; an
+ * alias whose survivor cannot be found is omitted so its placeholder falls
+ * through to the plain url-swap fallback (which aliases by URL).
+ */
+const buildImageMetaIndex = (
+  rehosted: Array<RehostedImage | null>,
+  duplicateAliases: Map<number, string>
+): Map<number, BioFigureImageMeta> => {
+  const map = new Map<number, BioFigureImageMeta>();
+  rehosted.forEach((image, index) => {
+    if (image) map.set(index, toFigureMeta(image));
+  });
+  duplicateAliases.forEach((survivorUrl, duplicateIndex) => {
+    if (map.has(duplicateIndex)) return;
+    const survivor = rehosted.find((image) => image?.url === survivorUrl);
+    if (survivor) map.set(duplicateIndex, toFigureMeta(survivor));
+  });
+  return map;
+};
+
 /**
  * Persist-order comparator, tiered top to bottom: primaries first, then higher
  * Rekognition face scores (a null/unscored image sorts last within this tier),
@@ -273,6 +308,17 @@ const sanitizeLinks = (links: BioGenerationData['links']): PersistedLink[] =>
     });
     return acc;
   }, []);
+
+/**
+ * Skip dead-link probing in E2E and fake-generation modes — mirrors
+ * `shouldSkipRehost` in {@link BioImageService}'s module. The fake path must
+ * stay deterministic and offline-safe: an offline dev regen (no DNS) would
+ * otherwise drop every fixture link as `dns_failure`.
+ */
+const shouldSkipLinkValidation = (): boolean =>
+  process.env.BIO_GENERATOR_FAKE === 'true' ||
+  process.env.E2E_MODE === 'true' ||
+  process.env.NEXT_PUBLIC_E2E_MODE === 'true';
 
 /** Builds the lambda-input releases payload from the label's own catalog. */
 const toLambdaReleases = (
@@ -346,6 +392,7 @@ type AssembleContentInput = {
   data: BioGenerationData;
   persistedImages: PersistedImage[];
   imageUrlByIndex: Map<number, string>;
+  imageMetaByIndex: Map<number, BioFigureImageMeta>;
   persistedLinks: PersistedLink[];
   genres: string | null;
 };
@@ -358,15 +405,21 @@ const assembleContent = ({
   data,
   persistedImages,
   imageUrlByIndex,
+  imageMetaByIndex,
   persistedLinks,
   genres,
 }: AssembleContentInput): GeneratedBioContent => ({
-  // Every bio is rich HTML that may carry inline links and a single inline
-  // image:N placeholder, so resolve placeholders first.  The short bio then
-  // uses the no-image sanitizer (inline images break layout in listing cards
-  // and meta descriptions); long bio and altBio keep their images.
+  // Every bio is rich HTML that may carry inline links and image:N
+  // placeholders, so resolve placeholders first. The short bio uses the
+  // no-image sanitizer (inline images break layout in listing cards and meta
+  // descriptions). The long bio's processing order is locked: compose the
+  // first mapped placeholders into floated figures, THEN plain-swap whatever
+  // the composer left (unmapped index or past the cap), THEN sanitize. The
+  // altBio keeps the plain src-swap only.
   shortBio: sanitizeBioHtmlNoImages(replaceBioImagePlaceholders(data.shortBio, imageUrlByIndex)),
-  longBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.longBio, imageUrlByIndex)),
+  longBio: sanitizeBioHtml(
+    replaceBioImagePlaceholders(composeBioFigures(data.longBio, imageMetaByIndex), imageUrlByIndex)
+  ),
   altBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.altBio, imageUrlByIndex)),
   genres,
   images: persistedImages.map(
@@ -401,6 +454,10 @@ export const persistGeneratedBio = async (
   // retains the picture instead of having the sanitizer drop the placeholder.
   const imageUrlByIndex = buildImageUrlIndex(rehosted, duplicateAliases);
 
+  // Same key-space with richer values: original index → sanitized caption meta
+  // so the long bio's first placeholders compose into floated figures.
+  const imageMetaByIndex = buildImageMetaIndex(rehosted, duplicateAliases);
+
   // Rank survivors `isPrimary desc, faceScore desc (nulls last), licensed desc`
   // (stable within a tier) then re-index sortOrder over the sorted result. The
   // Lambda already caps the number of primaries (and which images are primary is
@@ -417,8 +474,17 @@ export const persistGeneratedBio = async (
   // Drop any link whose URL is not http(s); streaming links are kept (2026-07).
   const sanitizedLinks = sanitizeLinks(data.links);
 
-  // Append internal release links using the prefetched catalog (no extra query).
-  const persistedLinks = appendReleaseLinks(sanitizedLinks, releases);
+  // Probe the sanitized EXTERNAL links and drop only the definitively dead
+  // (dns_failure / ssrf_disallowed / 404/410), then re-index sortOrder densely
+  // over the kept array. Skipped on the fake/E2E path (offline-deterministic).
+  const validatedLinks = shouldSkipLinkValidation()
+    ? sanitizedLinks
+    : await validateBioLinks(sanitizedLinks);
+  const reindexedLinks = validatedLinks.map((link, index) => ({ ...link, sortOrder: index }));
+
+  // Append internal release links using the prefetched catalog (no extra
+  // query). Appended AFTER validation so `/releases/...` URLs are never probed.
+  const persistedLinks = appendReleaseLinks(reindexedLinks, releases);
 
   // Append rights-cleared CDN cover images after the discovered palette.
   const persistedImagesWithCovers = appendInternalCoverImages(persistedImages, releases);
@@ -427,6 +493,7 @@ export const persistGeneratedBio = async (
     data,
     persistedImages: persistedImagesWithCovers,
     imageUrlByIndex,
+    imageMetaByIndex,
     persistedLinks,
     genres,
   });
