@@ -34,7 +34,7 @@ export interface ProseRequestOptions extends FetchRetryOptions {
 }
 
 /** Which pipeline stage a Gemini call serves — tags the usage telemetry line. */
-type GeminiPurpose = 'draft' | 'synthesis' | 'critic' | 'repair' | 'vision';
+type GeminiPurpose = 'draft' | 'synthesis' | 'critic' | 'repair' | 'vision' | 'adjudication';
 
 /** Cap on the response-body excerpt echoed into failure messages. */
 const ERROR_BODY_SNIPPET_LENGTH = 300;
@@ -788,3 +788,13 @@ export const draftAndSynthesizeProse = async (
 
   return synthesizeWithFallback({ facts, drafts, apiKey }, model, synthesisModel, retryOptions);
 };
+
+/** Public alias of the single-call request shape for sibling modules. */
+export type GeminiJsonRequest = ProseRequest;
+
+/**
+ * Public alias of the schema-generic JSON core so sibling modules (the
+ * video-enrichment adjudications) share the endpoint, auth, retry pacing,
+ * and JSON parsing instead of re-implementing them.
+ */
+export const requestGeminiJson = requestJson;

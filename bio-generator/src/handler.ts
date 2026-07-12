@@ -20,6 +20,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_PRO_MODEL,
 } from './types.js';
+import { isVideoEnrichmentTask, runVideoEnrichmentLambda } from './video-enrichment.js';
 import { verifyScrapedImages } from './vision.js';
 import { getWikidataData } from './wikidata.js';
 import { getCommonsCategoryImages, getCommonsImage } from './wikimedia.js';
@@ -36,6 +37,7 @@ import type {
   BioImage,
   BioLink,
   ProgressStage,
+  VideoEnrichmentResult,
 } from './types.js';
 import type { VerifiedScrapedImage, VisionContext } from './vision.js';
 
@@ -911,7 +913,14 @@ const runToResult = async (
 export const runLambda = async (
   event: unknown,
   deps: BioGeneratorDeps = defaultDeps
-): Promise<BioGenerationResult> => {
+): Promise<BioGenerationResult | VideoEnrichmentResult> => {
+  // Route on the task discriminator FIRST so the bio path below stays
+  // byte-identical for every existing event shape (bio events carry no
+  // `task` field).
+  if (isVideoEnrichmentTask(event)) {
+    return runVideoEnrichmentLambda(event);
+  }
+
   const parsed = bioGenerationInputSchema.safeParse(event);
   if (!parsed.success) {
     return {
@@ -941,4 +950,4 @@ export const runLambda = async (
 export const lambdaHandler = async (
   event: unknown,
   _context?: unknown
-): Promise<BioGenerationResult> => runLambda(event);
+): Promise<BioGenerationResult | VideoEnrichmentResult> => runLambda(event);
