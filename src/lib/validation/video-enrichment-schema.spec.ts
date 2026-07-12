@@ -112,6 +112,15 @@ describe('video-enrichment-schema', () => {
       const sources = Array.from({ length: 11 }, (_, i) => ({ url: `https://e.com/${i}` }));
       expect(videoSuggestionSchema.safeParse({ ...validSuggestion, sources }).success).toBe(false);
     });
+
+    it('rejects a source URL longer than 2048 characters', () => {
+      const url = `https://e.com/${'x'.repeat(2048)}`;
+      const parsed = videoSuggestionSchema.safeParse({
+        ...validSuggestion,
+        sources: [{ url }],
+      });
+      expect(parsed.success).toBe(false);
+    });
   });
 
   describe('videoEnrichmentDataSchema', () => {
@@ -134,6 +143,14 @@ describe('video-enrichment-schema', () => {
         artists: [{ artistId: OBJECT_ID, suggestions }],
       });
       expect(parsed.success).toBe(false);
+    });
+
+    it('rejects more than 10 artists', () => {
+      const artists = Array.from({ length: 11 }, () => ({
+        artistId: OBJECT_ID,
+        suggestions: [validSuggestion],
+      }));
+      expect(videoEnrichmentDataSchema.safeParse({ ...validData, artists }).success).toBe(false);
     });
   });
 
@@ -161,6 +178,14 @@ describe('video-enrichment-schema', () => {
       });
       expect(parsed.success).toBe(false);
     });
+
+    it('rejects a jobToken longer than 200 characters', () => {
+      const parsed = videoEnrichmentCallbackSchema.safeParse({
+        jobToken: 't'.repeat(201),
+        result: { ok: false, error: 'boom' },
+      });
+      expect(parsed.success).toBe(false);
+    });
   });
 
   describe('videoEnrichmentProgressPostSchema', () => {
@@ -177,6 +202,14 @@ describe('video-enrichment-schema', () => {
       const parsed = videoEnrichmentProgressPostSchema.safeParse({
         jobToken: 't',
         stage: 'drafting',
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it('rejects a jobToken longer than 200 characters', () => {
+      const parsed = videoEnrichmentProgressPostSchema.safeParse({
+        jobToken: 't'.repeat(201),
+        stage: 'wikidata',
       });
       expect(parsed.success).toBe(false);
     });

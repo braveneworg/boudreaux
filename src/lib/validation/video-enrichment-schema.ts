@@ -52,9 +52,13 @@ export const VIDEO_PROGRESS_STAGES = [
 ] as const;
 export type VideoProgressStage = (typeof VIDEO_PROGRESS_STAGES)[number];
 
-/** One provenance link backing a suggestion. */
+/**
+ * One provenance link backing a suggestion. The URL is persisted and later
+ * rendered as an admin-UI href, so it is length-bounded on top of the
+ * http(s)-scheme check.
+ */
 export const videoSuggestionSourceSchema = z.object({
-  url: httpUrlSchema,
+  url: httpUrlSchema.max(2048),
   label: z.string().max(200).optional(),
 });
 
@@ -96,9 +100,13 @@ export const videoEnrichmentResultSchema = z.discriminatedUnion('ok', [
 ]);
 export type VideoEnrichmentResult = z.infer<typeof videoEnrichmentResultSchema>;
 
-/** Body the Lambda POSTs to the async completion callback route. */
+/**
+ * Body the Lambda POSTs to the async completion callback route. The
+ * server-minted job token is far shorter than 200 chars — the cap only
+ * bounds hostile payloads.
+ */
 export const videoEnrichmentCallbackSchema = z.object({
-  jobToken: z.string().min(1),
+  jobToken: z.string().min(1).max(200),
   result: videoEnrichmentResultSchema,
 });
 export type VideoEnrichmentCallback = z.infer<typeof videoEnrichmentCallbackSchema>;
@@ -120,7 +128,7 @@ export type VideoEnrichmentProgress = z.infer<typeof videoEnrichmentProgressSche
  * shared Lambda progress helper does not send it, mirroring the bio channel).
  */
 export const videoEnrichmentProgressPostSchema = z.object({
-  jobToken: z.string().min(1),
+  jobToken: z.string().min(1).max(200),
   stage: z.enum(VIDEO_PROGRESS_STAGES),
   counts: z.record(z.string(), z.number().int().min(0)).optional(),
   at: z.string().datetime().optional(),
