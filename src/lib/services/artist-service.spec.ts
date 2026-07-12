@@ -62,6 +62,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     updateBioImageUrl: vi.fn(),
     createBioImage: vi.fn(),
     createBioLink: vi.fn(),
+    findBioLinkByUrl: vi.fn(),
     updateBioImageAttribution: vi.fn(),
   },
 }));
@@ -2130,7 +2131,8 @@ describe('ArtistService', () => {
   });
 
   describe('createBioLink', () => {
-    it('delegates to the repository and returns the created row', async () => {
+    it('creates a new row when no existing link has that URL', async () => {
+      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
       const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
       vi.mocked(ArtistRepository.createBioLink).mockResolvedValue(row as never);
 
@@ -2140,12 +2142,35 @@ describe('ArtistService', () => {
         url: 'https://cdn/x',
       });
 
+      expect(ArtistRepository.findBioLinkByUrl).toHaveBeenCalledWith('a1', 'https://cdn/x');
       expect(ArtistRepository.createBioLink).toHaveBeenCalledWith({
         artistId: 'a1',
         label: 'Site',
         url: 'https://cdn/x',
       });
       expect(result).toBe(row);
+    });
+
+    it('returns the existing row and does not create a duplicate URL', async () => {
+      const existing = {
+        id: 'link-9',
+        artistId: 'a1',
+        label: 'Existing',
+        url: 'https://cdn/x',
+        kind: null,
+        origin: 'custom',
+        sortOrder: 2,
+      };
+      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(existing);
+
+      const result = await ArtistService.createBioLink({
+        artistId: 'a1',
+        label: 'Duplicate attempt',
+        url: 'https://cdn/x',
+      });
+
+      expect(result).toBe(existing);
+      expect(ArtistRepository.createBioLink).not.toHaveBeenCalled();
     });
   });
 

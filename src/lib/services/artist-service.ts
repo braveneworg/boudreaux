@@ -873,8 +873,15 @@ export class ArtistService {
     return ArtistRepository.createBioImage(input);
   }
 
-  /** Persists one admin-authored bio link and returns the created row. */
+  /** Persists one admin-authored bio link and returns the created row.
+   *  Dedupes by URL: if the artist already has a link with this URL (custom or
+   *  generated), returns that existing row instead of creating a duplicate, so
+   *  the reference-links input and the Add-link editor stay idempotent. */
   static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
+    const existing = await ArtistRepository.findBioLinkByUrl(input.artistId, input.url);
+    if (existing) {
+      return existing;
+    }
     return ArtistRepository.createBioLink(input);
   }
 
