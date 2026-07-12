@@ -18,3 +18,4 @@ export * from './visitor-identity';
 export * from './sms-blast';
 export * from './video';
 export * from './video-artist';
+export * from './video-enrichment';

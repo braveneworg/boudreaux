@@ -386,4 +386,140 @@ describe('VideoRepository', () => {
       ).rejects.toBeInstanceOf(DataError);
     });
   });
+
+  describe('setEnrichmentStatus', () => {
+    it('stamps enrichmentStartedAt when flipping to processing', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'processing');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'processing', enrichmentStartedAt: expect.any(Date) },
+      });
+    });
+
+    it('clears progress and error when flipping to pending', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'pending');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'pending', enrichmentProgress: null, enrichmentError: null },
+      });
+    });
+
+    it('stamps enrichedAt when flipping to succeeded', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'succeeded', { error: null });
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: {
+          enrichmentStatus: 'succeeded',
+          enrichmentError: null,
+          enrichedAt: expect.any(Date),
+        },
+      });
+    });
+
+    it('writes the provided error when flipping to failed', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'failed', { error: 'boom' });
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'failed', enrichmentError: 'boom' },
+      });
+    });
+  });
+
+  describe('setEnrichmentJobToken', () => {
+    it('stores the per-job token', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentJobToken('video-123', 'token-1');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentJobToken: 'token-1' },
+      });
+    });
+
+    it('clears the token with null', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentJobToken('video-123', null);
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentJobToken: null },
+      });
+    });
+  });
+
+  describe('claimEnrichmentJobToken', () => {
+    it('claims atomically iff the token matches a processing job', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 });
+
+      const result = await VideoRepository.claimEnrichmentJobToken('video-123', 'token-1');
+
+      expect(result).toBe(true);
+      expect(prisma.video.updateMany).toHaveBeenCalledWith({
+        where: { id: 'video-123', enrichmentJobToken: 'token-1', enrichmentStatus: 'processing' },
+        data: { enrichmentJobToken: null },
+      });
+    });
+
+    it('returns false when another caller already claimed', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 0 });
+
+      const result = await VideoRepository.claimEnrichmentJobToken('video-123', 'token-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('setEnrichmentProgress', () => {
+    it('persists the checkpoint payload', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+      const checkpoint = { stage: 'musicbrainz', at: '2026-07-12T00:00:00.000Z' };
+
+      await VideoRepository.setEnrichmentProgress('video-123', checkpoint);
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentProgress: checkpoint },
+      });
+    });
+  });
+
+  describe('getEnrichmentState', () => {
+    it('selects the enrichment lifecycle projection', async () => {
+      vi.mocked(prisma.video.findUnique).mockResolvedValue(null);
+
+      await VideoRepository.getEnrichmentState('video-123');
+
+      expect(prisma.video.findUnique).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        select: {
+          id: true,
+          enrichmentStatus: true,
+          enrichmentError: true,
+          enrichmentStartedAt: true,
+          enrichmentJobToken: true,
+          enrichmentProgress: true,
+          enrichedAt: true,
+          category: true,
+          artist: true,
+          title: true,
+          releasedOn: true,
+          s3Key: true,
+        },
+      });
+    });
+  });
 });

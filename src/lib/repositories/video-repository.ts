@@ -12,6 +12,7 @@ import type {
   VideoCountFilters,
   VideoListFilters,
 } from '@/lib/types/domain/video';
+import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 
 import { runQuery } from './_internal/map-prisma-error';
 
@@ -184,5 +185,86 @@ export class VideoRepository {
   /** Hard-delete a video by id. */
   static async delete(id: string): Promise<Video> {
     return runQuery(() => prisma.video.delete({ where: { id } }));
+  }
+
+  /**
+   * Update the async enrichment lifecycle fields. `error` is only written when
+   * explicitly provided. Flipping to `pending` clears the previous run's
+   * progress AND error (a fresh trigger must never surface stale state);
+   * `processing` stamps `enrichmentStartedAt` for stale-job detection;
+   * `succeeded` stamps `enrichedAt`.
+   */
+  static async setEnrichmentStatus(
+    videoId: string,
+    status: 'pending' | 'processing' | 'succeeded' | 'failed',
+    opts: { error?: string | null } = {}
+  ): Promise<void> {
+    await runQuery(() =>
+      prisma.video.update({
+        where: { id: videoId },
+        data: {
+          enrichmentStatus: status,
+          ...(opts.error !== undefined ? { enrichmentError: opts.error } : {}),
+          ...(status === 'pending' ? { enrichmentProgress: null, enrichmentError: null } : {}),
+          ...(status === 'processing' ? { enrichmentStartedAt: new Date() } : {}),
+          ...(status === 'succeeded' ? { enrichedAt: new Date() } : {}),
+        },
+      })
+    );
+  }
+
+  /** Set (or clear, with null) the per-job async-callback token. */
+  static async setEnrichmentJobToken(videoId: string, token: string | null): Promise<void> {
+    await runQuery(() =>
+      prisma.video.update({ where: { id: videoId }, data: { enrichmentJobToken: token } })
+    );
+  }
+
+  /**
+   * Atomically claim the enrichment job iff the stored token matches AND the
+   * job is still processing, clearing the single-use token so only ONE
+   * concurrent callback wins (mirrors `ArtistRepository.claimBioJobToken`).
+   */
+  static async claimEnrichmentJobToken(videoId: string, token: string): Promise<boolean> {
+    const result = await runQuery(() =>
+      prisma.video.updateMany({
+        where: { id: videoId, enrichmentJobToken: token, enrichmentStatus: 'processing' },
+        data: { enrichmentJobToken: null },
+      })
+    );
+    return result.count === 1;
+  }
+
+  /** Persist the latest enrichment progress checkpoint (validated upstream). */
+  static async setEnrichmentProgress(videoId: string, progress: unknown): Promise<void> {
+    await runQuery(() =>
+      prisma.video.update({
+        where: { id: videoId },
+        data: { enrichmentProgress: progress as Prisma.InputJsonValue },
+      })
+    );
+  }
+
+  /** Read the enrichment lifecycle + dispatch context, or null when missing. */
+  static async getEnrichmentState(videoId: string): Promise<VideoEnrichmentState | null> {
+    return runQuery(() =>
+      prisma.video.findUnique({
+        where: { id: videoId },
+        select: {
+          id: true,
+          enrichmentStatus: true,
+          enrichmentError: true,
+          enrichmentStartedAt: true,
+          enrichmentJobToken: true,
+          enrichmentProgress: true,
+          enrichedAt: true,
+          category: true,
+          artist: true,
+          title: true,
+          releasedOn: true,
+          s3Key: true,
+        },
+      })
+    );
   }
 }
