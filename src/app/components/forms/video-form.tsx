@@ -22,6 +22,7 @@ import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
+import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoFileSection } from './videos/video-file-section';
 import { VideoFormFooter } from './videos/video-form-footer';
@@ -146,6 +147,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onValidSubmit)} noValidate className="space-y-8">
             <VideoFileSection control={control} upload={upload} />
+            {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
             <VideoMetadataSection control={control} onSelectDate={handleSelectDate} />
             <VideoPosterSection
               control={control}

@@ -144,6 +144,40 @@ beforeEach(() => {
   globalThis.URL.revokeObjectURL = vi.fn();
 });
 
+const editVideo = {
+  id: 'v1',
+  title: 'Existing Title',
+  artist: 'Existing Artist',
+  category: 'INFORMATIONAL' as const,
+  description: 'An existing description',
+  releasedOn: new Date('2023-03-03T00:00:00.000Z'),
+  durationSeconds: 120,
+  s3Key: 'media/videos/v1/existing.mp4',
+  fileName: 'existing.mp4',
+  fileSize: 4096n,
+  mimeType: 'video/mp4',
+  posterUrl: 'https://cdn.example.com/existing-poster.jpg',
+  publishedAt: null,
+  archivedAt: null,
+  createdBy: null,
+  updatedBy: null,
+  createdAt: new Date('2023-03-03T00:00:00.000Z'),
+  updatedAt: new Date('2023-03-03T00:00:00.000Z'),
+  width: null,
+  height: null,
+  videoCodec: null,
+  audioCodec: null,
+  bitrateKbps: null,
+  frameRate: null,
+  container: null,
+  audioChannels: null,
+  audioSampleRateHz: null,
+  sourceCreatedAt: null,
+  probedAt: null,
+  probeError: null,
+  enrichmentStatus: null,
+};
+
 describe('VideoForm — required-field validation', () => {
   it('shows a required error for the title on empty submit', async () => {
     const user = setup();
@@ -426,27 +460,6 @@ describe('VideoForm — create submit', () => {
 });
 
 describe('VideoForm — edit mode', () => {
-  const editVideo = {
-    id: 'v1',
-    title: 'Existing Title',
-    artist: 'Existing Artist',
-    category: 'INFORMATIONAL' as const,
-    description: 'An existing description',
-    releasedOn: new Date('2023-03-03T00:00:00.000Z'),
-    durationSeconds: 120,
-    s3Key: 'media/videos/v1/existing.mp4',
-    fileName: 'existing.mp4',
-    fileSize: 4096n,
-    mimeType: 'video/mp4',
-    posterUrl: 'https://cdn.example.com/existing-poster.jpg',
-    publishedAt: null,
-    archivedAt: null,
-    createdBy: null,
-    updatedBy: null,
-    createdAt: new Date('2023-03-03T00:00:00.000Z'),
-    updatedAt: new Date('2023-03-03T00:00:00.000Z'),
-  };
-
   const asEditMode = () =>
     mocks.useVideoQuery.mockReturnValue({
       data: editVideo,
@@ -648,5 +661,48 @@ describe('VideoForm — poster', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+  });
+});
+
+describe('VideoForm — technical metadata card', () => {
+  const probedVideo = {
+    ...editVideo,
+    probedAt: new Date('2023-03-04T00:00:00.000Z'),
+    width: 1920,
+    height: 1080,
+    bitrateKbps: 4200,
+  };
+
+  it('renders the card under the file section for a probed video', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: probedVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByTestId('video-technical-metadata-card')).toBeInTheDocument();
+  });
+
+  it('renders no card for an unprobed video', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByTestId('video-technical-metadata-card')).not.toBeInTheDocument();
+  });
+
+  it('renders no card in create mode', () => {
+    render(<VideoForm />);
+
+    expect(screen.queryByTestId('video-technical-metadata-card')).not.toBeInTheDocument();
   });
 });
