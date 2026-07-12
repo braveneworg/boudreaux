@@ -25,6 +25,14 @@ vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
   }),
 }));
 
+const createBioLinkMock = vi.fn();
+vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
+  useCreateBioLinkMutation: () => ({
+    createBioLink: createBioLinkMock,
+    isCreatingBioLink: false,
+  }),
+}));
+
 // The polled status drives completion. A module-level value lets each test set
 // the status the (enabled) query reports back after generation is triggered.
 let statusReturn: BioGenerationStatusResult = { status: null, error: null, content: null };
@@ -73,6 +81,7 @@ const ARTIST_ID = 'a'.repeat(24);
 
 beforeEach(() => {
   generateMock.mockReset();
+  createBioLinkMock.mockReset();
   toastError.mockClear();
   toastSuccess.mockClear();
   statusReturn = { status: null, error: null, content: null };
@@ -257,6 +266,21 @@ describe('ArtistBioGenerationSection', () => {
         screen.getByText(/regenerating replaces the palette images and links/i)
       ).toBeInTheDocument()
     );
+  });
+
+  it('persists an added reference link so it joins the palette', async () => {
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.type(
+      screen.getByLabelText(/reference links/i),
+      'https://www.pitchfork.com/artist{Enter}'
+    );
+
+    expect(createBioLinkMock).toHaveBeenCalledWith({
+      artistId: ARTIST_ID,
+      label: 'pitchfork.com',
+      url: 'https://www.pitchfork.com/artist',
+    });
   });
 
   it('times out the UI when a triggered run never reaches a terminal status', async () => {
