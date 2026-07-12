@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type { Video } from '@/lib/types/domain/video';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
@@ -12,11 +14,18 @@ import {
   confirmVideoUpload,
   deleteReplacedVideoAssets,
   isPosterReplaced,
+  kickPostSaveEnrichment,
 } from './video-action-helpers';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/utils/s3-client');
 vi.mock('@/lib/utils/s3-key-utils');
+vi.mock('@/lib/services/video-enrichment-service', () => ({
+  VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
+}));
+vi.mock('@/lib/services/video-probe-service', () => ({
+  VideoProbeService: { probeAndPersist: vi.fn() },
+}));
 
 const videoId = '507f1f77bcf86cd799439011';
 const validKey = `media/videos/${videoId}/clip.mp4`;
@@ -237,5 +246,87 @@ describe('deleteReplacedVideoAssets', () => {
     deleteReplacedVideoAssets(currentVideo, { ...formData, posterUrl: currentPosterUrl }, false);
 
     expect(deleteS3Object).not.toHaveBeenCalled();
+  });
+});
+
+describe('kickPostSaveEnrichment', () => {
+  const kickInput = {
+    videoId,
+    artist: 'Ceschi feat. Sage Francis',
+    category: 'MUSIC' as const,
+    reProbe: true,
+  };
+
+  beforeEach(() => {
+    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
+    vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
+    vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+  });
+
+  it('syncs video artists from the artist string', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+      videoId,
+      'Ceschi feat. Sage Francis'
+    );
+  });
+
+  it('probes when reProbe is true', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
+  });
+
+  it('skips the probe when reProbe is false', async () => {
+    await kickPostSaveEnrichment({ ...kickInput, reProbe: false });
+
+    expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the enrichment job for a MUSIC video', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
+  });
+
+  it('does not dispatch the enrichment job for an INFORMATIONAL video', async () => {
+    await kickPostSaveEnrichment({ ...kickInput, category: 'INFORMATIONAL' });
+
+    expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+  });
+
+  it('runs the sync before the probe and the probe before the job', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    const syncOrder = vi.mocked(VideoEnrichmentService.syncVideoArtists).mock
+      .invocationCallOrder[0];
+    const probeOrder = vi.mocked(VideoProbeService.probeAndPersist).mock.invocationCallOrder[0];
+    const jobOrder = vi.mocked(VideoEnrichmentService.runEnrichmentJob).mock.invocationCallOrder[0];
+    expect([syncOrder < probeOrder, probeOrder < jobOrder]).toEqual([true, true]);
+  });
+
+  it('still probes when the artist sync fails', async () => {
+    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('sync down'));
+
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
+  });
+
+  it('still dispatches the job when the probe fails', async () => {
+    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValue(Error('probe down'));
+
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
+  });
+
+  it('never throws even when every stage fails', async () => {
+    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('a'));
+    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValue(Error('b'));
+    vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockRejectedValue(Error('c'));
+
+    await expect(kickPostSaveEnrichment(kickInput)).resolves.toBeUndefined();
   });
 });

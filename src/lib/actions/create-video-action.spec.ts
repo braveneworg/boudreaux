@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -21,6 +23,20 @@ vi.mock('@/lib/utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('@/lib/utils/auth/require-role');
 vi.mock('@/lib/utils/s3-client');
+vi.mock('@/lib/services/video-enrichment-service', () => ({
+  VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
+}));
+vi.mock('@/lib/services/video-probe-service', () => ({
+  VideoProbeService: { probeAndPersist: vi.fn() },
+}));
+
+// Capture the after() callback so tests can run the "background" kick on demand.
+let afterCallback: (() => Promise<void>) | null = null;
+vi.mock('next/server', () => ({
+  after: (cb: () => Promise<void>) => {
+    afterCallback = cb;
+  },
+}));
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const videoId = '507f1f77bcf86cd799439011';
@@ -65,6 +81,10 @@ beforeEach(() => {
     success: true,
     data: { id: videoId },
   } as never);
+  afterCallback = null;
+  vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
+  vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
+  vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
 });
 
 describe('createVideoAction', () => {
@@ -404,6 +424,83 @@ describe('createVideoAction', () => {
       await createVideoAction(initialFormState, buildFormData());
 
       expect(revalidatePath).toHaveBeenCalledWith('/videos');
+    });
+  });
+
+  describe('Post-save enrichment kick', () => {
+    it('schedules the kick via after() on success', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(afterCallback).toBeTypeOf('function');
+    });
+
+    it('does not schedule the kick when creation fails', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.createVideo).mockResolvedValue({
+        success: false,
+        error: 'boom',
+      } as never);
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(afterCallback).toBeNull();
+    });
+
+    it('does not schedule the kick when S3 confirmation fails', async () => {
+      mockParsedSuccess();
+      vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(afterCallback).toBeNull();
+    });
+
+    it('syncs video artists from the submitted artist string', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(videoId, 'The Band');
+    });
+
+    it('probes the new upload', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
+    });
+
+    it('dispatches web enrichment for a MUSIC video', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
+    });
+
+    it('does not dispatch web enrichment for an INFORMATIONAL video', async () => {
+      mockParsedSuccess({ ...parsedData, category: 'INFORMATIONAL' });
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+    });
+
+    it('still probes when the artist sync fails', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('sync down'));
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
     });
   });
 });

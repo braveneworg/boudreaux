@@ -4,7 +4,15 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
-import type { CreateVideoData, UpdateVideoData, Video } from '@/lib/types/domain/video';
+import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import { VideoProbeService } from '@/lib/services/video-probe-service';
+import type {
+  CreateVideoData,
+  UpdateVideoData,
+  Video,
+  VideoCategory,
+} from '@/lib/types/domain/video';
+import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
@@ -137,4 +145,57 @@ export const deleteReplacedVideoAssets = (
   Promise.allSettled(keysToDelete.map((key) => deleteS3Object(key))).catch(() => {
     // Silently ignore — S3 cleanup is best-effort.
   });
+};
+
+const logger = loggers.media;
+
+/** Safe, always-string rendering of an unknown error. */
+const toMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/** Input for the post-save enrichment kick (runs inside `after()`). */
+export interface KickPostSaveEnrichmentInput {
+  videoId: string;
+  /** The admin-entered display artist string — the source of the artist sync. */
+  artist: string;
+  category: VideoCategory;
+  /** Probe (or re-probe) the file — true on create and on file replacement. */
+  reProbe: boolean;
+}
+
+/**
+ * Post-save enrichment kick: sync `VideoArtist` links from the artist string,
+ * probe the file when it is new/replaced, then dispatch the async web
+ * enrichment for MUSIC videos. Each stage is independently best-effort — a
+ * failure is logged and the remaining stages still run. Never throws, so the
+ * admin's already-successful save can never be failed retroactively by
+ * background work.
+ */
+export const kickPostSaveEnrichment = async ({
+  videoId,
+  artist,
+  category,
+  reProbe,
+}: KickPostSaveEnrichmentInput): Promise<void> => {
+  try {
+    await VideoEnrichmentService.syncVideoArtists(videoId, artist);
+  } catch (error) {
+    logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+  }
+
+  if (reProbe) {
+    try {
+      await VideoProbeService.probeAndPersist(videoId);
+    } catch (error) {
+      logger.warn('Post-save video probe failed', { videoId, error: toMessage(error) });
+    }
+  }
+
+  if (category === 'MUSIC') {
+    try {
+      await VideoEnrichmentService.runEnrichmentJob(videoId);
+    } catch (error) {
+      logger.warn('Post-save enrichment dispatch failed', { videoId, error: toMessage(error) });
+    }
+  }
 };

@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { VideoService } from '@/lib/services/video-service';
@@ -24,6 +25,7 @@ import {
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
+  kickPostSaveEnrichment,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -53,6 +55,32 @@ const applyUpdateResult = (
     mapVideoServiceError(response.error || 'Failed to update video', formState);
   }
   formState.success = response.success;
+};
+
+/**
+ * Schedule the post-update enrichment kick when the update changed something
+ * enrichment cares about: an artist-string change re-syncs `VideoArtist`
+ * links, a file replacement re-probes, and — via the kick's own category
+ * gate — a MUSIC video with either change re-dispatches the async web
+ * enrichment. The sync also runs on a file-only replacement; it is
+ * idempotent. No-op when nothing relevant changed.
+ */
+const scheduleUpdateEnrichment = (
+  current: Video,
+  data: VideoFormData,
+  s3KeyReplaced: boolean
+): void => {
+  const artistChanged = data.artist !== current.artist;
+  if (!artistChanged && !s3KeyReplaced) return;
+
+  after(() =>
+    kickPostSaveEnrichment({
+      videoId: current.id,
+      artist: data.artist,
+      category: data.category,
+      reProbe: s3KeyReplaced,
+    })
+  );
 };
 
 /**
@@ -99,6 +127,7 @@ const runVideoUpdate = async (
     deleteReplacedVideoAssets(current, data, s3KeyReplaced);
     revalidatePath('/admin/videos');
     revalidatePath('/videos');
+    scheduleUpdateEnrichment(current, data, s3KeyReplaced);
   }
 };
 
