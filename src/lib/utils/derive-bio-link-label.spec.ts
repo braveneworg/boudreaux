@@ -12,6 +12,10 @@ describe('deriveBioLinkLabel', () => {
     expect(deriveBioLinkLabel('https://www.pitchfork.com/reviews/x')).toBe('pitchfork.com');
   });
 
+  it('falls back to the full hostname when stripping www. leaves it empty', () => {
+    expect(deriveBioLinkLabel('https://www.')).toBe('www.');
+  });
+
   it('returns the raw input when the URL cannot be parsed', () => {
     expect(deriveBioLinkLabel('not a url')).toBe('not a url');
   });

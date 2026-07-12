@@ -5,14 +5,17 @@
 /**
  * Human-ish label for a URL-only reference link: the hostname minus a leading
  * `www.` (e.g. `https://www.pitchfork.com/x` → `pitchfork.com`). Falls back to
- * the raw input when the URL cannot be parsed (defensive — callers pass a value
- * that already passed `isHttpUrl`). Used to give a persisted reference link a
- * non-empty label without asking the admin for one.
+ * the full hostname when stripping `www.` would leave nothing (e.g. a bare
+ * `https://www.` host), and to the raw input when the URL cannot be parsed
+ * (defensive — callers pass a value that already passed `isHttpUrl`). Always
+ * returns a non-empty string so the persisted link satisfies the label schema
+ * without asking the admin for one.
  */
 export const deriveBioLinkLabel = (url: string): string => {
   try {
     const { hostname } = new URL(url);
-    return hostname.startsWith('www.') ? hostname.slice(4) : hostname;
+    const stripped = hostname.startsWith('www.') ? hostname.slice(4) : hostname;
+    return stripped || hostname || url;
   } catch {
     return url;
   }
