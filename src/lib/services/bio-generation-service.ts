@@ -15,6 +15,7 @@ import type { Json } from '@/lib/types/domain/shared';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
+import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
@@ -533,20 +534,6 @@ type GenerationPrep = {
 };
 
 /**
- * Resolve the app's canonical public origin (`NEXT_PUBLIC_BASE_URL` — the same
- * env every publicly-reachable absolute link uses, e.g. email/notification
- * URLs), with any trailing slash trimmed so appended paths have exactly one
- * separator. Returns `null` when the base URL is unconfigured, so the caller can
- * fail the job rather than dispatch an un-answerable invoke (fake/E2E never
- * reach here). Both the completion callback and the progress channel derive
- * their absolute URLs from this base.
- */
-const resolveBioBaseUrl = (): string | null => {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  return base ? base.replace(/\/$/, '') : null;
-};
-
-/**
  * Cap on how many reference images the Lambda receives per run — enough to give
  * Rekognition a strong face signal without inflating the invoke payload.
  */
@@ -679,7 +666,7 @@ const runFakeGeneration = async (prep: GenerationPrep): Promise<RunGenerationJob
  */
 const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJobResult> => {
   const jobToken = randomUUID();
-  const base = resolveBioBaseUrl();
+  const base = resolveEnrichmentBaseUrl();
   if (!base) {
     const error = 'Bio generator callback URL is not configured';
     await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error });
