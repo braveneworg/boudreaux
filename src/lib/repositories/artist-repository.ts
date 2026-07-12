@@ -769,6 +769,18 @@ export class ArtistRepository {
     }) as Promise<ArtistBioLinkRecord>;
   }
 
+  /** Finds one bio link row for an artist by exact URL, or null when none.
+   *  Used to dedupe the admin add-link path so the same URL is never stored
+   *  twice (whether it was previously added as custom or discovered). */
+  static async findBioLinkByUrl(
+    artistId: string,
+    url: string
+  ): Promise<ArtistBioLinkRecord | null> {
+    return runQuery(() =>
+      prisma.artistBioLink.findFirst({ where: { artistId, url } })
+    ) as Promise<ArtistBioLinkRecord | null>;
+  }
+
   /** Updates a single bio image row's attribution text (admin edit). */
   static async updateBioImageAttribution(
     imageId: string,
