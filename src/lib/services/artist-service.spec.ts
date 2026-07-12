@@ -2209,6 +2209,17 @@ describe('ArtistService', () => {
         ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
       ).rejects.toThrow('Connection failed');
     });
+
+    it('rethrows the duplicate error when the post-conflict re-read finds nothing', async () => {
+      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+        new DataError('DUPLICATE', 'Unique constraint failed')
+      );
+
+      await expect(
+        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
+      ).rejects.toThrow('Unique constraint failed');
+    });
   });
 
   describe('updateBioImageAttribution', () => {

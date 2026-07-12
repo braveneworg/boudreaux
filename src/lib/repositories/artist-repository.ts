@@ -254,9 +254,10 @@ type GeneratedLinkInput = { label: string; url: string; kind: string | null; sor
 
 /**
  * Builds the generated bio-link rows to insert during a regeneration: drops any
- * whose URL matches a surviving custom row (case-insensitive) and any that
- * exactly repeats an earlier URL, so the `@@unique([artistId, url])` index is
- * never violated. Keeps the first occurrence of each URL.
+ * whose URL matches a surviving custom row and any that repeats an earlier URL,
+ * so the `@@unique([artistId, url])` index is never violated. Both checks are
+ * case-insensitive (matching the custom-survivor set), and the first occurrence
+ * of each URL is kept.
  */
 const buildGeneratedLinks = (
   links: GeneratedLinkInput[],
@@ -265,10 +266,11 @@ const buildGeneratedLinks = (
   const seen = new Set<string>();
   return links
     .filter((link) => {
-      if (customLinkUrls.has(link.url.toLowerCase()) || seen.has(link.url)) {
+      const key = link.url.toLowerCase();
+      if (customLinkUrls.has(key) || seen.has(key)) {
         return false;
       }
-      seen.add(link.url);
+      seen.add(key);
       return true;
     })
     .map((link) => ({ ...link, origin: 'generated' }));

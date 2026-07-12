@@ -724,7 +724,7 @@ describe('ArtistRepository', () => {
       expect(arg.data.bioLinks.create).toEqual([]);
     });
 
-    it('drops an exact-duplicate-url generated link so the unique index never trips', async () => {
+    it('drops a case-insensitive duplicate-url generated link so the unique index never trips', async () => {
       const tx = buildTx({});
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
 
@@ -732,7 +732,7 @@ describe('ArtistRepository', () => {
         ...content,
         links: [
           { label: 'Site', url: 'https://dup.example/x', kind: null, sortOrder: 0 },
-          { label: 'Site again', url: 'https://dup.example/x', kind: null, sortOrder: 1 },
+          { label: 'Site again', url: 'https://DUP.EXAMPLE/x', kind: null, sortOrder: 1 },
         ],
       };
 
