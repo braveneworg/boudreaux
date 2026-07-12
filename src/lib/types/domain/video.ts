@@ -94,6 +94,33 @@ export interface CreateVideoData {
 /** Data accepted by the repository to update a video (all fields optional). */
 export type UpdateVideoData = Partial<CreateVideoData>;
 
+/**
+ * Repository payload for persisting one ffprobe pass onto a `Video` row.
+ * `probedAt` is always stamped; the optional scalar fields mirror
+ * `NormalizedProbe` (`@/lib/video-probe/normalize`); `probeData` carries the
+ * redacted raw ffprobe JSON (already JSON-safe). A failed probe persists only
+ * `probedAt` + `probeError`.
+ */
+export interface SaveProbeResultData {
+  probedAt: Date;
+  probeError?: string | null;
+  probeData?: unknown;
+  container?: string | null;
+  width?: number | null;
+  height?: number | null;
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+  bitrateKbps?: number | null;
+  frameRate?: number | null;
+  audioChannels?: number | null;
+  audioSampleRateHz?: number | null;
+  colorSpace?: string | null;
+  colorPrimaries?: string | null;
+  colorTransfer?: string | null;
+  sourceCreatedAt?: Date | null;
+  encoder?: string | null;
+}
+
 /** Pagination + filters for the admin videos listing. */
 export interface VideoListFilters {
   search?: string;

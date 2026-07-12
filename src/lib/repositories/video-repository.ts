@@ -6,6 +6,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   CreateVideoData,
+  SaveProbeResultData,
   UpdateVideoData,
   Video,
   VideoCountFilters,
@@ -35,6 +36,13 @@ const toPrismaCreate = (data: CreateVideoData): Prisma.VideoCreateInput => ({ ..
 
 /** Build a Prisma update payload from domain update data. */
 const toPrismaUpdate = (data: UpdateVideoData): Prisma.VideoUpdateInput => ({ ...data });
+
+/**
+ * The redacted probe JSON arrives as `unknown` (a JSON.parse product, so it is
+ * JSON-safe by construction); narrow it for Prisma's Json column input.
+ */
+const toPrismaJson = (value: unknown): Prisma.InputJsonValue | null =>
+  value === null || value === undefined ? null : (value as Prisma.InputJsonValue);
 
 // =============================================================================
 // Where builder (domain filters -> Prisma where; owned by the repository)
@@ -147,6 +155,30 @@ export class VideoRepository {
    */
   static async update(id: string, data: UpdateVideoData): Promise<Video> {
     return runQuery(() => prisma.video.update({ where: { id }, data: toPrismaUpdate(data) }));
+  }
+
+  /**
+   * Persist one ffprobe pass, guarded against the replaced-file race: the
+   * update matches on BOTH the id and the s3Key that was actually probed, so
+   * a stale probe of a file replaced mid-flight writes zero rows. Returns
+   * whether a row was written.
+   */
+  static async saveProbeResult(
+    videoId: string,
+    probedS3Key: string,
+    data: SaveProbeResultData
+  ): Promise<boolean> {
+    const { probeData, ...scalars } = data;
+    const result = await runQuery(() =>
+      prisma.video.updateMany({
+        where: { id: videoId, s3Key: probedS3Key },
+        data: {
+          ...scalars,
+          ...(probeData !== undefined ? { probeData: toPrismaJson(probeData) } : {}),
+        },
+      })
+    );
+    return result.count > 0;
   }
 
   /** Hard-delete a video by id. */
