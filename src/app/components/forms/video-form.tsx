@@ -71,7 +71,9 @@ const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<
   }
 
   toast.success(`Video ${isEditMode ? 'updated' : 'created'} successfully.`);
-  router.push('/admin/videos');
+  // Create lands on the new video's edit page so the admin can watch the
+  // probe + auto-kicked enrichment complete; edit returns to the list.
+  router.push(isEditMode ? '/admin/videos' : `/admin/videos/${preGeneratedId}`);
 };
 
 interface EnrichmentPanelMountProps {

@@ -433,7 +433,7 @@ describe('VideoForm — create submit', () => {
     );
   });
 
-  it('navigates to the admin videos list after a successful create', async () => {
+  it('navigates to the new video edit page after a successful create', async () => {
     const user = setup();
     render(<VideoForm />);
 
@@ -442,7 +442,7 @@ describe('VideoForm — create submit', () => {
     await fillRequiredFields(user);
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/videos'));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith(`/admin/videos/${'a'.repeat(24)}`));
   });
 
   it('maps a server field error onto the title field', async () => {
