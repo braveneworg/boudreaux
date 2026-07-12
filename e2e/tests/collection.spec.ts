@@ -64,3 +64,80 @@ test.describe('My Collection — purchased user', () => {
     await expect(userPage.getByRole('button', { name: /Delete purchase for/ })).toHaveCount(0);
   });
 });
+
+test.describe('My Collection — mobile layout (360px)', () => {
+  // 360px is the narrow-Android width where the purchased row was reported to
+  // overflow. Each test compares the card row's box to its grid column (the
+  // panel's content width): the row must never spill past it.
+  test.beforeEach(async ({ userPage }) => {
+    await userPage.setViewportSize({ width: 360, height: 740 });
+    await userPage.goto('/collection');
+    // The per-row download trigger's unambiguous aria-label signals hydration.
+    await expect(userPage.getByRole('button', { name: 'Download E2E Album One' })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test('the purchased-release card fits within its content column', async ({ userPage }) => {
+    const m = await userPage.evaluate(() => {
+      const round = (n: number): number => Math.round(n * 100) / 100;
+      const card = document
+        .querySelector('button[aria-label^="Download"]')
+        ?.closest('div.shadow-zine-sm');
+      if (!card) return null;
+      const grid = card.parentElement;
+      if (!grid) return null;
+      const c = card.getBoundingClientRect();
+      const g = grid.getBoundingClientRect();
+      return { cardRight: round(c.right), gridRight: round(g.right) };
+    });
+
+    expect(m, 'card row / grid not found — selector drift?').not.toBeNull();
+    if (!m) throw new Error('metrics not captured');
+    expect(
+      m.cardRight,
+      `card overflows its content column @360px: ${JSON.stringify(m)}`
+    ).toBeLessThanOrEqual(m.gridRight + 1);
+  });
+
+  test('a long release title cannot blow the card out of its content column', async ({
+    userPage,
+  }) => {
+    // The seeded title is short; a real long-titled release is what triggered
+    // the report. Force the pathological case: without `min-w-0` on the row the
+    // flex layout ignores `truncate` and the row blows past its grid column
+    // (~1692px vs the 292px column) instead of ellipsing the title.
+    const m = await userPage.evaluate(() => {
+      const round = (n: number): number => Math.round(n * 100) / 100;
+      const card = document
+        .querySelector('button[aria-label^="Download"]')
+        ?.closest('div.shadow-zine-sm');
+      if (!card) return null;
+      const grid = card.parentElement;
+      const info = card.children.item(1);
+      if (!grid || !info) return null;
+      const title = info.querySelector('a');
+      const artist = info.querySelector('p');
+      if (title) title.textContent = 'Supercalifragilisticexpialidocious'.repeat(6);
+      if (artist) artist.textContent = `Artist ${'Nombre'.repeat(30)}`;
+      // getBoundingClientRect() below forces the synchronous reflow that
+      // reflects the mutated text before measuring.
+      const c = card.getBoundingClientRect();
+      const g = grid.getBoundingClientRect();
+      return {
+        cardWidth: round(c.width),
+        cardRight: round(c.right),
+        gridWidth: round(g.width),
+        gridRight: round(g.right),
+      };
+    });
+
+    expect(m, 'card row / grid / info not found — selector drift?').not.toBeNull();
+    if (!m) throw new Error('metrics not captured');
+    expect(
+      m.cardWidth,
+      `long title widened the row past its column @360px: ${JSON.stringify(m)}`
+    ).toBeLessThanOrEqual(m.gridWidth + 1);
+    expect(m.cardRight).toBeLessThanOrEqual(m.gridRight + 1);
+  });
+});
