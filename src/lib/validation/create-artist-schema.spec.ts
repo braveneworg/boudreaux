@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { artistBaseSchema, createArtistSchema } from './create-artist-schema';
+import { artistBaseSchema, createArtistSchema, MAX_BIO_LENGTH } from './create-artist-schema';
 
 const validBase = {
   firstName: 'John',
@@ -76,42 +76,58 @@ describe('createArtistSchema', () => {
   });
 
   describe('visibleLength bio refinements', () => {
-    it('accepts a bio under 5000 visible characters even with markup overhead', () => {
+    it('accepts a bio far larger than the old 5000 cap (generous generator output)', () => {
       const result = createArtistSchema.safeParse({
         ...validBase,
-        bio: `<p>${'a'.repeat(4999)}</p>`,
+        bio: `<p>${'a'.repeat(50_000)}</p>`,
       });
       expect(result.success).toBe(true);
     });
 
-    it('rejects a bio whose visible text exceeds 5000 characters', () => {
+    it('accepts a bio at the MAX_BIO_LENGTH visible-character boundary', () => {
       const result = createArtistSchema.safeParse({
         ...validBase,
-        bio: '<p>' + 'a'.repeat(5001) + '</p>',
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('rejects a shortBio whose visible text exceeds 500 characters', () => {
-      const result = createArtistSchema.safeParse({
-        ...validBase,
-        shortBio: 'a'.repeat(501),
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('accepts a shortBio at the 500 visible-character boundary', () => {
-      const result = createArtistSchema.safeParse({
-        ...validBase,
-        shortBio: `<strong>${'a'.repeat(500)}</strong>`,
+        bio: `<p>${'a'.repeat(MAX_BIO_LENGTH)}</p>`,
       });
       expect(result.success).toBe(true);
     });
 
-    it('rejects an altBio whose visible text exceeds 5000 characters', () => {
+    it('rejects a bio whose visible text exceeds MAX_BIO_LENGTH', () => {
       const result = createArtistSchema.safeParse({
         ...validBase,
-        altBio: 'a'.repeat(5001),
+        bio: `<p>${'a'.repeat(MAX_BIO_LENGTH + 1)}</p>`,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts a shortBio far larger than the old 500 cap', () => {
+      const result = createArtistSchema.safeParse({
+        ...validBase,
+        shortBio: 'a'.repeat(5_000),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects a shortBio whose visible text exceeds MAX_BIO_LENGTH', () => {
+      const result = createArtistSchema.safeParse({
+        ...validBase,
+        shortBio: 'a'.repeat(MAX_BIO_LENGTH + 1),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts an altBio far larger than the old 5000 cap', () => {
+      const result = createArtistSchema.safeParse({
+        ...validBase,
+        altBio: 'a'.repeat(50_000),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects an altBio whose visible text exceeds MAX_BIO_LENGTH', () => {
+      const result = createArtistSchema.safeParse({
+        ...validBase,
+        altBio: 'a'.repeat(MAX_BIO_LENGTH + 1),
       });
       expect(result.success).toBe(false);
     });
