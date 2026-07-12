@@ -430,6 +430,9 @@ jobs:
           TWITTER_CLIENT_SECRET=${{ secrets.TWITTER_CLIENT_SECRET }}
           APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
           APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
+          APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY_BASE64=${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}
           APPLE_APP_BUNDLE_IDENTIFIER=${{ secrets.APPLE_APP_BUNDLE_IDENTIFIER }}
           EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
           EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}

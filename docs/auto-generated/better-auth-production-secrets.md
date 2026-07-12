@@ -77,30 +77,47 @@ deployment environment.
 
 ## Social OAuth providers (set per provider you enable)
 
-| Name                          | Purpose                                                                                                                                                                                                                            | NEW vs reused                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `GOOGLE_CLIENT_ID`            | Google OAuth client id                                                                                                                                                                                                             | **Reused** if Google sign-in already existed under Auth.js; otherwise **NEW**. |
-| `GOOGLE_CLIENT_SECRET`        | Google OAuth client secret                                                                                                                                                                                                         | Same as above.                                                                 |
-| `FACEBOOK_CLIENT_ID`          | Facebook OAuth app id                                                                                                                                                                                                              | **Reused** if previously configured; otherwise **NEW**.                        |
-| `FACEBOOK_CLIENT_SECRET`      | Facebook OAuth app secret                                                                                                                                                                                                          | Same as above.                                                                 |
-| `TWITTER_CLIENT_ID`           | X/Twitter OAuth client id                                                                                                                                                                                                          | **NEW** for most deployments (X sign-in is newly offered).                     |
-| `TWITTER_CLIENT_SECRET`       | X/Twitter OAuth client secret                                                                                                                                                                                                      | Same as above.                                                                 |
-| `APPLE_CLIENT_ID`             | Apple **Services ID** used as OAuth `client_id`                                                                                                                                                                                    | **NEW** unless Apple sign-in already existed.                                  |
-| `APPLE_CLIENT_SECRET`         | Apple OAuth `client_secret` — a **signed ES256 JWT**, not a static string. Generate with `apple-client-secret.ts` from the team/key/private-key below. **Expires within 6 months — rotate before expiry or Apple sign-in breaks.** | **NEW** (must be generated).                                                   |
-| `APPLE_APP_BUNDLE_IDENTIFIER` | Optional. Passed as `appBundleIdentifier` when present (native app token verification).                                                                                                                                            | **NEW** if using Apple; optional.                                              |
+| Name                          | Purpose                                                                                 | NEW vs reused                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `GOOGLE_CLIENT_ID`            | Google OAuth client id                                                                  | **Reused** if Google sign-in already existed under Auth.js; otherwise **NEW**. |
+| `GOOGLE_CLIENT_SECRET`        | Google OAuth client secret                                                              | Same as above.                                                                 |
+| `FACEBOOK_CLIENT_ID`          | Facebook OAuth app id                                                                   | **Reused** if previously configured; otherwise **NEW**.                        |
+| `FACEBOOK_CLIENT_SECRET`      | Facebook OAuth app secret                                                               | Same as above.                                                                 |
+| `TWITTER_CLIENT_ID`           | X/Twitter OAuth client id                                                               | **NEW** for most deployments (X sign-in is newly offered).                     |
+| `TWITTER_CLIENT_SECRET`       | X/Twitter OAuth client secret                                                           | Same as above.                                                                 |
+| `APPLE_CLIENT_ID`             | Apple **Services ID** used as OAuth `client_id`                                         | **NEW** unless Apple sign-in already existed.                                  |
+| `APPLE_APP_BUNDLE_IDENTIFIER` | Optional. Passed as `appBundleIdentifier` when present (native app token verification). | **NEW** if using Apple; optional.                                              |
 
-### Apple client-secret generation inputs
+### Apple client secret: runtime minting (preferred) vs static
 
-These are consumed by `generateAppleClientSecret(...)` (in
-`apple-client-secret.ts`) to mint `APPLE_CLIENT_SECRET`. They are passed to the
-generator (not read directly by `auth.ts`), but production must store them to
-regenerate the JWT every ≤ 6 months:
+Apple's `client_secret` is a **signed ES256 JWT** capped at 6 months of
+validity — not a static string. There are two ways to supply it; set the key
+material and forget rotation forever:
 
-| Name                | Purpose                                                 | NEW vs reused |
-| ------------------- | ------------------------------------------------------- | ------------- |
-| `APPLE_TEAM_ID`     | Apple Developer Team ID (10 chars) — JWT issuer.        | **NEW**       |
-| `APPLE_KEY_ID`      | Key ID of the `.p8` signing key — JWT `kid` header.     | **NEW**       |
-| `APPLE_PRIVATE_KEY` | Contents of the `.p8` EC private key (PEM). **Secret.** | **NEW**       |
+**Preferred — runtime minting.** Set all three and the server mints a fresh
+6-month secret at every boot (`resolveAppleClientSecret()` in
+`social-providers-config.ts`); no rotation, no expiry, ever (the `.p8` key
+itself does not expire). See
+`docs/auto-generated/apple-client-secret-runtime-minting.md`.
+
+| Name                       | Purpose                                                                    | NEW vs reused |
+| -------------------------- | -------------------------------------------------------------------------- | ------------- |
+| `APPLE_TEAM_ID`            | Apple Developer Team ID (10 chars) — JWT issuer.                           | **NEW**       |
+| `APPLE_KEY_ID`             | Key ID of the `.p8` signing key — JWT `kid` header.                        | **NEW**       |
+| `APPLE_PRIVATE_KEY_BASE64` | **Base64-encoded** contents of the `.p8` EC private key (PEM). **Secret.** | **NEW**       |
+
+The key is base64-encoded (like `CLOUDFRONT_PRIVATE_KEY_BASE64`) because a
+multi-line PEM cannot survive the `KEY=value` env-file format:
+`base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy`.
+
+**Fallback — static secret.** Only used when the key material above is absent
+(or minting fails). Generate offline with `generateAppleClientSecret(...)` and
+store the JWT; **it expires within 6 months** — the expiry monitor
+(`apple-secret-expiry-monitor.ts`) warns to Grafana starting 30 days out.
+
+| Name                  | Purpose                                        | NEW vs reused                |
+| --------------------- | ---------------------------------------------- | ---------------------------- |
+| `APPLE_CLIENT_SECRET` | Pre-minted Apple `client_secret` JWT (static). | **NEW** (must be generated). |
 
 > X/Twitter caveat (from code): X does not reliably return an email, so it is
 > deliberately excluded from `accountLinkingConfig.trustedProviders`. X accounts
@@ -167,10 +184,12 @@ Required per enabled OAuth provider (omit a provider to disable it):
 - Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - Facebook: `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`
 - Twitter/X: `TWITTER_CLIENT_ID`, `TWITTER_CLIENT_SECRET`
-- Apple: `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET` (generated JWT),
-  `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and optionally
+- Apple: `APPLE_CLIENT_ID` + the minting trio `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+  `APPLE_PRIVATE_KEY_BASE64` (preferred — no rotation ever), or a static
+  `APPLE_CLIENT_SECRET` (generated JWT, expires ≤ 6 months); optionally
   `APPLE_APP_BUNDLE_IDENTIFIER`
 
 Remember to register each provider's redirect URI
-(`<AUTH_URL>/api/auth/callback/<provider>`) in its developer console, and to
-schedule Apple `APPLE_CLIENT_SECRET` regeneration before its ≤ 6-month expiry.
+(`<AUTH_URL>/api/auth/callback/<provider>`) in its developer console. With
+runtime minting there is no Apple secret rotation to schedule; on the static
+path the Grafana `apple-secret-expiry` alert emails 30 days before expiry.
