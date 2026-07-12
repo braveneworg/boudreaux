@@ -166,7 +166,7 @@ const CollectionListItem = memo(
       }));
 
     return (
-      <div className="shadow-zine-sm flex items-center gap-4 border-2 border-black bg-white p-4">
+      <div className="shadow-zine-sm flex min-w-0 items-center gap-4 border-2 border-black bg-white p-4">
         {/* Cover Art */}
         <Link href={`/releases/${purchase.release.id}`} className="shrink-0">
           {coverArt ? (
