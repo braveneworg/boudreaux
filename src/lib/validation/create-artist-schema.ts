@@ -8,6 +8,13 @@ import { z } from 'zod';
 // overhead can reject a bio whose readable text is well within the limit.
 const visibleLength = (value: string): number => value.replace(/<[^>]*>/g, '').length;
 
+// Generous visible-prose ceiling shared by all three bio fields (bio, shortBio,
+// altBio). This is not a UX target — the bio generator's long-form output
+// routinely exceeds the old 5000/500 caps — but a finite bound still guards the
+// Mongo document against a pathological multi-megabyte paste. All bio content is
+// admin-authored, so this ceiling only needs to catch abuse, not shape prose.
+export const MAX_BIO_LENGTH = 100_000;
+
 // TODO: extract out commonality with update-artist-schema.ts to an object that you can spread into both schemas
 // Base schema without refinements — use this for .partial() in update schemas
 export const artistBaseSchema = z.object({
@@ -55,22 +62,22 @@ export const artistBaseSchema = z.object({
     }),
   bio: z
     .string()
-    .refine((value) => visibleLength(value) <= 5000, {
-      message: 'Bio must be less than 5000 characters',
+    .refine((value) => visibleLength(value) <= MAX_BIO_LENGTH, {
+      message: `Bio must be less than ${MAX_BIO_LENGTH} characters`,
     })
     .optional()
     .or(z.literal('')),
   shortBio: z
     .string()
-    .refine((value) => visibleLength(value) <= 500, {
-      message: 'Short bio must be less than 500 characters',
+    .refine((value) => visibleLength(value) <= MAX_BIO_LENGTH, {
+      message: `Short bio must be less than ${MAX_BIO_LENGTH} characters`,
     })
     .optional()
     .or(z.literal('')),
   altBio: z
     .string()
-    .refine((value) => visibleLength(value) <= 5000, {
-      message: 'Alternative bio must be less than 5000 characters',
+    .refine((value) => visibleLength(value) <= MAX_BIO_LENGTH, {
+      message: `Alternative bio must be less than ${MAX_BIO_LENGTH} characters`,
     })
     .optional()
     .or(z.literal('')),

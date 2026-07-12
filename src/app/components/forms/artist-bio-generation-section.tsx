@@ -15,9 +15,11 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Textarea } from '@/app/components/ui/textarea';
+import { useCreateBioLinkMutation } from '@/app/hooks/mutations/use-bio-media-mutations';
 import { useGenerateArtistBioMutation } from '@/app/hooks/mutations/use-bio-mutations';
 import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { cn } from '@/lib/utils';
+import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { BioProgress, GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
@@ -129,6 +131,7 @@ export const ArtistBioGenerationSection = ({
   // working state across the (minutes-long) background job.
   const [active, setActive] = useState(false);
   const { generateArtistBioAsync, isGeneratingArtistBio } = useGenerateArtistBioMutation();
+  const { createBioLink } = useCreateBioLinkMutation(artistId);
   const status = useArtistBioGenerationStatusQuery(artistId, { enabled: active });
 
   // Generation runs in the background; surface its terminal status once. On
@@ -171,8 +174,16 @@ export const ArtistBioGenerationSection = ({
       toast.error('Links must start with http:// or https://');
       return;
     }
+    const isNew = !links.includes(candidate);
     setLinks((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
     setLinkDraft('');
+    // Persist a genuinely new reference link as a custom palette row so it is
+    // draggable into the editors and survives reload; it still seeds the next
+    // generation via `links`. A dup URL is skipped here (the service also
+    // dedupes) and errors surface via the mutation hook's toast.
+    if (isNew) {
+      createBioLink({ artistId, label: deriveBioLinkLabel(candidate), url: candidate });
+    }
   };
 
   const removeLink = (url: string): void => {

@@ -12,6 +12,7 @@ import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { maskDateInput, parseMaskedDate } from '@/lib/utils/date-mask';
 
 import { Input } from './input';
 
@@ -22,16 +23,21 @@ interface DatePickerProps {
   value?: string;
 }
 
+const DISPLAY_FORMAT = 'MM/dd/yyyy';
+const startDate = new Date(1900, 0, 1);
+const endDate = new Date(2099, 11, 31);
+
 export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date>();
   const [month, setMonth] = useState<Date>(new Date());
+  // The field's live text. Held separately from `date` so a partially-typed,
+  // not-yet-valid entry can stay on screen until it parses (or is reverted).
+  const [inputValue, setInputValue] = useState('');
   const a11yId = useId();
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const startDate = new Date(1900, 0, 1);
-  const endDate = new Date(2099, 11, 31);
 
-  // Sync external controlled value → internal date state
+  // Sync external controlled value → internal date + field text.
   useEffect(() => {
     if (value) {
       // Append time to avoid UTC midnight → local-previous-day shift
@@ -40,59 +46,52 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
       if (!isNaN(parsed.getTime())) {
         setDate(parsed);
         setMonth(parsed);
+        setInputValue(format(parsed, DISPLAY_FORMAT));
       }
     } else {
       setDate(undefined);
+      setInputValue('');
     }
   }, [value]);
-
-  const handleChangeDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const parsedDate = new Date(inputValue);
-    if (!isNaN(parsedDate.getTime())) {
-      setDate(parsedDate);
-      onSelect?.(parsedDate.toISOString(), fieldName);
-    }
-  };
 
   const commitDate = (newDate: Date) => {
     setDate(newDate);
     setMonth(newDate);
+    setInputValue(format(newDate, DISPLAY_FORMAT));
     onSelect?.(newDate.toISOString(), fieldName);
   };
 
-  const handleYearKey = (key: 'ArrowUp' | 'ArrowDown') => {
-    const newDate = new Date(date ?? new Date());
-    const yearChange = key === 'ArrowUp' ? 1 : -1;
-    const newYear = newDate.getFullYear() + yearChange;
-    if (newYear < 1900 || newYear > 2099) {
-      return;
+  // Mask keystrokes to mm/dd/yyyy and commit only once a complete, valid,
+  // in-range date is typed. Partial/invalid input updates the text only.
+  const handleChangeDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskDateInput(e.target.value);
+    setInputValue(masked);
+    const parsed = parseMaskedDate(masked);
+    if (parsed) {
+      commitDate(parsed);
     }
-    newDate.setFullYear(newYear);
-    commitDate(newDate);
   };
 
-  const handleMonthKey = (currentDate: Date, key: 'ArrowLeft' | 'ArrowRight') => {
-    const newDate = new Date(currentDate);
-    const monthChange = key === 'ArrowRight' ? 1 : -1;
-    newDate.setMonth(newDate.getMonth() + monthChange);
-
-    // Check if new date is within bounds
-    if (newDate < startDate || newDate > endDate) {
+  // On blur: an emptied field clears the value; a partial/invalid entry reverts
+  // to the last committed date so the field never rests in a broken state.
+  const handleBlurDateInput = () => {
+    if (inputValue === '') {
+      if (date) {
+        setDate(undefined);
+        onSelect?.('', fieldName);
+      }
       return;
     }
-
-    commitDate(newDate);
+    if (!parseMaskedDate(inputValue)) {
+      setInputValue(date ? format(date, DISPLAY_FORMAT) : '');
+    }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      handleYearKey(e.key);
-    } else if (date && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-      e.preventDefault();
-      handleMonthKey(date, e.key);
-    }
+  const handleClear = () => {
+    setDate(undefined);
+    setInputValue('');
+    onSelect?.('', fieldName);
+    setOpen(false);
   };
 
   // Focus input after popover opens
@@ -105,12 +104,10 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
     }
   }, [open]);
 
-  const displayValue = date ? format(date, 'MM/dd/yyyy') : '';
-
   return (
     <div className="flex flex-col gap-3">
       <Label htmlFor={a11yId} className="sr-only px-1">
-        Use up/down arrow keys to change year, left/right to change month
+        Type the date as mm/dd/yyyy, or open the calendar to pick a month and year
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
@@ -130,9 +127,10 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               ref={dateInputRef}
               className="pl-10 text-[0.875rem] leading-5"
               onChange={handleChangeDateInput}
-              onKeyDown={handleKeyDown}
+              onBlur={handleBlurDateInput}
+              inputMode="numeric"
               placeholder="mm/dd/yyyy"
-              value={displayValue}
+              value={inputValue}
             />
           </div>
         </PopoverAnchor>
@@ -143,18 +141,17 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
           onFocusOutside={(e) => e.preventDefault()}
         >
           <Calendar
-            onDayFocus={() => dateInputRef.current?.focus}
             mode="single"
             month={month}
             onMonthChange={setMonth}
             selected={date}
-            captionLayout="label"
+            captionLayout="dropdown"
+            startMonth={startDate}
+            endMonth={endDate}
             disabled={{ before: startDate, after: endDate }}
-            onSelect={(date) => {
-              if (date) {
-                setDate(date);
-                setMonth(date);
-                onSelect?.(date.toISOString(), fieldName);
+            onSelect={(selected) => {
+              if (selected) {
+                commitDate(selected);
                 setOpen(false);
               }
             }}
@@ -165,11 +162,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-xs text-zinc-950"
-              onClick={() => {
-                setDate(undefined);
-                onSelect?.('', fieldName);
-                setOpen(false);
-              }}
+              onClick={handleClear}
             >
               Clear
             </Button>

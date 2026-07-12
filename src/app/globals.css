@@ -308,8 +308,11 @@
    Unlayered so the descendant selectors outrank the shadcn Input/Button
    utilities. Radix Switch/Checkbox/Radio render as <button>s and native
    checkbox/radio/range/color inputs are excluded, so toggles keep their
-   pill shape. */
-input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+   pill shape. The cmdk search field inside a Command popover/dialog is
+   excluded too — it wears the wrapper's bottom-border divider, not a box. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+    [data-slot='command-input']
+  ),
 textarea,
 [role='combobox'],
 [data-slot='select-trigger'] {

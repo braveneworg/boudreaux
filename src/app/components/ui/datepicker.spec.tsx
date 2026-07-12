@@ -63,4 +63,66 @@ describe('DatePicker', () => {
       expect(screen.queryByRole('grid')).not.toBeInTheDocument();
     });
   });
+
+  it('commits onSelect when a full valid date is typed', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<DatePicker fieldName="releasedOn" onSelect={onSelect} />);
+
+    await user.type(screen.getByRole('textbox'), '05122023');
+
+    const [iso, field] = (onSelect.mock.calls.at(-1) ?? ['', '']) as [string, string];
+    const picked = new Date(iso);
+    expect([picked.getFullYear(), picked.getMonth(), picked.getDate(), field]).toEqual([
+      2023,
+      4,
+      12,
+      'releasedOn',
+    ]);
+  });
+
+  it('does not call onSelect while the typed date is incomplete', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<DatePicker fieldName="releasedOn" onSelect={onSelect} />);
+
+    await user.type(screen.getByRole('textbox'), '0512');
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('reverts to the last valid date when an incomplete entry is blurred', async () => {
+    const user = userEvent.setup();
+    render(<DatePicker fieldName="releasedOn" value="2026-07-15" />);
+
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.type(input, '0512');
+    await user.tab();
+
+    expect(input).toHaveValue('07/15/2026');
+  });
+
+  it('commits a clear when an emptied field is blurred', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<DatePicker fieldName="publishedAt" value="2026-07-15" onSelect={onSelect} />);
+
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.tab();
+
+    expect(onSelect).toHaveBeenCalledWith('', 'publishedAt');
+  });
+
+  it('offers a year dropdown spanning 1900 to 2099', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+    render(<DatePicker fieldName="releasedOn" value="2026-07-15" />);
+
+    await user.click(screen.getByRole('button', { name: /open calendar/i }));
+    await screen.findByRole('grid');
+
+    expect(screen.getByRole('option', { name: '1900' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '2099' })).toBeInTheDocument();
+  });
 });

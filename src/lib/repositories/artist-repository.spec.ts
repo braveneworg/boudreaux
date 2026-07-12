@@ -28,6 +28,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     artistBioLink: {
       delete: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       deleteMany: vi.fn(),
       create: vi.fn(),
@@ -723,6 +724,32 @@ describe('ArtistRepository', () => {
       expect(arg.data.bioLinks.create).toEqual([]);
     });
 
+    it('drops a case-insensitive duplicate-url generated link so the unique index never trips', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      const contentWithDupLinks = {
+        ...content,
+        links: [
+          { label: 'Site', url: 'https://dup.example/x', kind: null, sortOrder: 0 },
+          { label: 'Site again', url: 'https://DUP.EXAMPLE/x', kind: null, sortOrder: 1 },
+        ],
+      };
+
+      await ArtistRepository.replaceBioContent('a1', contentWithDupLinks);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioLinks.create).toEqual([
+        {
+          label: 'Site',
+          url: 'https://dup.example/x',
+          kind: null,
+          sortOrder: 0,
+          origin: 'generated',
+        },
+      ]);
+    });
+
     it('dedupes per-row: drops a matched link but still inserts a different unmatched link in the same call', async () => {
       // Wikipedia URL matches a custom survivor; Official Site does not.
       const tx = buildTx({ links: [{ url: 'HTTPS://EN.WIKIPEDIA.ORG/wiki/X' }] });
@@ -1078,6 +1105,28 @@ describe('ArtistRepository', () => {
       expect(prisma.artistBioLink.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ origin: 'custom' }),
       });
+    });
+  });
+
+  describe('findBioLinkByUrl', () => {
+    it('returns the matching row for the artist and URL', async () => {
+      const row = { id: 'link-7', artistId: 'a1', url: 'https://example.com' };
+      vi.mocked(prisma.artistBioLink.findFirst).mockResolvedValue(row as never);
+
+      const found = await ArtistRepository.findBioLinkByUrl('a1', 'https://example.com');
+
+      expect(prisma.artistBioLink.findFirst).toHaveBeenCalledWith({
+        where: { artistId: 'a1', url: 'https://example.com' },
+      });
+      expect(found).toEqual(row);
+    });
+
+    it('returns null when no row matches', async () => {
+      vi.mocked(prisma.artistBioLink.findFirst).mockResolvedValue(null as never);
+
+      const found = await ArtistRepository.findBioLinkByUrl('a1', 'https://none.example');
+
+      expect(found).toBeNull();
     });
   });
 

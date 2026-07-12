@@ -263,6 +263,33 @@ const buildSearchWhere = (search?: string): Prisma.ArtistWhereInput => ({
   }),
 });
 
+/** A regenerated bio-link row before it is stamped `origin: 'generated'`. */
+type GeneratedLinkInput = { label: string; url: string; kind: string | null; sortOrder: number };
+
+/**
+ * Builds the generated bio-link rows to insert during a regeneration: drops any
+ * whose URL matches a surviving custom row and any that repeats an earlier URL,
+ * so the `@@unique([artistId, url])` index is never violated. Both checks are
+ * case-insensitive (matching the custom-survivor set), and the first occurrence
+ * of each URL is kept.
+ */
+const buildGeneratedLinks = (
+  links: GeneratedLinkInput[],
+  customLinkUrls: Set<string>
+): Array<GeneratedLinkInput & { origin: string }> => {
+  const seen = new Set<string>();
+  return links
+    .filter((link) => {
+      const key = link.url.toLowerCase();
+      if (customLinkUrls.has(key) || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .map((link) => ({ ...link, origin: 'generated' }));
+};
+
 /**
  * Data-access layer for the Artist and ArtistRelease models. The only layer that
  * touches Prisma for artists: it owns the query shapes (includes/where DSL),
@@ -542,9 +569,7 @@ export class ArtistRepository {
           const imagesToCreate = content.images
             .filter((image) => !customImageUrls.has(image.url.toLowerCase()))
             .map((image) => ({ ...image, origin: 'generated' }));
-          const linksToCreate = content.links
-            .filter((link) => !customLinkUrls.has(link.url.toLowerCase()))
-            .map((link) => ({ ...link, origin: 'generated' }));
+          const linksToCreate = buildGeneratedLinks(content.links, customLinkUrls);
 
           await tx.artist.update({
             where: { id: artistId },
@@ -781,6 +806,18 @@ export class ArtistRepository {
         },
       });
     }) as Promise<ArtistBioLinkRecord>;
+  }
+
+  /** Finds one bio link row for an artist by exact URL, or null when none.
+   *  Used to dedupe the admin add-link path so the same URL is never stored
+   *  twice (whether it was previously added as custom or discovered). */
+  static async findBioLinkByUrl(
+    artistId: string,
+    url: string
+  ): Promise<ArtistBioLinkRecord | null> {
+    return runQuery(() =>
+      prisma.artistBioLink.findFirst({ where: { artistId, url } })
+    ) as Promise<ArtistBioLinkRecord | null>;
   }
 
   /** Updates a single bio image row's attribution text (admin edit). */
