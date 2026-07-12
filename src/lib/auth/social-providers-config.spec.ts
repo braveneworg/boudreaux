@@ -13,9 +13,24 @@
 //   4. Twitter is NOT in trustedProviders (no reliable email from X/Twitter).
 // ---------------------------------------------------------------------------
 
-import { buildSocialProvidersConfig, accountLinkingConfig } from './social-providers-config';
+import { generateKeyPairSync } from 'crypto';
+
+import { loggers } from '@/lib/utils/logger';
+
+import {
+  buildSocialProvidersConfig,
+  accountLinkingConfig,
+  resolveAppleClientSecret,
+} from './social-providers-config';
 
 vi.mock('server-only', () => ({}));
+
+// Ephemeral P-256 key for the runtime-minting tests (no PEM literal in the
+// tree — gitleaks would flag it).
+const { privateKey: MINT_KEY_OBJ } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const MINT_PRIVATE_KEY_BASE64 = Buffer.from(
+  MINT_KEY_OBJ.export({ type: 'pkcs8', format: 'pem' }) as string
+).toString('base64');
 
 const GOOGLE_VARS = {
   GOOGLE_CLIENT_ID: 'google-id',
@@ -40,6 +55,7 @@ const ALL_VARS = { ...GOOGLE_VARS, ...FACEBOOK_VARS, ...TWITTER_VARS, ...APPLE_V
 describe('buildSocialProvidersConfig', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('includes all four providers when all env vars are set', () => {
@@ -138,6 +154,114 @@ describe('buildSocialProvidersConfig', () => {
   it('returns an empty object when no provider env vars are set', () => {
     const config = buildSocialProvidersConfig();
     expect(Object.keys(config)).toHaveLength(0);
+  });
+
+  it('mints the apple clientSecret from key material when present', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+
+    const config = buildSocialProvidersConfig();
+    expect(config.apple).toMatchObject({
+      clientSecret: expect.stringMatching(/^[\w-]+\.[\w-]+\.[\w-]+$/),
+    });
+  });
+
+  it('prefers minting over the static APPLE_CLIENT_SECRET', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_CLIENT_SECRET', 'static-secret');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+
+    const config = buildSocialProvidersConfig();
+    expect(config.apple).not.toMatchObject({ clientSecret: 'static-secret' });
+  });
+
+  it('falls back to the static secret when minting fails', () => {
+    vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_CLIENT_SECRET', 'static-secret');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', Buffer.from('not-a-pem').toString('base64'));
+
+    const config = buildSocialProvidersConfig();
+    expect(config.apple).toMatchObject({ clientSecret: 'static-secret' });
+  });
+
+  it('logs an error when minting fails', () => {
+    const errorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', Buffer.from('not-a-pem').toString('base64'));
+
+    buildSocialProvidersConfig();
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('omits apple when minting fails and no static secret exists', () => {
+    vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', Buffer.from('not-a-pem').toString('base64'));
+
+    const config = buildSocialProvidersConfig();
+    expect(config).not.toHaveProperty('apple');
+  });
+
+  it('keeps appBundleIdentifier alongside a minted secret', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+    vi.stubEnv('APPLE_APP_BUNDLE_IDENTIFIER', 'com.example.boudreaux');
+
+    const config = buildSocialProvidersConfig();
+    expect(config.apple).toMatchObject({ appBundleIdentifier: 'com.example.boudreaux' });
+  });
+});
+
+describe('resolveAppleClientSecret', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('returns null when APPLE_CLIENT_ID is absent even with key material', () => {
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+
+    expect(resolveAppleClientSecret()).toBeNull();
+  });
+
+  it('reports source=minted when built from key material', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+
+    expect(resolveAppleClientSecret()).toMatchObject({ clientId: 'apple-id', source: 'minted' });
+  });
+
+  it('reports source=static when only APPLE_CLIENT_SECRET is set', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_CLIENT_SECRET', 'static-secret');
+
+    expect(resolveAppleClientSecret()).toMatchObject({
+      secret: 'static-secret',
+      source: 'static',
+    });
+  });
+
+  it('returns null when APPLE_CLIENT_ID is set without any secret source', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+
+    expect(resolveAppleClientSecret()).toBeNull();
   });
 });
 
