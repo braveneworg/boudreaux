@@ -44,6 +44,11 @@ const mockVideo = {
   archivedAt: null,
   createdBy: 'admin-1',
   updatedBy: null,
+  width: 1920,
+  probedAt: new Date('2026-03-01'),
+  probeData: { format: { filename: 'media/videos/test/video.mp4' } },
+  enrichmentJobToken: 'job-token-1',
+  enrichmentProgress: { stage: 'searching' },
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
@@ -95,6 +100,54 @@ describe('GET /api/videos/[id]', () => {
     const data = await response.json();
 
     expect(data.fileSize).toBe(123456);
+  });
+
+  it('keeps probe display fields on the admin detail payload', async () => {
+    vi.mocked(VideoService.getVideoById).mockResolvedValue({
+      success: true,
+      data: mockVideo as never,
+    });
+
+    const response = await GET(request(), context(VALID_ID));
+    const data = await response.json();
+
+    expect(data.width).toBe(1920);
+  });
+
+  it('omits probeData from the admin detail payload', async () => {
+    vi.mocked(VideoService.getVideoById).mockResolvedValue({
+      success: true,
+      data: mockVideo as never,
+    });
+
+    const response = await GET(request(), context(VALID_ID));
+    const data = await response.json();
+
+    expect(data).not.toHaveProperty('probeData');
+  });
+
+  it('omits enrichmentJobToken from the admin detail payload', async () => {
+    vi.mocked(VideoService.getVideoById).mockResolvedValue({
+      success: true,
+      data: mockVideo as never,
+    });
+
+    const response = await GET(request(), context(VALID_ID));
+    const data = await response.json();
+
+    expect(data).not.toHaveProperty('enrichmentJobToken');
+  });
+
+  it('omits enrichmentProgress from the admin detail payload', async () => {
+    vi.mocked(VideoService.getVideoById).mockResolvedValue({
+      success: true,
+      data: mockVideo as never,
+    });
+
+    const response = await GET(request(), context(VALID_ID));
+    const data = await response.json();
+
+    expect(data).not.toHaveProperty('enrichmentProgress');
   });
 
   it('maps a database-unavailable failure to 503', async () => {

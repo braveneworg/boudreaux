@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { Json } from './shared';
 
 /**
  * Hand-written, Prisma-free mirror of the `Video` model. Drift-checked against
@@ -37,6 +38,31 @@ export type Video = {
   updatedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
+  // --- ffprobe technical metadata (probe pipeline; all nullable) ---
+  probedAt: Date | null;
+  probeError: string | null;
+  container: string | null;
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  bitrateKbps: number | null;
+  frameRate: number | null;
+  audioChannels: number | null;
+  audioSampleRateHz: number | null;
+  colorSpace: string | null;
+  colorPrimaries: string | null;
+  colorTransfer: string | null;
+  sourceCreatedAt: Date | null;
+  encoder: string | null;
+  probeData: Json | null;
+  // --- async web-enrichment job state (mirrors the Artist bio* fields) ---
+  enrichmentStatus: string | null;
+  enrichmentError: string | null;
+  enrichmentStartedAt: Date | null;
+  enrichmentJobToken: string | null;
+  enrichmentProgress: Json | null;
+  enrichedAt: Date | null;
 };
 
 /**
