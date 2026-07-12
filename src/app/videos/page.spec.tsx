@@ -178,13 +178,71 @@ describe('VideosPage', () => {
 
     await VideosPage();
 
-    // createdBy / updatedBy are internal admin ObjectIds, stripped from the SSR payload.
-    const { createdBy: _createdBy, updatedBy: _updatedBy, ...publicVideo } = mockVideo;
+    // Every audit/probe/enrichment internal is stripped from the SSR payload via
+    // the shared `toPublicVideoRow`; only the public row + signed URL survives.
+    const {
+      createdBy: _createdBy,
+      updatedBy: _updatedBy,
+      probedAt: _probedAt,
+      probeError: _probeError,
+      container: _container,
+      width: _width,
+      height: _height,
+      videoCodec: _videoCodec,
+      audioCodec: _audioCodec,
+      bitrateKbps: _bitrateKbps,
+      frameRate: _frameRate,
+      audioChannels: _audioChannels,
+      audioSampleRateHz: _audioSampleRateHz,
+      colorSpace: _colorSpace,
+      colorPrimaries: _colorPrimaries,
+      colorTransfer: _colorTransfer,
+      sourceCreatedAt: _sourceCreatedAt,
+      encoder: _encoder,
+      probeData: _probeData,
+      enrichmentStatus: _enrichmentStatus,
+      enrichmentError: _enrichmentError,
+      enrichmentStartedAt: _enrichmentStartedAt,
+      enrichmentJobToken: _enrichmentJobToken,
+      enrichmentProgress: _enrichmentProgress,
+      enrichedAt: _enrichedAt,
+      ...publicVideo
+    } = mockVideo;
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual({
       rows: [{ ...publicVideo, streamUrl: 'https://cdn.example.com/signed' }],
       nextSkip: null,
     });
+  });
+
+  it('should not leak the enrichmentJobToken into the SSR payload', async () => {
+    mockGetPublishedVideos.mockResolvedValue({
+      success: true,
+      data: [{ ...mockVideo, enrichmentJobToken: 'secret-job-token' }],
+    });
+
+    await VideosPage();
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [
+      { queryFn: () => Promise<{ rows: Array<Record<string, unknown>> }> },
+    ];
+    const { rows } = await opts.queryFn();
+    expect(rows[0]).not.toHaveProperty('enrichmentJobToken');
+  });
+
+  it('should not leak the raw probeData into the SSR payload', async () => {
+    mockGetPublishedVideos.mockResolvedValue({
+      success: true,
+      data: [{ ...mockVideo, probeData: { format: { filename: 'secret.mp4' } } }],
+    });
+
+    await VideosPage();
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [
+      { queryFn: () => Promise<{ rows: Array<Record<string, unknown>> }> },
+    ];
+    const { rows } = await opts.queryFn();
+    expect(rows[0]).not.toHaveProperty('probeData');
   });
 
   it('should degrade to an empty first page when the service fails', async () => {

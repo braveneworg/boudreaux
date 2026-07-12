@@ -12,7 +12,8 @@ import type { Video, VideoListFilters } from '@/lib/types/domain/video';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { signStreamUrl } from '@/lib/utils/sign-stream-url';
+import type { VideoRowWithStream } from '@/lib/utils/to-public-video-row';
+import { toPublicVideoRow } from '@/lib/utils/to-public-video-row';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,44 +22,6 @@ const MAX_TAKE = 50;
 
 /** Signed URLs are per-user; never share-cache the listing. */
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
-
-/**
- * Video fields that never leave the server on the listing payloads: the audit
- * ObjectIds plus every probe/enrichment internal. Probe display fields are
- * admin-detail-only; job state and raw probe JSON are never on any wire.
- */
-type VideoInternalField =
-  | 'createdBy'
-  | 'updatedBy'
-  | 'probedAt'
-  | 'probeError'
-  | 'container'
-  | 'width'
-  | 'height'
-  | 'videoCodec'
-  | 'audioCodec'
-  | 'bitrateKbps'
-  | 'frameRate'
-  | 'audioChannels'
-  | 'audioSampleRateHz'
-  | 'colorSpace'
-  | 'colorPrimaries'
-  | 'colorTransfer'
-  | 'sourceCreatedAt'
-  | 'encoder'
-  | 'probeData'
-  | 'enrichmentStatus'
-  | 'enrichmentError'
-  | 'enrichmentStartedAt'
-  | 'enrichmentJobToken'
-  | 'enrichmentProgress'
-  | 'enrichedAt';
-
-/**
- * A public video row: the internal audit/probe/enrichment fields are dropped,
- * with the runtime-only, per-request signed stream URL attached.
- */
-type VideoRowWithStream = Omit<Video, VideoInternalField> & { streamUrl: string | null };
 
 /** Parse and clamp the `skip`/`take` offset-pagination params from a request. */
 const parsePagination = (searchParams: URLSearchParams): { skip: number; take: number } => {
@@ -85,39 +48,6 @@ const parsePublished = (searchParams: URLSearchParams): boolean | null => {
 /** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
 const errorStatus = (error: string | undefined): number =>
   error === 'Database unavailable' ? 503 : 500;
-
-/** Strip the internal fields from one row and attach its signed stream URL. */
-const toPublicVideoRow = ({
-  createdBy: _createdBy,
-  updatedBy: _updatedBy,
-  probedAt: _probedAt,
-  probeError: _probeError,
-  container: _container,
-  width: _width,
-  height: _height,
-  videoCodec: _videoCodec,
-  audioCodec: _audioCodec,
-  bitrateKbps: _bitrateKbps,
-  frameRate: _frameRate,
-  audioChannels: _audioChannels,
-  audioSampleRateHz: _audioSampleRateHz,
-  colorSpace: _colorSpace,
-  colorPrimaries: _colorPrimaries,
-  colorTransfer: _colorTransfer,
-  sourceCreatedAt: _sourceCreatedAt,
-  encoder: _encoder,
-  probeData: _probeData,
-  enrichmentStatus: _enrichmentStatus,
-  enrichmentError: _enrichmentError,
-  enrichmentStartedAt: _enrichmentStartedAt,
-  enrichmentJobToken: _enrichmentJobToken,
-  enrichmentProgress: _enrichmentProgress,
-  enrichedAt: _enrichedAt,
-  ...video
-}: Video): VideoRowWithStream => ({
-  ...video,
-  streamUrl: signStreamUrl(video.s3Key),
-});
 
 /** Drop internal fields, attach signed stream URLs, then BigInt-serialize for JSON. */
 const buildRows = (videos: Video[]): VideoRowWithStream[] =>
