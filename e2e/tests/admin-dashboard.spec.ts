@@ -34,11 +34,13 @@ test.describe('Admin dashboard', () => {
       'href',
       '/admin/videos'
     );
-    // 9 total videos are seeded: 7 published + 1 draft + 1 archived. The archived
-    // row keeps its `publishedAt`, so the dashboard stat counts it as published
-    // (8 published · 1 draft) — asserts the value the app actually computes.
-    await expect(videosTile.getByText('9', { exact: true })).toBeVisible();
-    await expect(videosTile.getByText('8 published · 1 draft')).toBeVisible();
+    // 11 total videos are seeded: 7 published + 1 draft + 1 archived (base) plus
+    // 2 archived enrichment fixtures, both with `publishedAt`. The dashboard stat
+    // counts archived rows via `publishedAt` (VideoRepository.count() has no
+    // archived filter), so all 10 published-dated rows count as published
+    // (10 published · 1 draft) — asserts the value the app actually computes.
+    await expect(videosTile.getByText('11', { exact: true })).toBeVisible();
+    await expect(videosTile.getByText('10 published · 1 draft')).toBeVisible();
   });
 
   test('tiles link into their section', async ({ adminPage }) => {
