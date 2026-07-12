@@ -179,6 +179,40 @@ groups:
                     params:
                       - 0.85
 
+      - uid: apple-secret-expiry
+        title: Apple client secret expiring soon
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: Apple Sign-In client secret expires in under 30 days (or is undecodable)
+          description: 'With APPLE_TEAM_ID/APPLE_KEY_ID/APPLE_PRIVATE_KEY_BASE64 set, a redeploy re-mints a fresh 6-month secret. On the static path, rotate the APPLE_CLIENT_SECRET GitHub secret. See docs/auto-generated/apple-client-secret-runtime-minting.md.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 10800
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({container="website", level="warn"} |~ `Apple client secret (expiring soon|is not a decodable JWT)` [3h]))
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+
       - uid: app-payments-error
         title: Payment flow error
         condition: C

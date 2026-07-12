@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.207.0] - 2026-07-12
+
+### Added
+
+- feat(auth): mint Apple client secret at boot (#589)
+
+## [4.206.0] - 2026-07-12
+
+### Fixed
+
+- fix(auth): pass social OAuth env to prod deploy (#588)
+
 ## [4.205.0] - 2026-07-11
 
 ### Changed
