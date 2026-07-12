@@ -13,6 +13,8 @@ interface WikidataEntities {
     {
       claims?: Record<string, Array<{ mainsnak?: { datavalue?: { value?: unknown } } }>>;
       sitelinks?: Record<string, { title?: string; url?: string }>;
+      labels?: Record<string, { value?: string }>;
+      aliases?: Record<string, Array<{ value?: string }>>;
     }
   >;
 }
@@ -24,6 +26,16 @@ export interface WikidataData {
   wikipediaUrl?: string;
   /** Commons category name from P373, e.g. "Ceschi" (no `Category:` prefix). */
   commonsCategory?: string;
+  /** P569 date of birth (YYYY-MM-DD) with its precision (11 = day). */
+  dateOfBirth?: { value: string; precision: number };
+  /** P1477 birth name (monolingual text), when claimed. */
+  birthName?: string;
+  /** English "also known as" aliases. */
+  aliases: string[];
+  /** English label of the entity. */
+  entityLabel?: string;
+  /** P106 occupation entity ids (e.g. Q639669 = musician). */
+  occupationIds: string[];
 }
 
 type Claim = { mainsnak?: { datavalue?: { value?: unknown } } };
@@ -33,6 +45,72 @@ const stringValues = (entries: Claim[] | undefined): string[] =>
     .map((entry) => entry.mainsnak?.datavalue?.value)
     .filter((value): value is string => typeof value === 'string');
 
+/** A Wikidata time datavalue (`+YYYY-MM-DDT00:00:00Z` + precision). */
+interface WikidataTimeValue {
+  time: string;
+  precision: number;
+}
+
+const isTimeValue = (value: unknown): value is WikidataTimeValue => {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { time?: unknown; precision?: unknown };
+  return typeof candidate.time === 'string' && typeof candidate.precision === 'number';
+};
+
+const timeValues = (entries: Claim[] | undefined): Array<{ value: string; precision: number }> =>
+  (entries ?? [])
+    .map((entry) => entry.mainsnak?.datavalue?.value)
+    .filter(isTimeValue)
+    .map((value) => ({
+      value: value.time.replace(/^\+/, '').slice(0, 10),
+      precision: value.precision,
+    }));
+
+const isMonolingualValue = (value: unknown): value is { text: string } =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { text?: unknown }).text === 'string';
+
+const monolingualValues = (entries: Claim[] | undefined): string[] =>
+  (entries ?? [])
+    .map((entry) => entry.mainsnak?.datavalue?.value)
+    .filter(isMonolingualValue)
+    .map((value) => value.text);
+
+const isEntityIdValue = (value: unknown): value is { id: string } =>
+  typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string';
+
+const entityIdValues = (entries: Claim[] | undefined): string[] =>
+  (entries ?? [])
+    .map((entry) => entry.mainsnak?.datavalue?.value)
+    .filter(isEntityIdValue)
+    .map((value) => value.id);
+
+/** The single entity in a parsed EntityData body, keyed by its (unknown) id. */
+type WikidataEntity = NonNullable<WikidataEntities['entities']>[string];
+
+/** English "also known as" aliases, dropping any without a value. */
+const englishAliases = (entity: WikidataEntity | undefined): string[] =>
+  (entity?.aliases?.en ?? [])
+    .map((alias) => alias.value)
+    .filter((value): value is string => Boolean(value));
+
+/** The entity's English label, when present. */
+const englishLabel = (entity: WikidataEntity | undefined): string | undefined =>
+  entity?.labels?.en?.value;
+
+/** Extracts the P18/P856/P373/etc. claim-derived fields from an entity's claims. */
+const extractClaimData = (
+  claims: NonNullable<WikidataEntity['claims']>
+): Omit<WikidataData, 'wikipediaUrl' | 'aliases' | 'entityLabel'> => ({
+  imageFileNames: stringValues(claims.P18),
+  officialUrl: stringValues(claims.P856)[0],
+  commonsCategory: stringValues(claims.P373)[0],
+  dateOfBirth: timeValues(claims.P569)[0],
+  birthName: monolingualValues(claims.P1477)[0],
+  occupationIds: entityIdValues(claims.P106),
+});
+
 /**
  * Extracts the media/link data from a parsed EntityData body. The endpoint
  * returns a single entity keyed by its id, so we read it without a dynamic key
@@ -40,13 +118,11 @@ const stringValues = (entries: Claim[] | undefined): string[] =>
  */
 const extractWikidataData = (body: WikidataEntities): WikidataData => {
   const entity = Object.values(body.entities ?? {})[0];
-  const claims = entity?.claims ?? {};
-  const sitelinks = entity?.sitelinks ?? {};
   return {
-    imageFileNames: stringValues(claims.P18),
-    officialUrl: stringValues(claims.P856)[0],
-    wikipediaUrl: sitelinks.enwiki?.url,
-    commonsCategory: stringValues(claims.P373)[0],
+    ...extractClaimData(entity?.claims ?? {}),
+    wikipediaUrl: entity?.sitelinks?.enwiki?.url,
+    aliases: englishAliases(entity),
+    entityLabel: englishLabel(entity),
   };
 };
 

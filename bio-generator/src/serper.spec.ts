@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { MAX_SERPER_IMAGES_PER_QUERY, searchSerperImages } from './serper.js';
+import { MAX_SERPER_IMAGES_PER_QUERY, searchSerperImages, searchSerperWeb } from './serper.js';
 
 interface SerperImage {
   imageUrl?: string;
@@ -259,5 +259,55 @@ describe('searchSerperImages', () => {
     const events = info.mock.calls.map((call) => JSON.parse(call[0] as string).event);
     expect(events).toContain('serper_images');
     info.mockRestore();
+  });
+});
+
+describe('searchSerperWeb', () => {
+  it('maps organic results and caps at 10', async () => {
+    const organic = Array.from({ length: 12 }, (_, i) => ({
+      title: `Result ${i}`,
+      link: `https://example.com/${i}`,
+      snippet: `Snippet ${i}`,
+      date: i === 0 ? 'Jun 1, 2020' : undefined,
+    }));
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ organic })));
+
+    const result = await searchSerperWeb('ceschi premiere', 'key-1', fetchFn);
+
+    expect(result).toHaveLength(10);
+    expect(result[0]).toEqual({
+      title: 'Result 0',
+      link: 'https://example.com/0',
+      snippet: 'Snippet 0',
+      date: 'Jun 1, 2020',
+    });
+  });
+
+  it('POSTs the query to the search endpoint with the API key', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ organic: [] })));
+
+    await searchSerperWeb('ceschi premiere', 'key-1', fetchFn);
+
+    expect(fetchFn).toHaveBeenCalledWith('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'X-API-KEY': 'key-1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: 'ceschi premiere' }),
+    });
+  });
+
+  it('returns [] on a non-ok response', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('rate limited', { status: 429 }));
+
+    const result = await searchSerperWeb('q', 'key-1', fetchFn);
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when the fetch throws (never throws)', async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new Error('network'));
+
+    const result = await searchSerperWeb('q', 'key-1', fetchFn);
+
+    expect(result).toEqual([]);
   });
 });

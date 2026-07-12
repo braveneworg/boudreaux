@@ -234,3 +234,121 @@ export interface ArtistFacts {
   /** Site-relative `/releases/<id>` paths the prose may link, labeled by title. */
   internalReleaseUrls?: string[];
 }
+
+/**
+ * Ordered stages the video-enrichment mode checkpoints through. Wire contract
+ * with the web counterpart `VIDEO_PROGRESS_STAGES` in
+ * `src/lib/validation/video-enrichment-schema.ts` — keep in lockstep (the two
+ * projects cannot share a module).
+ */
+export const VIDEO_PROGRESS_STAGES = [
+  'musicbrainz',
+  'wikidata',
+  'web-search',
+  'adjudicating',
+  'finalizing',
+] as const;
+
+/** A single video-enrichment checkpoint stage name. */
+export type VideoProgressStage = (typeof VIDEO_PROGRESS_STAGES)[number];
+
+/** Identity fields the web app already holds for a linked artist. */
+export const videoKnownIdentitySchema = z.object({
+  firstName: z.string().optional(),
+  middleName: z.string().optional(),
+  surname: z.string().optional(),
+  displayName: z.string().optional(),
+  akaNames: z.string().optional(),
+  bornOn: isoDate.optional(),
+});
+
+/**
+ * Input the web app sends for `task: 'video-enrichment'`. The `known` block
+ * lets the Lambda skip facts the label already has; `callbackUrl`/
+ * `progressUrl`/`jobToken` mirror the bio pipeline's async plumbing. The
+ * `jobToken` cap (≤200) matches the web callback/progress POST schemas in
+ * `src/lib/validation/video-enrichment-schema.ts`.
+ */
+export const videoEnrichmentInputSchema = z.object({
+  task: z.literal('video-enrichment'),
+  videoId: z.string().min(1),
+  title: z.string().min(1),
+  artistDisplay: z.string().min(1),
+  releasedOn: isoDate.optional(),
+  artists: z
+    .array(
+      z.object({
+        artistId: z.string().min(1),
+        name: z.string().min(1),
+        role: z.enum(['primary', 'featured']),
+        known: videoKnownIdentitySchema.optional(),
+      })
+    )
+    .min(1)
+    .max(10),
+  callbackUrl: z.string().url().optional(),
+  progressUrl: z.string().url().optional(),
+  jobToken: z.string().min(1).max(200).optional(),
+});
+
+export type VideoEnrichmentInput = z.infer<typeof videoEnrichmentInputSchema>;
+
+/**
+ * One provenance link backing a suggestion. The `url` cap (≤2048) and `label`
+ * cap (≤200) mirror the web's `videoSuggestionSourceSchema` — keep in lockstep.
+ */
+export const videoSuggestionSourceSchema = z.object({
+  url: z.string().url().max(2048),
+  label: z.string().max(200).optional(),
+});
+
+/**
+ * One reviewable fact. Mirrors the web's `videoSuggestionSchema` in
+ * `src/lib/validation/video-enrichment-schema.ts` — keep in lockstep.
+ */
+export const videoSuggestionSchema = z.object({
+  field: z.enum([
+    'firstName',
+    'middleName',
+    'surname',
+    'akaNames',
+    'bornOn',
+    'displayName',
+    'releasedOn',
+  ]),
+  value: z.string().min(1).max(500),
+  confidence: z.enum(['high', 'medium', 'low']),
+  sources: z.array(videoSuggestionSourceSchema).max(10),
+  note: z.string().max(500).optional(),
+});
+
+export type VideoSuggestion = z.infer<typeof videoSuggestionSchema>;
+
+/** The successful video-enrichment payload (mirrors the web schema). */
+export const videoEnrichmentDataSchema = z.object({
+  artists: z
+    .array(
+      z.object({
+        artistId: z.string().min(1),
+        suggestions: z.array(videoSuggestionSchema).max(12),
+      })
+    )
+    .max(10),
+  video: z
+    .object({ releasedOn: videoSuggestionSchema.omit({ field: true }).optional() })
+    .optional(),
+  model: z.string().max(100),
+});
+
+export type VideoEnrichmentData = z.infer<typeof videoEnrichmentDataSchema>;
+
+/**
+ * Discriminated result envelope for the video-enrichment mode. The failure
+ * `error` cap (≤2000) mirrors the web's `videoEnrichmentResultSchema`.
+ */
+export const videoEnrichmentResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: videoEnrichmentDataSchema }),
+  z.object({ ok: z.literal(false), error: z.string().max(2000) }),
+]);
+
+export type VideoEnrichmentResult = z.infer<typeof videoEnrichmentResultSchema>;
