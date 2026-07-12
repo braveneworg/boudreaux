@@ -8,11 +8,13 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
 import { admin, magicLink } from 'better-auth/plugins';
 
+import { startAppleSecretExpiryMonitor } from '@/lib/auth/apple-secret-expiry-monitor';
 import { assertNotBanEvading } from '@/lib/auth/ban-evasion-hook';
 import { purchaseSessionPlugin } from '@/lib/auth/purchase-session-plugin';
 import {
   accountLinkingConfig,
   buildSocialProvidersConfig,
+  resolveAppleClientSecret,
 } from '@/lib/auth/social-providers-config';
 import { userCreateBeforeHook } from '@/lib/auth/user-create-before-hook';
 import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
@@ -215,3 +217,11 @@ export const auth = betterAuth({
     nextCookies(),
   ],
 });
+
+// Apple client secret expiry telemetry: an immediate check at boot plus an
+// hourly re-check. The warn line it emits under 30 days remaining is matched
+// verbatim by the `apple-secret-expiry` Grafana alert rule. Production-only
+// (E2E and dev never configure Apple credentials; builds resolve to null).
+if (isProductionRuntime) {
+  startAppleSecretExpiryMonitor(resolveAppleClientSecret());
+}
