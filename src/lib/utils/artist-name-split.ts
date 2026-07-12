@@ -1,0 +1,49 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+/** One artist name parsed out of a free-text video artist string. */
+export interface SplitArtistName {
+  name: string;
+  role: 'primary' | 'featured';
+}
+
+/**
+ * Matches a featuring separator as its own word: `feat.`, `ft.`, or `featuring`
+ * (case-insensitive), optionally preceded by an opening `(`/`[`, always followed
+ * by whitespace. The leading `\b` blocks mid-word hits ("Featurecast",
+ * "The Featherlights", "Loftft."). Ambiguous separators (`&`, `x`, `,`, `+`)
+ * are deliberately never split on — precision over recall.
+ */
+const FEAT_SEPARATOR = /\s*[([]?\s*\b(?:feat\.|ft\.|featuring\b)\s+/gi;
+
+/** Strip a trailing `)`/`]` left behind when the token was bracket-wrapped, then trim. */
+const cleanSegment = (segment: string): string => segment.replace(/[)\]]+\s*$/, '').trim();
+
+/**
+ * Split a free-text artist string into one primary name plus featured names.
+ * Splits ONLY on word-boundary feat./ft./featuring tokens; dedupes names
+ * case-insensitively (first occurrence wins); a string that *starts* with a
+ * feat token (empty primary) is returned whole as a single primary; blank
+ * input yields an empty array.
+ */
+export const splitFeaturedArtists = (artist: string): SplitArtistName[] => {
+  const raw = artist.trim();
+  if (raw === '') return [];
+
+  const [primary, ...featured] = raw.split(FEAT_SEPARATOR).map(cleanSegment);
+  if (!primary) return [{ name: raw, role: 'primary' }];
+
+  const seen = new Set<string>([primary.toLowerCase()]);
+  const result: SplitArtistName[] = [{ name: primary, role: 'primary' }];
+
+  for (const name of featured) {
+    const key = name.toLowerCase();
+    if (name !== '' && !seen.has(key)) {
+      seen.add(key);
+      result.push({ name, role: 'featured' });
+    }
+  }
+
+  return result;
+};
