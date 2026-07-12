@@ -4,7 +4,7 @@
 import type { Video } from '@/lib/types/domain/video';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 
-import { toPublicVideoRow } from './to-public-video-row';
+import { toAdminVideoDetailRow, toPublicVideoRow } from './to-public-video-row';
 
 vi.mock('@/lib/utils/sign-stream-url', () => ({
   signStreamUrl: vi.fn().mockReturnValue(null),
@@ -133,6 +133,78 @@ describe('toPublicVideoRow', () => {
     vi.mocked(signStreamUrl).mockReturnValueOnce(null);
 
     const row = toPublicVideoRow(fullVideo);
+
+    expect(row.streamUrl).toBeNull();
+  });
+});
+
+describe('toAdminVideoDetailRow', () => {
+  it('drops the enrichmentJobToken callback secret', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row).not.toHaveProperty('enrichmentJobToken');
+  });
+
+  it('drops the raw probeData JSON', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row).not.toHaveProperty('probeData');
+  });
+
+  it('drops the transient enrichmentProgress checkpoint', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row).not.toHaveProperty('enrichmentProgress');
+  });
+
+  it('retains the normalized probe display column the admin card renders', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.width).toBe(1920);
+  });
+
+  it('retains the probedAt timestamp for the admin card', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.probedAt).toEqual(new Date('2024-01-03'));
+  });
+
+  it('retains the enrichmentStatus job state the admin panel polls against', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.enrichmentStatus).toBe('pending');
+  });
+
+  it('retains the enrichedAt timestamp', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.enrichedAt).toEqual(new Date('2024-01-05'));
+  });
+
+  it('retains the createdBy audit ObjectId for the admin payload', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.createdBy).toBe('admin-1');
+  });
+
+  it('retains the public title field', () => {
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.title).toBe('Test Video');
+  });
+
+  it('attaches the signed stream URL from the s3Key', () => {
+    vi.mocked(signStreamUrl).mockReturnValueOnce('https://cdn.example.com/video.mp4');
+
+    const row = toAdminVideoDetailRow(fullVideo);
+
+    expect(row.streamUrl).toBe('https://cdn.example.com/video.mp4');
+  });
+
+  it('attaches a null stream URL when signing is unconfigured', () => {
+    vi.mocked(signStreamUrl).mockReturnValueOnce(null);
+
+    const row = toAdminVideoDetailRow(fullVideo);
 
     expect(row.streamUrl).toBeNull();
   });

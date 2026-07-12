@@ -7,7 +7,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { VideoService } from '@/lib/services/video-service';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { signStreamUrl } from '@/lib/utils/sign-stream-url';
+import { toAdminVideoDetailRow } from '@/lib/utils/to-public-video-row';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 export const dynamic = 'force-dynamic';
@@ -42,20 +42,11 @@ export const GET = withAdmin<{ id: string }>(async (_request, context) => {
       return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
     }
 
-    // Raw probe JSON, the per-job callback token, and the progress checkpoint
-    // are server-internal — the admin edit page reads the normalized probe
-    // columns here and polls job state via the enrichment endpoint instead.
-    const {
-      probeData: _probeData,
-      enrichmentJobToken: _enrichmentJobToken,
-      enrichmentProgress: _enrichmentProgress,
-      ...video
-    } = result.data;
-
-    const payload = serializeForResponse({
-      ...video,
-      streamUrl: signStreamUrl(video.s3Key),
-    });
+    // The canonical detail stripper drops only the always-internal secret fields
+    // (raw probe JSON, the per-job callback token, the progress checkpoint) and
+    // attaches the signed stream URL — the admin edit page reads the normalized
+    // probe columns here and polls job state via the enrichment endpoint instead.
+    const payload = serializeForResponse(toAdminVideoDetailRow(result.data));
 
     return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
