@@ -20,8 +20,11 @@ import {
 import { useVideoQuery } from '@/app/hooks/use-video-query';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
+import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
+import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
+import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoFileSection } from './videos/video-file-section';
@@ -35,7 +38,7 @@ import { VideoMetadataSection } from './videos/video-metadata-section';
 import { VideoPosterSection } from './videos/video-poster-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
-import type { UseFormReturn } from 'react-hook-form';
+import type { Control, UseFormReturn } from 'react-hook-form';
 
 export interface VideoFormProps {
   videoId?: string;
@@ -71,6 +74,28 @@ const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<
   router.push('/admin/videos');
 };
 
+interface EnrichmentPanelMountProps {
+  video: VideoRow | null | undefined;
+  control: Control<VideoFormData>;
+  onApplyReleaseDate: (value: string) => void;
+}
+
+/** MUSIC-only, edit-only: absent from the DOM otherwise (INFORMATIONAL/create). */
+const EnrichmentPanelMount = ({
+  video,
+  control,
+  onApplyReleaseDate,
+}: EnrichmentPanelMountProps): React.ReactElement | null =>
+  video?.category === 'MUSIC' ? (
+    <VideoEnrichmentErrorBoundary>
+      <VideoEnrichmentPanel
+        videoId={video.id}
+        control={control}
+        onApplyReleaseDate={onApplyReleaseDate}
+      />
+    </VideoEnrichmentErrorBoundary>
+  ) : null;
+
 export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
@@ -104,6 +129,12 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         shouldValidate: true,
       });
     },
+    [setValue]
+  );
+
+  const handleApplyReleaseDate = useCallback(
+    (value: string): void =>
+      setValue('releasedOn', value, { shouldDirty: true, shouldValidate: true }),
     [setValue]
   );
 
@@ -149,6 +180,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             <VideoFileSection control={control} upload={upload} />
             {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
             <VideoMetadataSection control={control} onSelectDate={handleSelectDate} />
+            <EnrichmentPanelMount
+              video={video}
+              control={control}
+              onApplyReleaseDate={handleApplyReleaseDate}
+            />
             <VideoPosterSection
               control={control}
               setValue={setValue}

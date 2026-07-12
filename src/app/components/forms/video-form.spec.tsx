@@ -65,6 +65,12 @@ vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFileToS3: mocks.uploadFileToS3,
 }));
 
+vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
+  VideoEnrichmentPanel: ({ videoId }: { videoId: string }) => (
+    <div data-testid="video-enrichment-panel" data-video-id={videoId} />
+  ),
+}));
+
 // A minimal controllable DatePicker so date fields are plain inputs associated
 // with their FormLabel (accessible name comes from the label, not aria-label).
 vi.mock('@/ui/datepicker', () => ({
@@ -704,5 +710,40 @@ describe('VideoForm — technical metadata card', () => {
     render(<VideoForm />);
 
     expect(screen.queryByTestId('video-technical-metadata-card')).not.toBeInTheDocument();
+  });
+});
+
+describe('VideoForm — enrichment panel mount gating', () => {
+  const asVideo = (video: unknown) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: video,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  it('mounts the panel for a MUSIC video in edit mode', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'v1'
+    );
+  });
+
+  it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
+    asVideo(editVideo);
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+  });
+
+  it('keeps the panel out of the DOM in create mode', () => {
+    render(<VideoForm />);
+
+    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
   });
 });
