@@ -77,6 +77,13 @@ describe('POST /api/videos/[id]/enrichment/progress', () => {
     });
   });
 
+  it('records a checkpoint with no counts as a bare stage', async () => {
+    const response = await callRoute(JSON.stringify({ jobToken: 't', stage: 'finalizing' }));
+
+    expect(response.status).toBe(202);
+    expect(recordProgressMock).toHaveBeenCalledWith(VIDEO_ID, 't', { stage: 'finalizing' });
+  });
+
   it('silently accepts malformed JSON with 202 (anti-enumeration)', async () => {
     const response = await callRoute('{not json');
 

@@ -49,6 +49,24 @@ describe('currentArtistFieldValue', () => {
     expect(currentArtistFieldValue(artist.current, 'surname')).toBe('Enrich Lead');
   });
 
+  it('reads firstName from the current identity', () => {
+    expect(currentArtistFieldValue(artist.current, 'firstName')).toBe('E2E');
+  });
+
+  it('reads middleName from the current identity', () => {
+    expect(currentArtistFieldValue({ ...artist.current, middleName: 'Q' }, 'middleName')).toBe('Q');
+  });
+
+  it('reads akaNames from the current identity', () => {
+    expect(currentArtistFieldValue({ ...artist.current, akaNames: 'The Alias' }, 'akaNames')).toBe(
+      'The Alias'
+    );
+  });
+
+  it('reads displayName from the current identity', () => {
+    expect(currentArtistFieldValue(artist.current, 'displayName')).toBe('E2E Enrich Lead');
+  });
+
   it('returns null for the video-level releasedOn field', () => {
     expect(currentArtistFieldValue(artist.current, 'releasedOn')).toBeNull();
   });

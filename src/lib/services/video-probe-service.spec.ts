@@ -174,6 +174,17 @@ describe('VideoProbeService.probeAndPersist', () => {
     });
   });
 
+  it('stringifies a non-Error rejection into the persisted probe error', async () => {
+    vi.mocked(generatePresignedProbeUrl).mockRejectedValue('raw-string-failure');
+
+    await VideoProbeService.probeAndPersist(videoId);
+
+    expect(VideoRepository.saveProbeResult).toHaveBeenCalledWith(videoId, s3Key, {
+      probedAt: expect.any(Date),
+      probeError: 'raw-string-failure',
+    });
+  });
+
   it('never throws when the lookup itself fails', async () => {
     vi.mocked(VideoRepository.findById).mockRejectedValue(new Error('db down'));
 

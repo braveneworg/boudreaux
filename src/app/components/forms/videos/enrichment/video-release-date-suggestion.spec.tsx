@@ -55,6 +55,12 @@ describe('VideoReleaseDateSuggestion', () => {
     expect(screen.getByText(/Current: 2026-02-01/)).toBeInTheDocument();
   });
 
+  it('shows a dash as the current value when the form field is empty', () => {
+    render(<Harness releasedOn="" onApplyReleaseDate={vi.fn()} onDismiss={vi.fn()} />);
+
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
   it('applies into the form via onApplyReleaseDate — never a server call', async () => {
     const onApplyReleaseDate = vi.fn();
     render(

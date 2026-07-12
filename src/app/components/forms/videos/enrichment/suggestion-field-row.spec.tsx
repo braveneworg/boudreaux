@@ -89,6 +89,20 @@ describe('SuggestionFieldRow — pending', () => {
     expect(screen.getByRole('link', { name: 'musicbrainz.org' })).toBeInTheDocument();
   });
 
+  it('falls back to the raw url when a labelless source is not a valid URL', () => {
+    renderRow({ sources: [{ url: 'not a url' }] });
+
+    expect(screen.getByRole('link', { name: 'not a url' })).toBeInTheDocument();
+  });
+
+  it('renders no source list when the suggestion has no sources', () => {
+    renderRow({ sources: [] });
+
+    expect(
+      screen.queryByRole('list', { name: 'Sources (each opens in a new tab)' })
+    ).not.toBeInTheDocument();
+  });
+
   it('exposes the note to screen readers only', () => {
     renderRow();
 

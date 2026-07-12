@@ -486,6 +486,26 @@ describe('verifyAndClaimCallback', () => {
     expect(result).toBe(true);
     expect(VideoRepository.claimEnrichmentJobToken).toHaveBeenCalledWith(VIDEO_ID, 'stored');
   });
+
+  it('returns false without claiming when the video state is missing', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
+
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored');
+
+    expect(result).toBe(false);
+    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
+  });
+
+  it('returns false without claiming when the job is not processing', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'succeeded', enrichmentJobToken: 'stored' })
+    );
+
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored');
+
+    expect(result).toBe(false);
+    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
+  });
 });
 
 describe('recordProgress', () => {
@@ -512,6 +532,26 @@ describe('recordProgress', () => {
     );
 
     await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the token does not match', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
+    );
+
+    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'forged', { stage: 'wikidata' });
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('swallows a repository failure instead of throwing', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
+
+    await expect(
+      VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' })
+    ).resolves.toBeUndefined();
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });

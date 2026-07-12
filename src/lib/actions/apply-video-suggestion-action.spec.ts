@@ -263,6 +263,108 @@ describe('applyVideoSuggestionAction', () => {
     });
   });
 
+  it('applies a surname suggestion, matching the current surname', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'surname', value: 'Ramirez' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+      expectedCurrent: 'Ramos',
+    });
+
+    expect(result).toEqual({ success: true, op: 'apply' });
+    expect(ArtistService.applyEnrichedField).toHaveBeenCalledWith(
+      ARTIST_ID,
+      'surname',
+      'Ramirez',
+      'admin-1'
+    );
+  });
+
+  it('applies a firstName suggestion, matching the current first name', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'firstName', value: 'Frank' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+      expectedCurrent: 'Francisco',
+    });
+
+    expect(result).toEqual({ success: true, op: 'apply' });
+  });
+
+  it('applies a displayName suggestion, matching the current display name', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'displayName', value: 'Ceschi Ramos' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+      expectedCurrent: 'Ceschi',
+    });
+
+    expect(result).toEqual({ success: true, op: 'apply' });
+  });
+
+  it('applies a middleName suggestion when the current middle name is empty', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'middleName', value: 'Q' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+      expectedCurrent: null,
+    });
+
+    expect(result).toEqual({ success: true, op: 'apply' });
+  });
+
+  it('applies an akaNames suggestion when the current aka is empty', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'akaNames', value: 'The Alias' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+      expectedCurrent: null,
+    });
+
+    expect(result).toEqual({ success: true, op: 'apply' });
+  });
+
+  it('rejects a whitelisted field with no linked artist id as unsupported', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'surname', artistId: null, value: 'Ramirez' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Unsupported suggestion field.' });
+  });
+
+  it('rejects a non-whitelisted field as unsupported', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ field: 'nickname', value: 'Chi' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Unsupported suggestion field.' });
+  });
+
   it('errors when the artist is no longer linked to the video', async () => {
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
 

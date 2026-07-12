@@ -66,8 +66,18 @@ vi.mock('@/lib/utils/direct-upload', () => ({
 }));
 
 vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
-  VideoEnrichmentPanel: ({ videoId }: { videoId: string }) => (
-    <div data-testid="video-enrichment-panel" data-video-id={videoId} />
+  VideoEnrichmentPanel: ({
+    videoId,
+    onApplyReleaseDate,
+  }: {
+    videoId: string;
+    onApplyReleaseDate: (value: string) => void;
+  }) => (
+    <div data-testid="video-enrichment-panel" data-video-id={videoId}>
+      <button type="button" onClick={() => onApplyReleaseDate('2024-08-08')}>
+        Apply enriched date
+      </button>
+    </div>
   ),
 }));
 
@@ -731,6 +741,15 @@ describe('VideoForm — enrichment panel mount gating', () => {
       'data-video-id',
       'v1'
     );
+  });
+
+  it('writes an applied enriched release date into the form field', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply enriched date' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2024-08-08'));
   });
 
   it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {

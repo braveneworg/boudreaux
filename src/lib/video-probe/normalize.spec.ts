@@ -241,4 +241,11 @@ describe('redactProbeJson', () => {
 
     expect(redactProbeJson(raw, s3Key)).toEqual({ __truncated: true });
   });
+
+  it('degrades to a truncation marker when the payload cannot be serialized', () => {
+    const circular: Record<string, unknown> = { format: {} };
+    circular.self = circular;
+
+    expect(redactProbeJson(circular, s3Key)).toEqual({ __truncated: true });
+  });
 });

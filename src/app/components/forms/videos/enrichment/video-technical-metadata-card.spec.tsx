@@ -78,6 +78,12 @@ describe('buildTechnicalMetadataRows', () => {
 
     expect(rows.some((row) => row.label === 'Video codec')).toBe(false);
   });
+
+  it('omits the Duration row when the duration is unknown', () => {
+    const rows = buildTechnicalMetadataRows({ ...probedVideo, durationSeconds: null } as VideoRow);
+
+    expect(rows.some((row) => row.label === 'Duration')).toBe(false);
+  });
 });
 
 describe('VideoTechnicalMetadataCard', () => {

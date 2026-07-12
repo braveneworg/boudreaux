@@ -95,6 +95,17 @@ describe('runVideoEnrichmentAction', () => {
     expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
   });
 
+  it('echoes a fresh pending status instead of double-triggering', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'pending', enrichmentStartedAt: new Date() })
+    );
+
+    const result = await runVideoEnrichmentAction(VIDEO_ID);
+
+    expect(result).toEqual({ success: true, status: 'pending' });
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  });
+
   it('supersedes a stale in-flight job', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({

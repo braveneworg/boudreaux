@@ -68,6 +68,21 @@ describe('VideoEnrichmentProgressTimeline', () => {
     expect(screen.getByText(/MusicBrainz — 3 candidates/)).toBeInTheDocument();
   });
 
+  it('omits the inline counts when the counts object is empty', () => {
+    render(
+      <VideoEnrichmentProgressTimeline
+        progress={{
+          stage: 'musicbrainz',
+          counts: {},
+          at: '2026-07-11T00:00:00.000Z',
+        }}
+      />
+    );
+
+    expect(screen.getByText('MusicBrainz').closest('li')).toHaveTextContent('MusicBrainz');
+    expect(screen.queryByText(/MusicBrainz —/)).not.toBeInTheDocument();
+  });
+
   it('never rewinds the highlight when a lower stage arrives late', () => {
     const { rerender } = render(
       <VideoEnrichmentProgressTimeline

@@ -64,6 +64,32 @@ describe('probeUrl', () => {
     });
   });
 
+  it('decodes a Buffer stdout chunk to parse the JSON', async () => {
+    const proc = nextProc();
+
+    const promise = probeUrl(presignedUrl);
+    proc.stdout.emit('data', Buffer.from('{"format":{"duration":"7.0"}}', 'utf8'));
+    proc.emit('close', 0);
+
+    await expect(promise).resolves.toEqual({
+      ok: true,
+      raw: { format: { duration: '7.0' } },
+    });
+  });
+
+  it('decodes a Buffer stderr chunk into the exit error', async () => {
+    const proc = nextProc();
+
+    const promise = probeUrl(presignedUrl);
+    proc.stderr.emit('data', Buffer.from('boom', 'utf8'));
+    proc.emit('close', 1);
+
+    await expect(promise).resolves.toEqual({
+      ok: false,
+      error: 'ffprobe exited with code 1: boom',
+    });
+  });
+
   it('resolves an error on a non-zero exit with empty stderr', async () => {
     const proc = nextProc();
 

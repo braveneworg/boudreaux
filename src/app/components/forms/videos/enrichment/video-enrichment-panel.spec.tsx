@@ -287,6 +287,31 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     expect(onApplyReleaseDate).toHaveBeenCalledWith('2020-06-01');
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
   });
+
+  it('dismisses the release-date suggestion server-side', async () => {
+    setStatus(succeededStatus);
+    render(<Harness />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss Release date suggestion' }));
+
+    expect(mocks.applyVideoSuggestion).toHaveBeenCalledWith({
+      suggestionId: 's3',
+      op: 'dismiss',
+    });
+  });
+
+  it('stops Apply-all after the first apply when the server rejects', async () => {
+    mocks.applyVideoSuggestionAsync.mockRejectedValue(new Error('server down'));
+    setStatus({
+      ...succeededStatus,
+      suggestions: [bornOnSuggestion, { ...bornOnSuggestion, id: 's2', field: 'surname' }],
+    });
+    render(<Harness />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply all' }));
+
+    await waitFor(() => expect(mocks.applyVideoSuggestionAsync).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe('VideoEnrichmentPanel — poll deadline give-up', () => {
