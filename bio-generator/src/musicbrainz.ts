@@ -253,3 +253,129 @@ export const lookupArtist = async (
     tags: topTags(relData.tags),
   };
 };
+
+/** One artist-search candidate for the video-enrichment identity gate. */
+export interface MusicBrainzArtistCandidate {
+  mbid: string;
+  name: string;
+  score: number;
+  sortName: string | null;
+  aliases: string[];
+}
+
+/** Subset of the artist search response the candidate gate reads. */
+interface MbCandidateSearchResponse {
+  artists?: Array<{
+    id?: string;
+    name?: string;
+    score?: number;
+    'sort-name'?: string;
+    aliases?: Array<{ name?: string }>;
+  }>;
+}
+
+/** Non-empty alias names from an aliases array (search or lookup shape). */
+const aliasNames = (aliases: Array<{ name?: string }> | undefined): string[] =>
+  (aliases ?? []).map((alias) => alias.name).filter((name): name is string => Boolean(name));
+
+/** A raw artist entry from the candidate search that has an id and a name. */
+type NamedCandidate = NonNullable<MbCandidateSearchResponse['artists']>[number] & {
+  id: string;
+  name: string;
+};
+
+/** Keeps only search entries with both an id and a name (the rest are unusable). */
+const hasIdAndName = (
+  artist: NonNullable<MbCandidateSearchResponse['artists']>[number]
+): artist is NamedCandidate => Boolean(artist.id && artist.name);
+
+/** Maps one named search entry to a candidate, defaulting the optional fields. */
+const toCandidate = (artist: NamedCandidate): MusicBrainzArtistCandidate => ({
+  mbid: artist.id,
+  name: artist.name,
+  score: artist.score ?? 0,
+  sortName: artist['sort-name'] ?? null,
+  aliases: aliasNames(artist.aliases),
+});
+
+/**
+ * Searches MusicBrainz for artist candidates, keeping the match score and
+ * aliases so the caller can apply the score ≥90 + name/alias equality gate.
+ * Best-effort: failures return [] (an obscure act simply has no candidates).
+ *
+ * @param name - The artist name to search for.
+ * @param limit - Max candidates to request (default 5).
+ */
+export const searchArtistCandidates = async (
+  name: string,
+  limit = 5,
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
+): Promise<MusicBrainzArtistCandidate[]> => {
+  const url = `${MB_BASE}/artist?query=${encodeURIComponent(name)}&fmt=json&limit=${limit}`;
+  try {
+    const body = await request<MbCandidateSearchResponse>(url, { ...options, fetchFn });
+    return (body.artists ?? []).filter(hasIdAndName).map(toCandidate);
+  } catch (err) {
+    logEvent('warn', 'musicbrainz_candidate_search_failed', { name, error: String(err) });
+    return [];
+  }
+};
+
+/** Identity details from one artist lookup (aliases + url-rels). */
+export interface MusicBrainzArtistIdentity {
+  type: string | null;
+  lifeSpanBegin: string | null;
+  sortName: string | null;
+  /** The alias MusicBrainz types as the artist's legal name, when present. */
+  legalName: string | null;
+  aliases: string[];
+  wikidataId: string | null;
+}
+
+/** Subset of the identity lookup response we read. */
+interface MbIdentityLookupResponse {
+  type?: string;
+  'sort-name'?: string;
+  'life-span'?: { begin?: string };
+  aliases?: Array<{ name?: string; type?: string }>;
+  relations?: Array<{ type: string; url?: { resource: string } }>;
+}
+
+/** The name of the alias MusicBrainz types as the artist's legal name, if any. */
+const legalNameAlias = (aliases: MbIdentityLookupResponse['aliases']): string | null =>
+  (aliases ?? []).find((alias) => alias.type === 'Legal name')?.name ?? null;
+
+/** Maps a raw identity lookup body to the extracted {@link MusicBrainzArtistIdentity}. */
+const toArtistIdentity = (body: MbIdentityLookupResponse): MusicBrainzArtistIdentity => ({
+  type: body.type ?? null,
+  lifeSpanBegin: body['life-span']?.begin ?? null,
+  sortName: body['sort-name'] ?? null,
+  legalName: legalNameAlias(body.aliases),
+  aliases: aliasNames(body.aliases),
+  wikidataId: collectRelations(body.relations).wikidataId ?? null,
+});
+
+/**
+ * Looks up one artist's identity facts (type, life-span begin, legal-name
+ * alias, all aliases, Wikidata relation). Sleeps the MusicBrainz rate limit
+ * BEFORE requesting so it can safely follow the candidate search. Best-effort:
+ * failures return null so the caller degrades to the web fallback.
+ *
+ * @param mbid - The candidate's MusicBrainz id.
+ */
+export const lookupArtistIdentity = async (
+  mbid: string,
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
+): Promise<MusicBrainzArtistIdentity | null> => {
+  await (options.sleep ?? sleep)(MB_RATE_LIMIT_MS);
+  const url = `${MB_BASE}/artist/${encodeURIComponent(mbid)}?inc=aliases+url-rels&fmt=json`;
+  try {
+    const body = await request<MbIdentityLookupResponse>(url, { ...options, fetchFn });
+    return toArtistIdentity(body);
+  } catch (err) {
+    logEvent('warn', 'musicbrainz_identity_lookup_failed', { mbid, error: String(err) });
+    return null;
+  }
+};

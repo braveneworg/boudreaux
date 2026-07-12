@@ -20,6 +20,7 @@ import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 const date = z.coerce.date();
 const nullableDate = z.coerce.date().nullable();
 const nullableString = z.string().nullable();
+const nullableNumber = z.coerce.number().nullable();
 
 /** Video category enum — matches the Prisma `VideoCategory` enum. */
 export const videoCategorySchema = z.enum([
@@ -55,6 +56,23 @@ export const videoRowSchema = z.object({
   createdAt: date,
   updatedAt: date,
   streamUrl: z.string().nullable().optional(),
+  // Probe/enrichment display fields — present on the admin detail wire only,
+  // stripped from listings, so all are optional. Numerics/dates are coerced
+  // like the base fields. probeData / enrichmentJobToken / enrichmentProgress /
+  // enrichmentError are NEVER on this wire (unknown keys are stripped at parse).
+  width: nullableNumber.optional(),
+  height: nullableNumber.optional(),
+  videoCodec: nullableString.optional(),
+  audioCodec: nullableString.optional(),
+  bitrateKbps: nullableNumber.optional(),
+  frameRate: nullableNumber.optional(),
+  container: nullableString.optional(),
+  audioChannels: nullableNumber.optional(),
+  audioSampleRateHz: nullableNumber.optional(),
+  sourceCreatedAt: nullableDate.optional(),
+  probedAt: nullableDate.optional(),
+  probeError: nullableString.optional(),
+  enrichmentStatus: nullableString.optional(),
 });
 
 /** Strict schema for one `/api/videos` page (`{ rows, nextSkip }`). */

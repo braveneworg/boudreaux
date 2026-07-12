@@ -61,6 +61,8 @@ export const queryKeys = {
         params.sort,
       ] as const,
     detail: (id: string) => [...queryKeys.videos.all, 'detail', id] as const,
+    /** Enrichment status poll — its own key so applies never reset `videos.detail`. */
+    enrichment: (id: string) => [...queryKeys.videos.all, 'enrichment', id] as const,
   },
   artists: {
     all: ['artists'] as const,

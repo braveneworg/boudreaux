@@ -154,6 +154,32 @@ export const generatePresignedDownloadUrl = async (
   return downloadUrl;
 };
 
+/** Presigned probe GET URLs live just long enough for one ffprobe header read. */
+const PROBE_URL_EXPIRATION_SECONDS = 120;
+
+/**
+ * Generate a short-lived presigned GET URL for the server-side ffprobe pass.
+ *
+ * Server-only and security-sensitive: the URL embeds credentials (X-Amz-*
+ * query parameters) — NEVER log it and NEVER return it to a client. A plain
+ * GetObjectCommand (no ResponseContentDisposition/Type overrides) so ffprobe
+ * can range-read the container headers directly from S3.
+ *
+ * @param s3Key - S3 object key of the uploaded video
+ * @returns Presigned URL valid for 120 seconds
+ */
+export const generatePresignedProbeUrl = async (s3Key: string): Promise<string> => {
+  const s3Client = getS3Client();
+  const bucketName = getS3BucketName();
+
+  const getCommand = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: s3Key,
+  });
+
+  return getSignedUrl(s3Client, getCommand, { expiresIn: PROBE_URL_EXPIRATION_SECONDS });
+};
+
 /**
  * Verify S3 object exists (HEAD request)
  *

@@ -2,7 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
+import {
+  listReleaseGroups,
+  lookupArtist,
+  lookupArtistIdentity,
+  searchArtistCandidates,
+} from './musicbrainz.js';
 
 const jsonResponse = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -260,5 +265,113 @@ describe('listReleaseGroups', () => {
     await expect(
       listReleaseGroups('mbid-1', fetchFn, { sleep: async () => {}, retries: 0 })
     ).resolves.toEqual([]);
+  });
+});
+
+describe('searchArtistCandidates', () => {
+  it('maps candidates with score, sort-name, and aliases', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          artists: [
+            {
+              id: 'mbid-1',
+              name: 'Ceschi',
+              score: 98,
+              'sort-name': 'Ceschi',
+              aliases: [{ name: 'Ceschi Ramos' }],
+            },
+          ],
+        })
+      )
+    );
+
+    const result = await searchArtistCandidates('Ceschi', 5, fetchFn);
+
+    expect(result).toEqual([
+      {
+        mbid: 'mbid-1',
+        name: 'Ceschi',
+        score: 98,
+        sortName: 'Ceschi',
+        aliases: ['Ceschi Ramos'],
+      },
+    ]);
+  });
+
+  it('threads the limit into the search URL', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ artists: [] })));
+
+    await searchArtistCandidates('Ceschi', 3, fetchFn);
+
+    expect(String(fetchFn.mock.calls[0][0])).toContain('limit=3');
+  });
+
+  it('returns [] on a failed request', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 404 }));
+
+    const result = await searchArtistCandidates('Ceschi', 5, fetchFn, { retries: 0 });
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('lookupArtistIdentity', () => {
+  const identityBody = {
+    type: 'Person',
+    'sort-name': 'Ceschi',
+    'life-span': { begin: '1980-01-02' },
+    aliases: [
+      { name: 'Francisco Ramos', type: 'Legal name' },
+      { name: 'Ceschi Ramos', type: 'Artist name' },
+    ],
+    relations: [{ type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q123' } }],
+  };
+
+  it('sleeps the MusicBrainz rate limit before the lookup', async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(identityBody)));
+
+    await lookupArtistIdentity('mbid-1', fetchFn, { sleep });
+
+    expect(sleep).toHaveBeenCalledWith(1100);
+  });
+
+  it('extracts type, life-span, legal name, aliases, and wikidata id', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(identityBody)));
+
+    const result = await lookupArtistIdentity('mbid-1', fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result).toEqual({
+      type: 'Person',
+      lifeSpanBegin: '1980-01-02',
+      sortName: 'Ceschi',
+      legalName: 'Francisco Ramos',
+      aliases: ['Francisco Ramos', 'Ceschi Ramos'],
+      wikidataId: 'Q123',
+    });
+  });
+
+  it('requests aliases and url-rels in one lookup', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(identityBody)));
+
+    await lookupArtistIdentity('mbid-1', fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(String(fetchFn.mock.calls[0][0])).toContain('inc=aliases+url-rels');
+  });
+
+  it('returns null on a failed lookup', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 404 }));
+
+    const result = await lookupArtistIdentity('mbid-1', fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+      retries: 0,
+    });
+
+    expect(result).toBeNull();
   });
 });

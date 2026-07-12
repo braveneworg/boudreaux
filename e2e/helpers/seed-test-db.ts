@@ -125,6 +125,18 @@ const BIO_FILTER_INSERT_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a2';
 const BIO_CUSTOM_MEDIA_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d1a3';
 
 /**
+ * Deterministic ids for the video-enrichment E2E fixtures
+ * (admin-video-enrichment.spec.ts). Both videos are published AND archived so
+ * they are invisible to every listing assertion (public /videos excludes
+ * archived; the admin default/published/unpublished views exclude archived);
+ * the spec reaches them by direct URL.
+ */
+const ENRICH_MUSIC_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d2b1';
+const ENRICH_INFO_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d2b2';
+const ENRICH_LEAD_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a1';
+const ENRICH_GUEST_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a2';
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -345,6 +357,113 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
 };
 
 /**
+ * Seed the dedicated video-enrichment fixtures: two probed videos (MUSIC +
+ * INFORMATIONAL) and the two shell artists the MUSIC video's artist string
+ * splits into ('E2E Enrich Lead feat. E2E Enrich Guest'). Slugs/displayNames
+ * match the canonical findOrCreateByName derivation so a Run in the spec
+ * attaches suggestions to THESE rows instead of creating duplicates. The
+ * artists' createdAt is pinned to 2020 so they sort last in the admin
+ * artists list and never become the first-listed artist the bio-generation
+ * spec regenerates.
+ */
+const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
+  await prisma.artist.createMany({
+    data: [
+      {
+        id: ENRICH_LEAD_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Enrich Lead',
+        slug: 'e2e-enrich-lead',
+        displayName: 'E2E Enrich Lead',
+        createdAt: new Date('2020-01-04T00:00:00Z'),
+      },
+      {
+        id: ENRICH_GUEST_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Enrich Guest',
+        slug: 'e2e-enrich-guest',
+        displayName: 'E2E Enrich Guest',
+        createdAt: new Date('2020-01-05T00:00:00Z'),
+      },
+    ],
+  });
+
+  // Probe scalars the technical-card assertions pin ('1920×1080', '4.2 Mbps',
+  // '29.97 fps'); releasedOn intentionally differs from the fixture's
+  // releasedOn suggestion (2020-06-01) so the suggestion is emitted.
+  const probeScalars = {
+    probedAt: new Date('2026-02-02T00:00:00.000Z'),
+    container: 'mp4',
+    width: 1920,
+    height: 1080,
+    videoCodec: 'h264',
+    audioCodec: 'aac',
+    bitrateKbps: 4200,
+    frameRate: 29.97,
+    audioChannels: 2,
+    audioSampleRateHz: 44100,
+  };
+
+  await prisma.video.createMany({
+    data: [
+      {
+        id: ENRICH_MUSIC_VIDEO_ID,
+        title: 'E2E Enrich Hotel',
+        artist: 'E2E Enrich Lead feat. E2E Enrich Guest',
+        category: 'MUSIC',
+        releasedOn: new Date('2026-02-01T00:00:00.000Z'),
+        durationSeconds: 200,
+        s3Key: 'media/videos/e2e/e2e-enrich-hotel.mp4',
+        fileName: 'e2e-enrich-hotel.mp4',
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: 'E2E Enrich Hotel description for E2E.',
+        publishedAt: PUBLISHED_AT,
+        archivedAt: ARCHIVED_AT,
+        ...probeScalars,
+      },
+      {
+        id: ENRICH_INFO_VIDEO_ID,
+        title: 'E2E Enrich India',
+        artist: 'E2E Enrich Narrator',
+        category: 'INFORMATIONAL',
+        releasedOn: new Date('2026-01-31T00:00:00.000Z'),
+        durationSeconds: 100,
+        s3Key: 'media/videos/e2e/e2e-enrich-india.mp4',
+        fileName: 'e2e-enrich-india.mp4',
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: 'E2E Enrich India description for E2E.',
+        publishedAt: PUBLISHED_AT,
+        archivedAt: ARCHIVED_AT,
+        ...probeScalars,
+      },
+    ],
+  });
+
+  // First-ever writes to the fresh VideoArtist collection — a single
+  // createMany (concurrent create() read-backs race in CI on new collections).
+  await prisma.videoArtist.createMany({
+    data: [
+      {
+        videoId: ENRICH_MUSIC_VIDEO_ID,
+        artistId: ENRICH_LEAD_ARTIST_ID,
+        role: 'PRIMARY',
+        sortOrder: 0,
+      },
+      {
+        videoId: ENRICH_MUSIC_VIDEO_ID,
+        artistId: ENRICH_GUEST_ARTIST_ID,
+        role: 'FEATURED',
+        sortOrder: 1,
+      },
+    ],
+  });
+};
+
+/**
  * Idempotent seed script for the E2E test database. Clears all collections
  * and creates deterministic test data.
  *
@@ -370,7 +489,11 @@ const seedTestDatabase = async () => {
     // Wait for the replica set to be ready before proceeding
     await waitForReplicaSet(prisma);
 
-    // Clear all collections in dependency-safe order
+    // Clear all collections in dependency-safe order. Video-enrichment join +
+    // suggestion rows reference Video (and VideoArtist references Artist), so
+    // they must be removed before the videos and artists they belong to.
+    await prisma.videoEnrichmentSuggestion.deleteMany({});
+    await prisma.videoArtist.deleteMany({});
     await prisma.abuseReport.deleteMany({});
     await prisma.smsBlast.deleteMany({});
     await prisma.chatMessage.deleteMany({});
@@ -1175,6 +1298,7 @@ const seedTestDatabase = async () => {
     });
 
     await seedVideos(prisma);
+    await seedEnrichmentFixtures(prisma);
 
     console.info('E2E test database seeded successfully.');
   } finally {
@@ -1188,6 +1312,8 @@ export {
   BIO_PALETTE_ARTIST_ID,
   createBioPaletteLinkRow,
   createDisposableSignoutState,
+  ENRICH_INFO_VIDEO_ID,
+  ENRICH_MUSIC_VIDEO_ID,
   seedTestDatabase,
   SIGNOUT_USER_ID,
   TEST_USERS,

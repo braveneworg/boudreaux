@@ -52,6 +52,10 @@ const mockVideo = {
   archivedAt: null,
   createdBy: 'admin-1',
   updatedBy: null,
+  width: 1920,
+  enrichmentStatus: 'pending',
+  probeData: { format: { filename: 'media/videos/test/video.mp4' } },
+  enrichmentJobToken: 'job-token-1',
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
@@ -261,6 +265,54 @@ describe('GET /api/videos', () => {
     const data = await response.json();
 
     expect(data.rows[0]).not.toHaveProperty('updatedBy');
+  });
+
+  it('omits probeData from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('probeData');
+  });
+
+  it('omits enrichmentJobToken from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('enrichmentJobToken');
+  });
+
+  it('omits probe display fields (width) from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('width');
+  });
+
+  it('omits enrichmentStatus from serialized rows', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.rows[0]).not.toHaveProperty('enrichmentStatus');
   });
 
   it('serializes a BigInt fileSize to a JSON-safe number', async () => {

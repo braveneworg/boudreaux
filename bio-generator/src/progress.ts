@@ -4,7 +4,7 @@
 
 import { logEvent, toErrorMessage } from './lib/log.js';
 
-import type { ProgressStage } from './types.js';
+import type { ProgressStage, VideoProgressStage } from './types.js';
 
 /**
  * Hard cap on a single progress POST. Progress is a pure side channel, so a hung
@@ -18,8 +18,8 @@ export interface BioProgressArgs {
   progressUrl: string;
   /** Opaque per-job token the web app verifies before recording the checkpoint. */
   jobToken: string;
-  /** The stage the generation just reached. */
-  stage: ProgressStage;
+  /** The stage the generation (bio) or enrichment (video) just reached. */
+  stage: ProgressStage | VideoProgressStage;
   /** Optional human-readable detail for the timeline. */
   detail?: string;
   /** Optional non-negative counters for the stage (e.g. `{ candidates: 42 }`). */

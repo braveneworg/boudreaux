@@ -16,7 +16,16 @@ import {
 
 import type { BioGeneratorDeps } from './handler.js';
 import type { ArtistFacts, BioImage } from './types.js';
+import type * as VideoEnrichmentModule from './video-enrichment.js';
 import type { VerifiedScrapedImage } from './vision.js';
+
+vi.mock('./video-enrichment.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof VideoEnrichmentModule>();
+  return {
+    ...actual,
+    runVideoEnrichmentLambda: vi.fn().mockResolvedValue({ ok: false, error: 'stubbed' }),
+  };
+});
 
 /**
  * Wraps verified images in the {@link VerifiedScrapedImage} envelope the vision
@@ -1996,5 +2005,27 @@ describe('media discovery v2 orchestration', () => {
     const data = await runBioGeneration(baseInput(), deps);
     expect(data.links.length).toBeLessThanOrEqual(100);
     expect(data.links.length).toBeGreaterThan(50);
+  });
+});
+
+describe('runLambda task routing', () => {
+  it('routes a video-enrichment event to the video mode', async () => {
+    const { runVideoEnrichmentLambda } = await import('./video-enrichment.js');
+
+    const result = await runLambda({ task: 'video-enrichment', videoId: 'v1' });
+
+    expect(vi.mocked(runVideoEnrichmentLambda)).toHaveBeenCalledWith({
+      task: 'video-enrichment',
+      videoId: 'v1',
+    });
+    expect(result).toEqual({ ok: false, error: 'stubbed' });
+  });
+
+  it('leaves a task-less bio event on the bio path', async () => {
+    const { runVideoEnrichmentLambda } = await import('./video-enrichment.js');
+
+    await runLambda({}); // invalid bio input — still must NOT route to video
+
+    expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
   });
 });

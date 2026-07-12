@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { VideoService } from '@/lib/services/video-service';
@@ -22,6 +23,7 @@ import { createVideoSchema } from '@/lib/validation/create-video-schema';
 import {
   buildVideoCreateInput,
   confirmVideoUpload,
+  kickPostSaveEnrichment,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -97,6 +99,16 @@ const runVideoCreate = async (
     revalidatePath('/admin/videos');
     if (response.success) {
       revalidatePath('/videos');
+      // Post-save enrichment (artist sync → probe → MUSIC web enrichment)
+      // runs after the response so the admin's save returns immediately.
+      after(() =>
+        kickPostSaveEnrichment({
+          videoId: response.data.id,
+          artist: data.artist,
+          category: data.category,
+          reProbe: true,
+        })
+      );
     }
   } catch {
     formState.success = false;
