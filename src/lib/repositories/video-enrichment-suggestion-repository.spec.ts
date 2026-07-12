@@ -67,6 +67,15 @@ describe('VideoEnrichmentSuggestionRepository', () => {
 
       expect(prisma.videoEnrichmentSuggestion.createMany).not.toHaveBeenCalled();
     });
+
+    it('runs the delete-then-create inside a single transaction', async () => {
+      vi.mocked(prisma.videoEnrichmentSuggestion.deleteMany).mockResolvedValue({ count: 0 });
+      vi.mocked(prisma.videoEnrichmentSuggestion.createMany).mockResolvedValue({ count: 1 });
+
+      await VideoEnrichmentSuggestionRepository.replacePending(VIDEO_ID, [row]);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('findByVideoId', () => {

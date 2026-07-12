@@ -53,6 +53,17 @@ describe('VideoArtistRepository', () => {
 
       expect(prisma.videoArtist.createMany).not.toHaveBeenCalled();
     });
+
+    it('runs the delete-then-create inside a single transaction', async () => {
+      vi.mocked(prisma.videoArtist.deleteMany).mockResolvedValue({ count: 0 });
+      vi.mocked(prisma.videoArtist.createMany).mockResolvedValue({ count: 1 });
+
+      await VideoArtistRepository.replaceForVideo(VIDEO_ID, [
+        { artistId: ARTIST_ID, role: 'PRIMARY', sortOrder: 0 },
+      ]);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('findByVideoId', () => {
