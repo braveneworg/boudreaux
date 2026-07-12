@@ -876,13 +876,26 @@ export class ArtistService {
   /** Persists one admin-authored bio link and returns the created row.
    *  Dedupes by URL: if the artist already has a link with this URL (custom or
    *  generated), returns that existing row instead of creating a duplicate, so
-   *  the reference-links input and the Add-link editor stay idempotent. */
+   *  the reference-links input and the Add-link editor stay idempotent. A
+   *  concurrent add can slip between the check and the insert; the DB's
+   *  `@@unique([artistId, url])` index then rejects the loser, so a `DUPLICATE`
+   *  is recovered by re-reading and returning the row the winner persisted. */
   static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
     const existing = await ArtistRepository.findBioLinkByUrl(input.artistId, input.url);
     if (existing) {
       return existing;
     }
-    return ArtistRepository.createBioLink(input);
+    try {
+      return await ArtistRepository.createBioLink(input);
+    } catch (error) {
+      if (error instanceof DataError && error.code === 'DUPLICATE') {
+        const raced = await ArtistRepository.findBioLinkByUrl(input.artistId, input.url);
+        if (raced) {
+          return raced;
+        }
+      }
+      throw error;
+    }
   }
 
   /** Updates one bio image's attribution text. */

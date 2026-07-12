@@ -2172,6 +2172,43 @@ describe('ArtistService', () => {
       expect(result).toBe(existing);
       expect(ArtistRepository.createBioLink).not.toHaveBeenCalled();
     });
+
+    it('returns the raced row when a concurrent create loses the unique index', async () => {
+      const raced = {
+        id: 'link-race',
+        artistId: 'a1',
+        label: 'Winner',
+        url: 'https://cdn/x',
+        kind: null,
+        origin: 'custom',
+        sortOrder: 3,
+      };
+      vi.mocked(ArtistRepository.findBioLinkByUrl)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(raced);
+      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+        new DataError('DUPLICATE', 'Unique constraint failed')
+      );
+
+      const result = await ArtistService.createBioLink({
+        artistId: 'a1',
+        label: 'Loser',
+        url: 'https://cdn/x',
+      });
+
+      expect(result).toBe(raced);
+    });
+
+    it('rethrows a non-duplicate data error from the create', async () => {
+      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
+
+      await expect(
+        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
+      ).rejects.toThrow('Connection failed');
+    });
   });
 
   describe('updateBioImageAttribution', () => {

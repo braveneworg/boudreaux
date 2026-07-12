@@ -249,6 +249,31 @@ const buildSearchWhere = (search?: string): Prisma.ArtistWhereInput => ({
   }),
 });
 
+/** A regenerated bio-link row before it is stamped `origin: 'generated'`. */
+type GeneratedLinkInput = { label: string; url: string; kind: string | null; sortOrder: number };
+
+/**
+ * Builds the generated bio-link rows to insert during a regeneration: drops any
+ * whose URL matches a surviving custom row (case-insensitive) and any that
+ * exactly repeats an earlier URL, so the `@@unique([artistId, url])` index is
+ * never violated. Keeps the first occurrence of each URL.
+ */
+const buildGeneratedLinks = (
+  links: GeneratedLinkInput[],
+  customLinkUrls: Set<string>
+): Array<GeneratedLinkInput & { origin: string }> => {
+  const seen = new Set<string>();
+  return links
+    .filter((link) => {
+      if (customLinkUrls.has(link.url.toLowerCase()) || seen.has(link.url)) {
+        return false;
+      }
+      seen.add(link.url);
+      return true;
+    })
+    .map((link) => ({ ...link, origin: 'generated' }));
+};
+
 /**
  * Data-access layer for the Artist and ArtistRelease models. The only layer that
  * touches Prisma for artists: it owns the query shapes (includes/where DSL),
@@ -528,9 +553,7 @@ export class ArtistRepository {
           const imagesToCreate = content.images
             .filter((image) => !customImageUrls.has(image.url.toLowerCase()))
             .map((image) => ({ ...image, origin: 'generated' }));
-          const linksToCreate = content.links
-            .filter((link) => !customLinkUrls.has(link.url.toLowerCase()))
-            .map((link) => ({ ...link, origin: 'generated' }));
+          const linksToCreate = buildGeneratedLinks(content.links, customLinkUrls);
 
           await tx.artist.update({
             where: { id: artistId },

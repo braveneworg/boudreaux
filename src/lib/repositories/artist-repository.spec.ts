@@ -724,6 +724,32 @@ describe('ArtistRepository', () => {
       expect(arg.data.bioLinks.create).toEqual([]);
     });
 
+    it('drops an exact-duplicate-url generated link so the unique index never trips', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      const contentWithDupLinks = {
+        ...content,
+        links: [
+          { label: 'Site', url: 'https://dup.example/x', kind: null, sortOrder: 0 },
+          { label: 'Site again', url: 'https://dup.example/x', kind: null, sortOrder: 1 },
+        ],
+      };
+
+      await ArtistRepository.replaceBioContent('a1', contentWithDupLinks);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioLinks.create).toEqual([
+        {
+          label: 'Site',
+          url: 'https://dup.example/x',
+          kind: null,
+          sortOrder: 0,
+          origin: 'generated',
+        },
+      ]);
+    });
+
     it('dedupes per-row: drops a matched link but still inserts a different unmatched link in the same call', async () => {
       // Wikipedia URL matches a custom survivor; Official Site does not.
       const tx = buildTx({ links: [{ url: 'HTTPS://EN.WIKIPEDIA.ORG/wiki/X' }] });

@@ -455,7 +455,11 @@ model ArtistBioLink {
   origin    String?
   sortOrder Int     @default(0)
 
-  @@index([artistId])
+  // One row per (artist, url): the admin add-link paths dedupe by URL in the
+  // service, and this index is the DB backstop so a concurrent double-add can
+  // never persist two identical links. Generated links are deduped by URL in
+  // `replaceBioContent` before insert so regeneration never trips it.
+  @@unique([artistId, url])
   @@index([sortOrder])
 }
 
