@@ -76,3 +76,26 @@ export const linkPreviewLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const LINK_PREVIEW_LIMIT = 30;
+
+/**
+ * Video-enrichment completion callback (server-to-server) — 20 requests per
+ * minute. One legitimate POST per dispatched job; the modest cap absorbs
+ * Lambda retries while blunting a flood of forged completion callbacks.
+ */
+export const videoEnrichmentCallbackLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const VIDEO_ENRICHMENT_CALLBACK_LIMIT = 20;
+
+/**
+ * Video-enrichment progress channel (server-to-server) — 60 requests per
+ * minute. A run POSTs one checkpoint per stage (5 stages), so the higher cap
+ * absorbs the cadence plus Lambda retries. Verify-only — it never claims the
+ * job token.
+ */
+export const videoEnrichmentProgressLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const VIDEO_ENRICHMENT_PROGRESS_LIMIT = 60;

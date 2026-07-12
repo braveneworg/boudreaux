@@ -2,7 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { bioGenerationInputSchema, bioImageSchema, bioLinkSchema } from './types.js';
+import {
+  bioGenerationInputSchema,
+  bioImageSchema,
+  bioLinkSchema,
+  VIDEO_PROGRESS_STAGES,
+  videoEnrichmentInputSchema,
+  videoEnrichmentResultSchema,
+} from './types.js';
 
 describe('bioGenerationInputSchema', () => {
   it('parses valid input without optional date fields', () => {
@@ -261,5 +268,120 @@ describe('bio media discovery v2 wire types', () => {
       releases: [{ title: 'X', releasedOn: '2015/04/14', url: '/releases/abc' }],
     };
     expect(bioGenerationInputSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('videoEnrichmentInputSchema', () => {
+  const validInput = {
+    task: 'video-enrichment',
+    videoId: 'f'.repeat(24),
+    title: 'Bite Through Stone',
+    artistDisplay: 'Ceschi feat. Sole',
+    releasedOn: '2021-04-09',
+    artists: [
+      {
+        artistId: 'a'.repeat(24),
+        name: 'Ceschi',
+        role: 'primary',
+        known: { firstName: 'Francisco', surname: 'Ramos', bornOn: '1980-01-02' },
+      },
+    ],
+    callbackUrl: 'https://example.com/api/videos/x/enrichment/callback',
+    progressUrl: 'https://example.com/api/videos/x/enrichment/progress',
+    jobToken: 'token-1',
+  };
+
+  it('accepts a full video-enrichment event', () => {
+    expect(videoEnrichmentInputSchema.safeParse(validInput).success).toBe(true);
+  });
+
+  it('rejects a missing task discriminator', () => {
+    const { task: _task, ...rest } = validInput;
+    expect(videoEnrichmentInputSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('rejects an empty artists list', () => {
+    expect(videoEnrichmentInputSchema.safeParse({ ...validInput, artists: [] }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects more than 10 artists', () => {
+    const artists = Array.from({ length: 11 }, (_, i) => ({
+      artistId: `${i}`.padStart(24, '0'),
+      name: `Artist ${i}`,
+      role: 'featured',
+    }));
+    expect(videoEnrichmentInputSchema.safeParse({ ...validInput, artists }).success).toBe(false);
+  });
+
+  it('rejects an unknown role', () => {
+    const artists = [{ artistId: 'a'.repeat(24), name: 'Ceschi', role: 'headliner' }];
+    expect(videoEnrichmentInputSchema.safeParse({ ...validInput, artists }).success).toBe(false);
+  });
+
+  it('rejects a jobToken longer than 200 chars', () => {
+    const jobToken = 'x'.repeat(201);
+    expect(videoEnrichmentInputSchema.safeParse({ ...validInput, jobToken }).success).toBe(false);
+  });
+});
+
+describe('videoEnrichmentResultSchema', () => {
+  it('accepts an ok envelope with suggestions', () => {
+    const parsed = videoEnrichmentResultSchema.safeParse({
+      ok: true,
+      data: {
+        artists: [
+          {
+            artistId: 'a'.repeat(24),
+            suggestions: [
+              {
+                field: 'bornOn',
+                value: '1985-03-15',
+                confidence: 'high',
+                sources: [{ url: 'https://musicbrainz.org/artist/x' }],
+              },
+            ],
+          },
+        ],
+        model: 'gemini-2.5-flash',
+      },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a failure envelope', () => {
+    expect(videoEnrichmentResultSchema.safeParse({ ok: false, error: 'boom' }).success).toBe(true);
+  });
+
+  it('rejects a source url longer than 2048 chars', () => {
+    const url = `https://example.com/${'a'.repeat(2048)}`;
+    const parsed = videoEnrichmentResultSchema.safeParse({
+      ok: true,
+      data: {
+        artists: [
+          {
+            artistId: 'a'.repeat(24),
+            suggestions: [
+              { field: 'bornOn', value: '1985-03-15', confidence: 'high', sources: [{ url }] },
+            ],
+          },
+        ],
+        model: 'gemini-2.5-flash',
+      },
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('VIDEO_PROGRESS_STAGES', () => {
+  it('pins the stage order (wire contract with the web app)', () => {
+    expect(VIDEO_PROGRESS_STAGES).toEqual([
+      'musicbrainz',
+      'wikidata',
+      'web-search',
+      'adjudicating',
+      'finalizing',
+    ]);
   });
 });

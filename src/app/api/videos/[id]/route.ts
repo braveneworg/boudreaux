@@ -42,12 +42,22 @@ export const GET = withAdmin<{ id: string }>(async (_request, context) => {
       return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
     }
 
-    const video = serializeForResponse({
-      ...result.data,
-      streamUrl: signStreamUrl(result.data.s3Key),
+    // Raw probe JSON, the per-job callback token, and the progress checkpoint
+    // are server-internal — the admin edit page reads the normalized probe
+    // columns here and polls job state via the enrichment endpoint instead.
+    const {
+      probeData: _probeData,
+      enrichmentJobToken: _enrichmentJobToken,
+      enrichmentProgress: _enrichmentProgress,
+      ...video
+    } = result.data;
+
+    const payload = serializeForResponse({
+      ...video,
+      streamUrl: signStreamUrl(video.s3Key),
     });
 
-    return NextResponse.json(video, { headers: CACHE_HEADERS });
+    return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
     loggers.media.error('Video detail GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

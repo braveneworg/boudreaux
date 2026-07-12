@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { DataError } from '@/lib/types/domain/errors';
-import type { CreateVideoData } from '@/lib/types/domain/video';
+import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
 import { VideoRepository } from './video-repository';
 
@@ -21,6 +21,7 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -283,6 +284,242 @@ describe('VideoRepository', () => {
 
       expect(result).toEqual(mockVideo);
       expect(prisma.video.delete).toHaveBeenCalledWith({ where: { id: 'video-123' } });
+    });
+  });
+
+  describe('saveProbeResult', () => {
+    const probeData = { format: { filename: 'videos/test.mp4' } };
+
+    const saveData: SaveProbeResultData = {
+      probedAt: new Date('2026-07-11T00:00:00.000Z'),
+      probeError: null,
+      probeData,
+      width: 1920,
+      height: 1080,
+    };
+
+    it('returns true when the s3Key-conditional update writes a row', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      const result = await VideoRepository.saveProbeResult(
+        'video-123',
+        'videos/test.mp4',
+        saveData
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when the file was replaced during the probe (zero rows)', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      const result = await VideoRepository.saveProbeResult(
+        'video-123',
+        'videos/stale.mp4',
+        saveData
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('conditions the update on BOTH id and the probed s3Key (race guard)', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', saveData);
+
+      const arg = vi.mocked(prisma.video.updateMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({ id: 'video-123', s3Key: 'videos/test.mp4' });
+    });
+
+    it('writes the scalar fields and the probe JSON', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', saveData);
+
+      const arg = vi.mocked(prisma.video.updateMany).mock.calls[0]?.[0];
+      expect(arg?.data).toEqual({
+        probedAt: new Date('2026-07-11T00:00:00.000Z'),
+        probeError: null,
+        width: 1920,
+        height: 1080,
+        probeData,
+      });
+    });
+
+    it('omits probeData when not supplied (failure-only persist)', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', {
+        probedAt: new Date('2026-07-11T00:00:00.000Z'),
+        probeError: 'ffprobe exited with code 1',
+      });
+
+      const arg = vi.mocked(prisma.video.updateMany).mock.calls[0]?.[0];
+      expect(arg?.data).toEqual({
+        probedAt: new Date('2026-07-11T00:00:00.000Z'),
+        probeError: 'ffprobe exited with code 1',
+      });
+    });
+
+    it('writes a null probeData as a DB null', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', {
+        probedAt: new Date('2026-07-11T00:00:00.000Z'),
+        probeData: null,
+      });
+
+      const arg = vi.mocked(prisma.video.updateMany).mock.calls[0]?.[0];
+      expect(arg?.data).toEqual({
+        probedAt: new Date('2026-07-11T00:00:00.000Z'),
+        probeData: null,
+      });
+    });
+
+    it('wraps a connection failure as a DataError', async () => {
+      vi.mocked(prisma.video.updateMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(
+        VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', saveData)
+      ).rejects.toBeInstanceOf(DataError);
+    });
+  });
+
+  describe('setEnrichmentStatus', () => {
+    it('stamps enrichmentStartedAt when flipping to processing', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'processing');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'processing', enrichmentStartedAt: expect.any(Date) },
+      });
+    });
+
+    it('clears progress and error when flipping to pending', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'pending');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'pending', enrichmentProgress: null, enrichmentError: null },
+      });
+    });
+
+    it('stamps enrichedAt when flipping to succeeded', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'succeeded', { error: null });
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: {
+          enrichmentStatus: 'succeeded',
+          enrichmentError: null,
+          enrichedAt: expect.any(Date),
+        },
+      });
+    });
+
+    it('writes the provided error when flipping to failed', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'failed', { error: 'boom' });
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentStatus: 'failed', enrichmentError: 'boom' },
+      });
+    });
+  });
+
+  describe('setEnrichmentJobToken', () => {
+    it('stores the per-job token', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentJobToken('video-123', 'token-1');
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentJobToken: 'token-1' },
+      });
+    });
+
+    it('clears the token with null', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentJobToken('video-123', null);
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentJobToken: null },
+      });
+    });
+  });
+
+  describe('claimEnrichmentJobToken', () => {
+    it('claims atomically iff the token matches a processing job', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 });
+
+      const result = await VideoRepository.claimEnrichmentJobToken('video-123', 'token-1');
+
+      expect(result).toBe(true);
+      expect(prisma.video.updateMany).toHaveBeenCalledWith({
+        where: { id: 'video-123', enrichmentJobToken: 'token-1', enrichmentStatus: 'processing' },
+        data: { enrichmentJobToken: null },
+      });
+    });
+
+    it('returns false when another caller already claimed', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 0 });
+
+      const result = await VideoRepository.claimEnrichmentJobToken('video-123', 'token-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('setEnrichmentProgress', () => {
+    it('persists the checkpoint payload', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+      const checkpoint = { stage: 'musicbrainz', at: '2026-07-12T00:00:00.000Z' };
+
+      await VideoRepository.setEnrichmentProgress('video-123', checkpoint);
+
+      expect(prisma.video.update).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        data: { enrichmentProgress: checkpoint },
+      });
+    });
+  });
+
+  describe('getEnrichmentState', () => {
+    it('selects the enrichment lifecycle projection', async () => {
+      vi.mocked(prisma.video.findUnique).mockResolvedValue(null);
+
+      await VideoRepository.getEnrichmentState('video-123');
+
+      expect(prisma.video.findUnique).toHaveBeenCalledWith({
+        where: { id: 'video-123' },
+        select: {
+          id: true,
+          enrichmentStatus: true,
+          enrichmentError: true,
+          enrichmentStartedAt: true,
+          enrichmentJobToken: true,
+          enrichmentProgress: true,
+          enrichedAt: true,
+          category: true,
+          artist: true,
+          title: true,
+          releasedOn: true,
+          s3Key: true,
+        },
+      });
     });
   });
 });

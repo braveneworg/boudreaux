@@ -5,7 +5,11 @@ import 'server-only';
 
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-import { ArtistRepository, type BioImageRehostRow } from '@/lib/repositories/artist-repository';
+import {
+  ArtistRepository,
+  type BioImageRehostRow,
+  type EnrichedArtistFieldUpdate,
+} from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
@@ -356,6 +360,40 @@ const recoverArtistFromDuplicate = async (
     return { success: true, data: existing };
   }
   return { success: false, error: 'Artist with this slug already exists' };
+};
+
+/** The artist fields a video-enrichment suggestion may apply. */
+export type ArtistEnrichedField =
+  | 'firstName'
+  | 'middleName'
+  | 'surname'
+  | 'akaNames'
+  | 'displayName'
+  | 'bornOn';
+
+/**
+ * Explicit whitelist switch mapping a suggestion field onto a typed one-field
+ * update — never a dynamic key. `bornOn` values arrive as YYYY-MM-DD and
+ * parse as UTC midnight.
+ */
+const buildEnrichedFieldUpdate = (
+  field: ArtistEnrichedField,
+  value: string
+): EnrichedArtistFieldUpdate => {
+  switch (field) {
+    case 'firstName':
+      return { firstName: value };
+    case 'middleName':
+      return { middleName: value };
+    case 'surname':
+      return { surname: value };
+    case 'akaNames':
+      return { akaNames: value };
+    case 'displayName':
+      return { displayName: value };
+    case 'bornOn':
+      return { bornOn: new Date(value) };
+  }
 };
 
 export class ArtistService {
@@ -913,5 +951,23 @@ export class ArtistService {
   static async existsById(artistId: string): Promise<boolean> {
     const found = await ArtistRepository.existsById(artistId);
     return Boolean(found);
+  }
+
+  /**
+   * Applies one admin-approved enrichment suggestion to the artist record
+   * through the field whitelist. Throws on a repository failure — the calling
+   * action maps that to a typed error.
+   */
+  static async applyEnrichedField(
+    artistId: string,
+    field: ArtistEnrichedField,
+    value: string,
+    updatedBy: string
+  ): Promise<void> {
+    await ArtistRepository.updateEnrichedField(
+      artistId,
+      buildEnrichedFieldUpdate(field, value),
+      updatedBy
+    );
   }
 }

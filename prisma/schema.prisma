@@ -314,6 +314,7 @@ model Artist {
   bioImages             ArtistBioImage[] // Images discovered during AI bio generation (Wikimedia etc.)
   bioLinks              ArtistBioLink[] // External links discovered during AI bio generation
   artistFeaturedArtists ArtistFeaturedArtist[]
+  videoArtists          VideoArtist[] // Videos this artist appears on (probe/enrichment feature)
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
   tourHeadliners        TourDateHeadliner[] // Tours where this artist is a headliner
@@ -1003,7 +1004,80 @@ model Video {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  // ffprobe technical metadata — written by the server-side probe pipeline.
+  // All optional: rows predating the feature (and failed probes) leave them unset.
+  probedAt          DateTime? // When the last probe attempt finished (success or failure)
+  probeError        String? // Error from the last failed probe; null after a successful probe
+  container         String? // ffprobe format.format_name, e.g. "mov,mp4,m4a,3gp,3g2,mj2"
+  width             Int?
+  height            Int?
+  videoCodec        String? // First video stream codec_name, e.g. "h264"
+  audioCodec        String? // First audio stream codec_name, e.g. "aac"
+  bitrateKbps       Int? // Overall format.bit_rate, rounded to kbps
+  frameRate         Float? // avg_frame_rate fraction evaluated, 2dp (30000/1001 -> 29.97)
+  audioChannels     Int?
+  audioSampleRateHz Int?
+  colorSpace        String?
+  colorPrimaries    String?
+  colorTransfer     String?
+  sourceCreatedAt   DateTime? // Container creation_time tag (when the source file was made)
+  encoder           String? // Encoder tag, e.g. "Lavf60.3.100"
+  probeData         Json? // Full raw ffprobe JSON — format.filename redacted to the bare s3Key, 256KB cap
+
+  // Async web-enrichment job state (mirrors the Artist bio* lifecycle fields)
+  enrichmentStatus    String? // pending | processing | succeeded | failed (null = never run)
+  enrichmentError     String? // Error from the last failed enrichment run, if any
+  enrichmentStartedAt DateTime? // When the current/last job started (stale-job detection)
+  enrichmentJobToken  String? // Opaque per-job callback token; set at dispatch, cleared on claim
+  enrichmentProgress  Json? // Latest progress checkpoint; cleared when a new run goes pending
+  enrichedAt          DateTime? // When the last enrichment run completed successfully
+
+  videoArtists          VideoArtist[] // Linked Artist rows parsed from the artist string
+  enrichmentSuggestions VideoEnrichmentSuggestion[] // Reviewable web-derived facts
+
   @@index([releasedOn])
   @@index([publishedAt])
   @@index([archivedAt])
+}
+
+enum VideoArtistRole {
+  PRIMARY
+  FEATURED
+}
+
+// Join between a Video and the Artist catalog, parsed from the free-text
+// Video.artist string (split only on feat./ft./featuring). Mirrors ArtistRelease.
+model VideoArtist {
+  id        String          @id @default(auto()) @map("_id") @db.ObjectId
+  video     Video           @relation(fields: [videoId], references: [id])
+  videoId   String          @db.ObjectId
+  artist    Artist          @relation(fields: [artistId], references: [id])
+  artistId  String          @db.ObjectId
+  role      VideoArtistRole @default(PRIMARY)
+  sortOrder Int             @default(0)
+
+  @@unique([videoId, artistId])
+  @@index([videoId])
+  @@index([artistId])
+}
+
+// One reviewable web-derived fact for a video (artistId null = the video-level
+// releasedOn suggestion). Rows, not Json: per-row atomic apply/dismiss + audit.
+model VideoEnrichmentSuggestion {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  video      Video     @relation(fields: [videoId], references: [id])
+  videoId    String    @db.ObjectId
+  artistId   String?   @db.ObjectId
+  field      String // Whitelisted field name, e.g. "fullName" | "stageName" | "bornOn" | "releasedOn"
+  value      String // Suggested value, serialized as a string
+  confidence String // high | medium | low
+  sources    Json // <=10 http(s) source URLs
+  note       String?
+  status     String    @default("pending") // pending | applied | dismissed
+  appliedAt  DateTime?
+  appliedBy  String?   @db.ObjectId
+  createdAt  DateTime  @default(now())
+
+  @@index([videoId, status])
+  @@index([artistId])
 }

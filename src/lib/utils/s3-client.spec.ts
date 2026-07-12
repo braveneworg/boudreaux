@@ -12,6 +12,7 @@ import {
   getS3BucketName,
   generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
+  generatePresignedProbeUrl,
   verifyS3ObjectExists,
   deleteS3Object,
 } from './s3-client';
@@ -221,6 +222,35 @@ describe('s3-client', () => {
       // presigning happens.
       expect(getCommandCalls).toHaveLength(0);
       expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generatePresignedProbeUrl', () => {
+    it('presigns a plain GetObjectCommand for the key (no response overrides)', async () => {
+      vi.mocked(getSignedUrl).mockResolvedValue('https://signed.example.com/probe');
+
+      await generatePresignedProbeUrl('media/videos/v1/clip.mp4');
+
+      expect(getCommandCalls.at(-1)).toEqual({
+        Bucket: 'test-bucket',
+        Key: 'media/videos/v1/clip.mp4',
+      });
+    });
+
+    it('expires in 120 seconds', async () => {
+      vi.mocked(getSignedUrl).mockResolvedValue('https://signed.example.com/probe');
+
+      await generatePresignedProbeUrl('media/videos/v1/clip.mp4');
+
+      expect(vi.mocked(getSignedUrl).mock.calls.at(-1)?.[2]).toEqual({ expiresIn: 120 });
+    });
+
+    it('returns the signed URL', async () => {
+      vi.mocked(getSignedUrl).mockResolvedValue('https://signed.example.com/probe');
+
+      const url = await generatePresignedProbeUrl('media/videos/v1/clip.mp4');
+
+      expect(url).toBe('https://signed.example.com/probe');
     });
   });
 

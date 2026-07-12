@@ -24,7 +24,7 @@ import { VideoService } from '@/lib/services/video-service';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { signStreamUrl } from '@/lib/utils/sign-stream-url';
+import { toPublicVideoRow } from '@/lib/utils/to-public-video-row';
 
 import type { Metadata } from 'next';
 
@@ -60,11 +60,11 @@ export default async function VideosPage() {
         take: PUBLISHED_VIDEOS_PAGE_SIZE,
       });
       const videos = result.success ? result.data : [];
-      // Drop the internal createdBy/updatedBy audit ObjectIds from the SSR payload.
-      const rows = videos.map(({ createdBy: _createdBy, updatedBy: _updatedBy, ...video }) => ({
-        ...video,
-        streamUrl: signStreamUrl(video.s3Key),
-      }));
+      // Route through the shared `toPublicVideoRow` so the dehydrated SSR cache
+      // strips every audit/probe/enrichment internal — including the
+      // `enrichmentJobToken` callback secret and raw `probeData` — exactly like
+      // the `/api/videos` listing response does.
+      const rows = videos.map(toPublicVideoRow);
       return serializeForResponse({
         rows,
         nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_VIDEOS_PAGE_SIZE),

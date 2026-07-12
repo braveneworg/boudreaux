@@ -64,6 +64,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     createBioLink: vi.fn(),
     findBioLinkByUrl: vi.fn(),
     updateBioImageAttribution: vi.fn(),
+    updateEnrichedField: vi.fn(),
   },
 }));
 
@@ -2265,6 +2266,32 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: { id: 'new-2' } });
       expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyEnrichedField', () => {
+    it('maps a text field through the whitelist switch', async () => {
+      vi.mocked(ArtistRepository.updateEnrichedField).mockResolvedValue(undefined);
+
+      await ArtistService.applyEnrichedField('a'.repeat(24), 'surname', 'Ramos', 'admin-1');
+
+      expect(ArtistRepository.updateEnrichedField).toHaveBeenCalledWith(
+        'a'.repeat(24),
+        { surname: 'Ramos' },
+        'admin-1'
+      );
+    });
+
+    it('parses bornOn into a Date', async () => {
+      vi.mocked(ArtistRepository.updateEnrichedField).mockResolvedValue(undefined);
+
+      await ArtistService.applyEnrichedField('a'.repeat(24), 'bornOn', '1985-03-15', 'admin-1');
+
+      expect(ArtistRepository.updateEnrichedField).toHaveBeenCalledWith(
+        'a'.repeat(24),
+        { bornOn: new Date('1985-03-15') },
+        'admin-1'
+      );
     });
   });
 });

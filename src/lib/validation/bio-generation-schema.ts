@@ -8,9 +8,15 @@ import { isHttpUrl } from '@/lib/utils/is-http-url';
 
 const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
 
+/** Shared 24-hex Mongo ObjectId schema, reused by sibling validation modules. */
+export const objectIdSchema = objectId;
+
 // z.string().url() accepts javascript:/data: URLs; require an explicit http(s)
 // scheme so a reference link can never become a script-bearing href.
 const httpUrl = z.string().refine(isHttpUrl, 'Must be an http(s) URL');
+
+/** Shared http(s)-only URL schema, reused by sibling validation modules. */
+export const httpUrlSchema = httpUrl;
 
 /**
  * Admin-supplied input for the generate-bio Server Action. Reference links and

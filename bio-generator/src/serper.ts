@@ -117,3 +117,63 @@ export const searchSerperImages = async (
   logEvent('info', 'serper_images', { count: merged.length });
   return merged;
 };
+
+/** Serper.dev Google web-search endpoint (POST, JSON body). */
+const SERPER_SEARCH_ENDPOINT = 'https://google.serper.dev/search';
+
+/** Cap on organic results kept per query. */
+export const MAX_SERPER_WEB_RESULTS = 10;
+
+/** One organic web-search result (title/link/snippet, optional date). */
+export interface SerperWebResult {
+  title: string;
+  link: string;
+  snippet: string;
+  date?: string;
+}
+
+/** Subset of the Serper search response we read. */
+interface SerperSearchResponse {
+  organic?: Array<{ title?: string; link?: string; snippet?: string; date?: string }>;
+}
+
+/**
+ * Runs one Serper.dev web search and returns up to
+ * {@link MAX_SERPER_WEB_RESULTS} organic results. Best-effort and key-gated:
+ * a non-ok response or thrown fetch logs a warning and yields [] — never
+ * throws, so a failed query can never abort an enrichment run.
+ *
+ * @param query - The full search query string.
+ * @param apiKey - The Serper.dev API key (required; resolved from SSM).
+ * @param fetchFn - Injectable fetch (defaults to global) for testability.
+ */
+export const searchSerperWeb = async (
+  query: string,
+  apiKey: string,
+  fetchFn: FetchFn = fetch
+): Promise<SerperWebResult[]> => {
+  try {
+    const response = await fetchFn(SERPER_SEARCH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: query }),
+    });
+    if (!response.ok) {
+      logEvent('warn', 'serper_web_query_failed', { status: response.status });
+      return [];
+    }
+    const body = (await response.json()) as SerperSearchResponse;
+    return (body.organic ?? [])
+      .filter(
+        (result): result is { title: string; link: string; snippet: string } & typeof result =>
+          Boolean(result.title && result.link && result.snippet)
+      )
+      .slice(0, MAX_SERPER_WEB_RESULTS)
+      .map(({ title, link, snippet, date }) =>
+        date === undefined ? { title, link, snippet } : { title, link, snippet, date }
+      );
+  } catch (err) {
+    logEvent('warn', 'serper_web_query_failed', { error: toErrorMessage(err) });
+    return [];
+  }
+};

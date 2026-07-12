@@ -65,6 +65,22 @@ vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFileToS3: mocks.uploadFileToS3,
 }));
 
+vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
+  VideoEnrichmentPanel: ({
+    videoId,
+    onApplyReleaseDate,
+  }: {
+    videoId: string;
+    onApplyReleaseDate: (value: string) => void;
+  }) => (
+    <div data-testid="video-enrichment-panel" data-video-id={videoId}>
+      <button type="button" onClick={() => onApplyReleaseDate('2024-08-08')}>
+        Apply enriched date
+      </button>
+    </div>
+  ),
+}));
+
 // A minimal controllable DatePicker so date fields are plain inputs associated
 // with their FormLabel (accessible name comes from the label, not aria-label).
 vi.mock('@/ui/datepicker', () => ({
@@ -143,6 +159,40 @@ beforeEach(() => {
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:candidate');
   globalThis.URL.revokeObjectURL = vi.fn();
 });
+
+const editVideo = {
+  id: 'v1',
+  title: 'Existing Title',
+  artist: 'Existing Artist',
+  category: 'INFORMATIONAL' as const,
+  description: 'An existing description',
+  releasedOn: new Date('2023-03-03T00:00:00.000Z'),
+  durationSeconds: 120,
+  s3Key: 'media/videos/v1/existing.mp4',
+  fileName: 'existing.mp4',
+  fileSize: 4096n,
+  mimeType: 'video/mp4',
+  posterUrl: 'https://cdn.example.com/existing-poster.jpg',
+  publishedAt: null,
+  archivedAt: null,
+  createdBy: null,
+  updatedBy: null,
+  createdAt: new Date('2023-03-03T00:00:00.000Z'),
+  updatedAt: new Date('2023-03-03T00:00:00.000Z'),
+  width: null,
+  height: null,
+  videoCodec: null,
+  audioCodec: null,
+  bitrateKbps: null,
+  frameRate: null,
+  container: null,
+  audioChannels: null,
+  audioSampleRateHz: null,
+  sourceCreatedAt: null,
+  probedAt: null,
+  probeError: null,
+  enrichmentStatus: null,
+};
 
 describe('VideoForm — required-field validation', () => {
   it('shows a required error for the title on empty submit', async () => {
@@ -393,7 +443,7 @@ describe('VideoForm — create submit', () => {
     );
   });
 
-  it('navigates to the admin videos list after a successful create', async () => {
+  it('navigates to the new video edit page after a successful create', async () => {
     const user = setup();
     render(<VideoForm />);
 
@@ -402,7 +452,7 @@ describe('VideoForm — create submit', () => {
     await fillRequiredFields(user);
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/videos'));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith(`/admin/videos/${'a'.repeat(24)}`));
   });
 
   it('maps a server field error onto the title field', async () => {
@@ -426,27 +476,6 @@ describe('VideoForm — create submit', () => {
 });
 
 describe('VideoForm — edit mode', () => {
-  const editVideo = {
-    id: 'v1',
-    title: 'Existing Title',
-    artist: 'Existing Artist',
-    category: 'INFORMATIONAL' as const,
-    description: 'An existing description',
-    releasedOn: new Date('2023-03-03T00:00:00.000Z'),
-    durationSeconds: 120,
-    s3Key: 'media/videos/v1/existing.mp4',
-    fileName: 'existing.mp4',
-    fileSize: 4096n,
-    mimeType: 'video/mp4',
-    posterUrl: 'https://cdn.example.com/existing-poster.jpg',
-    publishedAt: null,
-    archivedAt: null,
-    createdBy: null,
-    updatedBy: null,
-    createdAt: new Date('2023-03-03T00:00:00.000Z'),
-    updatedAt: new Date('2023-03-03T00:00:00.000Z'),
-  };
-
   const asEditMode = () =>
     mocks.useVideoQuery.mockReturnValue({
       data: editVideo,
@@ -648,5 +677,92 @@ describe('VideoForm — poster', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+  });
+});
+
+describe('VideoForm — technical metadata card', () => {
+  const probedVideo = {
+    ...editVideo,
+    probedAt: new Date('2023-03-04T00:00:00.000Z'),
+    width: 1920,
+    height: 1080,
+    bitrateKbps: 4200,
+  };
+
+  it('renders the card under the file section for a probed video', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: probedVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByTestId('video-technical-metadata-card')).toBeInTheDocument();
+  });
+
+  it('renders no card for an unprobed video', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByTestId('video-technical-metadata-card')).not.toBeInTheDocument();
+  });
+
+  it('renders no card in create mode', () => {
+    render(<VideoForm />);
+
+    expect(screen.queryByTestId('video-technical-metadata-card')).not.toBeInTheDocument();
+  });
+});
+
+describe('VideoForm — enrichment panel mount gating', () => {
+  const asVideo = (video: unknown) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: video,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  it('mounts the panel for a MUSIC video in edit mode', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'v1'
+    );
+  });
+
+  it('writes an applied enriched release date into the form field', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply enriched date' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2024-08-08'));
+  });
+
+  it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
+    asVideo(editVideo);
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+  });
+
+  it('keeps the panel out of the DOM in create mode', () => {
+    render(<VideoForm />);
+
+    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@
 import { fetchWithRetry } from './lib/http.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 
-import type { BioGenerationResult } from './types.js';
+import type { BioGenerationResult, VideoEnrichmentResult } from './types.js';
 
 /** The async completion callback the Lambda POSTs its generation result to. */
 export interface BioCallbackPayload {
@@ -14,7 +14,7 @@ export interface BioCallbackPayload {
   /** Opaque per-job token echoed back so the web app can match the in-flight job. */
   jobToken: string;
   /** The discriminated result envelope produced by the run (success or error). */
-  result: BioGenerationResult;
+  result: BioGenerationResult | VideoEnrichmentResult;
 }
 
 /**
