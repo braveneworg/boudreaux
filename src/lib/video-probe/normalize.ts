@@ -161,12 +161,33 @@ const dropSideDataLists = (root: Record<string, unknown>): void => {
   }
 };
 
+const AMZ_MARKER = 'X-Amz-';
+
+/** An X-Amz token runs to the next delimiter that can end it inside a JSON string. */
+const AMZ_TOKEN_PATTERN = /X-Amz-[^\s"'&\\]*/g;
+
+/**
+ * Terminal backstop: `format.filename` is the only documented echo point for
+ * the probed URL, but some demuxers copy source URIs into nested metadata, so
+ * the persisted payload as a whole must be proven free of `X-Amz-` material.
+ */
+const scrubAmzMaterial = (value: Record<string, unknown>): unknown => {
+  const serialized = JSON.stringify(value);
+  if (!serialized.includes(AMZ_MARKER)) return value;
+  try {
+    return JSON.parse(serialized.replace(AMZ_TOKEN_PATTERN, '')) as unknown;
+  } catch {
+    return { __truncated: true };
+  }
+};
+
 /**
  * Prepare raw ffprobe JSON for persistence: deep-clone it, replace
  * `format.filename` (which echoes the credentialed presigned probe URL — no
- * `X-Amz-` material may survive) with the bare s3Key, and cap the serialized
- * size at 256 KB — first by dropping `streams[i].side_data_list`, then by
- * degrading to `{ __truncated: true }`.
+ * `X-Amz-` material may survive) with the bare s3Key, scrub any residual
+ * `X-Amz-` tokens elsewhere in the payload, and cap the serialized size at
+ * 256 KB — first by dropping `streams[i].side_data_list`, then by degrading
+ * to `{ __truncated: true }`.
  */
 export const redactProbeJson = (raw: unknown, s3Key: string): unknown => {
   let clone: unknown;
@@ -181,8 +202,11 @@ export const redactProbeJson = (raw: unknown, s3Key: string): unknown => {
     clone.format.filename = s3Key;
   }
 
-  if (byteLength(clone) <= MAX_PROBE_JSON_BYTES) return clone;
-  dropSideDataLists(clone);
-  if (byteLength(clone) <= MAX_PROBE_JSON_BYTES) return clone;
+  const scrubbed = scrubAmzMaterial(clone);
+  if (!isRecord(scrubbed)) return { __truncated: true };
+
+  if (byteLength(scrubbed) <= MAX_PROBE_JSON_BYTES) return scrubbed;
+  dropSideDataLists(scrubbed);
+  if (byteLength(scrubbed) <= MAX_PROBE_JSON_BYTES) return scrubbed;
   return { __truncated: true };
 };

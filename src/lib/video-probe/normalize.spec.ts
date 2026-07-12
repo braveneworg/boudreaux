@@ -183,6 +183,15 @@ describe('redactProbeJson', () => {
     expect(JSON.stringify(redactProbeJson(rawProbe, s3Key))).not.toContain('X-Amz-');
   });
 
+  it('scrubs X-Amz- material echoed outside format.filename', () => {
+    const raw = {
+      format: { filename: presignedUrl },
+      streams: [{ codec_type: 'video', tags: { comment: presignedUrl } }],
+    };
+
+    expect(JSON.stringify(redactProbeJson(raw, s3Key))).not.toContain('X-Amz-');
+  });
+
   it('does not mutate the input', () => {
     redactProbeJson(rawProbe, s3Key);
 
