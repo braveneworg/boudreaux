@@ -5,15 +5,18 @@ import type { Video } from '@/lib/types/domain/video';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 
 /**
- * Video fields that never leave the server on the listing payloads: the audit
- * ObjectIds plus every probe/enrichment internal. Probe display fields are
- * admin-detail-only; job state and raw probe JSON are never on any wire.
- *
- * Declared as an exhaustive `Omit<Video, VideoInternalField>` (below) with NO
- * index signature so that a future new internal `Video` field forces a compile
- * error here — the whole point of the single canonical stripper.
+ * Fields stripped from EVERY video wire payload, admin included: the per-job
+ * callback secret, the transient progress checkpoint, and the raw (large) probe
+ * JSON. These never leave the server on any route — see {@link toAdminVideoDetailRow}.
  */
-type VideoInternalField =
+type VideoSecretField = 'probeData' | 'enrichmentJobToken' | 'enrichmentProgress';
+
+/**
+ * Fields additionally stripped from the PUBLIC listing payloads but KEPT on the
+ * admin detail payload (which renders them): the audit ObjectIds, the normalized
+ * probe display columns, and enrichment job-state.
+ */
+type VideoListingOnlyInternalField =
   | 'createdBy'
   | 'updatedBy'
   | 'probedAt'
@@ -32,13 +35,23 @@ type VideoInternalField =
   | 'colorTransfer'
   | 'sourceCreatedAt'
   | 'encoder'
-  | 'probeData'
   | 'enrichmentStatus'
   | 'enrichmentError'
   | 'enrichmentStartedAt'
-  | 'enrichmentJobToken'
-  | 'enrichmentProgress'
   | 'enrichedAt';
+
+/**
+ * Every field that never leaves the server on the listing payloads: the secret
+ * set plus the audit/probe/enrichment internals. Composing it from
+ * {@link VideoSecretField} makes `VideoSecretField ⊆ VideoInternalField` hold
+ * structurally, so the two strippers share one source of truth for the
+ * always-internal fields.
+ *
+ * Declared as an exhaustive `Omit<Video, VideoInternalField>` (below) with NO
+ * index signature so that a future new internal `Video` field forces a compile
+ * error here — the whole point of the single canonical stripper.
+ */
+type VideoInternalField = VideoSecretField | VideoListingOnlyInternalField;
 
 /**
  * A public video row: the internal audit/probe/enrichment fields are dropped,
@@ -83,6 +96,35 @@ export const toPublicVideoRow = ({
   enrichedAt: _enrichedAt,
   ...video
 }: Video): VideoRowWithStream => ({
+  ...video,
+  streamUrl: signStreamUrl(video.s3Key),
+});
+
+/**
+ * An admin video detail row: only the always-internal secret fields are dropped
+ * (the callback token, progress checkpoint, and raw probe JSON), with the
+ * per-request signed stream URL attached. Unlike {@link VideoRowWithStream}, the
+ * normalized probe columns, enrichment job-state, and audit ObjectIds are KEPT —
+ * the admin edit page renders them.
+ */
+export type VideoDetailRowWithStream = Omit<Video, VideoSecretField> & {
+  streamUrl: string | null;
+};
+
+/**
+ * Strip only the always-internal secret fields from one `Video` and attach its
+ * per-request signed stream URL, for the admin-only `/api/videos/[id]` detail
+ * route. Shares {@link VideoSecretField} with {@link toPublicVideoRow} so the
+ * `enrichmentJobToken` callback secret and raw `probeData` can never reach a
+ * client from either route, while the admin edit page still receives the
+ * normalized probe columns and enrichment job-state it renders.
+ */
+export const toAdminVideoDetailRow = ({
+  probeData: _probeData,
+  enrichmentJobToken: _enrichmentJobToken,
+  enrichmentProgress: _enrichmentProgress,
+  ...video
+}: Video): VideoDetailRowWithStream => ({
   ...video,
   streamUrl: signStreamUrl(video.s3Key),
 });
