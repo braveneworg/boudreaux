@@ -191,6 +191,7 @@ Conventional Commits, enforced by commitlint (`commitlint.config.mjs`, `commit-m
 
 # LESSONS
 
+- Before ANY edit — even a "small config fix" — create a worktree off freshly-fetched origin/main (EnterWorktree → `.claude/worktrees/<type>+<name>`, then rename the branch to `<type>/<name>`); never branch or edit in the main checkout (~/.config/agents/AGENTS.md line 1).
 - ESLint `complexity` caps functions at 10 repo-wide: when adding branching (optional chains, ternaries, `&&`) to an already-busy component like a page, extract it into a named helper up front instead of inlining it.
 - commitlint counts the gitmoji toward the 50-char subject cap — compose subjects to ≤48 visible characters before the emoji is added.
 - In the App Router, `next/dynamic` server-renders only its `loading` fallback — never the component — even with ssr:true (verified empirically on the webpack prod standalone). When markup must be in the server HTML (LCP elements, SEO content), use a static import and code-split the heavy leaf deeper instead.
