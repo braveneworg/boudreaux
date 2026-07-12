@@ -110,6 +110,8 @@ beforeEach(() => {
   vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'bio-fn');
   vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://example.com');
   vi.stubEnv('BIO_GENERATOR_FAKE', 'false');
+  // Neutralize the fake-path dwell so fake-path tests never wait a real timer.
+  vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
   vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(VideoRepository.setEnrichmentJobToken).mockResolvedValue(undefined);
   vi.mocked(VideoRepository.setEnrichmentProgress).mockResolvedValue(undefined);
@@ -256,6 +258,47 @@ describe('runEnrichmentJob', () => {
       VIDEO_ID,
       expect.objectContaining({ stage: 'musicbrainz' })
     );
+  });
+
+  it('does not arm a timer on the fake path when the dwell is zero', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('dwells the configured fake delay before flipping to succeeded', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '4000');
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+    vi.useFakeTimers();
+    try {
+      const promise = VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+      // Let the synchronous prep + checkpoint microtasks settle; the run then
+      // parks on the dwell timer, so no success flip has happened yet.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(
+        vi
+          .mocked(VideoRepository.setEnrichmentStatus)
+          .mock.calls.some(([, status]) => status === 'succeeded')
+      ).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(4000);
+      await promise;
+      expect(
+        vi
+          .mocked(VideoRepository.setEnrichmentStatus)
+          .mock.calls.some(([, status]) => status === 'succeeded')
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stores a job token and fires an Event invoke with the callback URLs', async () => {

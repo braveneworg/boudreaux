@@ -400,13 +400,35 @@ const buildPendingRows = ({
 // Job dispatch helpers
 // ---------------------------------------------------------------------------
 
-/** Fake/E2E path: one synthetic checkpoint, then persist the fixture. */
+/**
+ * Fake-path dwell between the synthetic `processing` checkpoint and completion.
+ * The real Lambda takes seconds; the fake path is otherwise instantaneous, so
+ * without a pause the 2.5s status poll can never observe the in-flight
+ * (`Enriching…`) chip — worst on a re-run whose start and end are both
+ * `succeeded`. Mirrors the bio pipeline and shares its env override
+ * (`BIO_GENERATOR_FAKE_DELAY_MS`); unit tests set `0`. Never used on the real path.
+ */
+const DEFAULT_FAKE_ENRICHMENT_DELAY_MS = 4000;
+
+/** Resolve the fake-path dwell from the env, falling back to the default. */
+const resolveFakeDelayMs = (): number => {
+  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_FAKE_ENRICHMENT_DELAY_MS;
+};
+
+/** Resolve after `ms`; short-circuits to an already-resolved promise for `ms <= 0`. */
+const sleep = (ms: number): Promise<void> =>
+  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+/** Fake/E2E path: one synthetic checkpoint, a dwell, then persist the fixture. */
 const runFakeEnrichment = async (videoId: string, rows: VideoArtistWithArtist[]): Promise<void> => {
   await VideoRepository.setEnrichmentProgress(videoId, {
     stage: 'musicbrainz',
     counts: { artists: rows.length },
     at: new Date().toISOString(),
   });
+  // Dwell while `processing` so the polling client can render the in-flight chip.
+  await sleep(resolveFakeDelayMs());
   const data = videoEnrichmentFixture({
     artists: rows.map(({ artistId }) => ({ artistId })),
   });

@@ -27,12 +27,14 @@ test.describe('Admin video enrichment', () => {
     await adminPage.goto(`/admin/videos/${ENRICH_MUSIC_VIDEO_ID}`);
 
     // The technical card renders from the seeded probe scalars for ALL
-    // categories — this is the MUSIC instance.
+    // categories — this is the MUSIC instance. The seed pins the same values
+    // the fake probe re-persists on every Run, so these hold across retries.
     const techCard = adminPage.getByTestId('video-technical-metadata-card');
     await expect(techCard).toBeVisible({ timeout: 15_000 });
     await expect(techCard.getByText('1920×1080')).toBeVisible();
-    await expect(techCard.getByText('4.2 Mbps')).toBeVisible();
-    await expect(techCard.getByText('29.97 fps')).toBeVisible();
+    await expect(techCard.getByText('4.8 Mbps')).toBeVisible();
+    // 23.976 rounds to 2dp for display (formatFrameRate → Number(x.toFixed(2))).
+    await expect(techCard.getByText('23.98 fps')).toBeVisible();
 
     const panel = adminPage.getByTestId('video-enrichment-panel');
     await expect(panel).toBeVisible();
