@@ -1104,4 +1104,21 @@ describe('ArtistRepository', () => {
       });
     });
   });
+
+  describe('updateEnrichedField', () => {
+    it('writes the single typed field plus the auditing updatedBy', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.updateEnrichedField(
+        'a'.repeat(24),
+        { bornOn: new Date('1985-03-15T00:00:00.000Z') },
+        'admin-1'
+      );
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a'.repeat(24) },
+        data: { bornOn: new Date('1985-03-15T00:00:00.000Z'), updatedBy: 'admin-1' },
+      });
+    });
+  });
 });

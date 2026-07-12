@@ -49,6 +49,20 @@ export interface BioImageRehostRow {
 }
 
 /**
+ * The one-field update shapes the enrichment Apply flow may write. A
+ * suggestion's `field` maps onto this through an explicit whitelist switch in
+ * `ArtistService.applyEnrichedField` — never a dynamic Prisma key.
+ */
+export interface EnrichedArtistFieldUpdate {
+  firstName?: string;
+  middleName?: string;
+  surname?: string;
+  akaNames?: string;
+  displayName?: string;
+  bornOn?: Date;
+}
+
+/**
  * Projection returned by {@link ArtistRepository.getBioGenerationState}: the
  * async lifecycle fields (incl. the latest `bioProgress` checkpoint) plus the
  * persisted bio content the admin form populates from.
@@ -790,6 +804,17 @@ export class ArtistRepository {
         update: {},
         create: { artistId, releaseId },
       })
+    );
+  }
+
+  /** Applies one whitelisted enriched field, stamping `updatedBy` for audit. */
+  static async updateEnrichedField(
+    artistId: string,
+    data: EnrichedArtistFieldUpdate,
+    updatedBy: string
+  ): Promise<void> {
+    await runQuery(() =>
+      prisma.artist.update({ where: { id: artistId }, data: { ...data, updatedBy } })
     );
   }
 }
