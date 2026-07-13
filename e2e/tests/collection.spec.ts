@@ -79,25 +79,66 @@ test.describe('My Collection — mobile layout (360px)', () => {
   });
 
   test('the purchased-release card fits within its content column', async ({ userPage }) => {
-    const m = await userPage.evaluate(() => {
+    // Measure the card row against its grid parent (the panel's content column)
+    // and break the row into its cover/info/actions parts so a failure pinpoints
+    // exactly which child forces the overflow.
+    const metrics = await userPage.evaluate(() => {
       const round = (n: number): number => Math.round(n * 100) / 100;
-      const card = document
-        .querySelector('button[aria-label^="Download"]')
-        ?.closest('div.shadow-zine-sm');
-      if (!card) return null;
-      const grid = card.parentElement;
-      if (!grid) return null;
-      const c = card.getBoundingClientRect();
-      const g = grid.getBoundingClientRect();
-      return { cardRight: round(c.right), gridRight: round(g.right) };
+      const box = (
+        el: Element | null | undefined
+      ): {
+        left: number;
+        right: number;
+        width: number;
+        scrollWidth: number;
+        clientWidth: number;
+      } | null => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {
+          left: round(r.left),
+          right: round(r.right),
+          width: round(r.width),
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+        };
+      };
+
+      const trigger = document.querySelector('button[aria-label^="Download"]');
+      const card = trigger?.closest('div.shadow-zine-sm') ?? null;
+      const grid = card?.parentElement ?? null;
+      const panel = document.querySelector('[data-slot="zine-panel"]');
+      const [cover, info, actions] = card ? Array.from(card.children) : [];
+
+      return {
+        viewportWidth: globalThis.innerWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        panel: box(panel),
+        grid: box(grid),
+        card: box(card),
+        cover: box(cover),
+        info: box(info),
+        actions: box(actions),
+        infoChildren: info ? Array.from(info.children).map(box) : [],
+      };
     });
 
-    expect(m, 'card row / grid not found — selector drift?').not.toBeNull();
-    if (!m) throw new Error('metrics not captured');
+    const detail = JSON.stringify(metrics, null, 2);
+    const { card, grid } = metrics;
+
+    expect(card, `card row not found — selector drift? ${detail}`).not.toBeNull();
+    expect(grid, `grid parent not found — selector drift? ${detail}`).not.toBeNull();
+    if (!card || !grid) throw new Error('card/grid not located');
+
+    // The card must not extend past its grid column. 1px tolerance for sub-pixel
+    // rounding. The message dumps every sub-part so a failure is self-diagnosing.
+    expect(card.width, `card wider than its content column @360px:\n${detail}`).toBeLessThanOrEqual(
+      grid.width + 1
+    );
     expect(
-      m.cardRight,
-      `card overflows its content column @360px: ${JSON.stringify(m)}`
-    ).toBeLessThanOrEqual(m.gridRight + 1);
+      card.right,
+      `card right edge past its content column @360px:\n${detail}`
+    ).toBeLessThanOrEqual(grid.right + 1);
   });
 
   test('a long release title cannot blow the card out of its content column', async ({
