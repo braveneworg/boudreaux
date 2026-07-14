@@ -17,6 +17,7 @@ import {
   useCreateVideoMutation,
   useUpdateVideoMutation,
 } from '@/app/hooks/mutations/use-video-mutations';
+import { useVideoProbePrefillQuery } from '@/app/hooks/use-video-probe-prefill-query';
 import { useVideoQuery } from '@/app/hooks/use-video-query';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
@@ -31,6 +32,7 @@ import { VideoFileSection } from './videos/video-file-section';
 import { VideoFormFooter } from './videos/video-form-footer';
 import {
   applyServerFieldErrors,
+  applyServerProbePrefill,
   buildVideoDefaults,
   mapVideoToFormValues,
 } from './videos/video-form-helpers';
@@ -123,6 +125,16 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const upload = useVideoUpload({ preGeneratedId, form, onPosterCandidate: setPosterCandidate });
   const s3Key = useWatch({ control, name: 's3Key' });
   const isSubmitting = isCreatingVideo || isUpdatingVideo;
+
+  const { data: probeData } = useVideoProbePrefillQuery(s3Key, preGeneratedId, {
+    enabled: upload.status === 'success',
+  });
+
+  useEffect(() => {
+    if (probeData?.ok === true) {
+      applyServerProbePrefill(form, probeData.tags);
+    }
+  }, [probeData, form]);
 
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {

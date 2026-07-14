@@ -5,6 +5,7 @@
 import { VIDEO_ALLOWED_MIME_TYPES, VIDEO_MAX_FILE_SIZE } from '@/lib/constants/video-uploads';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
+import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import type { ExtractedVideoTags } from './video-metadata';
 import type { DefaultValues, UseFormReturn } from 'react-hook-form';
@@ -78,6 +79,41 @@ export const applyVideoPrefill = (
   setIfEmpty('releasedOn', values.releasedOn, tags.releasedOn);
   if (!values.durationSeconds && duration !== undefined) {
     form.setValue('durationSeconds', String(duration), { shouldDirty: true, shouldValidate: true });
+  }
+};
+
+/**
+ * Merge server-probed ffprobe tags into the admin video form — only-if-empty,
+ * so values the admin has already typed are never clobbered. Called after a
+ * successful upload once the probe API returns.
+ *
+ * Unlike `applyVideoPrefill` (client-side file extractor), this helper also
+ * fills `description` because ffprobe sees comment/description tags that the
+ * client-side WebM/MP4 parser does not expose.
+ */
+export const applyServerProbePrefill = (
+  form: UseFormReturn<VideoFormData>,
+  tags: ProbePrefillTags
+): void => {
+  const values = form.getValues();
+  const setIfEmpty = (
+    name: 'title' | 'artist' | 'releasedOn' | 'description',
+    current: string | undefined,
+    value: string | null
+  ): void => {
+    if (!current && value) {
+      form.setValue(name, value, { shouldDirty: true, shouldValidate: true });
+    }
+  };
+  setIfEmpty('title', values.title, tags.title);
+  setIfEmpty('artist', values.artist, tags.artist);
+  setIfEmpty('releasedOn', values.releasedOn, tags.releasedOn);
+  setIfEmpty('description', values.description, tags.description);
+  if (!values.durationSeconds && tags.durationSeconds !== null) {
+    form.setValue('durationSeconds', String(tags.durationSeconds), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   }
 };
 
