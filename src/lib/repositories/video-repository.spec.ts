@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { DataError } from '@/lib/types/domain/errors';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
-import { VideoRepository } from './video-repository';
+import { VideoRepository, type VideoSummary } from './video-repository';
 
 vi.mock('server-only', () => ({}));
 
@@ -232,6 +232,134 @@ describe('VideoRepository', () => {
       expect(arg?.orderBy).toEqual({ releasedOn: 'asc' });
       expect(arg?.skip).toBe(5);
       expect(arg?.take).toBe(2);
+    });
+  });
+
+  // The lean projection pinned for the playlist lookup/search reads.
+  const summarySelect = {
+    id: true,
+    title: true,
+    artist: true,
+    durationSeconds: true,
+    posterUrl: true,
+  };
+
+  // The published + non-archived clauses mirrored from findPublished's where.
+  const publishedNonArchived = [notArchived, { publishedAt: { not: null } }];
+
+  const mockSummary: VideoSummary = {
+    id: 'video-123',
+    title: 'Test Video',
+    artist: 'Test Artist',
+    durationSeconds: 215,
+    posterUrl: 'https://cdn.example.com/poster.jpg',
+  };
+
+  describe('findManyByIds', () => {
+    it('fetches published, non-archived videos by id with the lean select', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([mockSummary] as never);
+
+      const result = await VideoRepository.findManyByIds(['video-123', 'video-456']);
+
+      expect(result).toEqual([mockSummary]);
+      expect(prisma.video.findMany).toHaveBeenCalledWith({
+        where: { AND: publishedNonArchived, id: { in: ['video-123', 'video-456'] } },
+        select: summarySelect,
+      });
+    });
+
+    it('passes an empty in-list through when ids is empty', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      const result = await VideoRepository.findManyByIds([]);
+
+      expect(result).toEqual([]);
+      expect(prisma.video.findMany).toHaveBeenCalledWith({
+        where: { AND: publishedNonArchived, id: { in: [] } },
+        select: summarySelect,
+      });
+    });
+
+    it('returns an empty array when no ids match', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      const result = await VideoRepository.findManyByIds(['missing']);
+
+      expect(result).toEqual([]);
+    });
+
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.video.findMany).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
+      );
+
+      await expect(VideoRepository.findManyByIds(['a'])).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.video.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(VideoRepository.findManyByIds(['a'])).rejects.toBeInstanceOf(DataError);
+    });
+  });
+
+  describe('searchPublished', () => {
+    it('searches title/artist within published videos, ordered by title asc', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([mockSummary] as never);
+
+      const result = await VideoRepository.searchPublished('foo', 8);
+
+      expect(result).toEqual([mockSummary]);
+      expect(prisma.video.findMany).toHaveBeenCalledWith({
+        where: {
+          AND: publishedNonArchived,
+          OR: [{ title: contains('foo') }, { artist: contains('foo') }],
+        },
+        orderBy: { title: 'asc' },
+        take: 8,
+        select: summarySelect,
+      });
+    });
+
+    it('honors the take limit', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      await VideoRepository.searchPublished('x', 3);
+
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
+      expect(arg?.take).toBe(3);
+    });
+
+    it('returns an empty array when nothing matches', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      const result = await VideoRepository.searchPublished('zzz', 8);
+
+      expect(result).toEqual([]);
+    });
+
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.video.findMany).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
+      );
+
+      await expect(VideoRepository.searchPublished('a', 8)).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.video.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(VideoRepository.searchPublished('a', 8)).rejects.toBeInstanceOf(DataError);
     });
   });
 
