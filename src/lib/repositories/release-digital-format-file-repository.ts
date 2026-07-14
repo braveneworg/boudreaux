@@ -203,8 +203,9 @@ export class ReleaseDigitalFormatFileRepository {
 
   /**
    * Search track files by title (case-insensitive substring), restricted to
-   * MP3_320KBPS formats on published, non-deleted releases. Used by the
-   * playlist media-search endpoint.
+   * non-deleted MP3_320KBPS formats on published, non-deleted releases.
+   * Ordered by title asc for deterministic results. Used by the playlist
+   * media-search endpoint.
    * `fileSize` is omitted from the select — BigInt breaks JSON serialisation.
    */
   async searchTracksByTitle(q: string, take: number): Promise<TrackFileWithRelease[]> {
@@ -215,10 +216,12 @@ export class ReleaseDigitalFormatFileRepository {
           format: {
             is: {
               formatType: 'MP3_320KBPS',
+              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
               release: { is: publishedReleaseFilter },
             },
           },
         },
+        orderBy: { title: 'asc' },
         take,
         select: trackFileWithReleaseSelect,
       })

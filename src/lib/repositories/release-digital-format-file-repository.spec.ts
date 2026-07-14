@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 
 import {
   ReleaseDigitalFormatFileRepository,
@@ -319,16 +322,28 @@ describe('ReleaseDigitalFormatFileRepository', () => {
       expect(call[0]).not.toHaveProperty('select.fileSize');
     });
 
-    it('should propagate a DataError when prisma throws', async () => {
-      const prismaError = Object.assign(new Error('DB error'), { code: 'P2025' });
-      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(prismaError);
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('DB error', { code: 'P2025', clientVersion: '6' })
+      );
 
-      await expect(repo.findManyByIdsWithRelease(['file-1'])).rejects.toThrow('DB error');
+      await expect(repo.findManyByIdsWithRelease(['file-1'])).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(repo.findManyByIdsWithRelease(['file-1'])).rejects.toBeInstanceOf(DataError);
     });
   });
 
   describe('searchTracksByTitle', () => {
-    it('should call findMany with title search, MP3_320KBPS format filter, and published-release filter', async () => {
+    it('should call findMany with title search, non-deleted MP3_320KBPS format filter, published-release filter, and title ordering', async () => {
       vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([
         mockTrackFileWithRelease,
       ] as never);
@@ -342,6 +357,7 @@ describe('ReleaseDigitalFormatFileRepository', () => {
           format: {
             is: {
               formatType: 'MP3_320KBPS',
+              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
               release: {
                 is: {
                   publishedAt: { not: null },
@@ -351,6 +367,7 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             },
           },
         },
+        orderBy: { title: 'asc' },
         take: 10,
         select: TRACK_FILE_WITH_RELEASE_SELECT,
       });
@@ -374,11 +391,23 @@ describe('ReleaseDigitalFormatFileRepository', () => {
       expect(call[0]).not.toHaveProperty('select.fileSize');
     });
 
-    it('should propagate a DataError when prisma throws', async () => {
-      const prismaError = Object.assign(new Error('DB error'), { code: 'P2025' });
-      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(prismaError);
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('DB error', { code: 'P2025', clientVersion: '6' })
+      );
 
-      await expect(repo.searchTracksByTitle('x', 10)).rejects.toThrow('DB error');
+      await expect(repo.searchTracksByTitle('x', 10)).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(repo.searchTracksByTitle('x', 10)).rejects.toBeInstanceOf(DataError);
     });
   });
 });
