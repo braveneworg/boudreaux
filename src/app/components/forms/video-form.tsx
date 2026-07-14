@@ -27,7 +27,9 @@ import { ZinePanel } from '@/ui/zine-panel';
 import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
+import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoUpload } from './videos/use-video-upload';
+import { VideoArtistReviewSection } from './videos/video-artist-review-section';
 import { VideoFileSection } from './videos/video-file-section';
 import { VideoFormFooter } from './videos/video-form-footer';
 import {
@@ -55,6 +57,15 @@ interface SubmitVideoDeps {
   createVideoAsync: ReturnType<typeof useCreateVideoMutation>['createVideoAsync'];
   updateVideoAsync: ReturnType<typeof useUpdateVideoMutation>['updateVideoAsync'];
 }
+
+/**
+ * Merge reviewed artist details into the form payload when present.
+ * Keeps `onValidSubmit` under the complexity cap by extracting the conditional.
+ */
+const mergeArtistDetails = (
+  data: VideoFormData,
+  details: VideoFormData['artistDetails']
+): VideoFormData => (details?.length ? { ...data, artistDetails: details } : data);
 
 /** Dispatch to the create/update mutation, then map errors or navigate on success. */
 const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<void> => {
@@ -124,7 +135,10 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
 
   const upload = useVideoUpload({ preGeneratedId, form, onPosterCandidate: setPosterCandidate });
   const s3Key = useWatch({ control, name: 's3Key' });
+  const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
   const isSubmitting = isCreatingVideo || isUpdatingVideo;
+
+  const { entries, updateDraft, buildArtistDetails } = useVideoArtistReview(artistValue);
 
   const { data: probeData } = useVideoProbePrefillQuery(s3Key, preGeneratedId, {
     enabled: upload.status === 'success',
@@ -154,7 +168,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
 
   const onValidSubmit = useCallback(
     (data: VideoFormData): Promise<void> =>
-      submitVideo(data, {
+      submitVideo(mergeArtistDetails(data, buildArtistDetails()), {
         isEditMode,
         videoId,
         preGeneratedId,
@@ -163,7 +177,16 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         createVideoAsync,
         updateVideoAsync,
       }),
-    [isEditMode, videoId, preGeneratedId, form, router, createVideoAsync, updateVideoAsync]
+    [
+      isEditMode,
+      videoId,
+      preGeneratedId,
+      form,
+      router,
+      createVideoAsync,
+      updateVideoAsync,
+      buildArtistDetails,
+    ]
   );
 
   const handleCancel = useCallback(() => router.push('/admin/videos'), [router]);
@@ -194,6 +217,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             <VideoFileSection control={control} upload={upload} />
             {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
             <VideoMetadataSection control={control} onSelectDate={handleSelectDate} />
+            <VideoArtistReviewSection entries={entries} updateDraft={updateDraft} />
             <EnrichmentPanelMount
               video={video}
               control={control}

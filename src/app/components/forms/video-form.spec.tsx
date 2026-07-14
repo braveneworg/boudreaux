@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   getPresignedUploadUrlsAction: vi.fn(),
   uploadFileToS3: vi.fn(),
   push: vi.fn(),
+  useVideoArtistReview: vi.fn(),
+  buildArtistDetails: vi.fn(),
+  updateDraft: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -69,6 +72,21 @@ vi.mock('@/lib/actions/presigned-upload-actions', () => ({
 
 vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFileToS3: mocks.uploadFileToS3,
+}));
+
+vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
+  useVideoArtistReview: (...args: unknown[]) => mocks.useVideoArtistReview(...args),
+}));
+
+vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
+  VideoArtistReviewSection: ({ entries }: { entries: { sourceName: string }[] }) =>
+    entries.length > 0 ? (
+      <div data-testid="video-artist-review-section">
+        {entries.map((e) => (
+          <span key={e.sourceName}>{e.sourceName}</span>
+        ))}
+      </div>
+    ) : null,
 }));
 
 vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
@@ -136,6 +154,12 @@ const PROBE_IDLE_RESULT = { data: undefined, isPending: false, isError: false };
 beforeEach(() => {
   mocks.useVideoQuery.mockReturnValue(CREATE_MODE_QUERY);
   mocks.useVideoProbePrefillQuery.mockReturnValue(PROBE_IDLE_RESULT);
+  mocks.buildArtistDetails.mockReturnValue([]);
+  mocks.useVideoArtistReview.mockReturnValue({
+    entries: [],
+    updateDraft: mocks.updateDraft,
+    buildArtistDetails: mocks.buildArtistDetails,
+  });
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
     fields: {},
@@ -908,5 +932,86 @@ describe('VideoForm — server probe prefill', () => {
     await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue(''));
     // No error UI rendered
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+// ── B6: artist review section ─────────────────────────────────────────────────
+
+const REVIEW_WITH_ENTRIES = {
+  entries: [{ sourceName: 'A', role: 'primary', status: 'new', match: null, draft: null }],
+  updateDraft: mocks.updateDraft,
+  buildArtistDetails: mocks.buildArtistDetails,
+};
+
+describe('VideoForm — artist review section (B6)', () => {
+  // Test 5a: section renders in create mode
+  it('renders the review section when entries are present in create mode', async () => {
+    mocks.useVideoArtistReview.mockReturnValue(REVIEW_WITH_ENTRIES);
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    await user.type(screen.getByLabelText('Artist / Creator'), 'A');
+
+    expect(await screen.findByTestId('video-artist-review-section')).toBeInTheDocument();
+  });
+
+  // Test 5b: section renders in edit mode
+  it('renders the review section when entries are present in edit mode', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useVideoArtistReview.mockReturnValue(REVIEW_WITH_ENTRIES);
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByTestId('video-artist-review-section')).toBeInTheDocument();
+  });
+
+  // Test 6: hook receives the watched artist value
+  it('passes the artist field value to useVideoArtistReview when the artist input changes', async () => {
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    await user.type(screen.getByLabelText('Artist / Creator'), 'Ceschi');
+
+    expect(mocks.useVideoArtistReview).toHaveBeenCalledWith(expect.stringContaining('Ceschi'));
+  });
+
+  // Test 7: submit with non-empty artistDetails includes them in the payload
+  it('includes artistDetails in the create payload when buildArtistDetails returns a non-empty array', async () => {
+    const details = [{ sourceName: 'A', firstName: 'A' }];
+    mocks.buildArtistDetails.mockReturnValue(details);
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ artistDetails: details })
+      )
+    );
+  });
+
+  // Test 8: submit with empty artistDetails omits the key
+  it('omits artistDetails from the create payload when buildArtistDetails returns []', async () => {
+    mocks.buildArtistDetails.mockReturnValue([]);
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    const payload = mocks.createVideoAsync.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('artistDetails');
   });
 });
