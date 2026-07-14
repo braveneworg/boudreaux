@@ -132,7 +132,7 @@ export const VideoArtistReviewSection = ({
   if (entries.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" data-testid="video-artist-review-section">
       <h2 className="font-semibold">Artist Review</h2>
       <div className="space-y-2">
         {entries.map((entry, index) => (
