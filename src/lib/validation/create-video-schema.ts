@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
+import { videoArtistDetailSchema } from '@/lib/validation/video-artist-detail-schema';
 
 /**
  * Whether a numeric-ish form field holds a positive whole number. `undefined`
@@ -55,6 +56,7 @@ export const videoFormSchema = z.object({
   }),
   posterUrl: z.string().url({ message: 'Poster must be a valid URL' }).optional().or(z.literal('')),
   publishedAt: z.string().optional().or(z.literal('')),
+  artistDetails: z.array(videoArtistDetailSchema).max(20).optional(),
 });
 
 /**
