@@ -142,7 +142,7 @@ export const playlistCoverUploadInputSchema = z.object({
       })
     )
     .min(1)
-    .max(4),
+    .max(MAX_PLAYLIST_COVER_IMAGES),
 });
 
 /** Inferred type for `playlistCoverUploadInputSchema`. */

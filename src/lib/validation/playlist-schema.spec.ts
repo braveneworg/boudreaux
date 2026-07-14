@@ -260,6 +260,16 @@ describe('addPlaylistItemInputSchema', () => {
       }).success
     ).toBe(false);
   });
+
+  it('accepts a valid video item add with force defaulting to false', () => {
+    const result = addPlaylistItemInputSchema.safeParse({
+      playlistId: VALID_OID,
+      itemType: 'video',
+      videoId: VALID_OID,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.force).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -281,7 +291,9 @@ describe('reorderPlaylistItemsInputSchema', () => {
   });
 
   it(`rejects more than ${MAX_PLAYLIST_ITEMS} items`, () => {
-    const orderedItemIds = Array.from({ length: MAX_PLAYLIST_ITEMS + 1 }, () => VALID_OID);
+    const orderedItemIds = Array.from({ length: MAX_PLAYLIST_ITEMS + 1 }, (_, i) =>
+      i.toString(16).padStart(24, '0')
+    );
     expect(
       reorderPlaylistItemsInputSchema.safeParse({ playlistId: VALID_OID, orderedItemIds }).success
     ).toBe(false);
@@ -354,15 +366,31 @@ describe('playlistCoverUploadInputSchema', () => {
     ).toBe(false);
   });
 
-  it('accepts image/png, image/webp, and image/gif content types', () => {
-    for (const contentType of ['image/png', 'image/webp', 'image/gif'] as const) {
-      expect(
-        playlistCoverUploadInputSchema.safeParse({
-          playlistId: VALID_OID,
-          files: [{ ...validFile, contentType }],
-        }).success
-      ).toBe(true);
-    }
+  it('accepts image/png content type', () => {
+    expect(
+      playlistCoverUploadInputSchema.safeParse({
+        playlistId: VALID_OID,
+        files: [{ ...validFile, contentType: 'image/png' }],
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts image/webp content type', () => {
+    expect(
+      playlistCoverUploadInputSchema.safeParse({
+        playlistId: VALID_OID,
+        files: [{ ...validFile, contentType: 'image/webp' }],
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts image/gif content type', () => {
+    expect(
+      playlistCoverUploadInputSchema.safeParse({
+        playlistId: VALID_OID,
+        files: [{ ...validFile, contentType: 'image/gif' }],
+      }).success
+    ).toBe(true);
   });
 });
 
