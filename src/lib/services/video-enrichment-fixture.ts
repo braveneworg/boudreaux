@@ -34,7 +34,14 @@ export const videoProbeFixture: { normalized: NormalizedProbe; probeData: unknow
       format_name: 'mov,mp4,m4a,3gp,3g2,mj2',
       duration: '245.000000',
       bit_rate: '4800000',
-      tags: { encoder: 'Lavf60.16.100', creation_time: '2020-05-30T12:00:00.000000Z' },
+      tags: {
+        encoder: 'Lavf60.16.100',
+        creation_time: '2020-05-30T12:00:00.000000Z',
+        title: 'E2E Probe Title',
+        artist: 'E2E Probe Artist',
+        date: '2019-08-01',
+        comment: 'E2E probe description',
+      },
     },
     streams: [
       {
