@@ -70,6 +70,15 @@ const eslintConfig = [
     },
   },
   {
+    // useVideoProbePrefillQuery intentionally keys only on s3Key (not videoId):
+    // a given s3Key is immutable once uploaded and always maps to one video.
+    // The URL (which carries videoId) is pre-built before useQuery so it's a
+    // derived stable string, not an independent reactive dep — but the rule can't
+    // infer that invariant from the closure shape alone.
+    files: ['src/app/hooks/use-video-probe-prefill-query.ts'],
+    rules: { '@tanstack/query/exhaustive-deps': 'off' },
+  },
+  {
     // Specs pass placeholder classNames (`custom-class`, `class1`, …) to assert
     // className plumbing; those aren't real utilities, so don't flag them.
     files: ['**/*.spec.{js,jsx,ts,tsx}'],

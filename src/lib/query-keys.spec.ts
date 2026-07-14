@@ -263,6 +263,34 @@ describe('queryKeys', () => {
     });
   });
 
+  describe('videos', () => {
+    it('should return all key', () => {
+      expect(queryKeys.videos.all).toEqual(['videos']);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.videos.detail('v-123');
+      expect(key).toEqual(['videos', 'detail', 'v-123']);
+    });
+
+    it('should return enrichment key with id', () => {
+      const key = queryKeys.videos.enrichment('v-123');
+      expect(key).toEqual(['videos', 'enrichment', 'v-123']);
+    });
+
+    it('should return probePrefill key with s3Key extending videos.all', () => {
+      const key = queryKeys.videos.probePrefill('videos/clip.mp4');
+      expect(key).toEqual(['videos', 'probePrefill', 'videos/clip.mp4']);
+      expect(key[0]).toBe(queryKeys.videos.all[0]);
+    });
+
+    it('should return different probePrefill keys for different s3Keys', () => {
+      const key1 = queryKeys.videos.probePrefill('videos/a.mp4');
+      const key2 = queryKeys.videos.probePrefill('videos/b.mp4');
+      expect(key1).not.toEqual(key2);
+    });
+  });
+
   describe('linkPreview', () => {
     it('should return linkPreview key with url', () => {
       const key = queryKeys.linkPreview('https://example.com');
