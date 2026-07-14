@@ -63,8 +63,9 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.videos.all, 'detail', id] as const,
     /** Enrichment status poll — its own key so applies never reset `videos.detail`. */
     enrichment: (id: string) => [...queryKeys.videos.all, 'enrichment', id] as const,
-    /** ffprobe prefill — keyed by s3Key; same key never re-probes (staleTime: Infinity). */
-    probePrefill: (s3Key: string) => [...queryKeys.videos.all, 'probePrefill', s3Key] as const,
+    /** ffprobe prefill — keyed by s3Key + videoId; same pair never re-probes (staleTime: Infinity). */
+    probePrefill: (s3Key: string, videoId: string) =>
+      [...queryKeys.videos.all, 'probePrefill', s3Key, videoId] as const,
   },
   artists: {
     all: ['artists'] as const,

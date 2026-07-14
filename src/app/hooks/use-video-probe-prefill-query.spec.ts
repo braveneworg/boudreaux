@@ -135,7 +135,12 @@ describe('useVideoProbePrefillQuery', () => {
   it('uses the probePrefill query key', () => {
     renderHook(() => useVideoProbePrefillQuery('videos/clip.mp4', 'video-1'));
 
-    expect(lastOptions().queryKey).toEqual(['videos', 'probePrefill', 'videos/clip.mp4']);
+    expect(lastOptions().queryKey).toEqual([
+      'videos',
+      'probePrefill',
+      'videos/clip.mp4',
+      'video-1',
+    ]);
   });
 
   it('sets staleTime to Infinity', () => {

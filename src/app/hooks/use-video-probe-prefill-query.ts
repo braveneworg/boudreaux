@@ -51,21 +51,14 @@ export const useVideoProbePrefillQuery = (
   videoId: string,
   options: QueryOptionsOverride<ProbePrefillResponse> = {}
 ): UseQueryResult<ProbePrefillResponse> => {
-  // Pre-build the URL so queryFn closes over a string (included in the key
-  // via s3Key) rather than over videoId directly. A given s3Key is always
-  // associated with one videoId, so the key uniquely identifies the result.
-  const url =
-    s3Key !== '' && videoId !== ''
-      ? `/api/videos/probe-metadata?videoId=${encodeURIComponent(videoId)}&s3Key=${encodeURIComponent(s3Key)}`
-      : '';
-
   return useQuery({
-    queryKey: queryKeys.videos.probePrefill(s3Key),
+    queryKey: queryKeys.videos.probePrefill(s3Key, videoId),
     queryFn: ({ signal }) =>
-      fetchAndParse(url, probePrefillResponseSchema, {
-        signal,
-        errorMessage: 'Failed to fetch probe prefill',
-      }),
+      fetchAndParse(
+        `/api/videos/probe-metadata?videoId=${encodeURIComponent(videoId)}&s3Key=${encodeURIComponent(s3Key)}`,
+        probePrefillResponseSchema,
+        { signal, errorMessage: 'Failed to fetch probe prefill' }
+      ),
     staleTime: Infinity,
     retry: false,
     ...options,

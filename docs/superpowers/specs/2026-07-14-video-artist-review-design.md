@@ -40,7 +40,7 @@ returns normalized tags via a new pure extractor
 The client merges via `applyServerProbePrefill` with the same
 only-fill-empty semantics as the existing `applyVideoPrefill`, wired
 through a TanStack Query hook (`useVideoProbePrefillQuery`, key
-`videos.probePrefill(s3Key)`, staleTime Infinity) gated on
+`videos.probePrefill(s3Key, videoId)`, staleTime Infinity) gated on
 `upload.status === 'success'` — it never fires on edit-page initial load.
 E2E/local-dev uses the existing `BIO_GENERATOR_FAKE` short-circuit with
 deterministic tags added to `videoProbeFixture`. A missing ffprobe binary

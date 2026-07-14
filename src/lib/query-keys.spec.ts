@@ -278,15 +278,21 @@ describe('queryKeys', () => {
       expect(key).toEqual(['videos', 'enrichment', 'v-123']);
     });
 
-    it('should return probePrefill key with s3Key extending videos.all', () => {
-      const key = queryKeys.videos.probePrefill('videos/clip.mp4');
-      expect(key).toEqual(['videos', 'probePrefill', 'videos/clip.mp4']);
+    it('should return probePrefill key with s3Key and videoId extending videos.all', () => {
+      const key = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-1');
+      expect(key).toEqual(['videos', 'probePrefill', 'videos/clip.mp4', 'v-1']);
       expect(key[0]).toBe(queryKeys.videos.all[0]);
     });
 
     it('should return different probePrefill keys for different s3Keys', () => {
-      const key1 = queryKeys.videos.probePrefill('videos/a.mp4');
-      const key2 = queryKeys.videos.probePrefill('videos/b.mp4');
+      const key1 = queryKeys.videos.probePrefill('videos/a.mp4', 'v-1');
+      const key2 = queryKeys.videos.probePrefill('videos/b.mp4', 'v-1');
+      expect(key1).not.toEqual(key2);
+    });
+
+    it('should return different probePrefill keys for different videoIds', () => {
+      const key1 = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-1');
+      const key2 = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-2');
       expect(key1).not.toEqual(key2);
     });
   });
