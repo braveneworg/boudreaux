@@ -38,7 +38,7 @@ describe('playlistTitleSchema', () => {
   it('trims surrounding whitespace', () => {
     const result = playlistTitleSchema.safeParse('  My Playlist  ');
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data).toBe('My Playlist');
+    expect(result.success && result.data).toBe('My Playlist');
   });
 
   it('rejects an empty string', () => {
@@ -139,13 +139,13 @@ describe('createPlaylistInputSchema', () => {
   it('defaults coverImages to an empty array', () => {
     const result = createPlaylistInputSchema.safeParse({ title: 'My Playlist', isPublic: false });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.coverImages).toEqual([]);
+    expect(result.success && result.data.coverImages).toEqual([]);
   });
 
   it('defaults items to an empty array', () => {
     const result = createPlaylistInputSchema.safeParse({ title: 'My Playlist', isPublic: false });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.items).toEqual([]);
+    expect(result.success && result.data.items).toEqual([]);
   });
 
   it('accepts items up to the max', () => {
@@ -238,7 +238,7 @@ describe('addPlaylistItemInputSchema', () => {
       trackFileId: VALID_OID,
     });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.force).toBe(false);
+    expect(result.success && result.data.force).toBe(false);
   });
 
   it('accepts force: true', () => {
@@ -249,7 +249,7 @@ describe('addPlaylistItemInputSchema', () => {
       force: true,
     });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.force).toBe(true);
+    expect(result.success && result.data.force).toBe(true);
   });
 
   it('rejects a video item without videoId', () => {
@@ -268,7 +268,7 @@ describe('addPlaylistItemInputSchema', () => {
       videoId: VALID_OID,
     });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.force).toBe(false);
+    expect(result.success && result.data.force).toBe(false);
   });
 });
 
