@@ -99,3 +99,14 @@ export const videoEnrichmentProgressLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const VIDEO_ENRICHMENT_PROGRESS_LIMIT = 60;
+
+/**
+ * Video probe prefill (admin video form) — 10 requests per minute.
+ * ffprobe spawns a child process per call, making this endpoint expensive;
+ * the low cap prevents accidental or deliberate process storms.
+ */
+export const videoProbePrefillLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const VIDEO_PROBE_PREFILL_LIMIT = 10;
