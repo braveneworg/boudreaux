@@ -14,9 +14,9 @@ import { REVIEW_VIDEO_ID } from '../helpers/seed-test-db';
  * expect.poll against GET /api/artists.
  *
  * Parallel safety: the spec uses REVIEW_VIDEO_ID (dedicated, archived) and
- * REVIEW_ARTIST_ID (dedicated read-only), both unique to this spec. The new
- * artist "Zora Quill Brandt" is created only inside the single edit-flow test
- * and carries a unique displayName that no other spec seeds or reads.
+ * the seeded 'E2E Review Lead' artist (matched by displayName string, not ID).
+ * The new artist "Zora Quill Brandt" is created only inside the single
+ * edit-flow test and carries a unique displayName no other spec seeds or reads.
  */
 
 /** Artist field label text in the video metadata section. */

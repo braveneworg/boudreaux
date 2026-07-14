@@ -487,34 +487,41 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
  * real artists and never becomes the first result in admin lists.
  */
 const seedReviewFixtures = async (prisma: PrismaClient): Promise<void> => {
-  await prisma.artist.create({
-    data: {
-      id: REVIEW_ARTIST_ID,
-      firstName: 'E2E',
-      surname: 'Review Lead',
-      slug: 'e2e-review-lead',
-      displayName: 'E2E Review Lead',
-      createdAt: new Date('2020-01-06T00:00:00Z'),
-    },
+  // First-ever writes to the fresh Artist/Video collections — a single
+  // createMany each (concurrent create() read-backs race in CI on new
+  // collections, per repo LESSONS).
+  await prisma.artist.createMany({
+    data: [
+      {
+        id: REVIEW_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Review Lead',
+        slug: 'e2e-review-lead',
+        displayName: 'E2E Review Lead',
+        createdAt: new Date('2020-01-06T00:00:00Z'),
+      },
+    ],
   });
 
-  await prisma.video.create({
-    data: {
-      id: REVIEW_VIDEO_ID,
-      title: 'E2E Review Video',
-      artist: 'E2E Review Lead',
-      category: 'MUSIC',
-      releasedOn: new Date('2026-03-01T00:00:00.000Z'),
-      durationSeconds: 180,
-      s3Key: `media/videos/${REVIEW_VIDEO_ID}/review-video.mp4`,
-      fileName: 'review-video.mp4',
-      mimeType: 'video/mp4',
-      fileSize: BigInt(1048576),
-      posterUrl: null,
-      description: 'E2E Review Video description.',
-      publishedAt: PUBLISHED_AT,
-      archivedAt: ARCHIVED_AT,
-    },
+  await prisma.video.createMany({
+    data: [
+      {
+        id: REVIEW_VIDEO_ID,
+        title: 'E2E Review Video',
+        artist: 'E2E Review Lead',
+        category: 'MUSIC',
+        releasedOn: new Date('2026-03-01T00:00:00.000Z'),
+        durationSeconds: 180,
+        s3Key: `media/videos/${REVIEW_VIDEO_ID}/review-video.mp4`,
+        fileName: 'review-video.mp4',
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: 'E2E Review Video description.',
+        publishedAt: PUBLISHED_AT,
+        archivedAt: ARCHIVED_AT,
+      },
+    ],
   });
 };
 
@@ -1370,7 +1377,6 @@ export {
   createDisposableSignoutState,
   ENRICH_INFO_VIDEO_ID,
   ENRICH_MUSIC_VIDEO_ID,
-  REVIEW_ARTIST_ID,
   REVIEW_VIDEO_ID,
   seedTestDatabase,
   SIGNOUT_USER_ID,
