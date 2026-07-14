@@ -4,7 +4,10 @@
 
 import { prisma } from '@/lib/prisma';
 
-import { ReleaseDigitalFormatFileRepository } from './release-digital-format-file-repository';
+import {
+  ReleaseDigitalFormatFileRepository,
+  type TrackFileWithRelease,
+} from './release-digital-format-file-repository';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/prisma', () => ({
@@ -209,6 +212,173 @@ describe('ReleaseDigitalFormatFileRepository', () => {
       expect(prisma.releaseDigitalFormatFile.count).toHaveBeenCalledWith({
         where: { formatId: 'format-1' },
       });
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // The expected select shape shared by both new methods. Pinning it here
+  // ensures fileSize is never added back (BigInt breaks JSON serialization).
+  // ──────────────────────────────────────────────────────────────────────────
+  const TRACK_FILE_WITH_RELEASE_SELECT = {
+    id: true,
+    trackNumber: true,
+    title: true,
+    duration: true,
+    s3Key: true,
+    fileName: true,
+    mimeType: true,
+    format: {
+      select: {
+        formatType: true,
+        releaseId: true,
+        release: {
+          select: {
+            id: true,
+            title: true,
+            coverArt: true,
+            publishedAt: true,
+            artistReleases: {
+              select: {
+                artist: {
+                  select: {
+                    displayName: true,
+                    firstName: true,
+                    surname: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  } as const;
+
+  const mockTrackFileWithRelease: TrackFileWithRelease = {
+    id: 'file-1',
+    trackNumber: 1,
+    title: 'Song One',
+    duration: 215,
+    s3Key: 'releases/123/digital-formats/MP3_320KBPS/tracks/1-song.mp3',
+    fileName: 'song1.mp3',
+    mimeType: 'audio/mpeg',
+    format: {
+      formatType: 'MP3_320KBPS',
+      releaseId: 'release-1',
+      release: {
+        id: 'release-1',
+        title: 'My Album',
+        coverArt: 'https://example.com/cover.jpg',
+        publishedAt: new Date('2024-01-01'),
+        artistReleases: [
+          {
+            artist: {
+              displayName: 'Artist One',
+              firstName: 'Artist',
+              surname: 'One',
+            },
+          },
+        ],
+      },
+    },
+  };
+
+  describe('findManyByIdsWithRelease', () => {
+    it('should call findMany with id-in where and the exact select (fileSize excluded)', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([
+        mockTrackFileWithRelease,
+      ] as never);
+
+      const result = await repo.findManyByIdsWithRelease(['file-1', 'file-2']);
+
+      expect(result).toEqual([mockTrackFileWithRelease]);
+      expect(prisma.releaseDigitalFormatFile.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['file-1', 'file-2'] } },
+        select: TRACK_FILE_WITH_RELEASE_SELECT,
+      });
+    });
+
+    it('should return an empty array when ids list is empty', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      const result = await repo.findManyByIdsWithRelease([]);
+
+      expect(result).toEqual([]);
+      expect(prisma.releaseDigitalFormatFile.findMany).toHaveBeenCalledWith({
+        where: { id: { in: [] } },
+        select: TRACK_FILE_WITH_RELEASE_SELECT,
+      });
+    });
+
+    it('should not include fileSize in the select', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      await repo.findManyByIdsWithRelease([]);
+
+      const [call] = vi.mocked(prisma.releaseDigitalFormatFile.findMany).mock.calls;
+      expect(call[0]).not.toHaveProperty('select.fileSize');
+    });
+
+    it('should propagate a DataError when prisma throws', async () => {
+      const prismaError = Object.assign(new Error('DB error'), { code: 'P2025' });
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(prismaError);
+
+      await expect(repo.findManyByIdsWithRelease(['file-1'])).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('searchTracksByTitle', () => {
+    it('should call findMany with title search, MP3_320KBPS format filter, and published-release filter', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([
+        mockTrackFileWithRelease,
+      ] as never);
+
+      const result = await repo.searchTracksByTitle('song', 10);
+
+      expect(result).toEqual([mockTrackFileWithRelease]);
+      expect(prisma.releaseDigitalFormatFile.findMany).toHaveBeenCalledWith({
+        where: {
+          title: { contains: 'song', mode: 'insensitive' },
+          format: {
+            is: {
+              formatType: 'MP3_320KBPS',
+              release: {
+                is: {
+                  publishedAt: { not: null },
+                  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+                },
+              },
+            },
+          },
+        },
+        take: 10,
+        select: TRACK_FILE_WITH_RELEASE_SELECT,
+      });
+    });
+
+    it('should respect the take limit', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      await repo.searchTracksByTitle('query', 5);
+
+      const [call] = vi.mocked(prisma.releaseDigitalFormatFile.findMany).mock.calls;
+      expect(call[0]).toMatchObject({ take: 5 });
+    });
+
+    it('should not include fileSize in the select', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      await repo.searchTracksByTitle('x', 1);
+
+      const [call] = vi.mocked(prisma.releaseDigitalFormatFile.findMany).mock.calls;
+      expect(call[0]).not.toHaveProperty('select.fileSize');
+    });
+
+    it('should propagate a DataError when prisma throws', async () => {
+      const prismaError = Object.assign(new Error('DB error'), { code: 'P2025' });
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(prismaError);
+
+      await expect(repo.searchTracksByTitle('x', 10)).rejects.toThrow('DB error');
     });
   });
 });
