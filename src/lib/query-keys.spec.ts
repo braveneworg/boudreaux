@@ -91,6 +91,25 @@ describe('queryKeys', () => {
       const key = queryKeys.artists.filteredList({});
       expect(key).toEqual(['artists', 'filteredList', '', '']);
     });
+
+    describe('nameLookup', () => {
+      it('returns a key rooted in artists.all with nameLookup discriminator', () => {
+        const key = queryKeys.artists.nameLookup(['Ceschi', 'Sole']);
+        expect(key[0]).toBe('artists');
+        expect(key[1]).toBe('nameLookup');
+      });
+
+      it('lowercases and trims each name entry in the key', () => {
+        const key = queryKeys.artists.nameLookup(['  Ceschi  ', 'SOLE']);
+        expect(key).toEqual(['artists', 'nameLookup', 'ceschi', 'sole']);
+      });
+
+      it('produces different keys for different name sets', () => {
+        const key1 = queryKeys.artists.nameLookup(['Ceschi']);
+        const key2 = queryKeys.artists.nameLookup(['Sole']);
+        expect(key1).not.toEqual(key2);
+      });
+    });
   });
 
   describe('featuredArtists', () => {

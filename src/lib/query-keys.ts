@@ -89,6 +89,12 @@ export const queryKeys = {
         params.search ?? '',
         String(params.take ?? ''),
       ] as const,
+    nameLookup: (names: string[]) =>
+      [
+        ...queryKeys.artists.all,
+        'nameLookup',
+        ...names.map((n) => n.trim().toLowerCase()),
+      ] as const,
   },
   featuredArtists: {
     all: ['featuredArtists'] as const,

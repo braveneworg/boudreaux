@@ -110,3 +110,15 @@ export const videoProbePrefillLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const VIDEO_PROBE_PREFILL_LIMIT = 10;
+
+/**
+ * Artist name lookup (admin video form review) — 20 requests per minute.
+ * Serves the artist-review UI that checks parsed names against the DB;
+ * the moderate cap absorbs batch checks (up to 20 names per request)
+ * while blunting any accidental polling storms.
+ */
+export const artistNameLookupLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const ARTIST_NAME_LOOKUP_LIMIT = 20;

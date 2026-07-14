@@ -2370,6 +2370,43 @@ describe('ArtistService', () => {
     });
   });
 
+  describe('findByName', () => {
+    const matchedArtist = {
+      id: 'artist-existing',
+      displayName: 'Ceschi',
+      firstName: 'Ceschi',
+      surname: '',
+    };
+
+    it('returns the match when found by slug and calls the same repository lookups in order', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+
+      const result = await ArtistService.findByName('Ceschi');
+
+      expect(result).toEqual(matchedArtist);
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+    });
+
+    it('returns null when no match is found across all three lookups', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+
+      const result = await ArtistService.findByName('Unknown Artist');
+
+      expect(result).toBeNull();
+    });
+
+    it('findOrCreateByName behavior is unchanged by the refactor — slug match still returns existing artist', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result).toEqual({ success: true, data: matchedArtist });
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+    });
+  });
+
   describe('applyEnrichedField', () => {
     it('maps a text field through the whitelist switch', async () => {
       vi.mocked(ArtistRepository.updateEnrichedField).mockResolvedValue(undefined);

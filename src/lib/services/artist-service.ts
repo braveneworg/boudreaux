@@ -874,6 +874,35 @@ export class ArtistService {
   }
 
   /**
+   * Look up an existing artist by name using the same search order that
+   * {@link findOrCreateByName} uses for its match step:
+   *   1. Slug match (deterministic, unique)
+   *   2. Case-insensitive displayName match
+   *   3. Case-insensitive firstName + surname match
+   *
+   * Returns the matched record (`id`, `displayName`, `firstName`, `surname`) or
+   * `null` when none of the three lookups succeeds. This method exists so the
+   * admin artist-lookup route and `findOrCreateByName` share the same code path
+   * and can never silently drift.
+   *
+   * @param artistName - Full artist name to look up (trimmed internally)
+   */
+  static async findByName(artistName: string): Promise<{
+    id: string;
+    displayName: string | null;
+    firstName: string;
+    surname: string;
+  } | null> {
+    const trimmed = artistName.trim();
+    if (!trimmed) return null;
+
+    const slug = generateSlug(trimmed);
+    const { firstName, lastName } = splitFullName(trimmed);
+
+    return findArtistByName({ trimmed, slug, firstName, lastName });
+  }
+
+  /**
    * Find an existing artist by name or create a new one.
    *
    * Search order:
