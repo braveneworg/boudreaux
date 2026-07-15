@@ -63,6 +63,15 @@ vi.mock('@/app/hooks/use-video-producers-query', () => ({
   useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
+vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
+  useReleaseDateLookupQuery: () => ({
+    isFetching: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/utils/multipart-upload', () => ({
   uploadVideoMultipart: mocks.uploadVideoMultipart,
 }));

@@ -12,8 +12,8 @@ import { Label } from '@/app/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
 import { Textarea } from '@/app/components/ui/textarea';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
-import { DatePicker } from '@/ui/datepicker';
 
+import { ReleaseDateField } from './release-date-field';
 import { useVideoArtistFields } from './use-video-artist-fields';
 
 import type { Control, UseFormSetValue } from 'react-hook-form';
@@ -104,19 +104,7 @@ export const VideoMetadataSection = ({
       <CategoryField control={control} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
-          control={control}
-          name="releasedOn"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Release date</FormLabel>
-              <FormControl>
-                <DatePicker fieldName={field.name} onSelect={onSelectDate} value={field.value} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <ReleaseDateField control={control} onSelectDate={onSelectDate} />
         <FormField
           control={control}
           name="durationSeconds"

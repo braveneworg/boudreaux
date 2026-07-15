@@ -17,6 +17,18 @@ import type { UseFormSetValue } from 'react-hook-form';
 vi.mock('server-only', () => ({}));
 
 // ---------------------------------------------------------------------------
+// Mock: useReleaseDateLookupQuery — idle (not fetching, no data)
+// ---------------------------------------------------------------------------
+vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
+  useReleaseDateLookupQuery: () => ({
+    isFetching: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock: useArtistListQuery — return empty list so comboboxes stay idle
 // ---------------------------------------------------------------------------
 vi.mock('@/app/hooks/use-artist-list-query', () => ({
