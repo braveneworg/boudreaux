@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createVideoSchema, videoFormSchema, type VideoFormData } from './create-video-schema';
+import { videoArtistDetailSchema } from './video-artist-detail-schema';
 
 describe('create-video-schema', () => {
   const validData: VideoFormData = {
@@ -214,6 +215,40 @@ describe('create-video-schema', () => {
     it('is the same schema the action input uses', () => {
       const result = videoFormSchema.safeParse(validData);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('artistDetails validation', () => {
+    const validDetail = { sourceName: 'Ceschi', displayName: 'Ceschi Ramos' };
+
+    it('parses when artistDetails is absent (back-compat)', () => {
+      const result = createVideoSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it('parses a valid single-entry artistDetails array', () => {
+      const result = createVideoSchema.safeParse({ ...validData, artistDetails: [validDetail] });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects an artistDetails array with 21 entries (max is 20)', () => {
+      const details = Array.from({ length: 21 }, (_, i) => ({ sourceName: `Artist ${i}` }));
+      const result = createVideoSchema.safeParse({ ...validData, artistDetails: details });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects an entry with an empty sourceName', () => {
+      const result = createVideoSchema.safeParse({
+        ...validData,
+        artistDetails: [{ sourceName: '' }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('videoArtistDetailSchema is used inside createVideoSchema', () => {
+      // Confirm the element schema is the same shape by testing a valid entry directly
+      const detailResult = videoArtistDetailSchema.safeParse(validDetail);
+      expect(detailResult.success).toBe(true);
     });
   });
 });

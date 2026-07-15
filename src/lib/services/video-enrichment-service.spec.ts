@@ -206,6 +206,65 @@ describe('syncVideoArtists', () => {
       [OTHER_ID]
     );
   });
+
+  it('forwards matched detail to findOrCreateByName by lowercased sourceName', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([
+      { name: 'A', role: 'primary' },
+      { name: 'Zora Quill Brandt', role: 'featured' },
+    ]);
+    vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+      success: true,
+      data: { id: ARTIST_ID, displayName: 'A', firstName: 'A', surname: '' },
+    });
+
+    await VideoEnrichmentService.syncVideoArtists(VIDEO_ID, 'A feat. Zora Quill Brandt', [
+      { sourceName: 'zora quill brandt', firstName: 'Zora', surname: 'Brandt' },
+    ]);
+
+    // First call (name 'A') — no matching detail → undefined
+    expect(ArtistService.findOrCreateByName).toHaveBeenNthCalledWith(1, 'A', undefined);
+    // Second call (name 'Zora Quill Brandt') — matched by lowercased sourceName
+    expect(ArtistService.findOrCreateByName).toHaveBeenNthCalledWith(2, 'Zora Quill Brandt', {
+      sourceName: 'zora quill brandt',
+      firstName: 'Zora',
+      surname: 'Brandt',
+    });
+  });
+
+  it('never forwards a stale detail whose sourceName is absent from the artist string', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+    vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+      success: true,
+      data: { id: ARTIST_ID, displayName: 'Ceschi', firstName: 'Francisco', surname: 'Ramos' },
+    });
+
+    await VideoEnrichmentService.syncVideoArtists(VIDEO_ID, 'Ceschi', [
+      { sourceName: 'stale artist', firstName: 'Stale', surname: 'Artist' },
+    ]);
+
+    expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Ceschi', undefined);
+  });
+
+  it('passes undefined details to every call when artistDetails is omitted', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([
+      { name: 'Ceschi', role: 'primary' },
+      { name: 'Sole', role: 'featured' },
+    ]);
+    vi.mocked(ArtistService.findOrCreateByName)
+      .mockResolvedValueOnce({
+        success: true,
+        data: { id: ARTIST_ID, displayName: 'Ceschi', firstName: 'Francisco', surname: 'Ramos' },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { id: OTHER_ID, displayName: 'Sole', firstName: 'Tim', surname: 'Holland' },
+      });
+
+    await VideoEnrichmentService.syncVideoArtists(VIDEO_ID, 'Ceschi feat. Sole');
+
+    expect(ArtistService.findOrCreateByName).toHaveBeenNthCalledWith(1, 'Ceschi', undefined);
+    expect(ArtistService.findOrCreateByName).toHaveBeenNthCalledWith(2, 'Sole', undefined);
+  });
 });
 
 describe('runEnrichmentJob', () => {

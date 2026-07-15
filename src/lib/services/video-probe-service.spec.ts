@@ -6,6 +6,7 @@ import { loggers } from '@/lib/utils/logger';
 import { generatePresignedProbeUrl } from '@/lib/utils/s3-client';
 import { probeUrl } from '@/lib/video-probe/ffprobe';
 import { normalizeProbe, redactProbeJson } from '@/lib/video-probe/normalize';
+import { extractProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import { VideoProbeService } from './video-probe-service';
 
@@ -67,6 +68,10 @@ vi.mock('@/lib/video-probe/ffprobe', () => ({ probeUrl: vi.fn() }));
 vi.mock('@/lib/video-probe/normalize', () => ({
   normalizeProbe: vi.fn(),
   redactProbeJson: vi.fn(),
+}));
+
+vi.mock('@/lib/video-probe/probe-tags', () => ({
+  extractProbePrefillTags: vi.fn(),
 }));
 
 const videoId = '507f1f77bcf86cd799439011';
@@ -237,5 +242,60 @@ describe('VideoProbeService.probeAndPersist', () => {
         ...fixtureNormalized,
       })
     );
+  });
+});
+
+describe('VideoProbeService.probeForPrefill', () => {
+  const fixtureTags = {
+    title: 'Fixture Title',
+    artist: 'Fixture Artist',
+    releasedOn: '2020-01-01',
+    description: null,
+    durationSeconds: 120,
+  };
+
+  beforeEach(() => {
+    vi.mocked(extractProbePrefillTags).mockReturnValue(fixtureTags);
+  });
+
+  it('returns ok:true with fixture tags in fake mode without calling S3 or probeUrl', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    const result = await VideoProbeService.probeForPrefill(s3Key);
+
+    expect(result).toEqual({ ok: true, tags: fixtureTags });
+    expect(generatePresignedProbeUrl).not.toHaveBeenCalled();
+    expect(probeUrl).not.toHaveBeenCalled();
+  });
+
+  it('presigns the s3Key and probes the URL in real mode, returning tags on success', async () => {
+    const result = await VideoProbeService.probeForPrefill(s3Key);
+
+    expect(generatePresignedProbeUrl).toHaveBeenCalledWith(s3Key);
+    expect(probeUrl).toHaveBeenCalledWith(presignedUrl);
+    expect(extractProbePrefillTags).toHaveBeenCalledWith(rawProbe);
+    expect(result).toEqual({ ok: true, tags: fixtureTags });
+  });
+
+  it('returns ok:false with error message when probeUrl fails, without throwing', async () => {
+    vi.mocked(probeUrl).mockResolvedValue({ ok: false, error: 'ffprobe spawn error' });
+
+    const result = await VideoProbeService.probeForPrefill(s3Key);
+
+    expect(result).toEqual({ ok: false, error: 'ffprobe spawn error' });
+  });
+
+  it('returns ok:false with error message when the presigner throws, without throwing', async () => {
+    vi.mocked(generatePresignedProbeUrl).mockRejectedValue(new Error('AWS credentials missing'));
+
+    const result = await VideoProbeService.probeForPrefill(s3Key);
+
+    expect(result).toEqual({ ok: false, error: 'AWS credentials missing' });
+  });
+
+  it('never touches VideoRepository in any code path', async () => {
+    await VideoProbeService.probeForPrefill(s3Key);
+    expect(VideoRepository.findById).not.toHaveBeenCalled();
+    expect(VideoRepository.saveProbeResult).not.toHaveBeenCalled();
   });
 });

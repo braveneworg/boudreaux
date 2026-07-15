@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 
 import { archiveVideoAction } from '@/lib/actions/archive-video-action';
 import { createVideoAction } from '@/lib/actions/create-video-action';
@@ -13,18 +13,27 @@ import { restoreVideoAction } from '@/lib/actions/restore-video-action';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
-import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 /**
+ * Returns true for every `videos.*` query except `videos.probePrefill`.
+ * The probePrefill query has `staleTime: Infinity` but that does NOT prevent
+ * invalidation-triggered refetches — excluding it avoids a wasted ffprobe when
+ * a create/update mutation succeeds while the probe query is still mounted.
+ */
+const isNonProbePrefillVideoQuery = (query: Query): boolean =>
+  query.queryKey[0] === 'videos' && query.queryKey[1] !== 'probePrefill';
+
+/**
  * Invalidate every cached video surface a mutation can affect. Videos are a
- * standalone entity (no embedded relations to refresh), so the single `videos`
- * key covers the admin listing, the public listing, and any detail query.
+ * standalone entity (no embedded relations to refresh), so the `videos` prefix
+ * covers the admin listing, the public listing, and detail queries. The
+ * `probePrefill` key is excluded — see {@link isNonProbePrefillVideoQuery}.
  */
 const invalidateVideoQueries = (queryClient: QueryClient): Promise<unknown> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.videos.all });
+  queryClient.invalidateQueries({ predicate: isNonProbePrefillVideoQuery });
 
 /**
  * Mutation hook wrapping {@link createVideoAction} — the DB-confirm half of the

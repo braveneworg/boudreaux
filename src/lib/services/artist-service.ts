@@ -38,6 +38,7 @@ import {
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
+import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
 import { BioImageService } from './bio-image-service';
@@ -395,6 +396,46 @@ const buildEnrichedFieldUpdate = (
       return { bornOn: new Date(value) };
   }
 };
+
+/** Trim an optional string field; returns `undefined` when absent or blank. */
+const trimDetail = (value: string | undefined): string | undefined => {
+  const t = value?.trim();
+  return t || undefined;
+};
+
+/** Input for {@link buildArtistCreateData}. */
+interface ArtistCreateInput {
+  firstName: string;
+  lastName: string;
+  trimmed: string;
+  slug: string;
+  details?: VideoArtistDetail;
+}
+
+/** Optional middleName spread: only include the field when a non-blank value is present. */
+const middleNameSpread = (value: string | undefined): { middleName?: string } =>
+  value ? { middleName: value } : {};
+
+/**
+ * Build the `createWithSelect` payload for a new artist shell, merging
+ * optional admin-reviewed detail values (per-field, trimmed-non-empty guards)
+ * with the naive `splitFullName` fallbacks and the source-name display name.
+ * `middleName` is omitted entirely when empty so absent stays absent.
+ */
+const buildArtistCreateData = ({
+  firstName,
+  lastName,
+  trimmed,
+  slug,
+  details,
+}: ArtistCreateInput): CreateArtistData => ({
+  firstName: trimDetail(details?.firstName) || firstName,
+  surname: trimDetail(details?.surname) || lastName,
+  displayName: trimDetail(details?.displayName) || trimmed,
+  slug: slug || generateSlug(firstName || 'artist'),
+  isActive: true,
+  ...middleNameSpread(trimDetail(details?.middleName)),
+});
 
 export class ArtistService {
   /**
@@ -833,6 +874,35 @@ export class ArtistService {
   }
 
   /**
+   * Look up an existing artist by name using the same search order that
+   * {@link findOrCreateByName} uses for its match step:
+   *   1. Slug match (deterministic, unique)
+   *   2. Case-insensitive displayName match
+   *   3. Case-insensitive firstName + surname match
+   *
+   * Returns the matched record (`id`, `displayName`, `firstName`, `surname`) or
+   * `null` when none of the three lookups succeeds. This method exists so the
+   * admin artist-lookup route and `findOrCreateByName` share the same code path
+   * and can never silently drift.
+   *
+   * @param artistName - Full artist name to look up (trimmed internally)
+   */
+  static async findByName(artistName: string): Promise<{
+    id: string;
+    displayName: string | null;
+    firstName: string;
+    surname: string;
+  } | null> {
+    const trimmed = artistName.trim();
+    if (!trimmed) return null;
+
+    const slug = generateSlug(trimmed);
+    const { firstName, lastName } = splitFullName(trimmed);
+
+    return findArtistByName({ trimmed, slug, firstName, lastName });
+  }
+
+  /**
    * Find an existing artist by name or create a new one.
    *
    * Search order:
@@ -841,11 +911,20 @@ export class ArtistService {
    *   3. Case-insensitive firstName + surname match
    *   4. Create new artist if no match found
    *
-   * @param artistName - Full artist name from ID3 metadata (e.g., "Ceschi", "John Doe")
+   * When `details` is supplied (admin-reviewed form values), the CREATE branch
+   * uses the admin values per field with trimmed-non-empty guards — falling back
+   * to the naive split or source name when a field is absent or whitespace-only.
+   * The MATCH path ignores `details` entirely: the video form never edits an
+   * existing artist. Slug derivation is always based on `artistName` so
+   * match/create symmetry is preserved regardless of `details`.
+   *
+   * @param artistName - Full artist name from ID3 metadata or video form
+   * @param details - Optional admin-reviewed name details (ignored on match)
    * @returns The artist ID and display name
    */
   static async findOrCreateByName(
-    artistName: string
+    artistName: string,
+    details?: VideoArtistDetail
   ): Promise<
     ServiceResponse<{ id: string; displayName: string | null; firstName: string; surname: string }>
   > {
@@ -864,14 +943,9 @@ export class ArtistService {
         return { success: true, data: found };
       }
 
-      // 4. Create new artist
-      const newArtist = await ArtistRepository.createWithSelect({
-        firstName,
-        surname: lastName,
-        displayName: trimmed,
-        slug: slug || generateSlug(firstName || 'artist'),
-        isActive: true,
-      });
+      // 4. Create new artist — admin detail values override naïve fallbacks per field.
+      const createData = buildArtistCreateData({ firstName, lastName, trimmed, slug, details });
+      const newArtist = await ArtistRepository.createWithSelect(createData);
       return { success: true, data: newArtist };
     } catch (error) {
       if (error instanceof DataError && error.code === 'DUPLICATE') {

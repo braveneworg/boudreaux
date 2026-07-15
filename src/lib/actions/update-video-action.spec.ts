@@ -411,7 +411,11 @@ describe('updateVideoAction', () => {
       await updateVideoAction(videoId, initialFormState, mockFormData);
       await afterCallback?.();
 
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(videoId, 'New Band');
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        'New Band',
+        undefined
+      );
     });
 
     it('does not re-probe on an artist-only change', async () => {
@@ -460,6 +464,55 @@ describe('updateVideoAction', () => {
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
       expect(afterCallback).toBeNull();
+    });
+
+    it('schedules a kick when artistDetails is non-empty (new trigger)', async () => {
+      const artistDetails = [{ sourceName: 'The Band' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallback).toBeTypeOf('function');
+    });
+
+    it('does not include artistDetails in the repository update payload', async () => {
+      const artistDetails = [{ sourceName: 'The Band' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
+      expect(Object.prototype.hasOwnProperty.call(updateCall, 'artistDetails')).toBe(false);
+    });
+
+    it('does not schedule a kick when artistDetails is empty (regression pin)', async () => {
+      mockParsedSuccess({ ...parsedData, artistDetails: [] });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallback).toBeNull();
+    });
+
+    it('does not schedule a kick when artist unchanged, no file replaced, and no artistDetails', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallback).toBeNull();
+    });
+
+    it('forwards artistDetails to syncVideoArtists when present', async () => {
+      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band (official)' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await afterCallback?.();
+
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        parsedData.artist,
+        artistDetails
+      );
     });
   });
 });

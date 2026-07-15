@@ -10,6 +10,7 @@ import { loggers } from '@/lib/utils/logger';
 import { generatePresignedProbeUrl } from '@/lib/utils/s3-client';
 import { probeUrl } from '@/lib/video-probe/ffprobe';
 import { normalizeProbe, redactProbeJson, type NormalizedProbe } from '@/lib/video-probe/normalize';
+import { extractProbePrefillTags, type ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 const logger = loggers.media;
 
@@ -73,6 +74,10 @@ const runProbe = async (videoId: string, s3Key: string): Promise<void> => {
   }
 };
 
+export type ProbePrefillResult =
+  | { ok: true; tags: ProbePrefillTags }
+  | { ok: false; error: string };
+
 /**
  * ffprobe pipeline for uploaded videos. Kicked after create / file replacement
  * (never awaited by the admin's save) and by the manual admin Re-run.
@@ -98,6 +103,30 @@ export class VideoProbeService {
       if (s3Key !== null) {
         await persistFailure(videoId, s3Key, toMessage(error));
       }
+    }
+  }
+
+  /**
+   * Probe an S3 key without persisting — used to prefill the admin video form
+   * before the Video row exists. Never throws; returns `{ ok: false, error }`
+   * on any failure. No VideoRepository calls.
+   */
+  static async probeForPrefill(s3Key: string): Promise<ProbePrefillResult> {
+    try {
+      if (process.env.BIO_GENERATOR_FAKE === 'true') {
+        return { ok: true, tags: extractProbePrefillTags(videoProbeFixture.probeData) };
+      }
+
+      const url = await generatePresignedProbeUrl(s3Key);
+      const result = await probeUrl(url);
+
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+
+      return { ok: true, tags: extractProbePrefillTags(result.raw) };
+    } catch (error) {
+      return { ok: false, error: toMessage(error) };
     }
   }
 }
