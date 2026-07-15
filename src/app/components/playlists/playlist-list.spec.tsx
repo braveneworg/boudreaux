@@ -6,11 +6,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
+import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
 import { PlaylistList } from './playlist-list';
 
 const usePlaylistsQueryMock = vi.hoisted(() => vi.fn());
+const loadMoreMock = vi.hoisted(() => vi.fn());
 
 interface DeleteMutateOptions {
   onSuccess?: () => void;
@@ -66,21 +67,27 @@ const CHILL_MIX = makeRow('pl-2', 'Chill Mix');
 
 const mockQueryState = ({
   isPending = false,
-  data,
+  rows,
+  nextSkip = null,
+  isLoadingMore = false,
 }: {
   isPending?: boolean;
-  data?: PlaylistsResponse;
+  rows?: PlaylistListRow[];
+  nextSkip?: number | null;
+  isLoadingMore?: boolean;
 }): void => {
   usePlaylistsQueryMock.mockReturnValue({
     isPending,
     error: new Error('Unknown error'),
-    data,
+    rows,
+    nextSkip,
+    loadMore: loadMoreMock,
+    isLoadingMore,
     refetch: vi.fn(),
   });
 };
 
-const mockRows = (rows: PlaylistListRow[]): void =>
-  mockQueryState({ data: { rows, nextSkip: null } });
+const mockRows = (rows: PlaylistListRow[]): void => mockQueryState({ rows });
 
 type ListProps = Parameters<typeof PlaylistList>[0];
 
@@ -110,7 +117,7 @@ describe('PlaylistList', () => {
   });
 
   describe('error state', () => {
-    it('renders a muted error line when the query settles without data', () => {
+    it('renders a muted error line when the query settles without rows', () => {
       mockQueryState({});
       renderList();
 
@@ -144,11 +151,11 @@ describe('PlaylistList', () => {
       expect(screen.getByRole('list')).toBeInTheDocument();
     });
 
-    it('composes className onto the list element', () => {
+    it('composes className onto the pane root', () => {
       mockRows([ROAD_TRIP]);
       renderList({ className: 'custom-list' });
 
-      expect(screen.getByRole('list')).toHaveClass('custom-list');
+      expect(screen.getByRole('list').parentElement).toHaveClass('custom-list');
     });
 
     it('calls onPlay with the clicked row id', async () => {
@@ -169,6 +176,32 @@ describe('PlaylistList', () => {
       await user.click(screen.getByRole('button', { name: 'stub-edit-pl-2' }));
 
       expect(props.onEdit).toHaveBeenCalledWith('pl-2');
+    });
+  });
+
+  describe('load more', () => {
+    it('shows Load more when nextSkip is set and forwards the click', async () => {
+      const user = userEvent.setup();
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: 24 });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+      expect(loadMoreMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides Load more on the final page', () => {
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: null });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    });
+
+    it('disables Load more while the next page is in flight', () => {
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: 24, isLoadingMore: true });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
     });
   });
 

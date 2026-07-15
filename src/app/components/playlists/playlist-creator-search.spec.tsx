@@ -138,7 +138,10 @@ beforeEach(() => {
   playlistsQueryMock.mockReturnValue({
     isPending: false,
     error: new Error('Unknown error'),
-    data: { rows: [ROAD_TRIP], nextSkip: null },
+    rows: [ROAD_TRIP],
+    nextSkip: null,
+    loadMore: vi.fn(),
+    isLoadingMore: false,
     refetch: vi.fn(),
   });
   addPlaylistItemAsyncMock.mockResolvedValue(SUCCESS_RESULT);

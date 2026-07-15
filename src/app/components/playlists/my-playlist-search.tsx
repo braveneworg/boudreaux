@@ -38,8 +38,8 @@ const SEARCH_PLACEHOLDER = 'Search your playlists…';
  */
 export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps): ReactElement => {
   const [open, setOpen] = useState(false);
-  const { data } = usePlaylistsQuery();
-  const rows = data?.rows ?? [];
+  const { rows } = usePlaylistsQuery();
+  const listRows = rows ?? [];
 
   const handleSelect = (id: string): void => {
     setOpen(false);
@@ -68,7 +68,7 @@ export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps)
           <CommandList>
             <CommandEmpty>No playlists yet.</CommandEmpty>
             <CommandGroup>
-              {rows.map((row) => (
+              {listRows.map((row) => (
                 <CommandItem key={row.id} value={row.title} onSelect={() => handleSelect(row.id)}>
                   <span className="min-w-0 flex-1 truncate">{row.title}</span>
                 </CommandItem>

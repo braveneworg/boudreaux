@@ -8,6 +8,7 @@ import type { ReactElement } from 'react';
 
 import { toast } from 'sonner';
 
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeletePlaylistMutation } from '@/hooks/use-playlist-mutations';
 import { usePlaylistsQuery } from '@/hooks/use-playlists-query';
@@ -54,7 +55,7 @@ const PlaylistListSkeleton = ({ className }: { className?: string }): ReactEleme
  * when the user has no playlists yet.
  */
 export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): ReactElement => {
-  const { isPending, data } = usePlaylistsQuery();
+  const { isPending, rows, nextSkip, loadMore, isLoadingMore } = usePlaylistsQuery();
   const { deletePlaylist } = useDeletePlaylistMutation();
 
   const handleDelete = (playlistId: string): void =>
@@ -68,11 +69,11 @@ export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): 
 
   if (isPending) return <PlaylistListSkeleton className={className} />;
 
-  if (!data) {
+  if (rows === undefined) {
     return <p className={cn('text-sm text-zinc-500', className)}>Couldn't load playlists.</p>;
   }
 
-  if (data.rows.length === 0) {
+  if (rows.length === 0) {
     return (
       <p className={cn('text-sm text-zinc-500', className)}>
         No playlists yet — build one with the creator.
@@ -81,16 +82,29 @@ export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): 
   }
 
   return (
-    <ul className={cn(className)}>
-      {data.rows.map((row) => (
-        <PlaylistRow
-          key={row.id}
-          row={row}
-          onEdit={() => onEdit(row.id)}
-          onPlay={() => onPlay(row.id)}
-          onDelete={() => handleDelete(row.id)}
-        />
-      ))}
-    </ul>
+    <div className={cn(className)}>
+      <ul>
+        {rows.map((row) => (
+          <PlaylistRow
+            key={row.id}
+            row={row}
+            onEdit={() => onEdit(row.id)}
+            onPlay={() => onPlay(row.id)}
+            onDelete={() => handleDelete(row.id)}
+          />
+        ))}
+      </ul>
+      {nextSkip !== null && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 w-full"
+          onClick={loadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? 'Loading…' : 'Load more'}
+        </Button>
+      )}
+    </div>
   );
 };

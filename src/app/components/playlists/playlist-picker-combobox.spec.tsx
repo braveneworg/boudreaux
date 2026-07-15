@@ -5,7 +5,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
+import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
 import { PlaylistPickerCombobox } from './playlist-picker-combobox';
 
@@ -47,18 +47,25 @@ const CHILL_MIX = makeRow('pl-2', 'Chill Mix');
 
 const mockQueryState = ({
   isPending = false,
-  data,
+  rows,
   error = new Error('Unknown error'),
 }: {
   isPending?: boolean;
-  data?: PlaylistsResponse;
+  rows?: PlaylistListRow[];
   error?: Error;
 }): void => {
-  usePlaylistsQueryMock.mockReturnValue({ isPending, error, data, refetch: vi.fn() });
+  usePlaylistsQueryMock.mockReturnValue({
+    isPending,
+    error,
+    rows,
+    nextSkip: null,
+    loadMore: vi.fn(),
+    isLoadingMore: false,
+    refetch: vi.fn(),
+  });
 };
 
-const mockRows = (rows: PlaylistListRow[]): void =>
-  mockQueryState({ data: { rows, nextSkip: null } });
+const mockRows = (rows: PlaylistListRow[]): void => mockQueryState({ rows });
 
 type PickerProps = Parameters<typeof PlaylistPickerCombobox>[0];
 
@@ -84,6 +91,15 @@ describe('PlaylistPickerCombobox', () => {
 
       expect(screen.getByRole('option', { name: 'Road Trip' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Chill Mix' })).toBeInTheDocument();
+    });
+
+    it('lists a row carried over from a second loaded page', () => {
+      const secondPageRow = makeRow('pl-3', 'Deep Cuts');
+      // rows here are already flattened across both loaded pages by the hook.
+      mockRows([ROAD_TRIP, CHILL_MIX, secondPageRow]);
+      renderPicker();
+
+      expect(screen.getByRole('option', { name: 'Deep Cuts' })).toBeInTheDocument();
     });
 
     it("renders small decorative cover tiles from each row's cover images", () => {
