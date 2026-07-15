@@ -14,6 +14,8 @@ import {
   createPlaylistInputSchema,
   playlistCoverUploadInputSchema,
   playlistDetailResponseSchema,
+  playlistDownloadPreflightResponseSchema,
+  playlistDownloadQuerySchema,
   playlistItemPayloadSchema,
   playlistItemSourceRefSchema,
   playlistListRowSchema,
@@ -433,6 +435,44 @@ describe('playlistsResponseSchema', () => {
 
   it('rejects when rows is missing', () => {
     expect(playlistsResponseSchema.safeParse({ nextSkip: null }).success).toBe(false);
+  });
+});
+
+describe('playlistDownloadQuerySchema', () => {
+  it('accepts MP3_320KBPS', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'MP3_320KBPS' }).success).toBe(true);
+  });
+
+  it('accepts AAC', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'AAC' }).success).toBe(true);
+  });
+
+  it('rejects a non-free format (FLAC)', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'FLAC' }).success).toBe(false);
+  });
+
+  it('rejects when format is undefined', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: undefined }).success).toBe(false);
+  });
+});
+
+describe('playlistDownloadPreflightResponseSchema', () => {
+  it('round-trips the ok variant with counts', () => {
+    const fixture = { ok: true, trackCount: 2, skippedCount: 1 };
+    const result = playlistDownloadPreflightResponseSchema.safeParse(fixture);
+    expect(result.success && result.data).toEqual(fixture);
+  });
+
+  it('round-trips the quota-exceeded variant', () => {
+    const fixture = { ok: false, reason: 'QUOTA_EXCEEDED' };
+    const result = playlistDownloadPreflightResponseSchema.safeParse(fixture);
+    expect(result.success && result.data).toEqual(fixture);
+  });
+
+  it('rejects an unknown rejection reason', () => {
+    expect(
+      playlistDownloadPreflightResponseSchema.safeParse({ ok: false, reason: 'OTHER' }).success
+    ).toBe(false);
   });
 });
 

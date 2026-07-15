@@ -7,7 +7,10 @@ import {
   PLAYLISTS_PAGE_SIZE,
 } from '@/lib/constants/playlists';
 import { PlaylistRepository } from '@/lib/repositories/playlist-repository';
-import type { TrackFileWithRelease } from '@/lib/repositories/release-digital-format-file-repository';
+import type {
+  PlaylistDownloadFile,
+  TrackFileWithRelease,
+} from '@/lib/repositories/release-digital-format-file-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import type { VideoSummary } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
@@ -24,6 +27,7 @@ vi.mock('server-only', () => ({}));
 const { trackFileRepoMock } = vi.hoisted(() => ({
   trackFileRepoMock: {
     findManyByIdsWithRelease: vi.fn(),
+    findManyByReleaseIdsAndFormatType: vi.fn(),
     searchTracksByTitle: vi.fn(),
   },
 }));
@@ -47,6 +51,7 @@ vi.mock('@/lib/repositories/playlist-repository', () => ({
 vi.mock('@/lib/repositories/release-digital-format-file-repository', () => ({
   ReleaseDigitalFormatFileRepository: class {
     findManyByIdsWithRelease = trackFileRepoMock.findManyByIdsWithRelease;
+    findManyByReleaseIdsAndFormatType = trackFileRepoMock.findManyByReleaseIdsAndFormatType;
     searchTracksByTitle = trackFileRepoMock.searchTracksByTitle;
   },
 }));
@@ -119,6 +124,7 @@ interface TrackFileOptions {
   title?: string | null;
   fileName?: string;
   duration?: number | null;
+  trackNumber?: number;
   releaseId?: string;
   releaseTitle?: string;
   coverArt?: string;
@@ -131,6 +137,7 @@ const TRACK_FILE_DEFAULTS: Required<TrackFileOptions> = {
   title: 'Live Song',
   fileName: '01-live-song.mp3',
   duration: 215,
+  trackNumber: 1,
   releaseId: 'release-1',
   releaseTitle: 'Live Album',
   coverArt: 'https://cdn.test/covers/release-1.jpg',
@@ -139,11 +146,21 @@ const TRACK_FILE_DEFAULTS: Required<TrackFileOptions> = {
 };
 
 const makeTrackFile = (options: TrackFileOptions = {}): TrackFileWithRelease => {
-  const { id, title, fileName, duration, releaseId, releaseTitle, coverArt, publishedAt, artists } =
-    { ...TRACK_FILE_DEFAULTS, ...options };
+  const {
+    id,
+    title,
+    fileName,
+    duration,
+    trackNumber,
+    releaseId,
+    releaseTitle,
+    coverArt,
+    publishedAt,
+    artists,
+  } = { ...TRACK_FILE_DEFAULTS, ...options };
   return {
     id,
-    trackNumber: 1,
+    trackNumber,
     title,
     duration,
     s3Key: `releases/${releaseId}/tracks/${fileName}`,
@@ -258,6 +275,7 @@ const makeArtist = (
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.test');
   trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([]);
+  trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([]);
   trackFileRepoMock.searchTracksByTitle.mockResolvedValue([]);
   vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([]);
   vi.mocked(VideoRepository.searchPublished).mockResolvedValue([]);
@@ -1759,6 +1777,186 @@ describe('PlaylistService', () => {
         OWNER_ID,
         expect.objectContaining({ skip: 0, take: PLAYLISTS_PAGE_SIZE })
       );
+    });
+  });
+
+  describe('getDownloadManifest', () => {
+    const mockPlaylistWithItems = (
+      playlistOverrides: Partial<PlaylistRecord>,
+      items: PlaylistItemRecord[]
+    ): void => {
+      vi.mocked(PlaylistRepository.findByIdWithItems).mockResolvedValue({
+        ...makePlaylist(playlistOverrides),
+        items,
+      });
+    };
+
+    const makeVideoItem = (overrides: Partial<PlaylistItemRecord> = {}): PlaylistItemRecord =>
+      makeItem({
+        id: 'item-video',
+        itemType: 'video',
+        trackFileId: null,
+        releaseId: null,
+        videoId: 'video-1',
+        ...overrides,
+      });
+
+    const makeAacTarget = (
+      overrides: Partial<PlaylistDownloadFile> = {}
+    ): PlaylistDownloadFile => ({
+      id: 'aac-1',
+      trackNumber: 4,
+      s3Key: 'releases/release-1/digital-formats/AAC/aac-1.aac',
+      fileName: 'aac-1.aac',
+      format: { formatType: 'AAC', releaseId: 'release-1' },
+      ...overrides,
+    });
+
+    /** Brief fixture: leading video, resolvable trackA, dangling trackB. */
+    const mixedItems = (): PlaylistItemRecord[] => [
+      makeVideoItem({ sortOrder: 0 }),
+      makeItem({ id: 'item-a', trackFileId: 'file-1', sortOrder: 1 }),
+      makeItem({ id: 'item-b', trackFileId: 'file-x', sortOrder: 2 }),
+    ];
+
+    it('returns null when the playlist is missing', async () => {
+      vi.mocked(PlaylistRepository.findByIdWithItems).mockResolvedValue(null);
+
+      await expect(
+        PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC')
+      ).resolves.toBeNull();
+    });
+
+    it('returns null for a private playlist requested by a non-owner', async () => {
+      mockPlaylistWithItems({ isPublic: false }, []);
+
+      await expect(
+        PlaylistService.getDownloadManifest(PLAYLIST_ID, OTHER_USER_ID, 'AAC')
+      ).resolves.toBeNull();
+    });
+
+    it('returns the manifest for the owner of a private playlist', async () => {
+      mockPlaylistWithItems({ isPublic: false }, []);
+
+      await expect(
+        PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC')
+      ).resolves.toEqual({
+        playlistTitle: 'Road Trip',
+        tracks: [],
+        skippedCount: 0,
+        distinctReleaseIds: [],
+      });
+    });
+
+    it('numbers included tracks densely, skipping videos and dangling tracks without gaps', async () => {
+      mockPlaylistWithItems({}, mixedItems());
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ id: 'file-1', trackNumber: 4 }),
+      ]);
+      trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([makeAacTarget()]);
+
+      await expect(
+        PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC')
+      ).resolves.toEqual({
+        playlistTitle: 'Road Trip',
+        tracks: [
+          {
+            entryName: '01 - Killah Trakz - Live Song.aac',
+            s3Key: 'releases/release-1/digital-formats/AAC/aac-1.aac',
+            releaseId: 'release-1',
+          },
+        ],
+        skippedCount: 2,
+        distinctReleaseIds: ['release-1'],
+      });
+    });
+
+    it('skips (and counts) a track whose release lacks the requested format', async () => {
+      mockPlaylistWithItems({}, [makeItem({ id: 'item-a', trackFileId: 'file-1', sortOrder: 0 })]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([makeTrackFile()]);
+      trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([]);
+
+      await expect(
+        PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC')
+      ).resolves.toEqual({
+        playlistTitle: 'Road Trip',
+        tracks: [],
+        skippedCount: 1,
+        distinctReleaseIds: [],
+      });
+    });
+
+    it('sanitizes entry names via safeArchiveEntryName', async () => {
+      mockPlaylistWithItems({}, [makeItem({ id: 'item-a', trackFileId: 'file-1', sortOrder: 0 })]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ title: 'Weird/Name: Ex?' }),
+      ]);
+      trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([
+        makeAacTarget({ trackNumber: 1 }),
+      ]);
+
+      const manifest = await PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC');
+
+      const [track] = manifest?.tracks ?? [];
+      expect(track?.entryName).not.toMatch(/[/:]/);
+    });
+
+    it('batches the source and requested-format lookups with deduped ids', async () => {
+      mockPlaylistWithItems({}, mixedItems());
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ id: 'file-1', trackNumber: 4 }),
+      ]);
+      trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([makeAacTarget()]);
+
+      await PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC');
+
+      expect(trackFileRepoMock.findManyByIdsWithRelease).toHaveBeenCalledWith(['file-1', 'file-x']);
+      expect(trackFileRepoMock.findManyByReleaseIdsAndFormatType).toHaveBeenCalledWith(
+        ['release-1'],
+        'AAC'
+      );
+    });
+
+    it('skips both lookups for an all-video playlist and counts every item skipped', async () => {
+      mockPlaylistWithItems({}, [
+        makeVideoItem({ id: 'item-v1', sortOrder: 0 }),
+        makeVideoItem({ id: 'item-v2', videoId: 'video-2', sortOrder: 1 }),
+      ]);
+
+      const manifest = await PlaylistService.getDownloadManifest(PLAYLIST_ID, OWNER_ID, 'AAC');
+
+      expect(manifest).toEqual({
+        playlistTitle: 'Road Trip',
+        tracks: [],
+        skippedCount: 2,
+        distinctReleaseIds: [],
+      });
+      expect(trackFileRepoMock.findManyByIdsWithRelease).not.toHaveBeenCalled();
+      expect(trackFileRepoMock.findManyByReleaseIdsAndFormatType).not.toHaveBeenCalled();
+    });
+
+    it('uses the .mp3 extension for MP3_320KBPS entries', async () => {
+      mockPlaylistWithItems({}, mixedItems());
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ id: 'file-1', trackNumber: 4 }),
+      ]);
+      trackFileRepoMock.findManyByReleaseIdsAndFormatType.mockResolvedValue([
+        makeAacTarget({
+          id: 'mp3-1',
+          s3Key: 'releases/release-1/digital-formats/MP3_320KBPS/mp3-1.mp3',
+          fileName: 'mp3-1.mp3',
+          format: { formatType: 'MP3_320KBPS', releaseId: 'release-1' },
+        }),
+      ]);
+
+      const manifest = await PlaylistService.getDownloadManifest(
+        PLAYLIST_ID,
+        OWNER_ID,
+        'MP3_320KBPS'
+      );
+
+      const [track] = manifest?.tracks ?? [];
+      expect(track?.entryName).toBe('01 - Killah Trakz - Live Song.mp3');
     });
   });
 });

@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { getFileExtensionForFormat } from '@/lib/constants/digital-formats';
+import type { FreeFormatType } from '@/lib/constants/digital-formats';
 import {
   MAX_PLAYLIST_ITEMS,
   PLAYLIST_SEARCH_GROUP_LIMIT,
@@ -10,7 +12,10 @@ import {
 } from '@/lib/constants/playlists';
 import { PlaylistRepository } from '@/lib/repositories/playlist-repository';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
-import type { TrackFileWithRelease } from '@/lib/repositories/release-digital-format-file-repository';
+import type {
+  PlaylistDownloadFile,
+  TrackFileWithRelease,
+} from '@/lib/repositories/release-digital-format-file-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import type { VideoSummary } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
@@ -35,6 +40,7 @@ import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
+import { safeArchiveEntryName } from '@/lib/utils/zip-stream';
 import type { UpdatePlaylistInput } from '@/lib/validation/playlist-schema';
 
 // =============================================================================
@@ -126,6 +132,27 @@ const MP3_FORMAT_TYPE = 'MP3_320KBPS';
 /** The stream/poster subset of {@link PlaylistItemPayload} (PR2). */
 type PlaylistItemStreamFields = Pick<PlaylistItemPayload, 's3Key' | 'streamUrl' | 'posterUrl'>;
 
+/** One zip entry of a playlist download: name is pre-sanitized, NN = dense 2-digit position among included tracks. */
+export interface PlaylistDownloadTrack {
+  entryName: string;
+  s3Key: string;
+  releaseId: string;
+}
+
+/** Everything the download route needs: entries in playlist order + skip/quota accounting. */
+export interface PlaylistDownloadManifest {
+  playlistTitle: string;
+  tracks: PlaylistDownloadTrack[];
+  skippedCount: number;
+  distinctReleaseIds: string[];
+}
+
+/** Batched lookups for download resolution, keyed by file id / (releaseId:trackNumber). */
+interface DownloadResolutionMaps {
+  sourceById: Map<string, TrackFileWithRelease>;
+  targetByReleaseTrack: Map<string, PlaylistDownloadFile>;
+}
+
 /** Live stream/poster fields for unavailable items — {@link attachPlaylistItemStreamUrls} overrides them when the source row resolved. */
 const NO_STREAM_FIELDS: PlaylistItemStreamFields = {
   s3Key: null,
@@ -185,6 +212,44 @@ const deriveArtistName = ({ displayName, firstName, surname }: ArtistNameParts):
 const firstArtistName = (artistReleases: Array<{ artist: ArtistNameParts }>): string | null => {
   const [first] = artistReleases;
   return first ? deriveArtistName(first.artist) : null;
+};
+
+/** `NN - Artist - Title.ext`, sanitized as a whole via safeArchiveEntryName. */
+const buildEntryName = (
+  position: number,
+  artistName: string,
+  title: string,
+  format: FreeFormatType
+): string =>
+  safeArchiveEntryName(
+    `${String(position).padStart(2, '0')} - ${artistName} - ${title}.${getFileExtensionForFormat(format)}`
+  );
+
+/**
+ * Resolve one playlist item to a downloadable requested-format entry, or null
+ * when it must be skipped (video, dangling source, unpublished release, or
+ * the release lacks the requested format). `position` is the 1-based DENSE
+ * position among the tracks already included (Assembly ratification 2) —
+ * the caller advances it only on inclusion, so skips leave no numbering gaps.
+ */
+const resolveDownloadTrack = (
+  item: PlaylistItemRecord,
+  position: number,
+  format: FreeFormatType,
+  { sourceById, targetByReleaseTrack }: DownloadResolutionMaps
+): PlaylistDownloadTrack | null => {
+  if (item.itemType !== 'track' || !item.trackFileId) return null;
+  const source = sourceById.get(item.trackFileId);
+  if (!source || !source.format.release.publishedAt) return null;
+  const target = targetByReleaseTrack.get(`${source.format.releaseId}:${source.trackNumber}`);
+  if (!target) return null;
+  const title = source.title ?? item.title;
+  const artistName = firstArtistName(source.format.release.artistReleases) ?? item.artistName;
+  return {
+    entryName: buildEntryName(position, artistName, title, format),
+    s3Key: target.s3Key,
+    releaseId: source.format.releaseId,
+  };
 };
 
 const parseUrl = (value: string): URL | null => {
@@ -650,6 +715,65 @@ export class PlaylistService {
       itemCount: playlist.itemCount,
       totalDuration: playlist.totalDuration,
       items,
+    };
+  }
+
+  /**
+   * Build the zip manifest for GET /api/playlists/[id]/download: owner-or-
+   * public visibility (null otherwise — indistinguishable from missing),
+   * requested-format resolution per track via (releaseId, trackNumber), videos
+   * and unresolvable items skipped and counted. Downloads intentionally require
+   * a PUBLISHED release (stricter than playback's grandfathering).
+   */
+  static async getDownloadManifest(
+    playlistId: string,
+    userId: string,
+    format: FreeFormatType
+  ): Promise<PlaylistDownloadManifest | null> {
+    const playlist = await PlaylistRepository.findByIdWithItems(playlistId);
+    if (!playlist) return null;
+    if (!playlist.isPublic && playlist.ownerId !== userId) return null;
+
+    const trackFileIds = playlist.items.flatMap(({ itemType, trackFileId }) =>
+      itemType === 'track' && trackFileId ? [trackFileId] : []
+    );
+    const sourceFiles =
+      trackFileIds.length > 0
+        ? await PlaylistService.trackFileRepository.findManyByIdsWithRelease(trackFileIds)
+        : [];
+    const sourceById = new Map(
+      sourceFiles.map((file): [string, TrackFileWithRelease] => [file.id, file])
+    );
+    const sourceReleaseIds = [...new Set(sourceFiles.map(({ format: f }) => f.releaseId))];
+    const targets =
+      sourceReleaseIds.length > 0
+        ? await PlaylistService.trackFileRepository.findManyByReleaseIdsAndFormatType(
+            sourceReleaseIds,
+            format
+          )
+        : [];
+    const targetByReleaseTrack = new Map(
+      targets.map((file): [string, PlaylistDownloadFile] => [
+        `${file.format.releaseId}:${file.trackNumber}`,
+        file,
+      ])
+    );
+
+    // Dense NN numbering (Assembly ratification 2): the position counter is the
+    // count of tracks included SO FAR (+1), not the playlist index — videos and
+    // skipped tracks leave no gaps, and the first included track is always 01.
+    const tracks = playlist.items.reduce<PlaylistDownloadTrack[]>((included, item) => {
+      const track = resolveDownloadTrack(item, included.length + 1, format, {
+        sourceById,
+        targetByReleaseTrack,
+      });
+      return track ? [...included, track] : included;
+    }, []);
+    return {
+      playlistTitle: playlist.title,
+      tracks,
+      skippedCount: playlist.items.length - tracks.length,
+      distinctReleaseIds: [...new Set(tracks.map(({ releaseId }) => releaseId))],
     };
   }
 
