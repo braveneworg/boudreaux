@@ -58,6 +58,15 @@ interface QueryTarget {
    * single-field index that already serves the query counts as a pass).
    */
   acceptableLeadingFields: string[];
+  /**
+   * Optional stronger assertion: the SPECIFIC covering index must be
+   * considered, identified by the leading key fields its keyPattern must begin
+   * with (in order). Unlike `acceptableLeadingFields` (any index sharing the
+   * leading field passes), this proves the exact compound index is applicable —
+   * needed where a pre-existing single-field index shares the leading field but
+   * does not cover the sort or an extra range/equality predicate.
+   */
+  requiredKeyPrefix?: string[];
 }
 
 /**
@@ -100,6 +109,8 @@ export interface PlanVerdict {
   winningHasBlockingSort: boolean;
   /** Index names of every considered IXSCAN (winning + rejected). */
   consideredIndexes: string[];
+  /** keyPattern of every considered IXSCAN (winning + rejected). */
+  consideredKeyPatterns: Record<string, number>[];
 }
 
 /**
@@ -130,8 +141,25 @@ export const analyzePlan = (
     consideredIndexes: [
       ...new Set(ixscans.map((s) => s.indexName).filter((n): n is string => Boolean(n))),
     ],
+    consideredKeyPatterns: ixscans
+      .map((s) => s.keyPattern)
+      .filter((kp): kp is Record<string, number> => Boolean(kp)),
   };
 };
+
+/**
+ * True when at least one considered index's keyPattern begins with exactly the
+ * given field sequence, in order. Proves the SPECIFIC covering index — not just
+ * something that shares the leading field — is applicable to the query shape.
+ */
+export const matchesKeyPrefix = (
+  keyPatterns: Record<string, number>[],
+  requiredPrefix: string[]
+): boolean =>
+  keyPatterns.some((keyPattern) => {
+    const keys = Object.keys(keyPattern);
+    return requiredPrefix.every((field, index) => keys.at(index) === field);
+  });
 
 /**
  * The queries this slow-query pass indexed. Filters/sorts mirror what the
@@ -195,6 +223,49 @@ export const TARGETS: QueryTarget[] = [
     },
     acceptableLeadingFields: ['fingerprint'],
   },
+
+  // --- slow-query hardening pass (2026-07-14) ---
+  // Four indexes that close a genuine gap (the query was NOT index-served
+  // before). `requiredKeyPrefix` asserts the specific compound index is
+  // considered, not merely a pre-existing index sharing the leading field.
+  // RED before the index is added; GREEN after `prisma db push`.
+  {
+    // featured-artist-repository.ts findAll — [position asc, featuredOn desc].
+    label: 'FeaturedArtist.findAll (position + featuredOn)',
+    collection: 'FeaturedArtist',
+    filter: {},
+    sort: { position: 1, featuredOn: -1 },
+    acceptableLeadingFields: ['position'],
+    requiredKeyPrefix: ['position', 'featuredOn'],
+  },
+  {
+    // tours/venue-repository.ts findRecent — createdAt desc sort.
+    label: 'Venue.findRecent (createdAt sort)',
+    collection: 'Venue',
+    filter: {},
+    sort: { createdAt: -1 },
+    acceptableLeadingFields: ['createdAt'],
+    requiredKeyPrefix: ['createdAt'],
+  },
+  {
+    // user-repository.ts findSmsOptedInUsers — opted-in + phone set.
+    label: 'User.findSmsOptedInUsers (allowSmsNotifications + phone)',
+    collection: 'User',
+    filter: { allowSmsNotifications: true, phone: { $ne: null } },
+    acceptableLeadingFields: ['allowSmsNotifications'],
+    requiredKeyPrefix: ['allowSmsNotifications', 'phone'],
+  },
+  {
+    // release-repository.ts published count — publishedAt `$ne null` filter.
+    label: 'Release published count (publishedAt)',
+    collection: 'Release',
+    filter: {
+      publishedAt: { $ne: null },
+      $or: [{ deletedOn: null }, { deletedOn: { $exists: false } }],
+    },
+    acceptableLeadingFields: ['publishedAt'],
+    requiredKeyPrefix: ['publishedAt'],
+  },
 ];
 
 interface ListIndexesResult {
@@ -244,6 +315,49 @@ const passNote = (verdict: PlanVerdict): string => {
 };
 
 /**
+ * Turn an explain verdict into a PASS/SKIP/FAIL result. Pure (no IO) so it is
+ * unit-tested directly. A target with `requiredKeyPrefix` must additionally have
+ * the specific compound index considered — a shared leading field is not enough.
+ */
+export const classifyPlan = ({
+  verdict,
+  docCount,
+  indexNames,
+  requiredKeyPrefix,
+}: {
+  verdict: PlanVerdict;
+  docCount: number;
+  indexNames: string[];
+  requiredKeyPrefix?: string[];
+}): TargetResult => {
+  const prefixConsidered =
+    !requiredKeyPrefix || matchesKeyPrefix(verdict.consideredKeyPatterns, requiredKeyPrefix);
+
+  if (verdict.usesAcceptableIndex && prefixConsidered) {
+    return { status: 'PASS', note: passNote(verdict), failed: false };
+  }
+  if (docCount === 0) {
+    return {
+      status: 'SKIP',
+      note: 'collection empty — cannot plan; seed data to verify applicability',
+      failed: false,
+    };
+  }
+  if (verdict.usesAcceptableIndex && !prefixConsidered) {
+    return {
+      status: 'FAIL',
+      note: `leading-field index present but no considered index covers [${(requiredKeyPrefix ?? []).join(', ')}] (${docCount} docs). indexes present: ${indexNames.join(', ')}`,
+      failed: true,
+    };
+  }
+  return {
+    status: 'FAIL',
+    note: `no applicable index scan considered (${docCount} docs). indexes present: ${indexNames.join(', ')}`,
+    failed: true,
+  };
+};
+
+/**
  * Run the index/count/explain commands for one target and classify the result.
  * Extracted from runChecks to keep that function within the complexity ceiling.
  */
@@ -271,21 +385,12 @@ const checkTarget = async (prisma: PrismaClient, target: QueryTarget): Promise<T
 
   const verdict = analyzePlan(explain, target.acceptableLeadingFields);
 
-  if (verdict.usesAcceptableIndex) {
-    return { status: 'PASS', note: passNote(verdict), failed: false };
-  }
-  if (docCount === 0) {
-    return {
-      status: 'SKIP',
-      note: 'collection empty — cannot plan; seed data to verify applicability',
-      failed: false,
-    };
-  }
-  return {
-    status: 'FAIL',
-    note: `no applicable index scan considered (${docCount} docs). indexes present: ${indexNames.join(', ')}`,
-    failed: true,
-  };
+  return classifyPlan({
+    verdict,
+    docCount,
+    indexNames,
+    requiredKeyPrefix: target.requiredKeyPrefix,
+  });
 };
 
 const runChecks = async (): Promise<void> => {
