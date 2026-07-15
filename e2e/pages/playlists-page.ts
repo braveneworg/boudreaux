@@ -51,6 +51,47 @@ export class PlaylistsPage {
     await option.click();
   }
 
+  /** Click the Videos-group result for `title` (stages/adds it). */
+  async addVideoResult(title: string): Promise<void> {
+    const option = this.searchOption('Videos', title);
+    await expect(option).toBeVisible();
+    await option.click();
+  }
+
+  /** The row's play-button, scoped by the row's unique title. */
+  rowPlayButton(title: string): Locator {
+    return this.rowByTitle(title).getByRole('button', { name: 'Play playlist' });
+  }
+
+  /** The row's share-button, scoped by the row's unique title. */
+  rowShareButton(title: string): Locator {
+    return this.rowByTitle(title).getByRole('button', { name: 'Share playlist' });
+  }
+
+  /** The share popover (Radix popover content renders role="dialog"). */
+  sharePopover(): Locator {
+    return this.page.getByRole('dialog', { name: 'Share playlist' });
+  }
+
+  /** The player dialog, disambiguated by the playlist title it displays. */
+  playerDialog(title: string): Locator {
+    return this.page.getByRole('dialog').filter({ hasText: title });
+  }
+
+  /**
+   * Resolve a playlist's id by its spec-unique title via the authenticated
+   * list API (page.request shares the fixture session cookies). Reads the
+   * first page — per-run playlist volume stays far below PLAYLISTS_PAGE_SIZE.
+   */
+  async playlistIdByTitle(title: string): Promise<string> {
+    const response = await this.page.request.get('/api/playlists?skip=0&take=24');
+    expect(response.ok()).toBe(true);
+    const body = (await response.json()) as { rows: Array<{ id: string; title: string }> };
+    const row = body.rows.find((r) => r.title === title);
+    if (!row) throw new Error(`Playlist not found in first page: ${title}`);
+    return row.id;
+  }
+
   /** The save dialog — named `New playlist` (create) or `Edit playlist` (edit). */
   saveDialog(mode: 'create' | 'edit'): Locator {
     return this.page.getByRole('dialog', {
@@ -85,14 +126,26 @@ export class PlaylistsPage {
   /**
    * Create a playlist through the UI: the FIRST added item of a draft session
    * auto-opens the save dialog, which this fills and submits, then waits for
-   * the new row to appear in the My Playlists list.
+   * the new row to appear in the My Playlists list. `makePublic` toggles the
+   * dialog's public switch before saving (existing callers stay untouched).
    */
-  async createPlaylistWithFirstTrack(trackTitle: string, playlistTitle: string): Promise<void> {
+  async createPlaylistWithFirstTrack(
+    trackTitle: string,
+    playlistTitle: string,
+    { makePublic = false }: { makePublic?: boolean } = {}
+  ): Promise<void> {
     await this.search(trackTitle);
     await this.addSongResult(trackTitle);
     const dialog = this.saveDialog('create');
     await expect(dialog).toBeVisible();
-    await this.submitSaveDialog(dialog, playlistTitle);
+    await dialog.getByLabel('Title').fill(playlistTitle);
+    if (makePublic) {
+      const publicSwitch = dialog.getByRole('switch', { name: 'Public playlist' });
+      await publicSwitch.click();
+      await expect(publicSwitch).toHaveAttribute('aria-checked', 'true');
+    }
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(dialog).toBeHidden();
     await expect(this.rowByTitle(playlistTitle)).toBeVisible();
   }
 }

@@ -173,6 +173,9 @@ const detailItem = (overrides: Partial<PlaylistItemPayload>): PlaylistItemPayloa
   releaseTitle: null,
   videoId: null,
   coverArt: null,
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
   ...overrides,
 });
 

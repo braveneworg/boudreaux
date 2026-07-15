@@ -128,4 +128,41 @@ describe('VideoPlayerSurface', () => {
 
     expect(player.dispose).toHaveBeenCalledTimes(1);
   });
+
+  it('fires onEnded when the player emits ended', () => {
+    const onEnded = vi.fn();
+    render(
+      <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" onEnded={onEnded} />
+    );
+    const [player] = getPlayers();
+
+    act(() => player.trigger('ended'));
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores ended when no onEnded callback is provided', () => {
+    render(<VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />);
+    const [player] = getPlayers();
+
+    expect(() => act(() => player.trigger('ended'))).not.toThrow();
+  });
+
+  it('uses the latest onEnded without re-initializing the player', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = render(
+      <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" onEnded={first} />
+    );
+
+    rerender(
+      <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" onEnded={second} />
+    );
+    const players = getPlayers();
+    act(() => players[0].trigger('ended'));
+
+    expect(players).toHaveLength(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+  });
 });

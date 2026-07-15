@@ -410,4 +410,67 @@ describe('ReleaseDigitalFormatFileRepository', () => {
       await expect(repo.searchTracksByTitle('x', 10)).rejects.toBeInstanceOf(DataError);
     });
   });
+
+  describe('findManyByReleaseIdsAndFormatType', () => {
+    it('queries requested-format files across releases (published, non-deleted only)', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      await repo.findManyByReleaseIdsAndFormatType(['r1', 'r2'], 'AAC');
+
+      expect(prisma.releaseDigitalFormatFile.findMany).toHaveBeenCalledWith({
+        where: {
+          format: {
+            is: {
+              formatType: 'AAC',
+              releaseId: { in: ['r1', 'r2'] },
+              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+              release: {
+                is: {
+                  publishedAt: { not: null },
+                  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          trackNumber: true,
+          s3Key: true,
+          fileName: true,
+          format: { select: { formatType: true, releaseId: true } },
+        },
+      });
+    });
+
+    it('should not include fileSize in the select', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValue([]);
+
+      await repo.findManyByReleaseIdsAndFormatType(['r1'], 'MP3_320KBPS');
+
+      const [call] = vi.mocked(prisma.releaseDigitalFormatFile.findMany).mock.calls;
+      expect(call[0]).not.toHaveProperty('select.fileSize');
+    });
+
+    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('DB error', { code: 'P2025', clientVersion: '6' })
+      );
+
+      await expect(repo.findManyByReleaseIdsAndFormatType(['r1'], 'AAC')).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws a DataError instance on failure', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('no db', '6')
+      );
+
+      await expect(repo.findManyByReleaseIdsAndFormatType(['r1'], 'AAC')).rejects.toBeInstanceOf(
+        DataError
+      );
+    });
+  });
 });

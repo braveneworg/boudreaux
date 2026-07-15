@@ -51,6 +51,9 @@ const makeItem = (overrides: Partial<PlaylistItemPayload> = {}): PlaylistItemPay
   releaseTitle: 'Album',
   videoId: null,
   coverArt: null,
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
   ...overrides,
 });
 

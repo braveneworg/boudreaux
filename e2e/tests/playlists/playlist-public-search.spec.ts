@@ -31,5 +31,7 @@ test.describe('Playlist public search', () => {
 
     // The snapshot-only token matches no live source — no Songs group.
     await expect(userPage.getByRole('group', { name: 'Songs', exact: true })).toHaveCount(0);
+    // …and it must not leak into the Videos live-source group either.
+    await expect(userPage.getByRole('group', { name: 'Videos', exact: true })).toHaveCount(0);
   });
 });

@@ -242,6 +242,7 @@ describe('VideoRepository', () => {
     artist: true,
     durationSeconds: true,
     posterUrl: true,
+    s3Key: true,
   };
 
   // The published + non-archived clauses for public visibility (publishedAt <= now).
@@ -255,6 +256,7 @@ describe('VideoRepository', () => {
     artist: 'Test Artist',
     durationSeconds: 215,
     posterUrl: 'https://cdn.example.com/poster.jpg',
+    s3Key: 'videos/test.mp4',
   };
 
   describe('findManyByIds', () => {

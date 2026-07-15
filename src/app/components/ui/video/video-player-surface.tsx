@@ -19,6 +19,8 @@ export interface VideoPlayerSurfaceProps {
   title: string;
   src: string;
   posterUrl?: string | null;
+  /** Fired when playback reaches the end of the source (e.g. queue advance). */
+  onEnded?: () => void;
 }
 
 /**
@@ -26,15 +28,23 @@ export interface VideoPlayerSurfaceProps {
  * click), so it autoplays once ready. Registers with the playback coordinator on
  * 'play' so only one surface plays at a time, and disposes cleanly on unmount
  * (list virtualization / refetch). A player 'error' swaps in an inline fallback.
+ * An optional `onEnded` callback fires when playback finishes (queue advance).
  */
 export const VideoPlayerSurface = ({
   title,
   src,
   posterUrl,
+  onEnded,
 }: VideoPlayerSurfaceProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceId = useId();
   const [hasError, setHasError] = useState(false);
+  // Ref-carried so callback identity changes never tear down the player.
+  const onEndedRef = useRef(onEnded);
+
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -62,6 +72,10 @@ export const VideoPlayerSurface = ({
 
     player.on('play', () => {
       claimPlayback(instanceId, () => player.pause());
+    });
+
+    player.on('ended', () => {
+      onEndedRef.current?.();
     });
 
     player.on('error', () => {

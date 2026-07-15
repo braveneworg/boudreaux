@@ -428,6 +428,51 @@ describe('generatePlaylistCoverUploadUrlsAction', () => {
     );
   });
 
+  it('falls back to a .bin extension for a junk (non-alphanumeric) tail', async () => {
+    vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
+
+    const result = await generatePlaylistCoverUploadUrlsAction({
+      playlistId: PLAYLIST_ID,
+      files: [{ fileName: 'shot.J%2FPG..exe.....', contentType: 'image/png', fileSize: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]?.key).toMatch(
+      new RegExp(`^media/playlists/${PLAYLIST_ID}/[a-z0-9-]+-\\d+-[a-z0-9]+\\.bin$`)
+    );
+  });
+
+  it('falls back to a .bin extension for an over-long tail', async () => {
+    vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
+
+    const result = await generatePlaylistCoverUploadUrlsAction({
+      playlistId: PLAYLIST_ID,
+      files: [{ fileName: 'photo.abcdefghijklmnopqrst', contentType: 'image/png', fileSize: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]?.key).toMatch(
+      new RegExp(`^media/playlists/${PLAYLIST_ID}/[a-z0-9-]+-\\d+-[a-z0-9]+\\.bin$`)
+    );
+  });
+
+  it('lowercases a valid extension into the key', async () => {
+    vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
+
+    const result = await generatePlaylistCoverUploadUrlsAction({
+      playlistId: PLAYLIST_ID,
+      files: [{ fileName: 'photo.WebP', contentType: 'image/webp', fileSize: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]?.key).toMatch(
+      new RegExp(`^media/playlists/${PLAYLIST_ID}/photo-\\d+-[a-z0-9]+\\.webp$`)
+    );
+  });
+
   it('reflects each file MIME type and size into the presigned PUT', async () => {
     vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
 

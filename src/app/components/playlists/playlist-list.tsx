@@ -8,6 +8,7 @@ import type { ReactElement } from 'react';
 
 import { toast } from 'sonner';
 
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeletePlaylistMutation } from '@/hooks/use-playlist-mutations';
 import { usePlaylistsQuery } from '@/hooks/use-playlists-query';
@@ -20,8 +21,6 @@ interface PlaylistListProps {
   onEdit: (id: string) => void;
   /** Fired with the row's playlist id from the play button. */
   onPlay: (id: string) => void;
-  /** Fired with the row's playlist id from the share button. */
-  onShare: (id: string) => void;
   /** Extra classes composed onto the pane's root element. */
   className?: string;
 }
@@ -30,7 +29,10 @@ const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 
 /** Three placeholder rows approximating the thumb + two-line row layout. */
 const PlaylistListSkeleton = ({ className }: { className?: string }): ReactElement => (
-  <div className={cn(className)}>
+  <div className={cn(className)} aria-busy="true">
+    <p role="status" className="sr-only">
+      Loading playlists…
+    </p>
     {SKELETON_KEYS.map((key) => (
       <div
         key={key}
@@ -55,16 +57,12 @@ const PlaylistListSkeleton = ({ className }: { className?: string }): ReactEleme
  * error line when the query settles without data, and the empty-state copy
  * when the user has no playlists yet.
  */
-export const PlaylistList = ({
-  onEdit,
-  onPlay,
-  onShare,
-  className,
-}: PlaylistListProps): ReactElement => {
-  const { isPending, data } = usePlaylistsQuery();
-  const { deletePlaylist } = useDeletePlaylistMutation();
+export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): ReactElement => {
+  const { isPending, rows, nextSkip, loadMore, isLoadingMore } = usePlaylistsQuery();
+  const { deletePlaylist, isDeletingPlaylist } = useDeletePlaylistMutation();
 
-  const handleDelete = (playlistId: string): void =>
+  const handleDelete = (playlistId: string): void => {
+    if (isDeletingPlaylist) return; // a confirmed delete is already in flight
     deletePlaylist(
       { playlistId },
       {
@@ -72,14 +70,15 @@ export const PlaylistList = ({
         onError: (error: Error) => toast.error(error.message),
       }
     );
+  };
 
   if (isPending) return <PlaylistListSkeleton className={className} />;
 
-  if (!data) {
+  if (rows === undefined) {
     return <p className={cn('text-sm text-zinc-500', className)}>Couldn't load playlists.</p>;
   }
 
-  if (data.rows.length === 0) {
+  if (rows.length === 0) {
     return (
       <p className={cn('text-sm text-zinc-500', className)}>
         No playlists yet — build one with the creator.
@@ -88,17 +87,29 @@ export const PlaylistList = ({
   }
 
   return (
-    <ul className={cn(className)}>
-      {data.rows.map((row) => (
-        <PlaylistRow
-          key={row.id}
-          row={row}
-          onEdit={() => onEdit(row.id)}
-          onPlay={() => onPlay(row.id)}
-          onShare={() => onShare(row.id)}
-          onDelete={() => handleDelete(row.id)}
-        />
-      ))}
-    </ul>
+    <div className={cn(className)}>
+      <ul>
+        {rows.map((row) => (
+          <PlaylistRow
+            key={row.id}
+            row={row}
+            onEdit={() => onEdit(row.id)}
+            onPlay={() => onPlay(row.id)}
+            onDelete={() => handleDelete(row.id)}
+          />
+        ))}
+      </ul>
+      {nextSkip !== null && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 w-full"
+          onClick={loadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? 'Loading…' : 'Load more'}
+        </Button>
+      )}
+    </div>
   );
 };

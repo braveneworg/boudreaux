@@ -20,9 +20,12 @@ interface StreamSigningConfig {
 /**
  * Resolve the CloudFront signing identity for streaming URLs.
  *
- * Returns `null` when any required env var is missing, which lets callers
- * fall back to an unsigned CDN URL in dev / E2E / preview environments
- * where the CloudFront key pair is not provisioned.
+ * Returns `null` when any required env var is missing (e.g. dev / E2E /
+ * preview environments where the CloudFront key pair is not provisioned).
+ * How callers handle that `null` depends on the asset: audio/public assets
+ * may fall back to an unsigned CDN URL via `buildCdnUrl`, but VIDEO keys
+ * must NEVER get an unsigned fallback — videos fail closed (signed access
+ * only) and surface a `null` stream URL instead.
  */
 const getStreamSigningConfig = (): StreamSigningConfig | null => {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
@@ -52,8 +55,10 @@ const getStreamSigningConfig = (): StreamSigningConfig | null => {
  * @param expiresInSeconds - Expiration window. Defaults to the standard
  *   24-hour download TTL so a single signed URL is valid for the whole
  *   listening session including auto-advance through a tracklist.
- * @returns Signed CloudFront URL, or `null` when signing is unconfigured
- *   (caller should fall back to an unsigned CDN URL via `buildCdnUrl`).
+ * @returns Signed CloudFront URL, or `null` when signing is unconfigured.
+ *   On `null`, callers for audio/public assets may fall back to an unsigned
+ *   CDN URL via `buildCdnUrl`; callers for VIDEO keys must NEVER use an
+ *   unsigned fallback — fail closed with a `null` stream URL instead.
  */
 export const signStreamUrl = (
   s3Key: string | null | undefined,
@@ -80,7 +85,7 @@ export const signStreamUrl = (
       dateLessThan,
     });
   } catch (err) {
-    logger.error('CloudFront stream signing failed; falling back to unsigned URL', err);
+    logger.error('CloudFront stream signing failed; failing closed with null URL', err);
     return null;
   }
 };

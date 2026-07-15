@@ -1337,3 +1337,17 @@ describe('MediaPlayer', () => {
     });
   });
 });
+
+describe('InfoTickerTape minimal variant', () => {
+  it('renders the track title with the artist name', () => {
+    render(<MediaPlayer.InfoTickerTape trackTitle="Night Drive" artistName="Ceschi" />);
+
+    expect(screen.getByText('Night Drive • by Ceschi')).toBeInTheDocument();
+  });
+
+  it('renders the title alone when artistName is null', () => {
+    render(<MediaPlayer.InfoTickerTape trackTitle="Night Drive" artistName={null} />);
+
+    expect(screen.getByText('Night Drive')).toBeInTheDocument();
+  });
+});

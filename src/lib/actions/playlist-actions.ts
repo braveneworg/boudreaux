@@ -58,7 +58,11 @@ const deletePlaylistInputSchema = z.object({
 const buildCoverObjectKey = (playlistId: string, fileName: string): string => {
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+  // Only trust a short alphanumeric tail as the extension; anything else
+  // (query-string leftovers, embedded dots/slashes, an over-long tail) falls
+  // back to `.bin` so nothing unsanitized reaches the S3 key.
+  const rawExtension = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const extension = /^[a-z0-9]{1,8}$/.test(rawExtension) ? rawExtension : 'bin';
   const sanitizedName = fileName
     .replace(/\.[^/.]+$/, '')
     .toLowerCase()

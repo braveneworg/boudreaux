@@ -119,15 +119,20 @@ const videoSummarySelect = {
   artist: true,
   durationSeconds: true,
   posterUrl: true,
+  s3Key: true,
 } as const satisfies Prisma.VideoSelect;
 
 /**
  * Vendor-neutral row returned by `findManyByIds` / `searchPublished`. Derived
  * from the hand-written `Video` domain type (not Prisma) and drift-checked
  * against the select's actual payload below. Exported for downstream services
- * (playlist service, media search).
+ * (playlist service, media search). `s3Key` is server-internal input for
+ * stream-URL signing — payload mappers never expose it to clients.
  */
-export type VideoSummary = Pick<Video, 'id' | 'title' | 'artist' | 'durationSeconds' | 'posterUrl'>;
+export type VideoSummary = Pick<
+  Video,
+  'id' | 'title' | 'artist' | 'durationSeconds' | 'posterUrl' | 's3Key'
+>;
 
 // Fails `pnpm run typecheck` if `videoSummarySelect` and `VideoSummary` diverge.
 type _VideoSummaryDrift = AssertExact<
