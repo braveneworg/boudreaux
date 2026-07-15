@@ -21,6 +21,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/pop
 import { useArtistListQuery } from '@/app/hooks/use-artist-list-query';
 import { useDebounce } from '@/app/hooks/use-debounce';
 
+import { buildArtistListParams, getArtistDisplayName } from './artist-combobox-helpers';
+
+import type { ArtistRow } from './artist-combobox-helpers';
+
 // --------------------------------------------------------------------------
 // Public types
 // --------------------------------------------------------------------------
@@ -31,35 +35,6 @@ export interface FeaturedArtistsComboboxProps {
   disabled?: boolean;
   label?: string;
 }
-
-// --------------------------------------------------------------------------
-// Internal types
-// --------------------------------------------------------------------------
-
-interface ArtistRow {
-  id: string;
-  displayName: string | null;
-  firstName: string | null;
-  surname: string;
-  slug: string;
-}
-
-// --------------------------------------------------------------------------
-// Helpers
-// --------------------------------------------------------------------------
-
-const buildArtistListParams = (
-  debouncedSearch: string
-): { search: string | undefined; take: number | undefined } => ({
-  search: debouncedSearch || undefined,
-  take: debouncedSearch ? undefined : 5,
-});
-
-const getArtistDisplayName = (artist: ArtistRow): string => {
-  if (artist.displayName) return artist.displayName;
-  const parts = [artist.firstName, artist.surname].filter(Boolean);
-  return parts.join(' ') || '(no name)';
-};
 
 // --------------------------------------------------------------------------
 // Sub-components (extracted to keep main component under ESLint complexity:10)
@@ -180,6 +155,8 @@ export const FeaturedArtistsCombobox = ({
     onChange([...value, name]);
   };
 
+  // Case-sensitive by design: stored pill names are always the canonical
+  // display/typed value, so an exact match is both correct and sufficient.
   const removeName = (name: string): void => {
     onChange(value.filter((n) => n !== name));
   };
