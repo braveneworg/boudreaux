@@ -16,6 +16,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      upsert: vi.fn(),
     },
   },
 }));
@@ -57,6 +58,7 @@ describe('UserDownloadQuotaRepository', () => {
     vi.mocked(prisma.userDownloadQuota.findUnique).mockReset();
     vi.mocked(prisma.userDownloadQuota.create).mockReset();
     vi.mocked(prisma.userDownloadQuota.update).mockReset();
+    vi.mocked(prisma.userDownloadQuota.upsert).mockReset();
   });
 
   describe('findOrCreateBySubject', () => {
@@ -119,51 +121,42 @@ describe('UserDownloadQuotaRepository', () => {
   });
 
   describe('addUniqueRelease', () => {
-    it('atomically pushes a release id for a user', async () => {
-      const existing = createUserQuota();
+    it('upserts a pushed release id for a user in a single round trip', async () => {
       const updated = createUserQuota({
-        uniqueReleaseIds: [...existing.uniqueReleaseIds, mockReleaseId],
+        uniqueReleaseIds: ['release-1', 'release-2', mockReleaseId],
       });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
-      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
+      vi.mocked(prisma.userDownloadQuota.upsert).mockResolvedValue(updated);
 
       const result = await repo.addUniqueRelease(userSubject, mockReleaseId);
 
       expect(result.uniqueReleaseIds).toContain(mockReleaseId);
-      expect(prisma.userDownloadQuota.update).toHaveBeenCalledWith({
+      expect(prisma.userDownloadQuota.upsert).toHaveBeenCalledWith({
         where: { userId: 'user-123' },
-        data: { uniqueReleaseIds: { push: mockReleaseId } },
+        update: { uniqueReleaseIds: { push: mockReleaseId } },
+        create: { user: { connect: { id: 'user-123' } }, uniqueReleaseIds: [mockReleaseId] },
       });
     });
 
-    it('atomically pushes a release id for a guest', async () => {
-      const existing = createGuestQuota();
-      const updated = createGuestQuota({
-        uniqueReleaseIds: [...existing.uniqueReleaseIds, mockReleaseId],
-      });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
-      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
+    it('does not pre-fetch the row before upserting', async () => {
+      vi.mocked(prisma.userDownloadQuota.upsert).mockResolvedValue(createUserQuota());
+
+      await repo.addUniqueRelease(userSubject, mockReleaseId);
+
+      expect(prisma.userDownloadQuota.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('upserts a pushed release id for a guest, seeding the create branch', async () => {
+      const updated = createGuestQuota({ uniqueReleaseIds: ['release-1', mockReleaseId] });
+      vi.mocked(prisma.userDownloadQuota.upsert).mockResolvedValue(updated);
 
       const result = await repo.addUniqueRelease(guestSubject, mockReleaseId);
 
       expect(result.uniqueReleaseIds).toContain(mockReleaseId);
-      expect(prisma.userDownloadQuota.update).toHaveBeenCalledWith({
+      expect(prisma.userDownloadQuota.upsert).toHaveBeenCalledWith({
         where: { visitorId: 'visitor-abc' },
-        data: { uniqueReleaseIds: { push: mockReleaseId } },
+        update: { uniqueReleaseIds: { push: mockReleaseId } },
+        create: { visitorId: 'visitor-abc', uniqueReleaseIds: [mockReleaseId] },
       });
-    });
-
-    it('creates the row first when missing before pushing', async () => {
-      const created = createGuestQuota({ uniqueReleaseIds: [] });
-      const updated = createGuestQuota({ uniqueReleaseIds: [mockReleaseId] });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(created);
-      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
-
-      const result = await repo.addUniqueRelease(guestSubject, mockReleaseId);
-
-      expect(prisma.userDownloadQuota.create).toHaveBeenCalled();
-      expect(result.uniqueReleaseIds).toEqual([mockReleaseId]);
     });
   });
 

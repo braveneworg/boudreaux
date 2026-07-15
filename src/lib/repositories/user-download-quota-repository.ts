@@ -53,14 +53,16 @@ export class UserDownloadQuotaRepository {
 
   /**
    * Atomically add a unique release ID to the subject's download quota.
+   *
+   * A single `upsert` handles both the create (seed the array with this
+   * release) and update (push the release) cases, saving the extra
+   * find-or-create round trip on the hot download path.
    */
   async addUniqueRelease(subject: DownloadSubject, releaseId: string): Promise<UserDownloadQuota> {
-    await this.findOrCreateBySubject(subject);
-    return prisma.userDownloadQuota.update({
+    return prisma.userDownloadQuota.upsert({
       where: this.whereForSubject(subject),
-      data: {
-        uniqueReleaseIds: { push: releaseId },
-      },
+      update: { uniqueReleaseIds: { push: releaseId } },
+      create: { ...this.createDataForSubject(subject), uniqueReleaseIds: [releaseId] },
     });
   }
 

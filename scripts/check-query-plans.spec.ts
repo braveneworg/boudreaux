@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { analyzePlan, collectStages, TARGETS } from './check-query-plans';
+import {
+  analyzePlan,
+  classifyPlan,
+  collectStages,
+  matchesKeyPrefix,
+  TARGETS,
+} from './check-query-plans';
 
 vi.mock('@prisma/client', () => ({ PrismaClient: class {} }));
 
@@ -135,10 +141,132 @@ describe('analyzePlan', () => {
   });
 });
 
+describe('analyzePlan consideredKeyPatterns', () => {
+  it('collects the keyPattern of every considered IXSCAN', () => {
+    const verdict = analyzePlan(collscanWinsIndexRejectedPlan, ['role']);
+
+    expect(verdict.consideredKeyPatterns).toEqual([{ role: 1 }]);
+  });
+
+  it('is empty when only a collection scan is considered', () => {
+    const verdict = analyzePlan(collscanOnlyPlan, ['role']);
+
+    expect(verdict.consideredKeyPatterns).toEqual([]);
+  });
+
+  it('omits considered IXSCANs that carry no keyPattern', () => {
+    const noKeyPatternPlan = {
+      queryPlanner: {
+        winningPlan: { stage: 'IXSCAN', indexName: 'role_1' },
+        rejectedPlans: [],
+      },
+    };
+
+    const verdict = analyzePlan(noKeyPatternPlan, ['role']);
+
+    expect(verdict.consideredKeyPatterns).toEqual([]);
+  });
+});
+
+describe('matchesKeyPrefix', () => {
+  it('matches a keyPattern that begins with the required fields in order', () => {
+    expect(matchesKeyPrefix([{ artistId: 1, sortOrder: 1 }], ['artistId', 'sortOrder'])).toBe(true);
+  });
+
+  it('matches a longer keyPattern by its leading prefix', () => {
+    expect(
+      matchesKeyPrefix([{ userId: 1, releaseId: 1, downloadedAt: 1 }], ['userId', 'releaseId'])
+    ).toBe(true);
+  });
+
+  it('rejects when the field order differs', () => {
+    expect(matchesKeyPrefix([{ sortOrder: 1, artistId: 1 }], ['artistId', 'sortOrder'])).toBe(
+      false
+    );
+  });
+
+  it('rejects when no considered index reaches the required depth', () => {
+    expect(matchesKeyPrefix([{ artistId: 1 }], ['artistId', 'sortOrder'])).toBe(false);
+  });
+});
+
+describe('classifyPlan', () => {
+  const compoundPlan = {
+    queryPlanner: {
+      winningPlan: {
+        stage: 'IXSCAN',
+        indexName: 'artistId_sortOrder',
+        keyPattern: { artistId: 1, sortOrder: 1 },
+      },
+      rejectedPlans: [],
+    },
+  };
+
+  it('passes a leading-field target with no key-prefix requirement', () => {
+    const result = classifyPlan({
+      verdict: analyzePlan(ixscanWinningPlan, ['createdAt']),
+      docCount: 5,
+      indexNames: ['createdAt_-1'],
+    });
+
+    expect(result.status).toBe('PASS');
+  });
+
+  it('fails when a required compound prefix is absent from considered indexes', () => {
+    const result = classifyPlan({
+      verdict: analyzePlan(ixscanWinningPlan, ['createdAt']),
+      docCount: 5,
+      indexNames: ['createdAt_-1'],
+      requiredKeyPrefix: ['createdAt', 'id'],
+    });
+
+    expect(result.failed).toBe(true);
+  });
+
+  it('passes when the required compound prefix is considered', () => {
+    const result = classifyPlan({
+      verdict: analyzePlan(compoundPlan, ['artistId']),
+      docCount: 5,
+      indexNames: ['artistId_sortOrder'],
+      requiredKeyPrefix: ['artistId', 'sortOrder'],
+    });
+
+    expect(result.status).toBe('PASS');
+  });
+
+  it('skips an empty collection rather than failing', () => {
+    const result = classifyPlan({
+      verdict: analyzePlan(collscanOnlyPlan, ['role']),
+      docCount: 0,
+      indexNames: ['_id_'],
+    });
+
+    expect(result.status).toBe('SKIP');
+  });
+
+  it('fails when no acceptable index is considered and the collection has rows', () => {
+    const result = classifyPlan({
+      verdict: analyzePlan(collscanOnlyPlan, ['role']),
+      docCount: 5,
+      indexNames: ['_id_'],
+    });
+
+    expect(result.failed).toBe(true);
+  });
+});
+
 describe('TARGETS', () => {
   it('declares acceptable leading fields for every target', () => {
     const allHaveLeadingFields = TARGETS.every((t) => t.acceptableLeadingFields.length > 0);
 
     expect(allHaveLeadingFields).toBe(true);
+  });
+
+  it('every requiredKeyPrefix starts with an acceptable leading field', () => {
+    const consistent = TARGETS.every(
+      (t) => !t.requiredKeyPrefix || t.acceptableLeadingFields.includes(t.requiredKeyPrefix[0])
+    );
+
+    expect(consistent).toBe(true);
   });
 });
