@@ -241,6 +241,32 @@ describe('ProducerMultiCombobox', () => {
     });
   });
 
+  describe('adds matched producer via Enter when exact search result exists', () => {
+    it('calls onChange with the matched result pill (with id) when Enter matches a search result', async () => {
+      mockProducerResults = [{ id: 'p1', name: 'Rick' }];
+      const { onChange } = setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      const input = screen.getByPlaceholderText(/search producers/i);
+      await userEvent.type(input, 'Rick');
+      await userEvent.keyboard('{Enter}');
+
+      expect(onChange).toHaveBeenCalledWith([{ id: 'p1', name: 'Rick' }]);
+    });
+
+    it('match is case-insensitive (lowercase input → matched result pill with id)', async () => {
+      mockProducerResults = [{ id: 'p1', name: 'Rick' }];
+      const { onChange } = setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      const input = screen.getByPlaceholderText(/search producers/i);
+      await userEvent.type(input, 'rick');
+      await userEvent.keyboard('{Enter}');
+
+      expect(onChange).toHaveBeenCalledWith([{ id: 'p1', name: 'Rick' }]);
+    });
+  });
+
   describe('adds a new free-text producer with no id', () => {
     it('calls onChange with a pill containing only name when Enter is pressed with no exact match', async () => {
       mockProducerResults = [];

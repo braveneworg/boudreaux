@@ -169,8 +169,8 @@ export const ProducerMultiCombobox = ({
     if (e.key !== 'Enter') return;
     const trimmed = search.trim();
     if (trimmed.length === 0) return;
-    const hasExact = results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
-    if (!hasExact) addPill({ name: trimmed });
+    const matched = results.find((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+    addPill(matched ?? { name: trimmed });
   };
 
   return (
