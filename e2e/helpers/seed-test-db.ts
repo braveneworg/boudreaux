@@ -178,6 +178,85 @@ const createBioPaletteLinkRow = async (label: string): Promise<void> => {
 const sessionExpiresAt = (): Date => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
 /**
+ * Title of the public playlist owned by "User B" (the existing admin seed
+ * user) for the playlist media-search E2E flow. The regular user's media
+ * search only surfaces OTHER users' public playlists, so the admin-owned
+ * fixture is visible to the `userPage` specs.
+ */
+const PUBLIC_PLAYLIST_TITLE = 'E2E Public Mix B';
+
+/**
+ * Snapshot title of the public playlist's first item. Carries a unique token
+ * that matches NO track/release/video/artist title, so searching it surfaces
+ * the item exclusively under the "From public playlists" group (snapshots are
+ * by-design copies — the item still references a real seeded MP3_320KBPS file
+ * and re-resolves to its live row for display).
+ */
+const PUBLIC_PLAYLIST_SNAPSHOT_TITLE = 'Zebra Crossing Cut';
+
+/** Seeded MP3 track file captured for fixtures that reference live rows. */
+interface SeededTrackFile {
+  id: string;
+  releaseId: string;
+}
+
+/**
+ * Seed the public-playlist fixture for
+ * `e2e/tests/playlists/playlist-public-search.spec.ts`: one PUBLIC playlist
+ * owned by the admin ("User B") whose two items reference seeded MP3_320KBPS
+ * files. `itemCount`/`totalDuration` are the denormalized values the app
+ * maintains in repo transactions — computed inline here to match the items.
+ */
+const seedPublicPlaylistFixture = async (
+  prisma: PrismaClient,
+  mp3FilesByTitle: Map<string, SeededTrackFile>
+): Promise<void> => {
+  const alpha = mp3FilesByTitle.get('E2E Track Alpha');
+  const beta = mp3FilesByTitle.get('E2E Track Beta');
+  if (!alpha || !beta) {
+    throw new Error('Playlist fixture requires the seeded E2E Track Alpha/Beta MP3 files.');
+  }
+
+  const playlist = await prisma.playlist.create({
+    data: {
+      ownerId: TEST_USERS.admin.id,
+      title: PUBLIC_PLAYLIST_TITLE,
+      isPublic: true,
+      coverImages: [],
+      itemCount: 2,
+      totalDuration: 420, // 2 × 210s seeded tracks
+    },
+  });
+
+  // First-ever writes to the fresh PlaylistItem collection — a single
+  // createMany (concurrent create() read-backs race in CI on new collections).
+  await prisma.playlistItem.createMany({
+    data: [
+      {
+        playlistId: playlist.id,
+        itemType: 'track',
+        trackFileId: alpha.id,
+        releaseId: alpha.releaseId,
+        title: PUBLIC_PLAYLIST_SNAPSHOT_TITLE,
+        artistName: 'E2E Artist',
+        duration: 210,
+        sortOrder: 0,
+      },
+      {
+        playlistId: playlist.id,
+        itemType: 'track',
+        trackFileId: beta.id,
+        releaseId: beta.releaseId,
+        title: 'E2E Track Beta',
+        artistName: 'E2E Artist',
+        duration: 210,
+        sortOrder: 1,
+      },
+    ],
+  });
+};
+
+/**
  * Mint a FRESH throwaway better-auth session for the dedicated sign-out user and
  * return a Playwright storageState carrying its signed session cookie. Each call
  * uses a unique token, so the destructive sign-out specs never share a session —
@@ -551,9 +630,13 @@ const seedTestDatabase = async () => {
     // Wait for the replica set to be ready before proceeding
     await waitForReplicaSet(prisma);
 
-    // Clear all collections in dependency-safe order. Video-enrichment join +
-    // suggestion rows reference Video (and VideoArtist references Artist), so
-    // they must be removed before the videos and artists they belong to.
+    // Clear all collections in dependency-safe order. Playlist items reference
+    // Playlist and Playlist references User, so both go before the users.
+    // Video-enrichment join + suggestion rows reference Video (and VideoArtist
+    // references Artist), so they must be removed before the videos and
+    // artists they belong to.
+    await prisma.playlistItem.deleteMany({});
+    await prisma.playlist.deleteMany({});
     await prisma.videoEnrichmentSuggestion.deleteMany({});
     await prisma.videoArtist.deleteMany({});
     await prisma.abuseReport.deleteMany({});
@@ -1054,6 +1137,10 @@ const seedTestDatabase = async () => {
       { release: e2eRelease3, trackTitle: 'E2E Track Gamma' },
     ];
 
+    // Captured per track title so the public-playlist fixture can reference
+    // the live MP3 rows by id.
+    const mp3FilesByTitle = new Map<string, SeededTrackFile>();
+
     for (const { release, trackTitle } of e2eReleases) {
       const format = await prisma.releaseDigitalFormat.create({
         data: {
@@ -1065,7 +1152,7 @@ const seedTestDatabase = async () => {
         },
       });
 
-      await prisma.releaseDigitalFormatFile.create({
+      const file = await prisma.releaseDigitalFormatFile.create({
         data: {
           formatId: format.id,
           trackNumber: 1,
@@ -1077,6 +1164,7 @@ const seedTestDatabase = async () => {
           mimeType: 'audio/mpeg',
         },
       });
+      mp3FilesByTitle.set(trackTitle, { id: file.id, releaseId: release.id });
     }
 
     // Add FLAC and WAV formats to E2E Album One for download/purchase flow testing
@@ -1362,6 +1450,7 @@ const seedTestDatabase = async () => {
     await seedVideos(prisma);
     await seedEnrichmentFixtures(prisma);
     await seedReviewFixtures(prisma);
+    await seedPublicPlaylistFixture(prisma, mp3FilesByTitle);
 
     console.info('E2E test database seeded successfully.');
   } finally {
@@ -1377,6 +1466,8 @@ export {
   createDisposableSignoutState,
   ENRICH_INFO_VIDEO_ID,
   ENRICH_MUSIC_VIDEO_ID,
+  PUBLIC_PLAYLIST_SNAPSHOT_TITLE,
+  PUBLIC_PLAYLIST_TITLE,
   REVIEW_VIDEO_ID,
   seedTestDatabase,
   SIGNOUT_USER_ID,

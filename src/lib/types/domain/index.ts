@@ -19,3 +19,4 @@ export * from './sms-blast';
 export * from './video';
 export * from './video-artist';
 export * from './video-enrichment';
+export * from './playlist';

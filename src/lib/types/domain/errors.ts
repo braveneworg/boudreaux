@@ -9,13 +9,18 @@
  * Prisma's error taxonomy (`PrismaClientKnownRequestError` codes,
  * `PrismaClientInitializationError`, …) into a {@link DataError} carrying a
  * stable, Prisma-free {@link DataErrorCode}. Services catch `DataError` and map
- * the code to a user-facing message — they never see a Prisma type.
+ * the code to a user-facing message — they never see a Prisma type. Services
+ * also raise `DataError`s of their own for business-rule failures
+ * (`INVALID_INPUT`, `LIMIT_EXCEEDED`, ownership `NOT_FOUND`), sharing the same
+ * vendor-neutral taxonomy.
  *
  * This module imports nothing from Prisma so every layer above the repository
  * can depend on it.
  */
 export type DataErrorCode =
   | 'DUPLICATE'
+  | 'INVALID_INPUT'
+  | 'LIMIT_EXCEEDED'
   | 'NOT_FOUND'
   | 'UNAVAILABLE'
   | 'VALIDATION'

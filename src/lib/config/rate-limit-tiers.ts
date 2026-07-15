@@ -77,6 +77,13 @@ export const linkPreviewLimiter = rateLimit({
 });
 export const LINK_PREVIEW_LIMIT = 30;
 
+/** User-keyed presigned-URL minting for playlist covers — 10 requests per minute. */
+export const playlistCoverUploadLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const PLAYLIST_COVER_UPLOAD_LIMIT = 10;
+
 /**
  * Video-enrichment completion callback (server-to-server) — 20 requests per
  * minute. One legitimate POST per dispatched job; the modest cap absorbs

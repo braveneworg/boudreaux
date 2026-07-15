@@ -81,6 +81,20 @@ describe('failFromError', () => {
     });
   });
 
+  it('uses the INVALID_INPUT default for a business-rule input failure', () => {
+    expect(failFromError(new DataError('INVALID_INPUT', 'x'))).toEqual({
+      success: false,
+      error: 'Invalid input',
+    });
+  });
+
+  it('uses the LIMIT_EXCEEDED default for a business-rule limit failure', () => {
+    expect(failFromError(new DataError('LIMIT_EXCEEDED', 'x'))).toEqual({
+      success: false,
+      error: 'Limit exceeded',
+    });
+  });
+
   it('keeps the UNAVAILABLE default and does not fall back to the UNKNOWN override', () => {
     const result = failFromError(new DataError('UNAVAILABLE', 'x'), { UNKNOWN: 'generic' });
 

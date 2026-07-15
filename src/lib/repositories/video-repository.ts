@@ -86,6 +86,38 @@ const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
   return { AND: and };
 };
 
+// =============================================================================
+// Select projections (lean playlist-feature reads)
+// =============================================================================
+
+/**
+ * Lean projection selected by the playlist lookup/search reads
+ * (`findManyByIds` / `searchPublished`): only the fields the playlist service
+ * needs for item resolution and media-search rows.
+ */
+const videoSummarySelect = {
+  id: true,
+  title: true,
+  artist: true,
+  durationSeconds: true,
+  posterUrl: true,
+} as const satisfies Prisma.VideoSelect;
+
+/**
+ * Vendor-neutral row returned by `findManyByIds` / `searchPublished`. Derived
+ * from the hand-written `Video` domain type (not Prisma) and drift-checked
+ * against the select's actual payload below. Exported for downstream services
+ * (playlist service, media search).
+ */
+export type VideoSummary = Pick<Video, 'id' | 'title' | 'artist' | 'durationSeconds' | 'posterUrl'>;
+
+// Fails `pnpm run typecheck` if `videoSummarySelect` and `VideoSummary` diverge.
+type _VideoSummaryDrift = AssertExact<
+  VideoSummary,
+  Prisma.VideoGetPayload<{ select: typeof videoSummarySelect }>
+>;
+const _videoSummaryDrift: _VideoSummaryDrift = true;
+
 /**
  * Data-access layer for the `Video` model. The only layer that touches Prisma
  * for videos: it owns the where DSL, translates domain input to Prisma input,
@@ -134,6 +166,43 @@ export class VideoRepository {
         orderBy: { releasedOn: sort },
         skip,
         take,
+      })
+    );
+  }
+
+  /**
+   * Fetch published, non-archived videos by id as lean `VideoSummary` rows.
+   * Used by the playlist service to resolve playlist-item video references —
+   * unpublished/archived videos resolve as missing. The published/non-archived
+   * clauses reuse `buildListWhere({ published: true })` (same as
+   * `findPublished`) so the two reads can never drift apart.
+   */
+  static async findManyByIds(ids: string[]): Promise<VideoSummary[]> {
+    return runQuery(() =>
+      prisma.video.findMany({
+        where: { ...buildListWhere({ published: true }), id: { in: ids } },
+        select: videoSummarySelect,
+      })
+    );
+  }
+
+  /**
+   * Search published, non-archived videos by title/artist (case-insensitive
+   * substring), ordered by title asc for deterministic results. The
+   * published/non-archived clauses sit under `AND` (via
+   * `buildListWhere({ published: true })`) so they never collide with the
+   * search `OR`. Used by the playlist media-search endpoint.
+   */
+  static async searchPublished(q: string, take: number): Promise<VideoSummary[]> {
+    return runQuery(() =>
+      prisma.video.findMany({
+        where: {
+          ...buildListWhere({ published: true }),
+          OR: [{ title: containsInsensitive(q) }, { artist: containsInsensitive(q) }],
+        },
+        orderBy: { title: 'asc' },
+        take,
+        select: videoSummarySelect,
       })
     );
   }

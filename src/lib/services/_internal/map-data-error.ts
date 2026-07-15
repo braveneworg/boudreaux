@@ -7,6 +7,8 @@ import { loggers } from '@/lib/utils/logger';
 /** Default user-facing message per data-error code. */
 const DEFAULT_MESSAGE = new Map<DataErrorCode, string>([
   ['DUPLICATE', 'Resource already exists'],
+  ['INVALID_INPUT', 'Invalid input'],
+  ['LIMIT_EXCEEDED', 'Limit exceeded'],
   ['NOT_FOUND', 'Resource not found'],
   ['UNAVAILABLE', 'Database unavailable'],
   ['VALIDATION', 'Invalid request'],

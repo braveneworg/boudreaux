@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
+import { formatDuration } from '@/lib/utils/format-duration';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import type { ArtistNameFields } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
@@ -688,16 +689,6 @@ const TrackListDrawer = ({
   const { release } = artistRelease;
   const allFiles = release.digitalFormats.flatMap((format) => format.files);
 
-  /**
-   * Format duration from seconds to MM:SS format
-   */
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
   // Sort tracks by track number
   const sortedFiles = [...allFiles].sort((a, b) => a.trackNumber - b.trackNumber);
 
@@ -849,13 +840,6 @@ interface FormatFileListDrawerProps {
    */
   downloadTrigger?: React.ReactNode;
 }
-
-/** Format a duration in seconds as `m:ss`. */
-const formatDuration = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-};
 
 /** A single track file from {@link FormatFileListDrawerProps.files}. */
 type FormatFileListItem = FormatFileListDrawerProps['files'][number];

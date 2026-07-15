@@ -124,6 +124,13 @@ export const queryKeys = {
     dateImages: (tourId: string, tourDateId: string) =>
       [...queryKeys.tours.all, 'dateImages', tourId, tourDateId] as const,
   },
+  playlists: {
+    all: ['playlists'] as const,
+    mine: () => [...queryKeys.playlists.all, 'mine'] as const,
+    detail: (id: string) => [...queryKeys.playlists.all, 'detail', id] as const,
+    mediaSearch: (q: string) =>
+      [...queryKeys.playlists.all, 'mediaSearch', q.trim().toLowerCase()] as const,
+  },
   purchaseStatus: {
     bySession: (releaseId: string, sessionId: string) =>
       ['purchaseStatus', releaseId, sessionId] as const,
