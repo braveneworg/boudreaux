@@ -15,9 +15,18 @@ import {
 } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
+import type * as ReleaseDateLookupModule from './release-date-lookup.js';
 import type { ArtistFacts, BioImage } from './types.js';
 import type * as VideoEnrichmentModule from './video-enrichment.js';
 import type { VerifiedScrapedImage } from './vision.js';
+
+vi.mock('./release-date-lookup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReleaseDateLookupModule>();
+  return {
+    ...actual,
+    runReleaseDateLookupLambda: vi.fn().mockResolvedValue({ ok: true, result: null }),
+  };
+});
 
 vi.mock('./video-enrichment.js', async (importOriginal) => {
   const actual = await importOriginal<typeof VideoEnrichmentModule>();
@@ -2027,5 +2036,19 @@ describe('runLambda task routing', () => {
     await runLambda({}); // invalid bio input — still must NOT route to video
 
     expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
+  });
+
+  it('routes a release-date-lookup event to the lookup task', async () => {
+    const { runReleaseDateLookupLambda } = await import('./release-date-lookup.js');
+    const { runVideoEnrichmentLambda } = await import('./video-enrichment.js');
+
+    const result = await runLambda({ task: 'release-date-lookup', title: 'Song' });
+
+    expect(vi.mocked(runReleaseDateLookupLambda)).toHaveBeenCalledWith({
+      task: 'release-date-lookup',
+      title: 'Song',
+    });
+    expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, result: null });
   });
 });
