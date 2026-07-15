@@ -18,7 +18,10 @@ import {
 } from 'react-share';
 
 interface SocialShareWidgetProps {
-  artistUrl: string;
+  /** Legacy share-URL prop (artist pages). Prefer `url` for new consumers. */
+  artistUrl?: string;
+  /** Neutral share-URL prop; takes precedence over `artistUrl`. */
+  url?: string;
   facebookMessengerAppId?: string;
 }
 
@@ -28,8 +31,10 @@ interface SocialShareWidgetProps {
  */
 export const SocialShareWidget = ({
   artistUrl,
+  url,
   facebookMessengerAppId = '',
 }: SocialShareWidgetProps) => {
+  const shareUrl = url ?? artistUrl ?? '';
   const shareTitle = 'Check this out on Fake Four Inc.!';
   const iconSize = 32;
 
@@ -37,7 +42,7 @@ export const SocialShareWidget = ({
     <>
       <FacebookShareButton
         className="pointer-events-auto size-10"
-        url={artistUrl}
+        url={shareUrl}
         htmlTitle="Share on Facebook"
         aria-label="Share on Facebook"
       >
@@ -46,7 +51,7 @@ export const SocialShareWidget = ({
 
       <FacebookMessengerShareButton
         className="pointer-events-auto size-10"
-        url={artistUrl}
+        url={shareUrl}
         appId={facebookMessengerAppId}
         htmlTitle="Share on Messenger"
         aria-label="Share on Messenger"
@@ -56,7 +61,7 @@ export const SocialShareWidget = ({
 
       <WhatsappShareButton
         className="pointer-events-auto size-10"
-        url={artistUrl}
+        url={shareUrl}
         title={shareTitle}
         htmlTitle="Share on WhatsApp"
         aria-label="Share on WhatsApp"
@@ -66,7 +71,7 @@ export const SocialShareWidget = ({
 
       {/* SMS / Messages button */}
       <a
-        href={`sms:?&body=${encodeURIComponent(`${shareTitle} ${artistUrl}`)}`}
+        href={`sms:?&body=${encodeURIComponent(`${shareTitle} ${shareUrl}`)}`}
         className="pointer-events-auto -mt-1.5 inline-flex size-10 items-center justify-center"
         aria-label="Share via SMS"
         title="Share via SMS"
@@ -77,7 +82,7 @@ export const SocialShareWidget = ({
 
       <TelegramShareButton
         className="pointer-events-auto ml-2 size-10"
-        url={artistUrl}
+        url={shareUrl}
         title={shareTitle}
         htmlTitle="Share on Telegram"
         aria-label="Share on Telegram"
@@ -90,7 +95,7 @@ export const SocialShareWidget = ({
           Lighthouse label-content-name-mismatch) so speech-input users can
           activate the control by saying its label. */}
       <a
-        href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(artistUrl)}`}
+        href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
         target="_blank"
         rel="noopener noreferrer"
         className="relative -top-3 inline-flex size-10"
@@ -109,7 +114,7 @@ export const SocialShareWidget = ({
         className="pointer-events-auto size-10"
         title={shareTitle}
         htmlTitle="Share on X"
-        url={artistUrl}
+        url={shareUrl}
         aria-label="Share on X"
       >
         <XIcon size={iconSize} className="bg-zinc-700" />
