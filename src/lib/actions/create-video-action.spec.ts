@@ -34,11 +34,12 @@ vi.mock('@/lib/services/producer-service', () => ({
   ProducerService: { syncVideoProducers: vi.fn() },
 }));
 
-// Capture the after() callback so tests can run the "background" kick on demand.
-let afterCallback: (() => Promise<void>) | null = null;
+// Capture after() callbacks so tests can inspect / run them on demand.
+// Index 0 = enrichment kick; Index 1 = producer sync (when producers present)
+const afterCallbacks: Array<() => Promise<void>> = [];
 vi.mock('next/server', () => ({
   after: (cb: () => Promise<void>) => {
-    afterCallback = cb;
+    afterCallbacks.push(cb);
   },
 }));
 
@@ -85,7 +86,7 @@ beforeEach(() => {
     success: true,
     data: { id: videoId },
   } as never);
-  afterCallback = null;
+  afterCallbacks.length = 0;
   vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
@@ -440,7 +441,8 @@ describe('createVideoAction', () => {
 
       await createVideoAction(initialFormState, buildFormData());
 
-      expect(afterCallback).toBeTypeOf('function');
+      // Kick is always the first after() call
+      expect(afterCallbacks[0]).toBeTypeOf('function');
     });
 
     it('does not schedule the kick when creation fails', async () => {
@@ -452,7 +454,7 @@ describe('createVideoAction', () => {
 
       await createVideoAction(initialFormState, buildFormData());
 
-      expect(afterCallback).toBeNull();
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('does not schedule the kick when S3 confirmation fails', async () => {
@@ -461,14 +463,14 @@ describe('createVideoAction', () => {
 
       await createVideoAction(initialFormState, buildFormData());
 
-      expect(afterCallback).toBeNull();
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('syncs video artists from the submitted artist string', async () => {
       mockParsedSuccess();
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
         videoId,
@@ -481,7 +483,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
     });
@@ -490,7 +492,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
@@ -499,7 +501,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess({ ...parsedData, category: 'INFORMATIONAL' });
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
     });
@@ -509,7 +511,7 @@ describe('createVideoAction', () => {
       vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('sync down'));
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
     });
@@ -519,7 +521,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess({ ...parsedData, artistDetails });
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      await afterCallbacks[0]?.();
 
       expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
         videoId,
@@ -547,12 +549,17 @@ describe('createVideoAction', () => {
       expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
     });
 
-    it('syncs producers from the submitted producers array', async () => {
+    // --- Producer sync is now DECOUPLED from the enrichment kick ---
+
+    it('syncs producers in a separate after() when producers is non-empty', async () => {
       const producers = [{ name: 'New Producer' }];
       mockParsedSuccess({ ...parsedData, producers });
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+
+      // kick = afterCallbacks[0], producer sync = afterCallbacks[1]
+      expect(afterCallbacks).toHaveLength(2);
+      await afterCallbacks[1]();
 
       expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
         videoId,
@@ -561,11 +568,20 @@ describe('createVideoAction', () => {
       );
     });
 
-    it('does not call syncVideoProducers when producers is absent', async () => {
+    it('does not schedule a producer sync when producers is absent', async () => {
       mockParsedSuccess();
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallback?.();
+      for (const cb of afterCallbacks) await cb();
+
+      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+    });
+
+    it('enrichment kick does not call syncVideoProducers', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallbacks[0]?.();
 
       expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
     });

@@ -16,6 +16,7 @@ import {
   deleteReplacedVideoAssets,
   isPosterReplaced,
   kickPostSaveEnrichment,
+  syncVideoProducersAfterSave,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -369,9 +370,21 @@ describe('kickPostSaveEnrichment', () => {
     await expect(kickPostSaveEnrichment(kickInput)).resolves.toBeUndefined();
   });
 
-  it('syncs producers when producers are provided', async () => {
-    await kickPostSaveEnrichment({
-      ...kickInput,
+  it('does not call syncVideoProducers (producers decoupled from kick)', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncVideoProducersAfterSave', () => {
+  beforeEach(() => {
+    vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
+  });
+
+  it('syncs producers when provided', async () => {
+    await syncVideoProducersAfterSave({
+      videoId,
       producers: [{ name: 'New Producer' }],
     });
 
@@ -382,9 +395,15 @@ describe('kickPostSaveEnrichment', () => {
     );
   });
 
+  it('syncs an empty producers array (clear-to-zero)', async () => {
+    await syncVideoProducersAfterSave({ videoId, producers: [] });
+
+    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(videoId, [], undefined);
+  });
+
   it('forwards createdBy to syncVideoProducers', async () => {
-    await kickPostSaveEnrichment({
-      ...kickInput,
+    await syncVideoProducersAfterSave({
+      videoId,
       producers: [{ id: 'p1', name: 'Rick' }],
       createdBy: 'user-abc',
     });
@@ -396,31 +415,11 @@ describe('kickPostSaveEnrichment', () => {
     );
   });
 
-  it('does not call syncVideoProducers when producers is absent', async () => {
-    await kickPostSaveEnrichment(kickInput);
-
-    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
-  });
-
-  it('does not call syncVideoProducers when producers is an empty array', async () => {
-    await kickPostSaveEnrichment({ ...kickInput, producers: [] });
-
-    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
-  });
-
-  it('swallows a producer sync failure (best-effort)', async () => {
+  it('swallows a sync failure (best-effort)', async () => {
     vi.mocked(ProducerService.syncVideoProducers).mockRejectedValue(Error('producer sync down'));
 
     await expect(
-      kickPostSaveEnrichment({ ...kickInput, producers: [{ name: 'Bad' }] })
+      syncVideoProducersAfterSave({ videoId, producers: [{ name: 'Bad' }] })
     ).resolves.toBeUndefined();
-  });
-
-  it('still runs the probe even when producer sync fails', async () => {
-    vi.mocked(ProducerService.syncVideoProducers).mockRejectedValue(Error('sync down'));
-
-    await kickPostSaveEnrichment({ ...kickInput, producers: [{ name: 'Bad' }] });
-
-    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
   });
 });

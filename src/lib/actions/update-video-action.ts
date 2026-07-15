@@ -26,6 +26,7 @@ import {
   confirmVideoUpload,
   deleteReplacedVideoAssets,
   kickPostSaveEnrichment,
+  syncVideoProducersAfterSave,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -65,17 +66,18 @@ const applyUpdateResult = (
  * any of these changes re-dispatches the async web enrichment. The sync also
  * runs on a file-only replacement; it is idempotent. No-op when nothing
  * relevant changed.
+ *
+ * Producer sync is NOT included here — it runs in its own `after()` call in
+ * {@link runVideoUpdate} so that clearing all producers persists correctly.
  */
 const scheduleUpdateEnrichment = (
   current: Video,
   data: VideoFormData,
-  s3KeyReplaced: boolean,
-  userId: string
+  s3KeyReplaced: boolean
 ): void => {
   const artistChanged = data.artist !== current.artist;
   const artistDetailsProvided = (data.artistDetails?.length ?? 0) > 0;
-  const producersProvided = (data.producers?.length ?? 0) > 0;
-  if (!artistChanged && !s3KeyReplaced && !artistDetailsProvided && !producersProvided) return;
+  if (!artistChanged && !s3KeyReplaced && !artistDetailsProvided) return;
 
   after(() =>
     kickPostSaveEnrichment({
@@ -84,8 +86,6 @@ const scheduleUpdateEnrichment = (
       category: data.category,
       reProbe: s3KeyReplaced,
       artistDetails: data.artistDetails,
-      producers: data.producers,
-      createdBy: userId,
     })
   );
 };
@@ -134,7 +134,18 @@ const runVideoUpdate = async (
     deleteReplacedVideoAssets(current, data, s3KeyReplaced);
     revalidatePath('/admin/videos');
     revalidatePath('/videos');
-    scheduleUpdateEnrichment(current, data, s3KeyReplaced, userId);
+    // Sync producers whenever the field was present in the payload — even when
+    // empty ([] means "clear all"), so clearing to zero is always persisted.
+    if (data.producers !== undefined) {
+      after(() =>
+        syncVideoProducersAfterSave({
+          videoId,
+          producers: data.producers ?? [],
+          createdBy: userId,
+        })
+      );
+    }
+    scheduleUpdateEnrichment(current, data, s3KeyReplaced);
   }
 };
 

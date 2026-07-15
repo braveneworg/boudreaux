@@ -168,10 +168,6 @@ export interface KickPostSaveEnrichmentInput {
   reProbe: boolean;
   /** Admin-reviewed artist name details forwarded to syncVideoArtists. */
   artistDetails?: VideoArtistDetail[];
-  /** Producer entries from the admin form forwarded to syncVideoProducers. */
-  producers?: VideoProducerInput[];
-  /** The user id to stamp on newly-created producer records. */
-  createdBy?: string;
 }
 
 /**
@@ -181,6 +177,11 @@ export interface KickPostSaveEnrichmentInput {
  * failure is logged and the remaining stages still run. Never throws, so the
  * admin's already-successful save can never be failed retroactively by
  * background work.
+ *
+ * Producer sync is intentionally NOT performed here — see
+ * {@link syncVideoProducersAfterSave} which runs in a separate `after()` call
+ * so that clearing all producers (producers: []) is always persisted regardless
+ * of whether any enrichment-relevant field changed.
  */
 export const kickPostSaveEnrichment = async ({
   videoId,
@@ -188,21 +189,11 @@ export const kickPostSaveEnrichment = async ({
   category,
   reProbe,
   artistDetails,
-  producers,
-  createdBy,
 }: KickPostSaveEnrichmentInput): Promise<void> => {
   try {
     await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
   } catch (error) {
     logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
-  }
-
-  if (producers?.length) {
-    try {
-      await ProducerService.syncVideoProducers(videoId, producers, createdBy);
-    } catch (error) {
-      logger.warn('Post-save video producer sync failed', { videoId, error: toMessage(error) });
-    }
   }
 
   if (reProbe) {
@@ -219,5 +210,22 @@ export const kickPostSaveEnrichment = async ({
     } catch (error) {
       logger.warn('Post-save enrichment dispatch failed', { videoId, error: toMessage(error) });
     }
+  }
+};
+
+/** Best-effort producer-join sync (runs in `after()`, never fails the save). */
+export const syncVideoProducersAfterSave = async ({
+  videoId,
+  producers,
+  createdBy,
+}: {
+  videoId: string;
+  producers: VideoProducerInput[];
+  createdBy?: string;
+}): Promise<void> => {
+  try {
+    await ProducerService.syncVideoProducers(videoId, producers, createdBy);
+  } catch (error) {
+    logger.warn('Post-save video producer sync failed', { videoId, error: toMessage(error) });
   }
 };
