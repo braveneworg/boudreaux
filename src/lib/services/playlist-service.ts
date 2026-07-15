@@ -102,6 +102,13 @@ interface ArtistReleaseTarget {
 
 const PLAYLIST_NOT_FOUND = 'Playlist not found';
 
+/**
+ * Message of the `NOT_FOUND` thrown when an add-item source ref cannot be
+ * resolved. Exported so the add-item Server Action can distinguish this case
+ * (→ `SOURCE_NOT_FOUND`) from the playlist-level `NOT_FOUND` (same code).
+ */
+export const SOURCE_NOT_FOUND_MESSAGE = 'Source track or video not found';
+
 /** How many release-title matches are expanded into track suggestions. */
 const RELEASE_MATCH_TAKE = 3;
 
@@ -619,7 +626,7 @@ export class PlaylistService {
   ): Promise<AddItemResult> {
     const playlist = await PlaylistService.requireOwned(playlistId, userId);
     const [resolved] = await PlaylistService.resolveSources([ref]);
-    if (!resolved) throw new DataError('NOT_FOUND', 'Source track or video not found');
+    if (!resolved) throw new DataError('NOT_FOUND', SOURCE_NOT_FOUND_MESSAGE);
     if (!force) {
       const existing = await PlaylistRepository.findDuplicateItem(playlistId, ref);
       if (existing) return { duplicate: true };
