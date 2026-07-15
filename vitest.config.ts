@@ -135,17 +135,25 @@ export default defineConfig((): ViteUserConfig => {
       // Use most cores, but leave headroom. Saturating every core (`'100%'`)
       // invites resource contention — workers spinning up simultaneously under
       // memory pressure can produce rare, non-deterministic VM-context failures
-      // that pass on retry. `'75%'` keeps throughput high while reducing that risk.
+      // that pass on retry. On Apple Silicon it is also measurably SLOWER: a
+      // maxWorkers sweep showed wall clock rising monotonically past ~10 workers
+      // (9→21.4s, 10→21.7s, 14→22.5s) as work spilled onto efficiency cores.
+      // `'75%'` (~10 workers on a 14-core box) keeps throughput at its peak while
+      // reducing the flakiness risk.
       maxWorkers: '75%',
 
       isolate: true, // Required for test isolation
       fileParallelism: true, // Run test files in parallel for speed
       testTimeout: 5000,
 
-      // Randomize test order to catch hidden dependencies
-      // Use fixed seed for reproducibility, override with VITEST_SEED env var
+      // Randomize test order to catch hidden dependencies, but ONLY within each
+      // file (`tests: true`). File order stays UNSHUFFLED (`files: false`) so
+      // Vitest's sequencer can schedule the slowest specs first and balance them
+      // across workers — shuffling file order piles slow specs onto one worker at
+      // the tail and nearly doubles wall clock (measured 23s → 13s here).
+      // Use fixed seed for reproducibility, override with VITEST_SEED env var.
       sequence: {
-        shuffle: true,
+        shuffle: { files: false, tests: true },
         seed: (() => {
           if (process.env.VITEST_SEED) {
             const parsed = parseInt(process.env.VITEST_SEED, 10);
