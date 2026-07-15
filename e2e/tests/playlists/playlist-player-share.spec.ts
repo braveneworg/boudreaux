@@ -91,6 +91,17 @@ test.describe('Playlist player and share', () => {
     await playlists.rowShareButton(title).click();
     const popover = playlists.sharePopover();
     await expect(popover).toBeVisible();
+
+    // Focus regression net for duplicate @radix-ui/* instances stealing focus
+    // from portaled popover content (repo lesson: only an E2E toBeFocused
+    // catches it; jsdom unit specs render the popover in isolation and pass).
+    // Radix FocusScope autofocuses the first tabbable, non-link candidate on
+    // open; the SocialShareWidget is lazy (ssr:false) so at open-time only its
+    // non-focusable skeleton is mounted → FocusScope falls back to focusing the
+    // content container itself (role="dialog", tabIndex -1). If a stray Radix
+    // FocusScope stole focus to the trigger/body, this assertion fails.
+    await expect(popover).toBeFocused();
+
     await expect(popover.getByRole('button', { name: 'Share on Facebook' })).toBeVisible();
     // The SMS anchor carries the encoded share URL — pin it to this playlist.
     // Read the attribute and substring-match (a built RegExp trips the lint's
