@@ -56,6 +56,15 @@ vi.mock('@/app/hooks/use-video-probe-prefill-query', () => ({
     mocks.useVideoProbePrefillQuery(s3Key, videoId, options),
 }));
 
+vi.mock('@/app/hooks/use-video-producers-query', () => ({
+  useVideoProducersQuery: () => ({
+    isPending: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/utils/multipart-upload', () => ({
   uploadVideoMultipart: mocks.uploadVideoMultipart,
 }));
@@ -87,6 +96,10 @@ vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
         ))}
       </div>
     ) : null,
+}));
+
+vi.mock('@/app/components/forms/videos/video-producers-section', () => ({
+  VideoProducersSection: () => <div data-testid="video-producers-section" />,
 }));
 
 vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({

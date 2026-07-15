@@ -37,6 +37,7 @@ export const buildVideoDefaults = (): DefaultValues<VideoFormData> => ({
   fileSize: '',
   posterUrl: '',
   publishedAt: '',
+  producers: [],
 });
 
 /** Project a loaded video row into the form's default values (pure mapping). */

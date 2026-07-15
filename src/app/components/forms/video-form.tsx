@@ -18,6 +18,7 @@ import {
   useUpdateVideoMutation,
 } from '@/app/hooks/mutations/use-video-mutations';
 import { useVideoProbePrefillQuery } from '@/app/hooks/use-video-probe-prefill-query';
+import { useVideoProducersQuery } from '@/app/hooks/use-video-producers-query';
 import { useVideoQuery } from '@/app/hooks/use-video-query';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
@@ -40,6 +41,7 @@ import {
 } from './videos/video-form-helpers';
 import { VideoMetadataSection } from './videos/video-metadata-section';
 import { VideoPosterSection } from './videos/video-poster-section';
+import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
 import type { Control, UseFormReturn } from 'react-hook-form';
@@ -95,6 +97,33 @@ interface EnrichmentPanelMountProps {
   onApplyReleaseDate: (value: string) => void;
 }
 
+interface UseVideoProducersPrefillArgs {
+  videoId: string | undefined;
+  isEditMode: boolean;
+  video: VideoRow | null | undefined;
+  form: UseFormReturn<VideoFormData>;
+}
+
+/**
+ * Fetches producers for edit-mode and sets the RHF field once both the main
+ * video reset and the producers query have settled — keeping `VideoForm` under
+ * the ESLint complexity cap of 10.
+ */
+const useVideoProducersPrefill = ({
+  videoId,
+  isEditMode,
+  video,
+  form,
+}: UseVideoProducersPrefillArgs): void => {
+  const { data: producerData } = useVideoProducersQuery(videoId ?? '', { enabled: isEditMode });
+
+  useEffect(() => {
+    if (isEditMode && video && producerData !== undefined) {
+      form.setValue('producers', producerData);
+    }
+  }, [isEditMode, video, producerData, form]);
+};
+
 /** MUSIC-only, edit-only: absent from the DOM otherwise (INFORMATIONAL/create). */
 const EnrichmentPanelMount = ({
   video,
@@ -132,6 +161,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       form.reset(mapVideoToFormValues(video));
     }
   }, [isEditMode, video, form]);
+
+  useVideoProducersPrefill({ videoId, isEditMode, video, form });
 
   const upload = useVideoUpload({ preGeneratedId, form, onPosterCandidate: setPosterCandidate });
   const s3Key = useWatch({ control, name: 's3Key' });
@@ -218,6 +249,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
             <VideoMetadataSection control={control} onSelectDate={handleSelectDate} />
             <VideoArtistReviewSection entries={entries} updateDraft={updateDraft} />
+            <VideoProducersSection control={control} />
             <EnrichmentPanelMount
               video={video}
               control={control}
