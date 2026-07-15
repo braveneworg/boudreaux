@@ -103,6 +103,26 @@ vi.mock('./playlist-view', () => ({
   ),
 }));
 
+interface PlayerDialogStubProps {
+  playlistId: string | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}
+
+vi.mock('./playlist-player-dialog', () => ({
+  PlaylistPlayerDialog: ({ playlistId, open, onOpenChange }: PlayerDialogStubProps) => (
+    <div
+      data-testid="playlist-player-dialog"
+      data-open={String(open)}
+      data-playlist-id={playlistId ?? 'null'}
+    >
+      <button type="button" onClick={() => onOpenChange(false)}>
+        stub-player-close
+      </button>
+    </div>
+  ),
+}));
+
 /** Re-stub `matchMedia` (setupTests defaults it to non-matching) per test. */
 const mockMatchMedia = (matches: boolean): void => {
   Object.defineProperty(window, 'matchMedia', {
@@ -275,29 +295,6 @@ describe('PlaylistsContent', () => {
   });
 
   describe('stubbed actions', () => {
-    it('toasts the player stub copy from a list row play', async () => {
-      const user = userEvent.setup();
-      render(<PlaylistsContent />);
-
-      await user.click(screen.getByRole('button', { name: 'stub-list-play' }));
-
-      expect(toastInfoMock).toHaveBeenCalledExactlyOnceWith(
-        'Playlist player arrives in the next update'
-      );
-    });
-
-    it('toasts the player stub copy from the view play button', async () => {
-      const user = userEvent.setup();
-      render(<PlaylistsContent />);
-
-      await user.click(screen.getByRole('button', { name: 'stub-search-select' }));
-      await user.click(screen.getByRole('button', { name: 'stub-view-play' }));
-
-      expect(toastInfoMock).toHaveBeenCalledExactlyOnceWith(
-        'Playlist player arrives in the next update'
-      );
-    });
-
     it('toasts the sharing stub copy from a list row share', async () => {
       const user = userEvent.setup();
       render(<PlaylistsContent />);
@@ -305,6 +302,60 @@ describe('PlaylistsContent', () => {
       await user.click(screen.getByRole('button', { name: 'stub-list-share' }));
 
       expect(toastInfoMock).toHaveBeenCalledExactlyOnceWith('Sharing arrives in the next update');
+    });
+  });
+
+  describe('player dialog wiring', () => {
+    it('renders the player dialog closed initially', () => {
+      render(<PlaylistsContent />);
+
+      const dialog = screen.getByTestId('playlist-player-dialog');
+      expect(dialog).toHaveAttribute('data-open', 'false');
+      expect(dialog).toHaveAttribute('data-playlist-id', 'null');
+    });
+
+    it('opens the player dialog from a list row play', async () => {
+      const user = userEvent.setup();
+      render(<PlaylistsContent />);
+
+      await user.click(screen.getByRole('button', { name: 'stub-list-play' }));
+
+      const dialog = screen.getByTestId('playlist-player-dialog');
+      expect(dialog).toHaveAttribute('data-open', 'true');
+      expect(dialog).toHaveAttribute('data-playlist-id', 'pl-1');
+    });
+
+    it('opens the player dialog from the view play button', async () => {
+      const user = userEvent.setup();
+      render(<PlaylistsContent />);
+
+      await user.click(screen.getByRole('button', { name: 'stub-search-select' }));
+      await user.click(screen.getByRole('button', { name: 'stub-view-play' }));
+
+      const dialog = screen.getByTestId('playlist-player-dialog');
+      expect(dialog).toHaveAttribute('data-open', 'true');
+      expect(dialog).toHaveAttribute('data-playlist-id', 'pl-7');
+    });
+
+    it('clears the playlist id when the dialog dismisses', async () => {
+      const user = userEvent.setup();
+      render(<PlaylistsContent />);
+
+      await user.click(screen.getByRole('button', { name: 'stub-list-play' }));
+      await user.click(screen.getByRole('button', { name: 'stub-player-close' }));
+
+      const dialog = screen.getByTestId('playlist-player-dialog');
+      expect(dialog).toHaveAttribute('data-open', 'false');
+      expect(dialog).toHaveAttribute('data-playlist-id', 'null');
+    });
+
+    it('never toasts the removed player stub copy', async () => {
+      const user = userEvent.setup();
+      render(<PlaylistsContent />);
+
+      await user.click(screen.getByRole('button', { name: 'stub-list-play' }));
+
+      expect(toastInfoMock).not.toHaveBeenCalled();
     });
   });
 });

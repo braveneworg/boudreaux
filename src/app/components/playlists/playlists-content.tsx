@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { MyPlaylistSearch } from './my-playlist-search';
 import { PlaylistCreator, type PlaylistCreatorHandle } from './playlist-creator';
 import { PlaylistList } from './playlist-list';
+import { PlaylistPlayerDialog } from './playlist-player-dialog';
 import { PlaylistView } from './playlist-view';
 
 /** Below this media query the layout is single-column (creator above list). */
@@ -23,14 +24,16 @@ const BELOW_LG_QUERY = '(max-width: 1023px)';
  * list (right) on desktop, stacked on mobile with a quick-jump search and a
  * creator/&lt;playlist&gt; view swap (the creator stays mounted in a hidden
  * wrapper so drafts survive). A `?edit=` deep link loads that playlist into
- * the creator and is cleared from the URL once handled; play/share are toast
- * stubs until the player and sharing arrive in PR2.
+ * the creator and is cleared from the URL once handled; play opens the shared
+ * `PlaylistPlayerDialog`, while share remains a toast stub until sharing
+ * lands later in PR2.
  */
 export const PlaylistsContent = (): ReactElement => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editParam = searchParams.get('edit');
   const [viewPlaylistId, setViewPlaylistId] = useState<string | null>(null);
+  const [playerPlaylistId, setPlayerPlaylistId] = useState<string | null>(null);
   const creatorRef = useRef<PlaylistCreatorHandle>(null);
   const creatorPaneRef = useRef<HTMLDivElement>(null);
 
@@ -45,8 +48,11 @@ export const PlaylistsContent = (): ReactElement => {
     }
   };
 
-  const handlePlay = (): void => {
-    toast.info('Playlist player arrives in the next update');
+  /** Shared by list rows and the view: open the playlist in the player dialog. */
+  const handlePlay = (id: string): void => setPlayerPlaylistId(id);
+
+  const handlePlayerOpenChange = (nextOpen: boolean): void => {
+    if (!nextOpen) setPlayerPlaylistId(null);
   };
 
   const handleShare = (): void => {
@@ -83,6 +89,11 @@ export const PlaylistsContent = (): ReactElement => {
           onShare={handleShare}
         />
       </div>
+      <PlaylistPlayerDialog
+        playlistId={playerPlaylistId}
+        open={playerPlaylistId !== null}
+        onOpenChange={handlePlayerOpenChange}
+      />
     </>
   );
 };
