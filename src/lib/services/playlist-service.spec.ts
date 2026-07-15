@@ -15,6 +15,7 @@ import { ReleaseService } from '@/lib/services/release-service';
 import type { Artist } from '@/lib/types/domain/artist';
 import type { PlaylistItemRecord, PlaylistRecord } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail, PublishedReleaseListing } from '@/lib/types/domain/release';
+import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 
 import { PlaylistService } from './playlist-service';
 
@@ -68,6 +69,10 @@ vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
     searchPublishedArtists: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/utils/sign-stream-url', () => ({
+  signStreamUrl: vi.fn((s3Key: string | null | undefined) => (s3Key ? `signed:${s3Key}` : null)),
 }));
 
 // ---------------------------------------------------------------------------
@@ -164,6 +169,7 @@ const makeVideo = (overrides: Partial<VideoSummary> = {}): VideoSummary => ({
   artist: 'Video Artist',
   durationSeconds: 240,
   posterUrl: 'https://cdn.test/posters/video-1.jpg',
+  s3Key: 'videos/video-1.mp4',
   ...overrides,
 });
 
@@ -367,8 +373,8 @@ describe('PlaylistService', () => {
         releaseTitle: 'Live Album',
         videoId: null,
         coverArt: 'https://cdn.test/covers/release-1.jpg',
-        s3Key: null,
-        streamUrl: null,
+        s3Key: 'releases/release-1/tracks/01-live-song.mp3',
+        streamUrl: 'https://cdn.test/releases/release-1/tracks/01-live-song.mp3',
         posterUrl: null,
       });
     });
@@ -475,8 +481,8 @@ describe('PlaylistService', () => {
         videoId: 'video-1',
         coverArt: 'https://cdn.test/posters/video-1.jpg',
         s3Key: null,
-        streamUrl: null,
-        posterUrl: null,
+        streamUrl: 'signed:videos/video-1.mp4',
+        posterUrl: 'https://cdn.test/posters/video-1.jpg',
       });
     });
 
@@ -535,6 +541,92 @@ describe('PlaylistService', () => {
         coverArt: null,
         releaseTitle: null,
       });
+    });
+  });
+
+  describe('getOwnedOrPublicDetail stream fields', () => {
+    const TRACK_S3_KEY = 'releases/release-1/tracks/01-live-song.mp3';
+
+    const mockDetailItems = (items: PlaylistItemRecord[]): void => {
+      vi.mocked(PlaylistRepository.findByIdWithItems).mockResolvedValue({
+        ...makePlaylist(),
+        items,
+      });
+    };
+
+    const makeVideoItem = (overrides: Partial<PlaylistItemRecord> = {}): PlaylistItemRecord =>
+      makeItem({
+        id: 'item-2',
+        itemType: 'video',
+        trackFileId: null,
+        releaseId: null,
+        videoId: 'video-1',
+        title: 'Snapshot Video',
+        artistName: 'Snapshot V',
+        duration: 5,
+        sortOrder: 1,
+        ...overrides,
+      });
+
+    it('attaches the raw key and unsigned CDN URL to a resolved track', async () => {
+      mockDetailItems([makeItem()]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([makeTrackFile()]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({
+        s3Key: TRACK_S3_KEY,
+        streamUrl: `https://cdn.test/${TRACK_S3_KEY}`,
+        posterUrl: null,
+      });
+    });
+
+    it('keeps stream fields on a grandfathered track of an unpublished release', async () => {
+      mockDetailItems([makeItem()]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ publishedAt: null }),
+      ]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({
+        available: true,
+        s3Key: TRACK_S3_KEY,
+        streamUrl: `https://cdn.test/${TRACK_S3_KEY}`,
+        posterUrl: null,
+      });
+    });
+
+    it('attaches a signed URL and poster to a resolved video, never the raw key', async () => {
+      mockDetailItems([makeVideoItem()]);
+      vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([makeVideo()]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({
+        s3Key: null,
+        streamUrl: 'signed:videos/video-1.mp4',
+        posterUrl: 'https://cdn.test/posters/video-1.jpg',
+      });
+      expect(vi.mocked(signStreamUrl).mock.calls).toEqual([['videos/video-1.mp4']]);
+    });
+
+    it('leaves all stream fields null for an unavailable track', async () => {
+      mockDetailItems([makeItem()]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ s3Key: null, streamUrl: null, posterUrl: null });
+    });
+
+    it('leaves all stream fields null for an unavailable video', async () => {
+      mockDetailItems([makeVideoItem({ videoId: 'video-archived' })]);
+      vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ s3Key: null, streamUrl: null, posterUrl: null });
     });
   });
 
@@ -902,8 +994,27 @@ describe('PlaylistService', () => {
           releaseTitle: 'Live Album',
           videoId: null,
           coverArt: 'https://cdn.test/covers/release-1.jpg',
-          s3Key: null,
-          streamUrl: null,
+          s3Key: 'releases/release-1/tracks/01-live-song.mp3',
+          streamUrl: 'https://cdn.test/releases/release-1/tracks/01-live-song.mp3',
+          posterUrl: null,
+        },
+      });
+    });
+
+    it('carries the track stream fields on the created item', async () => {
+      mockOwnedPlaylist();
+
+      const result = await PlaylistService.addItem(OWNER_ID, {
+        playlistId: PLAYLIST_ID,
+        ref: trackRef,
+        force: false,
+      });
+
+      expect(result).toMatchObject({
+        duplicate: false,
+        item: {
+          s3Key: 'releases/release-1/tracks/01-live-song.mp3',
+          streamUrl: 'https://cdn.test/releases/release-1/tracks/01-live-song.mp3',
           posterUrl: null,
         },
       });

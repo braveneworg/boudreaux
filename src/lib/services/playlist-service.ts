@@ -34,6 +34,7 @@ import type {
 import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 import type { UpdatePlaylistInput } from '@/lib/validation/playlist-schema';
 
 // =============================================================================
@@ -70,6 +71,7 @@ interface ResolvedSource {
   data: AddPlaylistItemData;
   coverArt: string | null;
   releaseTitle: string | null;
+  stream: PlaylistItemStreamFields;
 }
 
 /** Batched live-row lookups keyed by source id (one query per source kind). */
@@ -124,7 +126,7 @@ const MP3_FORMAT_TYPE = 'MP3_320KBPS';
 /** The stream/poster subset of {@link PlaylistItemPayload} (PR2). */
 type PlaylistItemStreamFields = Pick<PlaylistItemPayload, 's3Key' | 'streamUrl' | 'posterUrl'>;
 
-/** Live stream/poster fields (PR2) — null until attached from the live source row (see attachPlaylistItemStreamUrls, next task). */
+/** Live stream/poster fields for unavailable items — {@link attachPlaylistItemStreamUrls} overrides them when the source row resolved. */
 const NO_STREAM_FIELDS: PlaylistItemStreamFields = {
   s3Key: null,
   streamUrl: null,
@@ -134,6 +136,46 @@ const NO_STREAM_FIELDS: PlaylistItemStreamFields = {
 // =============================================================================
 // Pure helpers
 // =============================================================================
+
+/** Track stream fields: the MP3_320 CDN behavior is public, so the raw key + unsigned URL are safe. */
+const trackStreamFields = (s3Key: string): PlaylistItemStreamFields => ({
+  s3Key,
+  streamUrl: buildCdnUrl(s3Key),
+  posterUrl: null,
+});
+
+/**
+ * Video stream fields: NEVER expose the raw video key — access is via the
+ * CloudFront signed URL only (24h default TTL; null when signing is
+ * unconfigured, e.g. dev/E2E).
+ */
+const videoStreamFields = ({
+  s3Key,
+  posterUrl,
+}: Pick<VideoSummary, 's3Key' | 'posterUrl'>): PlaylistItemStreamFields => ({
+  s3Key: null,
+  streamUrl: signStreamUrl(s3Key),
+  posterUrl,
+});
+
+/**
+ * Attach the live stream/poster fields to a resolved item payload (spec:
+ * "attachPlaylistItemStreamUrls"). Keyed off the SAME source maps used for
+ * item resolution, so fields attach whenever the source row resolved —
+ * including grandfathered unpublished releases — and stay null for dangling
+ * items.
+ */
+const attachPlaylistItemStreamUrls = (
+  payload: PlaylistItemPayload,
+  { tracks, videos }: SourceMaps
+): PlaylistItemPayload => {
+  if (payload.itemType === 'track') {
+    const file = payload.trackFileId ? tracks.get(payload.trackFileId) : undefined;
+    return { ...payload, ...(file ? trackStreamFields(file.s3Key) : NO_STREAM_FIELDS) };
+  }
+  const video = payload.videoId ? videos.get(payload.videoId) : undefined;
+  return { ...payload, ...(video ? videoStreamFields(video) : NO_STREAM_FIELDS) };
+};
 
 /** Playlist display-name rule: `displayName`, else `firstName surname`. */
 const deriveArtistName = ({ displayName, firstName, surname }: ArtistNameParts): string =>
@@ -227,6 +269,7 @@ const toTrackResolved = (file: TrackFileWithRelease): ResolvedSource | null => {
     },
     coverArt: release.coverArt,
     releaseTitle: release.title,
+    stream: trackStreamFields(file.s3Key),
   };
 };
 
@@ -243,6 +286,7 @@ const toVideoResolved = (video: VideoSummary): ResolvedSource => ({
   },
   coverArt: video.posterUrl,
   releaseTitle: null,
+  stream: videoStreamFields(video),
 });
 
 /** Resolve one source ref against the batched lookups, or null when dangling. */
@@ -325,9 +369,9 @@ const toVideoPayload = (
 /** Payload for a just-created item (live by construction). */
 const toAddedItemPayload = (
   record: PlaylistItemRecord,
-  { coverArt, releaseTitle }: ResolvedSource
+  { coverArt, releaseTitle, stream }: ResolvedSource
 ): PlaylistItemPayload => ({
-  ...NO_STREAM_FIELDS,
+  ...stream,
   id: record.id,
   itemType: record.itemType,
   sortOrder: record.sortOrder,
@@ -573,9 +617,12 @@ export class PlaylistService {
   ): Promise<PlaylistItemPayload[]> {
     const maps = await PlaylistService.loadSourceMaps(items);
     return items.map((item) =>
-      item.itemType === 'track'
-        ? toTrackPayload(item, item.trackFileId ? maps.tracks.get(item.trackFileId) : undefined)
-        : toVideoPayload(item, item.videoId ? maps.videos.get(item.videoId) : undefined)
+      attachPlaylistItemStreamUrls(
+        item.itemType === 'track'
+          ? toTrackPayload(item, item.trackFileId ? maps.tracks.get(item.trackFileId) : undefined)
+          : toVideoPayload(item, item.videoId ? maps.videos.get(item.videoId) : undefined),
+        maps
+      )
     );
   }
 
