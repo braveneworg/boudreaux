@@ -9,11 +9,9 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAddPlaylistItemMutation } from '@/hooks/use-playlist-mutations';
+import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
-
-/** Exact error signal `addPlaylistItemAction` returns for an already-present source. */
-const DUPLICATE_ITEM_ERROR = 'DUPLICATE_ITEM';
 
 /** The row item + picked playlist an in-flight or duplicate-confirmed add targets. */
 interface AddTarget {

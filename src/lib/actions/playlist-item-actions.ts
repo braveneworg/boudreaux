@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { z } from 'zod';
 
+import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import { PlaylistService, SOURCE_NOT_FOUND_MESSAGE } from '@/lib/services/playlist-service';
 import { DataError } from '@/lib/types/domain/errors';
 import type {
@@ -31,8 +32,6 @@ import {
   unauthorizedFailure,
 } from './playlist-action-helpers';
 
-/** Signal the client switches on to open the duplicate-confirm dialog. */
-const DUPLICATE_ITEM_ERROR = 'DUPLICATE_ITEM';
 /** Signal for the 200-item cap (service `LIMIT_EXCEEDED`). */
 const PLAYLIST_FULL_ERROR = 'PLAYLIST_FULL';
 /** Signal for an add whose source track/video no longer resolves. */
