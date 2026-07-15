@@ -20,8 +20,6 @@ interface PlaylistListProps {
   onEdit: (id: string) => void;
   /** Fired with the row's playlist id from the play button. */
   onPlay: (id: string) => void;
-  /** Fired with the row's playlist id from the share button. */
-  onShare: (id: string) => void;
   /** Extra classes composed onto the pane's root element. */
   className?: string;
 }
@@ -55,12 +53,7 @@ const PlaylistListSkeleton = ({ className }: { className?: string }): ReactEleme
  * error line when the query settles without data, and the empty-state copy
  * when the user has no playlists yet.
  */
-export const PlaylistList = ({
-  onEdit,
-  onPlay,
-  onShare,
-  className,
-}: PlaylistListProps): ReactElement => {
+export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): ReactElement => {
   const { isPending, data } = usePlaylistsQuery();
   const { deletePlaylist } = useDeletePlaylistMutation();
 
@@ -95,7 +88,6 @@ export const PlaylistList = ({
           row={row}
           onEdit={() => onEdit(row.id)}
           onPlay={() => onPlay(row.id)}
-          onShare={() => onShare(row.id)}
           onDelete={() => handleDelete(row.id)}
         />
       ))}

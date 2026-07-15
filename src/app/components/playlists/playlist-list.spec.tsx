@@ -37,16 +37,14 @@ interface RowStubProps {
   row: PlaylistListRow;
   onEdit: () => void;
   onPlay: () => void;
-  onShare: () => void;
   onDelete: () => void;
 }
 
 vi.mock('./playlist-row', () => ({
-  PlaylistRow: ({ row, onEdit, onPlay, onShare, onDelete }: RowStubProps) => (
+  PlaylistRow: ({ row, onEdit, onPlay, onDelete }: RowStubProps) => (
     <li data-testid="playlist-row">
       <span>{row.title}</span>
       <button type="button" onClick={onPlay}>{`stub-play-${row.id}`}</button>
-      <button type="button" onClick={onShare}>{`stub-share-${row.id}`}</button>
       <button type="button" onClick={onEdit}>{`stub-edit-${row.id}`}</button>
       <button type="button" onClick={onDelete}>{`stub-delete-${row.id}`}</button>
     </li>
@@ -90,7 +88,6 @@ const renderList = (overrides: Partial<ListProps> = {}) => {
   const props: ListProps = {
     onEdit: vi.fn(),
     onPlay: vi.fn(),
-    onShare: vi.fn(),
     ...overrides,
   };
   return { ...render(<PlaylistList {...props} />), props };
@@ -162,16 +159,6 @@ describe('PlaylistList', () => {
       await user.click(screen.getByRole('button', { name: 'stub-play-pl-2' }));
 
       expect(props.onPlay).toHaveBeenCalledWith('pl-2');
-    });
-
-    it('calls onShare with the clicked row id', async () => {
-      const user = userEvent.setup();
-      mockRows([ROAD_TRIP, CHILL_MIX]);
-      const { props } = renderList();
-
-      await user.click(screen.getByRole('button', { name: 'stub-share-pl-1' }));
-
-      expect(props.onShare).toHaveBeenCalledWith('pl-1');
     });
 
     it('calls onEdit with the clicked row id', async () => {

@@ -8,8 +8,6 @@ import { useRef, useState, type ReactElement } from 'react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { toast } from 'sonner';
-
 import { MyPlaylistSearch } from './my-playlist-search';
 import { PlaylistCreator, type PlaylistCreatorHandle } from './playlist-creator';
 import { PlaylistList } from './playlist-list';
@@ -25,8 +23,8 @@ const BELOW_LG_QUERY = '(max-width: 1023px)';
  * creator/&lt;playlist&gt; view swap (the creator stays mounted in a hidden
  * wrapper so drafts survive). A `?edit=` deep link loads that playlist into
  * the creator and is cleared from the URL once handled; play opens the shared
- * `PlaylistPlayerDialog`, while share remains a toast stub until sharing
- * lands later in PR2.
+ * `PlaylistPlayerDialog`, while sharing is owned entirely by the row
+ * actions' `PlaylistSharePopover`.
  */
 export const PlaylistsContent = (): ReactElement => {
   const router = useRouter();
@@ -53,10 +51,6 @@ export const PlaylistsContent = (): ReactElement => {
 
   const handlePlayerOpenChange = (nextOpen: boolean): void => {
     if (!nextOpen) setPlayerPlaylistId(null);
-  };
-
-  const handleShare = (): void => {
-    toast.info('Sharing arrives in the next update');
   };
 
   const handleBackToCreator = (): void => setViewPlaylistId(null);
@@ -86,7 +80,6 @@ export const PlaylistsContent = (): ReactElement => {
           className="mt-8 lg:mt-0 lg:max-h-[75vh] lg:overflow-y-auto"
           onEdit={handleEdit}
           onPlay={handlePlay}
-          onShare={handleShare}
         />
       </div>
       <PlaylistPlayerDialog

@@ -19,8 +19,6 @@ interface PlaylistRowProps {
   onEdit: () => void;
   /** Fired by the actions cluster's play button. */
   onPlay: () => void;
-  /** Fired by the actions cluster's share button. */
-  onShare: () => void;
   /** Fired after the actions cluster's delete confirm. */
   onDelete: () => void;
 }
@@ -35,13 +33,7 @@ const metaLine = ({ itemCount, isPublic }: PlaylistListRow): string =>
  * per-row action cluster. Pure presentation — the list owns the delete
  * mutation and passes per-row callbacks.
  */
-export const PlaylistRow = ({
-  row,
-  onEdit,
-  onPlay,
-  onShare,
-  onDelete,
-}: PlaylistRowProps): ReactElement => (
+export const PlaylistRow = ({ row, onEdit, onPlay, onDelete }: PlaylistRowProps): ReactElement => (
   <li className="flex items-center gap-3 border-b py-2">
     {/* Decorative: the adjacent title text names the row. */}
     <PlaylistCoverTiles images={row.coverImages} alt="" size="sm" />
@@ -52,12 +44,6 @@ export const PlaylistRow = ({
     <span className="shrink-0 text-xs text-zinc-500 tabular-nums">
       {formatDurationLong(row.totalDuration)}
     </span>
-    <PlaylistRowActions
-      row={row}
-      onEdit={onEdit}
-      onPlay={onPlay}
-      onShare={onShare}
-      onDelete={onDelete}
-    />
+    <PlaylistRowActions row={row} onEdit={onEdit} onPlay={onPlay} onDelete={onDelete} />
   </li>
 );

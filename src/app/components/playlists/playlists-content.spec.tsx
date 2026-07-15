@@ -45,21 +45,17 @@ vi.mock('./playlist-creator', () => ({
 interface ListStubProps {
   onEdit: (id: string) => void;
   onPlay: (id: string) => void;
-  onShare: (id: string) => void;
   className?: string;
 }
 
 vi.mock('./playlist-list', () => ({
-  PlaylistList: ({ onEdit, onPlay, onShare, className }: ListStubProps) => (
+  PlaylistList: ({ onEdit, onPlay, className }: ListStubProps) => (
     <div data-testid="playlist-list" className={className}>
       <button type="button" onClick={() => onEdit('pl-1')}>
         stub-list-edit
       </button>
       <button type="button" onClick={() => onPlay('pl-1')}>
         stub-list-play
-      </button>
-      <button type="button" onClick={() => onShare('pl-1')}>
-        stub-list-share
       </button>
     </div>
   ),
@@ -291,17 +287,6 @@ describe('PlaylistsContent', () => {
       await user.click(screen.getByRole('button', { name: 'stub-list-edit' }));
 
       expect(vi.mocked(Element.prototype.scrollIntoView)).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('stubbed actions', () => {
-    it('toasts the sharing stub copy from a list row share', async () => {
-      const user = userEvent.setup();
-      render(<PlaylistsContent />);
-
-      await user.click(screen.getByRole('button', { name: 'stub-list-share' }));
-
-      expect(toastInfoMock).toHaveBeenCalledExactlyOnceWith('Sharing arrives in the next update');
     });
   });
 
