@@ -63,8 +63,10 @@ export interface ZinePanelProps extends React.ComponentProps<'section'> {
  * Full-content-width zine paper panel. The accent keys the page's
  * heading-strip color (sets `--card-accent` / `--card-accent-soft` on the
  * section itself so `shadow-zine` resolves there and cascades to all
- * descendants). `overflow-visible` is load-bearing for the tape — do not
- * wrap in Card, whose `overflow-hidden` clips it.
+ * descendants). Black border on top/left edges; accent offset shadow
+ * (`shadow-zine`) provides the right/bottom edge. `overflow-visible` is
+ * load-bearing for the tape — do not wrap in Card, whose `overflow-hidden`
+ * clips it.
  */
 export const ZinePanel = ({
   accent,
@@ -79,7 +81,7 @@ export const ZinePanel = ({
   <section
     data-slot="zine-panel"
     className={cn(
-      'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-2 border-black',
+      'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-t-2 border-l-2 border-black',
       ACCENT_CLASS.get(accent),
       className
     )}
