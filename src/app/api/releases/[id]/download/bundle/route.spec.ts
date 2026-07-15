@@ -317,6 +317,18 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
   });
 
+  afterEach(async () => {
+    // The archiver mock drives the ZIP pipeline through queueMicrotask chains
+    // (append → emit 'entry' → next append). A test that starts a streaming
+    // archive but returns before it settles would otherwise leak those append
+    // calls into the following test — after clearMocks — inflating its
+    // mockAppend count and making the suite order-dependent. Drain the pending
+    // microtask/immediate queue so each test's pipeline finishes inside its own
+    // boundary.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+
   it('should return 401 when user is not authenticated', async () => {
     mockGetSession.mockResolvedValue(null);
 
