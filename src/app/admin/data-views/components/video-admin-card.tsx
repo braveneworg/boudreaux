@@ -57,21 +57,40 @@ const buildVideoMetadata = (video: VideoRow): MetadataRow[] => {
   ];
 };
 
-/** Publish/draft and archived status badges for a video. */
+type PublishState = 'draft' | 'scheduled' | 'published';
+
+/** Derive the publish state from a video's publish date relative to now. */
+const derivePublishState = (publishedAt: Date | null): PublishState => {
+  if (publishedAt === null) return 'draft';
+  return publishedAt.getTime() > Date.now() ? 'scheduled' : 'published';
+};
+
+const PUBLISH_BADGE = new Map<PublishState, { label: string; variant: 'default' | 'secondary' }>([
+  ['draft', { label: 'Draft', variant: 'secondary' }],
+  ['scheduled', { label: 'Scheduled', variant: 'secondary' }],
+  ['published', { label: 'Published', variant: 'default' }],
+]);
+
+/** Publish/draft/scheduled and archived status badges for a video. */
 const VideoStatusBadges = ({
-  isPublished,
+  publishState,
   isArchived,
 }: {
-  isPublished: boolean;
+  publishState: PublishState;
   isArchived: boolean;
-}): ReactElement => (
-  <div className="flex flex-wrap gap-2">
-    <Badge variant={isPublished ? 'default' : 'secondary'}>
-      {isPublished ? 'Published' : 'Draft'}
-    </Badge>
-    {isArchived ? <Badge variant="outline">Archived</Badge> : null}
-  </div>
-);
+}): ReactElement => {
+  // Map.get is always defined for valid PublishState values; non-null assertion avoided via nullish coalescing
+  const { label, variant } = PUBLISH_BADGE.get(publishState) ?? {
+    label: 'Draft',
+    variant: 'secondary' as const,
+  };
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Badge variant={variant}>{label}</Badge>
+      {isArchived ? <Badge variant="outline">Archived</Badge> : null}
+    </div>
+  );
+};
 
 /**
  * Admin listing card for a single video: an inline lazy player, status badges,
@@ -88,6 +107,7 @@ export const VideoAdminCard = ({
 }: VideoAdminCardProps): ReactElement => {
   const isPublished = video.publishedAt !== null;
   const isArchived = video.archivedAt !== null;
+  const publishState = derivePublishState(video.publishedAt);
   const metadata = buildVideoMetadata(video);
 
   const confirmPublish = (): void => (isPublished ? onUnpublish : onPublish)(video.id);
@@ -105,7 +125,7 @@ export const VideoAdminCard = ({
 
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="font-fake-four-cutout text-lg break-words">{video.title}</h3>
-          <VideoStatusBadges isPublished={isPublished} isArchived={isArchived} />
+          <VideoStatusBadges publishState={publishState} isArchived={isArchived} />
         </div>
 
         <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
