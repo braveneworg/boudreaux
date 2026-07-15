@@ -6,11 +6,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
+import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
 import { PlaylistList } from './playlist-list';
 
 const usePlaylistsQueryMock = vi.hoisted(() => vi.fn());
+const loadMoreMock = vi.hoisted(() => vi.fn());
 
 interface DeleteMutateOptions {
   onSuccess?: () => void;
@@ -20,13 +21,19 @@ interface DeleteMutateOptions {
 const deletePlaylistMock = vi.hoisted(() =>
   vi.fn<(input: { playlistId: string }, options?: DeleteMutateOptions) => void>()
 );
+const isDeletingPlaylistMock = vi.hoisted(() => ({ value: false }));
 
 vi.mock('@/hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 
 vi.mock('@/hooks/use-playlist-mutations', () => ({
-  useDeletePlaylistMutation: () => ({ deletePlaylist: deletePlaylistMock }),
+  useDeletePlaylistMutation: () => ({
+    deletePlaylist: deletePlaylistMock,
+    get isDeletingPlaylist() {
+      return isDeletingPlaylistMock.value;
+    },
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -37,16 +44,14 @@ interface RowStubProps {
   row: PlaylistListRow;
   onEdit: () => void;
   onPlay: () => void;
-  onShare: () => void;
   onDelete: () => void;
 }
 
 vi.mock('./playlist-row', () => ({
-  PlaylistRow: ({ row, onEdit, onPlay, onShare, onDelete }: RowStubProps) => (
+  PlaylistRow: ({ row, onEdit, onPlay, onDelete }: RowStubProps) => (
     <li data-testid="playlist-row">
       <span>{row.title}</span>
       <button type="button" onClick={onPlay}>{`stub-play-${row.id}`}</button>
-      <button type="button" onClick={onShare}>{`stub-share-${row.id}`}</button>
       <button type="button" onClick={onEdit}>{`stub-edit-${row.id}`}</button>
       <button type="button" onClick={onDelete}>{`stub-delete-${row.id}`}</button>
     </li>
@@ -68,21 +73,27 @@ const CHILL_MIX = makeRow('pl-2', 'Chill Mix');
 
 const mockQueryState = ({
   isPending = false,
-  data,
+  rows,
+  nextSkip = null,
+  isLoadingMore = false,
 }: {
   isPending?: boolean;
-  data?: PlaylistsResponse;
+  rows?: PlaylistListRow[];
+  nextSkip?: number | null;
+  isLoadingMore?: boolean;
 }): void => {
   usePlaylistsQueryMock.mockReturnValue({
     isPending,
     error: new Error('Unknown error'),
-    data,
+    rows,
+    nextSkip,
+    loadMore: loadMoreMock,
+    isLoadingMore,
     refetch: vi.fn(),
   });
 };
 
-const mockRows = (rows: PlaylistListRow[]): void =>
-  mockQueryState({ data: { rows, nextSkip: null } });
+const mockRows = (rows: PlaylistListRow[]): void => mockQueryState({ rows });
 
 type ListProps = Parameters<typeof PlaylistList>[0];
 
@@ -90,7 +101,6 @@ const renderList = (overrides: Partial<ListProps> = {}) => {
   const props: ListProps = {
     onEdit: vi.fn(),
     onPlay: vi.fn(),
-    onShare: vi.fn(),
     ...overrides,
   };
   return { ...render(<PlaylistList {...props} />), props };
@@ -102,6 +112,10 @@ const toastErrorMock = vi.mocked(toast.error);
 const lastDeleteOptions = (): DeleteMutateOptions | undefined =>
   deletePlaylistMock.mock.calls.at(0)?.[1];
 
+beforeEach(() => {
+  isDeletingPlaylistMock.value = false;
+});
+
 describe('PlaylistList', () => {
   describe('loading state', () => {
     it('renders three skeleton rows while the query is pending', () => {
@@ -110,10 +124,24 @@ describe('PlaylistList', () => {
 
       expect(screen.getAllByTestId('playlist-row-skeleton')).toHaveLength(3);
     });
+
+    it('marks the skeleton wrapper busy for assistive tech', () => {
+      mockQueryState({ isPending: true });
+      const { container } = renderList();
+
+      expect(container.firstChild).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('announces the loading status to assistive tech', () => {
+      mockQueryState({ isPending: true });
+      renderList();
+
+      expect(screen.getByRole('status')).toHaveTextContent('Loading playlists…');
+    });
   });
 
   describe('error state', () => {
-    it('renders a muted error line when the query settles without data', () => {
+    it('renders a muted error line when the query settles without rows', () => {
       mockQueryState({});
       renderList();
 
@@ -147,11 +175,11 @@ describe('PlaylistList', () => {
       expect(screen.getByRole('list')).toBeInTheDocument();
     });
 
-    it('composes className onto the list element', () => {
+    it('composes className onto the pane root', () => {
       mockRows([ROAD_TRIP]);
       renderList({ className: 'custom-list' });
 
-      expect(screen.getByRole('list')).toHaveClass('custom-list');
+      expect(screen.getByRole('list').parentElement).toHaveClass('custom-list');
     });
 
     it('calls onPlay with the clicked row id', async () => {
@@ -164,16 +192,6 @@ describe('PlaylistList', () => {
       expect(props.onPlay).toHaveBeenCalledWith('pl-2');
     });
 
-    it('calls onShare with the clicked row id', async () => {
-      const user = userEvent.setup();
-      mockRows([ROAD_TRIP, CHILL_MIX]);
-      const { props } = renderList();
-
-      await user.click(screen.getByRole('button', { name: 'stub-share-pl-1' }));
-
-      expect(props.onShare).toHaveBeenCalledWith('pl-1');
-    });
-
     it('calls onEdit with the clicked row id', async () => {
       const user = userEvent.setup();
       mockRows([ROAD_TRIP, CHILL_MIX]);
@@ -182,6 +200,32 @@ describe('PlaylistList', () => {
       await user.click(screen.getByRole('button', { name: 'stub-edit-pl-2' }));
 
       expect(props.onEdit).toHaveBeenCalledWith('pl-2');
+    });
+  });
+
+  describe('load more', () => {
+    it('shows Load more when nextSkip is set and forwards the click', async () => {
+      const user = userEvent.setup();
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: 24 });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+      expect(loadMoreMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides Load more on the final page', () => {
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: null });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    });
+
+    it('disables Load more while the next page is in flight', () => {
+      mockQueryState({ rows: [ROAD_TRIP], nextSkip: 24, isLoadingMore: true });
+      render(<PlaylistList onEdit={vi.fn()} onPlay={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
     });
   });
 
@@ -222,6 +266,17 @@ describe('PlaylistList', () => {
       lastDeleteOptions()?.onError?.(new Error('Delete failed'));
 
       expect(toastErrorMock).toHaveBeenCalledWith('Delete failed');
+    });
+
+    it('ignores a second delete click while a delete is already in flight', async () => {
+      const user = userEvent.setup();
+      isDeletingPlaylistMock.value = true;
+      mockRows([ROAD_TRIP]);
+      renderList();
+
+      await user.click(screen.getByRole('button', { name: 'stub-delete-pl-1' }));
+
+      expect(deletePlaylistMock).not.toHaveBeenCalled();
     });
   });
 });

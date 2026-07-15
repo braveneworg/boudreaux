@@ -177,6 +177,23 @@ describe('SocialShareWidget', () => {
     });
   });
 
+  describe('neutral url prop', () => {
+    it('prefers the neutral url prop over artistUrl', () => {
+      render(<SocialShareWidget url="https://example.com/playlists/pl-1" artistUrl={TEST_URL} />);
+
+      expect(screen.getByLabelText('Share via SMS')).toHaveAttribute(
+        'href',
+        expect.stringContaining(encodeURIComponent('https://example.com/playlists/pl-1'))
+      );
+    });
+
+    it('degrades to an empty share url when neither prop is passed', () => {
+      render(<SocialShareWidget />);
+
+      expect(screen.getByLabelText('Share via SMS')).toBeInTheDocument();
+    });
+  });
+
   describe('SMS link', () => {
     it('has the correct href with encoded body containing the share title and url', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);

@@ -108,6 +108,9 @@ const ADDED_ITEM: PlaylistItemPayload = {
   releaseTitle: null,
   videoId: null,
   coverArt: null,
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
 };
 
 const SUCCESS_RESULT: PlaylistActionResult<{ item: PlaylistItemPayload }> = {
@@ -135,7 +138,10 @@ beforeEach(() => {
   playlistsQueryMock.mockReturnValue({
     isPending: false,
     error: new Error('Unknown error'),
-    data: { rows: [ROAD_TRIP], nextSkip: null },
+    rows: [ROAD_TRIP],
+    nextSkip: null,
+    loadMore: vi.fn(),
+    isLoadingMore: false,
     refetch: vi.fn(),
   });
   addPlaylistItemAsyncMock.mockResolvedValue(SUCCESS_RESULT);

@@ -37,6 +37,10 @@ const fetchPlaylist = async (
  * React Query hook for a single playlist's detail (title, covers, and
  * resolved items).
  *
+ * Items include per-request stream fields (`s3Key`/`streamUrl`/`posterUrl`):
+ * tracks carry an unsigned CDN URL, videos a CloudFront-signed URL (24h) with
+ * the raw key withheld.
+ *
  * Wraps {@link fetchPlaylist} with the stable `playlists.detail(id)` key and
  * exposes the request state. The query is disabled while `playlistId` is
  * `null` (e.g. no playlist selected yet). Cancellation is handled

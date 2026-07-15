@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock TanStack Query SSR utilities — execute the queryFn so coverage sees it.
-const mockPrefetchQuery = vi
+const mockPrefetchInfiniteQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
@@ -41,7 +41,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
-    prefetchQuery: mockPrefetchQuery,
+    prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
   }),
 }));
 
@@ -134,16 +134,17 @@ describe('PlaylistsPage', () => {
     mockAuth.mockResolvedValue(null);
 
     await expect(PlaylistsPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
-    expect(mockPrefetchQuery).not.toHaveBeenCalled();
+    expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
   });
 
   it('should prefetch the My Playlists list under the mine key', async () => {
     const Page = await PlaylistsPage();
     render(Page);
 
-    expect(mockPrefetchQuery).toHaveBeenCalledExactlyOnceWith(
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         queryKey: ['playlists', 'mine'],
+        initialPageParam: 0,
       })
     );
   });
@@ -159,7 +160,7 @@ describe('PlaylistsPage', () => {
 
     await PlaylistsPage();
 
-    const [opts] = mockPrefetchQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual(RESPONSE);
   });
 
@@ -168,7 +169,7 @@ describe('PlaylistsPage', () => {
 
     await PlaylistsPage();
 
-    const [opts] = mockPrefetchQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
   });
 

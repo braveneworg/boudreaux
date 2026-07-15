@@ -5,7 +5,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
+import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
 import { MyPlaylistSearch } from './my-playlist-search';
 
@@ -30,21 +30,23 @@ const CHILL_MIX = makeRow('pl-2', 'Chill Mix');
 
 const mockQueryState = ({
   isPending = false,
-  data,
+  rows,
 }: {
   isPending?: boolean;
-  data?: PlaylistsResponse;
+  rows?: PlaylistListRow[];
 }): void => {
   usePlaylistsQueryMock.mockReturnValue({
     isPending,
     error: new Error('Unknown error'),
-    data,
+    rows,
+    nextSkip: null,
+    loadMore: vi.fn(),
+    isLoadingMore: false,
     refetch: vi.fn(),
   });
 };
 
-const mockRows = (rows: PlaylistListRow[]): void =>
-  mockQueryState({ data: { rows, nextSkip: null } });
+const mockRows = (rows: PlaylistListRow[]): void => mockQueryState({ rows });
 
 type SearchProps = Parameters<typeof MyPlaylistSearch>[0];
 
@@ -103,6 +105,18 @@ describe('MyPlaylistSearch', () => {
 
       expect(screen.getByRole('option', { name: 'Road Trip' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Chill Mix' })).toBeInTheDocument();
+    });
+
+    it('lists rows carried over from a second loaded page', async () => {
+      const user = userEvent.setup();
+      const secondPageRow = makeRow('pl-3', 'Deep Cuts');
+      // rows here are already flattened across both loaded pages by the hook.
+      mockRows([ROAD_TRIP, CHILL_MIX, secondPageRow]);
+      renderSearch();
+
+      await user.click(findTrigger());
+
+      expect(screen.getByRole('option', { name: 'Deep Cuts' })).toBeInTheDocument();
     });
 
     it('shows "No playlists yet." when the user has no playlists', async () => {

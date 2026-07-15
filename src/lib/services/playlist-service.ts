@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { getFileExtensionForFormat } from '@/lib/constants/digital-formats';
+import type { FreeFormatType } from '@/lib/constants/digital-formats';
 import {
   MAX_PLAYLIST_ITEMS,
   PLAYLIST_SEARCH_GROUP_LIMIT,
@@ -10,7 +12,10 @@ import {
 } from '@/lib/constants/playlists';
 import { PlaylistRepository } from '@/lib/repositories/playlist-repository';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
-import type { TrackFileWithRelease } from '@/lib/repositories/release-digital-format-file-repository';
+import type {
+  PlaylistDownloadFile,
+  TrackFileWithRelease,
+} from '@/lib/repositories/release-digital-format-file-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import type { VideoSummary } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
@@ -34,6 +39,8 @@ import type {
 import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { signStreamUrl } from '@/lib/utils/sign-stream-url';
+import { safeArchiveEntryName } from '@/lib/utils/zip-stream';
 import type { UpdatePlaylistInput } from '@/lib/validation/playlist-schema';
 
 // =============================================================================
@@ -70,6 +77,7 @@ interface ResolvedSource {
   data: AddPlaylistItemData;
   coverArt: string | null;
   releaseTitle: string | null;
+  stream: PlaylistItemStreamFields;
 }
 
 /** Batched live-row lookups keyed by source id (one query per source kind). */
@@ -121,9 +129,80 @@ const ARTIST_EXPANSION_LIMIT = 3;
 /** The only format surfaced as playlist tracks (streamable, CDN-cached). */
 const MP3_FORMAT_TYPE = 'MP3_320KBPS';
 
+/** The stream/poster subset of {@link PlaylistItemPayload} (PR2). */
+type PlaylistItemStreamFields = Pick<PlaylistItemPayload, 's3Key' | 'streamUrl' | 'posterUrl'>;
+
+/** One zip entry of a playlist download: name is pre-sanitized, NN = dense 2-digit position among included tracks. */
+export interface PlaylistDownloadTrack {
+  entryName: string;
+  s3Key: string;
+  releaseId: string;
+}
+
+/** Everything the download route needs: entries in playlist order + skip/quota accounting. */
+export interface PlaylistDownloadManifest {
+  playlistTitle: string;
+  tracks: PlaylistDownloadTrack[];
+  skippedCount: number;
+  distinctReleaseIds: string[];
+}
+
+/** Batched lookups for download resolution, keyed by file id / (releaseId:trackNumber). */
+interface DownloadResolutionMaps {
+  sourceById: Map<string, TrackFileWithRelease>;
+  targetByReleaseTrack: Map<string, PlaylistDownloadFile>;
+}
+
+/** Live stream/poster fields for unavailable items — {@link attachPlaylistItemStreamUrls} overrides them when the source row resolved. */
+const NO_STREAM_FIELDS: PlaylistItemStreamFields = {
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
+};
+
 // =============================================================================
 // Pure helpers
 // =============================================================================
+
+/** Track stream fields: the MP3_320 CDN behavior is public, so the raw key + unsigned URL are safe. */
+const trackStreamFields = (s3Key: string): PlaylistItemStreamFields => ({
+  s3Key,
+  streamUrl: buildCdnUrl(s3Key),
+  posterUrl: null,
+});
+
+/**
+ * Video stream fields: NEVER expose the raw video key — access is via the
+ * CloudFront signed URL only (24h default TTL; null when signing is
+ * unconfigured, e.g. dev/E2E).
+ */
+const videoStreamFields = ({
+  s3Key,
+  posterUrl,
+}: Pick<VideoSummary, 's3Key' | 'posterUrl'>): PlaylistItemStreamFields => ({
+  s3Key: null,
+  streamUrl: signStreamUrl(s3Key),
+  posterUrl,
+});
+
+/**
+ * Attach the live stream/poster fields to a resolved item payload (spec:
+ * "attachPlaylistItemStreamUrls"). Keyed off the SAME source maps used for
+ * item resolution, so fields attach whenever the source row resolved —
+ * including grandfathered unpublished releases — and stay null for dangling
+ * items.
+ */
+const attachPlaylistItemStreamUrls = (
+  payload: PlaylistItemPayload,
+  { tracks, videos }: SourceMaps
+): PlaylistItemPayload => {
+  if (payload.itemType === 'track') {
+    const file = payload.trackFileId ? tracks.get(payload.trackFileId) : undefined;
+    return { ...payload, ...(file ? trackStreamFields(file.s3Key) : NO_STREAM_FIELDS) };
+  }
+  const video = payload.videoId ? videos.get(payload.videoId) : undefined;
+  return { ...payload, ...(video ? videoStreamFields(video) : NO_STREAM_FIELDS) };
+};
 
 /** Playlist display-name rule: `displayName`, else `firstName surname`. */
 const deriveArtistName = ({ displayName, firstName, surname }: ArtistNameParts): string =>
@@ -133,6 +212,44 @@ const deriveArtistName = ({ displayName, firstName, surname }: ArtistNameParts):
 const firstArtistName = (artistReleases: Array<{ artist: ArtistNameParts }>): string | null => {
   const [first] = artistReleases;
   return first ? deriveArtistName(first.artist) : null;
+};
+
+/** `NN - Artist - Title.ext`, sanitized as a whole via safeArchiveEntryName. */
+const buildEntryName = (
+  position: number,
+  artistName: string,
+  title: string,
+  format: FreeFormatType
+): string =>
+  safeArchiveEntryName(
+    `${String(position).padStart(2, '0')} - ${artistName} - ${title}.${getFileExtensionForFormat(format)}`
+  );
+
+/**
+ * Resolve one playlist item to a downloadable requested-format entry, or null
+ * when it must be skipped (video, dangling source, unpublished release, or
+ * the release lacks the requested format). `position` is the 1-based DENSE
+ * position among the tracks already included (Assembly ratification 2) —
+ * the caller advances it only on inclusion, so skips leave no numbering gaps.
+ */
+const resolveDownloadTrack = (
+  item: PlaylistItemRecord,
+  position: number,
+  format: FreeFormatType,
+  { sourceById, targetByReleaseTrack }: DownloadResolutionMaps
+): PlaylistDownloadTrack | null => {
+  if (item.itemType !== 'track' || !item.trackFileId) return null;
+  const source = sourceById.get(item.trackFileId);
+  if (!source || !source.format.release.publishedAt) return null;
+  const target = targetByReleaseTrack.get(`${source.format.releaseId}:${source.trackNumber}`);
+  if (!target) return null;
+  const title = source.title ?? item.title;
+  const artistName = firstArtistName(source.format.release.artistReleases) ?? item.artistName;
+  return {
+    entryName: buildEntryName(position, artistName, title, format),
+    s3Key: target.s3Key,
+    releaseId: source.format.releaseId,
+  };
 };
 
 const parseUrl = (value: string): URL | null => {
@@ -217,6 +334,7 @@ const toTrackResolved = (file: TrackFileWithRelease): ResolvedSource | null => {
     },
     coverArt: release.coverArt,
     releaseTitle: release.title,
+    stream: trackStreamFields(file.s3Key),
   };
 };
 
@@ -233,6 +351,7 @@ const toVideoResolved = (video: VideoSummary): ResolvedSource => ({
   },
   coverArt: video.posterUrl,
   releaseTitle: null,
+  stream: videoStreamFields(video),
 });
 
 /** Resolve one source ref against the batched lookups, or null when dangling. */
@@ -250,6 +369,7 @@ const resolveRefFromMaps = (
 
 /** Unavailable item: keep the stored snapshot, null out live-only fields. */
 const toUnavailablePayload = (item: PlaylistItemRecord): PlaylistItemPayload => ({
+  ...NO_STREAM_FIELDS,
   id: item.id,
   itemType: item.itemType,
   sortOrder: item.sortOrder,
@@ -272,6 +392,7 @@ const toTrackPayload = (
   if (!file) return toUnavailablePayload(item);
   const { release } = file.format;
   return {
+    ...NO_STREAM_FIELDS,
     id: item.id,
     itemType: item.itemType,
     sortOrder: item.sortOrder,
@@ -294,6 +415,7 @@ const toVideoPayload = (
 ): PlaylistItemPayload => {
   if (!video) return toUnavailablePayload(item);
   return {
+    ...NO_STREAM_FIELDS,
     id: item.id,
     itemType: item.itemType,
     sortOrder: item.sortOrder,
@@ -312,8 +434,9 @@ const toVideoPayload = (
 /** Payload for a just-created item (live by construction). */
 const toAddedItemPayload = (
   record: PlaylistItemRecord,
-  { coverArt, releaseTitle }: ResolvedSource
+  { coverArt, releaseTitle, stream }: ResolvedSource
 ): PlaylistItemPayload => ({
+  ...stream,
   id: record.id,
   itemType: record.itemType,
   sortOrder: record.sortOrder,
@@ -559,9 +682,12 @@ export class PlaylistService {
   ): Promise<PlaylistItemPayload[]> {
     const maps = await PlaylistService.loadSourceMaps(items);
     return items.map((item) =>
-      item.itemType === 'track'
-        ? toTrackPayload(item, item.trackFileId ? maps.tracks.get(item.trackFileId) : undefined)
-        : toVideoPayload(item, item.videoId ? maps.videos.get(item.videoId) : undefined)
+      attachPlaylistItemStreamUrls(
+        item.itemType === 'track'
+          ? toTrackPayload(item, item.trackFileId ? maps.tracks.get(item.trackFileId) : undefined)
+          : toVideoPayload(item, item.videoId ? maps.videos.get(item.videoId) : undefined),
+        maps
+      )
     );
   }
 
@@ -589,6 +715,65 @@ export class PlaylistService {
       itemCount: playlist.itemCount,
       totalDuration: playlist.totalDuration,
       items,
+    };
+  }
+
+  /**
+   * Build the zip manifest for GET /api/playlists/[id]/download: owner-or-
+   * public visibility (null otherwise — indistinguishable from missing),
+   * requested-format resolution per track via (releaseId, trackNumber), videos
+   * and unresolvable items skipped and counted. Downloads intentionally require
+   * a PUBLISHED release (stricter than playback's grandfathering).
+   */
+  static async getDownloadManifest(
+    playlistId: string,
+    userId: string,
+    format: FreeFormatType
+  ): Promise<PlaylistDownloadManifest | null> {
+    const playlist = await PlaylistRepository.findByIdWithItems(playlistId);
+    if (!playlist) return null;
+    if (!playlist.isPublic && playlist.ownerId !== userId) return null;
+
+    const trackFileIds = playlist.items.flatMap(({ itemType, trackFileId }) =>
+      itemType === 'track' && trackFileId ? [trackFileId] : []
+    );
+    const sourceFiles =
+      trackFileIds.length > 0
+        ? await PlaylistService.trackFileRepository.findManyByIdsWithRelease(trackFileIds)
+        : [];
+    const sourceById = new Map(
+      sourceFiles.map((file): [string, TrackFileWithRelease] => [file.id, file])
+    );
+    const sourceReleaseIds = [...new Set(sourceFiles.map(({ format: f }) => f.releaseId))];
+    const targets =
+      sourceReleaseIds.length > 0
+        ? await PlaylistService.trackFileRepository.findManyByReleaseIdsAndFormatType(
+            sourceReleaseIds,
+            format
+          )
+        : [];
+    const targetByReleaseTrack = new Map(
+      targets.map((file): [string, PlaylistDownloadFile] => [
+        `${file.format.releaseId}:${file.trackNumber}`,
+        file,
+      ])
+    );
+
+    // Dense NN numbering (Assembly ratification 2): the position counter is the
+    // count of tracks included SO FAR (+1), not the playlist index — videos and
+    // skipped tracks leave no gaps, and the first included track is always 01.
+    const tracks = playlist.items.reduce<PlaylistDownloadTrack[]>((included, item) => {
+      const track = resolveDownloadTrack(item, included.length + 1, format, {
+        sourceById,
+        targetByReleaseTrack,
+      });
+      return track ? [...included, track] : included;
+    }, []);
+    return {
+      playlistTitle: playlist.title,
+      tracks,
+      skippedCount: playlist.items.length - tracks.length,
+      distinctReleaseIds: [...new Set(tracks.map(({ releaseId }) => releaseId))],
     };
   }
 

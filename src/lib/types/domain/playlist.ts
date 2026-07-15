@@ -127,6 +127,20 @@ export interface PlaylistItemPayload {
   releaseTitle: string | null;
   videoId: string | null;
   coverArt: string | null; // track → release.coverArt; video → posterUrl
+  /**
+   * Raw S3 key of the streamable source. Tracks only — the MP3_320 CDN
+   * behavior is public/unsigned, so exposing the key is safe. ALWAYS null
+   * for videos (video access is via signed URL only) and unavailable items.
+   */
+  s3Key: string | null;
+  /**
+   * Playable URL. Tracks → unsigned `buildCdnUrl(s3Key)`; videos →
+   * CloudFront signed URL (24h). Null for unavailable items or when video
+   * signing is unconfigured (dev/E2E).
+   */
+  streamUrl: string | null;
+  /** Video poster image (videos only); null for tracks and unavailable items. */
+  posterUrl: string | null;
 }
 
 /** Full playlist detail response from GET /api/playlists/[id]. */

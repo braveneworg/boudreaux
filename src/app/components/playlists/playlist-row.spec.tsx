@@ -30,18 +30,14 @@ interface ActionsStubProps {
   row: PlaylistListRow;
   onEdit: () => void;
   onPlay: () => void;
-  onShare: () => void;
   onDelete: () => void;
 }
 
 vi.mock('./playlist-row-actions', () => ({
-  PlaylistRowActions: ({ row, onEdit, onPlay, onShare, onDelete }: ActionsStubProps) => (
+  PlaylistRowActions: ({ row, onEdit, onPlay, onDelete }: ActionsStubProps) => (
     <span data-testid="row-actions" data-row-id={row.id}>
       <button type="button" onClick={onPlay}>
         stub-play
-      </button>
-      <button type="button" onClick={onShare}>
-        stub-share
       </button>
       <button type="button" onClick={onEdit}>
         stub-edit
@@ -71,7 +67,6 @@ const renderRow = (overrides: Partial<RowProps> = {}) => {
     row: makeRow(),
     onEdit: vi.fn(),
     onPlay: vi.fn(),
-    onShare: vi.fn(),
     onDelete: vi.fn(),
     ...overrides,
   };
@@ -179,15 +174,6 @@ describe('PlaylistRow', () => {
       await user.click(screen.getByRole('button', { name: 'stub-play' }));
 
       expect(props.onPlay).toHaveBeenCalledTimes(1);
-    });
-
-    it('forwards onShare to the actions cluster', async () => {
-      const user = userEvent.setup();
-      const { props } = renderRow();
-
-      await user.click(screen.getByRole('button', { name: 'stub-share' }));
-
-      expect(props.onShare).toHaveBeenCalledTimes(1);
     });
 
     it('forwards onEdit to the actions cluster', async () => {

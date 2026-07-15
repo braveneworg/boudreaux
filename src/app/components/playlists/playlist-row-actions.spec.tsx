@@ -2,12 +2,30 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+
+import { render, screen, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 
 import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
 import { PlaylistRowActions } from './playlist-row-actions';
+
+vi.mock('./playlist-share-popover', () => ({
+  PlaylistSharePopover: ({
+    children,
+    playlistId,
+    isPublic,
+  }: {
+    children: ReactNode;
+    playlistId: string;
+    isPublic: boolean;
+  }) => (
+    <div data-testid="share-popover" data-playlist-id={playlistId} data-public={String(isPublic)}>
+      {children}
+    </div>
+  ),
+}));
 
 const ROW: PlaylistListRow = {
   id: 'pl-1',
@@ -26,7 +44,6 @@ const renderActions = (overrides: Partial<ActionsProps> = {}) => {
     row: ROW,
     onEdit: vi.fn(),
     onPlay: vi.fn(),
-    onShare: vi.fn(),
     onDelete: vi.fn(),
     ...overrides,
   };
@@ -75,6 +92,15 @@ describe('PlaylistRowActions', () => {
         'Delete playlist',
       ]);
     });
+
+    it('wraps the Share button in the share popover with the row context', () => {
+      renderActions();
+
+      const popover = screen.getByTestId('share-popover');
+      expect(popover).toHaveAttribute('data-playlist-id', 'pl-1');
+      expect(popover).toHaveAttribute('data-public', 'false');
+      expect(within(popover).getByRole('button', { name: 'Share playlist' })).toBeInTheDocument();
+    });
   });
 
   describe('callbacks', () => {
@@ -85,15 +111,6 @@ describe('PlaylistRowActions', () => {
       await user.click(screen.getByRole('button', { name: 'Play playlist' }));
 
       expect(props.onPlay).toHaveBeenCalledTimes(1);
-    });
-
-    it('fires onShare once when the share button is clicked', async () => {
-      const user = userEvent.setup();
-      const { props } = renderActions();
-
-      await user.click(screen.getByRole('button', { name: 'Share playlist' }));
-
-      expect(props.onShare).toHaveBeenCalledTimes(1);
     });
 
     it('fires onEdit once when the edit button is clicked', async () => {

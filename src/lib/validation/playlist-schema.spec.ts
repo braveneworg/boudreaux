@@ -14,6 +14,8 @@ import {
   createPlaylistInputSchema,
   playlistCoverUploadInputSchema,
   playlistDetailResponseSchema,
+  playlistDownloadPreflightResponseSchema,
+  playlistDownloadQuerySchema,
   playlistItemPayloadSchema,
   playlistItemSourceRefSchema,
   playlistListRowSchema,
@@ -436,6 +438,44 @@ describe('playlistsResponseSchema', () => {
   });
 });
 
+describe('playlistDownloadQuerySchema', () => {
+  it('accepts MP3_320KBPS', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'MP3_320KBPS' }).success).toBe(true);
+  });
+
+  it('accepts AAC', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'AAC' }).success).toBe(true);
+  });
+
+  it('rejects a non-free format (FLAC)', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: 'FLAC' }).success).toBe(false);
+  });
+
+  it('rejects when format is undefined', () => {
+    expect(playlistDownloadQuerySchema.safeParse({ format: undefined }).success).toBe(false);
+  });
+});
+
+describe('playlistDownloadPreflightResponseSchema', () => {
+  it('round-trips the ok variant with counts', () => {
+    const fixture = { ok: true, trackCount: 2, skippedCount: 1 };
+    const result = playlistDownloadPreflightResponseSchema.safeParse(fixture);
+    expect(result.success && result.data).toEqual(fixture);
+  });
+
+  it('round-trips the quota-exceeded variant', () => {
+    const fixture = { ok: false, reason: 'QUOTA_EXCEEDED' };
+    const result = playlistDownloadPreflightResponseSchema.safeParse(fixture);
+    expect(result.success && result.data).toEqual(fixture);
+  });
+
+  it('rejects an unknown rejection reason', () => {
+    expect(
+      playlistDownloadPreflightResponseSchema.safeParse({ ok: false, reason: 'OTHER' }).success
+    ).toBe(false);
+  });
+});
+
 const validPlaylistItemPayload = {
   id: VALID_OID,
   itemType: 'track',
@@ -449,6 +489,9 @@ const validPlaylistItemPayload = {
   releaseTitle: 'Album Name',
   videoId: null,
   coverArt: 'https://cdn.example.com/art.jpg',
+  s3Key: 'releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+  streamUrl: 'https://cdn.test/releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+  posterUrl: null,
 };
 
 describe('playlistItemPayloadSchema', () => {
@@ -470,8 +513,45 @@ describe('playlistItemPayloadSchema', () => {
       releaseTitle: null,
       videoId: VALID_OID,
       coverArt: 'https://cdn.example.com/poster.jpg',
+      s3Key: null,
+      streamUrl: 'https://signed.example.com/videos/v1.mp4?Signature=abc',
+      posterUrl: 'https://cdn.example.com/poster.jpg',
     };
     expect(playlistItemPayloadSchema.safeParse(videoItem).success).toBe(true);
+  });
+
+  it('parses s3Key through to the output', () => {
+    const result = playlistItemPayloadSchema.safeParse(validPlaylistItemPayload);
+    expect(result.success && result.data.s3Key).toBe(
+      'releases/r1/digital-formats/MP3_320KBPS/t1.mp3'
+    );
+  });
+
+  it('parses streamUrl through to the output', () => {
+    const result = playlistItemPayloadSchema.safeParse(validPlaylistItemPayload);
+    expect(result.success && result.data.streamUrl).toBe(
+      'https://cdn.test/releases/r1/digital-formats/MP3_320KBPS/t1.mp3'
+    );
+  });
+
+  it('parses posterUrl through to the output', () => {
+    const result = playlistItemPayloadSchema.safeParse(validPlaylistItemPayload);
+    expect(result.success && result.data.posterUrl).toBeNull();
+  });
+
+  it('rejects when streamUrl is missing', () => {
+    const { streamUrl: _streamUrl, ...rest } = validPlaylistItemPayload;
+    expect(playlistItemPayloadSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('accepts all-null stream fields (unavailable item shape)', () => {
+    const unavailableItem = {
+      ...validPlaylistItemPayload,
+      s3Key: null,
+      streamUrl: null,
+      posterUrl: null,
+    };
+    expect(playlistItemPayloadSchema.safeParse(unavailableItem).success).toBe(true);
   });
 
   it('rejects when id is missing', () => {

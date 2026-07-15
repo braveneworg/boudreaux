@@ -22,15 +22,15 @@ import {
 import { Button } from '@/components/ui/button';
 import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
+import { PlaylistSharePopover } from './playlist-share-popover';
+
 interface PlaylistRowActionsProps {
-  /** The playlist the actions operate on (names the delete confirm). */
+  /** The playlist the actions operate on (names the delete confirm and share popover). */
   row: PlaylistListRow;
   /** Fired by the pencil button. */
   onEdit: () => void;
   /** Fired by the play button. */
   onPlay: () => void;
-  /** Fired by the share button. */
-  onShare: () => void;
   /** Fired only after the user confirms the delete dialog. */
   onDelete: () => void;
 }
@@ -56,25 +56,32 @@ const ActionButton = ({ label, onAction, children }: ActionButtonProps): ReactEl
 );
 
 /**
- * Per-row action cluster for a My Playlists row: play, share, and edit
- * delegate straight to their callbacks (PR1 wires placeholder toasts; PR2
- * swaps in the share popover and player dialog without touching this API),
- * while the trash button gates `onDelete` behind an AlertDialog confirm.
+ * Per-row action cluster for a My Playlists row: play and edit delegate
+ * straight to their callbacks, the share button opens its own
+ * `PlaylistSharePopover` (the popover owns the make-public mutation), and
+ * the trash button gates `onDelete` behind an AlertDialog confirm.
  */
 export const PlaylistRowActions = ({
   row,
   onEdit,
   onPlay,
-  onShare,
   onDelete,
 }: PlaylistRowActionsProps): ReactElement => (
   <div className="flex shrink-0 items-center gap-1">
     <ActionButton label="Play playlist" onAction={onPlay}>
       <Play aria-hidden="true" />
     </ActionButton>
-    <ActionButton label="Share playlist" onAction={onShare}>
-      <Share2 aria-hidden="true" />
-    </ActionButton>
+    <PlaylistSharePopover playlistId={row.id} playlistTitle={row.title} isPublic={row.isPublic}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8 shrink-0"
+        aria-label="Share playlist"
+      >
+        <Share2 aria-hidden="true" />
+      </Button>
+    </PlaylistSharePopover>
     <ActionButton label="Edit playlist" onAction={onEdit}>
       <Pencil aria-hidden="true" />
     </ActionButton>

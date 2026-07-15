@@ -55,6 +55,9 @@ describe('GET /api/playlists/[id]', () => {
         releaseTitle: 'The Release',
         videoId: null,
         coverArt: 'https://cdn.example.com/art.jpg',
+        s3Key: null,
+        streamUrl: null,
+        posterUrl: null,
       },
     ],
   };

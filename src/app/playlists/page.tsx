@@ -73,8 +73,11 @@ export default async function PlaylistsPage() {
 
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery({
+  // The query key and initialPageParam must exactly match usePlaylistsQuery or
+  // hydration misses and the client refetches (videos/page.tsx precedent).
+  await queryClient.prefetchInfiniteQuery({
     queryKey: queryKeys.playlists.mine(),
+    initialPageParam: 0,
     queryFn: buildMinePlaylistsQueryFn(session.user.id),
   });
 

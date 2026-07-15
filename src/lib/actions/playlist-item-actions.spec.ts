@@ -58,6 +58,9 @@ const addedItem: PlaylistItemPayload = {
   releaseTitle: 'Sad, Fat Luck',
   videoId: null,
   coverArt: 'https://cdn.test/cover.jpg',
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
 };
 
 const validAddInput = {

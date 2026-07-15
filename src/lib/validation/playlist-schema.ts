@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 
+import { FREE_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import {
   MAX_PLAYLIST_COVER_IMAGE_BYTES,
   MAX_PLAYLIST_COVER_IMAGES,
@@ -148,6 +149,15 @@ export const playlistCoverUploadInputSchema = z.object({
 /** Inferred type for `playlistCoverUploadInputSchema`. */
 export type PlaylistCoverUploadInput = z.infer<typeof playlistCoverUploadInputSchema>;
 
+/**
+ * Query for `GET /api/playlists/[id]/download`: only the free formats
+ * (MP3_320KBPS, AAC) are downloadable as a playlist zip.
+ */
+export const playlistDownloadQuerySchema = z.object({ format: z.enum(FREE_FORMAT_TYPES) });
+
+/** Inferred type for `playlistDownloadQuerySchema`. */
+export type PlaylistDownloadQuery = z.infer<typeof playlistDownloadQuerySchema>;
+
 // ---------------------------------------------------------------------------
 // Response schemas
 // ---------------------------------------------------------------------------
@@ -176,8 +186,9 @@ export const playlistsResponseSchema: z.ZodType<PlaylistsResponse> = z.object({
 
 /**
  * Wire schema for a resolved playlist item (from GET /api/playlists/[id]).
- * `trackFileId`, `releaseId`, `releaseTitle`, `videoId`, and `coverArt` are
- * nullable — the server populates only the fields relevant to `itemType`.
+ * `trackFileId`, `releaseId`, `releaseTitle`, `videoId`, `coverArt`, `s3Key`,
+ * `streamUrl`, and `posterUrl` are nullable — the server populates only the
+ * fields relevant to `itemType`.
  */
 export const playlistItemPayloadSchema: z.ZodType<PlaylistItemPayload> = z.object({
   id: z.string(),
@@ -192,6 +203,9 @@ export const playlistItemPayloadSchema: z.ZodType<PlaylistItemPayload> = z.objec
   releaseTitle: z.string().nullable(),
   videoId: z.string().nullable(),
   coverArt: z.string().nullable(),
+  s3Key: z.string().nullable(),
+  streamUrl: z.string().nullable(),
+  posterUrl: z.string().nullable(),
 });
 
 /**
@@ -240,3 +254,21 @@ export const playlistSearchResponseSchema: z.ZodType<PlaylistSearchResponse> = z
     })
   ),
 });
+
+/**
+ * Wire schema for the `respond=preflight` variant of the playlist download
+ * route: either the downloadable/skipped counts or the AAC quota rejection.
+ */
+export const playlistDownloadPreflightResponseSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    trackCount: z.number().int().nonnegative(),
+    skippedCount: z.number().int().nonnegative(),
+  }),
+  z.object({ ok: z.literal(false), reason: z.literal('QUOTA_EXCEEDED') }),
+]);
+
+/** Inferred type for `playlistDownloadPreflightResponseSchema`. */
+export type PlaylistDownloadPreflightResponse = z.infer<
+  typeof playlistDownloadPreflightResponseSchema
+>;

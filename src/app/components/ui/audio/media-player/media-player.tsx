@@ -548,9 +548,27 @@ interface InfoTickerTapeFeaturedArtistProps {
   onTrackSelect?: (trackId: string) => void;
 }
 
-type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps;
+/**
+ * Props for InfoTickerTape when using the minimal format (title + optional
+ * artist name) — no release/featured-artist objects required. Used by the
+ * playlist player, whose items only carry snapshot display strings.
+ */
+interface InfoTickerTapeMinimalProps {
+  trackTitle: string;
+  artistName?: string | null;
+  artistRelease?: never;
+  featuredArtist?: never;
+  trackName?: never;
+  isPlaying?: boolean;
+  onTrackSelect?: (trackId: string) => void;
+}
 
-/** Resolved display values shown by {@link InfoTickerTape}, derived from either prop variant. */
+type InfoTickerTapeProps =
+  | InfoTickerTapeArtistReleaseProps
+  | InfoTickerTapeFeaturedArtistProps
+  | InfoTickerTapeMinimalProps;
+
+/** Resolved display values shown by {@link InfoTickerTape}, derived from any prop variant. */
 interface InfoTickerTapeDisplay {
   displayName: string | null;
   releaseTitle: string | null;
@@ -559,7 +577,8 @@ interface InfoTickerTapeDisplay {
 
 /**
  * Derive the artist/release/track display strings for {@link InfoTickerTape}
- * from whichever prop variant was supplied (featuredArtist or artistRelease).
+ * from whichever prop variant was supplied (featuredArtist, artistRelease,
+ * or the minimal title + artist-name pair).
  */
 const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTapeDisplay => {
   if ('featuredArtist' in props && props.featuredArtist) {
@@ -571,12 +590,17 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
     };
   }
 
-  const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
-  return {
-    displayName: getArtistDisplayName(artistRelease.artist),
-    releaseTitle: artistRelease.release.title,
-    trackTitle: trackName,
-  };
+  if ('artistRelease' in props && props.artistRelease) {
+    const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
+    return {
+      displayName: getArtistDisplayName(artistRelease.artist),
+      releaseTitle: artistRelease.release.title,
+      trackTitle: trackName,
+    };
+  }
+
+  const { trackTitle, artistName } = props as InfoTickerTapeMinimalProps;
+  return { displayName: artistName ?? null, releaseTitle: null, trackTitle };
 };
 
 /**
@@ -586,6 +610,8 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  * @param props.artistRelease - An object containing a release and its associated artist (option 1)
  * @param props.trackName - The name of the currently playing track (required with artistRelease)
  * @param props.featuredArtist - A FeaturedArtist object (option 2)
+ * @param props.trackTitle - The track title for the minimal format (option 3)
+ * @param props.artistName - Optional artist name shown with the minimal format
  *
  * @returns A ticker tape component with scrolling track information
  *
@@ -593,7 +619,8 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  * - Displays artist/group name, release title, and track name
  * - Has a transparent background
  * - Uses CSS animation for the scrolling effect
- * - Supports two usage patterns: artistRelease + trackName OR featuredArtist
+ * - Supports three usage patterns: artistRelease + trackName OR featuredArtist
+ *   OR the minimal trackTitle + artistName pair (used by the playlist player)
  *
  * @example
  * ```tsx
@@ -605,6 +632,9 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  *
  * // Using featuredArtist format
  * <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} />
+ *
+ * // Using the minimal format (playlist player)
+ * <MediaPlayer.InfoTickerTape trackTitle="Song Title" artistName="Artist" />
  * ```
  */
 const InfoTickerTape = (props: InfoTickerTapeProps) => {

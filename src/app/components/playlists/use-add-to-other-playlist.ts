@@ -49,21 +49,27 @@ const addItemInputFor = (
  * State + mutation flow for the search rows' "Add to another playlist" action:
  * one inline picker open at a time (keyed by `item.key`), the duplicate-confirm
  * dialog, and the add mutation with its toast outcomes. Success (including a
- * forced add) toasts `Added to {title}` and closes picker + dialog;
+ * forced add) toasts `Added to {title}`, closes the dialog, and closes the
+ * picker ONLY IF it still shows the row this add started from — so a stale
+ * add for one row can't slam shut a picker the user reopened on another row;
  * `DUPLICATE_ITEM` opens the confirm dialog for a forced retry; any other
- * failure toasts the action's error and leaves the picker open.
+ * failure toasts the action's error and leaves the picker open. Picks are
+ * ignored while an add is already in flight (`isAddingPlaylistItem`) so a
+ * double click can't double-fire the mutation.
  */
 export const useAddToOtherPlaylist = (): UseAddToOtherPlaylistResult => {
   const [activeItem, setActiveItem] = useState<PlaylistSearchItem | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<AddTarget | null>(null);
-  const { addPlaylistItemAsync } = useAddPlaylistItemMutation();
+  const { addPlaylistItemAsync, isAddingPlaylistItem } = useAddPlaylistItemMutation();
 
   const runAdd = async ({ item, playlist }: AddTarget, force: boolean): Promise<void> => {
     try {
       const result = await addPlaylistItemAsync(addItemInputFor(item, playlist.id, force));
       if (result.success) {
         toast.success(`Added to ${playlist.title}`);
-        setActiveItem(null);
+        // Close only the picker this add was started from — leave any picker
+        // the user reopened on a different row in the meantime untouched.
+        setActiveItem((current) => (current?.key === item.key ? null : current));
         setDuplicateTarget(null);
         return;
       }
@@ -81,12 +87,12 @@ export const useAddToOtherPlaylist = (): UseAddToOtherPlaylistResult => {
     setActiveItem((current) => (current?.key === item.key ? null : item));
 
   const pickPlaylist = (playlist: PlaylistListRow): void => {
-    if (!activeItem) return;
+    if (!activeItem || isAddingPlaylistItem) return;
     void runAdd({ item: activeItem, playlist }, false);
   };
 
   const confirmDuplicate = (): void => {
-    if (!duplicateTarget) return;
+    if (!duplicateTarget || isAddingPlaylistItem) return;
     setDuplicateTarget(null);
     void runAdd(duplicateTarget, true);
   };

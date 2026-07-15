@@ -43,10 +43,10 @@ export const PlaylistPickerCombobox = ({
   excludePlaylistId,
 }: PlaylistPickerComboboxProps): ReactElement => {
   const [search, setSearch] = useState('');
-  const { isPending, data } = usePlaylistsQuery();
+  const { isPending, rows } = usePlaylistsQuery();
 
   const q = search.toLowerCase();
-  const visibleRows = (data?.rows ?? [])
+  const visibleRows = (rows ?? [])
     .filter((row) => row.id !== excludePlaylistId)
     .filter((row) => row.title.toLowerCase().includes(q))
     .slice(0, MAX_VISIBLE_ROWS);
