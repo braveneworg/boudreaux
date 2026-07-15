@@ -328,6 +328,16 @@ describe('deletePlaylistAction', () => {
     expect(result).toEqual({ success: false, error: 'Playlist not found' });
   });
 
+  it('masks a repo-mapped NOT_FOUND (cause set) behind the generic message', async () => {
+    vi.mocked(PlaylistService.delete).mockRejectedValue(
+      new DataError('NOT_FOUND', 'Record to delete does not exist.', new Error('P2025'))
+    );
+
+    const result = await deletePlaylistAction({ playlistId: PLAYLIST_ID });
+
+    expect(result).toEqual({ success: false, error: 'Failed to delete playlist' });
+  });
+
   it('collapses non-user-facing DataError codes to the generic message', async () => {
     vi.mocked(PlaylistService.delete).mockRejectedValue(
       new DataError('UNAVAILABLE', 'connection string leaked')

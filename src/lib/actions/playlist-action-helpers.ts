@@ -67,11 +67,17 @@ export const invalidInputFailure = (issues: ZodIssues): PlaylistActionResult<nev
  * Map a thrown error to the action failure shape: the unique-title violation
  * (`DataError` code `DUPLICATE` from `@@unique([ownerId, title])`) becomes the
  * friendly message plus a `title` field error; other user-facing `DataError`
- * codes pass their message through; everything else collapses to `fallback`
- * so internals never reach the client.
+ * codes pass their message through — but only when the error carries no
+ * `cause`. Service-authored `DataError`s never set one, while the repository's
+ * `toDataError` always attaches the underlying Prisma error and copies its raw
+ * message, so cause-carrying errors collapse to `fallback` like everything
+ * else and internals never reach the client.
  */
 export const failureFromError = (error: unknown, fallback: string): PlaylistActionResult<never> => {
   if (error instanceof DataError) {
+    // Assumes the unique title is the only unique constraint in play (no
+    // unique index exists on PlaylistItem today) — if an item-level unique
+    // index ever lands, P2002 from adds would need disambiguation here.
     if (error.code === 'DUPLICATE') {
       return {
         success: false,
@@ -79,7 +85,7 @@ export const failureFromError = (error: unknown, fallback: string): PlaylistActi
         fieldErrors: { title: [DUPLICATE_TITLE_MESSAGE] },
       };
     }
-    if (USER_FACING_CODES.has(error.code)) {
+    if (USER_FACING_CODES.has(error.code) && error.cause === undefined) {
       return { success: false, error: error.message };
     }
   }

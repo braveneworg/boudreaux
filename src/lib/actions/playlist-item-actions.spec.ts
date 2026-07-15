@@ -274,6 +274,16 @@ describe('removePlaylistItemAction', () => {
     expect(result).toEqual({ success: false, error: 'Playlist item not found' });
   });
 
+  it('masks a repo-mapped NOT_FOUND (cause set) behind the generic message', async () => {
+    vi.mocked(PlaylistService.removeItem).mockRejectedValue(
+      new DataError('NOT_FOUND', 'Record to delete does not exist.', new Error('P2025'))
+    );
+
+    const result = await removePlaylistItemAction(validRemoveInput);
+
+    expect(result).toEqual({ success: false, error: 'Failed to remove playlist item' });
+  });
+
   it('collapses unexpected errors to a generic message', async () => {
     vi.mocked(PlaylistService.removeItem).mockRejectedValue(new Error('boom'));
 
