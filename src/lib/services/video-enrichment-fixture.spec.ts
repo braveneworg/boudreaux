@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { videoEnrichmentDataSchema } from '@/lib/validation/video-enrichment-schema';
+import { extractProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import { videoEnrichmentFixture, videoProbeFixture } from './video-enrichment-fixture';
 
@@ -21,6 +22,16 @@ describe('videoProbeFixture', () => {
 
   it('keeps the raw probeData filename as a bare s3 key (no presigned URL)', () => {
     expect(JSON.stringify(videoProbeFixture.probeData)).not.toContain('X-Amz-');
+  });
+
+  it('yields deterministic prefill tags for the admin form', () => {
+    expect(extractProbePrefillTags(videoProbeFixture.probeData)).toEqual({
+      title: 'E2E Probe Title',
+      artist: 'E2E Probe Artist',
+      releasedOn: '2019-08-01',
+      description: 'E2E probe description',
+      durationSeconds: 245,
+    });
   });
 });
 

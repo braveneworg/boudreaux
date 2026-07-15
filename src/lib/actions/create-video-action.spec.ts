@@ -127,6 +127,7 @@ describe('createVideoAction', () => {
           'mimeType',
           'posterUrl',
           'publishedAt',
+          'artistDetails',
         ],
         expect.anything()
       );
@@ -463,7 +464,11 @@ describe('createVideoAction', () => {
       await createVideoAction(initialFormState, buildFormData());
       await afterCallback?.();
 
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(videoId, 'The Band');
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        'The Band',
+        undefined
+      );
     });
 
     it('probes the new upload', async () => {
@@ -501,6 +506,39 @@ describe('createVideoAction', () => {
       await afterCallback?.();
 
       expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
+    });
+
+    it('forwards artistDetails to syncVideoArtists when present', async () => {
+      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band (official)' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        'The Band',
+        artistDetails
+      );
+    });
+
+    it('does not include artistDetails in the repository create payload', async () => {
+      const artistDetails = [{ sourceName: 'The Band' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+      expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
+    });
+
+    it('does not include artistDetails in the repository payload when absent', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+      expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
     });
   });
 });

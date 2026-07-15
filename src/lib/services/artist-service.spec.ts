@@ -1673,6 +1673,107 @@ describe('ArtistService', () => {
     });
   });
 
+  describe('findOrCreateByName with details', () => {
+    const noMatch = (): void => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+    };
+
+    it('create branch with full details uses trimmed admin names including middleName', async () => {
+      noMatch();
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+        id: 'artist-new',
+        displayName: 'Zora Quill Brandt',
+        firstName: 'Zora',
+        surname: 'Brandt',
+      } as never);
+
+      await ArtistService.findOrCreateByName('zora quill brandt', {
+        sourceName: 'zora quill brandt',
+        firstName: '  Zora  ',
+        middleName: ' Quill ',
+        surname: ' Brandt ',
+        displayName: ' Zora Quill Brandt ',
+      });
+
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          firstName: 'Zora',
+          middleName: 'Quill',
+          surname: 'Brandt',
+          displayName: 'Zora Quill Brandt',
+          isActive: true,
+        })
+      );
+    });
+
+    it('create branch with partial details uses provided field, others fall back; empty-string fields fall back too', async () => {
+      noMatch();
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+        id: 'artist-new',
+        displayName: 'Jane Smith',
+        firstName: 'Jane',
+        surname: 'Smith',
+      } as never);
+
+      await ArtistService.findOrCreateByName('Jane Smith', {
+        sourceName: 'Jane Smith',
+        middleName: 'Marie',
+        // firstName, surname, displayName omitted → fall back to naive split / trimmed source name
+      });
+
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          firstName: 'Jane',
+          middleName: 'Marie',
+          surname: 'Smith',
+          displayName: 'Jane Smith',
+        })
+      );
+    });
+
+    it('create branch with no details reproduces exact pre-task payload', async () => {
+      noMatch();
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+        id: 'artist-new',
+        displayName: 'Jane Smith',
+        firstName: 'Jane',
+        surname: 'Smith',
+      } as never);
+
+      await ArtistService.findOrCreateByName('Jane Smith');
+
+      expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith({
+        firstName: 'Jane',
+        surname: 'Smith',
+        displayName: 'Jane Smith',
+        slug: 'jane-smith',
+        isActive: true,
+      });
+    });
+
+    it('match path with details returns existing artist without create or update', async () => {
+      const existingArtist = {
+        id: 'artist-existing',
+        displayName: 'Zora',
+        firstName: 'Zora',
+        surname: '',
+      };
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(existingArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Zora', {
+        sourceName: 'Zora',
+        firstName: 'Zora',
+        displayName: 'Zora Q. Brandt',
+      });
+
+      expect(result).toEqual({ success: true, data: existingArtist });
+      expect(ArtistRepository.createWithSelect).not.toHaveBeenCalled();
+      expect(ArtistRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('uploadArtistImage - additional branch coverage', () => {
     beforeEach(() => {
       vi.stubEnv('S3_BUCKET', 'test-bucket');
@@ -2266,6 +2367,43 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: { id: 'new-2' } });
       expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findByName', () => {
+    const matchedArtist = {
+      id: 'artist-existing',
+      displayName: 'Ceschi',
+      firstName: 'Ceschi',
+      surname: '',
+    };
+
+    it('returns the match when found by slug and calls the same repository lookups in order', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+
+      const result = await ArtistService.findByName('Ceschi');
+
+      expect(result).toEqual(matchedArtist);
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+    });
+
+    it('returns null when no match is found across all three lookups', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+
+      const result = await ArtistService.findByName('Unknown Artist');
+
+      expect(result).toBeNull();
+    });
+
+    it('findOrCreateByName behavior is unchanged by the refactor — slug match still returns existing artist', async () => {
+      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result).toEqual({ success: true, data: matchedArtist });
+      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
     });
   });
 

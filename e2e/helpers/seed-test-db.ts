@@ -137,6 +137,17 @@ const ENRICH_LEAD_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a1';
 const ENRICH_GUEST_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a2';
 
 /**
+ * Deterministic ids for the video artist-review E2E fixtures
+ * (admin-video-artist-review.spec.ts). The artist is seeded with a known
+ * displayName so the name-lookup chip renders deterministically. The video is
+ * published AND archived so it is invisible to listing specs but reachable by
+ * direct URL. Both IDs are unique — no other spec references them, so these
+ * fixtures are parallel-safe read-only anchors.
+ */
+const REVIEW_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d3a1';
+const REVIEW_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d3b1';
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -540,6 +551,54 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
         artistId: ENRICH_GUEST_ARTIST_ID,
         role: 'FEATURED',
         sortOrder: 1,
+      },
+    ],
+  });
+};
+
+/**
+ * Seed the dedicated video artist-review fixtures: one matchable artist and one
+ * MUSIC video whose `artist` string contains that artist's name so the review
+ * section renders a "Links to existing artist" chip on the edit page. The video
+ * is published AND archived — invisible to listing assertions, reachable by
+ * direct URL. The artist's displayName is pinned to 'E2E Review Lead' so the
+ * chip text is deterministic. createdAt is pinned to 2020 so it sorts after the
+ * real artists and never becomes the first result in admin lists.
+ */
+const seedReviewFixtures = async (prisma: PrismaClient): Promise<void> => {
+  // First-ever writes to the fresh Artist/Video collections — a single
+  // createMany each (concurrent create() read-backs race in CI on new
+  // collections, per repo LESSONS).
+  await prisma.artist.createMany({
+    data: [
+      {
+        id: REVIEW_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Review Lead',
+        slug: 'e2e-review-lead',
+        displayName: 'E2E Review Lead',
+        createdAt: new Date('2020-01-06T00:00:00Z'),
+      },
+    ],
+  });
+
+  await prisma.video.createMany({
+    data: [
+      {
+        id: REVIEW_VIDEO_ID,
+        title: 'E2E Review Video',
+        artist: 'E2E Review Lead',
+        category: 'MUSIC',
+        releasedOn: new Date('2026-03-01T00:00:00.000Z'),
+        durationSeconds: 180,
+        s3Key: `media/videos/${REVIEW_VIDEO_ID}/review-video.mp4`,
+        fileName: 'review-video.mp4',
+        mimeType: 'video/mp4',
+        fileSize: BigInt(1048576),
+        posterUrl: null,
+        description: 'E2E Review Video description.',
+        publishedAt: PUBLISHED_AT,
+        archivedAt: ARCHIVED_AT,
       },
     ],
   });
@@ -1390,6 +1449,7 @@ const seedTestDatabase = async () => {
 
     await seedVideos(prisma);
     await seedEnrichmentFixtures(prisma);
+    await seedReviewFixtures(prisma);
     await seedPublicPlaylistFixture(prisma, mp3FilesByTitle);
 
     console.info('E2E test database seeded successfully.');
@@ -1408,6 +1468,7 @@ export {
   ENRICH_MUSIC_VIDEO_ID,
   PUBLIC_PLAYLIST_SNAPSHOT_TITLE,
   PUBLIC_PLAYLIST_TITLE,
+  REVIEW_VIDEO_ID,
   seedTestDatabase,
   SIGNOUT_USER_ID,
   TEST_USERS,
