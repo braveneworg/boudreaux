@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type { Video } from '@/lib/types/domain/video';
@@ -26,6 +27,9 @@ vi.mock('@/lib/services/video-enrichment-service', () => ({
 }));
 vi.mock('@/lib/services/video-probe-service', () => ({
   VideoProbeService: { probeAndPersist: vi.fn() },
+}));
+vi.mock('@/lib/services/producer-service', () => ({
+  ProducerService: { syncVideoProducers: vi.fn() },
 }));
 
 const videoId = '507f1f77bcf86cd799439011';
@@ -254,6 +258,10 @@ describe('VIDEO_PERMITTED_FIELD_NAMES', () => {
   it("includes 'artistDetails'", () => {
     expect(VIDEO_PERMITTED_FIELD_NAMES).toContain('artistDetails');
   });
+
+  it("includes 'producers'", () => {
+    expect(VIDEO_PERMITTED_FIELD_NAMES).toContain('producers');
+  });
 });
 
 describe('kickPostSaveEnrichment', () => {
@@ -268,6 +276,7 @@ describe('kickPostSaveEnrichment', () => {
     vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
     vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
     vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+    vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
   });
 
   it('syncs video artists from the artist string', async () => {
@@ -358,5 +367,60 @@ describe('kickPostSaveEnrichment', () => {
     vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockRejectedValue(Error('c'));
 
     await expect(kickPostSaveEnrichment(kickInput)).resolves.toBeUndefined();
+  });
+
+  it('syncs producers when producers are provided', async () => {
+    await kickPostSaveEnrichment({
+      ...kickInput,
+      producers: [{ name: 'New Producer' }],
+    });
+
+    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
+      videoId,
+      [{ name: 'New Producer' }],
+      undefined
+    );
+  });
+
+  it('forwards createdBy to syncVideoProducers', async () => {
+    await kickPostSaveEnrichment({
+      ...kickInput,
+      producers: [{ id: 'p1', name: 'Rick' }],
+      createdBy: 'user-abc',
+    });
+
+    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
+      videoId,
+      [{ id: 'p1', name: 'Rick' }],
+      'user-abc'
+    );
+  });
+
+  it('does not call syncVideoProducers when producers is absent', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+  });
+
+  it('does not call syncVideoProducers when producers is an empty array', async () => {
+    await kickPostSaveEnrichment({ ...kickInput, producers: [] });
+
+    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+  });
+
+  it('swallows a producer sync failure (best-effort)', async () => {
+    vi.mocked(ProducerService.syncVideoProducers).mockRejectedValue(Error('producer sync down'));
+
+    await expect(
+      kickPostSaveEnrichment({ ...kickInput, producers: [{ name: 'Bad' }] })
+    ).resolves.toBeUndefined();
+  });
+
+  it('still runs the probe even when producer sync fails', async () => {
+    vi.mocked(ProducerService.syncVideoProducers).mockRejectedValue(Error('sync down'));
+
+    await kickPostSaveEnrichment({ ...kickInput, producers: [{ name: 'Bad' }] });
+
+    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
   });
 });

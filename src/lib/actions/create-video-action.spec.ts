@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
@@ -28,6 +29,9 @@ vi.mock('@/lib/services/video-enrichment-service', () => ({
 }));
 vi.mock('@/lib/services/video-probe-service', () => ({
   VideoProbeService: { probeAndPersist: vi.fn() },
+}));
+vi.mock('@/lib/services/producer-service', () => ({
+  ProducerService: { syncVideoProducers: vi.fn() },
 }));
 
 // Capture the after() callback so tests can run the "background" kick on demand.
@@ -85,6 +89,7 @@ beforeEach(() => {
   vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
 });
 
 describe('createVideoAction', () => {
@@ -128,6 +133,7 @@ describe('createVideoAction', () => {
           'posterUrl',
           'publishedAt',
           'artistDetails',
+          'producers',
         ],
         expect.anything()
       );
@@ -539,6 +545,39 @@ describe('createVideoAction', () => {
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
+    });
+
+    it('syncs producers from the submitted producers array', async () => {
+      const producers = [{ name: 'New Producer' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
+        videoId,
+        producers,
+        'user-123'
+      );
+    });
+
+    it('does not call syncVideoProducers when producers is absent', async () => {
+      mockParsedSuccess();
+
+      await createVideoAction(initialFormState, buildFormData());
+      await afterCallback?.();
+
+      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+    });
+
+    it('does not include producers in the repository create payload', async () => {
+      const producers = [{ name: 'Studio Pro' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+      expect(Object.prototype.hasOwnProperty.call(createCall, 'producers')).toBe(false);
     });
   });
 });

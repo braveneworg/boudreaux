@@ -108,6 +108,8 @@ const runVideoCreate = async (
           category: data.category,
           reProbe: true,
           artistDetails: data.artistDetails,
+          producers: data.producers,
+          createdBy: userId,
         })
       );
     }

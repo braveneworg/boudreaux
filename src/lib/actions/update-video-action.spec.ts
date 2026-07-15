@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
@@ -30,6 +31,9 @@ vi.mock('@/lib/services/video-enrichment-service', () => ({
 }));
 vi.mock('@/lib/services/video-probe-service', () => ({
   VideoProbeService: { probeAndPersist: vi.fn() },
+}));
+vi.mock('@/lib/services/producer-service', () => ({
+  ProducerService: { syncVideoProducers: vi.fn() },
 }));
 
 // Capture the after() callback so tests can run the "background" kick on demand.
@@ -110,6 +114,7 @@ beforeEach(() => {
   vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
 });
 
 describe('updateVideoAction', () => {
@@ -513,6 +518,56 @@ describe('updateVideoAction', () => {
         parsedData.artist,
         artistDetails
       );
+    });
+
+    it('schedules a kick when producers is non-empty (new trigger)', async () => {
+      const producers = [{ name: 'New Producer' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallback).toBeTypeOf('function');
+    });
+
+    it('does not schedule a kick when producers is empty (regression pin)', async () => {
+      mockParsedSuccess({ ...parsedData, producers: [] });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallback).toBeNull();
+    });
+
+    it('syncs producers when producers is non-empty', async () => {
+      const producers = [{ name: 'Studio Pro' }, { id: 'p2', name: 'Rick' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await afterCallback?.();
+
+      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
+        videoId,
+        producers,
+        'user-123'
+      );
+    });
+
+    it('does not call syncVideoProducers when producers is absent', async () => {
+      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await afterCallback?.();
+
+      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+    });
+
+    it('does not include producers in the repository update payload', async () => {
+      const producers = [{ name: 'Studio Pro' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
+      expect(Object.prototype.hasOwnProperty.call(updateCall, 'producers')).toBe(false);
     });
   });
 });

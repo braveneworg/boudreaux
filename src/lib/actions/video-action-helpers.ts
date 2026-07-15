@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type {
@@ -17,6 +18,7 @@ import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
+import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
 
@@ -35,6 +37,7 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
   'posterUrl',
   'publishedAt',
   'artistDetails',
+  'producers',
 ];
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
@@ -165,6 +168,10 @@ export interface KickPostSaveEnrichmentInput {
   reProbe: boolean;
   /** Admin-reviewed artist name details forwarded to syncVideoArtists. */
   artistDetails?: VideoArtistDetail[];
+  /** Producer entries from the admin form forwarded to syncVideoProducers. */
+  producers?: VideoProducerInput[];
+  /** The user id to stamp on newly-created producer records. */
+  createdBy?: string;
 }
 
 /**
@@ -181,11 +188,21 @@ export const kickPostSaveEnrichment = async ({
   category,
   reProbe,
   artistDetails,
+  producers,
+  createdBy,
 }: KickPostSaveEnrichmentInput): Promise<void> => {
   try {
     await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
   } catch (error) {
     logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+  }
+
+  if (producers?.length) {
+    try {
+      await ProducerService.syncVideoProducers(videoId, producers, createdBy);
+    } catch (error) {
+      logger.warn('Post-save video producer sync failed', { videoId, error: toMessage(error) });
+    }
   }
 
   if (reProbe) {
