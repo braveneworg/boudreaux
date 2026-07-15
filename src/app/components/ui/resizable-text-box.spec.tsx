@@ -159,9 +159,13 @@ describe('ResizableTextBox', () => {
 
       const { container } = render(<ResizableTextBox {...defaultProps} textStyle={textStyle} />);
 
-      // The textStyle is applied to the content div which has flex class
-      const contentDiv = container.querySelector('.flex.h-full.w-full');
-      expect(contentDiv).toHaveStyle(textStyle);
+      // The textStyle is applied verbatim as inline style on the content div.
+      // Assert the inline values directly rather than via getComputedStyle so
+      // the check is independent of DOM-engine style computation (e.g. rem→px).
+      const contentDiv = container.querySelector<HTMLElement>('.flex.h-full.w-full');
+      expect(contentDiv?.style.fontFamily).toBe('Arial');
+      expect(contentDiv?.style.fontSize).toBe('2rem');
+      expect(contentDiv?.style.color).toBe('rgb(255, 0, 0)');
     });
 
     it('shows grabbing cursor when dragging', () => {
