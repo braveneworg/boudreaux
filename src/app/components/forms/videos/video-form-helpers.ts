@@ -21,13 +21,14 @@ export const formatDateForForm = (dateValue: string | Date | null | undefined): 
 };
 
 /**
- * Create-mode default form values. `category` and `mimeType` are intentionally
- * left undefined so the required-field errors surface on an empty submit; the
- * numeric-ish fields default to empty strings so their inputs stay controlled.
+ * Create-mode default form values. `mimeType` is intentionally left undefined
+ * so the required-field error surfaces on an empty submit; the numeric-ish
+ * fields default to empty strings so their inputs stay controlled.
  */
 export const buildVideoDefaults = (): DefaultValues<VideoFormData> => ({
   title: '',
   artist: '',
+  category: 'MUSIC',
   description: '',
   releasedOn: '',
   durationSeconds: '',

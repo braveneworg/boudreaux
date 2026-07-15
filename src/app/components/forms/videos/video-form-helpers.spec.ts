@@ -8,6 +8,7 @@ import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 import {
   applyServerFieldErrors,
   applyServerProbePrefill,
+  buildVideoDefaults,
   formatDateForForm,
   mapVideoToFormValues,
   validateVideoFile,
@@ -47,6 +48,12 @@ describe('formatDateForForm', () => {
 
   it('formats a Date to YYYY-MM-DD', () => {
     expect(formatDateForForm(new Date('2024-05-06T12:00:00.000Z'))).toBe('2024-05-06');
+  });
+});
+
+describe('buildVideoDefaults', () => {
+  it('defaults the category to MUSIC', () => {
+    expect(buildVideoDefaults().category).toBe('MUSIC');
   });
 });
 

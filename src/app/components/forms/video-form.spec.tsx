@@ -246,13 +246,12 @@ describe('VideoForm — required-field validation', () => {
     expect(await screen.findByText('Artist is required')).toBeInTheDocument();
   });
 
-  it('shows a required error for the category on empty submit', async () => {
-    const user = setup();
+  it('pre-selects Music as the default category', () => {
+    setup();
     render(<VideoForm />);
 
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('Category must be MUSIC or INFORMATIONAL')).toBeInTheDocument();
+    const musicRadio = screen.getByRole('radio', { name: 'Music', checked: true });
+    expect(musicRadio).toBeInTheDocument();
   });
 
   it('shows a required error for the release date on empty submit', async () => {
