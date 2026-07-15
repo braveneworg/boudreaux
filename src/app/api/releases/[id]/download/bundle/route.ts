@@ -2,14 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import path from 'node:path';
-import { PassThrough, Readable, Transform } from 'node:stream';
+import { PassThrough, Transform } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
 
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
-import archiver from 'archiver';
 
 import { auth } from '@/lib/auth';
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
@@ -42,8 +39,17 @@ import {
 } from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { computeFingerprintHash } from '@/lib/utils/visitor-fingerprint';
+import {
+  createStoreArchive,
+  issuePrefetch,
+  safeArchiveEntryName,
+  startBufferPrefetch,
+  type ZipArchive,
+} from '@/lib/utils/zip-stream';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 import type { DownloadSubject } from '@/types/download-subject';
+
+import type { Readable } from 'node:stream';
 
 /**
  * Allow up to 5 minutes for large multi-format bundles (WAV, AIFF).
@@ -76,18 +82,6 @@ const resolveFormatLabel = (formatType: DigitalFormatType): string =>
  */
 
 /**
- * Defense-in-depth against zip-slip: force every archive entry to a
- * path.basename without slashes, backslashes, or `..`. Upload-time validation
- * should already guarantee safe names, but an archive with `../../etc/passwd`
- * would escape on server-side extraction (backups, scanners, admin review).
- */
-function safeArchiveEntryName(fileName: string): string {
-  const base = path.basename(fileName).replace(/[\\/]/g, '_');
-  const sanitized = base.replace(/[^A-Za-z0-9._\- ]/g, '_').replace(/\.{2,}/g, '_');
-  return sanitized.length > 0 ? sanitized : 'file';
-}
-
-/**
  * How many S3 object bodies to download concurrently into memory ahead of
  * the archiver. archiver appends entries serially, and `archive.append`
  * with a Readable holds a single S3 socket open for the duration of that
@@ -105,75 +99,6 @@ const S3_PREFETCH_DEPTH = 8;
 /** Multipart upload tuning — large parts + deep queue keeps the egress pipe full. */
 const UPLOAD_PART_SIZE_BYTES = 16 * 1024 * 1024;
 const UPLOAD_QUEUE_SIZE = 8;
-
-/**
- * Download an S3 object's body fully into a Buffer. Resolves once the
- * entire body has been streamed to memory.
- */
-async function fetchObjectBuffer(
-  s3Client: ReturnType<typeof getS3Client>,
-  bucket: string,
-  key: string
-): Promise<Buffer | null> {
-  const response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  const body = response.Body;
-  if (!body) {
-    return null;
-  }
-  // AWS SDK v3 in Node returns an IncomingMessage with a smithy-injected
-  // `transformToByteArray` helper; tests pass a plain `Readable`. Support both.
-  const maybeTransform = (body as { transformToByteArray?: () => Promise<Uint8Array> })
-    .transformToByteArray;
-  if (typeof maybeTransform === 'function') {
-    const bytes = await maybeTransform.call(body);
-    return Buffer.from(bytes);
-  }
-  if (body instanceof Readable) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
-  }
-  return null;
-}
-
-/**
- * Issue a single prefetch and attach a passive rejection handler so that
- * if the consumer abandons the promise (e.g. another fetch fails first and
- * the surrounding try/catch exits the consume loop), Node does not log it
- * as an unhandled rejection. Awaiting the returned promise still observes
- * the original rejection.
- */
-function issuePrefetch(
-  s3Client: ReturnType<typeof getS3Client>,
-  bucket: string,
-  key: string
-): Promise<Buffer | null> {
-  const promise = fetchObjectBuffer(s3Client, bucket, key);
-  // Suppress "unhandled rejection" — the consumer's `await` (or the outer
-  // try/catch) is the authoritative handler.
-  promise.catch(() => {});
-  return promise;
-}
-
-function startBufferPrefetch(
-  s3Client: ReturnType<typeof getS3Client>,
-  bucket: string,
-  keys: readonly string[],
-  depth: number
-): Array<Promise<Buffer | null>> {
-  const inFlight: Array<Promise<Buffer | null>> = [];
-  const initial = Math.min(depth, keys.length);
-  for (let i = 0; i < initial; i++) {
-    const key = keys.at(i);
-    if (key === undefined) {
-      break;
-    }
-    inFlight.push(issuePrefetch(s3Client, bucket, key));
-  }
-  return inFlight;
-}
 
 /** A requested digital format resolved to its archivable child files. */
 interface ResolvedFormat {
@@ -322,7 +247,7 @@ const recordPaidBundleAnalytics = async (
 
 /** Mutable handle threaded through the SSE archive build for teardown. */
 interface SseArchiveHandles {
-  combinedArchive: ReturnType<typeof archiver> | null;
+  combinedArchive: ZipArchive | null;
   combinedPassThrough: PassThrough | null;
   combinedUpload: Upload | null;
   uploadPromise: Promise<unknown> | null;
@@ -384,9 +309,9 @@ const runSseCacheHit = async (session: SseSession): Promise<void> => {
  */
 const initSseArchive = (
   session: SseSession
-): { archive: ReturnType<typeof archiver>; getArchiveError: () => Error | null } => {
+): { archive: ZipArchive; getArchiveError: () => Error | null } => {
   const { ctx, s3Client, bucket, handles } = session;
-  const archiveForSse = archiver('zip', { zlib: { level: 0 } });
+  const archiveForSse = createStoreArchive();
   const passThroughForSse = new PassThrough();
   handles.combinedArchive = archiveForSse;
   handles.combinedPassThrough = passThroughForSse;
@@ -431,7 +356,7 @@ const initSseArchive = (
 interface SseDrainState {
   readonly flatKeys: readonly string[];
   readonly inFlight: Array<Promise<Buffer | null>>;
-  readonly archive: ReturnType<typeof archiver>;
+  readonly archive: ZipArchive;
   readonly getArchiveError: () => Error | null;
   readonly completedFormats: DigitalFormatType[];
   readonly formatHasError: Set<DigitalFormatType>;
@@ -448,7 +373,7 @@ interface SseDrainState {
 const drainSseEntries = async (
   session: SseSession,
   flatEntries: readonly FlatSseEntry[],
-  archive: ReturnType<typeof archiver>,
+  archive: ZipArchive,
   getArchiveError: () => Error | null
 ): Promise<DigitalFormatType[]> => {
   const { send, s3Client, bucket } = session;
@@ -676,7 +601,7 @@ const respondCacheHit302 = async (ctx: BundleDeliveryContext): Promise<Response>
 
 /** Wiring for the direct-stream tee path: archiver → response + cache upload. */
 interface StreamPipeline {
-  archive: ReturnType<typeof archiver>;
+  archive: ZipArchive;
   cachePass: PassThrough;
   teeToCache: Transform;
   responsePass: Readable;
@@ -697,7 +622,7 @@ const buildStreamPipeline = (
   bucketName: string
 ): StreamPipeline => {
   const { cachedZipKey, cachedZipFileName } = ctx;
-  const archive = archiver('zip', { zlib: { level: 0 } });
+  const archive = createStoreArchive();
   const cachePass = new PassThrough();
 
   // `teeToCache` forwards every chunk produced by the archiver into
@@ -957,7 +882,7 @@ const buildAndRedirectResponse = async (
   bucketName: string
 ): Promise<Response> => {
   const { resolvedFormats, cachedZipKey, cachedZipFileName } = ctx;
-  const archive = archiver('zip', { zlib: { level: 0 } }); // store mode (no compression)
+  const archive = createStoreArchive(); // store mode (no compression)
   const passThrough = new PassThrough();
   archive.pipe(passThrough);
 
@@ -1006,7 +931,7 @@ const buildAndRedirectResponse = async (
 const driveRedirectArchive = async (
   ctx: BundleDeliveryContext,
   args: {
-    archive: ReturnType<typeof archiver>;
+    archive: ZipArchive;
     passThrough: PassThrough;
     upload: Upload;
     uploadPromise: Promise<unknown>;
@@ -1062,7 +987,7 @@ const driveRedirectArchive = async (
  * removes the other.
  */
 const appendRedirectEntry = (
-  archive: ReturnType<typeof archiver>,
+  archive: ZipArchive,
   buffer: Buffer,
   archivePath: string
 ): Promise<void> =>
