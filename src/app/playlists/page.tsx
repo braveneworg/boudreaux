@@ -84,7 +84,7 @@ export default async function PlaylistsPage() {
         <ContentContainer>
           <ZinePanel chat accent="kraft" breadcrumbs={breadcrumbItems}>
             <ImageHeading
-              src="/media/headings/MY_PLAYLISTS.webp"
+              src="/media/headings/PLAYLISTS.webp"
               alt="My Playlists"
               imageHeight={480}
               priority

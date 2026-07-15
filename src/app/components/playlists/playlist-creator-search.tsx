@@ -111,6 +111,7 @@ export const PlaylistCreatorSearch = ({
     <>
       <Command shouldFilter={false}>
         <CommandInput
+          className="border-none"
           ref={inputRef}
           value={search}
           onValueChange={setSearch}
