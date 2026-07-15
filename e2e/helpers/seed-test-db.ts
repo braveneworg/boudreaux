@@ -1300,6 +1300,34 @@ const seedTestDatabase = async () => {
       },
     });
 
+    // Query-plan guard fixtures (scripts/check-query-plans.ts): one INERT row in
+    // each otherwise-empty collection so MongoDB's planner enumerates the
+    // slow-query-hardening compound indexes (an empty collection yields an EOF
+    // plan → the guard can only SKIP). Each row is chosen to be invisible to
+    // every existing test: the DownloadEvent has success:false (excluded by all
+    // success:true cap/analytics queries), the Image has no FKs (appears in no
+    // artist/release query), and the BannedIdentity uses a throwaway email that
+    // no auth flow signs in as.
+    await prisma.downloadEvent.create({
+      data: {
+        userId: TEST_USERS.regular.id,
+        releaseId: e2eRelease1.id,
+        formatType: 'MP3_320KBPS',
+        success: false,
+        errorCode: 'E2E_QUERY_PLAN_SEED',
+      },
+    });
+    await prisma.image.create({
+      data: { src: 'https://example.invalid/query-plan-seed.webp', sortOrder: 0 },
+    });
+    await prisma.bannedIdentity.create({
+      data: {
+        email: 'e2e-query-plan-seed@example.invalid',
+        fingerprintHash: 'e2e-query-plan-seed-fingerprint',
+        bannedByAdminId: TEST_USERS.admin.id,
+      },
+    });
+
     await seedVideos(prisma);
     await seedEnrichmentFixtures(prisma);
 
