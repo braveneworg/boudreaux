@@ -119,7 +119,8 @@ describe('safeArchiveEntryName', () => {
   });
 
   it('replaces backslashes and disallowed characters with underscores', () => {
-    expect(safeArchiveEntryName('a\\b:c?.mp3')).toBe('b_c_.mp3');
+    // POSIX path.basename does not split on '\' — the whole string is the basename.
+    expect(safeArchiveEntryName('a\\b:c?.mp3')).toBe('a_b_c_.mp3');
   });
 
   it('collapses runs of dots', () => {
