@@ -321,7 +321,30 @@ describe('useVideoArtistReview — buildArtistDetails', () => {
   });
 });
 
-// ── Test 7: cap at 20 entries ──────────────────────────────────────────────────
+// ── Test 7: lookup capped at 20 names before route call ───────────────────────
+
+describe('useVideoArtistReview — 20-name lookup cap', () => {
+  it('passes at most 20 names to useArtistNameLookupQuery when artist string yields 21 parts', () => {
+    mockUseArtistNameLookupQuery.mockReturnValue(makeQueryResult());
+
+    // Build a string with exactly 21 feat. tokens
+    const artistStr = Array.from({ length: 21 }, (_, i) => `Artist${i + 1}`).join(' feat. ');
+
+    renderHook(() => useVideoArtistReview(artistStr));
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    // The last call after debounce settles must receive exactly 20 names
+    const lastCall = mockUseArtistNameLookupQuery.mock.calls.at(-1) as [string[]];
+    expect(lastCall[0]).toHaveLength(20);
+    expect(lastCall[0][0]).toBe('Artist1');
+    expect(lastCall[0][19]).toBe('Artist20');
+  });
+});
+
+// ── Test 8: cap at 20 entries ──────────────────────────────────────────────────
 
 describe('useVideoArtistReview — 20-entry cap', () => {
   it('caps buildArtistDetails at 20 entries even with 21 new artists', () => {

@@ -33,6 +33,15 @@ export type ArtistNameLookupResponse = z.infer<typeof artistNameLookupResponseSc
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
+/** Build the URL for the name-lookup route from an array of artist name strings. */
+const buildLookupUrl = (names: string[]): string => {
+  const params = new URLSearchParams();
+  for (const name of names) {
+    params.append('name', name);
+  }
+  return `/api/artists/name-lookup?${params.toString()}`;
+};
+
 /**
  * React Query hook for looking up existing artists by name against the admin
  * name-lookup route. This is the **only** access path to
@@ -53,15 +62,6 @@ export type ArtistNameLookupResponse = z.infer<typeof artistNameLookupResponseSc
  * `queryKey` and `queryFn` stay locked.
  * @returns The TanStack Query result containing the `results` array.
  */
-/** Build the URL for the name-lookup route from an array of artist name strings. */
-const buildLookupUrl = (names: string[]): string => {
-  const params = new URLSearchParams();
-  for (const name of names) {
-    params.append('name', name);
-  }
-  return `/api/artists/name-lookup?${params.toString()}`;
-};
-
 export const useArtistNameLookupQuery = (
   names: string[],
   options: QueryOptionsOverride<ArtistNameLookupResponse> = {}

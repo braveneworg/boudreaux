@@ -35,9 +35,12 @@ test.describe('Admin video artist-review — edit-page flow', () => {
 
     await adminPage.goto(`/admin/videos/${REVIEW_VIDEO_ID}`);
 
-    // Wait for the form to hydrate (the artist field shows the seeded value).
+    // Wait for the form to hydrate — field must be visible and non-empty before
+    // interacting (avoids asserting a specific seeded value that mutates on save,
+    // which would cause this test to fail deterministically on a CI retry).
     const artistField = adminPage.getByLabel(ARTIST_LABEL);
-    await expect(artistField).toHaveValue(EXISTING_ARTIST_NAME, { timeout: 10_000 });
+    await expect(artistField).toBeVisible({ timeout: 10_000 });
+    await expect(artistField).not.toHaveValue('', { timeout: 10_000 });
 
     // Replace the artist string with a mixed name: one that matches an existing
     // artist plus a new featured artist.
@@ -122,9 +125,7 @@ test.describe('Admin video artist-review — edit-page flow', () => {
     ).toBeVisible({ timeout: 5_000 });
 
     // No new-artist block (no unmatched names).
-    await expect(
-      reviewSection.getByRole('textbox', { name: 'First name' })
-    ).toHaveCount(0);
+    await expect(reviewSection.getByRole('textbox', { name: 'First name' })).toHaveCount(0);
   });
 });
 

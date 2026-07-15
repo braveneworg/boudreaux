@@ -40,6 +40,8 @@ export interface UseVideoArtistReviewResult {
 
 const DEBOUNCE_MS = 400;
 const MAX_ARTIST_DETAILS = 20;
+/** Route caps name-lookup at 20 names — >20 returns 400. */
+const MAX_LOOKUP_NAMES = 20;
 
 // ── Pure helpers (extracted to keep hook complexity ≤10) ──────────────────────
 
@@ -130,7 +132,9 @@ export const useVideoArtistReview = (artist: string): UseVideoArtistReviewResult
   const parts = useMemo(() => splitFeaturedArtists(debounced), [debounced]);
   const names = useMemo(() => parts.map(({ name }) => name), [parts]);
 
-  const { data, isSuccess, isPending, isError } = useArtistNameLookupQuery(names);
+  const { data, isSuccess, isPending, isError } = useArtistNameLookupQuery(
+    names.slice(0, MAX_LOOKUP_NAMES)
+  );
 
   const [drafts, setDrafts] = useState<Map<string, ArtistNameParts>>(new Map());
 

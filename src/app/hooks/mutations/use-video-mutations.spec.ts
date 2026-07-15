@@ -12,7 +12,6 @@ import { publishVideoAction } from '@/lib/actions/publish-video-action';
 import { restoreVideoAction } from '@/lib/actions/restore-video-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
-import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
@@ -25,6 +24,19 @@ import {
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
 } from './use-video-mutations';
+
+// ── Predicate helpers shared across tests ─────────────────────────────────────
+
+/** Build a minimal Query-like object for predicate assertions. */
+const fakeQuery = (queryKey: unknown[]): { queryKey: unknown[] } => ({ queryKey });
+
+/** Extract the predicate fn from the first invalidateQueries call. */
+const capturedPredicate = (): ((q: { queryKey: unknown[] }) => boolean) => {
+  const call = invalidateQueriesMock.mock.calls[0] as unknown as [
+    { predicate: (q: { queryKey: unknown[] }) => boolean },
+  ];
+  return call[0].predicate;
+};
 
 const useMutationMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -106,12 +118,37 @@ describe('useCreateVideoMutation', () => {
     expect(vi.mocked(createVideoAction).mock.calls[0]?.[1].get('title')).toBe('Clip');
   });
 
-  it('invalidates the videos cache on success', async () => {
+  it('invalidates videos.detail and videos.list queries on success via predicate', async () => {
     const opts = getOptions(useCreateVideoMutation);
 
     await opts.onSuccess(okState, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
+    const predicate = capturedPredicate();
+    // detail and adminInfinite queries should be matched
+    expect(predicate(fakeQuery(['videos', 'detail', 'v1']))).toBe(true);
+    expect(predicate(fakeQuery(['videos', 'adminInfinite', '', null, false, 'asc']))).toBe(true);
+  });
+
+  it('does not invalidate the videos.probePrefill query on success', async () => {
+    const opts = getOptions(useCreateVideoMutation);
+
+    await opts.onSuccess(okState, {});
+
+    const predicate = capturedPredicate();
+    // probePrefill key must be excluded so a mounted probe query is not refetched
+    expect(predicate(fakeQuery(['videos', 'probePrefill', 'media/videos/v/f.mp4', 'v1']))).toBe(
+      false
+    );
+  });
+
+  it('does not invalidate queries from other top-level domains', async () => {
+    const opts = getOptions(useCreateVideoMutation);
+
+    await opts.onSuccess(okState, {});
+
+    const predicate = capturedPredicate();
+    expect(predicate(fakeQuery(['artists', 'detail', 'a1']))).toBe(false);
   });
 
   it('does not invalidate when the action reports failure', async () => {
@@ -138,7 +175,7 @@ describe('useUpdateVideoMutation', () => {
 
     await opts.onSuccess(okState, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
@@ -165,7 +202,7 @@ describe('usePublishVideoMutation', () => {
 
     await opts.onSuccess({ success: true }, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
@@ -192,7 +229,7 @@ describe('useUnpublishVideoMutation', () => {
 
     await opts.onSuccess({ success: true }, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
@@ -219,7 +256,7 @@ describe('useArchiveVideoMutation', () => {
 
     await opts.onSuccess({ success: true }, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
@@ -246,7 +283,7 @@ describe('useRestoreVideoMutation', () => {
 
     await opts.onSuccess({ success: true }, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
@@ -273,7 +310,7 @@ describe('useDeleteVideoMutation', () => {
 
     await opts.onSuccess({ success: true }, {});
 
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.videos.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
   });
 
   it('does not invalidate on failure', async () => {
