@@ -15,6 +15,7 @@ import {
   deleteReplacedVideoAssets,
   isPosterReplaced,
   kickPostSaveEnrichment,
+  VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
 vi.mock('server-only', () => ({}));
@@ -249,6 +250,12 @@ describe('deleteReplacedVideoAssets', () => {
   });
 });
 
+describe('VIDEO_PERMITTED_FIELD_NAMES', () => {
+  it("includes 'artistDetails'", () => {
+    expect(VIDEO_PERMITTED_FIELD_NAMES).toContain('artistDetails');
+  });
+});
+
 describe('kickPostSaveEnrichment', () => {
   const kickInput = {
     videoId,
@@ -268,7 +275,30 @@ describe('kickPostSaveEnrichment', () => {
 
     expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
       videoId,
-      'Ceschi feat. Sage Francis'
+      'Ceschi feat. Sage Francis',
+      undefined
+    );
+  });
+
+  it('forwards artistDetails as the third arg to syncVideoArtists', async () => {
+    const artistDetails = [{ sourceName: 'Ceschi', displayName: 'Ceschi Ramos' }];
+
+    await kickPostSaveEnrichment({ ...kickInput, artistDetails });
+
+    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+      videoId,
+      'Ceschi feat. Sage Francis',
+      artistDetails
+    );
+  });
+
+  it('passes undefined for artistDetails when absent', async () => {
+    await kickPostSaveEnrichment(kickInput);
+
+    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+      videoId,
+      'Ceschi feat. Sage Francis',
+      undefined
     );
   });
 

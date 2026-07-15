@@ -18,7 +18,6 @@ import { PlaylistsContent } from '@/app/components/playlists/playlists-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { auth } from '@/auth';
 import { PLAYLISTS_PAGE_SIZE } from '@/lib/constants/playlists';
@@ -27,6 +26,8 @@ import { PlaylistService } from '@/lib/services/playlist-service';
 import type { PlaylistsResponse } from '@/lib/types/domain/playlist';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { loggers } from '@/lib/utils/logger';
+
+import { ImageHeading } from '../components/ui/image-heading';
 
 import type { Metadata } from 'next';
 
@@ -85,7 +86,12 @@ export default async function PlaylistsPage() {
       <PageContainer>
         <ContentContainer>
           <ZinePanel chat accent="kraft" breadcrumbs={breadcrumbItems}>
-            <ZineHeading level={1}>My Playlists</ZineHeading>
+            <ImageHeading
+              src="/media/headings/PLAYLISTS.webp"
+              alt="My Playlists"
+              imageHeight={480}
+              priority
+            />
             {/* useSearchParams inside the island requires a Suspense boundary. */}
             <Suspense
               fallback={

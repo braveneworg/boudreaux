@@ -60,10 +60,11 @@ const applyUpdateResult = (
 /**
  * Schedule the post-update enrichment kick when the update changed something
  * enrichment cares about: an artist-string change re-syncs `VideoArtist`
- * links, a file replacement re-probes, and — via the kick's own category
- * gate — a MUSIC video with either change re-dispatches the async web
- * enrichment. The sync also runs on a file-only replacement; it is
- * idempotent. No-op when nothing relevant changed.
+ * links, a file replacement re-probes, admin-reviewed `artistDetails` trigger
+ * a sync pass, and — via the kick's own category gate — a MUSIC video with
+ * any of these changes re-dispatches the async web enrichment. The sync also
+ * runs on a file-only replacement; it is idempotent. No-op when nothing
+ * relevant changed.
  */
 const scheduleUpdateEnrichment = (
   current: Video,
@@ -71,7 +72,8 @@ const scheduleUpdateEnrichment = (
   s3KeyReplaced: boolean
 ): void => {
   const artistChanged = data.artist !== current.artist;
-  if (!artistChanged && !s3KeyReplaced) return;
+  const artistDetailsProvided = (data.artistDetails?.length ?? 0) > 0;
+  if (!artistChanged && !s3KeyReplaced && !artistDetailsProvided) return;
 
   after(() =>
     kickPostSaveEnrichment({
@@ -79,6 +81,7 @@ const scheduleUpdateEnrichment = (
       artist: data.artist,
       category: data.category,
       reProbe: s3KeyReplaced,
+      artistDetails: data.artistDetails,
     })
   );
 };

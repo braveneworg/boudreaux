@@ -24,6 +24,7 @@ import type {
 } from '@/lib/types/domain/video-enrichment';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
+import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
   ENRICHMENT_STATUSES,
   isInFlightEnrichmentStatus,
@@ -503,14 +504,27 @@ export class VideoEnrichmentService {
    * Artist shell per name (best-effort — a failed shell is logged and
    * skipped), replace the video's join rows, and drop pending suggestions for
    * artists the re-sync detached (applied/dismissed rows survive as audit).
+   *
+   * When `artistDetails` is provided, each detail is matched to an artist part
+   * by lowercased trimmed `sourceName`. Stale details (whose sourceName is no
+   * longer present in the artist string) are simply never forwarded — no
+   * explicit filtering is needed.
    */
-  static async syncVideoArtists(videoId: string, artistString: string): Promise<void> {
+  static async syncVideoArtists(
+    videoId: string,
+    artistString: string,
+    artistDetails?: VideoArtistDetail[]
+  ): Promise<void> {
     const parts = splitFeaturedArtists(artistString);
+    const detailMap = new Map<string, VideoArtistDetail>(
+      (artistDetails ?? []).map((detail) => [detail.sourceName.trim().toLowerCase(), detail])
+    );
     const previous = await VideoArtistRepository.findByVideoId(videoId);
     const rows: Array<{ artistId: string; role: 'PRIMARY' | 'FEATURED'; sortOrder: number }> = [];
     for (const part of parts) {
       try {
-        const found = await ArtistService.findOrCreateByName(part.name);
+        const details = detailMap.get(part.name.trim().toLowerCase());
+        const found = await ArtistService.findOrCreateByName(part.name, details);
         if (!found.success) {
           logger.warn('video_artist_shell_failed', {
             videoId,

@@ -54,6 +54,7 @@ export const PlaylistPickerCombobox = ({
   return (
     <Command shouldFilter={false}>
       <CommandInput
+        className="border-none"
         value={search}
         onValueChange={setSearch}
         placeholder="Find a playlist…"

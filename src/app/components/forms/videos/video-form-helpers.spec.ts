@@ -3,9 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
+import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import {
   applyServerFieldErrors,
+  applyServerProbePrefill,
   formatDateForForm,
   mapVideoToFormValues,
   validateVideoFile,
@@ -121,5 +123,155 @@ describe('applyServerFieldErrors', () => {
     const setError = makeSetError();
     applyServerFieldErrors(setError, { title: ['Taken'] });
     expect(setError).toHaveBeenCalledWith('title', { type: 'server', message: 'Taken' });
+  });
+});
+
+// ── applyServerProbePrefill ───────────────────────────────────────────────────
+
+const makeForm = (overrides: Partial<VideoFormData> = {}): UseFormReturn<VideoFormData> => {
+  const values: VideoFormData = {
+    title: '',
+    artist: '',
+    description: '',
+    releasedOn: '',
+    durationSeconds: '',
+    s3Key: 'media/videos/v1/clip.mp4',
+    fileName: 'clip.mp4',
+    fileSize: '4096',
+    mimeType: 'video/mp4',
+    posterUrl: '',
+    publishedAt: '',
+    category: 'MUSIC',
+    ...overrides,
+  };
+  return {
+    getValues: () => values,
+    setValue: vi.fn(),
+  } as unknown as UseFormReturn<VideoFormData>;
+};
+
+const fullTags: ProbePrefillTags = {
+  title: 'Probed Title',
+  artist: 'Probed Artist',
+  releasedOn: '2023-05-10',
+  description: 'A probed description',
+  durationSeconds: 245,
+};
+
+describe('applyServerProbePrefill', () => {
+  it('fills empty title, artist, releasedOn, and description from non-null tags', () => {
+    const form = makeForm();
+    applyServerProbePrefill(form, fullTags);
+
+    expect(form.setValue).toHaveBeenCalledWith('title', 'Probed Title', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    expect(form.setValue).toHaveBeenCalledWith('artist', 'Probed Artist', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2023-05-10', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    expect(form.setValue).toHaveBeenCalledWith('description', 'A probed description', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  });
+
+  it('leaves already-populated fields untouched', () => {
+    const form = makeForm({
+      title: 'User Title',
+      artist: 'User Artist',
+      releasedOn: '2020-01-01',
+      description: 'User description',
+      durationSeconds: '90',
+    });
+    applyServerProbePrefill(form, fullTags);
+
+    expect(form.setValue).not.toHaveBeenCalledWith('title', expect.anything(), expect.anything());
+    expect(form.setValue).not.toHaveBeenCalledWith('artist', expect.anything(), expect.anything());
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'releasedOn',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'description',
+      expect.anything(),
+      expect.anything()
+    );
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'durationSeconds',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('fills nothing when all tags are null', () => {
+    const form = makeForm();
+    applyServerProbePrefill(form, {
+      title: null,
+      artist: null,
+      releasedOn: null,
+      description: null,
+      durationSeconds: null,
+    });
+
+    expect(form.setValue).not.toHaveBeenCalled();
+  });
+
+  it('fills nothing when string tags are empty strings', () => {
+    const form = makeForm();
+    // ProbePrefillTags uses string | null; the helper must also guard '' from the type perspective
+    // (probe-tags.ts asString already prevents '' — but the helper's guard must be correct too)
+    applyServerProbePrefill(form, {
+      title: null,
+      artist: null,
+      releasedOn: null,
+      description: null,
+      durationSeconds: 120,
+    });
+
+    // Only durationSeconds should fire (it is non-null and field is empty)
+    expect(form.setValue).toHaveBeenCalledTimes(1);
+    expect(form.setValue).toHaveBeenCalledWith('durationSeconds', '120', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  });
+
+  it('fills durationSeconds as a string when the field is empty and the tag is non-null', () => {
+    const form = makeForm({ durationSeconds: '' });
+    applyServerProbePrefill(form, { ...fullTags, durationSeconds: 245 });
+
+    expect(form.setValue).toHaveBeenCalledWith('durationSeconds', '245', {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  });
+
+  it('does not fill durationSeconds when the field already has a value', () => {
+    const form = makeForm({ durationSeconds: '90' });
+    applyServerProbePrefill(form, { ...fullTags, durationSeconds: 245 });
+
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'durationSeconds',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('does not fill durationSeconds when the tag is null', () => {
+    const form = makeForm({ durationSeconds: '' });
+    applyServerProbePrefill(form, { ...fullTags, durationSeconds: null });
+
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'durationSeconds',
+      expect.anything(),
+      expect.anything()
+    );
   });
 });

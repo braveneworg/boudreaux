@@ -91,6 +91,25 @@ describe('queryKeys', () => {
       const key = queryKeys.artists.filteredList({});
       expect(key).toEqual(['artists', 'filteredList', '', '']);
     });
+
+    describe('nameLookup', () => {
+      it('returns a key rooted in artists.all with nameLookup discriminator', () => {
+        const key = queryKeys.artists.nameLookup(['Ceschi', 'Sole']);
+        expect(key[0]).toBe('artists');
+        expect(key[1]).toBe('nameLookup');
+      });
+
+      it('lowercases and trims each name entry in the key', () => {
+        const key = queryKeys.artists.nameLookup(['  Ceschi  ', 'SOLE']);
+        expect(key).toEqual(['artists', 'nameLookup', 'ceschi', 'sole']);
+      });
+
+      it('produces different keys for different name sets', () => {
+        const key1 = queryKeys.artists.nameLookup(['Ceschi']);
+        const key2 = queryKeys.artists.nameLookup(['Sole']);
+        expect(key1).not.toEqual(key2);
+      });
+    });
   });
 
   describe('featuredArtists', () => {
@@ -260,6 +279,40 @@ describe('queryKeys', () => {
     it('should return userMessages key with userId', () => {
       const key = queryKeys.chat.userMessages('u-123');
       expect(key).toEqual(['chat', 'userMessages', 'u-123']);
+    });
+  });
+
+  describe('videos', () => {
+    it('should return all key', () => {
+      expect(queryKeys.videos.all).toEqual(['videos']);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.videos.detail('v-123');
+      expect(key).toEqual(['videos', 'detail', 'v-123']);
+    });
+
+    it('should return enrichment key with id', () => {
+      const key = queryKeys.videos.enrichment('v-123');
+      expect(key).toEqual(['videos', 'enrichment', 'v-123']);
+    });
+
+    it('should return probePrefill key with s3Key and videoId extending videos.all', () => {
+      const key = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-1');
+      expect(key).toEqual(['videos', 'probePrefill', 'videos/clip.mp4', 'v-1']);
+      expect(key[0]).toBe(queryKeys.videos.all[0]);
+    });
+
+    it('should return different probePrefill keys for different s3Keys', () => {
+      const key1 = queryKeys.videos.probePrefill('videos/a.mp4', 'v-1');
+      const key2 = queryKeys.videos.probePrefill('videos/b.mp4', 'v-1');
+      expect(key1).not.toEqual(key2);
+    });
+
+    it('should return different probePrefill keys for different videoIds', () => {
+      const key1 = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-1');
+      const key2 = queryKeys.videos.probePrefill('videos/clip.mp4', 'v-2');
+      expect(key1).not.toEqual(key2);
     });
   });
 

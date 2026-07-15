@@ -16,6 +16,7 @@ import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
+import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
 
@@ -33,6 +34,7 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
   'mimeType',
   'posterUrl',
   'publishedAt',
+  'artistDetails',
 ];
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
@@ -161,6 +163,8 @@ export interface KickPostSaveEnrichmentInput {
   category: VideoCategory;
   /** Probe (or re-probe) the file — true on create and on file replacement. */
   reProbe: boolean;
+  /** Admin-reviewed artist name details forwarded to syncVideoArtists. */
+  artistDetails?: VideoArtistDetail[];
 }
 
 /**
@@ -176,9 +180,10 @@ export const kickPostSaveEnrichment = async ({
   artist,
   category,
   reProbe,
+  artistDetails,
 }: KickPostSaveEnrichmentInput): Promise<void> => {
   try {
-    await VideoEnrichmentService.syncVideoArtists(videoId, artist);
+    await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
   } catch (error) {
     logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
   }

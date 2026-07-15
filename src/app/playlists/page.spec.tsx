@@ -57,6 +57,16 @@ vi.mock('@/lib/utils/logger', () => ({
   loggers: { media: { error: mockLoggerError } },
 }));
 
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => (
+    <span
+      className={props.className as string | undefined}
+      data-alt={props.alt as string}
+      data-testid="next-image"
+    />
+  ),
+}));
+
 // Mock the shell containers + the client content island.
 vi.mock('@/app/components/ui/page-container', () => ({
   PageContainer: ({ children }: { children: React.ReactNode }) => (
@@ -187,13 +197,11 @@ describe('PlaylistsPage', () => {
     expect(panel).toHaveClass('zine-accent-kraft');
   });
 
-  it('should render the cutout strip heading with the page name', async () => {
+  it('should render the image heading with the page name', async () => {
     const Page = await PlaylistsPage();
     render(Page);
 
-    const heading = screen.getByRole('heading', { level: 1 });
-    const strip = heading.querySelector('[data-slot="zine-heading"]');
-    expect(strip).toHaveTextContent('My Playlists');
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-alt', 'My Playlists');
   });
 
   it('should render the Home and My Playlists breadcrumbs', async () => {
