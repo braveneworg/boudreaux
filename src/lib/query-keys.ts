@@ -42,6 +42,11 @@ export const queryKeys = {
         String(params.take ?? ''),
       ] as const,
   },
+  producers: {
+    all: ['producers'] as const,
+    search: (query: string) =>
+      [...queryKeys.producers.all, 'search', query.trim().toLowerCase()] as const,
+  },
   videos: {
     all: ['videos'] as const,
     publishedInfinite: (sort: 'asc' | 'desc') =>
