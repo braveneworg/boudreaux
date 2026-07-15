@@ -311,6 +311,17 @@ describe('SignupSigninForm', () => {
     } as FormState,
   };
 
+  beforeEach(() => {
+    // Reset persistent mocks to their defaults. Global clearMocks clears call
+    // history but NOT mockReturnValue, so a nested describe's paused-signup stub
+    // (data.paused === true) or a `/signin` pathname override would otherwise
+    // leak into sibling tests — e.g. flipping the submit button to disabled —
+    // depending on run order. Tests needing a paused status or a different
+    // pathname set them in their own scope, which runs after this reset.
+    mockUseSignupStatusQuery.mockReturnValue({ data: undefined });
+    mockUsePathname.mockReturnValue('/signup');
+  });
+
   describe('social provider buttons', () => {
     it('renders the social provider buttons block', () => {
       render(<SignupSigninForm {...defaultProps} />);
