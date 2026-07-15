@@ -85,7 +85,7 @@ export const signStreamUrl = (
       dateLessThan,
     });
   } catch (err) {
-    logger.error('CloudFront stream signing failed; falling back to unsigned URL', err);
+    logger.error('CloudFront stream signing failed; failing closed with null URL', err);
     return null;
   }
 };
