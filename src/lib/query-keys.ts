@@ -73,6 +73,14 @@ export const queryKeys = {
       [...queryKeys.videos.all, 'probePrefill', s3Key, videoId] as const,
     /** Producers linked to a video — used to prefill the producer pills in edit mode. */
     producers: (id: string) => [...queryKeys.videos.all, 'producers', id] as const,
+    /** Release-date web lookup keyed by normalised title + optional artist. */
+    releaseDateLookup: (title: string, artist: string) =>
+      [
+        ...queryKeys.videos.all,
+        'releaseDateLookup',
+        title.trim().toLowerCase(),
+        artist.trim().toLowerCase(),
+      ] as const,
   },
   artists: {
     all: ['artists'] as const,
