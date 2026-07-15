@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { VideoPlayer } from '@/components/ui/video/video-player';
 import { resolveStreamUrl } from '@/lib/utils/cdn-url';
-import { formatDuration } from '@/lib/utils/format-duration';
+import { formatVideoDuration } from '@/lib/utils/format-duration';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
 import { formatFieldDate } from '../data-view-utils';
@@ -50,7 +50,7 @@ const buildVideoMetadata = (video: VideoRow): MetadataRow[] => {
     { label: 'Artist', value: video.artist },
     { label: 'Category', value: categoryLabel },
     { label: 'Released', value: formatFieldDate(video.releasedOn) },
-    { label: 'Duration', value: formatDuration(video.durationSeconds) },
+    { label: 'Duration', value: formatVideoDuration(video.durationSeconds) },
     { label: 'File', value: `${video.fileName}${sizeSuffix}` },
     { label: 'Created', value: formatFieldDate(video.createdAt) },
     { label: 'Updated', value: formatFieldDate(video.updatedAt) },

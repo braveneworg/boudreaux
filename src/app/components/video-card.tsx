@@ -9,7 +9,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { VideoPlayer } from '@/components/ui/video/video-player';
 import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { formatTourDate } from '@/lib/utils/date-utils';
-import { formatDuration } from '@/lib/utils/format-duration';
+import { formatVideoDuration } from '@/lib/utils/format-duration';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
 interface VideoCardProps {
@@ -46,7 +46,7 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
         </div>
         <div className="flex gap-1">
           <dt className="sr-only">Duration</dt>
-          <dd>{formatDuration(video.durationSeconds)}</dd>
+          <dd>{formatVideoDuration(video.durationSeconds)}</dd>
         </div>
       </dl>
 

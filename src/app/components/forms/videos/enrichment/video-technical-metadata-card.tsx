@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { formatDuration } from '@/lib/utils/format-duration';
+import { formatVideoDuration } from '@/lib/utils/format-duration';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
 import { formatBitrate, formatFrameRate, formatResolution } from './video-enrichment-format';
@@ -25,7 +25,7 @@ export const buildTechnicalMetadataRows = (video: VideoRow): TechnicalMetadataRo
     ['Audio codec', video.audioCodec ?? null],
     ['Bitrate', formatBitrate(video.bitrateKbps)],
     ['Frame rate', formatFrameRate(video.frameRate)],
-    ['Duration', video.durationSeconds == null ? null : formatDuration(video.durationSeconds)],
+    ['Duration', video.durationSeconds == null ? null : formatVideoDuration(video.durationSeconds)],
     ['Audio channels', video.audioChannels == null ? null : String(video.audioChannels)],
     ['Sample rate', video.audioSampleRateHz == null ? null : `${video.audioSampleRateHz} Hz`],
   ];
