@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -97,7 +97,7 @@ interface EnrichmentPanelMountProps {
   onApplyReleaseDate: (value: string) => void;
 }
 
-interface UseVideoProducersPrefillArgs {
+export interface UseVideoProducersPrefillArgs {
   videoId: string | undefined;
   isEditMode: boolean;
   video: VideoRow | null | undefined;
@@ -109,17 +109,19 @@ interface UseVideoProducersPrefillArgs {
  * video reset and the producers query have settled — keeping `VideoForm` under
  * the ESLint complexity cap of 10.
  */
-const useVideoProducersPrefill = ({
+export const useVideoProducersPrefill = ({
   videoId,
   isEditMode,
   video,
   form,
 }: UseVideoProducersPrefillArgs): void => {
   const { data: producerData } = useVideoProducersQuery(videoId ?? '', { enabled: isEditMode });
+  const hasPrefilled = useRef(false);
 
   useEffect(() => {
-    if (isEditMode && video && producerData !== undefined) {
+    if (!hasPrefilled.current && isEditMode && video && producerData !== undefined) {
       form.setValue('producers', producerData);
+      hasPrefilled.current = true;
     }
   }, [isEditMode, video, producerData, form]);
 };

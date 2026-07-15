@@ -3,15 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { Controller } from 'react-hook-form';
+import { Controller, type Control } from 'react-hook-form';
 
 import {
   ProducerMultiCombobox,
   type ProducerPill,
 } from '@/app/components/forms/fields/producer-multi-combobox';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
-
-import type { Control } from 'react-hook-form';
 
 interface VideoProducersSectionProps {
   control: Control<VideoFormData>;

@@ -1,17 +1,20 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { VideoForm } from '@/app/components/forms/video-form';
+import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
   updateVideoAsync: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
+  useVideoProducersQuery: vi.fn(),
   uploadVideoMultipart: vi.fn(),
   extractVideoDuration: vi.fn(),
   extractVideoTags: vi.fn(),
@@ -57,12 +60,7 @@ vi.mock('@/app/hooks/use-video-probe-prefill-query', () => ({
 }));
 
 vi.mock('@/app/hooks/use-video-producers-query', () => ({
-  useVideoProducersQuery: () => ({
-    isPending: false,
-    error: null,
-    data: undefined,
-    refetch: vi.fn(),
-  }),
+  useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
 vi.mock('@/lib/utils/multipart-upload', () => ({
@@ -167,6 +165,12 @@ const PROBE_IDLE_RESULT = { data: undefined, isPending: false, isError: false };
 beforeEach(() => {
   mocks.useVideoQuery.mockReturnValue(CREATE_MODE_QUERY);
   mocks.useVideoProbePrefillQuery.mockReturnValue(PROBE_IDLE_RESULT);
+  mocks.useVideoProducersQuery.mockReturnValue({
+    isPending: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  });
   mocks.buildArtistDetails.mockReturnValue([]);
   mocks.useVideoArtistReview.mockReturnValue({
     entries: [],
@@ -944,6 +948,58 @@ describe('VideoForm — server probe prefill', () => {
     await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue(''));
     // No error UI rendered
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+// ── producers prefill — run-once guard ───────────────────────────────────────
+
+describe('useVideoProducersPrefill — run-once guard', () => {
+  const producersFirst = [{ id: 'p1', name: 'Rick Rubin' }];
+  const producersSecond = [{ id: 'p2', name: 'DJ Premier' }];
+
+  const stubVideo = editVideo;
+
+  it('calls form.setValue("producers") exactly once even when producerData changes after the initial prefill', async () => {
+    // Arrange: useVideoProducersQuery starts with producersFirst
+    mocks.useVideoProducersQuery.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: producersFirst,
+      refetch: vi.fn(),
+    });
+
+    // Build a real RHF form so we can spy on setValue directly
+    const { result: formResult } = renderHook(() =>
+      useForm<VideoFormData>({ defaultValues: { producers: [] } })
+    );
+    const setValueSpy = vi.spyOn(formResult.current, 'setValue');
+
+    // Render the hook with the initial props
+    const { rerender } = renderHook(() =>
+      useVideoProducersPrefill({
+        videoId: 'v1',
+        isEditMode: true,
+        video: stubVideo,
+        form: formResult.current,
+      })
+    );
+
+    // Wait for the initial prefill effect to fire
+    await waitFor(() => expect(setValueSpy).toHaveBeenCalledWith('producers', producersFirst));
+    expect(setValueSpy).toHaveBeenCalledTimes(1);
+
+    // Act: producerData changes (simulating a background refetch)
+    mocks.useVideoProducersQuery.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: producersSecond,
+      refetch: vi.fn(),
+    });
+
+    rerender();
+
+    // The guard must block the second write — setValue stays at exactly 1 call
+    expect(setValueSpy).toHaveBeenCalledTimes(1);
   });
 });
 
