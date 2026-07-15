@@ -137,6 +137,24 @@ const ENRICH_LEAD_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a1';
 const ENRICH_GUEST_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a2';
 
 /**
+ * Deterministic id of the Producer seeded for the video uploader v2 E2E specs
+ * (admin-video-form.spec.ts). The producers combobox hits the search API, so a
+ * persisted row is required. One Producer does NOT change video counts.
+ */
+const E2E_PRODUCER_ONE_ID = '65a1b2c3d4e5f6a7b8c9d4c1';
+
+/**
+ * Deterministic id of the future-dated "scheduled" video seeded for the
+ * publish-scheduling E2E spec (admin-video-publish-scheduling.spec.ts). Its
+ * `publishedAt` is set far in the future so `publishedAt > now`, which means:
+ *   - The admin list shows it with a "Scheduled" badge.
+ *   - The public /videos listing (publishedAt ≤ now) excludes it.
+ *   - VideoRepository.count({ published: true }) excludes it → draft count += 1.
+ * releasedOn is set inside the existing range so sort assertions still pass.
+ */
+const SCHEDULED_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d4d1';
+
+/**
  * Deterministic ids for the video artist-review E2E fixtures
  * (admin-video-artist-review.spec.ts). The artist is seeded with a known
  * displayName so the name-lookup chip renders deterministically. The video is
@@ -444,6 +462,34 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
       archivedAt: ARCHIVED_AT,
     },
   });
+
+  // Future-dated "scheduled" video: publishedAt is 10 years ahead so it stays
+  // scheduled throughout any foreseeable test run. releasedOn (2026-01-06) falls
+  // within the existing range so sort-order assertions still pass. This video
+  // shows a Scheduled badge in /admin/videos but is EXCLUDED from the public
+  // /videos listing (publishedAt > now) and from the published count on the
+  // dashboard (VideoRepository.count uses publishedAt <= now).
+  const scheduledSlug = makeSlug('E2E Video Scheduled');
+  await prisma.video.create({
+    data: {
+      id: SCHEDULED_VIDEO_ID,
+      title: 'E2E Video Scheduled',
+      artist: 'E2E Artist Two',
+      category: 'MUSIC',
+      releasedOn: new Date('2026-01-06T00:00:00.000Z'),
+      durationSeconds: 150,
+      s3Key: `media/videos/e2e/${scheduledSlug}.mp4`,
+      fileName: `${scheduledSlug}.mp4`,
+      mimeType: 'video/mp4',
+      fileSize: BigInt(1048576),
+      posterUrl: null,
+      description: 'E2E Video Scheduled description for E2E.',
+      // Far-future publishedAt: this video is "scheduled" — publishedAt is set
+      // but after now, so it is hidden on the public page and counts as draft
+      // on the dashboard.
+      publishedAt: new Date('2099-01-01T00:00:00.000Z'),
+    },
+  });
 };
 
 /**
@@ -639,6 +685,8 @@ const seedTestDatabase = async () => {
     await prisma.playlist.deleteMany({});
     await prisma.videoEnrichmentSuggestion.deleteMany({});
     await prisma.videoArtist.deleteMany({});
+    // VideoProducer must be removed before both Video and Producer.
+    await prisma.videoProducer.deleteMany({});
     await prisma.abuseReport.deleteMany({});
     await prisma.smsBlast.deleteMany({});
     await prisma.chatMessage.deleteMany({});
@@ -673,6 +721,9 @@ const seedTestDatabase = async () => {
     await prisma.release.deleteMany({});
     await prisma.artist.deleteMany({});
     await prisma.video.deleteMany({});
+    // Producer has no dependencies — delete after videos (VideoProducer already
+    // cleared above) so the FK constraint is satisfied.
+    await prisma.producer.deleteMany({});
     await prisma.authenticator.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.account.deleteMany({});
@@ -1448,6 +1499,17 @@ const seedTestDatabase = async () => {
     });
 
     await seedVideos(prisma);
+
+    // One Producer row so the producers combobox search returns a deterministic
+    // match. Producer rows are independent of Video counts — adding one here does
+    // not change any dashboard tile total or admin list page count.
+    await prisma.producer.create({
+      data: {
+        id: E2E_PRODUCER_ONE_ID,
+        name: 'E2E Producer One',
+      },
+    });
+
     await seedEnrichmentFixtures(prisma);
     await seedReviewFixtures(prisma);
     await seedPublicPlaylistFixture(prisma, mp3FilesByTitle);
@@ -1464,11 +1526,13 @@ export {
   BIO_PALETTE_ARTIST_ID,
   createBioPaletteLinkRow,
   createDisposableSignoutState,
+  E2E_PRODUCER_ONE_ID,
   ENRICH_INFO_VIDEO_ID,
   ENRICH_MUSIC_VIDEO_ID,
   PUBLIC_PLAYLIST_SNAPSHOT_TITLE,
   PUBLIC_PLAYLIST_TITLE,
   REVIEW_VIDEO_ID,
+  SCHEDULED_VIDEO_ID,
   seedTestDatabase,
   SIGNOUT_USER_ID,
   TEST_USERS,
