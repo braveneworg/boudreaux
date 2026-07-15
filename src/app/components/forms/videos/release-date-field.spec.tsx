@@ -103,6 +103,28 @@ const makeSetValueRef = (): React.MutableRefObject<UseFormSetValue<VideoFormData
   current: null,
 });
 
+// Wrapper whose form omits `title`/`artist` from defaultValues, so RHF's
+// `useWatch` yields `undefined` for both after the first render — exercising the
+// `title ?? ''` / `artist ?? ''` nullish fallbacks in ReleaseDateField.
+const WrapperNoArtistDefaults = (): React.ReactElement => {
+  const form = useForm<VideoFormData>({
+    defaultValues: {
+      category: 'MUSIC',
+      description: '',
+      releasedOn: '',
+      s3Key: '',
+      fileName: '',
+      mimeType: 'video/mp4',
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <ReleaseDateField control={form.control} onSelectDate={vi.fn()} />
+    </Form>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -175,6 +197,31 @@ describe('ReleaseDateField', () => {
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('https://example.com'));
   });
 
+  it('omits the source hint from the success toast when sources is empty', async () => {
+    const onSelectDate = vi.fn();
+    mockRefetch.mockResolvedValue({
+      data: { releasedOn: '2021-03-04', confidence: 'low', sources: [] },
+      error: null,
+      status: 'success',
+    });
+
+    const setValueRef = makeSetValueRef();
+    render(<Wrapper setValueRef={setValueRef} onSelectDate={onSelectDate} />);
+
+    act(() => {
+      setValueRef.current?.('title', 'Some Song');
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
+    });
+
+    await waitFor(() => {
+      expect(onSelectDate).toHaveBeenCalledWith('2021-03-04', 'releasedOn');
+    });
+    expect(toast.success).toHaveBeenCalledWith('Found 2021-03-04 (low confidence)');
+  });
+
   it('toasts "No release date found" when result is null', async () => {
     mockRefetch.mockResolvedValue({
       data: null,
@@ -238,5 +285,10 @@ describe('ReleaseDateField', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Release date lookup failed');
     });
+  });
+
+  it('renders with the find button disabled when title and artist are undefined', () => {
+    render(<WrapperNoArtistDefaults />);
+    expect(screen.getByRole('button', { name: 'Find release date' })).toBeDisabled();
   });
 });

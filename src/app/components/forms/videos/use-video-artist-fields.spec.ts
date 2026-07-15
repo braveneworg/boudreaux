@@ -96,4 +96,17 @@ describe('useVideoArtistFields', () => {
 
     expect(result.current.form.getValues('artist')).toBe('X');
   });
+
+  it('treats an undefined artist value as empty (nullish fallback)', () => {
+    // A form with no `artist` default: `useWatch` yields `undefined` after the
+    // first render, exercising the `artist ?? ''` fallback in the hook.
+    const { result } = renderHook(() => {
+      const form = useForm<VideoFormData>();
+      const fields = useVideoArtistFields({ control: form.control, setValue: form.setValue });
+      return { form, fields };
+    });
+
+    expect(result.current.fields.primary).toBe('');
+    expect(result.current.fields.featured).toEqual([]);
+  });
 });

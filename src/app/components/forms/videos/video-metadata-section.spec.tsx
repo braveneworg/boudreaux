@@ -128,15 +128,16 @@ vi.mock('@/ui/datepicker', () => ({
 
 interface WrapperProps {
   setValueRef: React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+  omitCategory?: boolean;
 }
 
-const Wrapper = ({ setValueRef }: WrapperProps): React.ReactElement => {
+const Wrapper = ({ setValueRef, omitCategory = false }: WrapperProps): React.ReactElement => {
   const form = useForm<VideoFormData>({
     resolver: zodResolver(createVideoSchema),
     defaultValues: {
       title: '',
       artist: '',
-      category: 'MUSIC',
+      ...(omitCategory ? {} : { category: 'MUSIC' }),
       description: '',
       releasedOn: '',
       s3Key: '',
@@ -192,5 +193,16 @@ describe('VideoMetadataSection — artist comboboxes', () => {
     });
 
     expect(screen.getByRole('combobox', { name: 'Search featured artists' })).not.toBeDisabled();
+  });
+
+  it('falls back to an empty category value when the field is undefined', () => {
+    const setValueRef = {
+      current: null,
+    } as React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+    render(<Wrapper setValueRef={setValueRef} omitCategory />);
+
+    // With no category selected, neither radio option is checked.
+    expect(screen.getByLabelText('Music')).not.toBeChecked();
+    expect(screen.getByLabelText('Informational')).not.toBeChecked();
   });
 });

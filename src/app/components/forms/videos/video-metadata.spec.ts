@@ -276,6 +276,30 @@ describe('captureVideoPoster', () => {
     await expect(promise).resolves.toBe(posterBlob);
   });
 
+  it('resolves null when the frame canvas has no 2d context', async () => {
+    // First getContext call is the render canvas — returning null there means
+    // renderFrameToCanvas yields null and the capture resolves null.
+    getContextMock.mockReset().mockReturnValueOnce(null);
+    const { promise, video } = startPoster({ atSeconds: 1 });
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('seeked'));
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it('scores a frame as zero when the sampler canvas has no 2d context', async () => {
+    // Render canvas gets a valid context; the sampler canvas gets null, so
+    // scoreCanvasQuality returns 0 but the frame is still captured.
+    const validContext = {
+      drawImage: drawImageMock,
+      getImageData: getImageDataMock,
+    } as unknown as CanvasRenderingContext2D;
+    getContextMock.mockReset().mockReturnValueOnce(validContext).mockReturnValueOnce(null);
+    const { promise, video } = startPoster({ atSeconds: 1 });
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('seeked'));
+    await expect(promise).resolves.toBe(posterBlob);
+  });
+
   it('encodes the poster as jpeg at 0.85 quality', async () => {
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
@@ -425,5 +449,16 @@ describe('scoreFrameQuality', () => {
   it('scores an empty frame as 0', () => {
     const empty = { data: new Uint8ClampedArray(0), width: 0, height: 0 } as unknown as ImageData;
     expect(scoreFrameQuality(empty)).toBe(0);
+  });
+
+  it('treats out-of-bounds pixel reads as zero luma', () => {
+    // width/height claim a 2×2 frame (16 bytes) but data holds only one pixel,
+    // so neighbor reads run off the end and each `data.at(i) ?? 0` falls back to 0.
+    const truncated = {
+      data: new Uint8ClampedArray([10, 20, 30, 255]),
+      width: 2,
+      height: 2,
+    } as unknown as ImageData;
+    expect(scoreFrameQuality(truncated)).toBeGreaterThanOrEqual(0);
   });
 });

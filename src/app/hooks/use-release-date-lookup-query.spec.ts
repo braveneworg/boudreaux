@@ -53,4 +53,32 @@ describe('useReleaseDateLookupQuery', () => {
       });
     });
   });
+
+  it('includes the artist query param when an artist is supplied', async () => {
+    const { wrapper } = buildHarness();
+    mockFetchAndParse.mockResolvedValue({ result: null });
+
+    const { result } = renderHook(() => useReleaseDateLookupQuery('Song', 'Band'), { wrapper });
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    const [url] = mockFetchAndParse.mock.calls[0] as [string, unknown, unknown];
+    expect(url).toContain('artist=Band');
+  });
+
+  it('omits the artist query param when the artist is empty', async () => {
+    const { wrapper } = buildHarness();
+    mockFetchAndParse.mockResolvedValue({ result: null });
+
+    const { result } = renderHook(() => useReleaseDateLookupQuery('Song', ''), { wrapper });
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    const [url] = mockFetchAndParse.mock.calls[0] as [string, unknown, unknown];
+    expect(url).not.toContain('artist=');
+  });
 });

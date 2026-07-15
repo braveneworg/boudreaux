@@ -48,6 +48,22 @@ describe('suggestionFieldLabel', () => {
   it('maps releasedOn to a human label', () => {
     expect(suggestionFieldLabel('releasedOn')).toBe('Release date');
   });
+
+  it('falls back to the raw field name for an unmapped field', () => {
+    // An out-of-map field (e.g. a future suggestion field) returns the raw name,
+    // exercising the `?? field` fallback.
+    const unknownField = 'nickname' as EnrichmentSuggestion['field'];
+    expect(suggestionFieldLabel(unknownField)).toBe('nickname');
+  });
+});
+
+describe('SuggestionFieldRow — confidence fallback', () => {
+  it('labels an unrecognized confidence level as Low', () => {
+    const unknownConfidence = 'unknown' as EnrichmentSuggestion['confidence'];
+    renderRow({ confidence: unknownConfidence });
+
+    expect(screen.getByText('Low')).toBeInTheDocument();
+  });
 });
 
 describe('SuggestionFieldRow — pending', () => {

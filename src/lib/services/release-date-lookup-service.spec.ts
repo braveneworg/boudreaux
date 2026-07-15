@@ -82,4 +82,13 @@ describe('ReleaseDateLookupService.lookup', () => {
     expect(result).toBeNull();
     expect(sendMock).not.toHaveBeenCalled();
   });
+
+  it('throws when the Lambda response carries no payload', async () => {
+    delete process.env.BIO_GENERATOR_FAKE;
+    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
+    sendMock.mockResolvedValue({ Payload: undefined });
+    await expect(ReleaseDateLookupService.lookup('Song', 'Band')).rejects.toThrow(
+      'Release date lookup returned no payload'
+    );
+  });
 });

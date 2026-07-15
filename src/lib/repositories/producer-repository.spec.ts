@@ -114,6 +114,15 @@ describe('ProducerRepository', () => {
 
       expect(result).toEqual({ id: PRODUCER_ID_1, name: 'Race Producer' });
     });
+
+    it('throws when create fails and the recovery re-find yields nothing', async () => {
+      vi.mocked(prisma.producer.findFirst).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      vi.mocked(prisma.producer.create).mockRejectedValue(new Error('boom'));
+
+      await expect(ProducerRepository.findOrCreateByName('Ghost')).rejects.toThrow(
+        'Failed to create producer "Ghost"'
+      );
+    });
   });
 
   describe('replaceForVideo', () => {

@@ -43,6 +43,24 @@ const Wrapper = ({ defaultProducers }: { defaultProducers: ProducerPill[] }) => 
   return <VideoProducersSection control={control} />;
 };
 
+// Wrapper that omits `producers` so the Controller field value is undefined,
+// exercising the `field.value ?? []` fallback.
+const WrapperNoProducers = () => {
+  const { control } = useForm<VideoFormData>({
+    resolver: zodResolver(createVideoSchema),
+    defaultValues: {
+      title: 'x',
+      artist: 'x',
+      category: 'MUSIC',
+      releasedOn: '2024-01-01',
+      s3Key: 'k',
+      fileName: 'f.mp4',
+      mimeType: 'video/mp4',
+    },
+  });
+  return <VideoProducersSection control={control} />;
+};
+
 // --------------------------------------------------------------------------
 // Tests
 // --------------------------------------------------------------------------
@@ -63,5 +81,11 @@ describe('VideoProducersSection', () => {
     render(<Wrapper defaultProducers={[]} />);
 
     expect(screen.getByRole('heading', { name: /producers/i })).toBeInTheDocument();
+  });
+
+  it('falls back to an empty pill list when the producers field is undefined', () => {
+    render(<WrapperNoProducers />);
+
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
   });
 });

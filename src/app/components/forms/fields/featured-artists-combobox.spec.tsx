@@ -21,12 +21,13 @@ interface MockArtistRow {
 
 let mockArtistResults: MockArtistRow[] = [];
 let mockIsPending = false;
+let mockDataUndefined = false;
 
 vi.mock('@/app/hooks/use-artist-list-query', () => ({
   useArtistListQuery: () => ({
     isPending: mockIsPending,
     error: null,
-    data: mockArtistResults,
+    data: mockDataUndefined ? undefined : mockArtistResults,
     refetch: vi.fn(),
   }),
 }));
@@ -230,6 +231,7 @@ describe('FeaturedArtistsCombobox', () => {
     mockPopoverOpen = false;
     mockArtistResults = [];
     mockIsPending = false;
+    mockDataUndefined = false;
   });
 
   describe('adds a featured artist from search results', () => {
@@ -387,6 +389,40 @@ describe('FeaturedArtistsCombobox', () => {
 
       await userEvent.click(screen.getByRole('combobox'));
       expect(await screen.findByText(/loading/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('query returns no data', () => {
+    it('renders the empty-results message when data is undefined', async () => {
+      mockDataUndefined = true;
+      setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      expect(await screen.findByText(/no artists found/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('search reset and empty Enter', () => {
+    it('clears the search when the popover closes', async () => {
+      setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      const input = screen.getByPlaceholderText(/search featured artists/i);
+      await userEvent.type(input, 'Guest');
+      expect(input).toHaveValue('Guest');
+
+      await userEvent.click(screen.getByRole('combobox'));
+      await userEvent.click(screen.getByRole('combobox'));
+      expect(screen.getByPlaceholderText(/search featured artists/i)).toHaveValue('');
+    });
+
+    it('ignores Enter when the search field is empty', async () => {
+      const { onChange } = setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      await userEvent.type(screen.getByPlaceholderText(/search featured artists/i), '{Enter}');
+
+      expect(onChange).not.toHaveBeenCalled();
     });
   });
 });

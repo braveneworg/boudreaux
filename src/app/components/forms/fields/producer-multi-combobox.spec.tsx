@@ -15,12 +15,13 @@ import type { ProducerPill } from './producer-multi-combobox';
 // --------------------------------------------------------------------------
 let mockProducerResults: ProducerPill[] = [];
 let mockIsPending = false;
+let mockDataUndefined = false;
 
 vi.mock('@/app/hooks/use-producers-search-query', () => ({
   useProducersSearchQuery: () => ({
     isPending: mockIsPending,
     error: null,
-    data: mockProducerResults,
+    data: mockDataUndefined ? undefined : mockProducerResults,
     refetch: vi.fn(),
   }),
 }));
@@ -224,6 +225,7 @@ describe('ProducerMultiCombobox', () => {
     mockPopoverOpen = false;
     mockProducerResults = [];
     mockIsPending = false;
+    mockDataUndefined = false;
   });
 
   describe('adds existing producer from search results', () => {
@@ -390,6 +392,50 @@ describe('ProducerMultiCombobox', () => {
 
       await userEvent.click(screen.getByRole('combobox'));
       expect(await screen.findByText(/loading/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('result rows without an id', () => {
+    it('renders a search result that has no id (keyed by name)', async () => {
+      mockProducerResults = [{ name: 'NoId Producer' }];
+      setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      expect(await screen.findByText('NoId Producer')).toBeInTheDocument();
+    });
+  });
+
+  describe('query returns no data', () => {
+    it('renders the empty-results message when data is undefined', async () => {
+      mockDataUndefined = true;
+      setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      expect(await screen.findByText(/no producers found/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('search reset and empty Enter', () => {
+    it('clears the search when the popover closes', async () => {
+      setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      const input = screen.getByPlaceholderText(/search producers/i);
+      await userEvent.type(input, 'Rick');
+      expect(input).toHaveValue('Rick');
+
+      await userEvent.click(screen.getByRole('combobox'));
+      await userEvent.click(screen.getByRole('combobox'));
+      expect(screen.getByPlaceholderText(/search producers/i)).toHaveValue('');
+    });
+
+    it('ignores Enter when the search field is empty', async () => {
+      const { onChange } = setup({ value: [] });
+
+      await userEvent.click(screen.getByRole('combobox'));
+      await userEvent.type(screen.getByPlaceholderText(/search producers/i), '{Enter}');
+
+      expect(onChange).not.toHaveBeenCalled();
     });
   });
 });

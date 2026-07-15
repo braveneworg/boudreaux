@@ -246,6 +246,26 @@ describe('ArtistSearchCombobox', () => {
     expect(onChange).toHaveBeenCalledWith('Nobody Known');
   });
 
+  it('selects the matched result display name when Enter exactly matches a result', async () => {
+    const onChange = vi.fn();
+    render(<ArtistSearchCombobox value="" onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.type(screen.getByPlaceholderText(/search artists/i), 'real artist{Enter}');
+
+    expect(onChange).toHaveBeenCalledWith('Real Artist');
+  });
+
+  it('ignores Enter when the search field is empty', async () => {
+    const onChange = vi.fn();
+    render(<ArtistSearchCombobox value="" onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.type(screen.getByPlaceholderText(/search artists/i), '{Enter}');
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('shows the current value in the trigger', () => {
     render(<ArtistSearchCombobox value="Existing Name" onChange={vi.fn()} />);
     expect(screen.getByRole('combobox')).toHaveTextContent('Existing Name');
