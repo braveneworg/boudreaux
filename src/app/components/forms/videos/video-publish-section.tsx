@@ -21,7 +21,12 @@ interface VideoPublishSectionProps {
   onSelectDate: (dateString: string, fieldName: string) => void;
 }
 
-/** Optional publish date — empty keeps the video a draft (mirrors release-form). */
+/**
+ * Publish date picker for the video form.
+ *
+ * Publish stamps this date (or today if empty). Leave empty and click Save to
+ * keep it a draft. A future date schedules the video.
+ */
 export const VideoPublishSection = ({
   control,
   onSelectDate,
@@ -37,7 +42,10 @@ export const VideoPublishSection = ({
           <FormControl>
             <DatePicker fieldName={field.name} onSelect={onSelectDate} value={field.value} />
           </FormControl>
-          <FormDescription>Leave empty to keep as a draft.</FormDescription>
+          <FormDescription>
+            Publish stamps this date (or today if empty). Leave empty and click Save to keep it a
+            draft. A future date schedules the video.
+          </FormDescription>
           <FormMessage />
         </FormItem>
       )}

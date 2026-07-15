@@ -15,6 +15,7 @@ import { Card, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import {
   useCreateVideoMutation,
+  useUnpublishVideoMutation,
   useUpdateVideoMutation,
 } from '@/app/hooks/mutations/use-video-mutations';
 import { useVideoProbePrefillQuery } from '@/app/hooks/use-video-probe-prefill-query';
@@ -38,6 +39,7 @@ import {
   applyServerProbePrefill,
   buildVideoDefaults,
   mapVideoToFormValues,
+  shapePublish,
 } from './videos/video-form-helpers';
 import { VideoMetadataSection } from './videos/video-metadata-section';
 import { VideoPosterSection } from './videos/video-poster-section';
@@ -45,6 +47,8 @@ import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
 import type { Control, UseFormReturn } from 'react-hook-form';
+
+type SubmitIntent = 'save' | 'publish';
 
 export interface VideoFormProps {
   videoId?: string;
@@ -126,6 +130,77 @@ export const useVideoProducersPrefill = ({
   }, [isEditMode, video, producerData, form]);
 };
 
+interface UseVideoFormResetArgs {
+  isEditMode: boolean;
+  video: VideoRow | null | undefined;
+  form: UseFormReturn<VideoFormData>;
+}
+
+/**
+ * Resets the form to the loaded video's values once the query settles.
+ * Extracted to keep `VideoForm` under the ESLint complexity cap.
+ */
+const useVideoFormReset = ({ isEditMode, video, form }: UseVideoFormResetArgs): void => {
+  useEffect(() => {
+    if (isEditMode && video) {
+      form.reset(mapVideoToFormValues(video));
+    }
+  }, [isEditMode, video, form]);
+};
+
+interface UseServerProbePrefillArgs {
+  s3Key: string;
+  preGeneratedId: string;
+  uploadStatus: string;
+  form: UseFormReturn<VideoFormData>;
+}
+
+/**
+ * Watches the probe query result and applies the returned tags onto the form
+ * (only-if-empty), keeping `VideoForm` under the ESLint complexity cap.
+ */
+export const useServerProbePrefill = ({
+  s3Key,
+  preGeneratedId,
+  uploadStatus,
+  form,
+}: UseServerProbePrefillArgs): void => {
+  const { data: probeData } = useVideoProbePrefillQuery(s3Key, preGeneratedId, {
+    enabled: uploadStatus === 'success',
+  });
+
+  useEffect(() => {
+    if (probeData?.ok === true) {
+      applyServerProbePrefill(form, probeData.tags);
+    }
+  }, [probeData, form]);
+};
+
+interface UseVideoUnpublishArgs {
+  videoId: string | undefined;
+  unpublishVideoAsync: ReturnType<typeof useUnpublishVideoMutation>['unpublishVideoAsync'];
+  router: ReturnType<typeof useRouter>;
+}
+
+/** Unpublish the video then redirect to the admin list, or show an error toast. */
+const handleVideoUnpublish = async ({
+  videoId,
+  unpublishVideoAsync,
+  router,
+}: UseVideoUnpublishArgs): Promise<void> => {
+  if (!videoId) return;
+  const result = await unpublishVideoAsync({ videoId });
+  if (result.success) {
+    router.push('/admin/videos');
+  } else {
+    toast.error('Failed to unpublish the video.');
+  }
+};
+
+/** Returns the `publishedAt` value from a video row, or null when not yet loaded. */
+const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | undefined =>
+  video ? video.publishedAt : undefined;
+
 /** MUSIC-only, edit-only: absent from the DOM otherwise (INFORMATIONAL/create). */
 const EnrichmentPanelMount = ({
   video,
@@ -148,8 +223,12 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
   const [posterCandidate, setPosterCandidate] = useState<Blob | null>(null);
 
+  /** Tracks whether the next submit is a Save or a Publish. */
+  const submitIntentRef = useRef<SubmitIntent>('save');
+
   const { createVideoAsync, isCreatingVideo } = useCreateVideoMutation();
   const { updateVideoAsync, isUpdatingVideo } = useUpdateVideoMutation();
+  const { unpublishVideoAsync } = useUnpublishVideoMutation();
   const { data: video, isPending } = useVideoQuery(videoId ?? '', { enabled: isEditMode });
 
   const form = useForm<VideoFormData>({
@@ -158,12 +237,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   });
   const { control, setValue } = form;
 
-  useEffect(() => {
-    if (isEditMode && video) {
-      form.reset(mapVideoToFormValues(video));
-    }
-  }, [isEditMode, video, form]);
-
+  useVideoFormReset({ isEditMode, video, form });
   useVideoProducersPrefill({ videoId, isEditMode, video, form });
 
   const upload = useVideoUpload({ preGeneratedId, form, onPosterCandidate: setPosterCandidate });
@@ -173,15 +247,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
 
   const { entries, updateDraft, buildArtistDetails } = useVideoArtistReview(artistValue);
 
-  const { data: probeData } = useVideoProbePrefillQuery(s3Key, preGeneratedId, {
-    enabled: upload.status === 'success',
-  });
-
-  useEffect(() => {
-    if (probeData?.ok === true) {
-      applyServerProbePrefill(form, probeData.tags);
-    }
-  }, [probeData, form]);
+  useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
 
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {
@@ -199,9 +265,20 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     [setValue]
   );
 
+  const isDraft = !getVideoPublishedAt(video);
+  /** Shared label for the breadcrumb and the card title. */
+  const formTitle = isEditMode ? 'Edit Video' : 'New Video';
+  /** Footer mode: drives Publish vs Unpublish button. */
+  const footerMode: 'draft' | 'published' = isDraft ? 'draft' : 'published';
+  /** True when no file has been uploaded yet — used to disable Save and show a hint. */
+  const isFileMissing = !s3Key;
+
   const onValidSubmit = useCallback(
-    (data: VideoFormData): Promise<void> =>
-      submitVideo(mergeArtistDetails(data, buildArtistDetails()), {
+    (data: VideoFormData): Promise<void> => {
+      const intent = submitIntentRef.current;
+      submitIntentRef.current = 'save';
+      const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
+      return submitVideo(shaped, {
         isEditMode,
         videoId,
         preGeneratedId,
@@ -209,8 +286,10 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         router,
         createVideoAsync,
         updateVideoAsync,
-      }),
+      });
+    },
     [
+      isDraft,
       isEditMode,
       videoId,
       preGeneratedId,
@@ -220,6 +299,15 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       updateVideoAsync,
       buildArtistDetails,
     ]
+  );
+
+  const handlePublish = useCallback(() => {
+    submitIntentRef.current = 'publish';
+  }, []);
+
+  const handleUnpublish = useCallback(
+    (): Promise<void> => handleVideoUnpublish({ videoId, unpublishVideoAsync, router }),
+    [videoId, unpublishVideoAsync, router]
   );
 
   const handleCancel = useCallback(() => router.push('/admin/videos'), [router]);
@@ -234,16 +322,12 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       tape={false}
       breadcrumbs={[
         { anchorText: 'Admin', url: '/admin', isActive: false },
-        {
-          anchorText: isEditMode ? 'Edit Video' : 'New Video',
-          url: '/admin/videos',
-          isActive: true,
-        },
+        { anchorText: formTitle, url: '/admin/videos', isActive: true },
       ]}
     >
       <Card className="w-full border-none px-0 pb-0">
         <CardHeader className="px-0">
-          <CardTitle>{isEditMode ? 'Edit Video' : 'New Video'}</CardTitle>
+          <CardTitle>{formTitle}</CardTitle>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onValidSubmit)} noValidate className="space-y-8">
@@ -269,16 +353,20 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoPublishSection control={control} onSelectDate={handleSelectDate} />
 
-            {!s3Key ? (
+            {isFileMissing && (
               <p role="status" className="text-sm text-zinc-700">
                 Upload a video file to enable saving.
               </p>
-            ) : null}
+            )}
 
             <VideoFormFooter
+              mode={footerMode}
               isSubmitting={isSubmitting}
               isUploading={upload.status === 'uploading'}
               onCancel={handleCancel}
+              onPublish={handlePublish}
+              onUnpublish={handleUnpublish}
+              isDirty={form.formState.isDirty}
             />
           </form>
         </Form>

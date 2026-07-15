@@ -48,6 +48,10 @@ vi.mock('@/app/hooks/mutations/use-video-mutations', () => ({
     updateVideoAsync: mocks.updateVideoAsync,
     isUpdatingVideo: false,
   }),
+  useUnpublishVideoMutation: () => ({
+    unpublishVideoAsync: vi.fn().mockResolvedValue({ success: true }),
+    isUnpublishingVideo: false,
+  }),
 }));
 
 vi.mock('@/app/hooks/use-video-query', () => ({

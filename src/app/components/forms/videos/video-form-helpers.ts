@@ -130,6 +130,26 @@ export const validateVideoFile = (file: File): string | null => {
   return null;
 };
 
+/**
+ * Shape the form payload before submission based on the user's intent.
+ *
+ * - `publish` → ensures `publishedAt` is set (stamps today if empty).
+ * - `save` on a draft → strips `publishedAt` so a typed date can't accidentally
+ *   publish the video.
+ * - `save` on an already-published video → returns `data` unchanged so the
+ *   admin can freely edit/correct the publish date.
+ */
+export const shapePublish = (
+  data: VideoFormData,
+  intent: 'save' | 'publish',
+  isDraft: boolean
+): VideoFormData => {
+  if (intent === 'publish') {
+    return { ...data, publishedAt: data.publishedAt || formatDateForForm(new Date()) };
+  }
+  return isDraft ? { ...data, publishedAt: '' } : data;
+};
+
 /** Copy server-side field errors from a FormState onto the RHF form for inline display. */
 export const applyServerFieldErrors = (
   setError: UseFormReturn<VideoFormData>['setError'],
