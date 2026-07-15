@@ -24,6 +24,7 @@ import {
   buildVideoCreateInput,
   confirmVideoUpload,
   kickPostSaveEnrichment,
+  syncVideoProducersAfterSave,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -110,6 +111,17 @@ const runVideoCreate = async (
           artistDetails: data.artistDetails,
         })
       );
+      // Producer sync runs in its own after() so it is independent of the
+      // enrichment kick. Only scheduled when the form included producers.
+      if (data.producers?.length) {
+        after(() =>
+          syncVideoProducersAfterSave({
+            videoId: response.data.id,
+            producers: data.producers ?? [],
+            createdBy: userId,
+          })
+        );
+      }
     }
   } catch {
     formState.success = false;

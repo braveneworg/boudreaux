@@ -47,3 +47,17 @@ export const splitFeaturedArtists = (artist: string): SplitArtistName[] => {
 
   return result;
 };
+
+/**
+ * Compose a primary artist plus featured names into the canonical
+ * `Video.artist` string. Each featured name gets its own ` feat. ` token so
+ * the result round-trips exactly through {@link splitFeaturedArtists} (which
+ * splits only on feat/ft/featuring tokens, never commas). Blank primary yields
+ * an empty string; blank featured entries are dropped.
+ */
+export const composeArtistString = (primary: string, featured: string[]): string => {
+  const base = primary.trim();
+  if (base === '') return '';
+  const extras = featured.map((name) => name.trim()).filter((name) => name !== '');
+  return extras.reduce((acc, name) => `${acc} feat. ${name}`, base);
+};

@@ -21,13 +21,14 @@ export const formatDateForForm = (dateValue: string | Date | null | undefined): 
 };
 
 /**
- * Create-mode default form values. `category` and `mimeType` are intentionally
- * left undefined so the required-field errors surface on an empty submit; the
- * numeric-ish fields default to empty strings so their inputs stay controlled.
+ * Create-mode default form values. `mimeType` is intentionally left undefined
+ * so the required-field error surfaces on an empty submit; the numeric-ish
+ * fields default to empty strings so their inputs stay controlled.
  */
 export const buildVideoDefaults = (): DefaultValues<VideoFormData> => ({
   title: '',
   artist: '',
+  category: 'MUSIC',
   description: '',
   releasedOn: '',
   durationSeconds: '',
@@ -36,6 +37,7 @@ export const buildVideoDefaults = (): DefaultValues<VideoFormData> => ({
   fileSize: '',
   posterUrl: '',
   publishedAt: '',
+  producers: [],
 });
 
 /** Project a loaded video row into the form's default values (pure mapping). */
@@ -126,6 +128,26 @@ export const validateVideoFile = (file: File): string | null => {
     return `This video exceeds the maximum size of ${VIDEO_MAX_FILE_SIZE_LABEL}`;
   }
   return null;
+};
+
+/**
+ * Shape the form payload before submission based on the user's intent.
+ *
+ * - `publish` → ensures `publishedAt` is set (stamps today if empty).
+ * - `save` on a draft → strips `publishedAt` so a typed date can't accidentally
+ *   publish the video.
+ * - `save` on an already-published video → returns `data` unchanged so the
+ *   admin can freely edit/correct the publish date.
+ */
+export const shapePublish = (
+  data: VideoFormData,
+  intent: 'save' | 'publish',
+  isDraft: boolean
+): VideoFormData => {
+  if (intent === 'publish') {
+    return { ...data, publishedAt: data.publishedAt || formatDateForForm(new Date()) };
+  }
+  return isDraft ? { ...data, publishedAt: '' } : data;
 };
 
 /** Copy server-side field errors from a FormState onto the RHF form for inline display. */

@@ -126,6 +126,24 @@ describe('VideoAdminCard', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument();
   });
 
+  it('shows a Scheduled badge for a future publish date', () => {
+    renderCard({ ...baseVideo, publishedAt: new Date(Date.now() + 86_400_000), archivedAt: null });
+
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+  });
+
+  it('shows Published for a past publish date', () => {
+    renderCard({ ...baseVideo, publishedAt: new Date(Date.now() - 86_400_000), archivedAt: null });
+
+    expect(screen.getByText('Published')).toBeInTheDocument();
+  });
+
+  it('shows Draft when publishedAt is null', () => {
+    renderCard({ ...baseVideo, publishedAt: null, archivedAt: null });
+
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+  });
+
   it('offers a Publish action for an unpublished video', () => {
     renderCard();
 

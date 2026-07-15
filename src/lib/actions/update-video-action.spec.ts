@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
@@ -31,12 +32,17 @@ vi.mock('@/lib/services/video-enrichment-service', () => ({
 vi.mock('@/lib/services/video-probe-service', () => ({
   VideoProbeService: { probeAndPersist: vi.fn() },
 }));
+vi.mock('@/lib/services/producer-service', () => ({
+  ProducerService: { syncVideoProducers: vi.fn() },
+}));
 
-// Capture the after() callback so tests can run the "background" kick on demand.
-let afterCallback: (() => Promise<void>) | null = null;
+// Capture after() callbacks so tests can inspect / run them on demand.
+// Index 0 = producer-sync (always scheduled when producers field present)
+// Index 1 = enrichment kick (scheduled only when enrichment-relevant fields changed)
+const afterCallbacks: Array<() => Promise<void>> = [];
 vi.mock('next/server', () => ({
   after: (cb: () => Promise<void>) => {
-    afterCallback = cb;
+    afterCallbacks.push(cb);
   },
 }));
 
@@ -106,10 +112,11 @@ beforeEach(() => {
     success: true,
     data: { id: videoId },
   } as never);
-  afterCallback = null;
+  afterCallbacks.length = 0;
   vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
 });
 
 describe('updateVideoAction', () => {
@@ -389,12 +396,25 @@ describe('updateVideoAction', () => {
   });
 
   describe('Post-update enrichment kick', () => {
+    /** Helper: returns the enrichment-kick callback (not the producer-sync one). */
+    const getEnrichmentCallback = (): (() => Promise<void>) | undefined =>
+      afterCallbacks.find(
+        (cb) =>
+          // The enrichment kick callback is the one that calls syncVideoArtists;
+          // we identify it by running it and checking mock call counts.
+          // Simpler approach: the action schedules producer-sync first, kick second.
+          // Producer sync is always index 0 when producers present; kick is last.
+          // When only kick scheduled (no producers), it's index 0.
+          cb === afterCallbacks[afterCallbacks.length - 1]
+      );
+
     it('does not schedule a kick when nothing enrichment-relevant changed', async () => {
       mockParsedSuccess();
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeNull();
+      // No producers field → no producer sync. No enrichment-relevant change → no kick.
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('schedules a kick when the artist string changed', async () => {
@@ -402,14 +422,14 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeTypeOf('function');
+      expect(afterCallbacks).toHaveLength(1);
     });
 
     it('re-syncs artists with the new artist string', async () => {
       mockParsedSuccess({ ...parsedData, artist: 'New Band' });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
         videoId,
@@ -422,7 +442,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, artist: 'New Band' });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
     });
@@ -431,7 +451,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
     });
@@ -440,7 +460,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
@@ -449,7 +469,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, artist: 'New Band', category: 'INFORMATIONAL' });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
     });
@@ -463,7 +483,7 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeNull();
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('schedules a kick when artistDetails is non-empty (new trigger)', async () => {
@@ -472,7 +492,7 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeTypeOf('function');
+      expect(afterCallbacks).toHaveLength(1);
     });
 
     it('does not include artistDetails in the repository update payload', async () => {
@@ -490,7 +510,7 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeNull();
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('does not schedule a kick when artist unchanged, no file replaced, and no artistDetails', async () => {
@@ -498,7 +518,7 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallback).toBeNull();
+      expect(afterCallbacks).toHaveLength(0);
     });
 
     it('forwards artistDetails to syncVideoArtists when present', async () => {
@@ -506,13 +526,95 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, artistDetails });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
-      await afterCallback?.();
+      await getEnrichmentCallback()?.();
 
       expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
         videoId,
         parsedData.artist,
         artistDetails
       );
+    });
+
+    // --- Producer sync is now DECOUPLED from the enrichment kick ---
+
+    it('syncs producers independently when producers is non-empty', async () => {
+      const producers = [{ name: 'Studio Pro' }, { id: 'p2', name: 'Rick' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      // Only producer sync scheduled — no enrichment-relevant change
+      expect(afterCallbacks).toHaveLength(1);
+      await afterCallbacks[0]();
+
+      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
+        videoId,
+        producers,
+        'user-123'
+      );
+    });
+
+    it('clears producers when producers is empty [] (the fix: clear-to-zero persists)', async () => {
+      mockParsedSuccess({ ...parsedData, producers: [] });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      // Producer sync scheduled even when empty — no enrichment kick since nothing relevant changed
+      expect(afterCallbacks).toHaveLength(1);
+      await afterCallbacks[0]();
+
+      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(videoId, [], 'user-123');
+    });
+
+    it('does not schedule producer sync when producers is absent (undefined)', async () => {
+      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      // Run all scheduled callbacks
+      for (const cb of afterCallbacks) await cb();
+
+      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+    });
+
+    it('does not include producers in the repository update payload', async () => {
+      const producers = [{ name: 'Studio Pro' }];
+      mockParsedSuccess({ ...parsedData, producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
+      expect(Object.prototype.hasOwnProperty.call(updateCall, 'producers')).toBe(false);
+    });
+
+    it('does not schedule any after() when update fails and producers present', async () => {
+      mockParsedSuccess({ ...parsedData, producers: [{ name: 'Someone' }] });
+      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+        success: false,
+        error: 'nope',
+      } as never);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallbacks).toHaveLength(0);
+    });
+
+    it('schedules both producer sync and enrichment kick independently when both conditions met', async () => {
+      const producers = [{ name: 'Producer' }];
+      mockParsedSuccess({ ...parsedData, artist: 'New Band', producers });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(afterCallbacks).toHaveLength(2);
+    });
+
+    it('enrichment kick does not call syncVideoProducers', async () => {
+      // Enrichment-relevant change (artist) but no producers field
+      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      for (const cb of afterCallbacks) await cb();
+
+      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
     });
   });
 });

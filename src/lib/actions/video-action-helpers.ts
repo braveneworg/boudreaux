@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
+import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type {
@@ -17,6 +18,7 @@ import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
+import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
 
@@ -35,6 +37,7 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
   'posterUrl',
   'publishedAt',
   'artistDetails',
+  'producers',
 ];
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
@@ -174,6 +177,11 @@ export interface KickPostSaveEnrichmentInput {
  * failure is logged and the remaining stages still run. Never throws, so the
  * admin's already-successful save can never be failed retroactively by
  * background work.
+ *
+ * Producer sync is intentionally NOT performed here — see
+ * {@link syncVideoProducersAfterSave} which runs in a separate `after()` call
+ * so that clearing all producers (producers: []) is always persisted regardless
+ * of whether any enrichment-relevant field changed.
  */
 export const kickPostSaveEnrichment = async ({
   videoId,
@@ -202,5 +210,22 @@ export const kickPostSaveEnrichment = async ({
     } catch (error) {
       logger.warn('Post-save enrichment dispatch failed', { videoId, error: toMessage(error) });
     }
+  }
+};
+
+/** Best-effort producer-join sync (runs in `after()`, never fails the save). */
+export const syncVideoProducersAfterSave = async ({
+  videoId,
+  producers,
+  createdBy,
+}: {
+  videoId: string;
+  producers: VideoProducerInput[];
+  createdBy?: string;
+}): Promise<void> => {
+  try {
+    await ProducerService.syncVideoProducers(videoId, producers, createdBy);
+  } catch (error) {
+    logger.warn('Post-save video producer sync failed', { videoId, error: toMessage(error) });
   }
 };

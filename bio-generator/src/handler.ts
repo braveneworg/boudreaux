@@ -14,6 +14,7 @@ import { isListeningServiceUrl } from './listening-services.js';
 import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { postBioProgress } from './progress.js';
 import { annotateFaces, fetchReferenceBytes } from './rekognition.js';
+import { isReleaseDateLookupTask, runReleaseDateLookupLambda } from './release-date-lookup.js';
 import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
@@ -37,6 +38,7 @@ import type {
   BioImage,
   BioLink,
   ProgressStage,
+  ReleaseDateLookupResult,
   VideoEnrichmentResult,
 } from './types.js';
 import type { VerifiedScrapedImage, VisionContext } from './vision.js';
@@ -913,10 +915,13 @@ const runToResult = async (
 export const runLambda = async (
   event: unknown,
   deps: BioGeneratorDeps = defaultDeps
-): Promise<BioGenerationResult | VideoEnrichmentResult> => {
+): Promise<BioGenerationResult | VideoEnrichmentResult | ReleaseDateLookupResult> => {
   // Route on the task discriminator FIRST so the bio path below stays
   // byte-identical for every existing event shape (bio events carry no
   // `task` field).
+  if (isReleaseDateLookupTask(event)) {
+    return runReleaseDateLookupLambda(event);
+  }
   if (isVideoEnrichmentTask(event)) {
     return runVideoEnrichmentLambda(event);
   }
@@ -950,4 +955,5 @@ export const runLambda = async (
 export const lambdaHandler = async (
   event: unknown,
   _context?: unknown
-): Promise<BioGenerationResult | VideoEnrichmentResult> => runLambda(event);
+): Promise<BioGenerationResult | VideoEnrichmentResult | ReleaseDateLookupResult> =>
+  runLambda(event);

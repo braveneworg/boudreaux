@@ -9,11 +9,11 @@ import type { Locator, Page } from '@playwright/test';
  * E2E coverage for the admin videos section (`/admin/videos`, Task 11).
  *
  * Asserts against the deterministic seed (e2e/helpers/seed-test-db.ts): 7
- * PUBLISHED + 1 DRAFT + 1 ARCHIVED video. The admin list orders by `releasedOn`
- * (desc default) and its filters are exclusive — `archived` on shows ONLY
- * archived rows; the publish switches narrow to published/unpublished. Page
- * size is 5, so the 8 non-archived rows span two pages (a "Load More" footer
- * pulls the second).
+ * PUBLISHED + 1 DRAFT + 1 ARCHIVED + 1 SCHEDULED (future-dated) video. The admin
+ * list orders by `releasedOn` (desc default) and its filters are exclusive —
+ * `archived` on shows ONLY archived rows; the publish switches narrow to
+ * published/unpublished. Page size is 5, so the 9 non-archived rows span two
+ * pages (a "Load More" footer pulls the second).
  *
  * Read-only: these specs exercise filters, sort, and dialog copy but never
  * confirm a publish/archive/delete, so the shared seed is never mutated and the
@@ -57,12 +57,13 @@ test.describe('Admin videos — default view', () => {
       adminPage.getByRole('heading', { level: 3, name: 'E2E Video Alpha' })
     ).toBeVisible();
 
-    // Load the second page so all 8 non-archived titles are present.
+    // Load the second page so all 9 non-archived titles are present (7 published
+    // + 1 draft + 1 scheduled; the archived video is excluded from this view).
     await adminPage.getByRole('button', { name: 'Load More' }).click();
     await expect(
       adminPage.getByRole('heading', { level: 3, name: 'E2E Video Golf' })
     ).toBeVisible();
-    await expect(cardTitles(adminPage)).toHaveCount(8);
+    await expect(cardTitles(adminPage)).toHaveCount(9);
 
     // The archived video is excluded from the default (non-archived) view.
     await expect(adminPage.getByText('E2E Video Archived')).toHaveCount(0);
