@@ -568,7 +568,7 @@ type InfoTickerTapeProps =
   | InfoTickerTapeFeaturedArtistProps
   | InfoTickerTapeMinimalProps;
 
-/** Resolved display values shown by {@link InfoTickerTape}, derived from either prop variant. */
+/** Resolved display values shown by {@link InfoTickerTape}, derived from any prop variant. */
 interface InfoTickerTapeDisplay {
   displayName: string | null;
   releaseTitle: string | null;
