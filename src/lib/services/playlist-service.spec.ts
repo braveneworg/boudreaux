@@ -611,6 +611,16 @@ describe('PlaylistService', () => {
       expect(vi.mocked(signStreamUrl).mock.calls).toEqual([['videos/video-1.mp4']]);
     });
 
+    it('fails closed with a null streamUrl on a resolved video when signing is unconfigured', async () => {
+      mockDetailItems([makeVideoItem()]);
+      vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([makeVideo()]);
+      vi.mocked(signStreamUrl).mockReturnValueOnce(null);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ streamUrl: null, s3Key: null });
+    });
+
     it('leaves all stream fields null for an unavailable track', async () => {
       mockDetailItems([makeItem()]);
       trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([]);
