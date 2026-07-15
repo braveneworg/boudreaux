@@ -35,17 +35,32 @@ test.describe('Admin video artist-review — edit-page flow', () => {
 
     await adminPage.goto(`/admin/videos/${REVIEW_VIDEO_ID}`);
 
-    // Wait for the form to hydrate — field must be visible and non-empty before
-    // interacting (avoids asserting a specific seeded value that mutates on save,
-    // which would cause this test to fail deterministically on a CI retry).
-    const artistField = adminPage.getByLabel(ARTIST_LABEL);
-    await expect(artistField).toBeVisible({ timeout: 10_000 });
-    await expect(artistField).not.toHaveValue('', { timeout: 10_000 });
+    // Wait for the form to hydrate — the "Artist / Creator" combobox trigger must
+    // be visible before interacting. The trigger's accessible name is stable (it
+    // comes from a <label htmlFor> link, not from the selected value).
+    const artistTrigger = adminPage.getByRole('combobox', { name: ARTIST_LABEL });
+    await expect(artistTrigger).toBeVisible({ timeout: 10_000 });
 
-    // Replace the artist string with a mixed name: one that matches an existing
-    // artist plus a new featured artist.
-    await artistField.fill('');
-    await artistField.fill(`${EXISTING_ARTIST_NAME} feat. Zora Quill Brandt`);
+    // Set the primary artist to the seeded "E2E Review Lead" by opening the
+    // combobox, typing the name, and selecting the matching option.
+    await artistTrigger.click();
+    const primaryInput = adminPage.getByPlaceholder('Search artists…').first();
+    await primaryInput.fill(EXISTING_ARTIST_NAME);
+    const primaryOption = adminPage.getByRole('option', { name: EXISTING_ARTIST_NAME });
+    await expect(primaryOption).toBeVisible({ timeout: 5_000 });
+    await primaryOption.click();
+
+    // Add a free-text featured artist "Zora Quill Brandt" via the Featured
+    // artists combobox. This composes the artist string to:
+    //   "E2E Review Lead feat. Zora Quill Brandt"
+    // which is what the review section's debounced lookup will receive.
+    const featuredTrigger = adminPage.getByRole('combobox', { name: 'Featured artists' });
+    await featuredTrigger.click();
+    const featuredInput = adminPage.getByPlaceholder('Search featured artists…');
+    await featuredInput.fill('Zora Quill Brandt');
+    const addOption = adminPage.getByRole('option', { name: /Add "Zora Quill Brandt"/i });
+    await expect(addOption).toBeVisible({ timeout: 5_000 });
+    await addOption.click();
 
     // Wait for the 400ms debounce + lookup round-trip.
     const reviewSection = adminPage.getByTestId('video-artist-review-section');
@@ -104,15 +119,18 @@ test.describe('Admin video artist-review — edit-page flow', () => {
   test('exact existing name → chip only, no new-artist block', async ({ adminPage }) => {
     await adminPage.goto(`/admin/videos/${REVIEW_VIDEO_ID}`);
 
-    // Wait for the form to hydrate before interacting (the artist field may hold
-    // any previously-saved value — reset it to the exact existing name to ensure
-    // the lookup fires cleanly with a single known name).
-    const artistField = adminPage.getByLabel(ARTIST_LABEL);
-    await expect(artistField).toBeVisible({ timeout: 10_000 });
+    // Wait for the form to hydrate — trigger must be visible before interacting.
+    const artistTrigger = adminPage.getByRole('combobox', { name: ARTIST_LABEL });
+    await expect(artistTrigger).toBeVisible({ timeout: 10_000 });
 
-    // Clear and fill with the exact existing artist name.
-    await artistField.fill('');
-    await artistField.fill(EXISTING_ARTIST_NAME);
+    // Set the primary artist to the exact seeded name (no featured artists) so
+    // the lookup sees only "E2E Review Lead" and fires a chip-only result.
+    await artistTrigger.click();
+    const primaryInput = adminPage.getByPlaceholder('Search artists…').first();
+    await primaryInput.fill(EXISTING_ARTIST_NAME);
+    const primaryOption = adminPage.getByRole('option', { name: EXISTING_ARTIST_NAME });
+    await expect(primaryOption).toBeVisible({ timeout: 5_000 });
+    await primaryOption.click();
 
     const reviewSection = adminPage.getByTestId('video-artist-review-section');
     await expect(reviewSection).toBeVisible({ timeout: 5_000 });

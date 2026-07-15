@@ -34,7 +34,7 @@ test.describe('Admin video form — create', () => {
     await expect(adminPage.getByLabel('Artist / Creator')).toBeVisible();
     await expect(adminPage.getByRole('radio', { name: 'Music' })).toBeVisible();
     await expect(adminPage.getByRole('radio', { name: 'Informational' })).toBeVisible();
-    await expect(adminPage.getByText('Release date')).toBeVisible();
+    await expect(adminPage.getByText('Release date', { exact: true })).toBeVisible();
     await expect(adminPage.getByLabel('Duration (seconds)')).toBeVisible();
     await expect(adminPage.getByLabel('Description')).toBeVisible();
 
@@ -118,20 +118,17 @@ test.describe('Admin video form — create', () => {
 
     // The Featured artists combobox trigger is disabled until primary is set.
     // The FeaturedArtistsCombobox renders a <Button role="combobox"> whose
-    // `disabled` prop is `primary.trim() === ''`.
-    const featuredTrigger = adminPage
-      .locator('button[role="combobox"]')
-      .filter({ hasText: /featured artist/i });
+    // `disabled` prop is `primary.trim() === ''`. Its accessible name comes
+    // from the <label htmlFor={triggerId}>Featured artists</label> linkage.
+    const featuredTrigger = adminPage.getByRole('combobox', { name: 'Featured artists' });
     await expect(featuredTrigger).toBeDisabled();
 
     // Open the primary artist popover and type a name to exercise the combobox.
     // The seeded "Test Artist One" will appear in the search results from the
-    // artist list API. The primary trigger renders "Search or type an artist"
-    // (the placeholder) — distinct from the "featured artists" and "producers"
-    // triggers. Click the trigger, type the name, select the item.
-    const primaryTrigger = adminPage
-      .locator('button[role="combobox"]')
-      .filter({ hasText: 'Search or type an artist' });
+    // artist list API. The primary trigger's accessible name is "Artist / Creator"
+    // (linked via <label htmlFor={triggerId}>) — this is stable regardless of
+    // which artist is selected (unlike hasText which changes on selection).
+    const primaryTrigger = adminPage.getByRole('combobox', { name: 'Artist / Creator' });
     await primaryTrigger.click();
 
     // Type in the combobox input to filter results.
@@ -142,7 +139,8 @@ test.describe('Admin video form — create', () => {
     await expect(artistOption).toBeVisible({ timeout: 5_000 });
     await artistOption.click();
 
-    // After selection the trigger shows the chosen name.
+    // After selection the trigger shows the chosen name (accessible name is
+    // still "Artist / Creator" — the label does not change).
     await expect(primaryTrigger).toContainText('Test Artist One');
 
     // Featured combobox should now be enabled.
@@ -155,9 +153,8 @@ test.describe('Admin video form — create', () => {
     await adminPage.goto('/admin/videos/new');
 
     // Set a primary artist first to enable the featured combobox.
-    const primaryTrigger = adminPage
-      .locator('button[role="combobox"]')
-      .filter({ hasText: 'Search or type an artist' });
+    // Use the stable accessible name rather than hasText (which changes on select).
+    const primaryTrigger = adminPage.getByRole('combobox', { name: 'Artist / Creator' });
     await primaryTrigger.click();
 
     const primaryInput = adminPage.getByPlaceholder('Search artists…').first();
@@ -167,9 +164,8 @@ test.describe('Admin video form — create', () => {
     await artistOption.click();
 
     // Now open the featured combobox and add a free-text featured artist name.
-    const featuredTrigger = adminPage
-      .locator('button[role="combobox"]')
-      .filter({ hasText: /featured artist/i });
+    // Stable accessible name via <label htmlFor> → "Featured artists".
+    const featuredTrigger = adminPage.getByRole('combobox', { name: 'Featured artists' });
     await featuredTrigger.click();
 
     const featuredInput = adminPage.getByPlaceholder('Search featured artists…');
@@ -199,9 +195,9 @@ test.describe('Admin video form — create', () => {
     // The Producers section heading and its combobox trigger should be present.
     await expect(adminPage.getByRole('heading', { name: 'Producers' })).toBeVisible();
 
-    const producerTrigger = adminPage
-      .locator('button[role="combobox"]')
-      .filter({ hasText: /search producers/i });
+    // Use stable accessible name (label→id link); trigger text changes after
+    // a producer is added ("1 producers selected") so hasText would go stale.
+    const producerTrigger = adminPage.getByRole('combobox', { name: 'Producers' });
     await expect(producerTrigger).toBeVisible();
     await producerTrigger.click();
 
