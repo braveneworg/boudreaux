@@ -208,16 +208,20 @@ test.describe('Admin video form — create', () => {
     await expect(seededOption).toBeVisible({ timeout: 5_000 });
     await seededOption.click();
 
-    // The seeded producer pill appears.
+    // The seeded producer pill appears. The multi-select popover stays OPEN
+    // after each add (so several can be added without reopening) — do NOT click
+    // the trigger again, which would toggle it closed and hide the search input.
     const pillsList = adminPage.getByRole('list', { name: 'Selected producers' });
     await expect(pillsList.getByText('E2E Producer One')).toBeVisible();
 
-    // Re-open the combobox and add a free-text producer (no DB match).
-    await producerTrigger.click();
+    // Add a free-text producer (no DB match) in the same open session.
     await producerInput.fill('Brand New Producer');
     const addNewOption = adminPage.getByRole('option', { name: /Add "Brand New Producer"/i });
     await expect(addNewOption).toBeVisible({ timeout: 5_000 });
     await addNewOption.click();
+
+    // Close the popover so it can't overlay the pills or the remove control.
+    await adminPage.keyboard.press('Escape');
 
     // Both pills are now visible.
     await expect(pillsList.getByText('E2E Producer One')).toBeVisible();
