@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 
 import { ChevronsUpDown, X } from 'lucide-react';
 
@@ -144,6 +144,7 @@ export const ProducerMultiCombobox = ({
 }: ProducerMultiComboboxProps): React.ReactElement => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const triggerId = useId();
 
   const debounced = useDebounce(search, 300);
   const { isPending, data } = useProducersSearchQuery(debounced, { enabled: open });
@@ -175,10 +176,15 @@ export const ProducerMultiCombobox = ({
 
   return (
     <div className="space-y-2">
-      {label && <label className="text-sm font-medium">{label}</label>}
+      {label && (
+        <label htmlFor={triggerId} className="text-sm font-medium">
+          {label}
+        </label>
+      )}
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
+            id={triggerId}
             variant="outline"
             role="combobox"
             aria-expanded={open}

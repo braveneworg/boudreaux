@@ -69,10 +69,10 @@ export const VideoMetadataSection = ({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <TextField control={control} name="title" label="Title" placeholder="Video title" />
         {/* A11Y: the label text "Artist / Creator" is rendered by ArtistSearchCombobox
-            as a <label> element. The combobox trigger button carries role="combobox"
-            and aria-expanded; screen readers announce the label via DOM proximity
-            (the label wraps the button's container). The FormMessage below surfaces
-            RHF validation errors for the hidden `artist` field. */}
+            as a <label> with htmlFor linked to the trigger button's id (via useId),
+            so screen readers announce the label as the combobox's accessible name.
+            The FormMessage below surfaces RHF validation errors for the hidden
+            `artist` field. */}
         <div className="space-y-1">
           <ArtistSearchCombobox
             label="Artist / Creator"

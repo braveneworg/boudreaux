@@ -70,7 +70,8 @@ export const runReleaseDateLookupLambda = async (
       },
     };
   } catch (err) {
-    logEvent('warn', 'release_date_lookup_failed', { error: toErrorMessage(err) });
-    return { ok: false, error: err instanceof Error ? err.message : 'Release date lookup failed' };
+    const message = toErrorMessage(err);
+    logEvent('warn', 'release_date_lookup_failed', { error: message });
+    return { ok: false, error: message };
   }
 };

@@ -159,7 +159,7 @@ interface UseServerProbePrefillArgs {
  * Watches the probe query result and applies the returned tags onto the form
  * (only-if-empty), keeping `VideoForm` under the ESLint complexity cap.
  */
-export const useServerProbePrefill = ({
+const useServerProbePrefill = ({
   s3Key,
   preGeneratedId,
   uploadStatus,

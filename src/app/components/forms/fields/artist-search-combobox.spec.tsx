@@ -263,6 +263,19 @@ describe('ArtistSearchCombobox', () => {
     expect(screen.getByText('Primary Artist')).toBeInTheDocument();
   });
 
+  it('label is programmatically associated with the combobox trigger', () => {
+    render(<ArtistSearchCombobox value="" onChange={vi.fn()} label="Artist / Creator" />);
+    // getByRole finds the trigger by its accessible name from the label
+    expect(screen.getByRole('combobox', { name: 'Artist / Creator' })).toBeInTheDocument();
+  });
+
+  it('does not render a label element when label prop is absent', () => {
+    render(<ArtistSearchCombobox value="" onChange={vi.fn()} />);
+    expect(screen.queryByRole('label')).not.toBeInTheDocument();
+    // No label text rendered at all
+    expect(document.querySelector('label')).toBeNull();
+  });
+
   it('disables the trigger when disabled prop is true', () => {
     render(<ArtistSearchCombobox value="" onChange={vi.fn()} disabled />);
     expect(screen.getByRole('combobox')).toBeDisabled();

@@ -375,6 +375,11 @@ describe('ProducerMultiCombobox', () => {
       setup({ value: [], label: 'Producers' });
       expect(screen.getByText('Producers')).toBeInTheDocument();
     });
+
+    it('label is programmatically associated with the combobox trigger', () => {
+      setup({ value: [], label: 'Producers' });
+      expect(screen.getByRole('combobox', { name: 'Producers' })).toBeInTheDocument();
+    });
   });
 
   describe('loading state', () => {

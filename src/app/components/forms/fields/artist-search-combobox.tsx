@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 
 import { ChevronsUpDown } from 'lucide-react';
 
@@ -114,6 +114,7 @@ export const ArtistSearchCombobox = ({
 }: ArtistSearchComboboxProps): React.ReactElement => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const triggerId = useId();
 
   const debounced = useDebounce(search, 300);
   const { isPending, data } = useArtistListQuery(buildArtistListParams(debounced), {
@@ -143,10 +144,15 @@ export const ArtistSearchCombobox = ({
 
   return (
     <div className="space-y-1">
-      {label && <label className="text-sm font-medium">{label}</label>}
+      {label && (
+        <label htmlFor={triggerId} className="text-sm font-medium">
+          {label}
+        </label>
+      )}
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
+            id={triggerId}
             variant="outline"
             role="combobox"
             aria-expanded={open}

@@ -373,6 +373,11 @@ describe('FeaturedArtistsCombobox', () => {
       setup({ value: [], label: 'Featured Artists' });
       expect(screen.getByText('Featured Artists')).toBeInTheDocument();
     });
+
+    it('label is programmatically associated with the combobox trigger', () => {
+      setup({ value: [], label: 'Featured Artists' });
+      expect(screen.getByRole('combobox', { name: 'Featured Artists' })).toBeInTheDocument();
+    });
   });
 
   describe('loading state', () => {
