@@ -14,14 +14,14 @@ import packageJson from './package.json' with { type: 'json' };
 // build of html-dom-parser require()s ESM-only `domhandler` and crashes. We
 // force the CJS entry (so Vite inlines+transforms it, routing every require
 // through Vite) and alias html-dom-parser to its DOMParser-based client build,
-// which jsdom satisfies without domhandler.
+// which a browser-like DOM environment (happy-dom) satisfies without domhandler.
 const require = createRequire(import.meta.url);
 const htmlReactParserCjs = require.resolve('html-react-parser/lib/index');
 const htmlDomParserClient = require.resolve('html-dom-parser/lib/client/html-to-dom');
 
 // Specs that import html-react-parser must run under the `forks` pool: the
 // default `vmThreads` pool ignores `server.deps.inline`, so the aliases above
-// can't redirect html-dom-parser to its jsdom-friendly client build and the
+// can't redirect html-dom-parser to its DOM-friendly client build and the
 // CJS→ESM (`domhandler`) boundary crashes. Keep this list tight — every other
 // `.spec.tsx` stays on the faster `vmThreads` pool.
 const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx', '**/rich-text-editor.spec.tsx'];
@@ -53,11 +53,11 @@ export default defineConfig((): ViteUserConfig => {
       silent: withCoverage ? false : 'passed-only', // Silence test output when not collecting coverage
       name: packageJson.name,
       environment: 'jsdom',
-      // Use Vitest 4 workspace projects to split .spec.ts (node) and .spec.tsx (jsdom).
-      // Pure TypeScript spec files run in the lightweight Node environment;
-      // skipping jsdom init saves 1–3s wall clock.
-      // The few .spec.ts files that DO need DOM opt back in via a
-      // `// @vitest-environment jsdom` comment at the top.
+      // Use Vitest 4 workspace projects to split .spec.ts (node) and .spec.tsx
+      // (happy-dom). Pure TypeScript spec files run in the lightweight Node
+      // environment; skipping DOM init saves 1–3s wall clock. The .spec.ts files
+      // that DO need DOM opt back in via a `// @vitest-environment jsdom` comment
+      // at the top (jsdom is retained for those explicit opt-ins).
       projects: [
         {
           extends: true,
@@ -80,7 +80,7 @@ export default defineConfig((): ViteUserConfig => {
           extends: true,
           test: {
             name: 'jsdom',
-            environment: 'jsdom',
+            environment: 'happy-dom',
             include: ['**/*.spec.tsx'],
             exclude: [
               '**/node_modules/**',
@@ -97,7 +97,7 @@ export default defineConfig((): ViteUserConfig => {
           extends: true,
           test: {
             name: 'jsdom-forks',
-            environment: 'jsdom',
+            environment: 'happy-dom',
             pool: 'forks',
             include: HTML_PARSER_SPECS,
             exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
@@ -135,17 +135,25 @@ export default defineConfig((): ViteUserConfig => {
       // Use most cores, but leave headroom. Saturating every core (`'100%'`)
       // invites resource contention — workers spinning up simultaneously under
       // memory pressure can produce rare, non-deterministic VM-context failures
-      // that pass on retry. `'75%'` keeps throughput high while reducing that risk.
+      // that pass on retry. On Apple Silicon it is also measurably SLOWER: a
+      // maxWorkers sweep showed wall clock rising monotonically past ~10 workers
+      // (9→21.4s, 10→21.7s, 14→22.5s) as work spilled onto efficiency cores.
+      // `'75%'` (~10 workers on a 14-core box) keeps throughput at its peak while
+      // reducing the flakiness risk.
       maxWorkers: '75%',
 
       isolate: true, // Required for test isolation
       fileParallelism: true, // Run test files in parallel for speed
       testTimeout: 5000,
 
-      // Randomize test order to catch hidden dependencies
-      // Use fixed seed for reproducibility, override with VITEST_SEED env var
+      // Randomize test order to catch hidden dependencies, but ONLY within each
+      // file (`tests: true`). File order stays UNSHUFFLED (`files: false`) so
+      // Vitest's sequencer can schedule the slowest specs first and balance them
+      // across workers — shuffling file order piles slow specs onto one worker at
+      // the tail and nearly doubles wall clock (measured 23s → 13s here).
+      // Use fixed seed for reproducibility, override with VITEST_SEED env var.
       sequence: {
-        shuffle: true,
+        shuffle: { files: false, tests: true },
         seed: (() => {
           if (process.env.VITEST_SEED) {
             const parsed = parseInt(process.env.VITEST_SEED, 10);

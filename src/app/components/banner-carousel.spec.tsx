@@ -514,8 +514,11 @@ describe('BannerCarousel', () => {
       render(<BannerCarousel banners={[banner]} />);
 
       const strip = screen.getByText('Colored strip');
-      expect(strip.style.color).toBe('rgb(255, 0, 0)');
-      expect(strip.style.backgroundColor).toBe('rgb(0, 255, 0)');
+      // Assert the inline style the component applies verbatim from the banner
+      // data (textColor/backgroundColor). Colors are stored exactly as provided
+      // — no engine-dependent hex→rgb() normalization.
+      expect(strip.style.color).toBe('#ff0000');
+      expect(strip.style.backgroundColor).toBe('#00ff00');
     });
 
     it('uses fallback styles when textColor and backgroundColor are null', () => {
