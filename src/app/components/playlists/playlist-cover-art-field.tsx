@@ -43,6 +43,8 @@ interface CoverThumbProps {
   src: string;
   /** Human label — feeds the image alt and the remove button's aria-label. */
   label: string;
+  /** Disables the remove button (e.g. while an upload is in flight). */
+  disabled: boolean;
   onRemove: () => void;
 }
 
@@ -52,14 +54,15 @@ interface PendingPreview {
   url: string;
 }
 
-const CoverThumb = ({ src, label, onRemove }: CoverThumbProps): ReactElement => (
+const CoverThumb = ({ src, label, disabled, onRemove }: CoverThumbProps): ReactElement => (
   <li className="relative size-16 overflow-hidden border-2 border-black">
     <Image src={src} alt={label} fill sizes="64px" className="object-cover" />
     <button
       type="button"
       onClick={onRemove}
+      disabled={disabled}
       aria-label={`Remove ${label}`}
-      className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center bg-black/70 text-white hover:bg-black"
+      className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center bg-black/70 text-white hover:bg-black disabled:pointer-events-none disabled:opacity-50"
     >
       <X aria-hidden="true" className="size-3" />
     </button>
@@ -78,6 +81,10 @@ const CoverThumb = ({ src, label, onRemove }: CoverThumbProps): ReactElement => 
  *
  * The combined cap of {@link MAX_PLAYLIST_COVER_IMAGES} spans
  * `value + pendingFiles`; excess selections toast and are ignored.
+ *
+ * While an upload is in flight every mutating control (file input, remove
+ * buttons, artist toggles) is disabled, so the `value` captured when the
+ * upload started cannot be clobbered by a concurrent edit when it resolves.
  */
 export const PlaylistCoverArtField = ({
   value,
@@ -192,6 +199,7 @@ export const PlaylistCoverArtField = ({
                   key={url}
                   src={url}
                   label={`cover image ${index + 1}`}
+                  disabled={isUploading}
                   onRemove={() => removeUploadedAt(index)}
                 />
               ))}
@@ -200,6 +208,7 @@ export const PlaylistCoverArtField = ({
                   key={url}
                   src={url}
                   label={file.name}
+                  disabled={isUploading}
                   onRemove={() => removePendingFile(file)}
                 />
               ))}
@@ -218,10 +227,11 @@ export const PlaylistCoverArtField = ({
                     key={url}
                     type="button"
                     onClick={() => toggleArtistImage(url)}
+                    disabled={isUploading}
                     aria-pressed={isSelected}
                     aria-label={`Artist image ${index + 1}`}
                     className={cn(
-                      'relative aspect-square overflow-hidden border-2 border-black',
+                      'relative aspect-square overflow-hidden border-2 border-black disabled:pointer-events-none disabled:opacity-50',
                       isSelected
                         ? 'ring-2 ring-black ring-offset-2'
                         : 'opacity-80 hover:opacity-100'

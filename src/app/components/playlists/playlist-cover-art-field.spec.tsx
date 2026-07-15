@@ -181,6 +181,35 @@ describe('PlaylistCoverArtField', () => {
     });
   });
 
+  describe('while an upload is in flight', () => {
+    it('disables the remove button for an uploaded URL', () => {
+      hookState.isUploading = true;
+      renderField({ playlistId: PLAYLIST_ID, value: ['https://cdn.example.com/u1.jpg'] });
+
+      expect(screen.getByRole('button', { name: 'Remove cover image 1' })).toBeDisabled();
+    });
+
+    it('disables the remove button for a pending file', () => {
+      hookState.isUploading = true;
+      renderField({ playlistId: PLAYLIST_ID, pendingFiles: [makeFile('pending.jpg')] });
+
+      expect(screen.getByRole('button', { name: 'Remove pending.jpg' })).toBeDisabled();
+    });
+
+    it('disables the artist image toggles', async () => {
+      const user = userEvent.setup();
+      hookState.isUploading = true;
+      renderField({
+        playlistId: PLAYLIST_ID,
+        availableArtistImages: ['https://cdn.example.com/a1.jpg'],
+      });
+
+      await user.click(screen.getByRole('tab', { name: 'From artists' }));
+
+      expect(screen.getByRole('button', { name: 'Artist image 1' })).toBeDisabled();
+    });
+  });
+
   describe('combined cap', () => {
     it('keeps only the files that fit and toasts when exceeding the cap', async () => {
       const user = userEvent.setup();
