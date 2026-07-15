@@ -71,6 +71,8 @@ export const queryKeys = {
     /** ffprobe prefill — keyed by s3Key + videoId; same pair never re-probes (staleTime: Infinity). */
     probePrefill: (s3Key: string, videoId: string) =>
       [...queryKeys.videos.all, 'probePrefill', s3Key, videoId] as const,
+    /** Producers linked to a video — used to prefill the producer pills in edit mode. */
+    producers: (id: string) => [...queryKeys.videos.all, 'producers', id] as const,
   },
   artists: {
     all: ['artists'] as const,
