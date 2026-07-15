@@ -249,7 +249,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
           <form onSubmit={form.handleSubmit(onValidSubmit)} noValidate className="space-y-8">
             <VideoFileSection control={control} upload={upload} />
             {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
-            <VideoMetadataSection control={control} onSelectDate={handleSelectDate} />
+            <VideoMetadataSection
+              control={control}
+              setValue={setValue}
+              onSelectDate={handleSelectDate}
+            />
             <VideoArtistReviewSection entries={entries} updateDraft={updateDraft} />
             <VideoProducersSection control={control} />
             <EnrichmentPanelMount

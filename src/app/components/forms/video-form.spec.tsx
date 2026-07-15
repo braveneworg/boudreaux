@@ -133,6 +133,52 @@ vi.mock('@/ui/datepicker', () => ({
   ),
 }));
 
+// ArtistSearchCombobox: renders a labelled text input so existing tests that
+// use getByLabelText('Artist / Creator') / toHaveValue / user.type continue
+// to work. onChange is called on every keystroke (simulating free-text entry).
+vi.mock('@/app/components/forms/fields/artist-search-combobox', () => ({
+  ArtistSearchCombobox: ({
+    label,
+    value,
+    onChange,
+    placeholder,
+  }: {
+    label?: string;
+    value: string;
+    onChange: (name: string) => void;
+    placeholder?: string;
+  }) => (
+    <div>
+      {label && <label htmlFor="artist-search-input">{label}</label>}
+      <input
+        id="artist-search-input"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  ),
+}));
+
+// FeaturedArtistsCombobox: minimal stub — video-form tests don't exercise
+// featured artists directly; the stub keeps the form render free of query deps.
+vi.mock('@/app/components/forms/fields/featured-artists-combobox', () => ({
+  FeaturedArtistsCombobox: ({
+    label,
+    disabled,
+  }: {
+    label?: string;
+    value: string[];
+    onChange: (names: string[]) => void;
+    disabled?: boolean;
+  }) => (
+    <div>
+      {label && <span>{label}</span>}
+      {disabled && <span>Add a primary artist first</span>}
+    </div>
+  ),
+}));
+
 const CREATE_MODE_QUERY = {
   data: null,
   isPending: false,
