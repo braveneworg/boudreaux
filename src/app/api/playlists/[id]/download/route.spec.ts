@@ -288,4 +288,57 @@ describe('GET /api/playlists/[id]/download', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
   });
+
+  it('skips the rate limiter in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
+    const response = await GET(makeRequest('format=MP3_320KBPS'), makeContext());
+    expect(response.status).toBe(200);
+    expect(limiterCheckMock).not.toHaveBeenCalled();
+    await response.arrayBuffer();
+    vi.unstubAllEnvs();
+  });
+
+  it('does not charge when the FIRST prefetched buffer rejects (S3 failure)', async () => {
+    // The charge-after-first-buffer rule: a rejected first body is coalesced
+    // to null so an all-failing download never consumes quota.
+    startBufferPrefetchMock.mockImplementation((_c, _b, keys: readonly string[]) =>
+      keys.slice(0, 4).map(() => {
+        const failing = Promise.reject(new Error('NoSuchKey'));
+        failing.catch(() => {});
+        return failing;
+      })
+    );
+    const response = await GET(makeRequest('format=AAC'), makeContext());
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
+    expect(incrementQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it('refills the prefetch window for a playlist longer than the depth', async () => {
+    const longTracks = Array.from({ length: 6 }, (_v, index) => ({
+      entryName: `${index}.mp3`,
+      s3Key: `releases/r1/digital-formats/MP3/t${index}.mp3`,
+      releaseId: 'r1',
+    }));
+    vi.mocked(PlaylistService.getDownloadManifest).mockResolvedValue({
+      ...manifest,
+      tracks: longTracks,
+      distinctReleaseIds: ['r1'],
+    });
+    const response = await GET(makeRequest('format=MP3_320KBPS'), makeContext());
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
+    // 6 tracks with a depth of 4 → 2 later keys are refilled via issuePrefetch.
+    expect(issuePrefetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts the archive when the response stream is cancelled', async () => {
+    const response = await GET(makeRequest('format=MP3_320KBPS'), makeContext());
+    expect(response.status).toBe(200);
+    expect(response.body).not.toBeNull();
+    await response.body?.cancel();
+    // Cancelling the web stream tears down the pipeline without throwing.
+    expect(response.bodyUsed).toBe(true);
+  });
 });
