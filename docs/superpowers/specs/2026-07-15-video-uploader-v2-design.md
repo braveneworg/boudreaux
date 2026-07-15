@@ -13,7 +13,7 @@ saving. Plus one global style tweak to `ZinePanel`.
 
 ## Decisions (user-approved)
 
-1. **Artist field** is *always* a search combobox (probe prefill fills it
+1. **Artist field** is _always_ a search combobox (probe prefill fills it
    when metadata exists) — not a conditional swap.
 2. **Producers** live in a **separate `Producer` model** (not the artist
    catalog / `VideoArtistRole`).
@@ -168,10 +168,10 @@ keeps the stored value. The RadioGroup renders with Music pre-selected.
 
 ### Button semantics (form footer)
 
-| State                    | Buttons              | Behavior                                                                                                                                     |
-| ------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create / draft           | Save, Publish        | **Save** submits with `publishedAt` stripped — a typed date is *not* persisted and the video stays a draft. **Publish** submits everything with `publishedAt` = date field, or today when empty. |
-| Published / scheduled    | Save, Unpublish      | **Save** persists date-field edits as an ordinary field change (moving a scheduled date isn't "publishing"). Clearing the field + Save keeps the existing `publishedAt` — Save never unpublishes. **Unpublish** calls the existing `unpublishVideoAction`, returning to draft — it changes publish state only and does not save other dirty fields (a confirm dialog notes this when the form is dirty). |
+| State                 | Buttons         | Behavior                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create / draft        | Save, Publish   | **Save** submits with `publishedAt` stripped — a typed date is _not_ persisted and the video stays a draft. **Publish** submits everything with `publishedAt` = date field, or today when empty.                                                                                                                                                                                                         |
+| Published / scheduled | Save, Unpublish | **Save** persists date-field edits as an ordinary field change (moving a scheduled date isn't "publishing"). Clearing the field + Save keeps the existing `publishedAt` — Save never unpublishes. **Unpublish** calls the existing `unpublishVideoAction`, returning to draft — it changes publish state only and does not save other dirty fields (a confirm dialog notes this when the form is dirty). |
 
 Publish/Save enforcement is client-side payload shaping (admin-only tool);
 the actions keep accepting `publishedAt` as today. The date field is
@@ -223,7 +223,7 @@ components; whichever lands second may see a trivial overlap.
   pill (new name → review section), add existing + new producer pills, Find
   release date (fixture path fills the field), Save → still draft on
   `/videos`; Publish (empty date) → visible; publish with future date via
-  the form → *not* visible publicly, Scheduled badge in admin; Unpublish →
+  the form → _not_ visible publicly, Scheduled badge in admin; Unpublish →
   hidden again. Prefer driving state through the UI over new seed rows;
   where the seed must change (e.g. one Producer row for search), sweep
   count-pinning assertions per the `#LESSONS` rule and run neighboring specs
