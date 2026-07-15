@@ -73,6 +73,7 @@ model User {
 
   // Indexes for performance
   @@index([role]) // Admin notification fan-out (findAdmins)
+  @@index([allowSmsNotifications, phone]) // SMS blast recipient filter (findSmsOptedInUsers)
 }
 
 model Account {
@@ -347,6 +348,7 @@ model FeaturedArtist {
   @@index([featuredOn])
   @@index([featuredUntil])
   @@index([digitalFormatId])
+  @@index([position, featuredOn(sort: Desc)]) // findAll: [position asc, featuredOn desc]
 }
 
 model ArtistMember {
@@ -540,6 +542,7 @@ model Release {
   @@index([featuredOn])
   @@index([featuredUntil])
   @@index([deletedOn])
+  @@index([publishedAt]) // published-releases count filter (publishedAt not-null)
 }
 
 model Instrument {
@@ -614,6 +617,7 @@ model Venue {
 
   @@index([name])
   @@index([city, state])
+  @@index([createdAt]) // findRecent: createdAt desc sort
 }
 
 model TourDateHeadliner {
