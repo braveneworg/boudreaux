@@ -58,6 +58,9 @@ model User {
   // Banner notification feature (006-banner-notification-carousel)
   bannerNotifications BannerNotification[]
 
+  // Playlists feature (011-playlists)
+  playlists Playlist[]
+
   // Live chat feature (009-live-chat)
   chatMessages ChatMessage[]
   chatUsers    ChatUser[]
@@ -1084,4 +1087,46 @@ model VideoEnrichmentSuggestion {
 
   @@index([videoId, status])
   @@index([artistId])
+}
+
+// Playlists feature (011-playlists)
+
+model Playlist {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  ownerId       String   @db.ObjectId
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title         String
+  isPublic      Boolean  @default(false)
+  coverImages   String[] // 0–4 CDN URLs; tiling is client-side
+  itemCount     Int      @default(0) // denormalized, maintained in repo transactions
+  totalDuration Int      @default(0) // seconds, denormalized
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  items         PlaylistItem[]
+
+  @@unique([ownerId, title])
+  @@index([ownerId, updatedAt(sort: Desc)])
+  @@index([isPublic])
+}
+
+model PlaylistItem {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  playlistId  String   @db.ObjectId
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  itemType    String   // 'track' | 'video'
+  trackFileId String?  @db.ObjectId // ReleaseDigitalFormatFile id (MP3_320KBPS file)
+  releaseId   String?  @db.ObjectId // denormalized for quota math + cover fallback
+  videoId     String?  @db.ObjectId
+  title       String   // snapshot at add time
+  artistName  String   // snapshot
+  duration    Int      @default(0) // snapshot seconds
+  sortOrder   Int      // dense 0..n-1, full rewrite on reorder ($transaction)
+  addedAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([playlistId, sortOrder])
+  @@index([trackFileId])
+  @@index([videoId])
+  @@index([releaseId])
 }

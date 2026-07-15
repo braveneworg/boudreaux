@@ -6,7 +6,74 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
-import type { ReleaseDigitalFormatFile } from '@prisma/client';
+import { runQuery } from './_internal/map-prisma-error';
+
+import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
+
+// =============================================================================
+// Query shapes
+// =============================================================================
+
+/**
+ * Select projection shared by `findManyByIdsWithRelease` and
+ * `searchTracksByTitle`. Deliberately omits `fileSize` (BigInt) which breaks
+ * JSON serialisation in API route responses.
+ */
+const trackFileWithReleaseSelect = {
+  id: true,
+  trackNumber: true,
+  title: true,
+  duration: true,
+  s3Key: true,
+  fileName: true,
+  mimeType: true,
+  format: {
+    select: {
+      formatType: true,
+      releaseId: true,
+      release: {
+        select: {
+          id: true,
+          title: true,
+          coverArt: true,
+          publishedAt: true,
+          artistReleases: {
+            select: {
+              artist: {
+                select: {
+                  displayName: true,
+                  firstName: true,
+                  surname: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.ReleaseDigitalFormatFileSelect;
+
+/**
+ * The published-release filter mirrored from `release-repository.ts`
+ * `buildPublishedWhere` (no search term variant). Matches records whose release
+ * has `publishedAt` set and has not been soft-deleted (`deletedOn`).
+ */
+const publishedReleaseFilter = {
+  publishedAt: { not: null },
+  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
+} as const satisfies Prisma.ReleaseWhereInput;
+
+// =============================================================================
+// Return types
+// =============================================================================
+
+/** Track file row joined with its parent format and release. Exported for
+ * downstream services (playlist service, search handler). `fileSize` is
+ * intentionally absent — BigInt cannot be serialised to JSON. */
+export type TrackFileWithRelease = Prisma.ReleaseDigitalFormatFileGetPayload<{
+  select: typeof trackFileWithReleaseSelect;
+}>;
 
 /**
  * Repository for ReleaseDigitalFormatFile data access
@@ -118,5 +185,46 @@ export class ReleaseDigitalFormatFileRepository {
     return await prisma.releaseDigitalFormatFile.count({
       where: { formatId },
     });
+  }
+
+  /**
+   * Fetch track files by their ids, joining parent format and release.
+   * Used by the playlist service to resolve playlist-item track references.
+   * `fileSize` is omitted from the select — BigInt breaks JSON serialisation.
+   */
+  async findManyByIdsWithRelease(ids: string[]): Promise<TrackFileWithRelease[]> {
+    return runQuery(() =>
+      prisma.releaseDigitalFormatFile.findMany({
+        where: { id: { in: ids } },
+        select: trackFileWithReleaseSelect,
+      })
+    );
+  }
+
+  /**
+   * Search track files by title (case-insensitive substring), restricted to
+   * non-deleted MP3_320KBPS formats on published, non-deleted releases.
+   * Ordered by title asc for deterministic results. Used by the playlist
+   * media-search endpoint.
+   * `fileSize` is omitted from the select — BigInt breaks JSON serialisation.
+   */
+  async searchTracksByTitle(q: string, take: number): Promise<TrackFileWithRelease[]> {
+    return runQuery(() =>
+      prisma.releaseDigitalFormatFile.findMany({
+        where: {
+          title: { contains: q, mode: 'insensitive' },
+          format: {
+            is: {
+              formatType: 'MP3_320KBPS',
+              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+              release: { is: publishedReleaseFilter },
+            },
+          },
+        },
+        orderBy: { title: 'asc' },
+        take,
+        select: trackFileWithReleaseSelect,
+      })
+    );
   }
 }

@@ -263,6 +263,34 @@ describe('queryKeys', () => {
     });
   });
 
+  describe('playlists', () => {
+    it('should return all key', () => {
+      expect(queryKeys.playlists.all).toEqual(['playlists']);
+    });
+
+    it('should return mine key extending all', () => {
+      const key = queryKeys.playlists.mine();
+      expect(key).toEqual(['playlists', 'mine']);
+      expect(key[0]).toBe(queryKeys.playlists.all[0]);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.playlists.detail('pl-123');
+      expect(key).toEqual(['playlists', 'detail', 'pl-123']);
+    });
+
+    it('should return mediaSearch key with normalized query', () => {
+      const key = queryKeys.playlists.mediaSearch('  Rock  ');
+      expect(key).toEqual(['playlists', 'mediaSearch', 'rock']);
+    });
+
+    it('should return different mediaSearch keys for different queries', () => {
+      const key1 = queryKeys.playlists.mediaSearch('rock');
+      const key2 = queryKeys.playlists.mediaSearch('jazz');
+      expect(key1).not.toEqual(key2);
+    });
+  });
+
   describe('linkPreview', () => {
     it('should return linkPreview key with url', () => {
       const key = queryKeys.linkPreview('https://example.com');
