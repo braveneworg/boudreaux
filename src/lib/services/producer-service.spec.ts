@@ -59,7 +59,7 @@ describe('ProducerService.search', () => {
     searchMock.mockResolvedValue([]);
     await ProducerService.search('ri');
     const [, take] = searchMock.mock.calls[0] as [string, number];
-    expect(take).toBeGreaterThan(0);
+    expect(take).toBe(10);
   });
 });
 
