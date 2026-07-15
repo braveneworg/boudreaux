@@ -1040,6 +1040,7 @@ model Video {
   enrichedAt          DateTime? // When the last enrichment run completed successfully
 
   videoArtists          VideoArtist[] // Linked Artist rows parsed from the artist string
+  videoProducers        VideoProducer[] // Linked Producer rows credited on this video
   enrichmentSuggestions VideoEnrichmentSuggestion[] // Reviewable web-derived facts
 
   @@index([releasedOn])
@@ -1066,6 +1067,32 @@ model VideoArtist {
   @@unique([videoId, artistId])
   @@index([videoId])
   @@index([artistId])
+}
+
+// Producer catalog — separate from the Artist catalog. Producers are credited
+// on videos via VideoProducer join rows (mirrors VideoArtist).
+model Producer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  createdBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  videoProducers VideoProducer[]
+}
+
+// Join between a Video and the Producer catalog.
+model VideoProducer {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  video      Video    @relation(fields: [videoId], references: [id])
+  videoId    String   @db.ObjectId
+  producer   Producer @relation(fields: [producerId], references: [id])
+  producerId String   @db.ObjectId
+  sortOrder  Int      @default(0)
+
+  @@unique([videoId, producerId])
+  @@index([videoId])
+  @@index([producerId])
 }
 
 // One reviewable web-derived fact for a video (artistId null = the video-level

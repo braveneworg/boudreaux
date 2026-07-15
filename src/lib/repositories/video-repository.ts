@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type { Producer, VideoProducer } from '@/lib/types/domain/producer';
 import type {
   CreateVideoData,
   SaveProbeResultData,
@@ -27,6 +28,14 @@ import type { Prisma } from '@prisma/client';
 // the Prisma `Video` scalar payload (no relations).
 type _VideoDrift = AssertExact<Video, Prisma.VideoGetPayload<Record<string, never>>>;
 const _videoDrift: _VideoDrift = true;
+
+type _ProducerDrift = AssertExact<Producer, Prisma.ProducerGetPayload<Record<string, never>>>;
+const _producerDrift: _ProducerDrift = true;
+type _VideoProducerDrift = AssertExact<
+  VideoProducer,
+  Omit<Prisma.VideoProducerGetPayload<Record<string, never>>, 'video' | 'producer'>
+>;
+const _videoProducerDrift: _VideoProducerDrift = true;
 
 // =============================================================================
 // Translators (domain input -> Prisma input; the return type is the drift guard)
