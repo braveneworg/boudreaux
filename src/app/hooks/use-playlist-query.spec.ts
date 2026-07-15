@@ -43,6 +43,53 @@ const playlistDetailResponse = {
   ],
 };
 
+const trackItemWithStreamFields = {
+  id: 'i1',
+  itemType: 'track',
+  sortOrder: 0,
+  title: 'Song',
+  artistName: 'Artist',
+  duration: 213,
+  available: true,
+  trackFileId: 'tf1',
+  releaseId: 'r1',
+  releaseTitle: 'Album',
+  videoId: null,
+  coverArt: null,
+  s3Key: 'releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+  streamUrl: 'https://cdn.test/releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+  posterUrl: null,
+};
+
+const videoItemWithStreamFields = {
+  id: 'i2',
+  itemType: 'video',
+  sortOrder: 1,
+  title: 'Clip',
+  artistName: 'Artist',
+  duration: 100,
+  available: true,
+  trackFileId: null,
+  releaseId: null,
+  releaseTitle: null,
+  videoId: 'v1',
+  coverArt: null,
+  s3Key: null,
+  streamUrl: 'https://signed.example/v.mp4?Signature=x',
+  posterUrl: 'https://cdn.test/posters/v.jpg',
+};
+
+const streamFieldsDetailResponse = {
+  id: 'p2',
+  title: 'Stream Fields Mix',
+  isPublic: false,
+  isOwner: true,
+  coverImages: [],
+  itemCount: 2,
+  totalDuration: 313,
+  items: [trackItemWithStreamFields, videoItemWithStreamFields],
+};
+
 interface CapturedOptions {
   enabled: boolean;
   queryKey: unknown[];
@@ -117,5 +164,51 @@ describe('usePlaylistQuery', () => {
     renderHook(() => usePlaylistQuery('p1', { enabled: false }));
 
     expect(lastOptions().enabled).toBe(false);
+  });
+
+  // Parity guards for the player cluster: the detail wire schema carries
+  // per-item stream fields (s3Key/streamUrl/posterUrl) and the hook must
+  // surface them unchanged — or fail loudly when the server drops one.
+  it('surfaces item stream fields unchanged through validation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => streamFieldsDetailResponse })
+    );
+
+    renderHook(() => usePlaylistQuery('p2'));
+
+    const { signal } = new AbortController();
+    const parsed = await lastOptions().queryFn({ signal });
+
+    expect(parsed).toMatchObject({
+      items: [
+        {
+          s3Key: 'releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+          streamUrl: 'https://cdn.test/releases/r1/digital-formats/MP3_320KBPS/t1.mp3',
+          posterUrl: null,
+        },
+        {
+          s3Key: null,
+          streamUrl: 'https://signed.example/v.mp4?Signature=x',
+          posterUrl: 'https://cdn.test/posters/v.jpg',
+        },
+      ],
+    });
+  });
+
+  it('settles in error when a server drops streamUrl from an item', async () => {
+    const { streamUrl: _streamUrl, ...trackWithoutStreamUrl } = trackItemWithStreamFields;
+    const driftedBody = {
+      ...streamFieldsDetailResponse,
+      items: [trackWithoutStreamUrl, videoItemWithStreamFields],
+    };
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => driftedBody }));
+
+    renderHook(() => usePlaylistQuery('p2'));
+
+    const { signal } = new AbortController();
+
+    await expect(lastOptions().queryFn({ signal })).rejects.toBeInstanceOf(ResponseValidationError);
   });
 });
