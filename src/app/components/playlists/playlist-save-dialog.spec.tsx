@@ -645,6 +645,41 @@ describe('PlaylistSaveDialog', () => {
       deferred.resolve({ success: true, data: UPDATED });
       await waitFor(() => expect(props.onSaved).toHaveBeenCalled());
     });
+
+    it('ignores dialog close requests (Escape) while the save is in flight', async () => {
+      const user = userEvent.setup();
+      const deferred = createDeferred<Awaited<ReturnType<typeof createPlaylistAction>>>();
+      createActionMock.mockReturnValue(deferred.promise);
+      const { props } = renderDialog({ initialValues: VALID_INITIAL_VALUES });
+
+      await clickSave(user);
+      await screen.findByRole('button', { name: 'Saving…' });
+
+      await user.keyboard('{Escape}');
+
+      expect(props.onOpenChange).not.toHaveBeenCalled();
+
+      deferred.resolve({ success: true, data: CREATED });
+      await waitFor(() => expect(props.onSaved).toHaveBeenCalled());
+      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('allows closing the dialog again once the save settles', async () => {
+      const user = userEvent.setup();
+      const deferred = createDeferred<Awaited<ReturnType<typeof createPlaylistAction>>>();
+      createActionMock.mockReturnValue(deferred.promise);
+      const { props } = renderDialog({ initialValues: VALID_INITIAL_VALUES });
+
+      await clickSave(user);
+      await screen.findByRole('button', { name: 'Saving…' });
+
+      deferred.resolve({ success: false, error: 'Failed to create playlist' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+
+      await user.keyboard('{Escape}');
+
+      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    });
   });
 
   describe('Cancel', () => {

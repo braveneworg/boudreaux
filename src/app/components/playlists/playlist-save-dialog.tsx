@@ -106,8 +106,16 @@ export const PlaylistSaveDialog = ({
     onAddSongs?.();
   };
 
+  // Hold Escape/overlay-click close requests while the save chain is in
+  // flight — closing mid-save would let a late `markSaved` in the parent
+  // clear items the user staged after escaping. The success path closes via
+  // the submit hook's own `onOpenChange`, so it is unaffected by this gate.
+  const handleDialogOpenChange = (nextOpen: boolean): void => {
+    if (!isSaving) onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       {/* The cover-art field makes the form taller than short viewports —
           scroll inside the fixed dialog so the footer stays reachable
           (same pattern as tour-date-form). */}
