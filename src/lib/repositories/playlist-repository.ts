@@ -219,12 +219,14 @@ export class PlaylistRepository {
   /**
    * Remove an item in one transaction: delete it, decrement the denormalized
    * counters by the removed item's duration, then compact the dense `sortOrder`
-   * of every following item down by one so the range stays gap-free.
+   * of every following item down by one so the range stays gap-free. The delete
+   * is scoped to the playlist (like `reorderItems`) so a stray item id can
+   * never touch another playlist's items.
    */
   static async removeItem(playlistId: string, itemId: string): Promise<void> {
     await runQuery(() =>
       prisma.$transaction(async (tx) => {
-        const removed = await tx.playlistItem.delete({ where: { id: itemId } });
+        const removed = await tx.playlistItem.delete({ where: { id: itemId, playlistId } });
         await tx.playlist.update({
           where: { id: playlistId },
           data: { itemCount: { decrement: 1 }, totalDuration: { decrement: removed.duration } },

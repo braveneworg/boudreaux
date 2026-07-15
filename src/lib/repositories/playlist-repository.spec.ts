@@ -415,14 +415,16 @@ describe('PlaylistRepository', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
-    it('deletes the item by id', async () => {
+    it('deletes the item by id scoped to its playlist', async () => {
       vi.mocked(prisma.playlistItem.delete).mockResolvedValue(middle as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
       vi.mocked(prisma.playlistItem.updateMany).mockResolvedValue({ count: 1 });
 
       await PlaylistRepository.removeItem(PLAYLIST_ID, ITEM_ID);
 
-      expect(prisma.playlistItem.delete).toHaveBeenCalledWith({ where: { id: ITEM_ID } });
+      expect(prisma.playlistItem.delete).toHaveBeenCalledWith({
+        where: { id: ITEM_ID, playlistId: PLAYLIST_ID },
+      });
     });
 
     it('decrements counters by one and by the removed item duration', async () => {
