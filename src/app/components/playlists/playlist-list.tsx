@@ -29,7 +29,10 @@ const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 
 /** Three placeholder rows approximating the thumb + two-line row layout. */
 const PlaylistListSkeleton = ({ className }: { className?: string }): ReactElement => (
-  <div className={cn(className)}>
+  <div className={cn(className)} aria-busy="true">
+    <p role="status" className="sr-only">
+      Loading playlists…
+    </p>
     {SKELETON_KEYS.map((key) => (
       <div
         key={key}
@@ -56,9 +59,10 @@ const PlaylistListSkeleton = ({ className }: { className?: string }): ReactEleme
  */
 export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): ReactElement => {
   const { isPending, rows, nextSkip, loadMore, isLoadingMore } = usePlaylistsQuery();
-  const { deletePlaylist } = useDeletePlaylistMutation();
+  const { deletePlaylist, isDeletingPlaylist } = useDeletePlaylistMutation();
 
-  const handleDelete = (playlistId: string): void =>
+  const handleDelete = (playlistId: string): void => {
+    if (isDeletingPlaylist) return; // a confirmed delete is already in flight
     deletePlaylist(
       { playlistId },
       {
@@ -66,6 +70,7 @@ export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): 
         onError: (error: Error) => toast.error(error.message),
       }
     );
+  };
 
   if (isPending) return <PlaylistListSkeleton className={className} />;
 

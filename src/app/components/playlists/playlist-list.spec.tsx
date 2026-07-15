@@ -21,13 +21,19 @@ interface DeleteMutateOptions {
 const deletePlaylistMock = vi.hoisted(() =>
   vi.fn<(input: { playlistId: string }, options?: DeleteMutateOptions) => void>()
 );
+const isDeletingPlaylistMock = vi.hoisted(() => ({ value: false }));
 
 vi.mock('@/hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 
 vi.mock('@/hooks/use-playlist-mutations', () => ({
-  useDeletePlaylistMutation: () => ({ deletePlaylist: deletePlaylistMock }),
+  useDeletePlaylistMutation: () => ({
+    deletePlaylist: deletePlaylistMock,
+    get isDeletingPlaylist() {
+      return isDeletingPlaylistMock.value;
+    },
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -106,6 +112,10 @@ const toastErrorMock = vi.mocked(toast.error);
 const lastDeleteOptions = (): DeleteMutateOptions | undefined =>
   deletePlaylistMock.mock.calls.at(0)?.[1];
 
+beforeEach(() => {
+  isDeletingPlaylistMock.value = false;
+});
+
 describe('PlaylistList', () => {
   describe('loading state', () => {
     it('renders three skeleton rows while the query is pending', () => {
@@ -113,6 +123,20 @@ describe('PlaylistList', () => {
       renderList();
 
       expect(screen.getAllByTestId('playlist-row-skeleton')).toHaveLength(3);
+    });
+
+    it('marks the skeleton wrapper busy for assistive tech', () => {
+      mockQueryState({ isPending: true });
+      const { container } = renderList();
+
+      expect(container.firstChild).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('announces the loading status to assistive tech', () => {
+      mockQueryState({ isPending: true });
+      renderList();
+
+      expect(screen.getByRole('status')).toHaveTextContent('Loading playlists…');
     });
   });
 
@@ -242,6 +266,17 @@ describe('PlaylistList', () => {
       lastDeleteOptions()?.onError?.(new Error('Delete failed'));
 
       expect(toastErrorMock).toHaveBeenCalledWith('Delete failed');
+    });
+
+    it('ignores a second delete click while a delete is already in flight', async () => {
+      const user = userEvent.setup();
+      isDeletingPlaylistMock.value = true;
+      mockRows([ROAD_TRIP]);
+      renderList();
+
+      await user.click(screen.getByRole('button', { name: 'stub-delete-pl-1' }));
+
+      expect(deletePlaylistMock).not.toHaveBeenCalled();
     });
   });
 });

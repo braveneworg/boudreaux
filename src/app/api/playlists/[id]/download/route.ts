@@ -372,7 +372,15 @@ const streamPlaylistZip = async (args: {
   const pipeline = createArchivePipeline();
   drivePlaylistArchive(pipeline, manifest.tracks, { inFlight, keys, s3Client, bucket });
 
-  const safeTitle = manifest.playlistTitle.replace(/[^\w\s.-]/g, '').trim() || 'playlist';
+  // Collapse whitespace runs (incl. CR/LF/tabs, which the title schema's
+  // end-only trim lets through) to a single space FIRST, so no control char
+  // survives into the Content-Disposition header value — a raw CR/LF makes
+  // undici's Headers throw "invalid header value" → a hard 500 on download.
+  const safeTitle =
+    manifest.playlistTitle
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w .-]/g, '')
+      .trim() || 'playlist';
   return new NextResponse(toWebStream(pipeline), {
     status: 200,
     headers: {

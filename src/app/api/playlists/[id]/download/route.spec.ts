@@ -217,6 +217,21 @@ describe('GET /api/playlists/[id]/download', () => {
     expect(incrementQuotaMock).not.toHaveBeenCalled();
   });
 
+  it('collapses an interior newline in the title to a valid Content-Disposition', async () => {
+    vi.mocked(PlaylistService.getDownloadManifest).mockResolvedValue({
+      ...manifest,
+      playlistTitle: 'My\nMix',
+    });
+    const response = await GET(makeRequest('format=MP3_320KBPS'), makeContext());
+    // A raw newline would make undici throw "invalid header value" → 500.
+    expect(response.status).toBe(200);
+    const disposition = response.headers.get('content-disposition');
+    expect(disposition).not.toBeNull();
+    expect(disposition).not.toMatch(/[\r\n]/);
+    expect(disposition).toContain('My Mix.zip');
+    await response.arrayBuffer();
+  });
+
   it('does not charge when the first prefetched buffer is missing', async () => {
     startBufferPrefetchMock.mockImplementation((_c, _b, keys: readonly string[]) =>
       keys.slice(0, 4).map(() => Promise.resolve(null))
