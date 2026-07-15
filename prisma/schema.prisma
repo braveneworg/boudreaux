@@ -169,7 +169,6 @@ model Image {
   @@index([releaseId])
   @@index([urlId])
   @@index([sortOrder])
-  @@index([artistId, sortOrder]) // findManyByArtist: artistId filter + sortOrder sort
 }
 
 enum Platform {
@@ -325,7 +324,6 @@ model Artist {
   @@index([firstName, surname])
   @@index([displayName])
   @@index([createdAt]) // Admin listing sort (findMany orderBy createdAt desc)
-  @@index([isActive, displayName]) // listPublishedWithBio: isActive filter + displayName sort
 }
 
 model FeaturedArtist {
@@ -443,7 +441,6 @@ model ArtistBioImage {
 
   @@index([artistId])
   @@index([sortOrder])
-  @@index([artistId, isPrimary, sortOrder]) // primary bio-image subquery ordering
 }
 
 // External links discovered for an artist during AI bio generation (Wikipedia,
@@ -467,7 +464,6 @@ model ArtistBioLink {
   // `replaceBioContent` before insert so regeneration never trips it.
   @@unique([artistId, url])
   @@index([sortOrder])
-  @@index([artistId, sortOrder]) // bio-link ordering per artist
 }
 
 // Add to Tag collection as new tags are created. Remove hash before storing
@@ -737,7 +733,6 @@ model ReleaseDigitalFormat {
   @@index([releaseId])
   @@index([s3Key])
   @@index([deletedAt]) // For soft delete queries
-  @@index([releaseId, deletedAt]) // findAllByRelease: releaseId + soft-delete filter
 }
 
 model ReleaseDigitalFormatFile {
@@ -815,9 +810,6 @@ model DownloadEvent {
   @@index([downloadedAt]) // For time-based analytics queries
   @@index([userId, releaseId]) // For per-user per-release download history
   @@index([visitorId, releaseId, downloadedAt]) // Free-flow rolling-window cap query (007-free-digital-downloads)
-  @@index([userId, releaseId, downloadedAt]) // Auth rolling-window cap (mirror of the guest index)
-  @@index([releaseId, success]) // Release analytics: getTotalDownloads / getUniqueUsers / getAnalyticsByRelease
-  @@index([userId, success]) // getAnalyticsByUser
 }
 
 // Composite-identity record for anonymous visitors (007-free-digital-downloads).
@@ -959,9 +951,6 @@ model BannedIdentity {
   @@index([email])
   @@index([fingerprintHash])
   @@index([userId])
-  @@index([email, unbannedAt]) // findActiveMatch email branch (active = unbannedAt null/absent)
-  @@index([fingerprintHash, unbannedAt]) // findActiveMatch fingerprint branch
-  @@index([userId, unbannedAt]) // findActiveMatch userId branch
 }
 
 model ChatRateLimitLog {
@@ -1074,7 +1063,6 @@ model VideoArtist {
   @@unique([videoId, artistId])
   @@index([videoId])
   @@index([artistId])
-  @@index([videoId, sortOrder]) // findByVideoId: videoId filter + sortOrder sort
 }
 
 // One reviewable web-derived fact for a video (artistId null = the video-level

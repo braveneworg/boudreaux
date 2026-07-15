@@ -225,68 +225,10 @@ export const TARGETS: QueryTarget[] = [
   },
 
   // --- slow-query hardening pass (2026-07-14) ---
-  // Each entry uses `requiredKeyPrefix` to assert the SPECIFIC new compound
-  // index is considered, not merely a pre-existing index sharing the leading
-  // field. RED before the index is added; GREEN after `prisma db push`.
-  {
-    // download-event-repository.ts countSuccessfulDownloadsInWindow (auth path).
-    label: 'DownloadEvent.countSuccessfulDownloadsInWindow (user)',
-    collection: 'DownloadEvent',
-    filter: {
-      userId: 'probe-user',
-      releaseId: 'probe-release',
-      success: true,
-      downloadedAt: { $gte: { $date: '2026-06-17T00:00:00Z' } },
-    },
-    acceptableLeadingFields: ['userId'],
-    requiredKeyPrefix: ['userId', 'releaseId', 'downloadedAt'],
-  },
-  {
-    // download-event-repository.ts getTotalDownloads / getAnalyticsByRelease.
-    label: 'DownloadEvent.getTotalDownloads (releaseId + success)',
-    collection: 'DownloadEvent',
-    filter: { releaseId: 'probe-release', success: true },
-    acceptableLeadingFields: ['releaseId'],
-    requiredKeyPrefix: ['releaseId', 'success'],
-  },
-  {
-    // download-event-repository.ts getAnalyticsByUser.
-    label: 'DownloadEvent.getAnalyticsByUser (userId + success)',
-    collection: 'DownloadEvent',
-    filter: { userId: 'probe-user', success: true },
-    acceptableLeadingFields: ['userId'],
-    requiredKeyPrefix: ['userId', 'success'],
-  },
-  {
-    // release-digital-format-repository.ts findAllByRelease (soft-delete filter).
-    label: 'ReleaseDigitalFormat.findAllByRelease (releaseId + deletedAt)',
-    collection: 'ReleaseDigitalFormat',
-    filter: {
-      releaseId: 'probe-release',
-      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
-    },
-    acceptableLeadingFields: ['releaseId'],
-    requiredKeyPrefix: ['releaseId', 'deletedAt'],
-  },
-  {
-    // image-repository.ts findManyByArtist — artistId filter, sortOrder sort.
-    label: 'Image.findManyByArtist (artistId + sortOrder)',
-    collection: 'Image',
-    filter: { artistId: 'probe-artist' },
-    sort: { sortOrder: 1 },
-    acceptableLeadingFields: ['artistId'],
-    requiredKeyPrefix: ['artistId', 'sortOrder'],
-  },
-  {
-    // artist-repository.ts listPublishedWithBio — isActive eq + displayName sort
-    // (publishedOn `$ne null` is a range, filtered inline).
-    label: 'Artist.listPublishedWithBio (isActive + displayName)',
-    collection: 'Artist',
-    filter: { isActive: true, publishedOn: { $ne: null } },
-    sort: { displayName: 1 },
-    acceptableLeadingFields: ['isActive', 'displayName'],
-    requiredKeyPrefix: ['isActive', 'displayName'],
-  },
+  // Four indexes that close a genuine gap (the query was NOT index-served
+  // before). `requiredKeyPrefix` asserts the specific compound index is
+  // considered, not merely a pre-existing index sharing the leading field.
+  // RED before the index is added; GREEN after `prisma db push`.
   {
     // featured-artist-repository.ts findAll — [position asc, featuredOn desc].
     label: 'FeaturedArtist.findAll (position + featuredOn)',
@@ -295,34 +237,6 @@ export const TARGETS: QueryTarget[] = [
     sort: { position: 1, featuredOn: -1 },
     acceptableLeadingFields: ['position'],
     requiredKeyPrefix: ['position', 'featuredOn'],
-  },
-  {
-    // artist-repository.ts primary bio-image subquery — artistId + isPrimary,
-    // sortOrder sort.
-    label: 'ArtistBioImage primary subquery (artistId + isPrimary + sortOrder)',
-    collection: 'ArtistBioImage',
-    filter: { artistId: 'probe-artist', isPrimary: true },
-    sort: { sortOrder: 1 },
-    acceptableLeadingFields: ['artistId'],
-    requiredKeyPrefix: ['artistId', 'isPrimary', 'sortOrder'],
-  },
-  {
-    // artist-repository.ts bio-link ordering — artistId filter, sortOrder sort.
-    label: 'ArtistBioLink ordering (artistId + sortOrder)',
-    collection: 'ArtistBioLink',
-    filter: { artistId: 'probe-artist' },
-    sort: { sortOrder: 1 },
-    acceptableLeadingFields: ['artistId'],
-    requiredKeyPrefix: ['artistId', 'sortOrder'],
-  },
-  {
-    // video-artist-repository.ts findByVideoId — videoId filter, sortOrder sort.
-    label: 'VideoArtist.findByVideoId (videoId + sortOrder)',
-    collection: 'VideoArtist',
-    filter: { videoId: 'probe-video' },
-    sort: { sortOrder: 1 },
-    acceptableLeadingFields: ['videoId'],
-    requiredKeyPrefix: ['videoId', 'sortOrder'],
   },
   {
     // tours/venue-repository.ts findRecent — createdAt desc sort.
@@ -340,39 +254,6 @@ export const TARGETS: QueryTarget[] = [
     filter: { allowSmsNotifications: true, phone: { $ne: null } },
     acceptableLeadingFields: ['allowSmsNotifications'],
     requiredKeyPrefix: ['allowSmsNotifications', 'phone'],
-  },
-  {
-    // banned-identity-repository.ts findActiveMatch (email branch).
-    label: 'BannedIdentity.findActiveMatch (email + unbannedAt)',
-    collection: 'BannedIdentity',
-    filter: {
-      email: 'probe@example.com',
-      $or: [{ unbannedAt: null }, { unbannedAt: { $exists: false } }],
-    },
-    acceptableLeadingFields: ['email'],
-    requiredKeyPrefix: ['email', 'unbannedAt'],
-  },
-  {
-    // banned-identity-repository.ts findActiveMatch (fingerprint branch).
-    label: 'BannedIdentity.findActiveMatch (fingerprintHash + unbannedAt)',
-    collection: 'BannedIdentity',
-    filter: {
-      fingerprintHash: 'probe-fingerprint',
-      $or: [{ unbannedAt: null }, { unbannedAt: { $exists: false } }],
-    },
-    acceptableLeadingFields: ['fingerprintHash'],
-    requiredKeyPrefix: ['fingerprintHash', 'unbannedAt'],
-  },
-  {
-    // banned-identity-repository.ts findActiveMatch (userId branch).
-    label: 'BannedIdentity.findActiveMatch (userId + unbannedAt)',
-    collection: 'BannedIdentity',
-    filter: {
-      userId: 'probe-user',
-      $or: [{ unbannedAt: null }, { unbannedAt: { $exists: false } }],
-    },
-    acceptableLeadingFields: ['userId'],
-    requiredKeyPrefix: ['userId', 'unbannedAt'],
   },
   {
     // release-repository.ts published count — publishedAt `$ne null` filter.

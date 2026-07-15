@@ -45,6 +45,14 @@ added is proven with an `explain` IXSCAN assertion before it ships.
 
 ## A. Index additions
 
+> **Trimmed 2026-07-14 (post-review):** shipped only the **four** indexes that
+> close a genuine gap (the query was not index-served before) — `Venue`
+> `[createdAt]`, `FeaturedArtist` `[position, featuredOn]`, `User`
+> `[allowSmsNotifications, phone]`, `Release` `[publishedAt]`. The other twelve
+> "M" indexes below were dropped: running the guard proved the queries were
+> already index-served at the leading-field level, so they were pure M0 write
+> cost for no measurable gain. They can be reinstated when prod data justifies.
+
 Each is added to `prisma/schema.prisma` and gets a `check-query-plans.ts`
 `TARGETS` entry asserting an applicable IXSCAN. Value column: **H** = serves a
 hot/growing path, **M** = marginal (leading field already narrows, or
