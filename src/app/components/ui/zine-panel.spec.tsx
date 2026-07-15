@@ -136,7 +136,8 @@ describe('ZinePanel', () => {
     const { container } = render(<ZinePanel accent="teal">Panel body</ZinePanel>);
     expect(getSection(container)).toHaveClass(
       'shadow-zine',
-      'border-2',
+      'border-t-2',
+      'border-l-2',
       'border-black',
       'w-full',
       'overflow-visible',
@@ -196,5 +197,26 @@ describe('ZinePanel', () => {
       </ZinePanel>
     );
     expect(screen.getByRole('region', { name: 'Tour dates' })).toHaveAttribute('id', 'tour-panel');
+  });
+
+  it('draws the black border only on the top and left edges', () => {
+    render(
+      <ZinePanel accent="storm" tape={false} data-testid="panel">
+        <p>content</p>
+      </ZinePanel>
+    );
+    const panel = screen.getByTestId('panel');
+    expect(panel.className).toContain('border-t-2');
+    expect(panel.className).toContain('border-l-2');
+    expect(panel.className).not.toContain('border-2');
+  });
+
+  it('keeps the accent offset shadow as the right/bottom edge', () => {
+    render(
+      <ZinePanel accent="storm" tape={false} data-testid="panel">
+        <p>content</p>
+      </ZinePanel>
+    );
+    expect(screen.getByTestId('panel').className).toContain('shadow-zine');
   });
 });

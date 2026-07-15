@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { splitFeaturedArtists } from './artist-name-split';
+import { composeArtistString, splitFeaturedArtists } from './artist-name-split';
 
 describe('splitFeaturedArtists', () => {
   it('returns a lone name as the single primary', () => {
@@ -154,5 +154,32 @@ describe('splitFeaturedArtists', () => {
 
   it('returns an empty array for a whitespace-only string', () => {
     expect(splitFeaturedArtists('   ')).toEqual([]);
+  });
+});
+
+describe('composeArtistString', () => {
+  it('returns the primary alone when there are no featured', () => {
+    expect(composeArtistString('X', [])).toBe('X');
+  });
+  it('joins a single featured with a feat. token', () => {
+    expect(composeArtistString('X', ['Y'])).toBe('X feat. Y');
+  });
+  it('joins multiple featured each with its own feat. token', () => {
+    expect(composeArtistString('X', ['Y', 'Z'])).toBe('X feat. Y feat. Z');
+  });
+  it('round-trips through splitFeaturedArtists', () => {
+    const composed = composeArtistString('X', ['Y', 'Z']);
+    const parts = splitFeaturedArtists(composed);
+    expect(parts).toEqual([
+      { name: 'X', role: 'primary' },
+      { name: 'Y', role: 'featured' },
+      { name: 'Z', role: 'featured' },
+    ]);
+  });
+  it('trims and drops empty featured entries', () => {
+    expect(composeArtistString('  X  ', [' Y ', '', '  '])).toBe('X feat. Y');
+  });
+  it('returns an empty string for an empty primary', () => {
+    expect(composeArtistString('', ['Y'])).toBe('');
   });
 });

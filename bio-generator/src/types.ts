@@ -352,3 +352,22 @@ export const videoEnrichmentResultSchema = z.discriminatedUnion('ok', [
 ]);
 
 export type VideoEnrichmentResult = z.infer<typeof videoEnrichmentResultSchema>;
+
+export const releaseDateLookupInputSchema = z.object({
+  task: z.literal('release-date-lookup'),
+  title: z.string().min(1),
+  artist: z.string().optional(),
+});
+
+export type ReleaseDateLookupInput = z.infer<typeof releaseDateLookupInputSchema>;
+
+export type ReleaseDateLookupResult =
+  | {
+      ok: true;
+      result: {
+        releasedOn: string;
+        confidence: 'high' | 'medium' | 'low';
+        sources: string[];
+      } | null;
+    }
+  | { ok: false; error: string };

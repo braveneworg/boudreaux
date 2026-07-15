@@ -129,6 +129,13 @@ export interface VideoListFilters {
   sort?: 'asc' | 'desc';
   skip?: number;
   take?: number;
+  /**
+   * When set, the published filter uses a visibility clause (`publishedAt <= visibleAt`)
+   * instead of the presence-based toggle (`publishedAt != null`). Used by the
+   * three public reads (`findPublished`, `findManyByIds`, `searchPublished`) to
+   * exclude future-dated scheduled videos from the public listing.
+   */
+  visibleAt?: Date;
 }
 
 /** Count filters for the admin dashboard (Prisma-free at the boundary). */

@@ -42,6 +42,11 @@ export const queryKeys = {
         String(params.take ?? ''),
       ] as const,
   },
+  producers: {
+    all: ['producers'] as const,
+    search: (query: string) =>
+      [...queryKeys.producers.all, 'search', query.trim().toLowerCase()] as const,
+  },
   videos: {
     all: ['videos'] as const,
     publishedInfinite: (sort: 'asc' | 'desc') =>
@@ -66,6 +71,16 @@ export const queryKeys = {
     /** ffprobe prefill — keyed by s3Key + videoId; same pair never re-probes (staleTime: Infinity). */
     probePrefill: (s3Key: string, videoId: string) =>
       [...queryKeys.videos.all, 'probePrefill', s3Key, videoId] as const,
+    /** Producers linked to a video — used to prefill the producer pills in edit mode. */
+    producers: (id: string) => [...queryKeys.videos.all, 'producers', id] as const,
+    /** Release-date web lookup keyed by normalised title + optional artist. */
+    releaseDateLookup: (title: string, artist: string) =>
+      [
+        ...queryKeys.videos.all,
+        'releaseDateLookup',
+        title.trim().toLowerCase(),
+        artist.trim().toLowerCase(),
+      ] as const,
   },
   artists: {
     all: ['artists'] as const,

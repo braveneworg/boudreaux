@@ -26,6 +26,7 @@ import {
   confirmVideoUpload,
   deleteReplacedVideoAssets,
   kickPostSaveEnrichment,
+  syncVideoProducersAfterSave,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -65,6 +66,9 @@ const applyUpdateResult = (
  * any of these changes re-dispatches the async web enrichment. The sync also
  * runs on a file-only replacement; it is idempotent. No-op when nothing
  * relevant changed.
+ *
+ * Producer sync is NOT included here — it runs in its own `after()` call in
+ * {@link runVideoUpdate} so that clearing all producers persists correctly.
  */
 const scheduleUpdateEnrichment = (
   current: Video,
@@ -130,6 +134,17 @@ const runVideoUpdate = async (
     deleteReplacedVideoAssets(current, data, s3KeyReplaced);
     revalidatePath('/admin/videos');
     revalidatePath('/videos');
+    // Sync producers whenever the field was present in the payload — even when
+    // empty ([] means "clear all"), so clearing to zero is always persisted.
+    if (data.producers !== undefined) {
+      after(() =>
+        syncVideoProducersAfterSave({
+          videoId,
+          producers: data.producers ?? [],
+          createdBy: userId,
+        })
+      );
+    }
     scheduleUpdateEnrichment(current, data, s3KeyReplaced);
   }
 };

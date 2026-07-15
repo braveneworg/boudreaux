@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
+import type { ComponentProps } from 'react';
+
 import { render, screen } from '@testing-library/react';
 
 import { VideoEnrichmentStatusChip } from './video-enrichment-status-chip';
@@ -36,5 +38,15 @@ describe('VideoEnrichmentStatusChip', () => {
     render(<VideoEnrichmentStatusChip status="succeeded" />);
 
     expect(screen.getByTestId('video-enrichment-status-chip')).toHaveTextContent('Enriched');
+  });
+
+  it('falls back to the not-enriched label for an unrecognized status', () => {
+    // An out-of-union status (e.g. from a future/unknown job state) is not in the
+    // label/variant maps, exercising the `?? 'Not enriched'` / `?? 'secondary'`
+    // defensive fallbacks.
+    const unknownStatus = 'archived' as ComponentProps<typeof VideoEnrichmentStatusChip>['status'];
+    render(<VideoEnrichmentStatusChip status={unknownStatus} />);
+
+    expect(screen.getByTestId('video-enrichment-status-chip')).toHaveTextContent('Not enriched');
   });
 });

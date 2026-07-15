@@ -129,3 +129,21 @@ export const artistNameLookupLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const ARTIST_NAME_LOOKUP_LIMIT = 20;
+
+/** Producer name search (admin video form) — 20 requests per minute. */
+export const producerSearchLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const PRODUCER_SEARCH_LIMIT = 20;
+
+/**
+ * Release-date web lookup (admin video form) — 10 requests per minute.
+ * Each call fans out to Serper + Gemini via the Lambda, so the low cap
+ * prevents accidental or deliberate cost storms.
+ */
+export const releaseDateLookupLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const RELEASE_DATE_LOOKUP_LIMIT = 10;

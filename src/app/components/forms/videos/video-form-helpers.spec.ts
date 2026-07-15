@@ -8,8 +8,10 @@ import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 import {
   applyServerFieldErrors,
   applyServerProbePrefill,
+  buildVideoDefaults,
   formatDateForForm,
   mapVideoToFormValues,
+  shapePublish,
   validateVideoFile,
 } from './video-form-helpers';
 
@@ -47,6 +49,12 @@ describe('formatDateForForm', () => {
 
   it('formats a Date to YYYY-MM-DD', () => {
     expect(formatDateForForm(new Date('2024-05-06T12:00:00.000Z'))).toBe('2024-05-06');
+  });
+});
+
+describe('buildVideoDefaults', () => {
+  it('defaults the category to MUSIC', () => {
+    expect(buildVideoDefaults().category).toBe('MUSIC');
   });
 });
 
@@ -273,5 +281,54 @@ describe('applyServerProbePrefill', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+});
+
+// ── shapePublish ──────────────────────────────────────────────────────────────
+
+const baseFormData: VideoFormData = {
+  title: 'My Video',
+  artist: 'An Artist',
+  category: 'MUSIC',
+  description: '',
+  releasedOn: '2026-01-01',
+  durationSeconds: '120',
+  s3Key: 'media/videos/v1/clip.mp4',
+  fileName: 'clip.mp4',
+  fileSize: '4096',
+  mimeType: 'video/mp4',
+  posterUrl: '',
+  publishedAt: '',
+  producers: [],
+};
+
+describe('shapePublish', () => {
+  it('Save strips publishedAt on a draft (typed date ignored)', () => {
+    expect(
+      shapePublish({ ...baseFormData, publishedAt: '2026-09-01' }, 'save', true).publishedAt
+    ).toBe('');
+  });
+
+  it('Publish stamps today when the date is empty', () => {
+    expect(shapePublish({ ...baseFormData, publishedAt: '' }, 'publish', true).publishedAt).toBe(
+      formatDateForForm(new Date())
+    );
+  });
+
+  it('Publish uses the typed date when present', () => {
+    expect(
+      shapePublish({ ...baseFormData, publishedAt: '2026-09-01' }, 'publish', true).publishedAt
+    ).toBe('2026-09-01');
+  });
+
+  it('Save persists the date on an already-published video', () => {
+    expect(
+      shapePublish({ ...baseFormData, publishedAt: '2026-09-01' }, 'save', false).publishedAt
+    ).toBe('2026-09-01');
+  });
+
+  it('Save on a published video returns data unchanged', () => {
+    const data = { ...baseFormData, publishedAt: '2026-09-01' };
+    expect(shapePublish(data, 'save', false)).toEqual(data);
   });
 });
