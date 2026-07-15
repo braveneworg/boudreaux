@@ -121,6 +121,16 @@ const ARTIST_EXPANSION_LIMIT = 3;
 /** The only format surfaced as playlist tracks (streamable, CDN-cached). */
 const MP3_FORMAT_TYPE = 'MP3_320KBPS';
 
+/** The stream/poster subset of {@link PlaylistItemPayload} (PR2). */
+type PlaylistItemStreamFields = Pick<PlaylistItemPayload, 's3Key' | 'streamUrl' | 'posterUrl'>;
+
+/** Live stream/poster fields (PR2) — null until attached from the live source row (see attachPlaylistItemStreamUrls, next task). */
+const NO_STREAM_FIELDS: PlaylistItemStreamFields = {
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
+};
+
 // =============================================================================
 // Pure helpers
 // =============================================================================
@@ -250,6 +260,7 @@ const resolveRefFromMaps = (
 
 /** Unavailable item: keep the stored snapshot, null out live-only fields. */
 const toUnavailablePayload = (item: PlaylistItemRecord): PlaylistItemPayload => ({
+  ...NO_STREAM_FIELDS,
   id: item.id,
   itemType: item.itemType,
   sortOrder: item.sortOrder,
@@ -272,6 +283,7 @@ const toTrackPayload = (
   if (!file) return toUnavailablePayload(item);
   const { release } = file.format;
   return {
+    ...NO_STREAM_FIELDS,
     id: item.id,
     itemType: item.itemType,
     sortOrder: item.sortOrder,
@@ -294,6 +306,7 @@ const toVideoPayload = (
 ): PlaylistItemPayload => {
   if (!video) return toUnavailablePayload(item);
   return {
+    ...NO_STREAM_FIELDS,
     id: item.id,
     itemType: item.itemType,
     sortOrder: item.sortOrder,
@@ -314,6 +327,7 @@ const toAddedItemPayload = (
   record: PlaylistItemRecord,
   { coverArt, releaseTitle }: ResolvedSource
 ): PlaylistItemPayload => ({
+  ...NO_STREAM_FIELDS,
   id: record.id,
   itemType: record.itemType,
   sortOrder: record.sortOrder,

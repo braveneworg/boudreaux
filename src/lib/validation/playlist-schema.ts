@@ -176,8 +176,9 @@ export const playlistsResponseSchema: z.ZodType<PlaylistsResponse> = z.object({
 
 /**
  * Wire schema for a resolved playlist item (from GET /api/playlists/[id]).
- * `trackFileId`, `releaseId`, `releaseTitle`, `videoId`, and `coverArt` are
- * nullable — the server populates only the fields relevant to `itemType`.
+ * `trackFileId`, `releaseId`, `releaseTitle`, `videoId`, `coverArt`, `s3Key`,
+ * `streamUrl`, and `posterUrl` are nullable — the server populates only the
+ * fields relevant to `itemType`.
  */
 export const playlistItemPayloadSchema: z.ZodType<PlaylistItemPayload> = z.object({
   id: z.string(),
@@ -192,6 +193,9 @@ export const playlistItemPayloadSchema: z.ZodType<PlaylistItemPayload> = z.objec
   releaseTitle: z.string().nullable(),
   videoId: z.string().nullable(),
   coverArt: z.string().nullable(),
+  s3Key: z.string().nullable(),
+  streamUrl: z.string().nullable(),
+  posterUrl: z.string().nullable(),
 });
 
 /**

@@ -108,6 +108,9 @@ const ADDED_ITEM: PlaylistItemPayload = {
   releaseTitle: null,
   videoId: null,
   coverArt: null,
+  s3Key: null,
+  streamUrl: null,
+  posterUrl: null,
 };
 
 const SUCCESS_RESULT: PlaylistActionResult<{ item: PlaylistItemPayload }> = {

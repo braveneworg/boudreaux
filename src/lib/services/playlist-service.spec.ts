@@ -367,6 +367,9 @@ describe('PlaylistService', () => {
         releaseTitle: 'Live Album',
         videoId: null,
         coverArt: 'https://cdn.test/covers/release-1.jpg',
+        s3Key: null,
+        streamUrl: null,
+        posterUrl: null,
       });
     });
 
@@ -434,6 +437,9 @@ describe('PlaylistService', () => {
         releaseTitle: null,
         videoId: null,
         coverArt: null,
+        s3Key: null,
+        streamUrl: null,
+        posterUrl: null,
       });
     });
 
@@ -468,6 +474,9 @@ describe('PlaylistService', () => {
         releaseTitle: null,
         videoId: 'video-1',
         coverArt: 'https://cdn.test/posters/video-1.jpg',
+        s3Key: null,
+        streamUrl: null,
+        posterUrl: null,
       });
     });
 
@@ -893,6 +902,9 @@ describe('PlaylistService', () => {
           releaseTitle: 'Live Album',
           videoId: null,
           coverArt: 'https://cdn.test/covers/release-1.jpg',
+          s3Key: null,
+          streamUrl: null,
+          posterUrl: null,
         },
       });
     });

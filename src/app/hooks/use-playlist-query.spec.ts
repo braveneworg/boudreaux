@@ -36,6 +36,9 @@ const playlistDetailResponse = {
       releaseTitle: 'Album',
       videoId: null,
       coverArt: null,
+      s3Key: null,
+      streamUrl: null,
+      posterUrl: null,
     },
   ],
 };
