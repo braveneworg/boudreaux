@@ -108,7 +108,10 @@ export const PlaylistSaveDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* The cover-art field makes the form taller than short viewports —
+          scroll inside the fixed dialog so the footer stays reachable
+          (same pattern as tour-date-form). */}
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit playlist' : 'New playlist'}</DialogTitle>
           <DialogDescription>
