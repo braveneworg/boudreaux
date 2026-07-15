@@ -396,6 +396,25 @@ describe('PlaylistService', () => {
       });
     });
 
+    it('falls back to the snapshot artist name when the live release has no artists', async () => {
+      mockPlaylistWithItems({}, [makeItem()]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ artists: [] }),
+      ]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]?.artistName).toBe('Snapshot Artist');
+    });
+
+    it('marks a track item without a trackFileId unavailable', async () => {
+      mockPlaylistWithItems({}, [makeItem({ trackFileId: null })]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ available: false, title: 'Snapshot Song' });
+    });
+
     it('marks a track item unavailable with snapshots when the file row is gone', async () => {
       mockPlaylistWithItems({}, [makeItem()]);
       trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([]);
@@ -452,6 +471,36 @@ describe('PlaylistService', () => {
       });
     });
 
+    it('falls back to the snapshot duration when the live video has no duration', async () => {
+      mockPlaylistWithItems({}, [
+        makeItem({
+          id: 'item-2',
+          itemType: 'video',
+          trackFileId: null,
+          releaseId: null,
+          videoId: 'video-1',
+          duration: 5,
+        }),
+      ]);
+      vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([
+        makeVideo({ durationSeconds: null }),
+      ]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ available: true, duration: 5 });
+    });
+
+    it('marks a video item without a videoId unavailable', async () => {
+      mockPlaylistWithItems({}, [
+        makeItem({ id: 'item-2', itemType: 'video', trackFileId: null, videoId: null }),
+      ]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]).toMatchObject({ available: false, title: 'Snapshot Song' });
+    });
+
     it('marks a video item unavailable when the published lookup omits it', async () => {
       mockPlaylistWithItems({}, [
         makeItem({
@@ -505,6 +554,24 @@ describe('PlaylistService', () => {
       await expect(
         PlaylistService.resolveItemSource({ itemType: 'track', trackFileId: 'file-1' })
       ).resolves.toMatchObject({ title: '01-live-song.mp3', duration: 0 });
+    });
+
+    it('resolves an empty artist join list to an empty artist name', async () => {
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ artists: [] }),
+      ]);
+
+      await expect(
+        PlaylistService.resolveItemSource({ itemType: 'track', trackFileId: 'file-1' })
+      ).resolves.toMatchObject({ artistName: '' });
+    });
+
+    it('returns null for a track ref without a trackFileId', async () => {
+      await expect(PlaylistService.resolveItemSource({ itemType: 'track' })).resolves.toBeNull();
+    });
+
+    it('returns null for a video ref without a videoId', async () => {
+      await expect(PlaylistService.resolveItemSource({ itemType: 'video' })).resolves.toBeNull();
     });
 
     it('returns null when the track file row is missing', async () => {
@@ -607,6 +674,39 @@ describe('PlaylistService', () => {
       });
 
       expect(detail).toMatchObject({ id: 'playlist-new', isOwner: true, items: [] });
+    });
+
+    it('seeds an item whose source has no artwork', async () => {
+      mockCreatedDetail();
+      vi.mocked(VideoRepository.findManyByIds).mockResolvedValue([makeVideo({ posterUrl: null })]);
+
+      await PlaylistService.createWithItems(OWNER_ID, {
+        title: 'New Mix',
+        isPublic: false,
+        coverImages: [],
+        items: [{ itemType: 'video', videoId: 'video-1' }],
+      });
+
+      expect(vi.mocked(PlaylistRepository.createWithItems)).toHaveBeenCalledWith(
+        expect.anything(),
+        [expect.objectContaining({ itemType: 'video', videoId: 'video-1' })]
+      );
+    });
+
+    it('throws NOT_FOUND when the created playlist cannot be reloaded', async () => {
+      vi.mocked(PlaylistRepository.createWithItems).mockResolvedValue(
+        makePlaylist({ id: 'playlist-new' })
+      );
+      vi.mocked(PlaylistRepository.findByIdWithItems).mockResolvedValue(null);
+
+      await expect(
+        PlaylistService.createWithItems(OWNER_ID, {
+          title: 'New Mix',
+          isPublic: false,
+          coverImages: [],
+          items: [],
+        })
+      ).rejects.toMatchObject({ name: 'DataError', code: 'NOT_FOUND' });
     });
 
     it('accepts a cover image that matches resolved item artwork', async () => {
@@ -1168,6 +1268,26 @@ describe('PlaylistService', () => {
       });
     });
 
+    it('falls back to the file name for an untitled song match', async () => {
+      trackFileRepoMock.searchTracksByTitle.mockResolvedValue([makeTrackFile({ title: null })]);
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups[0]?.items[0]?.title).toBe('01-live-song.mp3');
+    });
+
+    it('caps the songs group when the source over-returns', async () => {
+      trackFileRepoMock.searchTracksByTitle.mockResolvedValue(
+        Array.from({ length: PLAYLIST_SEARCH_GROUP_LIMIT + 1 }, (_, index) =>
+          makeTrackFile({ id: `file-${index}` })
+        )
+      );
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups[0]?.items).toHaveLength(PLAYLIST_SEARCH_GROUP_LIMIT);
+    });
+
     it('maps a video row onto a video source', async () => {
       vi.mocked(VideoRepository.searchPublished).mockResolvedValue([makeVideo()]);
 
@@ -1205,6 +1325,23 @@ describe('PlaylistService', () => {
           context: 'Public Mix',
         }),
       ]);
+    });
+
+    it('skips public playlist rows without a track file id', async () => {
+      vi.mocked(PlaylistRepository.searchPublicTrackItems).mockResolvedValue([
+        { ...makeItem({ trackFileId: 'file-2' }), playlist: { id: 'pl-2', title: 'Public Mix' } },
+        {
+          ...makeItem({ id: 'item-8', trackFileId: null }),
+          playlist: { id: 'pl-3', title: 'Ghost Mix' },
+        },
+      ]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({ id: 'file-2' }),
+      ]);
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups[0]?.items.map(({ key }) => key)).toEqual(['track:file-2']);
     });
 
     it('drops a trackFileId already emitted by the songs group from later groups', async () => {
@@ -1266,6 +1403,34 @@ describe('PlaylistService', () => {
       const result = await PlaylistService.searchMedia('night', OWNER_ID);
 
       expect(result.groups[0]?.items.map(({ key }) => key)).toEqual(['track:file-mp3']);
+    });
+
+    it('falls back to the file name for an untitled release track', async () => {
+      vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+        success: true,
+        data: [makeListing('release-9', 'Night Album')],
+      });
+      vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValue({
+        success: true,
+        data: makeReleaseDetail('release-9', 'Night Album', [
+          { files: [{ id: 'file-9', title: null }] },
+        ]),
+      });
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups[0]?.items[0]?.title).toBe('file-9.mp3');
+    });
+
+    it('omits the releases group when a matched release detail fails to load', async () => {
+      vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+        success: true,
+        data: [makeListing('release-9', 'Night Album')],
+      });
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups).toEqual([]);
     });
 
     it('caps an expanded group at the group limit', async () => {
@@ -1342,6 +1507,53 @@ describe('PlaylistService', () => {
       await PlaylistService.searchMedia('night', OWNER_ID);
 
       expect(vi.mocked(ReleaseService.getReleaseWithTracks)).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops artist expansion at the release fetch bound', async () => {
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [
+          makeArtist(
+            'Night Artist',
+            Array.from({ length: 4 }, (_, index) => ({
+              id: `release-${index}`,
+              title: `Album ${index}`,
+              publishedAt: NOW,
+              deletedOn: null,
+            }))
+          ),
+        ],
+      });
+
+      await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(vi.mocked(ReleaseService.getReleaseWithTracks)).toHaveBeenCalledTimes(3);
+    });
+
+    it('omits the artist group when the artist search fails', async () => {
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: false,
+        error: 'boom',
+      });
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups).toEqual([]);
+    });
+
+    it('omits the artist group when its release expansions fail', async () => {
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [
+          makeArtist('Night Artist', [
+            { id: 'release-9', title: 'Night Album', publishedAt: NOW, deletedOn: null },
+          ]),
+        ],
+      });
+
+      const result = await PlaylistService.searchMedia('night', OWNER_ID);
+
+      expect(result.groups).toEqual([]);
     });
 
     it('degrades to an omitted group when the release search fails', async () => {

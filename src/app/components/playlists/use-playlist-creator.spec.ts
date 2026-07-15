@@ -247,6 +247,18 @@ describe('usePlaylistCreator', () => {
       expect(result.current.state.pendingItems).toEqual([original]);
     });
 
+    it('drops a same-tick duplicate add via the reducer re-check', () => {
+      const { result } = renderHook(usePlaylistCreator);
+      const original = makeTrack(1);
+      // Both adds read the same render's (empty) state, so the pre-dispatch
+      // check passes twice and only the reducer re-check catches the second.
+      act(() => {
+        result.current.addItem(original);
+        result.current.addItem(makeTrack(2, { trackFileId: 'tf-1' }));
+      });
+      expect(result.current.state.pendingItems).toEqual([original]);
+    });
+
     it('reports a duplicate for a matching videoId', () => {
       const { result } = renderHook(usePlaylistCreator);
       addItemIn(result, makeVideo(1));
