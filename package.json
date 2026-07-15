@@ -202,6 +202,7 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "fast-xml-parser": "^5.8.0",
     "globals": "^17.6.0",
+    "happy-dom": "^20.10.6",
     "husky": "^9.1.7",
     "jsdom": "26.0.0",
     "lint-staged": "^16.4.0",
