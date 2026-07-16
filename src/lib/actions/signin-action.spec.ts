@@ -80,6 +80,14 @@ describe('signinAction', () => {
     mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
     // Default to passing Turnstile verification
     mockVerifyTurnstile.mockResolvedValue({ success: true });
+    // Reset the rate limiter to its passing default. Some tests queue a
+    // `mockRejectedValueOnce`, but if the action short-circuits before the
+    // limiter is reached (e.g. Turnstile/validation fails first), that queued
+    // rejection survives and fires on the next test that DOES reach the check —
+    // an order-dependent "Too many signin attempts" failure. mockReset drains
+    // any leftover queued value.
+    mockRateLimitCheck.mockReset();
+    mockRateLimitCheck.mockResolvedValue(undefined);
   });
 
   describe('successful signin flow', () => {

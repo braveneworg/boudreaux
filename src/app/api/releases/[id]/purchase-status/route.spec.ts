@@ -55,6 +55,17 @@ const makeContext = (id = 'release-123') => ({
 });
 
 describe('GET /api/releases/[id]/purchase-status', () => {
+  beforeEach(() => {
+    // Global clearMocks resets call history but NOT mockResolvedValue
+    // implementations, so a prior test's "paid" Stripe/purchase stub would leak
+    // into a test that only stubs findBySessionId — flipping confirmed:false →
+    // true depending on run order. Reset the data mocks to a clean slate.
+    mockFindBySessionId.mockReset();
+    mockFindByPaymentIntentId.mockReset();
+    mockCreate.mockReset();
+    mockStripeSessionsRetrieve.mockReset();
+  });
+
   it('returns 400 with missing_session_id when sessionId is absent', async () => {
     const request = makeRequest();
     const response = await GET(request, makeContext());
