@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
 import { FeaturedArtistsPlayer } from './featured-artists-player';
@@ -231,6 +232,22 @@ vi.mock('./deferred-download-dialog', async () => {
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     <span data-testid="cover-art-image" data-src={src} data-alt={alt} />
+  ),
+}));
+
+// Stub AddToPlaylistMenu: echo the built `item` (as JSON) and the positioning
+// `className` so tests can assert the media-item shape and the contrast styling
+// the player passes without exercising the real session-gated Radix popover.
+vi.mock('./playlists/add-to-playlist-menu', () => ({
+  AddToPlaylistMenu: ({ item, className }: { item: PlaylistSearchItem; className?: string }) => (
+    <button
+      type="button"
+      aria-label="Add to a playlist"
+      className={className}
+      data-item={JSON.stringify(item)}
+    >
+      Add to playlist
+    </button>
   ),
 }));
 
@@ -1615,6 +1632,64 @@ describe('FeaturedArtistsPlayer', () => {
         'data-current-file-id',
         'file-2'
       );
+    });
+  });
+
+  describe('add-to-playlist menu', () => {
+    it('should render the add-to-playlist menu inside the player frame', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select the artist with a release + digital format so a current file exists.
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      const menu = screen.getByRole('button', { name: /add to a playlist/i });
+      const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+      expect(frame).toContainElement(menu);
+    });
+
+    it('should build a track media item for the current file', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      const menu = screen.getByRole('button', { name: /add to a playlist/i });
+      const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+      expect(item.itemType).toBe('track');
+      expect(item.source).toEqual({ trackFileId: 'file-1', releaseId: 'release-1' });
+      expect(item.title).toBe('First Track');
+      expect(item.artistName).toBe('Test Artist 2');
+    });
+
+    it('should give the add-to-playlist trigger a contrasting overlay treatment', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      const menu = screen.getByRole('button', { name: /add to a playlist/i });
+      expect(menu).toHaveClass(
+        'absolute',
+        'right-1',
+        'top-1',
+        'z-10',
+        'text-white',
+        'rounded-full'
+      );
+    });
+
+    it('should not render the add-to-playlist menu when the selected artist has no release', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // The default first artist has no release + no files.
+      expect(screen.queryByRole('button', { name: /add to a playlist/i })).not.toBeInTheDocument();
     });
   });
 });

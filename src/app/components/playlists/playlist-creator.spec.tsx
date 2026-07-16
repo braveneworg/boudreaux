@@ -49,6 +49,16 @@ interface ListStubProps {
   onRemove: (id: string) => void;
 }
 
+interface SaveFormStubProps {
+  variant: 'dialog' | 'inline';
+  mode: 'create' | 'edit';
+  playlistId: string | null;
+  initialValues: { title: string; isPublic: boolean; coverImages: string[] };
+  pendingItemRefs: PlaylistItemSourceRef[];
+  availableArtistImages: string[];
+  onSaved: (playlist: PlaylistDetailResponse) => void;
+}
+
 const playlistQueryMock = vi.hoisted(() => vi.fn());
 const addPlaylistItemAsyncMock = vi.hoisted(() =>
   vi.fn<
@@ -70,6 +80,7 @@ const reorderPlaylistItemsMock = vi.hoisted(() =>
 );
 const capturedSearch = vi.hoisted(() => ({ current: null as SearchStubProps | null }));
 const capturedSaveDialog = vi.hoisted(() => ({ current: null as SaveDialogStubProps | null }));
+const capturedSaveForm = vi.hoisted(() => ({ current: null as SaveFormStubProps | null }));
 const capturedList = vi.hoisted(() => ({ current: null as ListStubProps | null }));
 
 vi.mock('./playlist-creator-search', () => ({
@@ -87,6 +98,20 @@ vi.mock('./playlist-save-dialog', () => ({
     return (
       <div
         data-testid="save-dialog"
+        data-mode={props.mode}
+        data-title={props.initialValues.title}
+      />
+    );
+  },
+}));
+
+vi.mock('./playlist-save-form', () => ({
+  PlaylistSaveForm: (props: SaveFormStubProps) => {
+    capturedSaveForm.current = props;
+    return (
+      <div
+        data-testid="save-form"
+        data-variant={props.variant}
         data-mode={props.mode}
         data-title={props.initialValues.title}
       />
@@ -231,6 +256,8 @@ const closeSaveDialog = (): void => {
 
 const saveDialog = (): HTMLElement | null => screen.queryByTestId('save-dialog');
 
+const saveForm = (): HTMLElement | null => screen.queryByTestId('save-form');
+
 const listTitles = (): string[] => (capturedList.current?.items ?? []).map(({ title }) => title);
 
 /** Draft add + save-dialog save — lands the creator in the saved phase for pl-1. */
@@ -243,6 +270,7 @@ const goToSaved = (): void => {
 beforeEach(() => {
   capturedSearch.current = null;
   capturedSaveDialog.current = null;
+  capturedSaveForm.current = null;
   capturedList.current = null;
   // The global `clearMocks` only clears calls — reset implementations too so
   // per-test `mockImplementation`s never leak across the shuffled test order.
@@ -723,6 +751,75 @@ describe('PlaylistCreator', () => {
       act(() => ref.current?.focusSearch());
 
       await waitFor(() => expect(screen.getByLabelText('mock search')).toHaveFocus());
+    });
+  });
+
+  describe('embedded variant', () => {
+    it('stages the seed item in the list on mount', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      expect(listTitles()).toEqual(['Cold Wind']);
+    });
+
+    it('renders the inline save form instead of a dialog', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      expect(saveForm()).toHaveAttribute('data-variant', 'inline');
+      expect(saveDialog()).not.toBeInTheDocument();
+    });
+
+    it('renders no dialog role in the embedded tree', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('does not re-stage when a different seed item arrives after mount', () => {
+      const { rerender, props } = renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      rerender(<PlaylistCreator {...props} seedItem={VIDEO} />);
+
+      expect(listTitles()).toEqual(['Cold Wind']);
+    });
+
+    it('shows the "Open in My Playlists" button after saving', () => {
+      playlistQueryMock.mockReturnValue(queryReturn({ data: DETAIL }));
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      act(() => capturedSaveForm.current?.onSaved({ ...DETAIL, id: 'p9' }));
+
+      expect(screen.getByRole('button', { name: 'Open in My Playlists' })).toBeInTheDocument();
+    });
+
+    it('calls onOpenInMyPlaylists with the saved id when clicked', async () => {
+      const user = userEvent.setup();
+      const onOpenInMyPlaylists = vi.fn();
+      playlistQueryMock.mockReturnValue(queryReturn({ data: DETAIL }));
+      renderCreator({ variant: 'embedded', seedItem: SONG, onOpenInMyPlaylists });
+
+      act(() => capturedSaveForm.current?.onSaved({ ...DETAIL, id: 'p9' }));
+      await user.click(screen.getByRole('button', { name: 'Open in My Playlists' }));
+
+      expect(onOpenInMyPlaylists).toHaveBeenCalledWith('p9');
+    });
+
+    it('shows no "Open in My Playlists" button before saving', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      expect(
+        screen.queryByRole('button', { name: 'Open in My Playlists' })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('page variant regression', () => {
+    it('renders the save flow through the save dialog by default', () => {
+      renderCreator();
+
+      addSong();
+
+      expect(saveDialog()).toBeInTheDocument();
+      expect(saveForm()).not.toBeInTheDocument();
     });
   });
 });

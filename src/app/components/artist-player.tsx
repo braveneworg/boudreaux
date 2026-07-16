@@ -25,6 +25,8 @@ import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 import { DeferredDownloadDialog } from './deferred-download-dialog';
 import { NowPlayingHeading } from './now-playing-heading';
+import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
+import { trackMediaItem } from './playlists/player-media-item';
 import { ReleaseShareWidget } from './release-share-widget';
 import { useTrackNavigation } from './use-track-navigation';
 
@@ -110,6 +112,45 @@ const ArtistReleaseSelector = ({
   />
 );
 
+type ArtistStageFile = ArtistRelease['release']['digitalFormats'][number]['files'][number];
+
+interface ArtistAddToPlaylistProps {
+  currentFile: ArtistStageFile;
+  selectedRelease: ArtistRelease['release'];
+  artistName: string;
+  coverArtSrc: string;
+}
+
+/**
+ * Session-gated "add the currently-playing track to a playlist" kebab, pinned to
+ * the top-right of the cover art. Builds the {@link PlaylistSearchItem} snapshot
+ * from the active file and delegates the menu UI to {@link AddToPlaylistMenu}.
+ * The trigger uses a white icon over a semi-opaque dark pill so it stays legible
+ * against arbitrary cover imagery.
+ */
+const ArtistAddToPlaylist = ({
+  currentFile,
+  selectedRelease,
+  artistName,
+  coverArtSrc,
+}: ArtistAddToPlaylistProps) => {
+  const mediaItem = trackMediaItem({
+    trackFileId: currentFile.id,
+    releaseId: selectedRelease.id,
+    title: getTrackDisplayTitle(currentFile.title, currentFile.fileName),
+    artistName,
+    coverArt: coverArtSrc,
+    duration: currentFile.duration ?? null,
+  });
+
+  return (
+    <AddToPlaylistMenu
+      item={mediaItem}
+      className="absolute top-1 right-1 z-10 rounded-full bg-black/40 p-1 text-white hover:bg-black/60 hover:text-white"
+    />
+  );
+};
+
 interface ArtistPlayerStageProps {
   artist: ArtistWithPublishedReleases;
   selectedRelease: ArtistRelease['release'];
@@ -164,6 +205,14 @@ const ArtistPlayerStage = ({
         onTogglePlay={onTogglePlay}
         priority
       />
+      {currentFile && selectedRelease && (
+        <ArtistAddToPlaylist
+          currentFile={currentFile}
+          selectedRelease={selectedRelease}
+          artistName={artistName}
+          coverArtSrc={coverArtSrc}
+        />
+      )}
       <NowPlayingHeading
         artistName={artistName}
         title={selectedRelease.title ?? ''}

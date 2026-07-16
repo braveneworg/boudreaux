@@ -4,6 +4,7 @@
 import React from 'react';
 
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import videojs from 'video.js';
 
 import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
@@ -211,27 +212,29 @@ vi.mock('lucide-react', () => ({
   ),
 }));
 
-// Mock Button from shadcn/ui
+// Mock Button from shadcn/ui. Spreads `...rest` onto the DOM button (mirroring
+// the real Button's `{...props}`) so an `aria-label` — and the props Radix
+// injects when the Button is a `PopoverTrigger asChild` (onClick, aria-expanded)
+// — reach the rendered element and drive the real Popover.
 vi.mock('@/components/ui/button', () => ({
   Button: ({
     children,
-    onClick,
     variant,
     size,
     className,
+    ...rest
   }: {
     children: React.ReactNode;
-    onClick?: () => void;
     variant?: string;
     size?: string;
     className?: string;
-  }) => (
+  } & React.ComponentProps<'button'>) => (
     <button
       data-testid="button"
       data-variant={variant}
       data-size={size}
       className={className}
-      onClick={onClick}
+      {...rest}
     >
       {children}
     </button>
@@ -1334,6 +1337,45 @@ describe('MediaPlayer', () => {
       );
 
       expect(screen.queryByTestId('star-icon')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('DotNavMenu component', () => {
+    it('should render a trigger button labelled by the label prop', () => {
+      render(
+        <MediaPlayer.DotNavMenu label="Add to a playlist">
+          <div>panel body</div>
+        </MediaPlayer.DotNavMenu>
+      );
+
+      expect(screen.getByRole('button', { name: 'Add to a playlist' })).toBeInTheDocument();
+    });
+
+    it('should default the trigger label to "Add to a playlist"', () => {
+      render(
+        <MediaPlayer.DotNavMenu>
+          <div>panel body</div>
+        </MediaPlayer.DotNavMenu>
+      );
+
+      expect(screen.getByRole('button', { name: 'Add to a playlist' })).toBeInTheDocument();
+    });
+
+    it('should reveal the portaled popover content when the trigger is clicked', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <MediaPlayer.DotNavMenu label="Add to a playlist">
+          <div>panel body</div>
+        </MediaPlayer.DotNavMenu>
+      );
+
+      expect(screen.queryByText('panel body')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Add to a playlist' }));
+
+      // PopoverContent renders through a portal, so wait for it to appear.
+      expect(await screen.findByText('panel body')).toBeInTheDocument();
     });
   });
 });

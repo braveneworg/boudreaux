@@ -17,6 +17,8 @@ import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { DeferredDownloadDialog } from './deferred-download-dialog';
 import { MediaActionLink } from './media-action-link';
 import { NowPlayingHeading } from './now-playing-heading';
+import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
+import { trackMediaItem } from './playlists/player-media-item';
 import { ReleaseShareWidget } from './release-share-widget';
 
 interface FeaturedArtistsPlayerProps {
@@ -46,6 +48,43 @@ const resolveInitialFileId = (
 };
 
 type FeaturedRelease = NonNullable<FeaturedArtist['release']>;
+
+interface FeaturedAddToPlaylistProps {
+  currentFile: FeaturedArtistFormatFile;
+  release: FeaturedRelease;
+  artistName: string | null;
+  coverArt: string | null;
+}
+
+/**
+ * Session-gated "add the currently-playing track to a playlist" kebab, pinned to
+ * the top-right of the cover art. Builds the {@link PlaylistSearchItem} snapshot
+ * from the active file and delegates the menu UI to {@link AddToPlaylistMenu}.
+ * The trigger uses a white icon over a semi-opaque dark pill so it stays legible
+ * against arbitrary cover imagery.
+ */
+const FeaturedAddToPlaylist = ({
+  currentFile,
+  release,
+  artistName,
+  coverArt,
+}: FeaturedAddToPlaylistProps) => {
+  const mediaItem = trackMediaItem({
+    trackFileId: currentFile.id,
+    releaseId: release.id,
+    title: getTrackDisplayTitle(currentFile.title, currentFile.fileName),
+    artistName,
+    coverArt,
+    duration: currentFile.duration ?? null,
+  });
+
+  return (
+    <AddToPlaylistMenu
+      item={mediaItem}
+      className="absolute top-1 right-1 z-10 rounded-full bg-black/40 p-1 text-white hover:bg-black/60 hover:text-white"
+    />
+  );
+};
 
 interface FeaturedArtistTrackRowProps {
   selectedArtist: FeaturedArtist;
@@ -126,6 +165,7 @@ const FeaturedArtistTrackRowSlot = ({
 
 interface FeaturedArtistDetailsProps {
   selectedArtist: FeaturedArtist;
+  currentFile: FeaturedArtistFormatFile | null;
   audioSrc: string | null;
   currentTrackTitle: string;
   isPlaying: boolean;
@@ -146,6 +186,7 @@ interface FeaturedArtistDetailsProps {
  */
 const FeaturedArtistDetails = ({
   selectedArtist,
+  currentFile,
   audioSrc,
   currentTrackTitle,
   isPlaying,
@@ -159,7 +200,9 @@ const FeaturedArtistDetails = ({
   setPlayerControls,
 }: FeaturedArtistDetailsProps) => {
   const coverArt = getFeaturedArtistCoverArt(selectedArtist);
-  const displayName = getFeaturedArtistDisplayName(selectedArtist) ?? '';
+  const artistName = getFeaturedArtistDisplayName(selectedArtist);
+  const displayName = artistName ?? '';
+  const release = selectedArtist.release;
 
   return (
     <div className="flex flex-col items-center">
@@ -169,8 +212,9 @@ const FeaturedArtistDetails = ({
           with the carousel's lg:max-w in media-player.tsx (player = carousel
           inset + 4rem for the arrow gutters). */}
       <div className="mx-auto w-full max-w-xl border-2 border-black lg:max-w-[calc(100%_-_6rem)]">
-        {/* Interactive Cover Art — aspect-square container prevents CLS */}
-        <div className="bg-muted aspect-square w-full overflow-hidden">
+        {/* Interactive Cover Art — aspect-square container prevents CLS.
+            `relative` anchors the add-to-playlist kebab overlay. */}
+        <div className="bg-muted relative aspect-square w-full overflow-hidden">
           {coverArt && (
             <MediaPlayer.InteractiveCoverArt
               src={coverArt}
@@ -183,6 +227,14 @@ const FeaturedArtistDetails = ({
               // `(min-width: 1024px)`-scoped preload for the initial
               // artist's cover (see (home)/page.tsx) that cache-feeds this
               // img on desktop, where it's the LCP element.
+            />
+          )}
+          {currentFile && release && (
+            <FeaturedAddToPlaylist
+              currentFile={currentFile}
+              release={release}
+              artistName={artistName}
+              coverArt={coverArt}
             />
           )}
         </div>
@@ -300,6 +352,7 @@ const FeaturedArtistsPlayerBody = ({
         {selectedArtist && (
           <FeaturedArtistDetails
             selectedArtist={selectedArtist}
+            currentFile={currentFile}
             audioSrc={audioSrc}
             currentTrackTitle={currentTrackTitle}
             isPlaying={isPlaying}

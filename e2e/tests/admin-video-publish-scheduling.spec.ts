@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
+import { scrollToLoad } from '../helpers/infinite-scroll';
 
 /**
  * E2E coverage for the video publish-scheduling feature (Tasks 3 + 4).
@@ -33,8 +34,13 @@ test.describe('Video publish scheduling — Scheduled badge', () => {
   }) => {
     await adminPage.goto('/admin/videos');
 
-    // Load all non-archived videos (two pages).
-    await adminPage.getByRole('button', { name: 'Load More' }).click();
+    // Load all non-archived videos (two pages). Scroll to auto-load the footer
+    // rather than clicking the transient "Load More" button, which races the
+    // IntersectionObserver auto-load (see scrollToLoad).
+    await scrollToLoad(
+      adminPage,
+      adminPage.getByRole('heading', { level: 3, name: 'E2E Video Scheduled' })
+    );
 
     // The scheduled video (publishedAt = 2099) must appear with a Scheduled badge.
     // The card's heading is a level-3 heading; locate the card that contains it.
@@ -74,7 +80,12 @@ test.describe('Video publish scheduling — public /videos gate', () => {
       .getByRole('article')
       .filter({ has: userPage.getByRole('heading', { level: 2, name: 'E2E Video Echo' }) });
     await expect(lastCard).toBeVisible();
-    await lastCard.scrollIntoViewIfNeeded();
+    // Retry the scroll: tripping the IntersectionObserver re-renders the list
+    // (appends page 2), which can transiently detach the grabbed node ("Element
+    // is not attached to the DOM"). toPass re-resolves and re-scrolls until it lands.
+    await expect(async () => {
+      await lastCard.scrollIntoViewIfNeeded();
+    }).toPass({ timeout: 15_000 });
 
     // Wait for infinite scroll to settle (Foxtrot + Golf pages in).
     await expect(

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useAddPlaylistItemMutation } from '@/hooks/use-playlist-mutations';
 import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
-import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
+import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
 import { draftItemFromSearchItem, type DraftItem } from './use-playlist-creator';
 
@@ -43,16 +43,6 @@ export interface UseCreatorAddFlowResult {
   dismissDuplicate: () => void;
 }
 
-/** Builds the exact add-item action input from a search item's source ref. */
-const addItemInputFor = (
-  { source }: PlaylistSearchItem,
-  playlistId: string,
-  force: boolean
-): AddPlaylistItemInput =>
-  'trackFileId' in source
-    ? { itemType: 'track', trackFileId: source.trackFileId, playlistId, force }
-    : { itemType: 'video', videoId: source.videoId, playlistId, force };
-
 /**
  * Phase-branched add flow for the playlist creator's search box. In the draft
  * phase items stage into the machine (a duplicate source opens the confirm
@@ -74,7 +64,7 @@ export const useCreatorAddFlow = ({
   const runServerAdd = async (item: PlaylistSearchItem, force: boolean): Promise<void> => {
     if (!playlistId) return;
     try {
-      const result = await addPlaylistItemAsync(addItemInputFor(item, playlistId, force));
+      const result = await addPlaylistItemAsync(buildAddPlaylistItemInput(item, playlistId, force));
       if (result.success) return;
       if (!force && result.error === DUPLICATE_ITEM_ERROR) {
         setPendingDuplicate({ kind: 'server', title: item.title, item });

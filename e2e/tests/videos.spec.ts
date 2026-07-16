@@ -116,8 +116,14 @@ test.describe('Videos page — signed-in listing', () => {
 
     await expect(cardTitles(userPage)).toHaveCount(PAGE_ONE_TITLES.length);
 
-    // Bring the end of the list into view to trip the IntersectionObserver.
-    await cardByTitle(userPage, 'E2E Video Echo').scrollIntoViewIfNeeded();
+    // Bring the end of page 1 into view to trip the IntersectionObserver. Retry
+    // the scroll: tripping the observer re-renders the list (appends page 2),
+    // which can transiently detach the node a single scrollIntoViewIfNeeded
+    // grabbed ("Element is not attached to the DOM"). toPass re-resolves the
+    // locator and re-scrolls until it lands.
+    await expect(async () => {
+      await cardByTitle(userPage, 'E2E Video Echo').scrollIntoViewIfNeeded();
+    }).toPass({ timeout: 15_000 });
 
     await expect(
       userPage.getByRole('heading', { level: 2, name: 'E2E Video Foxtrot' })
