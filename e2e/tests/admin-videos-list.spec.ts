@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
+import { scrollToLoad } from '../helpers/infinite-scroll';
 
 import type { Locator, Page } from '@playwright/test';
 
@@ -59,10 +60,13 @@ test.describe('Admin videos — default view', () => {
 
     // Load the second page so all 9 non-archived titles are present (7 published
     // + 1 draft + 1 scheduled; the archived video is excluded from this view).
-    await adminPage.getByRole('button', { name: 'Load More' }).click();
-    await expect(
+    // Scroll to auto-load the footer rather than clicking the transient "Load
+    // More" button, which races the IntersectionObserver auto-load (see
+    // scrollToLoad).
+    await scrollToLoad(
+      adminPage,
       adminPage.getByRole('heading', { level: 3, name: 'E2E Video Golf' })
-    ).toBeVisible();
+    );
     await expect(cardTitles(adminPage)).toHaveCount(9);
 
     // The archived video is excluded from the default (non-archived) view.
