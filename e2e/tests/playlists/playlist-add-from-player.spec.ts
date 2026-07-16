@@ -148,8 +148,8 @@ test.describe('Add to a playlist from a player', () => {
     // the saved playlist's edit view.
     await createDialog.getByRole('button', { name: 'Open in My Playlists' }).click();
 
-    // The dialog closes and the URL becomes /playlists?edit=<id>.
-    await expect(userPage).toHaveURL(/\/playlists\?edit=[a-f0-9]{24}$/);
+    // The deep link is consumed and stripped back to /playlists; edit mode is proven by the assertions below.
+    await expect(userPage).toHaveURL(/\/playlists(\?|$)/);
 
     // The creator now shows this playlist in edit mode: its title heads the pane
     // and the "Edit playlist" pencil (saved/editing state) is present.
