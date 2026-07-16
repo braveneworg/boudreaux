@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useImperativeHandle, useRef, type ReactElement, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, type ReactElement, type Ref } from 'react';
 
 import { Pencil } from 'lucide-react';
 
@@ -17,6 +17,7 @@ import { PlaylistCreatorItemList } from './playlist-creator-item-list';
 import { PlaylistCreatorSearch, type PlaylistCreatorSearchHandle } from './playlist-creator-search';
 import { PlaylistDuplicateConfirmDialog } from './playlist-duplicate-confirm-dialog';
 import { PlaylistSaveDialog } from './playlist-save-dialog';
+import { PlaylistSaveForm } from './playlist-save-form';
 import { useCreatorAddFlow } from './use-creator-add-flow';
 import { useCreatorEditParam } from './use-creator-edit-param';
 import { useCreatorServerItems } from './use-creator-server-items';
@@ -43,6 +44,16 @@ interface PlaylistCreatorProps {
   onEditHandled: () => void;
   /** React 19 ref-as-prop exposing {@link PlaylistCreatorHandle}. */
   ref?: Ref<PlaylistCreatorHandle>;
+  /**
+   * `page` (default) renders the save flow in a nested Dialog; `embedded`
+   * renders the metadata form inline so the creator can live inside a dialog
+   * without a Dialog-in-Dialog.
+   */
+  variant?: 'page' | 'embedded';
+  /** Embedded only: pre-stages this item into a fresh draft on mount. */
+  seedItem?: PlaylistSearchItem;
+  /** Embedded only: fires with the saved id from the "Open in My Playlists" link. */
+  onOpenInMyPlaylists?: (playlistId: string) => void;
 }
 
 const draftToListItem = ({
@@ -130,6 +141,82 @@ const CreatorHeading = ({
     </div>
   );
 
+interface CreatorSaveSurfaceProps {
+  variant: 'page' | 'embedded';
+  mode: 'create' | 'edit';
+  playlistId: string | null;
+  initialValues: { title: string; isPublic: boolean; coverImages: string[] };
+  pendingItemRefs: ReturnType<typeof toSourceRef>[];
+  availableArtistImages: string[];
+  onSaved: (playlist: PlaylistDetailResponse) => void;
+  onOpenChange: (open: boolean) => void;
+  onAddSongs: () => void;
+}
+
+/**
+ * The save surface: an inline metadata form in `embedded` mode (no nested
+ * Dialog), or the full {@link PlaylistSaveDialog} in `page` mode.
+ */
+const CreatorSaveSurface = ({
+  variant,
+  mode,
+  playlistId,
+  initialValues,
+  pendingItemRefs,
+  availableArtistImages,
+  onSaved,
+  onOpenChange,
+  onAddSongs,
+}: CreatorSaveSurfaceProps): ReactElement =>
+  variant === 'embedded' ? (
+    <PlaylistSaveForm
+      variant="inline"
+      mode={mode}
+      playlistId={playlistId}
+      initialValues={initialValues}
+      pendingItemRefs={pendingItemRefs}
+      availableArtistImages={availableArtistImages}
+      onSaved={onSaved}
+    />
+  ) : (
+    <PlaylistSaveDialog
+      open
+      onOpenChange={onOpenChange}
+      mode={mode}
+      playlistId={playlistId}
+      initialValues={initialValues}
+      pendingItemRefs={pendingItemRefs}
+      availableArtistImages={availableArtistImages}
+      onSaved={onSaved}
+      onAddSongs={onAddSongs}
+    />
+  );
+
+interface EmbeddedMyPlaylistsLinkProps {
+  variant: 'page' | 'embedded';
+  /** The saved playlist id, or `null` while still a draft. */
+  savedId: string | null;
+  onOpenInMyPlaylists?: (playlistId: string) => void;
+}
+
+/**
+ * Embedded-only deep-link shown once the playlist is saved. `savedId` is a
+ * prop (not `state.playlistId!`), so its non-null narrowing survives into the
+ * onClick closure without the banned non-null assertion.
+ */
+const EmbeddedMyPlaylistsLink = ({
+  variant,
+  savedId,
+  onOpenInMyPlaylists,
+}: EmbeddedMyPlaylistsLinkProps): ReactElement | null =>
+  variant === 'embedded' && savedId ? (
+    <div className="flex justify-end">
+      <Button type="button" variant="outline" onClick={() => onOpenInMyPlaylists?.(savedId)}>
+        Open in My Playlists
+      </Button>
+    </div>
+  ) : null;
+
 /**
  * Left-pane playlist creator: media search on top of the drag-sortable item
  * list, driven by the {@link usePlaylistCreator} machine. Draft items stage
@@ -137,11 +224,18 @@ const CreatorHeading = ({
  * once saved, items live on the server and reorder/remove/add go through
  * their mutations. An external `editPlaylistId` request loads that playlist
  * into the editing dialog after its detail is cached.
+ *
+ * `variant="embedded"` renders the save flow inline (no nested Dialog), can be
+ * pre-seeded via `seedItem`, and exposes an "Open in My Playlists" deep-link
+ * once saved.
  */
 export const PlaylistCreator = ({
   editPlaylistId,
   onEditHandled,
   ref,
+  variant = 'page',
+  seedItem,
+  onOpenInMyPlaylists,
 }: PlaylistCreatorProps): ReactElement => {
   const {
     state,
@@ -158,6 +252,16 @@ export const PlaylistCreator = ({
   } = usePlaylistCreator();
   const searchRef = useRef<PlaylistCreatorSearchHandle>(null);
   useImperativeHandle(ref, () => ({ focusSearch: () => searchRef.current?.focus() }), []);
+
+  // Embedded: stage the seed once on mount. Ref-guarded so a later `seedItem`
+  // prop change never re-stages (and keeps the effect exhaustive-deps-safe).
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (variant === 'embedded' && seedItem && !seededRef.current) {
+      seededRef.current = true;
+      resetToDraft([draftItemFromSearchItem(seedItem)]);
+    }
+  }, [variant, seedItem, resetToDraft]);
 
   const isDraft = state.phase === 'draft';
   const { isPending, data: detail } = usePlaylistQuery(editPlaylistId ?? state.playlistId, {
@@ -219,18 +323,23 @@ export const PlaylistCreator = ({
         onRemove={listHandlers.onRemove}
       />
       {canShowSaveDialog(state, detail) && (
-        <PlaylistSaveDialog
-          open
-          onOpenChange={handleSaveDialogOpenChange}
+        <CreatorSaveSurface
+          variant={variant}
           mode={state.phase === 'editing' ? 'edit' : 'create'}
           playlistId={state.playlistId}
           initialValues={saveDialogInitialValues(state.phase, detail)}
           pendingItemRefs={state.pendingItems.map(toSourceRef)}
           availableArtistImages={dedupeCoverArts(listItems)}
           onSaved={handleSaved}
+          onOpenChange={handleSaveDialogOpenChange}
           onAddSongs={handleAddSongs}
         />
       )}
+      <EmbeddedMyPlaylistsLink
+        variant={variant}
+        savedId={state.playlistId}
+        onOpenInMyPlaylists={onOpenInMyPlaylists}
+      />
       <PlaylistDuplicateConfirmDialog
         open={addFlow.duplicateItemTitle !== null}
         onOpenChange={handleDuplicateOpenChange}

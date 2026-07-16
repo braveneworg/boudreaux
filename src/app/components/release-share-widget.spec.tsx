@@ -61,12 +61,16 @@ describe('ReleaseShareWidget', () => {
       expect(screen.getByTestId('share2-icon')).toBeInTheDocument();
     });
 
-    it('should render the SocialShareWidget', () => {
+    it('should render the SocialShareWidget', async () => {
       render(<ReleaseShareWidget />, {
         wrapper: createQueryWrapper(),
       });
 
-      expect(screen.getByTestId('social-share-widget')).toBeInTheDocument();
+      // SocialShareWidget is a next/dynamic import that resolves asynchronously.
+      // Use findByTestId so the assertion waits for it instead of relying on the
+      // dynamic-import module cache being warmed by an earlier test (which made
+      // this order-dependent under shuffled test order).
+      expect(await screen.findByTestId('social-share-widget')).toBeInTheDocument();
     });
 
     it('should call setSelectedArtist with the second featured artist when no selectedArtist', () => {

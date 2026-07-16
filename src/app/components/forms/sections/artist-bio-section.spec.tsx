@@ -88,21 +88,23 @@ describe('ArtistBioSection', () => {
     expect(screen.getByTestId('bio-editors-column')).toBeInTheDocument();
   });
 
-  it('passes onUploadImage to each RichTextEditor when provided', () => {
+  it('passes onUploadImage to each RichTextEditor when provided', async () => {
     const handler = vi.fn();
     render(<ArtistBioSection {...editModeProps} onUploadImage={handler} />);
 
-    const editors = screen.getAllByTestId('rich-text-editor-stub');
+    // RichTextEditor is a next/dynamic import; await it rather than relying on a
+    // prior test having warmed the module cache (order-dependent under shuffle).
+    const editors = await screen.findAllByTestId('rich-text-editor-stub');
     expect(editors).toHaveLength(3);
     for (const editor of editors) {
       expect(editor).toHaveAttribute('data-has-upload-handler', 'true');
     }
   });
 
-  it('passes no onUploadImage to RichTextEditors when not provided', () => {
+  it('passes no onUploadImage to RichTextEditors when not provided', async () => {
     render(<ArtistBioSection {...editModeProps} />);
 
-    const editors = screen.getAllByTestId('rich-text-editor-stub');
+    const editors = await screen.findAllByTestId('rich-text-editor-stub');
     expect(editors).toHaveLength(3);
     for (const editor of editors) {
       expect(editor).toHaveAttribute('data-has-upload-handler', 'false');

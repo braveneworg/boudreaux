@@ -4,6 +4,7 @@
 'use client';
 
 import type React from 'react';
+import type { ReactNode } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
@@ -28,6 +29,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { formatDuration } from '@/lib/utils/format-duration';
@@ -1064,153 +1066,52 @@ const FormatFileListDrawer = ({
 };
 
 /**
- * Interface for navigation menu items.
+ * Props for {@link DotNavMenu}.
  *
- * @property label - The display text for the menu item
- * @property onClick - Optional callback function when the menu item is clicked
+ * @property children - The popover content (e.g. a "save to playlist" panel).
+ * @property open - Controlled open state; omit to let the popover self-manage.
+ * @property onOpenChange - Notified when the open state changes.
+ * @property label - Trigger button aria-label. Defaults to 'Add to a playlist'.
+ * @property align - Alignment of the popover against the trigger. Defaults to 'end'.
+ * @property className - Positioning classes applied to the trigger button.
  */
-interface NavMenuItem {
-  label: string;
-  onClick?: () => void;
+interface DotNavMenuProps {
+  children: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  label?: string;
+  align?: 'start' | 'center' | 'end';
+  className?: string;
 }
 
 /**
- * DotNavMenuTrigger component displays a trigger button with an ellipsis icon.
- *
- * @param props - The component props
- * @param props.onClick - Callback function when the trigger button is clicked
- *
- * @returns A button component with an ellipsis vertical icon
- *
- * @remarks
- * - Uses the EllipsisVertical icon from lucide-react
- * - Styled as a ghost button with hover states
- * - Includes proper ARIA label for accessibility
- * - Works in both light and dark modes
+ * DotNavMenu renders an ellipsis trigger that opens a Radix Popover holding the
+ * given content. Controllable via `open`/`onOpenChange`, or left uncontrolled.
  *
  * @example
  * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.DotNavMenuTrigger onClick={() => setMenuOpen(true)} />
- * </MediaPlayer>
+ * <MediaPlayer.DotNavMenu label="Add to a playlist">
+ *   <PlaylistSavePanel />
+ * </MediaPlayer.DotNavMenu>
  * ```
  */
-const DotNavMenuTrigger = ({ onClick }: { onClick: ({ isOpen }: { isOpen: boolean }) => void }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleToggle = () => {
-    const _isOpen = !isOpen;
-
-    setIsOpen(_isOpen);
-    onClick({ isOpen: _isOpen });
-  };
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-      onClick={handleToggle}
-      aria-label="Open menu"
-    >
-      <EllipsisVertical className="h-4 w-4" />
-    </Button>
-  );
-};
-
-/**
- * DotNavMenu component displays a navigation menu with a list of menu items.
- *
- * @param props - The component props
- * @param props.navMenuItems - Array of navigation menu items to display
- *
- * @returns A menu component with navigation items
- *
- * @remarks
- * - Only renders when navMenuItems array is not empty
- * - Maps through navMenuItems to render DotNavMenuItem components
- * - Typically used in conjunction with DotNavMenuTrigger
- * - Suitable for contextual actions related to the media player
- *
- * @example
- * ```tsx
- * const menuItems = [
- *   { label: 'Add to playlist', onClick: () => {} },
- *   { label: 'Share', onClick: () => {} },
- *   { label: 'Download', onClick: () => {} },
- * ];
- * <MediaPlayer.DotNavMenu navMenuItems={menuItems} />
- * ```
- */
-const DotNavMenu = ({ navMenuItems }: { navMenuItems: NavMenuItem[] }) => {
-  return (
-    <>
-      {navMenuItems.length > 0 && (
-        <div className="relative" role="menu">
-          <div className="py-1">
-            {navMenuItems.map((item) => (
-              <DotNavMenuItem key={item.label} navMenuItem={item} />
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-/**
- * DotNavMenuItem component displays a single menu item within the DotNavMenu.
- *
- * @param props - The component props
- * @param props.navMenuItem - The menu item object containing label and optional onClick handler
- *
- * @returns A clickable menu item element
- *
- * @remarks
- * - Renders as a div with menuitem role for accessibility
- * - Includes hover styles for better UX
- * - Styled to match the overall media player theme
- * - Supports both light and dark color schemes
- *
- * @example
- * ```tsx
- * const menuItem = { label: 'Add to playlist', onClick: handleAddToPlaylist };
- *
- * <MediaPlayer>
- *   <MediaPlayer.DotNavMenuItem navMenuItem={menuItem} />
- * </MediaPlayer>
- * ```
- */
-const DotNavMenuItem = ({ navMenuItem }: { navMenuItem: NavMenuItem }) => {
-  return (
-    <div
-      className="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
-      role="menuitem"
-    >
-      {navMenuItem.label}
-    </div>
-  );
-};
-
-/**
- * SocialSharer component provides social media sharing functionality.
- *
- * @returns A placeholder div for social sharing features
- *
- * @remarks
- * - This is a stub component that needs to be implemented
- * - Should provide buttons/links to share on various social media platforms
- * - Typical platforms include: Facebook, Twitter/X, Instagram, etc.
- * - Should accept props for the content to share (track, release, artist info)
- *
- * @example
- * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.SocialSharer />
- * </MediaPlayer>
- * ```
- */
-const SocialSharer = () => <div>SocialSharer</div>;
+const DotNavMenu = ({
+  children,
+  open,
+  onOpenChange,
+  label = 'Add to a playlist',
+  align = 'end',
+  className,
+}: DotNavMenuProps) => (
+  <Popover open={open} onOpenChange={onOpenChange}>
+    <PopoverTrigger asChild>
+      <Button variant="ghost" size="icon" aria-label={label} className={className}>
+        <EllipsisVertical className="h-4 w-4" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent align={align}>{children}</PopoverContent>
+  </Popover>
+);
 
 /**
  * Props interface for the main MediaPlayer component.
@@ -1236,8 +1137,5 @@ MediaPlayer.CoverArtCarousel = CoverArtCarousel;
 MediaPlayer.FeaturedArtistCarousel = FeaturedArtistCarousel;
 MediaPlayer.Description = Description;
 MediaPlayer.DotNavMenu = DotNavMenu;
-MediaPlayer.DotNavMenuItem = DotNavMenuItem;
-MediaPlayer.DotNavMenuTrigger = DotNavMenuTrigger;
 MediaPlayer.TrackListDrawer = TrackListDrawer;
 MediaPlayer.FormatFileListDrawer = FormatFileListDrawer;
-MediaPlayer.SocialSharer = SocialSharer;

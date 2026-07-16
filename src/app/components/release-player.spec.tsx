@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 
 import { ReleasePlayer } from './release-player';
@@ -202,6 +203,22 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
 
 vi.mock('@/app/components/media-action-link', () => ({
   MediaActionLink: ({ label }: { label: string }) => <span>{label}</span>,
+}));
+
+// Stub AddToPlaylistMenu: echo the built `item` (as JSON) and the positioning
+// `className` so tests can assert the media-item shape and the contrast styling
+// the player passes without exercising the real session-gated Radix popover.
+vi.mock('./playlists/add-to-playlist-menu', () => ({
+  AddToPlaylistMenu: ({ item, className }: { item: PlaylistSearchItem; className?: string }) => (
+    <button
+      type="button"
+      aria-label="Add to a playlist"
+      className={className}
+      data-item={JSON.stringify(item)}
+    >
+      Add to playlist
+    </button>
+  ),
 }));
 
 describe('ReleasePlayer', () => {
@@ -561,5 +578,38 @@ describe('ReleasePlayer', () => {
 
     const ticker = screen.getByTestId('info-ticker-tape');
     expect(ticker).toHaveAttribute('data-track-name', 'Track1');
+  });
+
+  it('should render the add-to-playlist menu inside the player frame', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    const frame = screen.getByTestId('interactive-cover-art').closest('.mx-auto');
+    expect(frame).toContainElement(menu);
+  });
+
+  it('should build a track media item for the current file', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+    expect(item.itemType).toBe('track');
+    expect(item.source).toEqual({ trackFileId: 'file-1', releaseId: 'release-1' });
+    expect(item.title).toBe('Track One');
+    expect(item.artistName).toBe('John Doe');
+  });
+
+  it('should give the add-to-playlist trigger a contrasting overlay treatment', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    expect(menu).toHaveClass('absolute', 'right-1', 'top-1', 'z-10', 'text-white', 'rounded-full');
+  });
+
+  it('should not render the add-to-playlist menu when there are no files', () => {
+    render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
+
+    expect(screen.queryByRole('button', { name: /add to a playlist/i })).not.toBeInTheDocument();
   });
 });

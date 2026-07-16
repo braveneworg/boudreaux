@@ -6,46 +6,16 @@
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import type { PlaylistDetailResponse, PlaylistItemSourceRef } from '@/lib/types/domain/playlist';
-import { coverImagesSchema, playlistTitleSchema } from '@/lib/validation/playlist-schema';
 
-import { PlaylistCoverArtField } from './playlist-cover-art-field';
-import { usePlaylistSaveSubmit } from './use-playlist-save-submit';
-
-import type { PlaylistSaveFormValues } from './use-playlist-save-submit';
-
-/**
- * Dialog form schema, composed from the shared playlist validation primitives
- * so client rules never drift from the server action's input schema.
- */
-const playlistSaveFormSchema = z.object({
-  title: playlistTitleSchema,
-  isPublic: z.boolean(),
-  coverImages: coverImagesSchema,
-});
+import { PlaylistSaveForm } from './playlist-save-form';
 
 interface PlaylistSaveDialogProps {
   open: boolean;
@@ -67,11 +37,12 @@ interface PlaylistSaveDialogProps {
 /**
  * Create/edit dialog for a playlist's title, cover art, and visibility.
  *
- * RHF + Zod over `{ title, isPublic, coverImages }`; the dialog owns the
- * `pendingFiles` staged by the cover art field in create mode and hands them
- * to {@link usePlaylistSaveSubmit}, which runs the create → upload → update
- * chain and the cache bookkeeping. Server-side title errors (duplicate title)
- * land inline on the title field; "Add songs" closes the dialog first, then
+ * A thin Dialog wrapper around {@link PlaylistSaveForm} (which owns the RHF form
+ * and the create → upload → update chain). The dialog holds Escape/overlay-click
+ * close requests while the form's save is in flight — closing mid-save would let
+ * a late `markSaved` in the parent clear items the user staged after escaping.
+ * The success path closes via the form's `onCancel` (wired to `onOpenChange`),
+ * so it is unaffected by this gate. "Add songs" closes the dialog first, then
  * notifies the caller.
  */
 export const PlaylistSaveDialog = ({
@@ -85,31 +56,11 @@ export const PlaylistSaveDialog = ({
   onSaved,
   onAddSongs,
 }: PlaylistSaveDialogProps): ReactElement => {
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const form = useForm<PlaylistSaveFormValues>({
-    resolver: zodResolver(playlistSaveFormSchema),
-    defaultValues: initialValues,
-  });
-  const { isSaving, submitSave } = usePlaylistSaveSubmit({
-    mode,
-    playlistId,
-    pendingItemRefs,
-    onTitleError: (message) => form.setError('title', { type: 'server', message }),
-    onSaved,
-    onOpenChange,
-  });
+  const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = mode === 'edit';
 
-  const handleAddSongs = (): void => {
-    onOpenChange(false);
-    onAddSongs?.();
-  };
-
-  // Hold Escape/overlay-click close requests while the save chain is in
-  // flight — closing mid-save would let a late `markSaved` in the parent
-  // clear items the user staged after escaping. The success path closes via
-  // the submit hook's own `onOpenChange`, so it is unaffected by this gate.
+  // Hold Escape/overlay-click close requests while the save chain is in flight.
   const handleDialogOpenChange = (nextOpen: boolean): void => {
     if (!isSaving) onOpenChange(nextOpen);
   };
@@ -126,81 +77,18 @@ export const PlaylistSaveDialog = ({
             Name your playlist, pick cover art, and choose who can see it.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form
-            noValidate
-            onSubmit={form.handleSubmit((values) => submitSave(values, pendingFiles))}
-            className="flex flex-col gap-4"
-          >
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="My playlist" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="coverImages"
-              render={({ field }) => (
-                <FormItem>
-                  <span className="text-sm font-medium">Cover art</span>
-                  <PlaylistCoverArtField
-                    value={field.value}
-                    onChange={field.onChange}
-                    playlistId={playlistId}
-                    availableArtistImages={availableArtistImages}
-                    pendingFiles={pendingFiles}
-                    onPendingFilesChange={setPendingFiles}
-                  />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="isPublic"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between">
-                  <FormLabel>Public playlist</FormLabel>
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              {isEditMode && onAddSongs && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddSongs}
-                  disabled={isSaving}
-                  className="sm:mr-auto"
-                >
-                  Add songs
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Save'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <PlaylistSaveForm
+          variant="dialog"
+          mode={mode}
+          playlistId={playlistId}
+          initialValues={initialValues}
+          pendingItemRefs={pendingItemRefs}
+          availableArtistImages={availableArtistImages}
+          onSaved={onSaved}
+          onSavingChange={setIsSaving}
+          onCancel={() => onOpenChange(false)}
+          onAddSongs={onAddSongs}
+        />
       </DialogContent>
     </Dialog>
   );

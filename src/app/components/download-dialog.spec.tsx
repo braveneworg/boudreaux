@@ -185,6 +185,21 @@ vi.mock('@/app/components/free-format-select-step', () => ({
   ),
 }));
 
+// File-level baseline so no describe inherits another's mock state. Global
+// clearMocks resets call history but NOT mockReturnValue/mockImplementation, so
+// a persistent stub from one describe — the fixed useFreeDownloadStatusQuery
+// return value, or an authenticated session — would otherwise leak into sibling
+// describes that don't set these themselves, making the file order-dependent.
+// Re-establishing the baseline before every test fixes that; describes needing
+// a different session/status override it in their own beforeEach (which runs
+// after this one). The query mock keeps its implementation so the free-download
+// describe can drive it by mutating currentFreeStatusData.
+beforeEach(() => {
+  currentFreeStatusData = { availableFreeFormats: ['MP3_320KBPS', 'AAC'] };
+  mockUseFreeDownloadStatusQuery.mockImplementation(() => ({ data: currentFreeStatusData }));
+  mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+});
+
 describe('DownloadDialog', () => {
   const defaultProps = {
     artistName: 'Test Artist',

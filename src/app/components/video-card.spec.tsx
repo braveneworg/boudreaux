@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
+import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
@@ -10,6 +11,22 @@ import { VideoCard } from './video-card';
 
 vi.mock('@/lib/utils/cdn-url', () => ({
   resolveStreamUrl: vi.fn(() => 'https://cdn.example.com/resolved.mp4'),
+}));
+
+// Stub AddToPlaylistMenu: echo the built `item` (as JSON) and the `className`
+// so tests can assert the media-item shape and the neutral header styling
+// without exercising the real session-gated Radix popover.
+vi.mock('./playlists/add-to-playlist-menu', () => ({
+  AddToPlaylistMenu: ({ item, className }: { item: PlaylistSearchItem; className?: string }) => (
+    <button
+      type="button"
+      aria-label="Add to a playlist"
+      className={className}
+      data-item={JSON.stringify(item)}
+    >
+      Add to playlist
+    </button>
+  ),
 }));
 
 vi.mock('@/components/ui/video/video-player', () => ({
@@ -123,5 +140,41 @@ describe('VideoCard', () => {
       'data-poster',
       'https://cdn.example.com/poster.jpg'
     );
+  });
+
+  it('renders the add-to-playlist menu', () => {
+    render(<VideoCard video={baseVideo} />);
+
+    expect(screen.getByRole('button', { name: /add to a playlist/i })).toBeInTheDocument();
+  });
+
+  it('builds a video media item from the video row', () => {
+    render(<VideoCard video={baseVideo} />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+    expect(item.itemType).toBe('video');
+    expect(item.source).toEqual({ videoId: 'video-1' });
+    expect(item.title).toBe('Live at the Basement');
+    expect(item.artistName).toBe('The Band');
+  });
+
+  it('passes the poster url as the media item cover art', () => {
+    render(<VideoCard video={baseVideo} />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+    expect(item.coverArt).toBe('https://cdn.example.com/poster.jpg');
+  });
+
+  it('falls back to null cover art when the poster url is absent', () => {
+    render(<VideoCard video={{ ...baseVideo, posterUrl: null }} />);
+
+    const menu = screen.getByRole('button', { name: /add to a playlist/i });
+    const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+    expect(item.coverArt).toBeNull();
   });
 });

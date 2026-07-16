@@ -23,6 +23,8 @@ import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
+import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
+import { trackMediaItem } from './playlists/player-media-item';
 import { useTrackNavigation } from './use-track-navigation';
 
 interface ReleasePlayerProps {
@@ -130,6 +132,43 @@ const ReleasePlayerControls = ({
   </>
 );
 
+interface ReleaseAddToPlaylistProps {
+  currentFile: ReleaseTrackFile;
+  primaryArtist: ReleasePrimaryArtist;
+  releaseId: string;
+  coverArtSrc: string;
+}
+
+/**
+ * Session-gated "add the currently-playing track to a playlist" kebab, pinned to
+ * the top-right of the cover art. Builds the {@link PlaylistSearchItem} snapshot
+ * from the active file and delegates the menu UI to {@link AddToPlaylistMenu}.
+ * The trigger uses a white icon over a semi-opaque dark pill so it stays legible
+ * against arbitrary cover imagery.
+ */
+const ReleaseAddToPlaylist = ({
+  currentFile,
+  primaryArtist,
+  releaseId,
+  coverArtSrc,
+}: ReleaseAddToPlaylistProps) => {
+  const mediaItem = trackMediaItem({
+    trackFileId: currentFile.id,
+    releaseId,
+    title: getTrackDisplayTitle(currentFile.title, currentFile.fileName),
+    artistName: getArtistDisplayName(primaryArtist),
+    coverArt: coverArtSrc,
+    duration: currentFile.duration ?? null,
+  });
+
+  return (
+    <AddToPlaylistMenu
+      item={mediaItem}
+      className="absolute top-1 right-1 z-10 rounded-full bg-black/40 p-1 text-white hover:bg-black/60 hover:text-white"
+    />
+  );
+};
+
 interface ReleasePlayerBodyProps {
   release: PublishedReleaseDetail;
   primaryArtist: ReleasePrimaryArtist | undefined;
@@ -206,6 +245,14 @@ const ReleasePlayerBody = ({
               onTogglePlay={onTogglePlay}
               priority
             />
+            {currentFile && primaryArtist && (
+              <ReleaseAddToPlaylist
+                currentFile={currentFile}
+                primaryArtist={primaryArtist}
+                releaseId={releaseId}
+                coverArtSrc={coverArtSrc}
+              />
+            )}
           </div>
 
           {hasFiles && currentFile && primaryArtist && audioSrc ? (
