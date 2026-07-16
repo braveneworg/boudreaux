@@ -74,7 +74,12 @@ test.describe('Video publish scheduling — public /videos gate', () => {
       .getByRole('article')
       .filter({ has: userPage.getByRole('heading', { level: 2, name: 'E2E Video Echo' }) });
     await expect(lastCard).toBeVisible();
-    await lastCard.scrollIntoViewIfNeeded();
+    // Retry the scroll: tripping the IntersectionObserver re-renders the list
+    // (appends page 2), which can transiently detach the grabbed node ("Element
+    // is not attached to the DOM"). toPass re-resolves and re-scrolls until it lands.
+    await expect(async () => {
+      await lastCard.scrollIntoViewIfNeeded();
+    }).toPass({ timeout: 15_000 });
 
     // Wait for infinite scroll to settle (Foxtrot + Golf pages in).
     await expect(
