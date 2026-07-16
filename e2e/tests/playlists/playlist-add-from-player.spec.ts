@@ -29,6 +29,13 @@ const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 const RELEASE_TITLE = 'E2E Album One';
 /** The track that plays first on that release — the item added from its player. */
 const RELEASE_TRACK_TITLE = 'E2E Track Alpha';
+/**
+ * A DIFFERENT seeded track (on another release) used to PRE-FILL a target
+ * playlist, so adding the release's playing track (`RELEASE_TRACK_TITLE`) from
+ * the player is a FRESH add — not an instant duplicate of what the playlist was
+ * seeded with.
+ */
+const SEED_TRACK_TITLE = 'E2E Track Beta';
 /** Newest seeded published video — its card carries the kebab. */
 const VIDEO_TITLE = 'E2E Video Alpha';
 
@@ -86,10 +93,12 @@ test.describe('Add to a playlist from a player', () => {
   }, testInfo) => {
     const title = `Player Add ${testInfo.retry}-${Date.now()}`;
 
-    // Create the target playlist first (the picker needs an existing one).
+    // Create the target playlist first (the picker needs an existing one),
+    // seeded with a DIFFERENT track than the release's playing track — so the
+    // first add from the player is fresh and only the SECOND add is the dup.
     const playlists = new PlaylistsPage(userPage);
     await playlists.goto();
-    await playlists.createPlaylistWithFirstTrack(RELEASE_TRACK_TITLE, title);
+    await playlists.createPlaylistWithFirstTrack(SEED_TRACK_TITLE, title);
 
     await userPage.goto(`/releases/${releaseId}`);
 
@@ -148,16 +157,17 @@ test.describe('Add to a playlist from a player', () => {
     // the saved playlist's edit view.
     await createDialog.getByRole('button', { name: 'Open in My Playlists' }).click();
 
-    // The deep link is consumed and stripped back to /playlists; edit mode is proven by the assertions below.
+    // The deep link is consumed and stripped back to /playlists.
     await expect(userPage).toHaveURL(/\/playlists(\?|$)/);
 
-    // The creator now shows this playlist in edit mode: its title heads the pane
-    // and the "Edit playlist" pencil (saved/editing state) is present.
+    // `?edit=` opens THIS playlist in the "Edit playlist" save dialog (a modal —
+    // so the pane heading/pencil behind it leave the a11y tree). The dialog
+    // itself, pre-filled with this playlist's title, is the edit-mode proof
+    // (mirrors playlist-edit-reorder.spec.ts).
     const playlists = new PlaylistsPage(userPage);
-    await expect(userPage.getByRole('heading', { level: 2, name: title })).toBeVisible();
-    await expect(userPage.getByRole('button', { name: 'Edit playlist' })).toBeVisible();
-    // The new row is also in the My Playlists list.
-    await expect(playlists.rowByTitle(title)).toBeVisible();
+    const editDialog = playlists.saveDialog('edit');
+    await expect(editDialog).toBeVisible();
+    await expect(editDialog.getByLabel('Title')).toHaveValue(title);
   });
 
   test('adds a video to a playlist from its card', async ({ userPage }, testInfo) => {
