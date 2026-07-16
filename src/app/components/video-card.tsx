@@ -12,6 +12,9 @@ import { formatTourDate } from '@/lib/utils/date-utils';
 import { formatVideoDuration } from '@/lib/utils/format-duration';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
+import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
+import { videoMediaItem } from './playlists/player-media-item';
+
 interface VideoCardProps {
   video: VideoRow;
 }
@@ -24,6 +27,13 @@ interface VideoCardProps {
  */
 export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   const categoryLabel = video.category === 'MUSIC' ? 'Music' : 'Informational';
+  const mediaItem = videoMediaItem({
+    videoId: video.id,
+    title: video.title,
+    artistName: video.artist,
+    coverArt: video.posterUrl ?? null,
+    duration: video.durationSeconds,
+  });
 
   return (
     <article className="shadow-zine-sm flex flex-col gap-3 border-2 border-black bg-white p-4">
@@ -34,9 +44,12 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
           <h2 className="font-fake-four-cutout text-xl break-words text-zinc-950">{video.title}</h2>
           <p className="text-sm text-zinc-600">{video.artist}</p>
         </div>
-        <Badge variant={video.category === 'MUSIC' ? 'default' : 'secondary'}>
-          {categoryLabel}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <Badge variant={video.category === 'MUSIC' ? 'default' : 'secondary'}>
+            {categoryLabel}
+          </Badge>
+          <AddToPlaylistMenu item={mediaItem} className="shrink-0" />
+        </div>
       </div>
 
       <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-600">
