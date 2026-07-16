@@ -4,7 +4,7 @@
 
 'use client';
 
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 
 import dynamic from 'next/dynamic';
 
@@ -33,20 +33,28 @@ interface AddToPlaylistMenuProps {
 /**
  * Session-gated kebab for the player surfaces: renders {@link MediaPlayer.DotNavMenu}
  * (a Radix Popover) holding the lazy {@link AddToPlaylistPanel}, and owns the
- * popover / create-dialog state. Hidden for signed-out users and during the
- * SSR/first-paint `loading` window (so the markup stays hydration-safe). Creating
- * a new playlist closes the popover *before* opening the dialog to avoid a Radix
- * focus-teardown race.
+ * popover / create-dialog state. Mount-gated so it renders NOTHING on the server
+ * and the client's first paint — `useSession` resolves to `authenticated` during
+ * SSR (the cookie is present) yet starts `loading` on the client, so rendering the
+ * Popover server-side and null client-side hydrates as a mismatch and React
+ * regenerates the subtree (janking the portaled popover on busy pages like
+ * /videos). Deferring all output to after mount keeps hydration stable (the same
+ * pattern as DesktopAuthMenu / use-nav-menu-items). Hidden for signed-out users.
+ * Creating a new playlist closes the popover *before* opening the dialog to avoid
+ * a Radix focus-teardown race.
  */
 export const AddToPlaylistMenu = ({
   item,
   className,
 }: AddToPlaylistMenuProps): ReactElement | null => {
   const { status } = useSession();
+  const [mounted, setMounted] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  if (status !== 'authenticated') return null;
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted || status !== 'authenticated') return null;
 
   const handleCreate = (): void => {
     setPopoverOpen(false);
