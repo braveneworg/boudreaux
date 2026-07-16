@@ -71,9 +71,12 @@ const playlistOption = (page: Page, title: string): Locator =>
  * getByText) sidesteps the known Sonner `<li>` collision AND the "Add" substring
  * clash with the popover's "Add to a playlist" heading — getByText is a
  * case-insensitive substring match, so "Added to …" would otherwise collide.
+ * `.first()` because a fresh add and a later forced-duplicate add stack TWO
+ * same-titled toasts (Sonner keeps the first ~4s), which would otherwise trip
+ * Playwright strict mode ("resolved to 2 elements").
  */
 const successToast = (page: Page, title: string): Locator =>
-  page.locator('li[data-sonner-toast]').filter({ hasText: title });
+  page.locator('li[data-sonner-toast]').filter({ hasText: title }).first();
 
 /** The seeded video card (an <article>) scoped by its title heading. */
 const videoCardByTitle = (page: Page, title: string): Locator =>
