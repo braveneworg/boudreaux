@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useAddPlaylistItemMutation } from '@/hooks/use-playlist-mutations';
 import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/playlist';
-import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
+import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
 /** The row item + picked playlist an in-flight or duplicate-confirmed add targets. */
 interface AddTarget {
@@ -35,16 +35,6 @@ export interface UseAddToOtherPlaylistResult {
   dismissDuplicate: () => void;
 }
 
-/** Builds the exact add-item action input from a search item's source ref. */
-const addItemInputFor = (
-  { source }: PlaylistSearchItem,
-  playlistId: string,
-  force: boolean
-): AddPlaylistItemInput =>
-  'trackFileId' in source
-    ? { itemType: 'track', trackFileId: source.trackFileId, playlistId, force }
-    : { itemType: 'video', videoId: source.videoId, playlistId, force };
-
 /**
  * State + mutation flow for the search rows' "Add to another playlist" action:
  * one inline picker open at a time (keyed by `item.key`), the duplicate-confirm
@@ -64,7 +54,9 @@ export const useAddToOtherPlaylist = (): UseAddToOtherPlaylistResult => {
 
   const runAdd = async ({ item, playlist }: AddTarget, force: boolean): Promise<void> => {
     try {
-      const result = await addPlaylistItemAsync(addItemInputFor(item, playlist.id, force));
+      const result = await addPlaylistItemAsync(
+        buildAddPlaylistItemInput(item, playlist.id, force)
+      );
       if (result.success) {
         toast.success(`Added to ${playlist.title}`);
         // Close only the picker this add was started from — leave any picker
