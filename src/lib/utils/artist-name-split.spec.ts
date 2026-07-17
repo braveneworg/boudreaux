@@ -1,7 +1,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { composeArtistString, splitFeaturedArtists } from './artist-name-split';
+import {
+  composeArtistString,
+  splitFeaturedArtists,
+  splitNameCandidates,
+} from './artist-name-split';
 
 describe('splitFeaturedArtists', () => {
   it('returns a lone name as the single primary', () => {
@@ -154,6 +158,40 @@ describe('splitFeaturedArtists', () => {
 
   it('returns an empty array for a whitespace-only string', () => {
     expect(splitFeaturedArtists('   ')).toEqual([]);
+  });
+});
+
+describe('splitFeaturedArtists extended markers', () => {
+  it('splits on feat and ft without a dot', () => {
+    expect(splitFeaturedArtists('Alpha feat Bravo')).toEqual([
+      { name: 'Alpha', role: 'primary' },
+      { name: 'Bravo', role: 'featured' },
+    ]);
+    expect(splitFeaturedArtists('Alpha ft Bravo')[1]).toEqual({ name: 'Bravo', role: 'featured' });
+  });
+
+  it('splits on w/ followed by a space', () => {
+    expect(splitFeaturedArtists('Alpha w/ Bravo')[1]).toEqual({ name: 'Bravo', role: 'featured' });
+  });
+
+  it('does not split w/o or mid-word ft', () => {
+    expect(splitFeaturedArtists('Alpha w/o tears')).toEqual([
+      { name: 'Alpha w/o tears', role: 'primary' },
+    ]);
+    expect(splitFeaturedArtists('Daft Punk')).toEqual([{ name: 'Daft Punk', role: 'primary' }]);
+  });
+});
+
+describe('splitNameCandidates', () => {
+  it('returns parts for comma, ampersand, and x separators', () => {
+    expect(splitNameCandidates('Alpha & Bravo')).toEqual(['Alpha', 'Bravo']);
+    expect(splitNameCandidates('Alpha, Bravo, Charlie')).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(splitNameCandidates('Alpha x Bravo')).toEqual(['Alpha', 'Bravo']);
+  });
+
+  it('returns [] for single names, including x inside a word', () => {
+    expect(splitNameCandidates('Alpha')).toEqual([]);
+    expect(splitNameCandidates('Xavier Exodus')).toEqual([]);
   });
 });
 
