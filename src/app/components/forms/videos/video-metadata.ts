@@ -112,8 +112,9 @@ const renderFrameToCanvas = (video: HTMLVideoElement): HTMLCanvasElement | null 
 
 /** How many early frames to sample when auto-picking a poster. */
 const POSTER_CANDIDATE_COUNT = 5;
-/** Candidates come from the first seconds of the video (clamped to duration). */
-const POSTER_SAMPLE_WINDOW_SECONDS = 3;
+/** Auto-poster candidates come from this window (skips fade-ins/title cards). */
+export const POSTER_SAMPLE_START_SECONDS = 3;
+export const POSTER_SAMPLE_END_SECONDS = 10;
 /** Width of the downscaled copy each candidate is scored on. */
 const SCORE_SAMPLE_WIDTH = 96;
 
@@ -166,25 +167,29 @@ const scoreCanvasQuality = (source: HTMLCanvasElement): number => {
   }
 };
 
-/** Evenly spaced sample times inside the opening window; [0] when unknowable. */
-const posterCandidateTimes = (duration: number): number[] => {
+/**
+ * Evenly spaced sample times inside the poster window: `[3s, 10s]` clamped to
+ * the duration, whole-video for clips of 3s or less; `[0]` when unknowable.
+ */
+export const posterCandidateTimes = (duration: number): number[] => {
   if (!Number.isFinite(duration) || duration <= 0) {
     return [0];
   }
-  const window = Math.min(POSTER_SAMPLE_WINDOW_SECONDS, duration);
+  const start = duration <= POSTER_SAMPLE_START_SECONDS ? 0 : POSTER_SAMPLE_START_SECONDS;
+  const end = Math.min(POSTER_SAMPLE_END_SECONDS, duration);
+  const sampleWindow = end - start;
   return Array.from(
     { length: POSTER_CANDIDATE_COUNT },
-    (_, index) => (window * (index + 0.5)) / POSTER_CANDIDATE_COUNT
+    (_, index) => start + (sampleWindow * (index + 0.5)) / POSTER_CANDIDATE_COUNT
   );
 };
 
 /**
  * Capture a JPEG poster frame from a video file. Without `atSeconds` it
- * samples several frames from the video's opening seconds and encodes the
- * one scoring highest on `scoreFrameQuality` (skipping fade-in black frames
- * and blur). With `atSeconds` it captures exactly that frame. Resolves the
- * Blob, or `null` for an unrenderable frame or undecodable file — never
- * rejects.
+ * samples several frames from the 3–10s window (skipping fade-in black frames
+ * and blur) and encodes the one scoring highest on `scoreFrameQuality`. With
+ * `atSeconds` it captures exactly that frame. Resolves the Blob, or `null`
+ * for an unrenderable frame or undecodable file — never rejects.
  */
 export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob | null> =>
   new Promise((resolve) => {
