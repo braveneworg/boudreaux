@@ -375,6 +375,30 @@ describe('kickPostSaveEnrichment', () => {
 
     expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
   });
+
+  it('skips artist sync and enrichment when the artist is blank', async () => {
+    await kickPostSaveEnrichment({
+      videoId: 'v1',
+      artist: '   ',
+      category: 'MUSIC',
+      reProbe: true,
+    });
+    expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
+    expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith('v1');
+  });
+
+  it('still syncs and dispatches when the artist is non-blank', async () => {
+    await kickPostSaveEnrichment({
+      videoId: 'v1',
+      artist: 'Ceschi',
+      category: 'MUSIC',
+      reProbe: false,
+    });
+    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith('v1', 'Ceschi', undefined);
+    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith('v1');
+    expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
+  });
 });
 
 describe('syncVideoProducersAfterSave', () => {

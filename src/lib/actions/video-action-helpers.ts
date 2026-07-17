@@ -178,6 +178,11 @@ export interface KickPostSaveEnrichmentInput {
  * admin's already-successful save can never be failed retroactively by
  * background work.
  *
+ * When `artist` is blank (e.g. a draft row created before the admin typed one),
+ * the artist-sync and enrichment-dispatch stages are skipped entirely — no
+ * "Unknown Artist" shell is ever minted. The probe stage still runs regardless
+ * of whether an artist is present.
+ *
  * Producer sync is intentionally NOT performed here — see
  * {@link syncVideoProducersAfterSave} which runs in a separate `after()` call
  * so that clearing all producers (producers: []) is always persisted regardless
@@ -190,10 +195,14 @@ export const kickPostSaveEnrichment = async ({
   reProbe,
   artistDetails,
 }: KickPostSaveEnrichmentInput): Promise<void> => {
-  try {
-    await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
-  } catch (error) {
-    logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+  const hasArtist = artist.trim() !== '';
+
+  if (hasArtist) {
+    try {
+      await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
+    } catch (error) {
+      logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+    }
   }
 
   if (reProbe) {
@@ -204,7 +213,7 @@ export const kickPostSaveEnrichment = async ({
     }
   }
 
-  if (category === 'MUSIC') {
+  if (category === 'MUSIC' && hasArtist) {
     try {
       await VideoEnrichmentService.runEnrichmentJob(videoId);
     } catch (error) {
