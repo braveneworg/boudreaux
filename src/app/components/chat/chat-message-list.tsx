@@ -71,6 +71,17 @@ const SCROLL_BOTTOM_THRESHOLD_PX = 50;
  */
 const USER_SCROLL_WINDOW_MS = 200;
 
+/**
+ * How long after a viewport resize a scroll event is still attributed to that
+ * resize rather than the user. A resize (iOS URL-bar/keyboard collapse, a
+ * desktop window/devtools resize) clamps the scroll container and fires a
+ * synthetic `scroll` event; on fine pointers `handleScroll` would otherwise
+ * read the transiently-not-at-bottom position and flip the pin off, so the
+ * ResizeObserver's re-pin (gated on the pin flag) gets skipped and the tail
+ * drifts. Within this window a non-user scroll keeps the tail pinned instead.
+ */
+const RESIZE_REPIN_WINDOW_MS = 300;
+
 interface ScrollFlags {
   firstId: string | undefined;
   lastId: string | undefined;
@@ -166,11 +177,29 @@ export const ChatMessageList = ({
   const prevScrollHeightRef = useRef(0);
   const isPinnedRef = useRef(true);
   const lastUserInputTsRef = useRef(0);
+  const lastResizeTsRef = useRef(0);
   const isCoarsePointerRef = useRef(false);
   const mentionScrollDoneRef = useRef(false);
 
   useLayoutEffect(() => {
     isCoarsePointerRef.current = globalThis.matchMedia('(pointer: coarse)').matches;
+  }, []);
+
+  // Arm the resize window as early as possible — a viewport resize dispatches
+  // `resize` (and `visualViewport` resize on mobile) around the same time it
+  // clamps the container and fires the synthetic scroll, and either can land
+  // first. Stamping the flag here means `handleScroll` sees the in-flight
+  // resize regardless of event ordering and keeps the tail pinned.
+  useLayoutEffect(() => {
+    const armResize = (): void => {
+      lastResizeTsRef.current = Date.now();
+    };
+    globalThis.addEventListener('resize', armResize);
+    globalThis.visualViewport?.addEventListener('resize', armResize);
+    return () => {
+      globalThis.removeEventListener('resize', armResize);
+      globalThis.visualViewport?.removeEventListener('resize', armResize);
+    };
   }, []);
 
   // Admin-pinned announcements (caller already enforces the 3-cap),
@@ -190,6 +219,15 @@ export const ChatMessageList = ({
     const el = containerRef.current;
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_BOTTOM_THRESHOLD_PX;
+
+    // A viewport resize just clamped the container and fired this scroll — it is
+    // not user intent. While pinned, re-pin the tail instead of letting the
+    // synthetic scroll flip the pin off (which would skip the ResizeObserver's
+    // re-pin and leave the list drifted). Applies to both pointer kinds.
+    if (Date.now() - lastResizeTsRef.current < RESIZE_REPIN_WINDOW_MS && isPinnedRef.current) {
+      if (!atBottom) el.scrollTop = el.scrollHeight;
+      return;
+    }
 
     // Fine pointers (desktop): every scroll is user intent — scrollbar
     // drags and keyboard scrolling never emit touch/wheel events.
@@ -288,6 +326,7 @@ export const ChatMessageList = ({
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
+      lastResizeTsRef.current = Date.now();
       if (isPinnedRef.current) el.scrollTop = el.scrollHeight;
     });
     observer.observe(el);
