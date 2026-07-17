@@ -250,14 +250,14 @@ describe('extractVideoTags', () => {
   it('derives the title from the filename when tags have none', async () => {
     parseBlobMock.mockResolvedValue({ common: {} });
     await expect(extractVideoTags(videoFile('My.Cool_video-file.mp4'))).resolves.toEqual({
-      title: 'My Cool video file',
+      title: 'My.Cool video-file',
     });
   });
 
   it('derives the title from the filename when parsing throws', async () => {
     parseBlobMock.mockRejectedValue(new Error('unparseable'));
     await expect(extractVideoTags(videoFile('My.Cool_video-file.mp4'))).resolves.toEqual({
-      title: 'My Cool video file',
+      title: 'My.Cool video-file',
     });
   });
 
@@ -267,6 +267,37 @@ describe('extractVideoTags', () => {
     expect(parseBlobMock).toHaveBeenCalledWith(expect.any(File), {
       skipCovers: true,
       duration: false,
+    });
+  });
+
+  it('falls back to parsed artist and featured names when tags are absent', async () => {
+    parseBlobMock.mockRejectedValueOnce(new Error('unparseable'));
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo) [Official Video].mp4', {
+      type: 'video/mp4',
+    });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Song',
+      artist: 'Alpha feat. Bravo',
+    });
+  });
+
+  it('prefers container artist but supplements filename feat-clauses', async () => {
+    parseBlobMock.mockResolvedValueOnce({ common: { title: 'Tagged', artist: 'Real Alpha' } });
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo).mp4', { type: 'video/mp4' });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Tagged',
+      artist: 'Real Alpha feat. Bravo',
+    });
+  });
+
+  it('does not duplicate a featured name the container already carries', async () => {
+    parseBlobMock.mockResolvedValueOnce({
+      common: { title: 'Tagged', artist: 'Real Alpha feat. Bravo' },
+    });
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo).mp4', { type: 'video/mp4' });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Tagged',
+      artist: 'Real Alpha feat. Bravo',
     });
   });
 });

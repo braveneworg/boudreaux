@@ -9,23 +9,25 @@
  * file degrades gracefully instead of blocking the form.
  */
 
+import { composeArtistString, splitFeaturedArtists } from '@/utils/artist-name-split';
+import { parseVideoFilename } from '@/utils/parse-video-filename';
+
 export interface ExtractedVideoTags {
   title: string;
   artist?: string;
   releasedOn?: string;
 }
 
-const FILE_EXTENSION = /\.[^/.]+$/;
-const FILENAME_SEPARATORS = /[-_.]+/g;
-const WHITESPACE = /\s+/g;
-
-/** Derive a human title from a file name: strip extension, normalize separators. */
-const deriveTitleFromFileName = (fileName: string): string =>
-  fileName
-    .replace(FILE_EXTENSION, '')
-    .replace(FILENAME_SEPARATORS, ' ')
-    .replace(WHITESPACE, ' ')
-    .trim();
+/** Fold filename feat-clauses into a container artist, skipping known names. */
+const supplementFeatured = (containerArtist: string, parsedFeatured: string[]): string => {
+  if (parsedFeatured.length === 0) return containerArtist;
+  const parts = splitFeaturedArtists(containerArtist);
+  const known = new Set(parts.map((part) => part.name.toLowerCase()));
+  const extras = parsedFeatured.filter((name) => !known.has(name.toLowerCase()));
+  if (extras.length === 0 || parts.length === 0) return containerArtist;
+  const [primary, ...featured] = parts;
+  return composeArtistString(primary.name, [...featured.map((part) => part.name), ...extras]);
+};
 
 /** Resolve an ISO date (YYYY-MM-DD) from music-metadata's `date`/`year` fields. */
 const resolveReleasedOn = (date?: string, year?: number): string | undefined => {
@@ -69,27 +71,30 @@ export const extractVideoDuration = (file: File): Promise<number | undefined> =>
 
 /**
  * Extract title/artist/release-date tags from a video container. music-metadata
- * is imported lazily so the parser stays out of initial bundles. A title is
- * always guaranteed: it falls back to a filename-derived title when tags lack
- * one or parsing throws.
+ * is imported lazily so the parser stays out of initial bundles. Container tags
+ * are the preferred source; the file name (parsed via {@link parseVideoFilename})
+ * supplies the cleaned title and artist when tags lack them, and folds in any
+ * feat-clause names it finds even when the container already carries an artist.
+ * A title is always guaranteed, including when parsing throws.
  */
 export const extractVideoTags = async (file: File): Promise<ExtractedVideoTags> => {
+  const parsed = parseVideoFilename(file.name);
+  const parsedArtist = parsed.artist
+    ? composeArtistString(parsed.artist, parsed.featuredArtists)
+    : undefined;
   try {
     const { parseBlob } = await import('music-metadata');
     const { common } = await parseBlob(file, { skipCovers: true, duration: false });
-    const tags: ExtractedVideoTags = {
-      title: common.title || deriveTitleFromFileName(file.name),
-    };
-    if (common.artist) {
-      tags.artist = common.artist;
-    }
+    const tags: ExtractedVideoTags = { title: common.title || parsed.title };
+    const artist = common.artist
+      ? supplementFeatured(common.artist, parsed.featuredArtists)
+      : parsedArtist;
+    if (artist) tags.artist = artist;
     const releasedOn = resolveReleasedOn(common.date, common.year);
-    if (releasedOn) {
-      tags.releasedOn = releasedOn;
-    }
+    if (releasedOn) tags.releasedOn = releasedOn;
     return tags;
   } catch {
-    return { title: deriveTitleFromFileName(file.name) };
+    return { title: parsed.title, ...(parsedArtist ? { artist: parsedArtist } : {}) };
   }
 };
 
