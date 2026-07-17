@@ -42,13 +42,13 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
 ];
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
-const parseDurationSeconds = (value: string | number | undefined): number | undefined => {
+export const parseDurationSeconds = (value: string | number | undefined): number | undefined => {
   if (value === undefined || value === '') return undefined;
   return typeof value === 'number' ? value : parseInt(value, 10);
 };
 
 /** Coerce a string-or-number byte count to a `bigint`, or `undefined`. */
-const parseFileSize = (value: string | number | undefined): bigint | undefined => {
+export const parseFileSize = (value: string | number | undefined): bigint | undefined => {
   if (value === undefined || value === '') return undefined;
   return BigInt(value);
 };
