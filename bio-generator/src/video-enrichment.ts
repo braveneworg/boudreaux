@@ -14,6 +14,7 @@ import { postBioProgress } from './progress.js';
 import { resolveIdentityFallback, resolveReleaseDateSuggestion } from './release-date.js';
 import { searchSerperWeb } from './serper.js';
 import { DEFAULT_GEMINI_MODEL, videoEnrichmentInputSchema } from './types.js';
+import { resolveDescriptionSuggestion } from './video-description.js';
 import { getWikidataData } from './wikidata.js';
 
 import type {
@@ -41,6 +42,7 @@ export interface VideoEnrichmentDeps {
   getGeminiApiKey: () => Promise<string>;
   getSerperApiKey: typeof getSerperApiKey;
   resolveReleaseDateSuggestion: typeof resolveReleaseDateSuggestion;
+  resolveDescriptionSuggestion: typeof resolveDescriptionSuggestion;
   resolveIdentityFallback: typeof resolveIdentityFallback;
   /** Best-effort POST of the result back to the web app's async callback. */
   postCallback: typeof postBioCallback;
@@ -57,6 +59,7 @@ const defaultDeps: VideoEnrichmentDeps = {
   getGeminiApiKey,
   getSerperApiKey,
   resolveReleaseDateSuggestion,
+  resolveDescriptionSuggestion,
   resolveIdentityFallback,
   postCallback: postBioCallback,
   postProgress: postBioProgress,
@@ -587,16 +590,40 @@ const mergeReleaseDate = (
   return { ...mbRow, confidence: 'high', sources: [...mbRow.sources, ...webSuggestion.sources] };
 };
 
+/** Verified-fact lines fed to the description synthesis (credits, dates). */
+const descriptionFacts = (
+  recording: MusicBrainzRecordingCandidate | null,
+  adminReleasedOn: string | undefined
+): string[] => {
+  const facts: string[] = [];
+  const credits = recording?.credits.map((credit) => credit.name).filter(Boolean) ?? [];
+  if (credits.length > 0) facts.push(`Credited artists: ${credits.join(', ')}.`);
+  if (recording && isFullDate(recording.firstReleaseDate)) {
+    facts.push(`MusicBrainz first-release date: ${recording.firstReleaseDate}.`);
+  }
+  if (adminReleasedOn) facts.push(`Admin-entered release date: ${adminReleasedOn.slice(0, 10)}.`);
+  return facts;
+};
+
+/** The three parts that may populate the optional `video` block. */
+interface VideoBlockParts {
+  releasedOn: VideoLevelSuggestion | null;
+  description: VideoLevelSuggestion | null;
+  featuredArtists: VideoLevelSuggestion[];
+}
+
 /** Assembles the optional `video` block, omitting empty keys. */
-const buildVideoBlock = (
-  releasedOn: VideoLevelSuggestion | null,
-  featuredArtists: VideoLevelSuggestion[]
-): VideoBlock | null => {
+const buildVideoBlock = ({
+  releasedOn,
+  description,
+  featuredArtists,
+}: VideoBlockParts): VideoBlock | null => {
   const video: VideoBlock = {
     ...(releasedOn ? { releasedOn } : {}),
+    ...(description ? { description } : {}),
     ...(featuredArtists.length > 0 ? { featuredArtists } : {}),
   };
-  return releasedOn || featuredArtists.length > 0 ? video : null;
+  return releasedOn || description || featuredArtists.length > 0 ? video : null;
 };
 
 /**
@@ -659,10 +686,28 @@ export const runVideoEnrichment = async (
         { searchWeb: deps.searchSerperWeb }
       )
     : null;
+  const description = keys.serper
+    ? await deps.resolveDescriptionSuggestion(
+        {
+          title: input.title,
+          artistDisplay: input.artistDisplay,
+          releasedOn: input.releasedOn,
+          facts: descriptionFacts(recording, input.releasedOn),
+          serperKey: keys.serper,
+          geminiKey: keys.gemini,
+          model,
+        },
+        { searchWeb: deps.searchSerperWeb }
+      )
+    : null;
 
   await report('finalizing');
   const releasedOn = mergeReleaseDate(recording, webReleasedOn, input.releasedOn);
-  const video = buildVideoBlock(releasedOn, discoverFeatured(input, recording));
+  const video = buildVideoBlock({
+    releasedOn,
+    description,
+    featuredArtists: discoverFeatured(input, recording),
+  });
   return { artists, ...(video ? { video } : {}), model };
 };
 

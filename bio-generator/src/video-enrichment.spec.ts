@@ -70,6 +70,7 @@ const buildDeps = (overrides: Partial<VideoEnrichmentDeps> = {}): VideoEnrichmen
   getGeminiApiKey: vi.fn().mockResolvedValue('gemini-key'),
   getSerperApiKey: vi.fn().mockResolvedValue('serper-key'),
   resolveReleaseDateSuggestion: vi.fn().mockResolvedValue(null),
+  resolveDescriptionSuggestion: vi.fn().mockResolvedValue(null),
   resolveIdentityFallback: vi.fn().mockResolvedValue(null),
   postCallback: vi.fn().mockResolvedValue(undefined),
   postProgress: vi.fn().mockResolvedValue(undefined),
@@ -305,6 +306,70 @@ describe('runVideoEnrichment', () => {
     const result = await runVideoEnrichment(baseInput, deps);
 
     expect(result.video?.releasedOn).toEqual(releasedOn);
+  });
+
+  it('attaches the synthesized description to the video block', async () => {
+    const description = {
+      value: 'Bite Through Stone is a single by Ceschi.',
+      confidence: 'medium' as const,
+      sources: [{ url: 'https://example.com/song' }],
+      note: 'The album page names the single.',
+    };
+    const deps = buildDeps({
+      resolveDescriptionSuggestion: vi.fn().mockResolvedValue(description),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.description).toEqual(description);
+  });
+
+  it('leaves the description unset when synthesis returns null', async () => {
+    const deps = buildDeps({
+      resolveDescriptionSuggestion: vi.fn().mockResolvedValue(null),
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.description).toBeUndefined();
+  });
+
+  it('skips description synthesis without a Serper key', async () => {
+    const deps = buildDeps({
+      getSerperApiKey: vi.fn().mockResolvedValue(null),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    expect(deps.resolveDescriptionSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('feeds the credited names, MB date, and admin date as description facts', async () => {
+    const resolveDescriptionSuggestion = vi.fn().mockResolvedValue(null);
+    const deps = buildDeps({
+      resolveDescriptionSuggestion,
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          firstReleaseDate: '2019-05-01',
+          credits: [{ mbid: 'mb-c', name: 'Ceschi' }],
+        }),
+      ]),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    const [args] = resolveDescriptionSuggestion.mock.calls[0];
+    expect(args.facts).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Ceschi'),
+        expect.stringContaining('2019-05-01'),
+        expect.stringContaining('2021-04-09'),
+      ])
+    );
   });
 
   it('posts progress checkpoints when the event carries progress plumbing', async () => {
