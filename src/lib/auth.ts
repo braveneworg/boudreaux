@@ -162,6 +162,14 @@ export const auth = betterAuth({
     // — users must manually link their X account from their profile (Task 7).
     accountLinking: accountLinkingConfig,
   },
+  rateLimit: {
+    // better-auth enables its limiter whenever NODE_ENV === 'production',
+    // which also captures the CI E2E standalone (production build, parallel
+    // Playwright workers sharing one IP) — /api/auth/get-session then 429s
+    // and signed-in UI intermittently renders signed-out. Scope the limiter
+    // to REAL production; E2E keeps it off. Defaults (window/max) unchanged.
+    enabled: isProductionRuntime,
+  },
   advanced: {
     useSecureCookies: isProductionRuntime,
     cookiePrefix: 'boudreaux',
