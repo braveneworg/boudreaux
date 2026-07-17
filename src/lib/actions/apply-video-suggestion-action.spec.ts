@@ -142,9 +142,57 @@ describe('applyVideoSuggestionAction', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'The release date applies in the edit form, not on the server.',
+      error: 'This suggestion applies in the edit form, not on the server.',
     });
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
+  });
+
+  it('refuses to server-apply a description suggestion (client-side only)', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'description', value: 'A synthesized description.' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'This suggestion applies in the edit form, not on the server.',
+    });
+    expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
+  });
+
+  it('refuses to server-apply a featuredArtist suggestion (client-side only)', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'featuredArtist', value: 'New Guest' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'This suggestion applies in the edit form, not on the server.',
+    });
+    expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
+  });
+
+  it('dismisses a video-level featuredArtist suggestion', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'featuredArtist', value: 'New Guest' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'dismiss',
+    });
+
+    expect(result).toEqual({ success: true, op: 'dismiss' });
+    expect(VideoEnrichmentSuggestionRepository.markDismissed).toHaveBeenCalledWith(SUGGESTION_ID);
   });
 
   it('rejects an impossible calendar month for bornOn (2020-13-45)', async () => {

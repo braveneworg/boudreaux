@@ -19,8 +19,23 @@ export const VIDEO_SUGGESTION_FIELDS = [
   'bornOn',
   'displayName',
   'releasedOn',
+  'description',
+  'featuredArtist',
 ] as const;
 export type VideoSuggestionField = (typeof VIDEO_SUGGESTION_FIELDS)[number];
+
+/**
+ * Video-level fields (persisted with `artistId: null`). These are applied
+ * client-side into the RHF edit form — never server-applied — because a
+ * `videos.detail` refetch would wipe dirty edits. The apply action rejects an
+ * `apply` op for every one of these (dismiss stays allowed).
+ */
+export const VIDEO_LEVEL_SUGGESTION_FIELDS = [
+  'releasedOn',
+  'description',
+  'featuredArtist',
+] as const;
+export type VideoLevelSuggestionField = (typeof VIDEO_LEVEL_SUGGESTION_FIELDS)[number];
 
 /**
  * Confidence rubric (see the design spec): high = MusicBrainz ≥95 + Wikidata
@@ -73,6 +88,21 @@ export const videoSuggestionSchema = z.object({
 export type VideoSuggestion = z.infer<typeof videoSuggestionSchema>;
 
 /**
+ * A video-level suggestion — the fielded suggestion shape without its `field`
+ * discriminator (the `video` object keys it by position instead). Backs the
+ * release date and each discovered featured artist.
+ */
+const videoLevelSuggestionSchema = videoSuggestionSchema.omit({ field: true });
+
+/**
+ * A synthesized video description (2–4 sentences). Widens the base 500-char
+ * value cap to 2000 — long-form prose, unlike the short fielded facts.
+ */
+const videoDescriptionSuggestionSchema = videoLevelSuggestionSchema.extend({
+  value: z.string().min(1).max(2000),
+});
+
+/**
  * The successful payload the Lambda returns. Kept in lockstep with
  * `bio-generator/src/types.ts` `videoEnrichmentResultSchema` — validated at
  * the callback boundary so a malformed Lambda response is never trusted.
@@ -87,7 +117,11 @@ export const videoEnrichmentDataSchema = z.object({
     )
     .max(10),
   video: z
-    .object({ releasedOn: videoSuggestionSchema.omit({ field: true }).optional() })
+    .object({
+      releasedOn: videoLevelSuggestionSchema.optional(),
+      description: videoDescriptionSuggestionSchema.optional(),
+      featuredArtists: z.array(videoLevelSuggestionSchema).max(5).optional(),
+    })
     .optional(),
   model: z.string().max(100),
 });

@@ -65,6 +65,23 @@ describe('videoEnrichmentFixture', () => {
     expect(data.video?.releasedOn).toMatchObject({ value: '2020-06-01', confidence: 'medium' });
   });
 
+  it('emits the deterministic video-level description', () => {
+    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }] });
+
+    expect(data.video?.description).toMatchObject({
+      value: 'A deterministic E2E description of the track, its artists, and its release context.',
+      confidence: 'medium',
+    });
+  });
+
+  it('emits one discovered featured artist', () => {
+    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }] });
+
+    expect(data.video?.featuredArtists).toEqual([
+      expect.objectContaining({ value: 'E2E Discovered Feature', confidence: 'medium' }),
+    ]);
+  });
+
   it('is deterministic across calls', () => {
     const a = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }] });
     const b = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }] });
