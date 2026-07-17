@@ -197,7 +197,7 @@ describe('ChatMessageList', () => {
       // A viewport resize (iOS URL-bar/keyboard, desktop window resize) arms the
       // resize window, then the browser clamps the container and fires a
       // synthetic scroll with the list transiently displaced upward.
-      fireEvent(globalThis, new Event('resize'));
+      fireEvent(window, new Event('resize'));
       Object.defineProperty(list, 'scrollTop', { configurable: true, writable: true, value: 100 });
       list.dispatchEvent(new Event('scroll'));
 
