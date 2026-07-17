@@ -746,6 +746,7 @@ describe('runVideoEnrichment recording-first', () => {
       value: '2019-05-01',
       confidence: 'medium',
       sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+      note: 'MusicBrainz first release date of the recording — the video may have premiered later.',
     });
   });
 
@@ -771,7 +772,32 @@ describe('runVideoEnrichment recording-first', () => {
         { url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' },
         { url: 'https://example.com/premiere' },
       ],
+      note: "Web evidence corroborates the recording's first release date.",
     });
+  });
+
+  it('caps the merged sources at 10 with the MusicBrainz URL first', async () => {
+    const webSources = Array.from({ length: 10 }, (_, index) => ({
+      url: `https://example.com/source-${index}`,
+    }));
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue({
+        value: '2019-05-01',
+        confidence: 'medium' as const,
+        sources: webSources,
+        note: 'Premiere.',
+      }),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn?.sources).toEqual([
+      { url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' },
+      ...webSources.slice(0, 9),
+    ]);
   });
 
   it('emits the MB date row when the web adjudication returns null', async () => {
@@ -788,6 +814,7 @@ describe('runVideoEnrichment recording-first', () => {
       value: '2019-05-01',
       confidence: 'medium',
       sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+      note: 'MusicBrainz first release date of the recording — the video may have premiered later.',
     });
   });
 

@@ -570,14 +570,20 @@ const mbReleaseRow = (
   if (!recording || !isFullDate(recording.firstReleaseDate)) return null;
   const mbDate = recording.firstReleaseDate;
   if (mbDate === adminReleasedOn?.slice(0, 10)) return null;
-  return { value: mbDate, confidence: 'medium', sources: recordingSource(recording) };
+  return {
+    value: mbDate,
+    confidence: 'medium',
+    sources: recordingSource(recording),
+    note: 'MusicBrainz first release date of the recording — the video may have premiered later.',
+  };
 };
 
 /**
  * Merges the MusicBrainz release date with the web adjudication: the MB full
  * date leads; an agreeing web date promotes it to high with combined sources
- * (MB first); a disagreeing/absent web date leaves the MB row unchanged; and
- * with no MB full date the web-only suggestion passes through untouched.
+ * (MB first, capped at the 10-source wire limit); a disagreeing/absent web date
+ * leaves the MB row unchanged; and with no MB full date the web-only suggestion
+ * passes through untouched.
  */
 const mergeReleaseDate = (
   recording: MusicBrainzRecordingCandidate | null,
@@ -587,7 +593,12 @@ const mergeReleaseDate = (
   const mbRow = mbReleaseRow(recording, adminReleasedOn);
   if (!mbRow) return webSuggestion;
   if (webSuggestion?.value !== mbRow.value) return mbRow;
-  return { ...mbRow, confidence: 'high', sources: [...mbRow.sources, ...webSuggestion.sources] };
+  return {
+    ...mbRow,
+    confidence: 'high',
+    sources: [...mbRow.sources, ...webSuggestion.sources].slice(0, 10),
+    note: "Web evidence corroborates the recording's first release date.",
+  };
 };
 
 /** Verified-fact lines fed to the description synthesis (credits, dates). */

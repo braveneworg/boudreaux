@@ -20,7 +20,8 @@ const FEAT_SEPARATOR = /\s*[([]?\s*(?:\b(?:feat|ft)\.?\s+|\bfeaturing\s+|\bw\/\s
 
 /**
  * Joiners that MAY separate multiple artists (also live inside band names).
- * `g` is required so {@link String.prototype.split} scans past the first hit.
+ * The `i` flag makes the ` x ` joiner case-insensitive; `g` is harmless here
+ * ({@link String.prototype.split} ignores it) and kept only for consistency.
  */
 const NAME_CANDIDATE_SEPARATOR = /\s*,\s*|\s+&\s+|\s+x\s+/gi;
 
