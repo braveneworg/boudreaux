@@ -192,6 +192,20 @@ describe('ChatMessageList', () => {
       expect(list.scrollTop).toBe(0);
     });
 
+    it('keeps the tail pinned when a viewport resize fires a synthetic scroll', () => {
+      const { list } = renderWithGeometry(400); // distance 0 → at the bottom, pinned
+      // A viewport resize (iOS URL-bar/keyboard, desktop window resize) arms the
+      // resize window, then the browser clamps the container and fires a
+      // synthetic scroll with the list transiently displaced upward.
+      fireEvent(window, new Event('resize'));
+      Object.defineProperty(list, 'scrollTop', { configurable: true, writable: true, value: 100 });
+      list.dispatchEvent(new Event('scroll'));
+
+      // The non-user scroll must NOT unpin — the tail re-pins to the bottom
+      // (previously it flipped the pin off and the list drifted).
+      expect(list.scrollTop).toBe(500);
+    });
+
     it('also observes the message stream so late-loading rows keep the tail visible', () => {
       const { container } = render(<ChatMessageList {...baseProps} messages={[makeMsg('a')]} />);
       const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
