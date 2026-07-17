@@ -66,6 +66,8 @@ export const confirmVideoUpload = async (
   if (videoId === undefined || isInvalidS3Key(s3Key, expectedPrefix)) {
     return `Invalid S3 key: must start with ${expectedPrefix}`;
   }
+  // E2E runs without S3 — the namespace check above still guards the key shape.
+  if (process.env.E2E_MODE === 'true') return null;
   const exists = await verifyS3ObjectExists(s3Key);
   if (!exists) {
     return 'File not found in S3 storage. Upload may have failed.';

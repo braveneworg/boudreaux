@@ -70,6 +70,10 @@ beforeEach(() => {
   vi.mocked(extractS3KeyFromUrl).mockReturnValue(ownPosterKey);
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('confirmVideoUpload', () => {
   it('rejects an undefined video id', async () => {
     const result = await confirmVideoUpload(validKey, undefined);
@@ -478,5 +482,18 @@ describe('syncVideoProducersAfterSave', () => {
     await expect(
       syncVideoProducersAfterSave({ videoId, producers: [{ name: 'Bad' }] })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('confirmVideoUpload — E2E mode', () => {
+  it('confirms without an S3 HEAD in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    await expect(confirmVideoUpload('media/videos/v1/x.mp4', 'v1')).resolves.toBeNull();
+    expect(verifyS3ObjectExists).not.toHaveBeenCalled();
+  });
+
+  it('still rejects a wrong-namespace key in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    await expect(confirmVideoUpload('media/other/x.mp4', 'v1')).resolves.toMatch(/Invalid S3 key/);
   });
 });
