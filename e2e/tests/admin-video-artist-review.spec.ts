@@ -1,8 +1,19 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { PrismaClient } from '@prisma/client';
+
 import { expect, test } from '../fixtures/auth.fixture';
 import { REVIEW_VIDEO_ID } from '../helpers/seed-test-db';
+
+/**
+ * E2E database URL — always the local Docker MongoDB container (never
+ * `.env*`/`DATABASE_URL`) per the E2E database isolation mandate.
+ */
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
+const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 /**
  * E2E coverage for the video artist-review flow and the probe-metadata
@@ -25,10 +36,56 @@ const ARTIST_LABEL = 'Artist / Creator';
 /** displayName of the seeded artist the lookup should match. */
 const EXISTING_ARTIST_NAME = 'E2E Review Lead';
 
+/**
+ * Free-text featured artist the matched-chip test adds. The server's post-save
+ * sync creates a shell Artist with this displayName + VideoArtist join rows;
+ * the afterEach restores both so repeat-each stress runs start from seeded
+ * state (see the afterEach note below).
+ */
+const NEW_FEATURED_ARTIST_NAME = 'Zora Quill Brandt';
+
 /** A valid 24-char hex OID (matches REVIEW_VIDEO_ID pattern). */
 const VALID_OID = REVIEW_VIDEO_ID;
 
 test.describe('Admin video artist-review — edit-page flow', () => {
+  /** The review video's seeded `artist` string, captured to restore after each test. */
+  let seededReviewArtist: string;
+
+  test.beforeAll(async () => {
+    const video = await prisma.video.findUniqueOrThrow({
+      where: { id: REVIEW_VIDEO_ID },
+      select: { artist: true },
+    });
+    seededReviewArtist = video.artist;
+  });
+
+  // The matched-chip test saves the review video with a new featured artist and
+  // the server sync creates a 'Zora Quill Brandt' shell. Restore both so
+  // repeat-each stress runs (and any same-DB rerun) start from seeded state —
+  // without this, later runs see an exact-match artist, the combobox suppresses
+  // its `Add "…"` option, and the test false-flakes. NOTE: concurrent repeats of
+  // THIS test on parallel workers still interfere (they share the seeded video
+  // row) — stress this file with --workers=1.
+  test.afterEach(async () => {
+    const created = await prisma.artist.findMany({
+      where: { displayName: NEW_FEATURED_ARTIST_NAME },
+      select: { id: true },
+    });
+    const createdIds = created.map((artist) => artist.id);
+    if (createdIds.length > 0) {
+      await prisma.videoArtist.deleteMany({ where: { artistId: { in: createdIds } } });
+      await prisma.artist.deleteMany({ where: { id: { in: createdIds } } });
+    }
+    await prisma.video.update({
+      where: { id: REVIEW_VIDEO_ID },
+      data: { artist: seededReviewArtist },
+    });
+  });
+
+  test.afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
   test('matched chip + new-artist block + persistence after save', async ({ adminPage }) => {
     // Artist sync runs server-side in after() post-response — budget extra time.
     test.slow();
@@ -57,8 +114,10 @@ test.describe('Admin video artist-review — edit-page flow', () => {
     const featuredTrigger = adminPage.getByRole('combobox', { name: 'Featured artists' });
     await featuredTrigger.click();
     const featuredInput = adminPage.getByPlaceholder('Search featured artists…');
-    await featuredInput.fill('Zora Quill Brandt');
-    const addOption = adminPage.getByRole('option', { name: /Add "Zora Quill Brandt"/i });
+    await featuredInput.fill(NEW_FEATURED_ARTIST_NAME);
+    const addOption = adminPage.getByRole('option', {
+      name: new RegExp(`Add "${NEW_FEATURED_ARTIST_NAME}"`, 'i'),
+    });
     await expect(addOption).toBeVisible({ timeout: 5_000 });
     await addOption.click();
 
@@ -73,7 +132,7 @@ test.describe('Admin video artist-review — edit-page flow', () => {
     await expect(chip).toBeVisible({ timeout: 5_000 });
 
     // New-artist block should appear with pre-filled name parts.
-    await expect(reviewSection.getByText('Zora Quill Brandt')).toBeVisible();
+    await expect(reviewSection.getByText(NEW_FEATURED_ARTIST_NAME)).toBeVisible();
     const firstInput = reviewSection.getByRole('textbox', { name: 'First name' });
     const middleInput = reviewSection.getByRole('textbox', { name: 'Middle name' });
     const surnameInput = reviewSection.getByRole('textbox', { name: 'Surname' });
