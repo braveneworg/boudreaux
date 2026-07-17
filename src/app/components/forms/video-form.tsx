@@ -21,6 +21,7 @@ import {
 import { useVideoProbePrefillQuery } from '@/app/hooks/use-video-probe-prefill-query';
 import { useVideoProducersQuery } from '@/app/hooks/use-video-producers-query';
 import { useVideoQuery } from '@/app/hooks/use-video-query';
+import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
@@ -245,7 +246,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
   const isSubmitting = isCreatingVideo || isUpdatingVideo;
 
-  const { entries, updateDraft, buildArtistDetails } = useVideoArtistReview(artistValue);
+  const { entries, updateDraft, buildArtistDetails, primarySplitParts } =
+    useVideoArtistReview(artistValue);
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
 
@@ -263,6 +265,17 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     (value: string): void =>
       setValue('releasedOn', value, { shouldDirty: true, shouldValidate: true }),
     [setValue]
+  );
+
+  const handleApplySplit = useCallback(
+    (parts: string[]): void => {
+      const existing = splitFeaturedArtists(form.getValues('artist'))
+        .filter((part) => part.role === 'featured')
+        .map((part) => part.name);
+      const composed = composeArtistString(parts[0], [...parts.slice(1), ...existing]);
+      setValue('artist', composed, { shouldDirty: true, shouldValidate: true });
+    },
+    [form, setValue]
   );
 
   const isDraft = !getVideoPublishedAt(video);
@@ -338,7 +351,12 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
               setValue={setValue}
               onSelectDate={handleSelectDate}
             />
-            <VideoArtistReviewSection entries={entries} updateDraft={updateDraft} />
+            <VideoArtistReviewSection
+              entries={entries}
+              updateDraft={updateDraft}
+              primarySplitParts={primarySplitParts}
+              onApplySplit={handleApplySplit}
+            />
             <VideoProducersSection control={control} />
             <EnrichmentPanelMount
               video={video}

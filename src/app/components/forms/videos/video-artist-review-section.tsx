@@ -8,6 +8,7 @@ import { useId } from 'react';
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,10 @@ import type { VideoArtistReviewEntry } from './use-video-artist-review';
 export interface VideoArtistReviewSectionProps {
   entries: VideoArtistReviewEntry[];
   updateDraft: (sourceName: string, patch: Partial<ArtistNameParts>) => void;
+  /** Split candidates for the primary name, or null when it isn't multi-artist. */
+  primarySplitParts: string[] | null;
+  /** Rewrite the artist field: first part primary, rest featured. */
+  onApplySplit: (parts: string[]) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,19 +126,41 @@ const ReviewEntry = ({ entry, idPrefix, updateDraft }: ReviewEntryProps): React.
   </div>
 );
 
+interface PrimarySplitHintProps {
+  parts: string[];
+  onApplySplit: (parts: string[]) => void;
+}
+
+/** Nudge the admin to split a multi-artist primary name into separate artists. */
+const PrimarySplitHint = ({ parts, onApplySplit }: PrimarySplitHintProps): React.ReactElement => (
+  <div className="space-y-2 rounded-none border border-zinc-200 p-3 text-sm" role="note">
+    <p>
+      Multiple artists? Split as <strong>{parts.join(' + ')}</strong>
+    </p>
+    <Button type="button" variant="secondary" size="sm" onClick={() => onApplySplit(parts)}>
+      Apply split
+    </Button>
+  </div>
+);
+
 // ── Export ────────────────────────────────────────────────────────────────────
 
 export const VideoArtistReviewSection = ({
   entries,
   updateDraft,
+  primarySplitParts,
+  onApplySplit,
 }: VideoArtistReviewSectionProps): React.ReactElement | null => {
   const idPrefix = useId();
 
-  if (entries.length === 0) return null;
+  if (entries.length === 0 && !primarySplitParts) return null;
 
   return (
     <section className="space-y-4" data-testid="video-artist-review-section">
       <h2 className="font-semibold">Artist Review</h2>
+      {primarySplitParts ? (
+        <PrimarySplitHint parts={primarySplitParts} onApplySplit={onApplySplit} />
+      ) : null}
       <div className="space-y-2">
         {entries.map((entry, index) => (
           <ReviewEntry

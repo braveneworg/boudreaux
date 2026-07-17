@@ -344,7 +344,50 @@ describe('useVideoArtistReview — 20-name lookup cap', () => {
   });
 });
 
-// ── Test 8: cap at 20 entries ──────────────────────────────────────────────────
+// ── Test 8: primary-split candidates ──────────────────────────────────────────
+
+describe('useVideoArtistReview — primary split candidates', () => {
+  it('surfaces split candidates for a multi-name primary', () => {
+    mockUseArtistNameLookupQuery.mockReturnValue(
+      makeQueryResult({
+        isSuccess: true,
+        data: { results: [{ name: 'Alpha & Bravo', match: null }] },
+      })
+    );
+
+    const { result } = renderHook(() => useVideoArtistReview('Alpha & Bravo'));
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(result.current.primarySplitParts).toEqual(['Alpha', 'Bravo']);
+  });
+
+  it('has no split candidates for a single-name primary', () => {
+    mockUseArtistNameLookupQuery.mockReturnValue(
+      makeQueryResult({
+        isSuccess: true,
+        data: {
+          results: [
+            { name: 'Alpha', match: null },
+            { name: 'Bravo', match: null },
+          ],
+        },
+      })
+    );
+
+    const { result } = renderHook(() => useVideoArtistReview('Alpha feat. Bravo'));
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(result.current.primarySplitParts).toBeNull();
+  });
+});
+
+// ── Test 9: cap at 20 entries ──────────────────────────────────────────────────
 
 describe('useVideoArtistReview — 20-entry cap', () => {
   it('caps buildArtistDetails at 20 entries even with 21 new artists', () => {

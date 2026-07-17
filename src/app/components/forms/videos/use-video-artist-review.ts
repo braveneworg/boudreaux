@@ -11,7 +11,7 @@ import {
 } from '@/hooks/use-artist-name-lookup-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
-import { splitFeaturedArtists } from '@/utils/artist-name-split';
+import { splitFeaturedArtists, splitNameCandidates } from '@/utils/artist-name-split';
 import { splitArtistNameParts, type ArtistNameParts } from '@/utils/split-artist-name-parts';
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -34,6 +34,8 @@ export interface UseVideoArtistReviewResult {
   entries: VideoArtistReviewEntry[];
   updateDraft: (sourceName: string, patch: Partial<ArtistNameParts>) => void;
   buildArtistDetails: () => VideoArtistDetail[];
+  /** Split candidates for the PRIMARY entry's sourceName; null when it isn't multi-artist. */
+  primarySplitParts: string[] | null;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -143,6 +145,12 @@ export const useVideoArtistReview = (artist: string): UseVideoArtistReviewResult
     [isPending, isError, data, isSuccess, drafts, parts]
   );
 
+  const primarySplitParts = useMemo(() => {
+    const primary = parts.find((part) => part.role === 'primary') ?? null;
+    const candidates = primary ? splitNameCandidates(primary.name) : [];
+    return candidates.length > 1 ? candidates : null;
+  }, [parts]);
+
   const updateDraft = useCallback((sourceName: string, patch: Partial<ArtistNameParts>): void => {
     const key = draftKey(sourceName);
     setDrafts((prev) => {
@@ -162,5 +170,5 @@ export const useVideoArtistReview = (artist: string): UseVideoArtistReviewResult
     [entries]
   );
 
-  return { entries, updateDraft, buildArtistDetails };
+  return { entries, updateDraft, buildArtistDetails, primarySplitParts };
 };

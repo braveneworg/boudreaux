@@ -99,12 +99,25 @@ vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
 }));
 
 vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
-  VideoArtistReviewSection: ({ entries }: { entries: { sourceName: string }[] }) =>
-    entries.length > 0 ? (
+  VideoArtistReviewSection: ({
+    entries,
+    primarySplitParts,
+    onApplySplit,
+  }: {
+    entries: { sourceName: string }[];
+    primarySplitParts: string[] | null;
+    onApplySplit: (parts: string[]) => void;
+  }) =>
+    entries.length > 0 || primarySplitParts ? (
       <div data-testid="video-artist-review-section">
         {entries.map((e) => (
           <span key={e.sourceName}>{e.sourceName}</span>
         ))}
+        {primarySplitParts ? (
+          <button type="button" onClick={() => onApplySplit(primarySplitParts)}>
+            Apply split
+          </button>
+        ) : null}
       </div>
     ) : null,
 }));
@@ -178,6 +191,7 @@ vi.mock('@/app/components/forms/fields/artist-search-combobox', () => ({
 vi.mock('@/app/components/forms/fields/featured-artists-combobox', () => ({
   FeaturedArtistsCombobox: ({
     label,
+    value,
     disabled,
   }: {
     label?: string;
@@ -188,6 +202,7 @@ vi.mock('@/app/components/forms/fields/featured-artists-combobox', () => ({
     <div>
       {label && <span>{label}</span>}
       {disabled && <span>Add a primary artist first</span>}
+      <span data-testid="featured-artists-value">{value.join(', ')}</span>
     </div>
   ),
 }));
@@ -1105,6 +1120,27 @@ describe('VideoForm — artist review section (B6)', () => {
     await user.type(screen.getByLabelText('Artist / Creator'), 'Ceschi');
 
     expect(mocks.useVideoArtistReview).toHaveBeenCalledWith(expect.stringContaining('Ceschi'));
+  });
+
+  // Test 6b: applying a primary split rewrites the artist field
+  it('rewrites the artist field to feat.-joined parts when Apply split is clicked', async () => {
+    mocks.useVideoArtistReview.mockReturnValue({
+      entries: [],
+      updateDraft: mocks.updateDraft,
+      buildArtistDetails: mocks.buildArtistDetails,
+      primarySplitParts: ['Alpha', 'Bravo'],
+    });
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    fireEvent.change(screen.getByLabelText('Artist / Creator'), {
+      target: { value: 'Alpha & Bravo' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Apply split' }));
+
+    // The rewrite makes the first part primary and the rest featured.
+    expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Alpha');
+    expect(screen.getByTestId('featured-artists-value')).toHaveTextContent('Bravo');
   });
 
   // Test 7: submit with non-empty artistDetails includes them in the payload
