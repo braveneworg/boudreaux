@@ -22,6 +22,10 @@ test.describe('Admin dashboard', () => {
   });
 
   test('renders the Videos tile linking into the section with its stats', async ({ adminPage }) => {
+    // The stats toPass reload loop (below) can span up to 60s while a mutating
+    // spec's transient row clears — extend the per-test budget to fit it.
+    test.slow();
+
     await adminPage.goto('/admin');
 
     const overview = adminPage.getByRole('list', { name: /section overview/i });
@@ -41,8 +45,16 @@ test.describe('Admin dashboard', () => {
     // published count uses VideoRepository.count({ published: true }) which applies
     // publishedAt <= now — the scheduled video does NOT meet that clause, so it
     // counts as draft (total − published = 13 − 11 = 2).
-    await expect(videosTile.getByText('13', { exact: true })).toBeVisible();
-    await expect(videosTile.getByText('11 published · 2 draft')).toBeVisible();
+    // toPass: converges past transient rows created by mutating specs (draft-upload).
+    await expect(async () => {
+      await adminPage.reload();
+      const tile = adminPage
+        .getByRole('list', { name: /section overview/i })
+        .getByRole('listitem')
+        .filter({ has: adminPage.getByRole('link', { name: 'Videos', exact: true }) });
+      await expect(tile.getByText('13', { exact: true })).toBeVisible({ timeout: 2_000 });
+      await expect(tile.getByText('11 published · 2 draft')).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 60_000 });
   });
 
   test('tiles link into their section', async ({ adminPage }) => {

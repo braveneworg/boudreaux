@@ -48,6 +48,10 @@ test.describe('Admin videos — list chrome', () => {
 
 test.describe('Admin videos — default view', () => {
   test('shows published and draft videos but never the archived one', async ({ adminPage }) => {
+    // The count toPass reload loop (below) can span up to 60s while a mutating
+    // spec's transient row clears — extend the per-test budget to fit it.
+    test.slow();
+
     await adminPage.goto('/admin/videos');
 
     // The draft sorts first by releasedOn (2026-01-08); a published video follows.
@@ -62,11 +66,15 @@ test.describe('Admin videos — default view', () => {
     // + 1 draft + 1 scheduled; the archived video is excluded from this view).
     // Scroll to auto-load the footer rather than clicking the transient "Load
     // More" button, which races the IntersectionObserver auto-load (see scrollToLoad).
-    await scrollToLoad(
-      adminPage,
-      adminPage.getByRole('heading', { level: 3, name: 'E2E Video Golf' })
-    );
-    await expect(cardTitles(adminPage)).toHaveCount(9);
+    // toPass: converges past transient rows created by mutating specs (draft-upload).
+    await expect(async () => {
+      await adminPage.reload();
+      await scrollToLoad(
+        adminPage,
+        adminPage.getByRole('heading', { level: 3, name: 'E2E Video Golf' })
+      );
+      await expect(cardTitles(adminPage)).toHaveCount(9, { timeout: 2_000 });
+    }).toPass({ timeout: 60_000 });
 
     // The archived video is excluded from the default (non-archived) view.
     await expect(adminPage.getByText('E2E Video Archived')).toHaveCount(0);
@@ -88,15 +96,23 @@ test.describe('Admin videos — filters', () => {
   });
 
   test('the unpublished-only filter shows just the draft', async ({ adminPage }) => {
+    // The count toPass reload loop (below) can span up to 60s while a mutating
+    // spec's transient DRAFT row clears — extend the per-test budget to fit it.
+    test.slow();
+
     await adminPage.goto('/admin/videos');
 
     // Turning off "Show published" leaves the unpublished (draft) rows only.
-    await adminPage.getByRole('switch', { name: 'Show published' }).click();
-
-    await expect(
-      adminPage.getByRole('heading', { level: 3, name: 'E2E Video Draft' })
-    ).toBeVisible();
-    await expect(cardTitles(adminPage)).toHaveCount(1);
+    // toPass: converges past transient DRAFT rows created by mutating specs
+    // (draft-upload creates an unpublished video that would show here transiently).
+    await expect(async () => {
+      await adminPage.reload();
+      await adminPage.getByRole('switch', { name: 'Show published' }).click();
+      await expect(
+        adminPage.getByRole('heading', { level: 3, name: 'E2E Video Draft' })
+      ).toBeVisible({ timeout: 2_000 });
+      await expect(cardTitles(adminPage)).toHaveCount(1, { timeout: 2_000 });
+    }).toPass({ timeout: 60_000 });
     await expect(adminPage.getByText('E2E Video Alpha')).toHaveCount(0);
   });
 
