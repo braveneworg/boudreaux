@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Sparkles } from 'lucide-react';
+import { useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import {
@@ -26,15 +27,22 @@ import {
   useRunVideoEnrichmentMutation,
 } from '@/app/hooks/mutations/use-video-enrichment-mutations';
 import { useVideoEnrichmentStatusQuery } from '@/app/hooks/use-video-enrichment-status-query';
+import { splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
-import { isInFlightEnrichmentStatus } from '@/lib/validation/video-enrichment-schema';
-import type { VideoEnrichmentStatusResult } from '@/lib/validation/video-enrichment-schema';
+import {
+  isInFlightEnrichmentStatus,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
+} from '@/lib/validation/video-enrichment-schema';
+import type {
+  VideoEnrichmentStatusResult,
+  VideoLevelSuggestionField,
+} from '@/lib/validation/video-enrichment-schema';
 
 import { VideoArtistSuggestionCard } from './video-artist-suggestion-card';
 import { VideoEnrichmentProgressTimeline } from './video-enrichment-progress-timeline';
 import { VideoEnrichmentStatusChip } from './video-enrichment-status-chip';
-import { VideoReleaseDateSuggestion } from './video-release-date-suggestion';
+import { VideoFieldSuggestion } from './video-field-suggestion';
 
 import type { Control } from 'react-hook-form';
 
@@ -44,8 +52,8 @@ type EnrichmentSuggestion = VideoEnrichmentStatusResult['suggestions'][number];
 interface VideoEnrichmentPanelProps {
   videoId: string;
   control: Control<VideoFormData>;
-  /** Applies the release-date suggestion into the parent RHF form. */
-  onApplyReleaseDate: (value: string) => void;
+  /** Applies a video-level suggestion into the parent RHF form (never the server). */
+  onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
 }
 
 interface ArtistGroup {
@@ -62,11 +70,32 @@ export const groupArtistSuggestions = (data: VideoEnrichmentStatusResult): Artis
     }))
     .filter(({ suggestions }) => suggestions.length > 0);
 
-/** The single video-level release-date suggestion, if the run produced one. */
-export const findReleaseDateSuggestion = (
-  data: VideoEnrichmentStatusResult
-): EnrichmentSuggestion | undefined =>
-  data.suggestions.find((s) => s.artistId === null && s.field === 'releasedOn');
+/** Per-video-level-field card config: apply-button label + container test id. */
+interface VideoLevelFieldConfig {
+  applyLabel: string;
+  testId: string;
+}
+
+const VIDEO_LEVEL_FIELD_CONFIG = new Map<VideoLevelSuggestionField, VideoLevelFieldConfig>([
+  ['releasedOn', { applyLabel: 'Use this date', testId: 'video-release-date-suggestion' }],
+  ['description', { applyLabel: 'Use this description', testId: 'video-description-suggestion' }],
+  [
+    'featuredArtist',
+    { applyLabel: 'Add featured artist', testId: 'video-featured-artist-suggestion' },
+  ],
+]);
+
+/** Narrow a raw suggestion field to a video-level field, or null (no `as` cast). */
+export const toVideoLevelField = (field: string): VideoLevelSuggestionField | null =>
+  (VIDEO_LEVEL_SUGGESTION_FIELDS as readonly string[]).includes(field)
+    ? (field as VideoLevelSuggestionField)
+    : null;
+
+/** True when `name` already appears (case-insensitive) among the artist string's parts. */
+const isFeaturedApplied = (artistValue: string, name: string): boolean =>
+  splitFeaturedArtists(artistValue).some(
+    (part) => part.name.toLowerCase() === name.trim().toLowerCase()
+  );
 
 interface RerunEnrichmentDialogProps {
   disabled: boolean;
@@ -98,11 +127,74 @@ const RerunEnrichmentDialog = ({ disabled, onConfirm }: RerunEnrichmentDialogPro
   </AlertDialog>
 );
 
+interface VideoLevelSuggestionListProps {
+  suggestions: EnrichmentSuggestion[];
+  control: Control<VideoFormData>;
+  isBusy: boolean;
+  onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
+  onDismissSuggestion: (suggestion: EnrichmentSuggestion) => void;
+}
+
+/**
+ * All video-level suggestions (`artistId === null`) rendered as one card per
+ * row: release date, description, and each featured artist. Watches the three
+ * targeted form fields once so every card's applied state derives from the
+ * live form — value equality for releasedOn/description, name-membership for
+ * featuredArtist. Apply is always client-only (the parent fills the form).
+ */
+const VideoLevelSuggestionList = ({
+  suggestions,
+  control,
+  isBusy,
+  onApplyVideoSuggestion,
+  onDismissSuggestion,
+}: VideoLevelSuggestionListProps): React.ReactElement => {
+  const releasedOn = useWatch({ control, name: 'releasedOn' });
+  const description = useWatch({ control, name: 'description' });
+  const artist = useWatch({ control, name: 'artist' });
+
+  const isApplied = (field: VideoLevelSuggestionField, value: string): boolean => {
+    if (field === 'releasedOn') return (releasedOn ?? '') === value;
+    if (field === 'description') return (description ?? '') === value;
+    return isFeaturedApplied(artist ?? '', value);
+  };
+
+  const currentValueFor = (field: VideoLevelSuggestionField): string | null => {
+    if (field === 'releasedOn') return releasedOn || null;
+    if (field === 'description') return description || null;
+    return artist || null;
+  };
+
+  return (
+    <>
+      {suggestions.map((suggestion) => {
+        const field = toVideoLevelField(suggestion.field);
+        const config = field === null ? undefined : VIDEO_LEVEL_FIELD_CONFIG.get(field);
+        if (field === null || config === undefined) return null;
+        const { applyLabel, testId } = config;
+        return (
+          <VideoFieldSuggestion
+            key={suggestion.id}
+            suggestion={suggestion}
+            currentValue={currentValueFor(field)}
+            isAppliedToForm={isApplied(field, suggestion.value)}
+            applyLabel={applyLabel}
+            testId={testId}
+            onApply={() => onApplyVideoSuggestion(field, suggestion.value)}
+            onDismiss={() => onDismissSuggestion(suggestion)}
+            isBusy={isBusy}
+          />
+        );
+      })}
+    </>
+  );
+};
+
 interface EnrichmentResultsProps {
   data: VideoEnrichmentStatusResult;
   control: Control<VideoFormData>;
   isBusy: boolean;
-  onApplyReleaseDate: (value: string) => void;
+  onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
   onApplySuggestion: (
     suggestion: EnrichmentSuggestion,
     expectedCurrent: string | null
@@ -114,36 +206,30 @@ const EnrichmentResults = ({
   data,
   control,
   isBusy,
-  onApplyReleaseDate,
+  onApplyVideoSuggestion,
   onApplySuggestion,
   onDismissSuggestion,
-}: EnrichmentResultsProps) => {
-  const releaseDateSuggestion = findReleaseDateSuggestion(data);
-  return (
-    <div className="space-y-4">
-      {groupArtistSuggestions(data).map(({ artist, suggestions }) => (
-        <VideoArtistSuggestionCard
-          key={artist.artistId}
-          artist={artist}
-          suggestions={suggestions}
-          isBusy={isBusy}
-          onApplySuggestion={onApplySuggestion}
-          onDismissSuggestion={onDismissSuggestion}
-        />
-      ))}
-      {releaseDateSuggestion ? (
-        <VideoReleaseDateSuggestion
-          suggestion={releaseDateSuggestion}
-          control={control}
-          name="releasedOn"
-          onApplyReleaseDate={onApplyReleaseDate}
-          onDismiss={() => onDismissSuggestion(releaseDateSuggestion)}
-          isBusy={isBusy}
-        />
-      ) : null}
-    </div>
-  );
-};
+}: EnrichmentResultsProps) => (
+  <div className="space-y-4">
+    {groupArtistSuggestions(data).map(({ artist, suggestions }) => (
+      <VideoArtistSuggestionCard
+        key={artist.artistId}
+        artist={artist}
+        suggestions={suggestions}
+        isBusy={isBusy}
+        onApplySuggestion={onApplySuggestion}
+        onDismissSuggestion={onDismissSuggestion}
+      />
+    ))}
+    <VideoLevelSuggestionList
+      suggestions={data.suggestions.filter((s) => s.artistId === null)}
+      control={control}
+      isBusy={isBusy}
+      onApplyVideoSuggestion={onApplyVideoSuggestion}
+      onDismissSuggestion={onDismissSuggestion}
+    />
+  </div>
+);
 
 /** Terminal-state polite announcement (screen-reader only). */
 const TerminalAnnouncement = ({ succeeded }: { succeeded: boolean }): React.ReactElement => (
@@ -189,7 +275,7 @@ interface EnrichmentPanelBodyProps {
   data: VideoEnrichmentStatusResult | undefined;
   control: Control<VideoFormData>;
   isBusy: boolean;
-  onApplyReleaseDate: (value: string) => void;
+  onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
   onRun: () => void;
   onApplySuggestion: (
     suggestion: EnrichmentSuggestion,
@@ -208,7 +294,7 @@ const PhaseContent = ({
   data,
   control,
   isBusy,
-  onApplyReleaseDate,
+  onApplyVideoSuggestion,
   onRun,
   onApplySuggestion,
   onDismissSuggestion,
@@ -228,7 +314,7 @@ const PhaseContent = ({
           data={data}
           control={control}
           isBusy={isBusy}
-          onApplyReleaseDate={onApplyReleaseDate}
+          onApplyVideoSuggestion={onApplyVideoSuggestion}
           onApplySuggestion={onApplySuggestion}
           onDismissSuggestion={onDismissSuggestion}
         />
@@ -263,13 +349,13 @@ const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElemen
  * video: trigger/re-run (re-run behind a confirm dialog), status polling
  * with a 20-minute client give-up (mirroring the bio section's
  * CLIENT_POLL_DEADLINE pattern), a live stage timeline, and per-artist /
- * release-date suggestion review. Artist applies are pessimistic server
- * actions; the release date applies into the parent form only.
+ * video-level suggestion review. Artist applies are pessimistic server
+ * actions; video-level suggestions apply into the parent form only.
  */
 export const VideoEnrichmentPanel = ({
   videoId,
   control,
-  onApplyReleaseDate,
+  onApplyVideoSuggestion,
 }: VideoEnrichmentPanelProps): React.ReactElement => {
   const [gaveUp, setGaveUp] = useState(false);
   const { data } = useVideoEnrichmentStatusQuery(videoId, { enabled: !gaveUp });
@@ -332,7 +418,7 @@ export const VideoEnrichmentPanel = ({
         data={data}
         control={control}
         isBusy={isBusy}
-        onApplyReleaseDate={onApplyReleaseDate}
+        onApplyVideoSuggestion={onApplyVideoSuggestion}
         onRun={triggerRun}
         onApplySuggestion={applySuggestion}
         onDismissSuggestion={dismissSuggestion}

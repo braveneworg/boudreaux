@@ -17,6 +17,8 @@ const FIELD_LABELS = new Map<SuggestionField, string>([
   ['bornOn', 'Born on'],
   ['displayName', 'Display name'],
   ['releasedOn', 'Release date'],
+  ['description', 'Description'],
+  ['featuredArtist', 'Featured artist'],
 ]);
 
 const CONFIDENCE_LABELS = new Map<EnrichmentSuggestion['confidence'], string>([

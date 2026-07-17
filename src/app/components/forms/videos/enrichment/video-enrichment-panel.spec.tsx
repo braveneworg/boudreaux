@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
+import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
 
 import { VideoEnrichmentPanel } from './video-enrichment-panel';
 
@@ -85,6 +86,28 @@ const releasedOnSuggestion = {
   status: 'pending' as const,
 };
 
+const descriptionSuggestion = {
+  id: 's4',
+  artistId: null,
+  field: 'description' as const,
+  value: 'A haunting studio performance filmed in one take.',
+  confidence: 'low' as const,
+  sources: [],
+  note: null,
+  status: 'pending' as const,
+};
+
+const featuredArtistSuggestion = {
+  id: 's5',
+  artistId: null,
+  field: 'featuredArtist' as const,
+  value: 'Guest Vocalist',
+  confidence: 'medium' as const,
+  sources: [{ url: 'https://musicbrainz.org/release/z' }],
+  note: null,
+  status: 'pending' as const,
+};
+
 const succeededStatus = {
   ...baseStatus,
   status: 'succeeded',
@@ -102,16 +125,35 @@ const setStatus = (data: unknown) =>
   });
 
 interface HarnessProps {
-  onApplyReleaseDate?: (value: string) => void;
+  /** Spy fired alongside the real form write, so tests can assert the args. */
+  onApply?: (field: VideoLevelSuggestionField, value: string) => void;
+  /** Seed initial artist so featured-apply composes against it. */
+  artist?: string;
 }
 
-const Harness = ({ onApplyReleaseDate = vi.fn() }: HarnessProps) => {
-  const form = useForm<VideoFormData>({ defaultValues: { releasedOn: '2026-02-01' } });
+/**
+ * Wires `onApplyVideoSuggestion` into the real RHF form exactly like
+ * `VideoForm` does (featured appends `feat.`, other fields overwrite), so the
+ * panel's live-form applied-state derivation is exercised end to end.
+ */
+const Harness = ({ onApply = vi.fn(), artist = '' }: HarnessProps) => {
+  const form = useForm<VideoFormData>({
+    defaultValues: { releasedOn: '2026-02-01', description: '', artist },
+  });
+  const onApplyVideoSuggestion = (field: VideoLevelSuggestionField, value: string): void => {
+    onApply(field, value);
+    if (field === 'featuredArtist') {
+      const current = form.getValues('artist');
+      form.setValue('artist', current ? `${current} feat. ${value}` : value);
+      return;
+    }
+    form.setValue(field, value);
+  };
   return (
     <VideoEnrichmentPanel
       videoId="v1"
       control={form.control}
-      onApplyReleaseDate={onApplyReleaseDate}
+      onApplyVideoSuggestion={onApplyVideoSuggestion}
     />
   );
 };
@@ -278,13 +320,13 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
   });
 
   it('routes the release-date apply into the form callback, never the server', async () => {
-    const onApplyReleaseDate = vi.fn();
+    const onApply = vi.fn();
     setStatus(succeededStatus);
-    render(<Harness onApplyReleaseDate={onApplyReleaseDate} />);
+    render(<Harness onApply={onApply} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Apply Release date suggestion' }));
 
-    expect(onApplyReleaseDate).toHaveBeenCalledWith('2020-06-01');
+    expect(onApply).toHaveBeenCalledWith('releasedOn', '2020-06-01');
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
   });
 
@@ -298,6 +340,58 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
       suggestionId: 's3',
       op: 'dismiss',
     });
+  });
+
+  it('routes the description apply into the form callback, never the server', async () => {
+    const onApply = vi.fn();
+    setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
+    render(<Harness onApply={onApply} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply Description suggestion' }));
+
+    expect(onApply).toHaveBeenCalledWith('description', descriptionSuggestion.value);
+    expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
+  });
+
+  it('marks the description card applied once the form holds the value', async () => {
+    setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
+    render(<Harness />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply Description suggestion' }));
+
+    const card = screen.getByTestId('video-description-suggestion');
+    expect(within(card).getByText('Applied')).toBeInTheDocument();
+  });
+
+  it('routes the featured-artist apply into the form callback, never the server', async () => {
+    const onApply = vi.fn();
+    setStatus({ ...succeededStatus, suggestions: [featuredArtistSuggestion] });
+    render(<Harness onApply={onApply} artist="Lead Act" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply Featured artist suggestion' }));
+
+    expect(onApply).toHaveBeenCalledWith('featuredArtist', 'Guest Vocalist');
+    expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
+  });
+
+  it('marks the featured-artist card applied once the name joins the artist string', async () => {
+    setStatus({ ...succeededStatus, suggestions: [featuredArtistSuggestion] });
+    render(<Harness artist="Lead Act" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply Featured artist suggestion' }));
+
+    const card = screen.getByTestId('video-featured-artist-suggestion');
+    expect(within(card).getByText('Applied')).toBeInTheDocument();
+  });
+
+  it('renders one featured-artist card per featuredArtist suggestion row', () => {
+    setStatus({
+      ...succeededStatus,
+      suggestions: [featuredArtistSuggestion, { ...featuredArtistSuggestion, id: 's6' }],
+    });
+    render(<Harness />);
+
+    expect(screen.getAllByTestId('video-featured-artist-suggestion')).toHaveLength(2);
   });
 
   it('stops Apply-all after the first apply when the server rejects', async () => {

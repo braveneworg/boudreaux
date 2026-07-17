@@ -24,6 +24,7 @@ import { useVideoQuery } from '@/app/hooks/use-video-query';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
+import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
@@ -102,7 +103,7 @@ interface EnrichmentPanelMountProps {
   videoId: string | undefined;
   category: VideoFormData['category'] | undefined;
   control: Control<VideoFormData>;
-  onApplyReleaseDate: (value: string) => void;
+  onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
 }
 
 export interface UseVideoProducersPrefillArgs {
@@ -231,14 +232,14 @@ const EnrichmentPanelMount = ({
   videoId,
   category,
   control,
-  onApplyReleaseDate,
+  onApplyVideoSuggestion,
 }: EnrichmentPanelMountProps): React.ReactElement | null =>
   videoId !== undefined && category === 'MUSIC' ? (
     <VideoEnrichmentErrorBoundary>
       <VideoEnrichmentPanel
         videoId={videoId}
         control={control}
-        onApplyReleaseDate={onApplyReleaseDate}
+        onApplyVideoSuggestion={onApplyVideoSuggestion}
       />
     </VideoEnrichmentErrorBoundary>
   ) : null;
@@ -303,10 +304,20 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     [setValue]
   );
 
-  const handleApplyReleaseDate = useCallback(
-    (value: string): void =>
-      setValue('releasedOn', value, { shouldDirty: true, shouldValidate: true }),
-    [setValue]
+  const handleApplyVideoSuggestion = useCallback(
+    (field: VideoLevelSuggestionField, value: string): void => {
+      if (field === 'featuredArtist') {
+        const parts = splitFeaturedArtists(form.getValues('artist'));
+        const [primary, ...featured] = parts;
+        const composed = primary
+          ? composeArtistString(primary.name, [...featured.map((part) => part.name), value])
+          : value;
+        setValue('artist', composed, { shouldDirty: true, shouldValidate: true });
+        return;
+      }
+      setValue(field, value, { shouldDirty: true, shouldValidate: true });
+    },
+    [form, setValue]
   );
 
   const handleApplySplit = useCallback(
@@ -404,7 +415,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
               videoId={effectiveVideoId}
               category={categoryValue}
               control={control}
-              onApplyReleaseDate={handleApplyReleaseDate}
+              onApplyVideoSuggestion={handleApplyVideoSuggestion}
             />
             <VideoPosterSection
               control={control}

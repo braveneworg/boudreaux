@@ -134,14 +134,26 @@ vi.mock('@/app/components/forms/videos/video-producers-section', () => ({
 vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
   VideoEnrichmentPanel: ({
     videoId,
-    onApplyReleaseDate,
+    onApplyVideoSuggestion,
   }: {
     videoId: string;
-    onApplyReleaseDate: (value: string) => void;
+    onApplyVideoSuggestion: (field: string, value: string) => void;
   }) => (
     <div data-testid="video-enrichment-panel" data-video-id={videoId}>
-      <button type="button" onClick={() => onApplyReleaseDate('2024-08-08')}>
+      <button type="button" onClick={() => onApplyVideoSuggestion('releasedOn', '2024-08-08')}>
         Apply enriched date
+      </button>
+      <button
+        type="button"
+        onClick={() => onApplyVideoSuggestion('description', 'Enriched description.')}
+      >
+        Apply enriched description
+      </button>
+      <button
+        type="button"
+        onClick={() => onApplyVideoSuggestion('featuredArtist', 'Guest Vocalist')}
+      >
+        Apply enriched featured artist
       </button>
     </div>
   ),
@@ -903,6 +915,48 @@ describe('VideoForm — enrichment panel mount gating', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Apply enriched date' }));
 
     await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2024-08-08'));
+  });
+
+  it('writes an applied enriched description into the form field', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched description' })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('Enriched description.')
+    );
+  });
+
+  it('appends an applied featured artist onto the existing artist string', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC', artist: 'Lead Act' });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Lead Act'));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched featured artist' })
+    );
+
+    // Primary stays put; the applied name joins as a `feat.` entry.
+    await waitFor(() =>
+      expect(screen.getByTestId('featured-artists-value')).toHaveTextContent('Guest Vocalist')
+    );
+    expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Lead Act');
+  });
+
+  it('promotes the featured artist to primary when the artist is empty', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC', artist: '' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched featured artist' })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Guest Vocalist')
+    );
   });
 
   it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
