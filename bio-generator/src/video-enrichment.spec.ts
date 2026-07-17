@@ -5,11 +5,16 @@
 import {
   confidenceFor,
   isVideoEnrichmentTask,
+  RECORDING_MIN_SCORE,
   runVideoEnrichment,
   runVideoEnrichmentLambda,
 } from './video-enrichment.js';
 
-import type { MusicBrainzArtistCandidate, MusicBrainzArtistIdentity } from './musicbrainz.js';
+import type {
+  MusicBrainzArtistCandidate,
+  MusicBrainzArtistIdentity,
+  MusicBrainzRecordingCandidate,
+} from './musicbrainz.js';
 import type { VideoEnrichmentInput } from './types.js';
 import type { VideoEnrichmentDeps } from './video-enrichment.js';
 import type { WikidataData } from './wikidata.js';
@@ -45,9 +50,21 @@ const wikidata = (overrides: Partial<WikidataData> = {}): WikidataData => ({
   ...overrides,
 });
 
+const recording = (
+  over: Partial<MusicBrainzRecordingCandidate> = {}
+): MusicBrainzRecordingCandidate => ({
+  rid: 'rec-1',
+  title: 'Song',
+  score: 97,
+  firstReleaseDate: '2019-05-01',
+  credits: [{ mbid: 'mb-1', name: 'Alpha Canonical' }],
+  ...over,
+});
+
 const buildDeps = (overrides: Partial<VideoEnrichmentDeps> = {}): VideoEnrichmentDeps => ({
   searchArtistCandidates: vi.fn().mockResolvedValue([candidate()]),
   lookupArtistIdentity: vi.fn().mockResolvedValue(identity()),
+  searchRecordingCandidates: vi.fn().mockResolvedValue([]),
   getWikidataData: vi.fn().mockResolvedValue(wikidata()),
   searchSerperWeb: vi.fn().mockResolvedValue([]),
   getGeminiApiKey: vi.fn().mockResolvedValue('gemini-key'),
@@ -71,19 +88,61 @@ const baseInput: VideoEnrichmentInput = {
 describe('confidenceFor', () => {
   it('grants high with MB >= 95 + corroboration + occupation gate', () => {
     expect(
-      confidenceFor({ score: 96, corroborated: true, occupationOk: true, singleToken: true })
+      confidenceFor({
+        score: 96,
+        corroborated: true,
+        occupationOk: true,
+        singleToken: true,
+        creditCorroborated: false,
+      })
     ).toBe('high');
   });
 
   it('caps a single-token name at medium without corroboration', () => {
     expect(
-      confidenceFor({ score: 98, corroborated: false, occupationOk: true, singleToken: true })
+      confidenceFor({
+        score: 98,
+        corroborated: false,
+        occupationOk: true,
+        singleToken: true,
+        creditCorroborated: false,
+      })
     ).toBe('medium');
   });
 
   it('caps at medium when the occupation gate fails', () => {
     expect(
-      confidenceFor({ score: 98, corroborated: true, occupationOk: false, singleToken: false })
+      confidenceFor({
+        score: 98,
+        corroborated: true,
+        occupationOk: false,
+        singleToken: false,
+        creditCorroborated: false,
+      })
+    ).toBe('medium');
+  });
+
+  it('grants high when a credit corroborates a Wikidata-corroborated fact', () => {
+    expect(
+      confidenceFor({
+        score: 60,
+        corroborated: true,
+        occupationOk: false,
+        singleToken: false,
+        creditCorroborated: true,
+      })
+    ).toBe('high');
+  });
+
+  it('keeps a single-token name at medium even when a credit corroborates it', () => {
+    expect(
+      confidenceFor({
+        score: 98,
+        corroborated: false,
+        occupationOk: true,
+        singleToken: true,
+        creditCorroborated: true,
+      })
     ).toBe('medium');
   });
 });
@@ -420,6 +479,305 @@ describe('runVideoEnrichment additional branches', () => {
       expect.anything()
     );
     vi.unstubAllEnvs();
+  });
+});
+
+describe('runVideoEnrichment recording-first', () => {
+  it('exports RECORDING_MIN_SCORE = 90', () => {
+    expect(RECORDING_MIN_SCORE).toBe(90);
+  });
+
+  it('takes the credit fast-path, skipping the artist candidate search', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          recording({ title: 'Bite Through Stone', credits: [{ mbid: 'mb-c', name: 'Ceschi' }] }),
+        ]),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    expect(deps.searchArtistCandidates).not.toHaveBeenCalled();
+    expect(deps.lookupArtistIdentity).toHaveBeenCalledWith('mb-c');
+  });
+
+  it('grants high confidence when the credit corroborates a Wikidata-backed fact', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          recording({ title: 'Bite Through Stone', credits: [{ mbid: 'mb-c', name: 'Ceschi' }] }),
+        ]),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.artists[0].suggestions).toContainEqual(
+      expect.objectContaining({ field: 'bornOn', value: '1980-01-02', confidence: 'high' })
+    );
+  });
+
+  it("ignores a recording below RECORDING_MIN_SCORE (today's flow)", async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          score: 85,
+          credits: [{ mbid: 'mb-c', name: 'Ceschi' }],
+        }),
+      ]),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    expect(deps.searchArtistCandidates).toHaveBeenCalledWith('Ceschi', 5);
+  });
+
+  it("ignores a recording whose title does not match (today's flow)", async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          recording({ title: 'A Different Song', credits: [{ mbid: 'mb-c', name: 'Ceschi' }] }),
+        ]),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    expect(deps.searchArtistCandidates).toHaveBeenCalledWith('Ceschi', 5);
+  });
+
+  it("degrades to today's flow when the recording search fails", async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi.fn().mockRejectedValue(new Error('mb down')),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(deps.searchArtistCandidates).toHaveBeenCalledWith('Ceschi', 5);
+    expect(result.artists[0].suggestions).toContainEqual(
+      expect.objectContaining({ field: 'bornOn', value: '1980-01-02' })
+    );
+  });
+
+  it('discovers a featured artist from an unmatched credit', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          credits: [
+            { mbid: 'mb-c', name: 'Ceschi' },
+            { mbid: 'mb-g', name: 'Guest MC' },
+          ],
+        }),
+      ]),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.featuredArtists).toContainEqual(
+      expect.objectContaining({
+        value: 'Guest MC',
+        confidence: 'medium',
+        sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+        note: 'Credited on the matched recording but not linked to this video.',
+      })
+    );
+  });
+
+  it('caps discovered featured artists at five', async () => {
+    const credits = [
+      { mbid: 'mb-c', name: 'Ceschi' },
+      { mbid: 'g1', name: 'Guest 1' },
+      { mbid: 'g2', name: 'Guest 2' },
+      { mbid: 'g3', name: 'Guest 3' },
+      { mbid: 'g4', name: 'Guest 4' },
+      { mbid: 'g5', name: 'Guest 5' },
+      { mbid: 'g6', name: 'Guest 6' },
+    ];
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone', credits })]),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.featuredArtists).toHaveLength(5);
+  });
+
+  it('suggests a unified display name when a multi-artist split may be wrong', async () => {
+    const input: VideoEnrichmentInput = {
+      ...baseInput,
+      artists: [
+        { artistId: 'a'.repeat(24), name: 'Ceschi', role: 'primary' },
+        { artistId: 'b'.repeat(24), name: 'Factor', role: 'featured' },
+      ],
+    };
+    const deps = buildDeps({
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          credits: [{ mbid: 'mb-duo', name: 'Ceschi & Factor' }],
+        }),
+      ]),
+    });
+
+    const result = await runVideoEnrichment(input, deps);
+
+    expect(result.artists[0].suggestions).toContainEqual(
+      expect.objectContaining({
+        field: 'displayName',
+        value: 'Ceschi & Factor',
+        confidence: 'medium',
+        note: 'MusicBrainz credits this recording to a single artist — the split may be wrong.',
+        sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+      })
+    );
+  });
+
+  it('omits the unified suggestion when the single credit matches the primary', async () => {
+    const input: VideoEnrichmentInput = {
+      ...baseInput,
+      artists: [
+        { artistId: 'a'.repeat(24), name: 'Ceschi', role: 'primary' },
+        { artistId: 'b'.repeat(24), name: 'Factor', role: 'featured' },
+      ],
+    };
+    const deps = buildDeps({
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          credits: [{ mbid: 'mb-c', name: 'Ceschi' }],
+        }),
+      ]),
+    });
+
+    const result = await runVideoEnrichment(input, deps);
+
+    const notes = result.artists[0].suggestions.map(({ note }) => note);
+    expect(notes).not.toContain(
+      'MusicBrainz credits this recording to a single artist — the split may be wrong.'
+    );
+  });
+
+  it('lets the MB full date win when the web adjudication disagrees', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue({
+        value: '2022-01-01',
+        confidence: 'medium' as const,
+        sources: [{ url: 'https://example.com/premiere' }],
+        note: 'Premiere.',
+      }),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn).toEqual({
+      value: '2019-05-01',
+      confidence: 'medium',
+      sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+    });
+  });
+
+  it('merges to high confidence when the web adjudication agrees with the MB date', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue({
+        value: '2019-05-01',
+        confidence: 'medium' as const,
+        sources: [{ url: 'https://example.com/premiere' }],
+        note: 'Premiere.',
+      }),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn).toEqual({
+      value: '2019-05-01',
+      confidence: 'high',
+      sources: [
+        { url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' },
+        { url: 'https://example.com/premiere' },
+      ],
+    });
+  });
+
+  it('emits the MB date row when the web adjudication returns null', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue(null),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn).toEqual({
+      value: '2019-05-01',
+      confidence: 'medium',
+      sources: [{ url: 'https://musicbrainz.org/recording/rec-1', label: 'MusicBrainz' }],
+    });
+  });
+
+  it('suppresses the MB date row when it equals the admin-entered date', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          recording({ title: 'Bite Through Stone', firstReleaseDate: '2021-04-09' }),
+        ]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue(null),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn).toBeUndefined();
+  });
+
+  it('falls back to the web-only date when the MB date is not a full date', async () => {
+    const releasedOn = {
+      value: '2020-06-01',
+      confidence: 'medium' as const,
+      sources: [{ url: 'https://example.com/premiere' }],
+      note: 'Premiere.',
+    };
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone', firstReleaseDate: '2019' })]),
+      resolveReleaseDateSuggestion: vi.fn().mockResolvedValue(releasedOn),
+    });
+
+    const result = await runVideoEnrichment(baseInput, deps);
+
+    expect(result.video?.releasedOn).toEqual(releasedOn);
+  });
+
+  it('folds the recording search under the musicbrainz progress stage', async () => {
+    const deps = buildDeps({
+      searchRecordingCandidates: vi
+        .fn()
+        .mockResolvedValue([recording({ title: 'Bite Through Stone' })]),
+    });
+    const input: VideoEnrichmentInput = {
+      ...baseInput,
+      progressUrl: 'https://example.com/progress',
+      jobToken: 'token-1',
+    };
+
+    await runVideoEnrichment(input, deps);
+
+    const stages = vi.mocked(deps.postProgress).mock.calls.map(([args]) => args.stage);
+    expect(stages).toEqual(
+      expect.arrayContaining(['musicbrainz', 'wikidata', 'adjudicating', 'finalizing'])
+    );
   });
 });
 
