@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   useVideoArtistReview: vi.fn(),
   buildArtistDetails: vi.fn(),
   updateDraft: vi.fn(),
+  useVideoDraft: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -98,13 +99,30 @@ vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
   useVideoArtistReview: (...args: unknown[]) => mocks.useVideoArtistReview(...args),
 }));
 
+vi.mock('@/app/components/forms/videos/use-video-draft', () => ({
+  useVideoDraft: (...args: unknown[]) => mocks.useVideoDraft(...args),
+}));
+
 vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
-  VideoArtistReviewSection: ({ entries }: { entries: { sourceName: string }[] }) =>
-    entries.length > 0 ? (
+  VideoArtistReviewSection: ({
+    entries,
+    primarySplitParts,
+    onApplySplit,
+  }: {
+    entries: { sourceName: string }[];
+    primarySplitParts: string[] | null;
+    onApplySplit: (parts: string[]) => void;
+  }) =>
+    entries.length > 0 || primarySplitParts ? (
       <div data-testid="video-artist-review-section">
         {entries.map((e) => (
           <span key={e.sourceName}>{e.sourceName}</span>
         ))}
+        {primarySplitParts ? (
+          <button type="button" onClick={() => onApplySplit(primarySplitParts)}>
+            Apply split
+          </button>
+        ) : null}
       </div>
     ) : null,
 }));
@@ -116,14 +134,26 @@ vi.mock('@/app/components/forms/videos/video-producers-section', () => ({
 vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
   VideoEnrichmentPanel: ({
     videoId,
-    onApplyReleaseDate,
+    onApplyVideoSuggestion,
   }: {
     videoId: string;
-    onApplyReleaseDate: (value: string) => void;
+    onApplyVideoSuggestion: (field: string, value: string) => void;
   }) => (
     <div data-testid="video-enrichment-panel" data-video-id={videoId}>
-      <button type="button" onClick={() => onApplyReleaseDate('2024-08-08')}>
+      <button type="button" onClick={() => onApplyVideoSuggestion('releasedOn', '2024-08-08')}>
         Apply enriched date
+      </button>
+      <button
+        type="button"
+        onClick={() => onApplyVideoSuggestion('description', 'Enriched description.')}
+      >
+        Apply enriched description
+      </button>
+      <button
+        type="button"
+        onClick={() => onApplyVideoSuggestion('featuredArtist', 'Guest Vocalist')}
+      >
+        Apply enriched featured artist
       </button>
     </div>
   ),
@@ -178,6 +208,7 @@ vi.mock('@/app/components/forms/fields/artist-search-combobox', () => ({
 vi.mock('@/app/components/forms/fields/featured-artists-combobox', () => ({
   FeaturedArtistsCombobox: ({
     label,
+    value,
     disabled,
   }: {
     label?: string;
@@ -188,6 +219,7 @@ vi.mock('@/app/components/forms/fields/featured-artists-combobox', () => ({
     <div>
       {label && <span>{label}</span>}
       {disabled && <span>Add a primary artist first</span>}
+      <span data-testid="featured-artists-value">{value.join(', ')}</span>
     </div>
   ),
 }));
@@ -236,6 +268,7 @@ beforeEach(() => {
     updateDraft: mocks.updateDraft,
     buildArtistDetails: mocks.buildArtistDetails,
   });
+  mocks.useVideoDraft.mockReturnValue({ draftId: null, handleUploadComplete: vi.fn() });
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
     fields: {},
@@ -583,6 +616,30 @@ describe('VideoForm — create submit', () => {
   });
 });
 
+describe('VideoForm — draft-mode submit', () => {
+  it('updates the draft row and returns to the admin list after a draft flip', async () => {
+    // A draft row already exists from the upload-complete flip.
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'draft-video-id' })
+      )
+    );
+    expect(mocks.push).toHaveBeenCalledWith('/admin/videos');
+  });
+});
+
 describe('VideoForm — edit mode', () => {
   const asEditMode = () =>
     mocks.useVideoQuery.mockReturnValue({
@@ -860,6 +917,48 @@ describe('VideoForm — enrichment panel mount gating', () => {
     await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2024-08-08'));
   });
 
+  it('writes an applied enriched description into the form field', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched description' })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('Enriched description.')
+    );
+  });
+
+  it('appends an applied featured artist onto the existing artist string', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC', artist: 'Lead Act' });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Lead Act'));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched featured artist' })
+    );
+
+    // Primary stays put; the applied name joins as a `feat.` entry.
+    await waitFor(() =>
+      expect(screen.getByTestId('featured-artists-value')).toHaveTextContent('Guest Vocalist')
+    );
+    expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Lead Act');
+  });
+
+  it('promotes the featured artist to primary when the artist is empty', async () => {
+    asVideo({ ...editVideo, category: 'MUSIC', artist: '' });
+    render(<VideoForm videoId="v1" />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Apply enriched featured artist' })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Guest Vocalist')
+    );
+  });
+
   it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
     asVideo(editVideo);
     render(<VideoForm videoId="v1" />);
@@ -872,6 +971,20 @@ describe('VideoForm — enrichment panel mount gating', () => {
     render(<VideoForm />);
 
     expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+  });
+
+  it('mounts the panel in create mode once a draft row exists (MUSIC)', async () => {
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+    });
+    render(<VideoForm />);
+
+    // Default category is MUSIC; the draft id now stands in as the row id.
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'draft-video-id'
+    );
   });
 });
 
@@ -1105,6 +1218,27 @@ describe('VideoForm — artist review section (B6)', () => {
     await user.type(screen.getByLabelText('Artist / Creator'), 'Ceschi');
 
     expect(mocks.useVideoArtistReview).toHaveBeenCalledWith(expect.stringContaining('Ceschi'));
+  });
+
+  // Test 6b: applying a primary split rewrites the artist field
+  it('rewrites the artist field to feat.-joined parts when Apply split is clicked', async () => {
+    mocks.useVideoArtistReview.mockReturnValue({
+      entries: [],
+      updateDraft: mocks.updateDraft,
+      buildArtistDetails: mocks.buildArtistDetails,
+      primarySplitParts: ['Alpha', 'Bravo'],
+    });
+    const user = userEvent.setup();
+    render(<VideoForm />);
+
+    fireEvent.change(screen.getByLabelText('Artist / Creator'), {
+      target: { value: 'Alpha & Bravo' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Apply split' }));
+
+    // The rewrite makes the first part primary and the rest featured.
+    expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Alpha');
+    expect(screen.getByTestId('featured-artists-value')).toHaveTextContent('Bravo');
   });
 
   // Test 7: submit with non-empty artistDetails includes them in the payload

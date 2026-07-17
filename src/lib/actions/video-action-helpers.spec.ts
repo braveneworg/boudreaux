@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -10,6 +11,7 @@ import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import {
+  artistDetailsDiffer,
   buildVideoCreateInput,
   buildVideoUpdateInput,
   confirmVideoUpload,
@@ -66,6 +68,10 @@ beforeEach(() => {
   vi.mocked(verifyS3ObjectExists).mockResolvedValue(true);
   vi.mocked(deleteS3Object).mockResolvedValue(true);
   vi.mocked(extractS3KeyFromUrl).mockReturnValue(ownPosterKey);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('confirmVideoUpload', () => {
@@ -265,6 +271,37 @@ describe('VIDEO_PERMITTED_FIELD_NAMES', () => {
   });
 });
 
+describe('artistDetailsDiffer', () => {
+  const row = (over: Partial<VideoArtistWithArtist['artist']> = {}): VideoArtistWithArtist =>
+    ({
+      artistId: 'a1',
+      role: 'PRIMARY',
+      artist: {
+        firstName: 'Alpha',
+        middleName: null,
+        surname: 'Beta',
+        displayName: 'Alpha Beta',
+        akaNames: null,
+        bornOn: null,
+        ...over,
+      },
+    }) as VideoArtistWithArtist;
+
+  it('is false when every detail matches the linked artist', () => {
+    const details = [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }];
+    expect(artistDetailsDiffer(details, [row()])).toBe(false);
+  });
+
+  it('is true when a provided part differs', () => {
+    const details = [{ sourceName: 'Alpha Beta', firstName: 'Changed' }];
+    expect(artistDetailsDiffer(details, [row()])).toBe(true);
+  });
+
+  it('is true when the source name matches no linked artist', () => {
+    expect(artistDetailsDiffer([{ sourceName: 'Nobody' }], [row()])).toBe(true);
+  });
+});
+
 describe('kickPostSaveEnrichment', () => {
   const kickInput = {
     videoId,
@@ -375,6 +412,30 @@ describe('kickPostSaveEnrichment', () => {
 
     expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
   });
+
+  it('skips artist sync and enrichment when the artist is blank', async () => {
+    await kickPostSaveEnrichment({
+      videoId: 'v1',
+      artist: '   ',
+      category: 'MUSIC',
+      reProbe: true,
+    });
+    expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
+    expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith('v1');
+  });
+
+  it('still syncs and dispatches when the artist is non-blank', async () => {
+    await kickPostSaveEnrichment({
+      videoId: 'v1',
+      artist: 'Ceschi',
+      category: 'MUSIC',
+      reProbe: false,
+    });
+    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith('v1', 'Ceschi', undefined);
+    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith('v1');
+    expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
+  });
 });
 
 describe('syncVideoProducersAfterSave', () => {
@@ -421,5 +482,18 @@ describe('syncVideoProducersAfterSave', () => {
     await expect(
       syncVideoProducersAfterSave({ videoId, producers: [{ name: 'Bad' }] })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('confirmVideoUpload — E2E mode', () => {
+  it('confirms without an S3 HEAD in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    await expect(confirmVideoUpload('media/videos/v1/x.mp4', 'v1')).resolves.toBeNull();
+    expect(verifyS3ObjectExists).not.toHaveBeenCalled();
+  });
+
+  it('still rejects a wrong-namespace key in E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    await expect(confirmVideoUpload('media/other/x.mp4', 'v1')).resolves.toMatch(/Invalid S3 key/);
   });
 });

@@ -34,6 +34,20 @@ const setup = (): ReturnType<typeof renderHook<ReturnType<typeof useVideoUpload>
   );
 };
 
+const setupWithCallback = (
+  onUploadComplete: () => void
+): ReturnType<typeof renderHook<ReturnType<typeof useVideoUpload>, void>> => {
+  const form = { setValue: vi.fn() } as unknown as UseFormReturn<VideoFormData>;
+  return renderHook(() =>
+    useVideoUpload({
+      preGeneratedId: PRE_GENERATED_ID,
+      form,
+      onPosterCandidate: vi.fn(),
+      onUploadComplete,
+    })
+  );
+};
+
 const videoFile = (): File => new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' });
 
 describe('useVideoUpload — unmount', () => {
@@ -56,5 +70,39 @@ describe('useVideoUpload — unmount', () => {
     unmount();
 
     expect(capturedSignal?.aborted).toBe(true);
+  });
+});
+
+describe('useVideoUpload — onUploadComplete callback', () => {
+  it('fires onUploadComplete once after a successful upload', async () => {
+    vi.mocked(uploadVideoMultipart).mockResolvedValue({
+      success: true,
+      s3Key: 'media/videos/x/clip.mp4',
+      fileSize: 2048,
+    });
+    const onUploadComplete = vi.fn();
+
+    const { result } = setupWithCallback(onUploadComplete);
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+
+    await waitFor(() => expect(onUploadComplete).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not fire onUploadComplete when the upload fails', async () => {
+    vi.mocked(uploadVideoMultipart).mockResolvedValue({
+      success: false,
+      error: 'Network exploded',
+    });
+    const onUploadComplete = vi.fn();
+
+    const { result } = setupWithCallback(onUploadComplete);
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(onUploadComplete).not.toHaveBeenCalled();
   });
 });

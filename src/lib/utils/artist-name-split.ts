@@ -9,13 +9,21 @@ export interface SplitArtistName {
 }
 
 /**
- * Matches a featuring separator as its own word: `feat.`, `ft.`, or `featuring`
- * (case-insensitive), optionally preceded by an opening `(`/`[`, always followed
- * by whitespace. The leading `\b` blocks mid-word hits ("Featurecast",
- * "The Featherlights", "Loftft."). Ambiguous separators (`&`, `x`, `,`, `+`)
- * are deliberately never split on — precision over recall.
+ * Matches a featuring separator as its own word: `feat`/`ft` (dot optional),
+ * `featuring`, or `w/ ` (case-insensitive), optionally preceded by an opening
+ * `(`/`[`. The leading `\b` blocks mid-word hits ("Featurecast", "Daft");
+ * `w/` requires trailing whitespace so `w/o` never splits. Ambiguous joiners
+ * (`&`, `x`, `,`, `+`) are still never split on here — see
+ * {@link splitNameCandidates} for the candidates-only path.
  */
-const FEAT_SEPARATOR = /\s*[([]?\s*\b(?:feat\.|ft\.|featuring\b)\s+/gi;
+const FEAT_SEPARATOR = /\s*[([]?\s*(?:\b(?:feat|ft)\.?\s+|\bfeaturing\s+|\bw\/\s+)/gi;
+
+/**
+ * Joiners that MAY separate multiple artists (also live inside band names).
+ * The `i` flag makes the ` x ` joiner case-insensitive; `g` is harmless here
+ * ({@link String.prototype.split} ignores it) and kept only for consistency.
+ */
+const NAME_CANDIDATE_SEPARATOR = /\s*,\s*|\s+&\s+|\s+x\s+/gi;
 
 /** Strip a trailing `)`/`]` left behind when the token was bracket-wrapped, then trim. */
 const cleanSegment = (segment: string): string => segment.replace(/[)\]]+\s*$/, '').trim();
@@ -60,4 +68,18 @@ export const composeArtistString = (primary: string, featured: string[]): string
   if (base === '') return '';
   const extras = featured.map((name) => name.trim()).filter((name) => name !== '');
   return extras.reduce((acc, name) => `${acc} feat. ${name}`, base);
+};
+
+/**
+ * Candidate multi-artist split of one name on `", "`, `" & "`, or `" x "`.
+ * Returns the trimmed parts when there are 2+, else `[]`. Candidates only:
+ * the canonical splitter never uses this (a legit band name may contain the
+ * joiner), so callers must surface the split for explicit review.
+ */
+export const splitNameCandidates = (name: string): string[] => {
+  const parts = name
+    .split(NAME_CANDIDATE_SEPARATOR)
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+  return parts.length > 1 ? parts : [];
 };

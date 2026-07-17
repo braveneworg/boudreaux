@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
+import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -41,13 +42,13 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
 ];
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
-const parseDurationSeconds = (value: string | number | undefined): number | undefined => {
+export const parseDurationSeconds = (value: string | number | undefined): number | undefined => {
   if (value === undefined || value === '') return undefined;
   return typeof value === 'number' ? value : parseInt(value, 10);
 };
 
 /** Coerce a string-or-number byte count to a `bigint`, or `undefined`. */
-const parseFileSize = (value: string | number | undefined): bigint | undefined => {
+export const parseFileSize = (value: string | number | undefined): bigint | undefined => {
   if (value === undefined || value === '') return undefined;
   return BigInt(value);
 };
@@ -65,6 +66,8 @@ export const confirmVideoUpload = async (
   if (videoId === undefined || isInvalidS3Key(s3Key, expectedPrefix)) {
     return `Invalid S3 key: must start with ${expectedPrefix}`;
   }
+  // E2E runs without S3 — the namespace check above still guards the key shape.
+  if (process.env.E2E_MODE === 'true') return null;
   const exists = await verifyS3ObjectExists(s3Key);
   if (!exists) {
     return 'File not found in S3 storage. Upload may have failed.';
@@ -158,6 +161,36 @@ const logger = loggers.media;
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+/** The linked artist's matchable display name (mirrors the enrichment service). */
+const linkedNameFor = (row: VideoArtistWithArtist): string =>
+  (
+    row.artist.displayName?.trim() || `${row.artist.firstName} ${row.artist.surname}`.trim()
+  ).toLowerCase();
+
+/** True when one provided part differs from the stored value (undefined = not provided). */
+const detailPartDiffers = (stored: string | null, provided: string | undefined): boolean =>
+  provided !== undefined && (stored ?? '').trim() !== provided.trim();
+
+/**
+ * True when any admin-reviewed artist detail actually differs from the linked
+ * artists' stored name parts (an unmatched sourceName counts as a change).
+ * Lets the update action skip re-kicking enrichment for a no-op save.
+ */
+export const artistDetailsDiffer = (
+  details: VideoArtistDetail[],
+  rows: VideoArtistWithArtist[]
+): boolean =>
+  details.some((detail) => {
+    const match = rows.find((row) => linkedNameFor(row) === detail.sourceName.trim().toLowerCase());
+    if (!match) return true;
+    return (
+      detailPartDiffers(match.artist.firstName, detail.firstName) ||
+      detailPartDiffers(match.artist.middleName, detail.middleName) ||
+      detailPartDiffers(match.artist.surname, detail.surname) ||
+      detailPartDiffers(match.artist.displayName, detail.displayName)
+    );
+  });
+
 /** Input for the post-save enrichment kick (runs inside `after()`). */
 export interface KickPostSaveEnrichmentInput {
   videoId: string;
@@ -178,6 +211,11 @@ export interface KickPostSaveEnrichmentInput {
  * admin's already-successful save can never be failed retroactively by
  * background work.
  *
+ * When `artist` is blank (e.g. a draft row created before the admin typed one),
+ * the artist-sync and enrichment-dispatch stages are skipped entirely — no
+ * "Unknown Artist" shell is ever minted. The probe stage still runs regardless
+ * of whether an artist is present.
+ *
  * Producer sync is intentionally NOT performed here — see
  * {@link syncVideoProducersAfterSave} which runs in a separate `after()` call
  * so that clearing all producers (producers: []) is always persisted regardless
@@ -190,10 +228,14 @@ export const kickPostSaveEnrichment = async ({
   reProbe,
   artistDetails,
 }: KickPostSaveEnrichmentInput): Promise<void> => {
-  try {
-    await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
-  } catch (error) {
-    logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+  const hasArtist = artist.trim() !== '';
+
+  if (hasArtist) {
+    try {
+      await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
+    } catch (error) {
+      logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
+    }
   }
 
   if (reProbe) {
@@ -204,7 +246,7 @@ export const kickPostSaveEnrichment = async ({
     }
   }
 
-  if (category === 'MUSIC') {
+  if (category === 'MUSIC' && hasArtist) {
     try {
       await VideoEnrichmentService.runEnrichmentJob(videoId);
     } catch (error) {

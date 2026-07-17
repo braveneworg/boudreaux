@@ -7,6 +7,7 @@ import {
   ENRICHMENT_STATUSES,
   isInFlightEnrichmentStatus,
   STALE_JOB_MS,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_PROGRESS_STAGES,
   VIDEO_SUGGESTION_FIELDS,
   videoEnrichmentCallbackSchema,
@@ -48,7 +49,13 @@ describe('video-enrichment-schema', () => {
       'bornOn',
       'displayName',
       'releasedOn',
+      'description',
+      'featuredArtist',
     ]);
+  });
+
+  it('pins the video-level (client-applied) field whitelist', () => {
+    expect(VIDEO_LEVEL_SUGGESTION_FIELDS).toEqual(['releasedOn', 'description', 'featuredArtist']);
   });
 
   it('pins the enrichment lifecycle statuses', () => {
@@ -151,6 +158,60 @@ describe('video-enrichment-schema', () => {
         suggestions: [validSuggestion],
       }));
       expect(videoEnrichmentDataSchema.safeParse({ ...validData, artists }).success).toBe(false);
+    });
+
+    it('accepts a video-level description and two featured artists', () => {
+      const parsed = videoEnrichmentDataSchema.safeParse({
+        ...validData,
+        video: {
+          ...validData.video,
+          description: {
+            value: 'x'.repeat(600),
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+          featuredArtists: [
+            {
+              value: 'Sole',
+              confidence: 'medium',
+              sources: [{ url: 'https://musicbrainz.org/artist/y' }],
+            },
+            {
+              value: 'Buck 65',
+              confidence: 'low',
+              sources: [{ url: 'https://musicbrainz.org/artist/z' }],
+            },
+          ],
+        },
+      });
+      expect(parsed.success).toBe(true);
+    });
+
+    it('rejects a 2001-character video description', () => {
+      const parsed = videoEnrichmentDataSchema.safeParse({
+        ...validData,
+        video: {
+          description: {
+            value: 'x'.repeat(2001),
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it('rejects a sixth featured artist', () => {
+      const featuredArtists = Array.from({ length: 6 }, (_, i) => ({
+        value: `Feature ${i}`,
+        confidence: 'medium' as const,
+        sources: [{ url: `https://musicbrainz.org/artist/${i}` }],
+      }));
+      const parsed = videoEnrichmentDataSchema.safeParse({
+        ...validData,
+        video: { featuredArtists },
+      });
+      expect(parsed.success).toBe(false);
     });
   });
 

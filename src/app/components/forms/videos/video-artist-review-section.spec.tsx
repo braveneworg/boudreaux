@@ -51,10 +51,77 @@ const NEW_ENTRY: VideoArtistReviewEntry = {
 // ── Test 1: empty entries renders nothing ──────────────────────────────────────
 
 describe('VideoArtistReviewSection — empty entries', () => {
-  it('renders nothing when entries is empty', () => {
-    const { container } = render(<VideoArtistReviewSection entries={[]} updateDraft={vi.fn()} />);
+  it('renders nothing when entries is empty and there are no split parts', () => {
+    const { container } = render(
+      <VideoArtistReviewSection
+        entries={[]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+// ── Test 1b: primary-split hint ────────────────────────────────────────────────
+
+describe('VideoArtistReviewSection — primary split hint', () => {
+  it('renders a hint card with the joined split candidates', () => {
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={['Alpha', 'Bravo']}
+        onApplySplit={vi.fn()}
+      />
+    );
+
+    const hint = screen.getByRole('note');
+    expect(hint).toHaveTextContent('Multiple artists? Split as Alpha + Bravo');
+  });
+
+  it('calls onApplySplit with the parts when Apply split is clicked', () => {
+    const onApplySplit = vi.fn();
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={['Alpha', 'Bravo']}
+        onApplySplit={onApplySplit}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /apply split/i }));
+
+    expect(onApplySplit).toHaveBeenCalledWith(['Alpha', 'Bravo']);
+  });
+
+  it('renders no hint card when primarySplitParts is null', () => {
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  it('renders the hint even when there are no entries', () => {
+    render(
+      <VideoArtistReviewSection
+        entries={[]}
+        updateDraft={vi.fn()}
+        primarySplitParts={['Alpha', 'Bravo']}
+        onApplySplit={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('note')).toBeInTheDocument();
   });
 });
 
@@ -62,7 +129,14 @@ describe('VideoArtistReviewSection — empty entries', () => {
 
 describe('VideoArtistReviewSection — matched entry', () => {
   it('shows chip text "Links to existing artist Jane Doe" with a link to the artist page', () => {
-    render(<VideoArtistReviewSection entries={[MATCHED_ENTRY]} updateDraft={vi.fn()} />);
+    render(
+      <VideoArtistReviewSection
+        entries={[MATCHED_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
 
     expect(screen.getByText(/links to existing artist jane doe/i)).toBeInTheDocument();
     expect(
@@ -72,7 +146,12 @@ describe('VideoArtistReviewSection — matched entry', () => {
 
   it('falls back to "First Surname" when displayName is null', () => {
     render(
-      <VideoArtistReviewSection entries={[MATCHED_ENTRY_NO_DISPLAY_NAME]} updateDraft={vi.fn()} />
+      <VideoArtistReviewSection
+        entries={[MATCHED_ENTRY_NO_DISPLAY_NAME]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
     );
 
     expect(screen.getByText(/links to existing artist bob smith/i)).toBeInTheDocument();
@@ -86,7 +165,14 @@ describe('VideoArtistReviewSection — matched entry', () => {
 
 describe('VideoArtistReviewSection — new entry', () => {
   it('renders four inputs prefilled from the draft', () => {
-    render(<VideoArtistReviewSection entries={[NEW_ENTRY]} updateDraft={vi.fn()} />);
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
 
     expect(screen.getByDisplayValue('Zora')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Quill')).toBeInTheDocument();
@@ -96,7 +182,14 @@ describe('VideoArtistReviewSection — new entry', () => {
 
   it('calls updateDraft with the sourceName and { middleName } when the middle name input changes', () => {
     const updateDraft = vi.fn();
-    render(<VideoArtistReviewSection entries={[NEW_ENTRY]} updateDraft={updateDraft} />);
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={updateDraft}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
 
     const middleInput = screen.getByRole('textbox', { name: /middle name/i });
     fireEvent.change(middleInput, { target: { value: 'Q.' } });
@@ -109,7 +202,14 @@ describe('VideoArtistReviewSection — new entry', () => {
 
 describe('VideoArtistReviewSection — label association', () => {
   it('makes all four inputs accessible by role + name', () => {
-    render(<VideoArtistReviewSection entries={[NEW_ENTRY]} updateDraft={vi.fn()} />);
+    render(
+      <VideoArtistReviewSection
+        entries={[NEW_ENTRY]}
+        updateDraft={vi.fn()}
+        primarySplitParts={null}
+        onApplySplit={vi.fn()}
+      />
+    );
 
     expect(screen.getByRole('textbox', { name: /first name/i })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /middle name/i })).toBeInTheDocument();

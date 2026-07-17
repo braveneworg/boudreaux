@@ -315,6 +315,8 @@ export const videoSuggestionSchema = z.object({
     'bornOn',
     'displayName',
     'releasedOn',
+    'description',
+    'featuredArtist',
   ]),
   value: z.string().min(1).max(500),
   confidence: z.enum(['high', 'medium', 'low']),
@@ -323,6 +325,23 @@ export const videoSuggestionSchema = z.object({
 });
 
 export type VideoSuggestion = z.infer<typeof videoSuggestionSchema>;
+
+/**
+ * A video-level suggestion — the fielded suggestion shape without its `field`
+ * discriminator (the `video` object keys it by position instead). Backs the
+ * release date and each discovered featured artist. Mirrors the web's
+ * `videoLevelSuggestionSchema` — keep in lockstep.
+ */
+const videoLevelSuggestionSchema = videoSuggestionSchema.omit({ field: true });
+
+/**
+ * A synthesized video description (2–4 sentences). Widens the base 500-char
+ * value cap to 2000 — long-form prose, unlike the short fielded facts. Mirrors
+ * the web's `videoDescriptionSuggestionSchema` — keep in lockstep.
+ */
+const videoDescriptionSuggestionSchema = videoLevelSuggestionSchema.extend({
+  value: z.string().min(1).max(2000),
+});
 
 /** The successful video-enrichment payload (mirrors the web schema). */
 export const videoEnrichmentDataSchema = z.object({
@@ -335,7 +354,11 @@ export const videoEnrichmentDataSchema = z.object({
     )
     .max(10),
   video: z
-    .object({ releasedOn: videoSuggestionSchema.omit({ field: true }).optional() })
+    .object({
+      releasedOn: videoLevelSuggestionSchema.optional(),
+      description: videoDescriptionSuggestionSchema.optional(),
+      featuredArtists: z.array(videoLevelSuggestionSchema).max(5).optional(),
+    })
     .optional(),
   model: z.string().max(100),
 });

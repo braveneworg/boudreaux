@@ -81,6 +81,7 @@ const baseState = (overrides: Partial<VideoEnrichmentState> = {}): VideoEnrichme
   artist: 'Ceschi',
   title: 'Bite Through Stone',
   releasedOn: new Date('2021-04-09T00:00:00.000Z'),
+  description: null,
   s3Key: 'media/videos/abc.mp4',
   ...overrides,
 });
@@ -820,6 +821,139 @@ describe('completeCallback', () => {
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
       expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2020-06-01' }),
     ]);
+  });
+
+  it('persists description and featuredArtist rows from the callback', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'A fresh synthesized description of the track.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+          featuredArtists: [
+            {
+              value: 'New Name',
+              confidence: 'medium',
+              sources: [{ url: 'https://musicbrainz.org/artist/y' }],
+            },
+          ],
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({
+        artistId: null,
+        field: 'description',
+        value: 'A fresh synthesized description of the track.',
+      }),
+      expect.objectContaining({ artistId: null, field: 'featuredArtist', value: 'New Name' }),
+    ]);
+  });
+
+  it('drops a description equal to the stored one (case-insensitive)', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ description: 'An Existing Description.' })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'AN EXISTING DESCRIPTION.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops featured artists already linked or already in the artist string', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([
+      { name: 'Ceschi', role: 'primary' },
+      { name: 'Sole', role: 'featured' },
+    ]);
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({
+        artist: {
+          displayName: 'Buck 65',
+          firstName: 'Rich',
+          middleName: null,
+          surname: 'Terfry',
+          akaNames: null,
+          bornOn: null,
+        },
+      }),
+    ]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          featuredArtists: [
+            { value: 'Buck 65', confidence: 'medium', sources: [] }, // already linked
+            { value: 'sole', confidence: 'medium', sources: [] }, // already in artist string
+            {
+              value: 'New Guest',
+              confidence: 'medium',
+              sources: [{ url: 'https://musicbrainz.org/artist/y' }],
+            },
+          ],
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({ artistId: null, field: 'featuredArtist', value: 'New Guest' }),
+    ]);
+  });
+
+  it('fences previously applied/dismissed video-level facts', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+    vi.mocked(VideoEnrichmentSuggestionRepository.findExistingFacts).mockResolvedValue([
+      { artistId: null, field: 'description', value: 'A synthesized description.' },
+      { artistId: null, field: 'featuredArtist', value: 'New Name' },
+    ]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'A synthesized description.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+          featuredArtists: [
+            {
+              value: 'New Name',
+              confidence: 'medium',
+              sources: [{ url: 'https://musicbrainz.org/artist/y' }],
+            },
+          ],
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('flips to failed when persistence throws', async () => {

@@ -88,7 +88,7 @@ const evidenceLines = (results: SerperWebResult[]): string =>
     .join('\n');
 
 /** Keep only URLs Gemini was actually shown (subset enforcement, post-parse). */
-const enforceSourceSubset = (urls: string[], provided: Set<string>): string[] =>
+export const enforceSourceSubset = (urls: string[], provided: Set<string>): string[] =>
   urls.filter((url) => provided.has(url));
 
 const SHARED_SYSTEM_LINES = [
@@ -98,12 +98,12 @@ const SHARED_SYSTEM_LINES = [
 ];
 
 /** A Zod schema that parses an adjudication body of type `T`. */
-interface AdjudicationSchema<T> {
+export interface AdjudicationSchema<T> {
   parse: (value: unknown) => T;
 }
 
 /** One adjudication run's inputs: its schema, prompts, and Gemini config. */
-interface AdjudicationRun<T> {
+export interface AdjudicationRun<T> {
   queries: string[];
   serperKey: string;
   geminiKey: string;
@@ -115,7 +115,7 @@ interface AdjudicationRun<T> {
 }
 
 /** The parsed adjudication plus the evidence-link allowlist for subset checks. */
-interface AdjudicationOutcome<T> {
+export interface AdjudicationOutcome<T> {
   parsed: T;
   provided: Set<string>;
 }
@@ -127,7 +127,7 @@ interface AdjudicationOutcome<T> {
  * was found. Keeps the endpoint/auth/retry/JSON parsing identical across both
  * adjudications and holds each public entry point under the complexity cap.
  */
-const adjudicate = async <T>(
+export const adjudicate = async <T>(
   run: AdjudicationRun<T>,
   { searchWeb = searchSerperWeb, requestJson = requestGeminiJson, fetchOptions }: AdjudicationDeps
 ): Promise<AdjudicationOutcome<T> | null> => {

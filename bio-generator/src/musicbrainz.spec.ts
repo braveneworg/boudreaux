@@ -7,6 +7,7 @@ import {
   lookupArtist,
   lookupArtistIdentity,
   searchArtistCandidates,
+  searchRecordingCandidates,
 } from './musicbrainz.js';
 
 const jsonResponse = (body: unknown): Response =>
@@ -373,5 +374,150 @@ describe('lookupArtistIdentity', () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+describe('searchRecordingCandidates', () => {
+  const recordingsBody = {
+    recordings: [
+      {
+        id: 'rec-1',
+        title: 'Song',
+        score: 100,
+        'first-release-date': '2021-04-09',
+        'artist-credit': [
+          { name: 'Alpha', artist: { id: 'artist-1', name: 'Alpha' } },
+          { name: 'B', artist: { id: 'artist-2', name: 'Beta' } },
+        ],
+      },
+    ],
+  };
+
+  it('builds a quoted recording+artist Lucene query in the search URL', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(recordingsBody)));
+
+    await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const url = String(fetchFn.mock.calls[0][0]);
+    expect(url).toContain(encodeURIComponent('recording:"Song"'));
+    expect(url).toContain(encodeURIComponent('artist:"Alpha"'));
+  });
+
+  it('maps recordings to candidates with credited artist names and mbids', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(recordingsBody)));
+
+    const result = await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result).toEqual([
+      {
+        rid: 'rec-1',
+        title: 'Song',
+        score: 100,
+        firstReleaseDate: '2021-04-09',
+        credits: [
+          { mbid: 'artist-1', name: 'Alpha' },
+          { mbid: 'artist-2', name: 'Beta' },
+        ],
+      },
+    ]);
+  });
+
+  it('falls back to the credit-level name when the artist object is absent', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          recordings: [
+            {
+              id: 'rec-2',
+              title: 'Song',
+              score: 88,
+              'first-release-date': '2020-01-01',
+              'artist-credit': [{ name: 'Featured Guest' }],
+            },
+          ],
+        })
+      )
+    );
+
+    const result = await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result[0].credits).toEqual([{ mbid: null, name: 'Featured Guest' }]);
+  });
+
+  it('trims an empty first-release-date to null', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          recordings: [
+            {
+              id: 'rec-3',
+              title: 'Song',
+              score: 50,
+              'first-release-date': '',
+              'artist-credit': [],
+            },
+          ],
+        })
+      )
+    );
+
+    const result = await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result[0].firstReleaseDate).toBeNull();
+  });
+
+  it('defaults firstReleaseDate to null when the field is missing', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          recordings: [{ id: 'rec-4', title: 'Song', score: 50, 'artist-credit': [] }],
+        })
+      )
+    );
+
+    const result = await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(result[0].firstReleaseDate).toBeNull();
+  });
+
+  it('escapes embedded quotes in the query terms before encoding', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ recordings: [] })));
+
+    await searchRecordingCandidates('Al"pha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const url = String(fetchFn.mock.calls[0][0]);
+    expect(url).toContain(encodeURIComponent('artist:"Al\\"pha"'));
+  });
+
+  it('sleeps the MusicBrainz rate limit before the request', async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ recordings: [] })));
+
+    await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, { sleep });
+
+    expect(sleep).toHaveBeenCalledWith(1100);
+  });
+
+  it('resolves to an empty list on a failed request', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 503 }));
+
+    const result = await searchRecordingCandidates('Alpha', 'Song', 5, fetchFn, {
+      sleep: vi.fn().mockResolvedValue(undefined),
+      retries: 0,
+    });
+
+    expect(result).toEqual([]);
   });
 });

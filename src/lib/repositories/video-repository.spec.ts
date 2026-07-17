@@ -687,6 +687,7 @@ describe('VideoRepository', () => {
           artist: true,
           title: true,
           releasedOn: true,
+          description: true,
           s3Key: true,
         },
       });

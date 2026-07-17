@@ -27,6 +27,8 @@ interface UseVideoUploadArgs {
   form: UseFormReturn<VideoFormData>;
   /** Receives the poster frame captured from a freshly-selected file (or null). */
   onPosterCandidate: (poster: Blob | null) => void;
+  /** Fired once after the hidden fields are written on a successful upload. */
+  onUploadComplete?: () => void;
 }
 
 export interface UseVideoUploadResult {
@@ -43,6 +45,7 @@ interface ApplyResultDeps {
   form: UseFormReturn<VideoFormData>;
   setStatus: (status: VideoUploadStatus) => void;
   setErrorMessage: (message: string | null) => void;
+  onUploadComplete?: () => void;
 }
 
 /** Write the hidden fields the create/update schema requires from a successful upload. */
@@ -64,11 +67,12 @@ const writeUploadedFields = (
 const applyUploadResult = (
   result: MultipartUploadSuccess | MultipartUploadFailure,
   file: File,
-  { form, setStatus, setErrorMessage }: ApplyResultDeps
+  { form, setStatus, setErrorMessage, onUploadComplete }: ApplyResultDeps
 ): void => {
   if (result.success) {
     writeUploadedFields(form, result, file);
     setStatus('success');
+    onUploadComplete?.();
     return;
   }
   if (result.aborted) {
@@ -90,6 +94,7 @@ export const useVideoUpload = ({
   preGeneratedId,
   form,
   onPosterCandidate,
+  onUploadComplete,
 }: UseVideoUploadArgs): UseVideoUploadResult => {
   const [status, setStatus] = useState<VideoUploadStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -114,9 +119,9 @@ export const useVideoUpload = ({
         onProgress: (fraction) => setProgress(Math.round(fraction * 100)),
         signal: controller.signal,
       });
-      applyUploadResult(result, file, { form, setStatus, setErrorMessage });
+      applyUploadResult(result, file, { form, setStatus, setErrorMessage, onUploadComplete });
     },
-    [preGeneratedId, form]
+    [preGeneratedId, form, onUploadComplete]
   );
 
   const runSelect = useCallback(

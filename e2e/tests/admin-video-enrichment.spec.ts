@@ -65,6 +65,25 @@ test.describe('Admin video enrichment', () => {
       panel.getByTestId('video-release-date-suggestion').getByText('2020-06-01')
     ).toBeVisible();
 
+    // The fixture also emits video-level description + featured-artist cards.
+    const descriptionCard = panel.getByTestId('video-description-suggestion');
+    const featuredCard = panel.getByTestId('video-featured-artist-suggestion');
+    await expect(descriptionCard).toBeVisible();
+    await expect(featuredCard).toBeVisible();
+
+    // Applying the description writes it into the mounted form (client-only —
+    // video-level applies never hit the server) and flips the card to Applied.
+    await descriptionCard.getByRole('button', { name: 'Apply Description suggestion' }).click();
+    await expect(adminPage.getByLabel('Description')).toHaveValue(/deterministic E2E description/);
+    await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
+
+    // Dismissing the featured-artist card IS server-side for video-level fields;
+    // the row collapses to its muted dismissed one-liner.
+    await featuredCard.getByRole('button', { name: 'Dismiss Featured artist suggestion' }).click();
+    await expect(featuredCard.getByText('Featured artist: Dismissed')).toBeVisible({
+      timeout: 15_000,
+    });
+
     // Apply the lead's bornOn (pessimistic — the row flips only after the
     // server confirms and the status refetch lands).
     await leadCard.getByRole('button', { name: 'Apply Born on suggestion' }).click();

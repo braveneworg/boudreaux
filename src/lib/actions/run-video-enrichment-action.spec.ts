@@ -48,6 +48,7 @@ const baseState = (overrides: Partial<VideoEnrichmentState> = {}): VideoEnrichme
   artist: 'Ceschi',
   title: 'Bite Through Stone',
   releasedOn: new Date('2021-04-09T00:00:00.000Z'),
+  description: null,
   s3Key: 'media/videos/abc.mp4',
   ...overrides,
 });

@@ -16,6 +16,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   applyVideoSuggestionInputSchema,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
   type ApplyVideoSuggestionActionResult,
 } from '@/lib/validation/video-enrichment-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -158,12 +159,12 @@ const loadApplicableSuggestion = async (
   if (!suggestion || suggestion.status !== 'pending') {
     return { ok: false, result: ALREADY_RESOLVED };
   }
-  if (suggestion.field === 'releasedOn') {
+  if ((VIDEO_LEVEL_SUGGESTION_FIELDS as readonly string[]).includes(suggestion.field)) {
     return {
       ok: false,
       result: {
         success: false,
-        error: 'The release date applies in the edit form, not on the server.',
+        error: 'This suggestion applies in the edit form, not on the server.',
       },
     };
   }
@@ -220,9 +221,10 @@ const applySuggestion = async (
 /**
  * Applies or dismisses one enrichment suggestion. Admin-only. Applies go
  * through the artist field whitelist with an `expectedCurrent`
- * optimistic-concurrency guard; the video-level release date is never
- * server-applied (it flows into the RHF edit form instead, because a
- * `videos.detail` refetch would wipe dirty edits).
+ * optimistic-concurrency guard; the video-level fields (release date,
+ * description, featured artist) are never server-applied (they flow into the
+ * RHF edit form instead, because a `videos.detail` refetch would wipe dirty
+ * edits).
  *
  * @param input - `{ suggestionId, op, expectedCurrent? }` (Zod-validated).
  */

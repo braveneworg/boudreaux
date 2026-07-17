@@ -69,8 +69,10 @@ const FIXTURE_WD_SOURCE = { url: 'https://www.wikidata.org/wiki/Q0', label: 'Wik
 /**
  * Deterministic enrichment result used when `BIO_GENERATOR_FAKE=true`. Emits,
  * per artist: a high-confidence bornOn (1985-03-15) and a medium-confidence
- * akaNames ('E2E Alias'); plus a medium-confidence video release date
- * (2020-06-01) so E2E can assert the full run → suggest → apply flow.
+ * akaNames ('E2E Alias'); plus video-level facts (a medium-confidence release
+ * date 2020-06-01, a synthesized description, and one discovered featured
+ * artist 'E2E Discovered Feature') so E2E can assert the full run → suggest →
+ * apply flow.
  */
 export const videoEnrichmentFixture = (input: {
   artists: Array<{ artistId: string }>;
@@ -101,6 +103,20 @@ export const videoEnrichmentFixture = (input: {
       sources: [{ url: 'https://musicbrainz.org/release/e2e-fixture', label: 'MusicBrainz' }],
       note: 'Deterministic fixture release date (E2E).',
     },
+    description: {
+      value: 'A deterministic E2E description of the track, its artists, and its release context.',
+      confidence: 'medium',
+      sources: [FIXTURE_MB_SOURCE],
+      note: 'Deterministic fixture description (E2E).',
+    },
+    featuredArtists: [
+      {
+        value: 'E2E Discovered Feature',
+        confidence: 'medium',
+        sources: [FIXTURE_MB_SOURCE],
+        note: 'Deterministic fixture featured artist (E2E).',
+      },
+    ],
   },
   model: 'fake/deterministic',
 });

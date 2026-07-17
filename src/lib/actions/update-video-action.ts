@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
+import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { VideoService } from '@/lib/services/video-service';
 import type { Video } from '@/lib/types/domain/video';
@@ -22,6 +23,7 @@ import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
 import {
+  artistDetailsDiffer,
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
@@ -60,12 +62,17 @@ const applyUpdateResult = (
 
 /**
  * Schedule the post-update enrichment kick when the update changed something
- * enrichment cares about: an artist-string change re-syncs `VideoArtist`
- * links, a file replacement re-probes, admin-reviewed `artistDetails` trigger
- * a sync pass, and — via the kick's own category gate — a MUSIC video with
- * any of these changes re-dispatches the async web enrichment. The sync also
- * runs on a file-only replacement; it is idempotent. No-op when nothing
- * relevant changed.
+ * enrichment cares about. An artist-string change or a file replacement kicks
+ * immediately (re-syncing `VideoArtist` links and, for a replacement, re-probing)
+ * — and, via the kick's own category gate, re-dispatches the async web
+ * enrichment for a MUSIC video.
+ *
+ * Otherwise, when only `artistDetails` are supplied — the common case in the
+ * draft flow, where an ordinary save must not re-run a job that already ran at
+ * upload-complete — the change check is deferred into `after()`: it reads the
+ * linked artists off the request path and only kicks when the details actually
+ * differ from the stored name parts (see {@link artistDetailsDiffer}). No-op
+ * when nothing relevant changed.
  *
  * Producer sync is NOT included here — it runs in its own `after()` call in
  * {@link runVideoUpdate} so that clearing all producers persists correctly.
@@ -76,18 +83,33 @@ const scheduleUpdateEnrichment = (
   s3KeyReplaced: boolean
 ): void => {
   const artistChanged = data.artist !== current.artist;
-  const artistDetailsProvided = (data.artistDetails?.length ?? 0) > 0;
-  if (!artistChanged && !s3KeyReplaced && !artistDetailsProvided) return;
-
-  after(() =>
-    kickPostSaveEnrichment({
+  if (artistChanged || s3KeyReplaced) {
+    after(() =>
+      kickPostSaveEnrichment({
+        videoId: current.id,
+        artist: data.artist,
+        category: data.category,
+        reProbe: s3KeyReplaced,
+        artistDetails: data.artistDetails,
+      })
+    );
+    return;
+  }
+  const details = data.artistDetails;
+  if (!details?.length) return;
+  // Details-only saves are common in the draft flow — verify an ACTUAL change
+  // against the linked artists before re-running a job that already ran.
+  after(async () => {
+    const rows = await VideoArtistRepository.findByVideoId(current.id);
+    if (!artistDetailsDiffer(details, rows)) return;
+    await kickPostSaveEnrichment({
       videoId: current.id,
       artist: data.artist,
       category: data.category,
-      reProbe: s3KeyReplaced,
-      artistDetails: data.artistDetails,
-    })
-  );
+      reProbe: false,
+      artistDetails: details,
+    });
+  });
 };
 
 /**

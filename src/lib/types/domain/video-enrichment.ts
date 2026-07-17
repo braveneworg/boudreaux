@@ -53,5 +53,7 @@ export interface VideoEnrichmentState {
   artist: string;
   title: string;
   releasedOn: Date;
+  /** The admin-entered description; the callback drops a matching suggestion. */
+  description: string | null;
   s3Key: string;
 }

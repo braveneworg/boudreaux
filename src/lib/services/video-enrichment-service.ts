@@ -30,6 +30,7 @@ import {
   isInFlightEnrichmentStatus,
   STALE_JOB_MS,
   SUGGESTION_CONFIDENCES,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_SUGGESTION_FIELDS,
   videoEnrichmentProgressSchema,
   videoSuggestionSourceSchema,
@@ -309,7 +310,9 @@ const prepareSuggestion = (
   suggestion: VideoSuggestion,
   current: VideoArtistWithArtist['artist']
 ): Omit<CreateSuggestionRow, 'artistId'> | null => {
-  if (suggestion.field === 'releasedOn') return null; // video-level only
+  // Video-level fields (releasedOn/description/featuredArtist) are emitted only
+  // under `data.video`; ignore any that arrive misfiled at artist scope.
+  if ((VIDEO_LEVEL_SUGGESTION_FIELDS as readonly string[]).includes(suggestion.field)) return null;
   const value =
     suggestion.field === 'akaNames'
       ? mergeAkaNames(current.akaNames, suggestion.value)
@@ -373,6 +376,68 @@ const buildReleaseDateRow = (
   };
 };
 
+/** Video-level description row — skipped when it matches the stored text. */
+const buildDescriptionRow = (
+  data: VideoEnrichmentData,
+  state: VideoEnrichmentState,
+  facts: ExistingFact[]
+): CreateSuggestionRow | null => {
+  const description = data.video?.description;
+  if (!description) return null;
+  const value = description.value.trim();
+  if (!value) return null;
+  if (state.description && normalizeText(state.description) === normalizeText(value)) return null;
+  if (matchesExistingFact(facts, null, 'description', value)) return null;
+  return {
+    artistId: null,
+    field: 'description',
+    value,
+    confidence: description.confidence,
+    sources: toJsonSources(description.sources),
+    note: description.note ?? null,
+  };
+};
+
+/** Names already represented on the video (linked rows + artist string parts). */
+const knownArtistNames = (
+  state: VideoEnrichmentState,
+  rows: VideoArtistWithArtist[]
+): Set<string> =>
+  new Set([
+    ...rows.map((row) => displayNameFor(row).toLowerCase()),
+    ...splitFeaturedArtists(state.artist).map((part) => part.name.toLowerCase()),
+  ]);
+
+/** Featured-artist discovery rows: deduped, fence-checked, never already linked. */
+const buildFeaturedArtistRows = ({
+  data,
+  state,
+  rows,
+  facts,
+}: BuildPendingRowsInput): CreateSuggestionRow[] => {
+  const featured = data.video?.featuredArtists ?? [];
+  if (featured.length === 0) return [];
+  const known = knownArtistNames(state, rows);
+  const seen = new Set<string>();
+  const out: CreateSuggestionRow[] = [];
+  for (const suggestion of featured) {
+    const value = suggestion.value.trim();
+    const key = value.toLowerCase();
+    if (!value || known.has(key) || seen.has(key)) continue;
+    if (matchesExistingFact(facts, null, 'featuredArtist', value)) continue;
+    seen.add(key);
+    out.push({
+      artistId: null,
+      field: 'featuredArtist',
+      value,
+      confidence: suggestion.confidence,
+      sources: toJsonSources(suggestion.sources),
+      note: suggestion.note ?? null,
+    });
+  }
+  return out;
+};
+
 /**
  * Convert the Lambda's validated payload into pending suggestion rows:
  * drop facts equal to current values, fence facts already applied/dismissed,
@@ -394,6 +459,9 @@ const buildPendingRows = ({
   }
   const releaseRow = buildReleaseDateRow(data, state, facts);
   if (releaseRow) out.push(releaseRow);
+  const descriptionRow = buildDescriptionRow(data, state, facts);
+  if (descriptionRow) out.push(descriptionRow);
+  out.push(...buildFeaturedArtistRows({ data, state, rows, facts }));
   return out;
 };
 

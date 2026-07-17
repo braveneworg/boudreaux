@@ -3,9 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 import {
+  POSTER_SAMPLE_END_SECONDS,
+  POSTER_SAMPLE_START_SECONDS,
   captureVideoPoster,
   extractVideoDuration,
   extractVideoTags,
+  posterCandidateTimes,
   scoreFrameQuality,
 } from './video-metadata';
 
@@ -247,14 +250,14 @@ describe('extractVideoTags', () => {
   it('derives the title from the filename when tags have none', async () => {
     parseBlobMock.mockResolvedValue({ common: {} });
     await expect(extractVideoTags(videoFile('My.Cool_video-file.mp4'))).resolves.toEqual({
-      title: 'My Cool video file',
+      title: 'My.Cool video-file',
     });
   });
 
   it('derives the title from the filename when parsing throws', async () => {
     parseBlobMock.mockRejectedValue(new Error('unparseable'));
     await expect(extractVideoTags(videoFile('My.Cool_video-file.mp4'))).resolves.toEqual({
-      title: 'My Cool video file',
+      title: 'My.Cool video-file',
     });
   });
 
@@ -264,6 +267,37 @@ describe('extractVideoTags', () => {
     expect(parseBlobMock).toHaveBeenCalledWith(expect.any(File), {
       skipCovers: true,
       duration: false,
+    });
+  });
+
+  it('falls back to parsed artist and featured names when tags are absent', async () => {
+    parseBlobMock.mockRejectedValueOnce(new Error('unparseable'));
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo) [Official Video].mp4', {
+      type: 'video/mp4',
+    });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Song',
+      artist: 'Alpha feat. Bravo',
+    });
+  });
+
+  it('prefers container artist but supplements filename feat-clauses', async () => {
+    parseBlobMock.mockResolvedValueOnce({ common: { title: 'Tagged', artist: 'Real Alpha' } });
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo).mp4', { type: 'video/mp4' });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Tagged',
+      artist: 'Real Alpha feat. Bravo',
+    });
+  });
+
+  it('does not duplicate a featured name the container already carries', async () => {
+    parseBlobMock.mockResolvedValueOnce({
+      common: { title: 'Tagged', artist: 'Real Alpha feat. Bravo' },
+    });
+    const file = new File(['x'], 'Alpha - Song (feat. Bravo).mp4', { type: 'video/mp4' });
+    await expect(extractVideoTags(file)).resolves.toEqual({
+      title: 'Tagged',
+      artist: 'Real Alpha feat. Bravo',
     });
   });
 });
@@ -324,20 +358,22 @@ describe('captureVideoPoster', () => {
     expect(seeks).toEqual([3]);
   });
 
-  it('samples five candidate frames across the first three seconds', async () => {
-    const { promise, video, seeks } = startPoster({ duration: 10 });
+  it('samples five candidate frames across the 3–10s window', async () => {
+    const { promise, video, seeks } = startPoster({ duration: 245 });
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
     await promise;
-    expect(seeks).toEqual([0.3, 0.9, 1.5, 2.1, 2.7]);
+    // window = 10 - 3 = 7; times = 3 + (7 * (i + 0.5)) / 5 for i in 0..4
+    expect(seeks).toEqual([3.7, 5.1, 6.5, 7.9, 9.3]);
   });
 
   it('clamps the sample window to a shorter duration', async () => {
-    const { promise, video, seeks } = startPoster({ duration: 1.5 });
+    const { promise, video, seeks } = startPoster({ duration: 6 });
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
     await promise;
-    expect(seeks).toEqual([0.15, 0.45, 0.75, 1.05, 1.35]);
+    // window = 6 - 3 = 3; times = 3 + (3 * (i + 0.5)) / 5 for i in 0..4
+    expect(seeks).toEqual([3.3, 3.9, 4.5, 5.1, 5.7]);
   });
 
   it('captures a single frame at 0 when the duration is not finite', async () => {
@@ -429,6 +465,34 @@ describe('captureVideoPoster', () => {
     video.dispatchEvent(new Event('error'));
     await promise;
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+  });
+});
+
+describe('posterCandidateTimes', () => {
+  it('samples 5 times inside [3, 10] for long videos', () => {
+    const times = posterCandidateTimes(245);
+    expect(times).toHaveLength(5);
+    expect(Math.min(...times)).toBeGreaterThanOrEqual(POSTER_SAMPLE_START_SECONDS);
+    expect(Math.max(...times)).toBeLessThanOrEqual(POSTER_SAMPLE_END_SECONDS);
+    expect(times[0]).toBeCloseTo(3.7, 5); // 3 + (7 * 0.5) / 5
+  });
+
+  it('samples [3, duration] when the video is shorter than 10s', () => {
+    const times = posterCandidateTimes(6);
+    expect(Math.min(...times)).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...times)).toBeLessThanOrEqual(6);
+  });
+
+  it('falls back to whole-video sampling at or under 3s', () => {
+    const times = posterCandidateTimes(3);
+    expect(times).toHaveLength(5);
+    expect(Math.min(...times)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...times)).toBeLessThanOrEqual(3);
+  });
+
+  it('returns [0] for a non-finite or non-positive duration', () => {
+    expect(posterCandidateTimes(Number.NaN)).toEqual([0]);
+    expect(posterCandidateTimes(0)).toEqual([0]);
   });
 });
 
