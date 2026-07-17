@@ -35,3 +35,28 @@ export const deleteVideoCascade = async (videoId: string): Promise<void> => {
     await prisma.$disconnect();
   }
 };
+
+/**
+ * Hard-delete a spec-created Artist shell — but only when it has no remaining
+ * VideoArtist join rows. Guards against accidentally removing a shell that a
+ * parallel spec or seed row still references. Safe to call even if the artist
+ * was never created (no-op when not found).
+ *
+ * Uses an isolated Prisma client pinned to the local Docker Mongo — the same
+ * datasource the seed uses — and disconnects in `finally` so a failed delete
+ * can never leak a connection.
+ */
+export const deleteUnlinkedArtistByDisplayName = async (displayName: string): Promise<void> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    const artists = await prisma.artist.findMany({ where: { displayName } });
+    for (const { id: artistId } of artists) {
+      const linkedCount = await prisma.videoArtist.count({ where: { artistId } });
+      if (linkedCount === 0) {
+        await prisma.artist.delete({ where: { id: artistId } });
+      }
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+};

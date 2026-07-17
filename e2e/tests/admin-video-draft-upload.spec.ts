@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
-import { deleteVideoCascade } from '../helpers/e2e-db';
+import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helpers/e2e-db';
 
 /**
  * Keystone E2E for the upload → draft → pre-save enrichment flow.
@@ -117,6 +117,7 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       }).toPass({ timeout: 20_000 });
     } finally {
       if (videoId) await deleteVideoCascade(videoId);
+      await deleteUnlinkedArtistByDisplayName(DISCOVERED_FEATURE);
     }
   });
 });
