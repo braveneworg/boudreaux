@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   useVideoArtistReview: vi.fn(),
   buildArtistDetails: vi.fn(),
   updateDraft: vi.fn(),
+  useVideoDraft: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -96,6 +97,10 @@ vi.mock('@/lib/utils/direct-upload', () => ({
 
 vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
   useVideoArtistReview: (...args: unknown[]) => mocks.useVideoArtistReview(...args),
+}));
+
+vi.mock('@/app/components/forms/videos/use-video-draft', () => ({
+  useVideoDraft: (...args: unknown[]) => mocks.useVideoDraft(...args),
 }));
 
 vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
@@ -251,6 +256,7 @@ beforeEach(() => {
     updateDraft: mocks.updateDraft,
     buildArtistDetails: mocks.buildArtistDetails,
   });
+  mocks.useVideoDraft.mockReturnValue({ draftId: null, handleUploadComplete: vi.fn() });
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
     fields: {},
@@ -598,6 +604,30 @@ describe('VideoForm — create submit', () => {
   });
 });
 
+describe('VideoForm — draft-mode submit', () => {
+  it('updates the draft row and returns to the admin list after a draft flip', async () => {
+    // A draft row already exists from the upload-complete flip.
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'draft-video-id' })
+      )
+    );
+    expect(mocks.push).toHaveBeenCalledWith('/admin/videos');
+  });
+});
+
 describe('VideoForm — edit mode', () => {
   const asEditMode = () =>
     mocks.useVideoQuery.mockReturnValue({
@@ -887,6 +917,20 @@ describe('VideoForm — enrichment panel mount gating', () => {
     render(<VideoForm />);
 
     expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+  });
+
+  it('mounts the panel in create mode once a draft row exists (MUSIC)', async () => {
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+    });
+    render(<VideoForm />);
+
+    // Default category is MUSIC; the draft id now stands in as the row id.
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'draft-video-id'
+    );
   });
 });
 

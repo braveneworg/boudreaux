@@ -31,6 +31,7 @@ import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichme
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
+import { useVideoDraft } from './videos/use-video-draft';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoArtistReviewSection } from './videos/video-artist-review-section';
 import { VideoFileSection } from './videos/video-file-section';
@@ -56,8 +57,8 @@ export interface VideoFormProps {
 }
 
 interface SubmitVideoDeps {
-  isEditMode: boolean;
-  videoId: string | undefined;
+  isPersisted: boolean;
+  effectiveVideoId: string | undefined;
   preGeneratedId: string;
   form: UseFormReturn<VideoFormData>;
   router: ReturnType<typeof useRouter>;
@@ -76,28 +77,30 @@ const mergeArtistDetails = (
 
 /** Dispatch to the create/update mutation, then map errors or navigate on success. */
 const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<void> => {
-  const { isEditMode, videoId, preGeneratedId, form, router } = deps;
+  const { isPersisted, effectiveVideoId, preGeneratedId, form, router } = deps;
   const result =
-    isEditMode && videoId
-      ? await deps.updateVideoAsync({ id: videoId, values: data })
+    isPersisted && effectiveVideoId
+      ? await deps.updateVideoAsync({ id: effectiveVideoId, values: data })
       : await deps.createVideoAsync({ ...data, preGeneratedId });
 
   if (!result.success) {
     applyServerFieldErrors(form.setError, result.errors);
     toast.error(
-      result.errors?.general?.[0] ?? `Failed to ${isEditMode ? 'update' : 'create'} the video.`
+      result.errors?.general?.[0] ?? `Failed to ${isPersisted ? 'update' : 'create'} the video.`
     );
     return;
   }
 
-  toast.success(`Video ${isEditMode ? 'updated' : 'created'} successfully.`);
+  toast.success(`Video ${isPersisted ? 'saved' : 'created'} successfully.`);
   // Create lands on the new video's edit page so the admin can watch the
-  // probe + auto-kicked enrichment complete; edit returns to the list.
-  router.push(isEditMode ? '/admin/videos' : `/admin/videos/${preGeneratedId}`);
+  // probe + auto-kicked enrichment complete; a persisted (edit/draft) save
+  // returns to the list.
+  router.push(isPersisted ? '/admin/videos' : `/admin/videos/${preGeneratedId}`);
 };
 
 interface EnrichmentPanelMountProps {
-  video: VideoRow | null | undefined;
+  videoId: string | undefined;
+  category: VideoFormData['category'] | undefined;
   control: Control<VideoFormData>;
   onApplyReleaseDate: (value: string) => void;
 }
@@ -202,16 +205,38 @@ const handleVideoUnpublish = async ({
 const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | undefined =>
   video ? video.publishedAt : undefined;
 
-/** MUSIC-only, edit-only: absent from the DOM otherwise (INFORMATIONAL/create). */
+interface PersistedRow {
+  /** True once a row exists (edit mode, or a draft was created at upload). */
+  isPersisted: boolean;
+  /** The id of the persisted row (edit id, else draft id), or undefined. */
+  effectiveVideoId: string | undefined;
+}
+
+/**
+ * Fold edit-mode + the draft-at-upload id into the "row exists" state the
+ * submit path and enrichment panel key off. Extracted to keep `VideoForm`
+ * under the ESLint complexity cap.
+ */
+const resolvePersistedRow = (
+  videoId: string | undefined,
+  isEditMode: boolean,
+  draftId: string | null
+): PersistedRow => ({
+  isPersisted: isEditMode || draftId !== null,
+  effectiveVideoId: videoId ?? draftId ?? undefined,
+});
+
+/** MUSIC-only, row-required: mounts as soon as a draft/edit row exists. */
 const EnrichmentPanelMount = ({
-  video,
+  videoId,
+  category,
   control,
   onApplyReleaseDate,
 }: EnrichmentPanelMountProps): React.ReactElement | null =>
-  video?.category === 'MUSIC' ? (
+  videoId !== undefined && category === 'MUSIC' ? (
     <VideoEnrichmentErrorBoundary>
       <VideoEnrichmentPanel
-        videoId={video.id}
+        videoId={videoId}
         control={control}
         onApplyReleaseDate={onApplyReleaseDate}
       />
@@ -241,13 +266,30 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   useVideoFormReset({ isEditMode, video, form });
   useVideoProducersPrefill({ videoId, isEditMode, video, form });
 
-  const upload = useVideoUpload({ preGeneratedId, form, onPosterCandidate: setPosterCandidate });
   const s3Key = useWatch({ control, name: 's3Key' });
   const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
+  const categoryValue = useWatch({ control, name: 'category' });
   const isSubmitting = isCreatingVideo || isUpdatingVideo;
 
   const { entries, updateDraft, buildArtistDetails, primarySplitParts } =
     useVideoArtistReview(artistValue);
+
+  // The draft hook must sit before the upload hook so its handleUploadComplete
+  // is available to wire; it in turn depends on buildArtistDetails above.
+  const { draftId, handleUploadComplete } = useVideoDraft({
+    form,
+    preGeneratedId,
+    isEditMode,
+    getArtistDetails: buildArtistDetails,
+  });
+  const upload = useVideoUpload({
+    preGeneratedId,
+    form,
+    onPosterCandidate: setPosterCandidate,
+    onUploadComplete: handleUploadComplete,
+  });
+
+  const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
 
@@ -292,8 +334,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       submitIntentRef.current = 'save';
       const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
       return submitVideo(shaped, {
-        isEditMode,
-        videoId,
+        isPersisted,
+        effectiveVideoId,
         preGeneratedId,
         form,
         router,
@@ -303,8 +345,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     },
     [
       isDraft,
-      isEditMode,
-      videoId,
+      isPersisted,
+      effectiveVideoId,
       preGeneratedId,
       form,
       router,
@@ -359,7 +401,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoProducersSection control={control} />
             <EnrichmentPanelMount
-              video={video}
+              videoId={effectiveVideoId}
+              category={categoryValue}
               control={control}
               onApplyReleaseDate={handleApplyReleaseDate}
             />
