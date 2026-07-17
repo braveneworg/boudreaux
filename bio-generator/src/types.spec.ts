@@ -372,6 +372,68 @@ describe('videoEnrichmentResultSchema', () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  const videoLevelSuggestion = (value: string) => ({
+    value,
+    confidence: 'medium' as const,
+    sources: [{ url: 'https://musicbrainz.org/recording/x' }],
+  });
+
+  const dataWithVideo = (video: unknown) => ({
+    ok: true as const,
+    data: { artists: [], video, model: 'gemini-2.5-flash' },
+  });
+
+  it('accepts a description suggestion up to 2000 chars and five featured artists', () => {
+    const parsed = videoEnrichmentResultSchema.safeParse(
+      dataWithVideo({
+        releasedOn: videoLevelSuggestion('2021-04-09'),
+        description: videoLevelSuggestion('d'.repeat(2000)),
+        featuredArtists: Array.from({ length: 5 }, (_, i) => videoLevelSuggestion(`Artist ${i}`)),
+      })
+    );
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a description value longer than 2000 chars', () => {
+    const parsed = videoEnrichmentResultSchema.safeParse(
+      dataWithVideo({ description: videoLevelSuggestion('d'.repeat(2001)) })
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects more than five featured artists', () => {
+    const parsed = videoEnrichmentResultSchema.safeParse(
+      dataWithVideo({
+        featuredArtists: Array.from({ length: 6 }, (_, i) => videoLevelSuggestion(`Artist ${i}`)),
+      })
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts a description and featuredArtist as artist-suggestion fields', () => {
+    const parsed = videoEnrichmentResultSchema.safeParse({
+      ok: true,
+      data: {
+        artists: [
+          {
+            artistId: 'a'.repeat(24),
+            suggestions: [
+              {
+                field: 'displayName',
+                value: 'Sole',
+                confidence: 'high',
+                sources: [{ url: 'https://musicbrainz.org/artist/x' }],
+              },
+            ],
+          },
+        ],
+        video: { featuredArtists: [videoLevelSuggestion('Sole')] },
+        model: 'gemini-2.5-flash',
+      },
+    });
+    expect(parsed.success).toBe(true);
+  });
 });
 
 describe('VIDEO_PROGRESS_STAGES', () => {

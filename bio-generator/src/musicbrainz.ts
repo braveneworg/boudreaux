@@ -379,3 +379,78 @@ export const lookupArtistIdentity = async (
     return null;
   }
 };
+
+/** One credited artist on a matched recording (the canonical stage name). */
+export interface MusicBrainzRecordingCredit {
+  mbid: string | null;
+  name: string;
+}
+
+/** One recording-search candidate: a matched track with its credited artists. */
+export interface MusicBrainzRecordingCandidate {
+  rid: string;
+  title: string;
+  score: number;
+  firstReleaseDate: string | null;
+  credits: MusicBrainzRecordingCredit[];
+}
+
+/** Subset of the MusicBrainz recording search response we rely on. */
+interface MbRecordingSearchResponse {
+  recordings?: Array<{
+    id?: string;
+    title?: string;
+    score?: number;
+    'first-release-date'?: string;
+    'artist-credit'?: Array<{ name?: string; artist?: { id?: string; name?: string } }>;
+  }>;
+}
+
+/** Maps a recording's artist-credit to credited names, dropping unnamed entries. */
+const toRecordingCredits = (
+  credit: NonNullable<MbRecordingSearchResponse['recordings']>[number]['artist-credit']
+): MusicBrainzRecordingCredit[] =>
+  (credit ?? [])
+    .map((entry) => ({
+      mbid: entry.artist?.id ?? null,
+      name: entry.artist?.name ?? entry.name ?? '',
+    }))
+    .filter((entry) => entry.name !== '');
+
+/** Escape quotes/backslashes inside a quoted Lucene query term. */
+const escapeQueryTerm = (value: string): string => value.replace(/(["\\])/g, '\\$1');
+
+/**
+ * Searches MusicBrainz recordings by artist + title together. A matched
+ * recording's artist-credit yields the canonical credited (stage) names for
+ * the primary and every featured artist, plus a first-release date. Sleeps
+ * the rate limit BEFORE requesting. Best-effort: failures return [].
+ */
+export const searchRecordingCandidates = async (
+  artist: string,
+  title: string,
+  limit = 5,
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
+): Promise<MusicBrainzRecordingCandidate[]> => {
+  await (options.sleep ?? sleep)(MB_RATE_LIMIT_MS);
+  const query = `recording:"${escapeQueryTerm(title)}" AND artist:"${escapeQueryTerm(artist)}"`;
+  const url = `${MB_BASE}/recording?query=${encodeURIComponent(query)}&fmt=json&limit=${limit}`;
+  try {
+    const body = await request<MbRecordingSearchResponse>(url, { ...options, fetchFn });
+    return (body.recordings ?? [])
+      .filter((rec): rec is { id: string; title: string } & typeof rec =>
+        Boolean(rec.id && rec.title)
+      )
+      .map((rec) => ({
+        rid: rec.id,
+        title: rec.title,
+        score: rec.score ?? 0,
+        firstReleaseDate: rec['first-release-date']?.trim() || null,
+        credits: toRecordingCredits(rec['artist-credit']),
+      }));
+  } catch (err) {
+    logEvent('warn', 'musicbrainz_recording_search_failed', { artist, title, error: String(err) });
+    return [];
+  }
+};

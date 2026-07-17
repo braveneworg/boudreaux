@@ -341,6 +341,18 @@ const eslintConfig = [
       'max-lines-per-function': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
     },
   },
+  // The MusicBrainz client's search functions share one injectable signature
+  // shape — `(…domain args, limit, fetchFn, options)` — so the Lambda can mock
+  // `fetchFn`/`sleep` deterministically in tests. The recording search keys on
+  // BOTH an artist and a title (two domain args), which pushes it to five
+  // positional params; `max-params` is genuinely inapplicable to this
+  // established, test-driven convention here.
+  {
+    files: ['bio-generator/src/musicbrainz.ts'],
+    rules: {
+      'max-params': 'off',
+    },
+  },
   // Tests, e2e, and one-off maintenance scripts are exempt from the function-length
   // limit: describe/it/setup blocks and CLI scripts are legitimately long, so the rule
   // would add noise rather than signal there.
