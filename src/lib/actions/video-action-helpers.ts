@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
+import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -157,6 +158,36 @@ const logger = loggers.media;
 /** Safe, always-string rendering of an unknown error. */
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+/** The linked artist's matchable display name (mirrors the enrichment service). */
+const linkedNameFor = (row: VideoArtistWithArtist): string =>
+  (
+    row.artist.displayName?.trim() || `${row.artist.firstName} ${row.artist.surname}`.trim()
+  ).toLowerCase();
+
+/** True when one provided part differs from the stored value (undefined = not provided). */
+const detailPartDiffers = (stored: string | null, provided: string | undefined): boolean =>
+  provided !== undefined && (stored ?? '').trim() !== provided.trim();
+
+/**
+ * True when any admin-reviewed artist detail actually differs from the linked
+ * artists' stored name parts (an unmatched sourceName counts as a change).
+ * Lets the update action skip re-kicking enrichment for a no-op save.
+ */
+export const artistDetailsDiffer = (
+  details: VideoArtistDetail[],
+  rows: VideoArtistWithArtist[]
+): boolean =>
+  details.some((detail) => {
+    const match = rows.find((row) => linkedNameFor(row) === detail.sourceName.trim().toLowerCase());
+    if (!match) return true;
+    return (
+      detailPartDiffers(match.artist.firstName, detail.firstName) ||
+      detailPartDiffers(match.artist.middleName, detail.middleName) ||
+      detailPartDiffers(match.artist.surname, detail.surname) ||
+      detailPartDiffers(match.artist.displayName, detail.displayName)
+    );
+  });
 
 /** Input for the post-save enrichment kick (runs inside `after()`). */
 export interface KickPostSaveEnrichmentInput {

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -34,6 +35,9 @@ vi.mock('@/lib/services/video-probe-service', () => ({
 }));
 vi.mock('@/lib/services/producer-service', () => ({
   ProducerService: { syncVideoProducers: vi.fn() },
+}));
+vi.mock('@/lib/repositories/video-artist-repository', () => ({
+  VideoArtistRepository: { findByVideoId: vi.fn() },
 }));
 
 // Capture after() callbacks so tests can inspect / run them on demand.
@@ -117,6 +121,24 @@ beforeEach(() => {
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
   vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
+  // Default: the linked artist row matches the current 'The Band' artist string
+  // exactly, so a details-only save whose sourceName is 'The Band' is a no-op
+  // unless a test overrides this to return a differing row.
+  vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+    {
+      artistId: 'a1',
+      role: 'PRIMARY',
+      sortOrder: 0,
+      artist: {
+        displayName: 'The Band',
+        firstName: 'The',
+        middleName: null,
+        surname: 'Band',
+        akaNames: null,
+        bornOn: null,
+      },
+    },
+  ]);
 });
 
 describe('updateVideoAction', () => {
@@ -532,6 +554,69 @@ describe('updateVideoAction', () => {
         videoId,
         parsedData.artist,
         artistDetails
+      );
+    });
+
+    // --- No-op change detection (details-only saves in the draft flow) ---
+
+    it('does not kick when details-only save matches the linked artist rows', async () => {
+      // sourceName + parts equal the default linked row → an ACTUAL no-op save.
+      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      // The details path still schedules an after() (the change check runs there).
+      await getEnrichmentCallback()?.();
+
+      expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
+    });
+
+    it('kicks with reProbe false when a details-only save changes a name part', async () => {
+      // The provided surname differs from the linked row's stored surname.
+      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await getEnrichmentCallback()?.();
+
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        parsedData.artist,
+        artistDetails
+      );
+    });
+
+    it('reads the linked rows before deciding on a details-only save', async () => {
+      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await getEnrichmentCallback()?.();
+
+      expect(VideoArtistRepository.findByVideoId).toHaveBeenCalledWith(videoId);
+    });
+
+    it('does not re-probe on a details-only change', async () => {
+      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
+      mockParsedSuccess({ ...parsedData, artistDetails });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await getEnrichmentCallback()?.();
+
+      expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
+    });
+
+    it('kicks immediately without reading the linked rows when the artist changed', async () => {
+      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await getEnrichmentCallback()?.();
+
+      expect(VideoArtistRepository.findByVideoId).not.toHaveBeenCalled();
+      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
+        videoId,
+        'New Band',
+        undefined
       );
     });
 

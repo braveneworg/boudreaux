@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -10,6 +11,7 @@ import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import {
+  artistDetailsDiffer,
   buildVideoCreateInput,
   buildVideoUpdateInput,
   confirmVideoUpload,
@@ -262,6 +264,37 @@ describe('VIDEO_PERMITTED_FIELD_NAMES', () => {
 
   it("includes 'producers'", () => {
     expect(VIDEO_PERMITTED_FIELD_NAMES).toContain('producers');
+  });
+});
+
+describe('artistDetailsDiffer', () => {
+  const row = (over: Partial<VideoArtistWithArtist['artist']> = {}): VideoArtistWithArtist =>
+    ({
+      artistId: 'a1',
+      role: 'PRIMARY',
+      artist: {
+        firstName: 'Alpha',
+        middleName: null,
+        surname: 'Beta',
+        displayName: 'Alpha Beta',
+        akaNames: null,
+        bornOn: null,
+        ...over,
+      },
+    }) as VideoArtistWithArtist;
+
+  it('is false when every detail matches the linked artist', () => {
+    const details = [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }];
+    expect(artistDetailsDiffer(details, [row()])).toBe(false);
+  });
+
+  it('is true when a provided part differs', () => {
+    const details = [{ sourceName: 'Alpha Beta', firstName: 'Changed' }];
+    expect(artistDetailsDiffer(details, [row()])).toBe(true);
+  });
+
+  it('is true when the source name matches no linked artist', () => {
+    expect(artistDetailsDiffer([{ sourceName: 'Nobody' }], [row()])).toBe(true);
   });
 });
 
