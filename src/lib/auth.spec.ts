@@ -18,6 +18,13 @@ vi.mock('@/lib/auth/social-providers-config', () => ({
     enabled: true,
     trustedProviders: ['google', 'apple', 'facebook'],
   },
+  resolveAppleClientSecret: vi.fn(() => null),
+}));
+// The real-production path (isProductionRuntime === true) boots the Apple
+// secret expiry monitor at module load — stub it so the wiring tests can
+// exercise that branch without touching the real telemetry loop.
+vi.mock('@/lib/auth/apple-secret-expiry-monitor', () => ({
+  startAppleSecretExpiryMonitor: vi.fn(),
 }));
 vi.mock('@/lib/email/send-magic-link-email', () => ({ sendMagicLinkEmail: vi.fn() }));
 vi.mock('@/lib/repositories/user-repository', () => ({
@@ -290,5 +297,49 @@ describe('src/lib/auth — AUTH_SECRET + E2E_MODE guards', () => {
     vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
 
     await expect(import('./auth')).resolves.toBeDefined();
+  });
+});
+
+describe('src/lib/auth — rate limiter scoping', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const loadConfig = async (): Promise<Record<string, unknown>> => {
+    await import('./auth');
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    return calls[calls.length - 1][0];
+  };
+
+  it('disables the rate limiter under E2E (production + E2E_MODE)', async () => {
+    vi.resetModules();
+    // The E2E standalone runs the production build with E2E_MODE=true; the guard
+    // requires SKIP_ENV_VALIDATION so the module does not throw by design.
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.stubEnv('SKIP_ENV_VALIDATION', 'true');
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+
+    const config = await loadConfig();
+
+    // better-auth defaults the limiter to enabled whenever NODE_ENV is
+    // 'production', which also captures the CI E2E standalone (parallel workers
+    // sharing one IP → /api/auth/get-session 429s). Scope it to REAL production.
+    expect(config.rateLimit).toMatchObject({ enabled: false });
+  });
+
+  it('enables the rate limiter in real production (no E2E_MODE)', async () => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+
+    const config = await loadConfig();
+
+    // Real production keeps the limiter on — behavior is byte-identical to
+    // relying on better-auth's NODE_ENV-driven default there.
+    expect(config.rateLimit).toMatchObject({ enabled: true });
   });
 });
