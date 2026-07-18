@@ -15,7 +15,12 @@ import {
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { applyVideoPrefill, validateVideoFile } from './video-form-helpers';
-import { captureVideoPoster, extractVideoDuration, extractVideoTags } from './video-metadata';
+import {
+  captureVideoPosterCandidates,
+  extractVideoDuration,
+  extractVideoTags,
+  type PosterCandidate,
+} from './video-metadata';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -25,8 +30,8 @@ export type VideoUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 interface UseVideoUploadArgs {
   preGeneratedId: string;
   form: UseFormReturn<VideoFormData>;
-  /** Receives the poster frame captured from a freshly-selected file (or null). */
-  onPosterCandidate: (poster: Blob | null) => void;
+  /** Receives the scored poster candidates captured from a freshly-selected file. */
+  onPosterCandidates: (candidates: PosterCandidate[]) => void;
   /** Fired once after the hidden fields are written on a successful upload. */
   onUploadComplete?: () => void;
 }
@@ -93,7 +98,7 @@ const applyUploadResult = (
 export const useVideoUpload = ({
   preGeneratedId,
   form,
-  onPosterCandidate,
+  onPosterCandidates,
   onUploadComplete,
 }: UseVideoUploadArgs): UseVideoUploadResult => {
   const [status, setStatus] = useState<VideoUploadStatus>('idle');
@@ -126,16 +131,16 @@ export const useVideoUpload = ({
 
   const runSelect = useCallback(
     async (file: File): Promise<void> => {
-      const [duration, tags, poster] = await Promise.all([
+      const [duration, tags, posterCandidates] = await Promise.all([
         extractVideoDuration(file),
         extractVideoTags(file),
-        captureVideoPoster(file),
+        captureVideoPosterCandidates(file),
       ]);
       applyVideoPrefill(form, tags, duration);
-      onPosterCandidate(poster);
+      onPosterCandidates(posterCandidates);
       await startUpload(file);
     },
-    [form, onPosterCandidate, startUpload]
+    [form, onPosterCandidates, startUpload]
   );
 
   const selectFile = useCallback(

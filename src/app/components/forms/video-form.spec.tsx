@@ -9,9 +9,22 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import type { UseFormSetValue } from 'react-hook-form';
+
+type PosterCandidate = videoMetadata.PosterCandidate;
+
+/** Build a scored candidate whose blob size encodes its identity for assertions. */
+const posterCandidate = (content: string, score: number, atSeconds = 3.7): PosterCandidate => ({
+  blob: new Blob([content], { type: 'image/jpeg' }),
+  atSeconds,
+  score,
+});
+
+/** The single captured frame most poster tests need. */
+const singleCandidate = (): PosterCandidate => posterCandidate('jpeg', 1);
 
 const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
@@ -22,7 +35,7 @@ const mocks = vi.hoisted(() => ({
   uploadVideoMultipart: vi.fn(),
   extractVideoDuration: vi.fn(),
   extractVideoTags: vi.fn(),
-  captureVideoPoster: vi.fn(),
+  captureVideoPosterCandidates: vi.fn(),
   getPresignedUploadUrlsAction: vi.fn(),
   uploadFileToS3: vi.fn(),
   push: vi.fn(),
@@ -87,10 +100,13 @@ vi.mock('@/lib/utils/multipart-upload', () => ({
   uploadVideoMultipart: mocks.uploadVideoMultipart,
 }));
 
-vi.mock('@/app/components/forms/videos/video-metadata', () => ({
+vi.mock('@/app/components/forms/videos/video-metadata', async (importOriginal) => ({
+  // Keep the real pure helpers (bestPosterCandidateIndex) — only the file/DOM
+  // touching extractors are faked.
+  ...(await importOriginal<typeof videoMetadata>()),
   extractVideoDuration: mocks.extractVideoDuration,
   extractVideoTags: mocks.extractVideoTags,
-  captureVideoPoster: mocks.captureVideoPoster,
+  captureVideoPosterCandidates: mocks.captureVideoPosterCandidates,
 }));
 
 vi.mock('@/lib/actions/presigned-upload-actions', () => ({
@@ -315,7 +331,7 @@ beforeEach(() => {
   });
   mocks.extractVideoTags.mockResolvedValue({ title: 'clip' });
   mocks.extractVideoDuration.mockResolvedValue(undefined);
-  mocks.captureVideoPoster.mockResolvedValue(null);
+  mocks.captureVideoPosterCandidates.mockResolvedValue([]);
   mocks.getPresignedUploadUrlsAction.mockResolvedValue({
     success: true,
     data: [
@@ -816,41 +832,12 @@ describe('VideoForm — edit mode', () => {
 });
 
 describe('VideoForm — poster', () => {
-  it('uploads the captured frame via presign when Use this frame is clicked', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+  it('shows the uploaded poster preview after a manual upload succeeds', async () => {
     const user = setup();
     render(<VideoForm />);
 
-    await uploadVideoFile(user);
-    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
-
-    await waitFor(() =>
-      expect(mocks.getPresignedUploadUrlsAction).toHaveBeenCalledWith(
-        'videos',
-        'a'.repeat(24),
-        expect.any(Array)
-      )
-    );
-  });
-
-  it('PUTs the captured frame to S3 when Use this frame is clicked', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
-    const user = setup();
-    render(<VideoForm />);
-
-    await uploadVideoFile(user);
-    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
-
-    await waitFor(() => expect(mocks.uploadFileToS3).toHaveBeenCalled());
-  });
-
-  it('shows the uploaded poster preview after Use this frame succeeds', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
-    const user = setup();
-    render(<VideoForm />);
-
-    await uploadVideoFile(user);
-    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
 
     await waitFor(() =>
       expect(screen.getByAltText('Video poster')).toHaveAttribute(
@@ -913,7 +900,7 @@ describe('VideoForm — poster', () => {
 
 describe('VideoForm — poster candidate auto-commit on Save', () => {
   it('uploads the visible candidate frame on Save when no poster is chosen', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
     const user = setup();
     render(<VideoForm />);
 
@@ -929,7 +916,7 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
   });
 
   it('submits the auto-uploaded poster URL in the create payload', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
     const user = setup();
     render(<VideoForm />);
 
@@ -946,7 +933,7 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
   });
 
   it('aborts the submit and shows an error toast when the candidate upload fails', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
     // Upload resolves without ever writing posterUrl → failed commit.
     mocks.posterUploadImpl.mockImplementation(
       async (
@@ -972,16 +959,39 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
     expect(mocks.createVideoAsync).not.toHaveBeenCalled();
   });
 
-  it('does not re-upload a poster on Save when one is already chosen', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+  it('auto-uploads the frame selected in the strip on Save', async () => {
+    // The sharpest frame (score 9) is pre-selected; the admin picks 6.5s instead.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([
+      posterCandidate('x', 9, 3.7),
+      posterCandidate('yy', 1, 5.1),
+      posterCandidate('zzz', 2, 6.5),
+    ]);
     const user = setup();
     render(<VideoForm />);
 
     await uploadVideoFile(user);
     await screen.findByText('clip.mp4');
     await fillRequiredFields(user);
-    // Explicitly commit the frame first — posterUrl is now set.
-    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1));
+    // The 6.5s candidate's blob is 'zzz' — 3 bytes — not the argmax frame's 1.
+    const file = mocks.posterUploadImpl.mock.calls[0][0] as File;
+    expect(file.size).toBe(3);
+  });
+
+  it('does not re-upload a poster on Save when one is already chosen', async () => {
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    // Commit a poster manually first — posterUrl is now set.
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
     await waitFor(() => expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1));
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -991,8 +1001,28 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
     expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('auto-uploads the highest-scoring candidate by default on Save', async () => {
+    mocks.captureVideoPosterCandidates.mockResolvedValue([
+      posterCandidate('x', 1),
+      posterCandidate('yy', 9),
+      posterCandidate('zzz', 3),
+    ]);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1));
+    // The argmax candidate's blob is 'yy' — 2 bytes — not the first frame's 1.
+    const file = mocks.posterUploadImpl.mock.calls[0][0] as File;
+    expect(file.size).toBe(2);
+  });
+
   it('does not attempt a poster upload on Save when no candidate exists', async () => {
-    // Default captureVideoPoster resolves null → no candidate.
+    // Default captureVideoPosterCandidates resolves [] → no candidate.
     const user = setup();
     render(<VideoForm />);
 
@@ -1010,7 +1040,6 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
   });
 
   it('disables Save while a poster upload is in flight', async () => {
-    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
     let releaseUpload: () => void = () => undefined;
     mocks.posterUploadImpl.mockImplementation(
       () =>
@@ -1023,8 +1052,9 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
 
     await uploadVideoFile(user);
     await screen.findByText('clip.mp4');
-    // Kick off an in-flight poster upload via the explicit button.
-    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
+    // Kick off an in-flight poster upload via the manual picker.
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
 

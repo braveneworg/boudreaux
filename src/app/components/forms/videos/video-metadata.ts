@@ -189,55 +189,85 @@ export const posterCandidateTimes = (duration: number): number[] => {
   );
 };
 
+/** A captured, scored poster-frame candidate. */
+export interface PosterCandidate {
+  /** JPEG-encoded frame. */
+  blob: Blob;
+  /** Timestamp the frame was sampled at. */
+  atSeconds: number;
+  /** `scoreFrameQuality` result — higher is sharper. */
+  score: number;
+}
+
+/** Index of the highest-scoring candidate; ties go to the earliest frame. */
+export const bestPosterCandidateIndex = (candidates: PosterCandidate[]): number =>
+  candidates.reduce(
+    (best, candidate, index) =>
+      candidate.score > (candidates.at(best)?.score ?? 0) ? index : best,
+    0
+  );
+
 /**
- * Capture a JPEG poster frame from a video file. Without `atSeconds` it
- * samples several frames from the 3–10s window (skipping fade-in black frames
- * and blur) and encodes the one scoring highest on `scoreFrameQuality`. With
- * `atSeconds` it captures exactly that frame. Resolves the Blob, or `null`
- * for an unrenderable frame or undecodable file — never rejects.
+ * Capture scored JPEG poster candidates from a video file — one per sampled
+ * timestamp in the 3–10s window (skipping fade-in black frames and blur when
+ * the caller defaults to `bestPosterCandidateIndex`). Each frame is encoded
+ * inline — render → score → `toBlob` → next seek — so at most one
+ * full-resolution canvas is alive at a time. A frame that fails to render or
+ * encode is skipped; an undecodable file resolves `[]` — never rejects.
  */
-export const captureVideoPoster = (file: File, atSeconds?: number): Promise<Blob | null> =>
+export const captureVideoPosterCandidates = (file: File): Promise<PosterCandidate[]> =>
   new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(file);
     const video = document.createElement('video');
-    const finish = (poster: Blob | null): void => {
+    const candidates: PosterCandidate[] = [];
+    const finish = (): void => {
       URL.revokeObjectURL(objectUrl);
-      resolve(poster);
+      resolve(candidates);
     };
 
     let times: number[] = [0];
     let index = 0;
-    let best: { canvas: HTMLCanvasElement; score: number } | null = null;
+
+    const seekNextOrFinish = (): void => {
+      index += 1;
+      const nextTime = times.at(index);
+      if (nextTime === undefined) {
+        finish();
+        return;
+      }
+      video.currentTime = nextTime;
+    };
 
     video.preload = 'metadata';
     video.addEventListener('loadedmetadata', () => {
-      times = atSeconds === undefined ? posterCandidateTimes(video.duration) : [atSeconds];
+      times = posterCandidateTimes(video.duration);
       video.currentTime = times[0];
     });
     video.addEventListener('seeked', () => {
+      const atSeconds = times.at(index) ?? 0;
       try {
         const canvas = renderFrameToCanvas(video);
         if (!canvas) {
-          finish(null);
+          seekNextOrFinish();
           return;
         }
         const score = scoreCanvasQuality(canvas);
-        if (!best || score > best.score) {
-          best = { canvas, score };
-        }
-        index += 1;
-        const nextTime = times.at(index);
-        if (nextTime !== undefined) {
-          video.currentTime = nextTime;
-          return;
-        }
-        best.canvas.toBlob(finish, 'image/jpeg', 0.85);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              candidates.push({ blob, atSeconds, score });
+            }
+            seekNextOrFinish();
+          },
+          'image/jpeg',
+          0.85
+        );
       } catch {
         // A throwing getContext/drawImage/toBlob must not strand the promise or
-        // leak the object URL — resolve null and revoke via finish().
-        finish(null);
+        // leak the object URL — skip the frame and keep the loop moving.
+        seekNextOrFinish();
       }
     });
-    video.addEventListener('error', () => finish(null));
+    video.addEventListener('error', () => finish());
     video.src = objectUrl;
   });

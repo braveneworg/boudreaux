@@ -5,11 +5,13 @@
 import {
   POSTER_SAMPLE_END_SECONDS,
   POSTER_SAMPLE_START_SECONDS,
-  captureVideoPoster,
+  bestPosterCandidateIndex,
+  captureVideoPosterCandidates,
   extractVideoDuration,
   extractVideoTags,
   posterCandidateTimes,
   scoreFrameQuality,
+  type PosterCandidate,
 } from './video-metadata';
 
 const parseBlobMock = vi.fn();
@@ -80,20 +82,19 @@ const setupDom = (): (() => HTMLVideoElement) => {
 };
 
 interface PosterOptions {
-  atSeconds?: number;
   duration?: number;
   width?: number;
   height?: number;
 }
 
-/** Start a poster capture and prime the captured video's metrics. */
-const startPoster = ({ atSeconds, duration = 10, width = 320, height = 240 }: PosterOptions = {}): {
-  promise: Promise<Blob | null>;
+/** Start a poster-candidates capture and prime the captured video's metrics. */
+const startPoster = ({ duration = 10, width = 320, height = 240 }: PosterOptions = {}): {
+  promise: Promise<PosterCandidate[]>;
   video: HTMLVideoElement;
   seeks: number[];
 } => {
   const getVideo = setupDom();
-  const promise = captureVideoPoster(videoFile(), atSeconds);
+  const promise = captureVideoPosterCandidates(videoFile());
   const video = getVideo();
   defineNumber(video, 'videoWidth', width);
   defineNumber(video, 'videoHeight', height);
@@ -302,44 +303,51 @@ describe('extractVideoTags', () => {
   });
 });
 
-describe('captureVideoPoster', () => {
-  it('resolves with the captured jpeg blob on the happy path', async () => {
-    const { promise, video } = startPoster();
+describe('captureVideoPosterCandidates', () => {
+  it('resolves every sampled frame as a candidate in time order', async () => {
+    const { promise, video, seeks } = startPoster({ duration: 245 });
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
-    await expect(promise).resolves.toBe(posterBlob);
+    const candidates = await promise;
+    // window = 10 - 3 = 7; times = 3 + (7 * (i + 0.5)) / 5 for i in 0..4
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([3.7, 5.1, 6.5, 7.9, 9.3]);
+    expect(seeks).toEqual([3.7, 5.1, 6.5, 7.9, 9.3]);
+    candidates.forEach((candidate) => expect(candidate.blob).toBe(posterBlob));
   });
 
-  it('resolves null when the frame canvas has no 2d context', async () => {
-    // First getContext call is the render canvas — returning null there means
-    // renderFrameToCanvas yields null and the capture resolves null.
-    getContextMock.mockReset().mockReturnValueOnce(null);
-    const { promise, video } = startPoster({ atSeconds: 1 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBeNull();
-  });
-
-  it('scores a frame as zero when the sampler canvas has no 2d context', async () => {
-    // Render canvas gets a valid context; the sampler canvas gets null, so
-    // scoreCanvasQuality returns 0 but the frame is still captured.
-    const validContext = {
-      drawImage: drawImageMock,
-      getImageData: getImageDataMock,
-    } as unknown as CanvasRenderingContext2D;
-    getContextMock.mockReset().mockReturnValueOnce(validContext).mockReturnValueOnce(null);
-    const { promise, video } = startPoster({ atSeconds: 1 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBe(posterBlob);
-  });
-
-  it('encodes the poster as jpeg at 0.85 quality', async () => {
+  it('encodes every candidate as jpeg at 0.85 quality', async () => {
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
     await promise;
-    expect(toBlobMock).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.85);
+    expect(toBlobMock).toHaveBeenCalledTimes(5);
+    toBlobMock.mock.calls.forEach((call) => {
+      expect(call[1]).toBe('image/jpeg');
+      expect(call[2]).toBe(0.85);
+    });
+  });
+
+  it('encodes inline per frame rather than batching canvases at the end', async () => {
+    const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('seeked'));
+    // After a single seeked event the first frame must already be encoded —
+    // batching all full-res canvases to the end would hold ~5 RGBA framebuffers.
+    expect(toBlobMock).toHaveBeenCalledTimes(1);
+    dispatchSeeks(video, 4);
+    await promise;
+  });
+
+  it('encodes each frame from its own full-res render canvas', async () => {
+    const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    await promise;
+    // Per candidate the util creates a full-res canvas then a scoring canvas,
+    // so frame i's render canvas sits at even index 2i.
+    toBlobMock.mock.contexts.forEach((context, index) => {
+      expect(context).toBe(createdCanvases[index * 2]);
+    });
   });
 
   it('draws each frame at the native video dimensions', async () => {
@@ -350,41 +358,7 @@ describe('captureVideoPoster', () => {
     expect(drawImageMock).toHaveBeenCalledWith(video, 0, 0, 640, 360);
   });
 
-  it('seeks only the explicit atSeconds when provided', async () => {
-    const { promise, video, seeks } = startPoster({ atSeconds: 3 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await promise;
-    expect(seeks).toEqual([3]);
-  });
-
-  it('samples five candidate frames across the 3–10s window', async () => {
-    const { promise, video, seeks } = startPoster({ duration: 245 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    dispatchSeeks(video, 5);
-    await promise;
-    // window = 10 - 3 = 7; times = 3 + (7 * (i + 0.5)) / 5 for i in 0..4
-    expect(seeks).toEqual([3.7, 5.1, 6.5, 7.9, 9.3]);
-  });
-
-  it('clamps the sample window to a shorter duration', async () => {
-    const { promise, video, seeks } = startPoster({ duration: 6 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    dispatchSeeks(video, 5);
-    await promise;
-    // window = 6 - 3 = 3; times = 3 + (3 * (i + 0.5)) / 5 for i in 0..4
-    expect(seeks).toEqual([3.3, 3.9, 4.5, 5.1, 5.7]);
-  });
-
-  it('captures a single frame at 0 when the duration is not finite', async () => {
-    const { promise, video, seeks } = startPoster({ duration: NaN });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBe(posterBlob);
-    expect(seeks).toEqual([0]);
-  });
-
-  it('encodes the sharpest candidate frame, not the first', async () => {
+  it('carries each frame’s luma score on its candidate', async () => {
     // Candidates 1, 2, 4, 5 sample flat gray; candidate 3 is a checkerboard.
     getImageDataMock
       .mockImplementationOnce(() => flatSample())
@@ -395,64 +369,111 @@ describe('captureVideoPoster', () => {
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
-    await promise;
-    // Per candidate the util creates a full-res canvas then a scoring canvas,
-    // so candidate 3's full-res canvas is the 5th canvas created (index 4).
-    expect(toBlobMock).toHaveBeenCalledTimes(1);
-    expect(toBlobMock.mock.contexts[0]).toBe(createdCanvases[4]);
+    const candidates = await promise;
+    expect(candidates[2].score).toBeGreaterThan(candidates[0].score);
   });
 
-  it('resolves null when toBlob yields no blob', async () => {
-    toBlobMock.mockImplementationOnce((callback: BlobCallback) => callback(null));
+  it('scores a candidate as zero when the sampler canvas has no 2d context', async () => {
+    // Render canvas gets a valid context; the sampler canvas gets null, so
+    // scoreCanvasQuality returns 0 but the frame is still captured.
+    const validContext = {
+      drawImage: drawImageMock,
+      getImageData: getImageDataMock,
+    } as unknown as CanvasRenderingContext2D;
+    getContextMock
+      .mockReset()
+      .mockReturnValueOnce(validContext)
+      .mockReturnValueOnce(null)
+      .mockReturnValue(validContext);
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
-    await expect(promise).resolves.toBeNull();
+    const candidates = await promise;
+    expect(candidates).toHaveLength(5);
+    expect(candidates[0].score).toBe(0);
   });
 
-  it('resolves null when the 2d context is unavailable', async () => {
-    getContextMock.mockReturnValueOnce(null);
-    const { promise, video } = startPoster();
+  it('skips a frame whose render canvas has no 2d context and continues', async () => {
+    const validContext = {
+      drawImage: drawImageMock,
+      getImageData: getImageDataMock,
+    } as unknown as CanvasRenderingContext2D;
+    // Frame 1 renders + scores (calls 1–2); frame 2's render context is null.
+    getContextMock
+      .mockReturnValueOnce(validContext)
+      .mockReturnValueOnce(validContext)
+      .mockReturnValueOnce(null);
+    const { promise, video } = startPoster({ duration: 245 });
     video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBeNull();
+    dispatchSeeks(video, 5);
+    const candidates = await promise;
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([3.7, 6.5, 7.9, 9.3]);
   });
 
-  it('resolves null when rendering the frame throws', async () => {
+  it('skips a frame whose toBlob yields no blob and continues', async () => {
+    toBlobMock.mockImplementationOnce((callback: BlobCallback) => callback(null));
+    const { promise, video } = startPoster({ duration: 245 });
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    const candidates = await promise;
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([5.1, 6.5, 7.9, 9.3]);
+  });
+
+  it('skips a frame whose rendering throws and continues', async () => {
+    drawImageMock.mockImplementationOnce(() => {
+      throw new Error('draw boom');
+    });
+    const { promise, video } = startPoster({ duration: 245 });
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    const candidates = await promise;
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([5.1, 6.5, 7.9, 9.3]);
+  });
+
+  it('resolves an empty list when every frame is unrenderable', async () => {
+    const { promise, video } = startPoster({ width: 0 });
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    await expect(promise).resolves.toEqual([]);
+  });
+
+  it('resolves an empty list when rendering every frame throws', async () => {
     drawImageMock.mockImplementation(() => {
       throw new Error('draw boom');
     });
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBeNull();
+    dispatchSeeks(video, 5);
+    await expect(promise).resolves.toEqual([]);
   });
 
-  it('revokes the object URL when rendering the frame throws', async () => {
-    drawImageMock.mockImplementation(() => {
-      throw new Error('draw boom');
-    });
+  it('resolves an empty list on a media error event', async () => {
     const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('error'));
+    await expect(promise).resolves.toEqual([]);
+  });
+
+  it('captures a single candidate at 0 when the duration is not finite', async () => {
+    const { promise, video, seeks } = startPoster({ duration: NaN });
     video.dispatchEvent(new Event('loadedmetadata'));
     video.dispatchEvent(new Event('seeked'));
+    const candidates = await promise;
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([0]);
+    expect(seeks).toEqual([0]);
+  });
+
+  it('revokes the object URL after capturing', async () => {
+    const { promise, video } = startPoster();
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
     await promise;
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
   });
 
-  it('resolves null when the video has zero dimensions', async () => {
-    const { promise, video } = startPoster({ width: 0 });
-    video.dispatchEvent(new Event('loadedmetadata'));
-    video.dispatchEvent(new Event('seeked'));
-    await expect(promise).resolves.toBeNull();
-  });
-
-  it('resolves null on a media error event', async () => {
-    const { promise, video } = startPoster();
-    video.dispatchEvent(new Event('error'));
-    await expect(promise).resolves.toBeNull();
-  });
-
-  it('revokes the object URL after capturing', async () => {
+  it('revokes the object URL when rendering every frame throws', async () => {
+    drawImageMock.mockImplementation(() => {
+      throw new Error('draw boom');
+    });
     const { promise, video } = startPoster();
     video.dispatchEvent(new Event('loadedmetadata'));
     dispatchSeeks(video, 5);
@@ -465,6 +486,26 @@ describe('captureVideoPoster', () => {
     video.dispatchEvent(new Event('error'));
     await promise;
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+  });
+});
+
+describe('bestPosterCandidateIndex', () => {
+  const candidateWithScore = (score: number): PosterCandidate => ({
+    blob: posterBlob,
+    atSeconds: 0,
+    score,
+  });
+
+  it('returns the index of the highest-scoring candidate', () => {
+    expect(bestPosterCandidateIndex([0, 5, 3].map(candidateWithScore))).toBe(1);
+  });
+
+  it('breaks ties toward the earliest candidate', () => {
+    expect(bestPosterCandidateIndex([2, 2, 1].map(candidateWithScore))).toBe(0);
+  });
+
+  it('returns 0 for an empty list', () => {
+    expect(bestPosterCandidateIndex([])).toBe(0);
   });
 });
 
