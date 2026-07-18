@@ -13,6 +13,8 @@ import { MediaPlayer } from './media-player';
 
 // Mock video.js - factory function must not use variables defined outside
 vi.mock('video.js', () => {
+  let currentVolume = 1;
+  let currentMuted = false;
   const mockPlayer = {
     addClass: vi.fn(),
     removeClass: vi.fn(),
@@ -29,6 +31,20 @@ vi.mock('video.js', () => {
     userActive: vi.fn(),
     error: vi.fn().mockReturnValue(null),
     el: vi.fn().mockReturnValue(document.createElement('div')),
+    volume: vi.fn((value?: number) => {
+      if (value !== undefined) {
+        currentVolume = value;
+        return undefined;
+      }
+      return currentVolume;
+    }),
+    muted: vi.fn((value?: boolean) => {
+      if (value !== undefined) {
+        currentMuted = value;
+        return undefined;
+      }
+      return currentMuted;
+    }),
   };
 
   const componentRegistry = new Map<string, unknown>([['Button', () => null]]);
