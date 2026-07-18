@@ -776,21 +776,25 @@ it('restores filter state across unmount and remount', async () => {
   vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
   const { unmount } = render(<ReleaseDataView />, { wrapper: createWrapper() });
-  await userEvent.click(screen.getByRole('switch', { name: /show deleted/i }));
-  expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+  // Releases render with forceHardDelete, so there is NO "Show deleted"
+  // toggle — drive the "Show unpublished" toggle instead (default ON).
+  await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
+  expect(screen.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
 
   unmount();
   render(<ReleaseDataView />, { wrapper: createWrapper() });
 
   // Store-backed filters survive the remount; local useState would not.
-  expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+  expect(screen.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
 });
 ```
+
+`forceHardDelete` stays on the releases `<DataView>` — the spec mandates the DataView/toolbar contract is untouched. Only the filter STATE moves.
 
 - [ ] **Step 2: Run the spec — expect exactly that test to fail**
 
 Run: `pnpm run test:run -- src/app/admin/data-views/release-data-view.spec.tsx`
-Expected: FAIL — the new test's final `toBeChecked()` fails (state was component-local); all pre-existing tests still pass.
+Expected: FAIL — the new test's final `not.toBeChecked()` fails (state was component-local, so the remounted toggle is back ON); all pre-existing tests still pass.
 
 - [ ] **Step 3: Swap useState for the store in the component**
 
@@ -1102,16 +1106,18 @@ test.describe('Admin data-view filter persistence', () => {
   test('release filters survive navigating away and back, and a reload', async ({ adminPage }) => {
     await adminPage.goto('/admin/releases');
     await adminPage.getByPlaceholder(/search releases/i).fill('Alpha');
-    await adminPage.getByRole('switch', { name: /show deleted/i }).click();
+    // Releases use forceHardDelete → no "Show deleted" toggle exists; the
+    // "Show unpublished" toggle (default ON) is the persistence probe.
+    await adminPage.getByRole('switch', { name: /show unpublished/i }).click();
 
     await adminPage.goto('/admin');
     await adminPage.goto('/admin/releases');
     await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Alpha');
-    await expect(adminPage.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+    await expect(adminPage.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
 
     await adminPage.reload();
     await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Alpha');
-    await expect(adminPage.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+    await expect(adminPage.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
   });
 
   test('video sort selection survives navigation', async ({ adminPage }) => {
