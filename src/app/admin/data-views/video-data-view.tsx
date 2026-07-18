@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ReactElement } from 'react';
 
 import Link from 'next/link';
@@ -30,6 +30,7 @@ import type { VideoRow } from '@/lib/validation/video-schema';
 
 import { LoadMoreTrigger } from './components/load-more-trigger';
 import { VideoAdminCard } from './components/video-admin-card';
+import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 
 import type { VideoCardHandlers } from './components/video-admin-card';
 import type { DataViewPagination } from './data-view-types';
@@ -111,18 +112,21 @@ const VideoListBody = ({
  * generic `DataView`, which has no place for inline video playback.
  */
 export const VideoDataView = (): ReactElement => {
-  const [search, setSearch] = useState('');
-  const [showPublished, setShowPublished] = useState(true);
-  const [showUnpublished, setShowUnpublished] = useState(true);
-  const [showArchived, setShowArchived] = useState(false);
-  const [sort, setSort] = useState<'asc' | 'desc'>('desc');
+  const { search, showPublished, showUnpublished, showArchived, sort } = useDataViewFilters(
+    (state) => state.videos
+  );
+  const setFilters = useDataViewFilters((state) => state.setFilters);
+  const hydrated = useDataViewFiltersHydration();
   const debouncedSearch = useDebounce(search);
 
   // Both same → no publish filter; otherwise the enabled one.
   const published = showPublished === showUnpublished ? null : showPublished;
 
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteVideosQuery({ search: debouncedSearch, published, archived: showArchived, sort });
+    useInfiniteVideosQuery(
+      { search: debouncedSearch, published, archived: showArchived, sort },
+      { enabled: hydrated }
+    );
 
   const videos = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
@@ -168,7 +172,7 @@ export const VideoDataView = (): ReactElement => {
   );
 
   const handleSortChange = (value: string): void => {
-    if (value === 'asc' || value === 'desc') setSort(value);
+    if (value === 'asc' || value === 'desc') setFilters('videos', { sort: value });
   };
 
   return (
@@ -180,13 +184,17 @@ export const VideoDataView = (): ReactElement => {
       <Input
         type="search"
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => setFilters('videos', { search: event.target.value })}
         placeholder="Search videos..."
       />
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex items-center gap-2">
-          <Switch id="show-published" checked={showPublished} onCheckedChange={setShowPublished} />
+          <Switch
+            id="show-published"
+            checked={showPublished}
+            onCheckedChange={(value) => setFilters('videos', { showPublished: value })}
+          />
           <Label htmlFor="show-published" className="cursor-pointer">
             Show published
           </Label>
@@ -195,14 +203,18 @@ export const VideoDataView = (): ReactElement => {
           <Switch
             id="show-unpublished"
             checked={showUnpublished}
-            onCheckedChange={setShowUnpublished}
+            onCheckedChange={(value) => setFilters('videos', { showUnpublished: value })}
           />
           <Label htmlFor="show-unpublished" className="cursor-pointer">
             Show unpublished
           </Label>
         </div>
         <div className="flex items-center gap-2">
-          <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
+          <Switch
+            id="show-archived"
+            checked={showArchived}
+            onCheckedChange={(value) => setFilters('videos', { showArchived: value })}
+          />
           <Label htmlFor="show-archived" className="cursor-pointer">
             Show archived
           </Label>
