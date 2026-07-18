@@ -45,6 +45,7 @@ import {
   mapVideoToFormValues,
   shapePublish,
 } from './videos/video-form-helpers';
+import { bestPosterCandidateIndex, type PosterCandidate } from './videos/video-metadata';
 import { VideoMetadataSection } from './videos/video-metadata-section';
 import { posterCandidateToFile, VideoPosterSection } from './videos/video-poster-section';
 import { VideoProducersSection } from './videos/video-producers-section';
@@ -232,6 +233,10 @@ const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | 
 const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
   uploadStatus === 'uploading' || isPosterUploading;
 
+/** The blob the submit path auto-uploads — the selected candidate's, if any. */
+const selectedCandidateBlob = (candidates: PosterCandidate[], selectedIndex: number): Blob | null =>
+  candidates.at(selectedIndex)?.blob ?? null;
+
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */
   isPersisted: boolean;
@@ -274,7 +279,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
   const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
-  const [posterCandidate, setPosterCandidate] = useState<Blob | null>(null);
+  const [posterCandidates, setPosterCandidates] = useState<PosterCandidate[]>([]);
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
 
   /** Tracks whether the next submit is a Save or a Publish. */
   const submitIntentRef = useRef<SubmitIntent>('save');
@@ -309,10 +315,16 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     isEditMode,
     getArtistDetails: buildArtistDetails,
   });
+  // Capturing a fresh candidate set pre-selects the sharpest frame, so the
+  // Save auto-upload commits exactly what the old single-winner capture did.
+  const handlePosterCandidates = useCallback((candidates: PosterCandidate[]): void => {
+    setPosterCandidates(candidates);
+    setSelectedCandidateIndex(bestPosterCandidateIndex(candidates));
+  }, []);
   const upload = useVideoUpload({
     preGeneratedId,
     form,
-    onPosterCandidate: setPosterCandidate,
+    onPosterCandidates: handlePosterCandidates,
     onUploadComplete: handleUploadComplete,
   });
   // Owned by the form (not the section) so Save can auto-commit the visible
@@ -320,6 +332,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const poster = useVideoPosterUpload({ preGeneratedId, setValue });
 
   const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
+  const selectedPosterBlob = selectedCandidateBlob(posterCandidates, selectedCandidateIndex);
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
 
@@ -375,7 +388,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       // Commit the visible candidate frame before submit so Save (or Publish)
       // persists the poster the admin can see, not the empty default.
       const resolvedPoster = await resolveSubmitPosterUrl({
-        candidate: posterCandidate,
+        candidate: selectedPosterBlob,
         posterUrl: data.posterUrl,
         uploadPoster: poster.uploadPoster,
         getPosterUrl: () => form.getValues('posterUrl'),
@@ -399,7 +412,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       );
     },
     [
-      posterCandidate,
+      selectedPosterBlob,
       poster.uploadPoster,
       isDraft,
       isPersisted,
@@ -465,7 +478,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoPosterSection
               control={control}
-              candidate={posterCandidate}
+              candidates={posterCandidates}
+              selectedIndex={selectedCandidateIndex}
+              onSelectCandidate={setSelectedCandidateIndex}
               uploadedPosterUrl={poster.uploadedPosterUrl}
               isUploading={poster.isUploading}
               errorMessage={poster.errorMessage}

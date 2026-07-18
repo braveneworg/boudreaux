@@ -7,6 +7,7 @@ import { uploadVideoMultipart } from '@/lib/utils/multipart-upload';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { useVideoUpload } from './use-video-upload';
+import { captureVideoPosterCandidates, type PosterCandidate } from './video-metadata';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -15,7 +16,7 @@ vi.mock('@/lib/utils/multipart-upload', () => ({ uploadVideoMultipart: vi.fn() }
 vi.mock('./video-metadata', () => ({
   extractVideoDuration: vi.fn().mockResolvedValue(undefined),
   extractVideoTags: vi.fn().mockResolvedValue({ title: 'clip' }),
-  captureVideoPoster: vi.fn().mockResolvedValue(null),
+  captureVideoPosterCandidates: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('./video-form-helpers', () => ({
@@ -27,10 +28,12 @@ vi.mock('sonner', () => ({ toast: { info: vi.fn() } }));
 
 const PRE_GENERATED_ID = '507f1f77bcf86cd799439011';
 
-const setup = (): ReturnType<typeof renderHook<ReturnType<typeof useVideoUpload>, void>> => {
+const setup = (
+  onPosterCandidates: (candidates: PosterCandidate[]) => void = vi.fn()
+): ReturnType<typeof renderHook<ReturnType<typeof useVideoUpload>, void>> => {
   const form = { setValue: vi.fn() } as unknown as UseFormReturn<VideoFormData>;
   return renderHook(() =>
-    useVideoUpload({ preGeneratedId: PRE_GENERATED_ID, form, onPosterCandidate: vi.fn() })
+    useVideoUpload({ preGeneratedId: PRE_GENERATED_ID, form, onPosterCandidates })
   );
 };
 
@@ -42,7 +45,7 @@ const setupWithCallback = (
     useVideoUpload({
       preGeneratedId: PRE_GENERATED_ID,
       form,
-      onPosterCandidate: vi.fn(),
+      onPosterCandidates: vi.fn(),
       onUploadComplete,
     })
   );
@@ -70,6 +73,28 @@ describe('useVideoUpload — unmount', () => {
     unmount();
 
     expect(capturedSignal?.aborted).toBe(true);
+  });
+});
+
+describe('useVideoUpload — poster candidates', () => {
+  it('forwards the captured candidates to onPosterCandidates', async () => {
+    vi.mocked(uploadVideoMultipart).mockResolvedValue({
+      success: true,
+      s3Key: 'media/videos/x/clip.mp4',
+      fileSize: 2048,
+    });
+    const candidates: PosterCandidate[] = [
+      { blob: new Blob(['frame'], { type: 'image/jpeg' }), atSeconds: 3.7, score: 42 },
+    ];
+    vi.mocked(captureVideoPosterCandidates).mockResolvedValue(candidates);
+    const onPosterCandidates = vi.fn();
+
+    const { result } = setup(onPosterCandidates);
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+
+    await waitFor(() => expect(onPosterCandidates).toHaveBeenCalledWith(candidates));
   });
 });
 
