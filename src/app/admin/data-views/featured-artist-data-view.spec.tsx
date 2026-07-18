@@ -98,6 +98,7 @@ describe('FeaturedArtistDataView', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
       publishedOn: null,
+      deletedOn: null,
       artists: [],
       digitalFormat: null,
       release: null,
@@ -345,7 +346,8 @@ describe('FeaturedArtistDataView', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
     expect(useInfiniteFeaturedArtistsQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -371,5 +373,18 @@ describe('FeaturedArtistDataView', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => expect(deleteFeaturedArtistAction).toHaveBeenCalledWith('featured-123'));
+  });
+
+  it('restores filter state across unmount and remount', async () => {
+    vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(toInfiniteResult(mockRows) as never);
+
+    const { unmount } = render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+    await userEvent.click(screen.getByRole('switch', { name: /show deleted/i }));
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+
+    unmount();
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
   });
 });

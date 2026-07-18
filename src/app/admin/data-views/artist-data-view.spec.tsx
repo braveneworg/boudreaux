@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
@@ -72,6 +73,13 @@ vi.mock('./data-view', () => ({
         >
           toggle unpublished
         </button>
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Show deleted"
+          checked={filters.showDeleted as boolean}
+          onChange={(e) => filters.onShowDeletedChange(e.target.checked)}
+        />
         <button
           type="button"
           data-testid="invoke-publish"
@@ -164,7 +172,8 @@ describe('ArtistDataView', () => {
     fireEvent.click(screen.getByTestId('toggle-unpublished'));
 
     expect(mockUseArtistsQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -181,5 +190,19 @@ describe('ArtistDataView', () => {
       expect(archiveArtistAction).toHaveBeenCalledWith('artist-1');
       expect(restoreArtistAction).toHaveBeenCalledWith('artist-1');
     });
+  });
+
+  it('restores filter state across unmount and remount', async () => {
+    mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    const { unmount } = render(<ArtistDataView />);
+    await user.click(screen.getByRole('switch', { name: /show deleted/i }));
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+
+    unmount();
+    render(<ArtistDataView />);
+
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
   });
 });
