@@ -11,6 +11,11 @@ const PRISTINE_ENV = { ...process.env };
 // Mock server-only module to allow testing server-side code
 vi.mock('server-only', () => ({}));
 
+// Auto-mock zustand via __mocks__/zustand.ts: every store created in a test
+// file registers a reset fn and the mock's own afterEach restores initial
+// state between tests, so module-level stores cannot leak state across tests.
+vi.mock('zustand');
+
 // Global safety-net mock for the Prisma client singleton. `src/lib/prisma.ts`
 // constructs `new PrismaClient()` at module load, and the generated library
 // engine initializes its native N-API addon eagerly. Loading that native engine
@@ -283,6 +288,13 @@ if (typeof window !== 'undefined') {
 // Mock call history is cleared automatically by clearMocks: true in vitest.config.ts.
 afterEach(() => {
   cleanupFn();
+
+  // Persisted zustand stores (and any direct storage writes) must not leak
+  // between tests. node-env specs have no window, hence the guard.
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  }
 
   // Restore any `vi.stubEnv` calls, then reset `process.env` to the pristine
   // snapshot so raw assignments / deletes in one test cannot leak into the next.

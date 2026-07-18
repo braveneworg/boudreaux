@@ -318,6 +318,22 @@ describe('ReleaseDataView', () => {
     expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
   });
 
+  it('restores filter state across unmount and remount', async () => {
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+
+    const { unmount } = render(<ReleaseDataView />, { wrapper: createWrapper() });
+    // Releases render with forceHardDelete, so there is NO "Show deleted"
+    // toggle — drive the "Show unpublished" toggle instead (default ON).
+    await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
+    expect(screen.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
+
+    unmount();
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    // Store-backed filters survive the remount; local useState would not.
+    expect(screen.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
+  });
+
   it('passes a published filter to the query when the publish toggles differ', async () => {
     vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
@@ -326,7 +342,8 @@ describe('ReleaseDataView', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
     expect(useInfiniteReleasesQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 

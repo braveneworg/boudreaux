@@ -85,11 +85,24 @@ beforeEach(() => {
 });
 
 describe('VideoDataView filters', () => {
+  it('restores sort and archived filters across unmount and remount', async () => {
+    const { unmount } = render(<VideoDataView />);
+    await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
+    await userEvent.click(screen.getByRole('switch', { name: /show archived/i }));
+
+    unmount();
+    render(<VideoDataView />);
+
+    expect(screen.getByRole('radio', { name: /oldest first/i })).toBeChecked();
+    expect(screen.getByRole('switch', { name: /show archived/i })).toBeChecked();
+  });
+
   it('defaults to no publish filter with both toggles on', () => {
     render(<VideoDataView />);
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ search: '', published: null, archived: false, sort: 'desc' })
+      expect.objectContaining({ search: '', published: null, archived: false, sort: 'desc' }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -99,7 +112,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -109,7 +123,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show published/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: false })
+      expect.objectContaining({ published: false }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -120,7 +135,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: null })
+      expect.objectContaining({ published: null }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -130,7 +146,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show archived/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ archived: true })
+      expect.objectContaining({ archived: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -140,7 +157,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sort: 'asc' })
+      expect.objectContaining({ sort: 'asc' }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -151,7 +169,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sort: 'desc' })
+      expect.objectContaining({ sort: 'desc' }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -161,7 +180,8 @@ describe('VideoDataView filters', () => {
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
     expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sort: 'desc' })
+      expect.objectContaining({ sort: 'desc' }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -172,7 +192,8 @@ describe('VideoDataView filters', () => {
 
     await waitFor(() =>
       expect(useInfiniteVideosQuery).toHaveBeenLastCalledWith(
-        expect.objectContaining({ search: 'jazz' })
+        expect.objectContaining({ search: 'jazz' }),
+        expect.objectContaining({ enabled: true })
       )
     );
   });

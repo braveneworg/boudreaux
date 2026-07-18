@@ -5,7 +5,9 @@ import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
+import type { DataViewFilters } from '@/app/admin/data-views/data-view-types';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
@@ -50,14 +52,20 @@ type EntityMutations = {
   delete: EntityMutation;
   restore?: EntityMutation;
 };
-type DataViewFilters = { onShowUnpublishedChange: (value: boolean) => void };
+
+interface DataViewMockProps {
+  mutations: EntityMutations;
+  filters: DataViewFilters;
+  entity: unknown;
+  imageField: unknown;
+}
 
 // DataView is mocked to a stub exposing the injected mutation callbacks as
 // buttons, so the wrapper's `(id) => xAsync({ artistId: id })` arrows execute.
 vi.mock('./data-view', () => ({
-  DataView: (props: Record<string, unknown>) => {
-    const mutations = props.mutations as EntityMutations;
-    const filters = props.filters as DataViewFilters;
+  DataView: (props: DataViewMockProps) => {
+    const mutations = props.mutations;
+    const filters = props.filters;
     return (
       <div
         data-testid="data-view"
@@ -72,6 +80,13 @@ vi.mock('./data-view', () => ({
         >
           toggle unpublished
         </button>
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Show deleted"
+          checked={filters.showDeleted}
+          onChange={(e) => filters.onShowDeletedChange(e.target.checked)}
+        />
         <button
           type="button"
           data-testid="invoke-publish"
@@ -164,7 +179,8 @@ describe('ArtistDataView', () => {
     fireEvent.click(screen.getByTestId('toggle-unpublished'));
 
     expect(mockUseArtistsQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
@@ -181,5 +197,19 @@ describe('ArtistDataView', () => {
       expect(archiveArtistAction).toHaveBeenCalledWith('artist-1');
       expect(restoreArtistAction).toHaveBeenCalledWith('artist-1');
     });
+  });
+
+  it('restores filter state across unmount and remount', async () => {
+    mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    const { unmount } = render(<ArtistDataView />);
+    await user.click(screen.getByRole('switch', { name: /show deleted/i }));
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+
+    unmount();
+    render(<ArtistDataView />);
+
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
   });
 });

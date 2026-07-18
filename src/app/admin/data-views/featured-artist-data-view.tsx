@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Globe } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
 import { DataView } from './data-view';
+import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 
 export const FeaturedArtistDataView = () => {
   const { publishFeaturedArtistsAsync, isPublishingFeaturedArtists: isPublishing } =
@@ -39,10 +40,11 @@ export const FeaturedArtistDataView = () => {
     'publishedOn',
   ];
 
-  const [search, setSearch] = useState('');
-  const [showPublished, setShowPublished] = useState(true);
-  const [showUnpublished, setShowUnpublished] = useState(true);
-  const [showDeleted, setShowDeleted] = useState(false);
+  const { search, showPublished, showUnpublished, showDeleted } = useDataViewFilters(
+    (state) => state.featuredArtists
+  );
+  const setFilters = useDataViewFilters((state) => state.setFilters);
+  const hydrated = useDataViewFiltersHydration();
   const debouncedSearch = useDebounce(search);
 
   // Both same → no publish filter; otherwise the enabled one.
@@ -57,7 +59,10 @@ export const FeaturedArtistDataView = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteFeaturedArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  } = useInfiniteFeaturedArtistsQuery(
+    { search: debouncedSearch, published, deleted: showDeleted },
+    { enabled: hydrated }
+  );
 
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
@@ -107,13 +112,14 @@ export const FeaturedArtistDataView = () => {
         pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
         filters={{
           search,
-          onSearchChange: setSearch,
+          onSearchChange: (value) => setFilters('featuredArtists', { search: value }),
           showPublished,
-          onShowPublishedChange: setShowPublished,
+          onShowPublishedChange: (value) => setFilters('featuredArtists', { showPublished: value }),
           showUnpublished,
-          onShowUnpublishedChange: setShowUnpublished,
+          onShowUnpublishedChange: (value) =>
+            setFilters('featuredArtists', { showUnpublished: value }),
           showDeleted,
-          onShowDeletedChange: setShowDeleted,
+          onShowDeletedChange: (value) => setFilters('featuredArtists', { showDeleted: value }),
         }}
         getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
       />

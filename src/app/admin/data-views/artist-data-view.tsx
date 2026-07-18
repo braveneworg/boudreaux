@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   useArchiveArtistMutation,
@@ -16,6 +16,7 @@ import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 
 import { DataView } from './data-view';
+import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 
 export const ArtistDataView = () => {
   const { publishArtistAsync } = usePublishArtistMutation();
@@ -32,10 +33,11 @@ export const ArtistDataView = () => {
     'publishedOn',
   ];
 
-  const [search, setSearch] = useState('');
-  const [showPublished, setShowPublished] = useState(true);
-  const [showUnpublished, setShowUnpublished] = useState(true);
-  const [showDeleted, setShowDeleted] = useState(false);
+  const { search, showPublished, showUnpublished, showDeleted } = useDataViewFilters(
+    (state) => state.artists
+  );
+  const setFilters = useDataViewFilters((state) => state.setFilters);
+  const hydrated = useDataViewFiltersHydration();
   const debouncedSearch = useDebounce(search);
 
   // Both same → no publish filter; otherwise the enabled one.
@@ -50,7 +52,10 @@ export const ArtistDataView = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteArtistsQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  } = useInfiniteArtistsQuery(
+    { search: debouncedSearch, published, deleted: showDeleted },
+    { enabled: hydrated }
+  );
 
   const rows = useMemo(() => data?.pages.flatMap((page) => page.rows) ?? [], [data]);
 
@@ -81,13 +86,13 @@ export const ArtistDataView = () => {
       pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
       filters={{
         search,
-        onSearchChange: setSearch,
+        onSearchChange: (value) => setFilters('artists', { search: value }),
         showPublished,
-        onShowPublishedChange: setShowPublished,
+        onShowPublishedChange: (value) => setFilters('artists', { showPublished: value }),
         showUnpublished,
-        onShowUnpublishedChange: setShowUnpublished,
+        onShowUnpublishedChange: (value) => setFilters('artists', { showUnpublished: value }),
         showDeleted,
-        onShowDeletedChange: setShowDeleted,
+        onShowDeletedChange: (value) => setFilters('artists', { showDeleted: value }),
       }}
     />
   );

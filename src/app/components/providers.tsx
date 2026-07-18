@@ -10,8 +10,6 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { reportResponseValidationError } from '@/lib/query-error-reporter';
 
-import { ChatOpenProvider } from './chat/use-chat-open';
-
 import type { ThemeProviderProps } from 'next-themes';
 
 const ThemeProvider = ({ children, ...props }: ThemeProviderProps) => {
@@ -40,12 +38,12 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
 
   // better-auth's `useSession` reads from its own nanostore and needs no
   // React context provider, so the legacy `SessionProvider` wrapper is gone.
+  // The chat drawer's open state lives in the `useChatOpen` zustand store,
+  // so it needs no provider either.
   return (
     <QueryClientProvider client={client}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-        {/* Shares the chat drawer's open state between the global launcher
-            and triggers docked inside page panels. */}
-        <ChatOpenProvider>{children}</ChatOpenProvider>
+        {children}
       </ThemeProvider>
     </QueryClientProvider>
   );
