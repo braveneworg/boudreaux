@@ -6,7 +6,7 @@ import type ReactModule from 'react';
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { FeaturedArtist } from '@/lib/types/media-models';
@@ -233,6 +233,20 @@ vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     <span data-testid="cover-art-image" data-src={src} data-alt={alt} />
   ),
+}));
+
+// Capture ReleaseShareWidget props so tests can invoke the setSelectedArtist relay.
+const shareWidgetProps = vi.hoisted(() => ({
+  current: null as null | {
+    setSelectedArtist?: (artist: unknown) => void;
+  },
+}));
+
+vi.mock('./release-share-widget', () => ({
+  ReleaseShareWidget: (props: { setSelectedArtist?: (artist: unknown) => void }) => {
+    shareWidgetProps.current = props;
+    return <div data-testid="release-share-widget-mock" />;
+  },
 }));
 
 // Stub AddToPlaylistMenu: echo the built `item` (as JSON) and the positioning
@@ -509,6 +523,22 @@ describe('FeaturedArtistsPlayer', () => {
     fireEvent.click(screen.getByTestId('artist-featured-2'));
 
     // Should now display second artist via cover art data-alt text
+    expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
+  });
+
+  it('restores the selected artist across unmount and remount', () => {
+    const { unmount } = render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+    expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
+
+    unmount();
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    // Store-backed selection survives the remount; local useState would not.
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
   });
 
@@ -1632,6 +1662,40 @@ describe('FeaturedArtistsPlayer', () => {
         'data-current-file-id',
         'file-2'
       );
+    });
+  });
+
+  describe('share widget relay', () => {
+    it('relays share-widget artist selection into the store', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist-2 (has a release) so the widget mounts and captures props.
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      // Now relay a selection back to artist-1 via the widget callback.
+      act(() => {
+        shareWidgetProps.current?.setSelectedArtist?.(mockFeaturedArtists[0]);
+      });
+
+      expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
+    });
+
+    it('ignores a null share-widget selection', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist-2 (has a release) so the widget mounts and captures props.
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      // Calling with null must not change the selection (the if (artist) guard).
+      act(() => {
+        shareWidgetProps.current?.setSelectedArtist?.(null);
+      });
+
+      expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
     });
   });
 

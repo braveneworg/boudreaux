@@ -10,6 +10,7 @@ import videojs from 'video.js';
 // video.js base skin CSS is imported globally in globals.css — do NOT re-import
 // it here; a chunk-level stylesheet on this ssr:false subtree would arrive late.
 
+import { bindPlayerVolumePersistence } from '@/hooks/use-player-prefs';
 import { cn } from '@/lib/utils';
 
 import { getVideoMimeType } from './get-video-mime-type';
@@ -64,6 +65,8 @@ export const VideoPlayerSurface = ({
       poster: posterUrl ?? undefined,
       sources: [{ src, type: getVideoMimeType(src) }],
     });
+
+    bindPlayerVolumePersistence(player);
 
     player.ready(() => {
       // Autoplay policies can reject play() even after a gesture — swallow it.

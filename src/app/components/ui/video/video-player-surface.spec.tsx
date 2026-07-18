@@ -4,6 +4,8 @@
 import { act, render, screen } from '@testing-library/react';
 import videojs from 'video.js';
 
+import { usePlayerPrefs } from '@/hooks/use-player-prefs';
+
 import { claimPlayback } from './video-playback-coordinator';
 import { VideoPlayerSurface } from './video-player-surface';
 
@@ -13,6 +15,8 @@ interface FakePlayer {
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
+  volume: (value?: number) => number | undefined;
+  muted: (value?: boolean) => boolean | undefined;
   /** Test-only helper to fire a registered video.js event handler. */
   trigger: (event: string) => void;
 }
@@ -23,6 +27,8 @@ interface FakePlayer {
 vi.mock('video.js', () => {
   const makePlayer = (): FakePlayer => {
     const handlers = new Map<string, Array<() => void>>();
+    let currentVolume = 1;
+    let currentMuted = false;
     return {
       ready: vi.fn((callback: () => void) => callback()),
       on: vi.fn((event: string, callback: () => void) => {
@@ -33,6 +39,20 @@ vi.mock('video.js', () => {
       play: vi.fn(() => Promise.reject(new Error('autoplay-blocked'))),
       pause: vi.fn(),
       dispose: vi.fn(),
+      volume: vi.fn((value?: number) => {
+        if (value !== undefined) {
+          currentVolume = value;
+          return undefined;
+        }
+        return currentVolume;
+      }),
+      muted: vi.fn((value?: boolean) => {
+        if (value !== undefined) {
+          currentMuted = value;
+          return undefined;
+        }
+        return currentMuted;
+      }),
       trigger: (event: string) => handlers.get(event)?.forEach((callback) => callback()),
     };
   };
@@ -164,5 +184,28 @@ describe('VideoPlayerSurface', () => {
     expect(players).toHaveLength(1);
     expect(second).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
+  });
+
+  it('applies stored volume prefs when the player mounts', () => {
+    usePlayerPrefs.getState().setVolume(0.35);
+    usePlayerPrefs.getState().setMuted(true);
+
+    render(<VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />);
+
+    const [player] = getPlayers();
+    expect(player.volume()).toBe(0.35);
+    expect(player.muted()).toBe(true);
+  });
+
+  it('records user volume changes into the prefs store', () => {
+    render(<VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />);
+    const [player] = getPlayers();
+
+    player.volume(0.6);
+    player.muted(true);
+    act(() => player.trigger('volumechange'));
+
+    expect(usePlayerPrefs.getState().volume).toBe(0.6);
+    expect(usePlayerPrefs.getState().muted).toBe(true);
   });
 });

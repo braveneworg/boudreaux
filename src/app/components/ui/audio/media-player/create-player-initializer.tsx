@@ -12,6 +12,7 @@ import {
   getSkipNextButton,
   resetClasses,
 } from '@/app/components/ui/audio/audio-controls';
+import { bindPlayerVolumePersistence } from '@/hooks/use-player-prefs';
 
 import type { MediaPlayerControls } from './media-player-controls';
 import type Player from 'video.js/dist/types/player';
@@ -230,6 +231,7 @@ export const createPlayerInitializer = (
 
     playerRef.current = player;
     isInitializedRef.current = true;
+    bindPlayerVolumePersistence(player);
 
     player.ready(() => {
       player.addClass('vjs-audio');

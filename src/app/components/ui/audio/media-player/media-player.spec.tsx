@@ -11,6 +11,10 @@ import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
 
 import { MediaPlayer } from './media-player';
 
+// Hoisted state for video.js mock (vi.mock factories are hoisted, so they
+// cannot reference spec-module-scope let/const directly; use vi.hoisted).
+const playerVolumeState = vi.hoisted(() => ({ volume: 1, muted: false }));
+
 // Mock video.js - factory function must not use variables defined outside
 vi.mock('video.js', () => {
   const mockPlayer = {
@@ -29,6 +33,20 @@ vi.mock('video.js', () => {
     userActive: vi.fn(),
     error: vi.fn().mockReturnValue(null),
     el: vi.fn().mockReturnValue(document.createElement('div')),
+    volume: vi.fn((value?: number) => {
+      if (value !== undefined) {
+        playerVolumeState.volume = value;
+        return undefined;
+      }
+      return playerVolumeState.volume;
+    }),
+    muted: vi.fn((value?: boolean) => {
+      if (value !== undefined) {
+        playerVolumeState.muted = value;
+        return undefined;
+      }
+      return playerVolumeState.muted;
+    }),
   };
 
   const componentRegistry = new Map<string, unknown>([['Button', () => null]]);
@@ -354,6 +372,11 @@ const createMockFeaturedArtist = (
   }) as unknown as FeaturedArtist;
 
 describe('MediaPlayer', () => {
+  beforeEach(() => {
+    playerVolumeState.volume = 1;
+    playerVolumeState.muted = false;
+  });
+
   describe('MediaPlayer container', () => {
     it('should render children', () => {
       render(
