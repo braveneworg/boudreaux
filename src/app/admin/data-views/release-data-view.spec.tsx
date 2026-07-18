@@ -13,6 +13,9 @@ import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 
 import { ReleaseDataView } from './release-data-view';
+import { useDataViewFilters } from './use-data-view-filters';
+
+const STORAGE_KEY = 'boudreaux-admin-filters';
 
 // Mock the useInfiniteReleasesQuery hook
 vi.mock('@/lib/actions/publish-release-action', () => ({
@@ -332,6 +335,45 @@ describe('ReleaseDataView', () => {
 
     // Store-backed filters survive the remount; local useState would not.
     expect(screen.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
+  });
+
+  it('first enabled query uses the persisted search without debounce lag', async () => {
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult([]) as never);
+    // Recreate the pre-hydration state a real first load starts from: a
+    // corrupted-storage rehydrate leaves hasHydrated false (see the
+    // use-data-view-filters-hydration spec), then valid storage is what the
+    // mount-time rehydrate reads.
+    sessionStorage.setItem(STORAGE_KEY, 'not-json{');
+    useDataViewFilters.persist?.rehydrate();
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          releases: {
+            search: 'Persisted Term',
+            showPublished: true,
+            showUnpublished: true,
+            showDeleted: false,
+          },
+        },
+        version: 1,
+      })
+    );
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(useInfiniteReleasesQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: 'Persisted Term' }),
+        expect.objectContaining({ enabled: true })
+      );
+    });
+    // The lag bug: an enabled fetch fired with the not-yet-debounced empty
+    // search, loading the unfiltered list before the persisted one.
+    const laggedCalls = vi
+      .mocked(useInfiniteReleasesQuery)
+      .mock.calls.filter(([params, options]) => params.search === '' && options?.enabled === true);
+    expect(laggedCalls).toHaveLength(0);
   });
 
   it('passes a published filter to the query when the publish toggles differ', async () => {

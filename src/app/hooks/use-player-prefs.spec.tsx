@@ -55,18 +55,17 @@ describe('usePlayerPrefs', () => {
     expect(usePlayerPrefs.getState().muted).toBe(false);
   });
 
-  it('clamps setVolume into the 0..1 range', () => {
-    usePlayerPrefs.getState().setVolume(1.7);
+  it('clamps setPrefs volume into the 0..1 range', () => {
+    usePlayerPrefs.getState().setPrefs({ volume: 1.7 });
     expect(usePlayerPrefs.getState().volume).toBe(1);
-    usePlayerPrefs.getState().setVolume(-0.2);
+    usePlayerPrefs.getState().setPrefs({ volume: -0.2 });
     expect(usePlayerPrefs.getState().volume).toBe(0);
-    usePlayerPrefs.getState().setVolume(0.42);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.42 });
     expect(usePlayerPrefs.getState().volume).toBe(0.42);
   });
 
   it('persists volume and muted (and only those) to localStorage', () => {
-    usePlayerPrefs.getState().setVolume(0.3);
-    usePlayerPrefs.getState().setMuted(true);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.3, muted: true });
 
     const raw = localStorage.getItem(STORAGE_KEY);
     expect(raw).not.toBeNull();
@@ -107,12 +106,49 @@ describe('usePlayerPrefs', () => {
     expect(usePlayerPrefs.getState().volume).toBe(1);
     expect(usePlayerPrefs.getState().muted).toBe(false);
   });
+
+  it('falls back to defaults for corrupted same-version storage', async () => {
+    // Same version as the store: migrate never runs, so the merge must validate.
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { volume: 'loud', muted: 'yes' }, version: 1 })
+    );
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(1);
+    expect(usePlayerPrefs.getState().muted).toBe(false);
+  });
+
+  it('clamps out-of-range same-version volume on rehydrate', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { volume: -0.5, muted: true }, version: 1 })
+    );
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(0);
+    expect(usePlayerPrefs.getState().muted).toBe(true);
+  });
+
+  it('keeps the store functional after a corrupted rehydrate', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: 42, version: 1 }));
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    const fake = makeFakePlayer({ volume: 1, muted: false });
+    bindPlayerVolumePersistence(asPlayer(fake));
+    fake.volume(0.55);
+    fake.trigger('volumechange');
+
+    expect(usePlayerPrefs.getState().volume).toBe(0.55);
+  });
 });
 
 describe('bindPlayerVolumePersistence', () => {
   it('applies stored volume and muted when the player is ready', () => {
-    usePlayerPrefs.getState().setVolume(0.4);
-    usePlayerPrefs.getState().setMuted(true);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.4, muted: true });
     const fake = makeFakePlayer({ volume: 1, muted: false });
 
     bindPlayerVolumePersistence(asPlayer(fake));
@@ -133,8 +169,22 @@ describe('bindPlayerVolumePersistence', () => {
     expect(usePlayerPrefs.getState().muted).toBe(true);
   });
 
+  it('notifies the store exactly once per volumechange event', () => {
+    const fake = makeFakePlayer({ volume: 1, muted: false });
+    bindPlayerVolumePersistence(asPlayer(fake));
+    const listener = vi.fn();
+    const unsubscribe = usePlayerPrefs.subscribe(listener);
+
+    fake.volume(0.5);
+    fake.muted(true);
+    fake.trigger('volumechange');
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
   it('the apply-on-ready echo does not corrupt the stored values', () => {
-    usePlayerPrefs.getState().setVolume(0.25);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.25 });
     const fake = makeFakePlayer({ volume: 1, muted: false });
 
     bindPlayerVolumePersistence(asPlayer(fake));
@@ -146,8 +196,7 @@ describe('bindPlayerVolumePersistence', () => {
   });
 
   it('skips store update on volumechange when player returns undefined', () => {
-    usePlayerPrefs.getState().setVolume(0.5);
-    usePlayerPrefs.getState().setMuted(false);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.5, muted: false });
 
     // Override volume/muted to return undefined (simulates a uninitialized player state)
     const handlers = new Map<string, Array<() => void>>();

@@ -12,13 +12,26 @@ interface PlayerPrefsState {
   /** Playback volume, 0..1. */
   volume: number;
   muted: boolean;
-  setVolume: (volume: number) => void;
-  setMuted: (muted: boolean) => void;
+  /** Updates both prefs in one store write; invalid fields keep their value. */
+  setPrefs: (prefs: { volume?: number; muted?: boolean }) => void;
 }
 
 const DEFAULT_PREFS = { volume: 1, muted: false };
 
 const clampVolume = (volume: number): number => Math.min(1, Math.max(0, volume));
+
+/**
+ * Coerces anything read from durable storage into valid preference values.
+ * localStorage outlives deploys and can be edited or corrupted in place, so
+ * every rehydrate path must validate — never trust the stored shape.
+ */
+const sanitizePrefs = (candidate: unknown): { volume: number; muted: boolean } => {
+  const prefs = candidate as Partial<PlayerPrefsState> | null | undefined;
+  return {
+    volume: typeof prefs?.volume === 'number' ? clampVolume(prefs.volume) : DEFAULT_PREFS.volume,
+    muted: typeof prefs?.muted === 'boolean' ? prefs.muted : DEFAULT_PREFS.muted,
+  };
+};
 
 /**
  * Durable player preferences shared by every audio/video player, persisted to
@@ -31,25 +44,25 @@ export const usePlayerPrefs = create<PlayerPrefsState>()(
   persist(
     (set) => ({
       ...DEFAULT_PREFS,
-      setVolume: (volume) => set({ volume: clampVolume(volume) }),
-      setMuted: (muted) => set({ muted }),
+      setPrefs: ({ volume, muted }) =>
+        set((state) => ({
+          volume: typeof volume === 'number' ? clampVolume(volume) : state.volume,
+          muted: typeof muted === 'boolean' ? muted : state.muted,
+        })),
     }),
     {
       name: 'boudreaux-player-prefs',
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ volume: state.volume, muted: state.muted }),
-      // Durable storage outlives deploys: validate anything not written by
-      // this exact version and fall back to defaults rather than trusting it.
-      migrate: (persistedState) => {
-        const candidate = persistedState as Partial<PlayerPrefsState> | null | undefined;
-        const volume =
-          typeof candidate?.volume === 'number'
-            ? clampVolume(candidate.volume)
-            : DEFAULT_PREFS.volume;
-        const muted = typeof candidate?.muted === 'boolean' ? candidate.muted : DEFAULT_PREFS.muted;
-        return { volume, muted };
-      },
+      // `migrate` only runs on a version MISMATCH; `merge` runs on every
+      // rehydrate, so it must sanitize too or a same-version corrupted
+      // envelope lands in the store unvalidated.
+      migrate: (persistedState) => sanitizePrefs(persistedState),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizePrefs(persistedState),
+      }),
     }
   )
 );
@@ -72,13 +85,8 @@ export const bindPlayerVolumePersistence = (player: Player): void => {
   });
 
   player.on('volumechange', () => {
-    const volume = player.volume();
-    const muted = player.muted();
-    if (typeof volume === 'number') {
-      usePlayerPrefs.getState().setVolume(volume);
-    }
-    if (typeof muted === 'boolean') {
-      usePlayerPrefs.getState().setMuted(muted);
-    }
+    // One store write per event — persist serializes to localStorage on
+    // every write, and volume drags fire volumechange continuously.
+    usePlayerPrefs.getState().setPrefs({ volume: player.volume(), muted: player.muted() });
   });
 };

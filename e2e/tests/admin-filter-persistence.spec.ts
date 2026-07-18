@@ -11,19 +11,25 @@ import { expect, test } from '../fixtures/auth.fixture';
 test.describe('Admin data-view filter persistence', () => {
   test('release filters survive navigating away and back, and a reload', async ({ adminPage }) => {
     await adminPage.goto('/admin/releases');
-    await adminPage.getByPlaceholder(/search releases/i).fill('Alpha');
+    // "Album Two" matches only the published seed "E2E Album Two", so the
+    // row set stays assertable with the unpublished toggle off below.
+    await adminPage.getByPlaceholder(/search releases/i).fill('Album Two');
     // Releases use forceHardDelete → no "Show deleted" toggle exists; the
     // "Show unpublished" toggle (default ON) is the persistence probe.
     await adminPage.getByRole('switch', { name: /show unpublished/i }).click();
 
     await adminPage.goto('/admin');
     await adminPage.goto('/admin/releases');
-    await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Alpha');
+    await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Album Two');
     await expect(adminPage.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
 
     await adminPage.reload();
-    await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Alpha');
+    await expect(adminPage.getByPlaceholder(/search releases/i)).toHaveValue('Album Two');
     await expect(adminPage.getByRole('switch', { name: /show unpublished/i })).not.toBeChecked();
+    // The rows reflect the persisted filters, not just the controls: only
+    // the matching published release renders.
+    await expect(adminPage.getByText('E2E Album Two')).toBeVisible();
+    await expect(adminPage.getByText('E2E Album One')).not.toBeVisible();
   });
 
   test('video sort selection survives navigation', async ({ adminPage }) => {

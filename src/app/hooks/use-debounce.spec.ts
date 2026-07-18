@@ -165,6 +165,52 @@ describe('useDebounce', () => {
     expect(result.current).toBe('world');
   });
 
+  it('adopts the value immediately when flushKey changes', () => {
+    const { result, rerender } = renderHook(
+      ({ value, flushKey }: { value: string; flushKey: boolean }) =>
+        useDebounce(value, 300, { flushKey }),
+      { initialProps: { value: '', flushKey: false } }
+    );
+
+    rerender({ value: 'persisted', flushKey: true });
+
+    // No timer advance: the flush must bypass the debounce delay entirely.
+    expect(result.current).toBe('persisted');
+  });
+
+  it('still debounces value changes while flushKey is stable', () => {
+    const { result, rerender } = renderHook(
+      ({ value, flushKey }: { value: string; flushKey: boolean }) =>
+        useDebounce(value, 300, { flushKey }),
+      { initialProps: { value: 'a', flushKey: true } }
+    );
+
+    rerender({ value: 'ab', flushKey: true });
+    expect(result.current).toBe('a');
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current).toBe('ab');
+  });
+
+  it('debounces normally after a flush', () => {
+    const { result, rerender } = renderHook(
+      ({ value, flushKey }: { value: string; flushKey: boolean }) =>
+        useDebounce(value, 300, { flushKey }),
+      { initialProps: { value: '', flushKey: false } }
+    );
+
+    rerender({ value: 'persisted', flushKey: true });
+    rerender({ value: 'persisted typing', flushKey: true });
+
+    expect(result.current).toBe('persisted');
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current).toBe('persisted typing');
+  });
+
   it('should clean up the timer on unmount', () => {
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 

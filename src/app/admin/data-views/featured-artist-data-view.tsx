@@ -45,7 +45,8 @@ export const FeaturedArtistDataView = () => {
   );
   const setFilters = useDataViewFilters((state) => state.setFilters);
   const hydrated = useDataViewFiltersHydration();
-  const debouncedSearch = useDebounce(search);
+  // flushKey: a rehydrated search reaches the query without the debounce lag.
+  const debouncedSearch = useDebounce(search, 300, { flushKey: hydrated });
 
   // Both same → no publish filter; otherwise the enabled one.
   const published = showPublished === showUnpublished ? null : showPublished;
