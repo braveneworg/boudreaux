@@ -1,13 +1,17 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
+
+import type { UseFormSetValue } from 'react-hook-form';
 
 const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
@@ -26,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   buildArtistDetails: vi.fn(),
   updateDraft: vi.fn(),
   useVideoDraft: vi.fn(),
+  /** Overridable per-test poster-upload behaviour; default replays the real hook. */
+  posterUploadImpl: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -93,6 +99,33 @@ vi.mock('@/lib/actions/presigned-upload-actions', () => ({
 
 vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFileToS3: mocks.uploadFileToS3,
+}));
+
+// Fake the poster-upload hook that VideoForm now owns. It faithfully replays the
+// real hook's contract — delegating to `posterUploadImpl` (which, by default,
+// drives the presign + S3 mocks and writes `posterUrl` via setValue) — so the
+// existing "Use this frame" / manual-pick assertions keep exercising those
+// action mocks, while failure cases can override `posterUploadImpl`.
+vi.mock('@/app/components/forms/videos/use-video-poster-upload', () => ({
+  useVideoPosterUpload: ({ setValue }: { setValue: UseFormSetValue<VideoFormData> }) => {
+    const [uploadedPosterUrl, setUploadedPosterUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const uploadPoster = async (file: File): Promise<void> => {
+      setIsUploading(true);
+      setErrorMessage(null);
+      try {
+        await mocks.posterUploadImpl(file, {
+          setValue,
+          setUploadedPosterUrl,
+          setErrorMessage,
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster };
+  },
 }));
 
 vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
@@ -298,6 +331,39 @@ beforeEach(() => {
     s3Key: 'media/videos/aaa/poster.jpg',
     cdnUrl: 'https://cdn.example.com/poster.jpg',
   });
+  // Default poster-upload behaviour mirrors the real hook: presign → PUT → write
+  // `posterUrl`. A presign/PUT failure surfaces an inline error and leaves the
+  // form value untouched, matching the hook's replace-only contract.
+  mocks.posterUploadImpl.mockImplementation(
+    async (
+      file: File,
+      {
+        setValue,
+        setUploadedPosterUrl,
+        setErrorMessage,
+      }: {
+        setValue: UseFormSetValue<VideoFormData>;
+        setUploadedPosterUrl: (url: string | null) => void;
+        setErrorMessage: (message: string | null) => void;
+      }
+    ) => {
+      const presigned = await mocks.getPresignedUploadUrlsAction('videos', 'a'.repeat(24), [
+        { fileName: file.name, contentType: file.type, fileSize: file.size },
+      ]);
+      const target = presigned.success ? presigned.data?.[0] : undefined;
+      if (!target) {
+        setErrorMessage(presigned.error ?? 'Failed to prepare the poster upload.');
+        return;
+      }
+      const result = await mocks.uploadFileToS3(file, target);
+      if (!result.success) {
+        setErrorMessage(result.error ?? 'Failed to upload the poster.');
+        return;
+      }
+      setValue('posterUrl', result.cdnUrl, { shouldDirty: true, shouldValidate: true });
+      setUploadedPosterUrl(result.cdnUrl);
+    }
+  );
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:candidate');
   globalThis.URL.revokeObjectURL = vi.fn();
 });
@@ -842,6 +908,128 @@ describe('VideoForm — poster', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+  });
+});
+
+describe('VideoForm — poster candidate auto-commit on Save', () => {
+  it('uploads the visible candidate frame on Save when no poster is chosen', async () => {
+    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    // Do NOT click "Use this frame" — just Save with the candidate visible.
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1));
+    const file = mocks.posterUploadImpl.mock.calls[0][0] as File;
+    expect(file.name).toBe('poster.jpg');
+  });
+
+  it('submits the auto-uploaded poster URL in the create payload', async () => {
+    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
+  });
+
+  it('aborts the submit and shows an error toast when the candidate upload fails', async () => {
+    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    // Upload resolves without ever writing posterUrl → failed commit.
+    mocks.posterUploadImpl.mockImplementation(
+      async (
+        _file: File,
+        { setErrorMessage }: { setErrorMessage: (message: string | null) => void }
+      ) => {
+        setErrorMessage('put failed');
+      }
+    );
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        'Poster upload failed — try again or pick a different image.'
+      )
+    );
+    expect(mocks.createVideoAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not re-upload a poster on Save when one is already chosen', async () => {
+    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    // Explicitly commit the frame first — posterUrl is now set.
+    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
+    await waitFor(() => expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    // No second upload — the Save reused the already-persisted posterUrl.
+    expect(mocks.posterUploadImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not attempt a poster upload on Save when no candidate exists', async () => {
+    // Default captureVideoPoster resolves null → no candidate.
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: '' })
+      )
+    );
+    expect(mocks.posterUploadImpl).not.toHaveBeenCalled();
+  });
+
+  it('disables Save while a poster upload is in flight', async () => {
+    mocks.captureVideoPoster.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    let releaseUpload: () => void = () => undefined;
+    mocks.posterUploadImpl.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseUpload = resolve;
+        })
+    );
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    // Kick off an in-flight poster upload via the explicit button.
+    await user.click(await screen.findByRole('button', { name: 'Use this frame' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
+
+    // Let the upload finish so the test tears down cleanly.
+    act(() => releaseUpload());
   });
 });
 
