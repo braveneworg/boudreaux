@@ -76,11 +76,29 @@ export const useDataViewFilters = create<DataViewFiltersState>()(
     (set) => ({
       ...DEFAULT_SLICES,
       setFilters: (entity, patch) =>
-        set(
-          (state) => ({ [entity]: { ...state[entity], ...patch } }) as Partial<DataViewFiltersState>
-        ),
-      resetFilters: (entity) =>
-        set({ [entity]: DEFAULT_SLICES[entity] } as Partial<DataViewFiltersState>),
+        set((state) => {
+          // Explicit branch per key avoids security/detect-object-injection on
+          // dynamic access — entity is a closed DataViewEntityKey union so all
+          // paths are statically reachable and safe.
+          if (entity === 'releases')
+            return { releases: { ...state.releases, ...(patch as Partial<EntityFilters>) } };
+          if (entity === 'artists')
+            return { artists: { ...state.artists, ...(patch as Partial<EntityFilters>) } };
+          if (entity === 'featuredArtists')
+            return {
+              featuredArtists: {
+                ...state.featuredArtists,
+                ...(patch as Partial<EntityFilters>),
+              },
+            };
+          return { videos: { ...state.videos, ...(patch as Partial<VideoFilters>) } };
+        }),
+      resetFilters: (entity) => {
+        if (entity === 'releases') set({ releases: DEFAULT_ENTITY_FILTERS });
+        else if (entity === 'artists') set({ artists: DEFAULT_ENTITY_FILTERS });
+        else if (entity === 'featuredArtists') set({ featuredArtists: DEFAULT_ENTITY_FILTERS });
+        else set({ videos: DEFAULT_VIDEO_FILTERS });
+      },
     }),
     {
       name: 'boudreaux-admin-filters',
