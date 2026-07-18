@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ChatPanelTrigger } from './chat-panel-trigger';
-import { ChatOpenProvider, useChatOpen } from './use-chat-open';
+import { useChatOpen } from './use-chat-open';
 
 const OpenProbe = () => {
   const { open } = useChatOpen();
@@ -14,10 +14,10 @@ const OpenProbe = () => {
 
 const renderDocked = () =>
   render(
-    <ChatOpenProvider>
+    <>
       <ChatPanelTrigger />
       <OpenProbe />
-    </ChatOpenProvider>
+    </>
   );
 
 describe('ChatPanelTrigger', () => {

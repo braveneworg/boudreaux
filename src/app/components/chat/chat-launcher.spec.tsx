@@ -7,7 +7,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ChatLauncher } from './chat-launcher';
-import { ChatOpenProvider } from './use-chat-open';
 
 const useSessionMock = vi.hoisted(() => vi.fn());
 const useIsMobileMock = vi.hoisted(() => vi.fn());
@@ -53,7 +52,7 @@ describe('ChatLauncher', () => {
   it('renders the trigger but no drawer content on first render', () => {
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
 
-    render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    render(<ChatLauncher />);
 
     expect(screen.getByRole('button', { name: /open chat/i })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /live chat/i })).not.toBeInTheDocument();
@@ -62,7 +61,7 @@ describe('ChatLauncher', () => {
   it('hides the fixed trigger via CSS when a panel dock is on the page', () => {
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
 
-    render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    render(<ChatLauncher />);
 
     // The :has() variant keys off the dock's data attribute — pure CSS, so
     // there is no double-button hydration flash on panel pages.
@@ -75,7 +74,7 @@ describe('ChatLauncher', () => {
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
-    render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
 
     expect(screen.getByRole('img', { name: /live chat/i })).toHaveAttribute('alt', 'live chat');
@@ -90,7 +89,7 @@ describe('ChatLauncher', () => {
     });
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
-    render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
 
     // ChatBody is mocked at the top of this file so the launcher test
@@ -103,7 +102,7 @@ describe('ChatLauncher', () => {
     useSessionMock.mockReturnValue(authenticatedSession);
     searchParamsMock.mockReturnValue(new URLSearchParams('chat=mention'));
 
-    const { rerender } = render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    const { rerender } = render(<ChatLauncher />);
 
     // The auto-open effect mounts ChatBody without any click.
     expect(screen.getByTestId('chat-body-mock')).toBeInTheDocument();
@@ -124,7 +123,7 @@ describe('ChatLauncher', () => {
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
     searchParamsMock.mockReturnValue(new URLSearchParams('chat=mention'));
 
-    render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    render(<ChatLauncher />);
 
     expect(screen.queryByText('Sign in to chat')).not.toBeInTheDocument();
   });
@@ -133,7 +132,7 @@ describe('ChatLauncher', () => {
     useSessionMock.mockReturnValue(authenticatedSession);
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
-    const { rerender } = render(<ChatLauncher />, { wrapper: ChatOpenProvider });
+    const { rerender } = render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
     expect(screen.getByTestId('chat-body-mock')).toBeInTheDocument();
 
