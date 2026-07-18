@@ -33,6 +33,7 @@ import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoDraft } from './videos/use-video-draft';
+import { useVideoPosterUpload } from './videos/use-video-poster-upload';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoArtistReviewSection } from './videos/video-artist-review-section';
 import { VideoFileSection } from './videos/video-file-section';
@@ -45,7 +46,7 @@ import {
   shapePublish,
 } from './videos/video-form-helpers';
 import { VideoMetadataSection } from './videos/video-metadata-section';
-import { VideoPosterSection } from './videos/video-poster-section';
+import { posterCandidateToFile, VideoPosterSection } from './videos/video-poster-section';
 import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
@@ -75,6 +76,27 @@ const mergeArtistDetails = (
   data: VideoFormData,
   details: VideoFormData['artistDetails']
 ): VideoFormData => (details?.length ? { ...data, artistDetails: details } : data);
+
+interface ResolveSubmitPosterArgs {
+  candidate: Blob | null;
+  posterUrl: string | undefined;
+  uploadPoster: (file: File) => Promise<void>;
+  getPosterUrl: () => string | undefined;
+}
+
+/** Commit the visible candidate frame before submit; '' + ok:false = upload failed. */
+const resolveSubmitPosterUrl = async ({
+  candidate,
+  posterUrl,
+  uploadPoster,
+  getPosterUrl,
+}: ResolveSubmitPosterArgs): Promise<{ ok: boolean; posterUrl: string }> => {
+  if (posterUrl) return { ok: true, posterUrl };
+  if (!candidate) return { ok: true, posterUrl: '' };
+  await uploadPoster(posterCandidateToFile(candidate));
+  const uploaded = getPosterUrl();
+  return uploaded ? { ok: true, posterUrl: uploaded } : { ok: false, posterUrl: '' };
+};
 
 /** Dispatch to the create/update mutation, then map errors or navigate on success. */
 const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<void> => {
@@ -206,6 +228,10 @@ const handleVideoUnpublish = async ({
 const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | undefined =>
   video ? video.publishedAt : undefined;
 
+/** Save is blocked while either the video multipart or the poster PUT is in flight. */
+const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
+  uploadStatus === 'uploading' || isPosterUploading;
+
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */
   isPersisted: boolean;
@@ -289,6 +315,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     onPosterCandidate: setPosterCandidate,
     onUploadComplete: handleUploadComplete,
   });
+  // Owned by the form (not the section) so Save can auto-commit the visible
+  // candidate frame before submit and the footer can gate on the in-flight PUT.
+  const poster = useVideoPosterUpload({ preGeneratedId, setValue });
 
   const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
 
@@ -340,21 +369,38 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const isFileMissing = !s3Key;
 
   const onValidSubmit = useCallback(
-    (data: VideoFormData): Promise<void> => {
+    async (data: VideoFormData): Promise<void> => {
       const intent = submitIntentRef.current;
       submitIntentRef.current = 'save';
-      const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
-      return submitVideo(shaped, {
-        isPersisted,
-        effectiveVideoId,
-        preGeneratedId,
-        form,
-        router,
-        createVideoAsync,
-        updateVideoAsync,
+      // Commit the visible candidate frame before submit so Save (or Publish)
+      // persists the poster the admin can see, not the empty default.
+      const resolvedPoster = await resolveSubmitPosterUrl({
+        candidate: posterCandidate,
+        posterUrl: data.posterUrl,
+        uploadPoster: poster.uploadPoster,
+        getPosterUrl: () => form.getValues('posterUrl'),
       });
+      if (!resolvedPoster.ok) {
+        toast.error('Poster upload failed — try again or pick a different image.');
+        return;
+      }
+      const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
+      return submitVideo(
+        { ...shaped, posterUrl: resolvedPoster.posterUrl },
+        {
+          isPersisted,
+          effectiveVideoId,
+          preGeneratedId,
+          form,
+          router,
+          createVideoAsync,
+          updateVideoAsync,
+        }
+      );
     },
     [
+      posterCandidate,
+      poster.uploadPoster,
       isDraft,
       isPersisted,
       effectiveVideoId,
@@ -419,9 +465,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoPosterSection
               control={control}
-              setValue={setValue}
-              preGeneratedId={preGeneratedId}
               candidate={posterCandidate}
+              uploadedPosterUrl={poster.uploadedPosterUrl}
+              isUploading={poster.isUploading}
+              errorMessage={poster.errorMessage}
+              uploadPoster={poster.uploadPoster}
             />
             <VideoPublishSection control={control} onSelectDate={handleSelectDate} />
 
@@ -434,7 +482,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             <VideoFormFooter
               mode={footerMode}
               isSubmitting={isSubmitting}
-              isUploading={upload.status === 'uploading'}
+              isUploading={isSaveBlocked(upload.status, poster.isUploading)}
               onCancel={handleCancel}
               onPublish={handlePublish}
               onUnpublish={handleUnpublish}

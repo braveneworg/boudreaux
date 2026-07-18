@@ -13,17 +13,25 @@ import { useWatch } from 'react-hook-form';
 import { Button } from '@/app/components/ui/button';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import { useVideoPosterUpload } from './use-video-poster-upload';
-
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 interface VideoPosterSectionProps {
   control: Control<VideoFormData>;
-  setValue: UseFormSetValue<VideoFormData>;
-  preGeneratedId: string;
   /** Poster frame captured from a freshly-selected video, offered as a candidate. */
   candidate: Blob | null;
+  /** CDN URL of a poster uploaded this session (highest display priority). */
+  uploadedPosterUrl: string | null;
+  /** True while a poster presign/PUT is in flight — disables the pick affordances. */
+  isUploading: boolean;
+  /** Inline poster-upload error message, or null. */
+  errorMessage: string | null;
+  /** Presign-and-PUT a poster image, writing `posterUrl` on success. */
+  uploadPoster: (file: File) => Promise<void>;
 }
+
+/** Wrap a captured candidate frame as the `poster.jpg` JPEG File the upload expects. */
+export const posterCandidateToFile = (candidate: Blob): File =>
+  new File([candidate], 'poster.jpg', { type: 'image/jpeg' });
 
 const PosterPreview = ({ src }: { src: string | null }): React.ReactElement =>
   src ? (
@@ -40,20 +48,20 @@ const PosterPreview = ({ src }: { src: string | null }): React.ReactElement =>
  * Poster capture/upload — replace-only (no clear). Priority: a poster uploaded
  * this session → the captured-frame candidate → the existing `posterUrl` → an
  * empty placeholder. "Use this frame" and the manual picker share one presign +
- * PUT path; the form submits fine without any poster.
+ * PUT path (the `uploadPoster` the parent form now owns). The form submits fine
+ * without any poster; and clicking Save with only the candidate visible commits
+ * it automatically (the parent auto-uploads the candidate before submitting).
  */
 export const VideoPosterSection = ({
   control,
-  setValue,
-  preGeneratedId,
   candidate,
+  uploadedPosterUrl,
+  isUploading,
+  errorMessage,
+  uploadPoster,
 }: VideoPosterSectionProps): React.ReactElement => {
   const inputId = useId();
   const existingPosterUrl = useWatch({ control, name: 'posterUrl' });
-  const { uploadedPosterUrl, isUploading, errorMessage, uploadPoster } = useVideoPosterUpload({
-    preGeneratedId,
-    setValue,
-  });
 
   // Create + revoke the candidate object URL in a single effect keyed on the
   // candidate blob, so StrictMode's dev double-render can't leak an orphan URL.
@@ -77,7 +85,7 @@ export const VideoPosterSection = ({
   };
 
   const onUseFrame = (): void => {
-    if (candidate) void uploadPoster(new File([candidate], 'poster.jpg', { type: 'image/jpeg' }));
+    if (candidate) void uploadPoster(posterCandidateToFile(candidate));
   };
 
   return (
