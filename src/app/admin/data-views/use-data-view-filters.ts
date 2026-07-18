@@ -106,11 +106,22 @@ export const useDataViewFilters = create<DataViewFiltersState>()(
  * @returns `true` once persisted filters (if any) have been applied.
  */
 export const useDataViewFiltersHydration = (): boolean => {
-  const [hydrated, setHydrated] = useState(useDataViewFilters.persist?.hasHydrated() ?? false);
+  const [hydrated, setHydrated] = useState(
+    () => useDataViewFilters.persist?.hasHydrated() ?? false
+  );
 
   useEffect(() => {
-    const unsubscribe = useDataViewFilters.persist.onFinishHydration(() => setHydrated(true));
-    void useDataViewFilters.persist.rehydrate();
+    // Storage-blocked environments (and SSR) have no persist API at all —
+    // createJSONStorage returned undefined, so the middleware never attached
+    // it. Degrade to "hydrated": filters simply aren't persisted, but the
+    // views must still load.
+    const persistApi = useDataViewFilters.persist;
+    if (!persistApi) {
+      setHydrated(true);
+      return;
+    }
+    const unsubscribe = persistApi.onFinishHydration(() => setHydrated(true));
+    void persistApi.rehydrate();
     return unsubscribe;
   }, []);
 

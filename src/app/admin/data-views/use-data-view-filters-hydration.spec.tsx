@@ -42,4 +42,27 @@ describe('useDataViewFiltersHydration', () => {
     // Slices absent from storage keep their defaults.
     expect(useDataViewFilters.getState().releases.search).toBe('');
   });
+
+  it('degrades to hydrated when the persist API is unavailable', async () => {
+    const persistApi = useDataViewFilters.persist;
+    // Simulate a storage-blocked client: the middleware never attached the
+    // persist API. Restore in finally so other tests keep persistence.
+    Object.defineProperty(useDataViewFilters, 'persist', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    try {
+      const { result } = renderHook(() => useDataViewFiltersHydration());
+      await waitFor(() => {
+        expect(result.current).toBe(true);
+      });
+    } finally {
+      Object.defineProperty(useDataViewFilters, 'persist', {
+        configurable: true,
+        writable: true,
+        value: persistApi,
+      });
+    }
+  });
 });
