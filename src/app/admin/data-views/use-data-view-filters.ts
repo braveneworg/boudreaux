@@ -139,7 +139,10 @@ export const useDataViewFiltersHydration = (): boolean => {
       return;
     }
     const unsubscribe = persistApi.onFinishHydration(() => setHydrated(true));
-    void persistApi.rehydrate();
+    // rehydrate()'s internal catch swallows failures, so this thenable always
+    // resolves — flip on settle too, or a corrupted stored value would leave
+    // `hydrated` false forever and keep every data-view query disabled.
+    void Promise.resolve(persistApi.rehydrate()).then(() => setHydrated(true));
     return unsubscribe;
   }, []);
 
