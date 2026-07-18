@@ -12,6 +12,7 @@ import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
 import { FeaturedArtistsPlayer } from './featured-artists-player';
+import { useFeaturedPlayerStore } from './use-featured-player-store';
 
 // Mock buildCdnUrl + resolveStreamUrl to return predictable URLs
 vi.mock('@/lib/utils/cdn-url', () => ({
@@ -270,6 +271,18 @@ const createWrapper = () => {
 };
 
 describe('FeaturedArtistsPlayer', () => {
+  beforeEach(() => {
+    // Reset the Zustand store to its initial state between tests so selection
+    // from one test cannot bleed into the next.
+    useFeaturedPlayerStore.setState({
+      selectedArtistId: null,
+      currentFileId: null,
+      isPlaying: false,
+      shouldAutoPlay: false,
+      playerControls: null,
+    });
+  });
+
   const mockFiles = [
     {
       id: 'file-1',
@@ -509,6 +522,22 @@ describe('FeaturedArtistsPlayer', () => {
     fireEvent.click(screen.getByTestId('artist-featured-2'));
 
     // Should now display second artist via cover art data-alt text
+    expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
+  });
+
+  it('restores the selected artist across unmount and remount', () => {
+    const { unmount } = render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+    expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
+
+    unmount();
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    // Store-backed selection survives the remount; local useState would not.
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 2');
   });
 
