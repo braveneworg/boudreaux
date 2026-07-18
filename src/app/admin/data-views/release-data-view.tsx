@@ -93,6 +93,7 @@ export const ReleaseDataView = () => {
       data={{ releases: rows }}
       fieldsToShow={fieldsToShow}
       imageField="images"
+      forceHardDelete
       mutations={{
         publish: (id) => publishReleaseAsync({ releaseId: id }),
         delete: (id) => deleteReleaseAsync({ releaseId: id }),
