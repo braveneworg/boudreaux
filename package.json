@@ -156,7 +156,8 @@
     "vaul": "^1.1.2",
     "video.js": "^8.23.8",
     "winston": "^3.19.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@aws-sdk/client-cloudfront": "^3.1064.0",
