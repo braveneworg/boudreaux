@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import type { DataViewFilters } from '@/app/admin/data-views/data-view-types';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
@@ -51,14 +52,20 @@ type EntityMutations = {
   delete: EntityMutation;
   restore?: EntityMutation;
 };
-type DataViewFilters = { onShowUnpublishedChange: (value: boolean) => void };
+
+interface DataViewMockProps {
+  mutations: EntityMutations;
+  filters: DataViewFilters;
+  entity: unknown;
+  imageField: unknown;
+}
 
 // DataView is mocked to a stub exposing the injected mutation callbacks as
 // buttons, so the wrapper's `(id) => xAsync({ artistId: id })` arrows execute.
 vi.mock('./data-view', () => ({
-  DataView: (props: Record<string, unknown>) => {
-    const mutations = props.mutations as EntityMutations;
-    const filters = props.filters as DataViewFilters;
+  DataView: (props: DataViewMockProps) => {
+    const mutations = props.mutations;
+    const filters = props.filters;
     return (
       <div
         data-testid="data-view"
@@ -77,7 +84,7 @@ vi.mock('./data-view', () => ({
           type="checkbox"
           role="switch"
           aria-label="Show deleted"
-          checked={filters.showDeleted as boolean}
+          checked={filters.showDeleted}
           onChange={(e) => filters.onShowDeletedChange(e.target.checked)}
         />
         <button
