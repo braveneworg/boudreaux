@@ -86,6 +86,27 @@ describe('usePlayerPrefs', () => {
     expect(usePlayerPrefs.getState().volume).toBe(1);
     expect(usePlayerPrefs.getState().muted).toBe(false);
   });
+
+  it('migrate clamps valid persisted values into range', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { volume: 1.5, muted: true }, version: 0 })
+    );
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(1);
+    expect(usePlayerPrefs.getState().muted).toBe(true);
+  });
+
+  it('migrate handles null persisted state by returning defaults', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: null, version: 0 }));
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(1);
+    expect(usePlayerPrefs.getState().muted).toBe(false);
+  });
 });
 
 describe('bindPlayerVolumePersistence', () => {
@@ -121,6 +142,32 @@ describe('bindPlayerVolumePersistence', () => {
     fake.trigger('volumechange');
 
     expect(usePlayerPrefs.getState().volume).toBe(0.25);
+    expect(usePlayerPrefs.getState().muted).toBe(false);
+  });
+
+  it('skips store update on volumechange when player returns undefined', () => {
+    usePlayerPrefs.getState().setVolume(0.5);
+    usePlayerPrefs.getState().setMuted(false);
+
+    // Override volume/muted to return undefined (simulates a uninitialized player state)
+    const handlers = new Map<string, Array<() => void>>();
+    const undefinedPlayer: FakeVolumePlayer = {
+      ready: (callback) => callback(),
+      on: (event, callback) => {
+        const existing = handlers.get(event) ?? [];
+        existing.push(callback);
+        handlers.set(event, existing);
+      },
+      volume: () => undefined,
+      muted: () => undefined,
+      trigger: (event) => handlers.get(event)?.forEach((callback) => callback()),
+    };
+
+    bindPlayerVolumePersistence(asPlayer(undefinedPlayer));
+    undefinedPlayer.trigger('volumechange');
+
+    // Store values must remain unchanged when player returns undefined
+    expect(usePlayerPrefs.getState().volume).toBe(0.5);
     expect(usePlayerPrefs.getState().muted).toBe(false);
   });
 });
