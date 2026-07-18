@@ -107,6 +107,44 @@ describe('usePlayerPrefs', () => {
     expect(usePlayerPrefs.getState().volume).toBe(1);
     expect(usePlayerPrefs.getState().muted).toBe(false);
   });
+
+  it('falls back to defaults for corrupted same-version storage', async () => {
+    // Same version as the store: migrate never runs, so the merge must validate.
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { volume: 'loud', muted: 'yes' }, version: 1 })
+    );
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(1);
+    expect(usePlayerPrefs.getState().muted).toBe(false);
+  });
+
+  it('clamps out-of-range same-version volume on rehydrate', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ state: { volume: -0.5, muted: true }, version: 1 })
+    );
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    expect(usePlayerPrefs.getState().volume).toBe(0);
+    expect(usePlayerPrefs.getState().muted).toBe(true);
+  });
+
+  it('keeps the store functional after a corrupted rehydrate', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: 42, version: 1 }));
+
+    await usePlayerPrefs.persist?.rehydrate();
+
+    const fake = makeFakePlayer({ volume: 1, muted: false });
+    bindPlayerVolumePersistence(asPlayer(fake));
+    fake.volume(0.55);
+    fake.trigger('volumechange');
+
+    expect(usePlayerPrefs.getState().volume).toBe(0.55);
+  });
 });
 
 describe('bindPlayerVolumePersistence', () => {

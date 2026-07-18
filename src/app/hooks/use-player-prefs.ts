@@ -21,6 +21,19 @@ const DEFAULT_PREFS = { volume: 1, muted: false };
 const clampVolume = (volume: number): number => Math.min(1, Math.max(0, volume));
 
 /**
+ * Coerces anything read from durable storage into valid preference values.
+ * localStorage outlives deploys and can be edited or corrupted in place, so
+ * every rehydrate path must validate — never trust the stored shape.
+ */
+const sanitizePrefs = (candidate: unknown): { volume: number; muted: boolean } => {
+  const prefs = candidate as Partial<PlayerPrefsState> | null | undefined;
+  return {
+    volume: typeof prefs?.volume === 'number' ? clampVolume(prefs.volume) : DEFAULT_PREFS.volume,
+    muted: typeof prefs?.muted === 'boolean' ? prefs.muted : DEFAULT_PREFS.muted,
+  };
+};
+
+/**
  * Durable player preferences shared by every audio/video player, persisted to
  * localStorage so volume/mute survive browser restarts. Holds only client
  * preference values — playback state stays with each Video.js instance.
@@ -39,17 +52,14 @@ export const usePlayerPrefs = create<PlayerPrefsState>()(
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ volume: state.volume, muted: state.muted }),
-      // Durable storage outlives deploys: validate anything not written by
-      // this exact version and fall back to defaults rather than trusting it.
-      migrate: (persistedState) => {
-        const candidate = persistedState as Partial<PlayerPrefsState> | null | undefined;
-        const volume =
-          typeof candidate?.volume === 'number'
-            ? clampVolume(candidate.volume)
-            : DEFAULT_PREFS.volume;
-        const muted = typeof candidate?.muted === 'boolean' ? candidate.muted : DEFAULT_PREFS.muted;
-        return { volume, muted };
-      },
+      // `migrate` only runs on a version MISMATCH; `merge` runs on every
+      // rehydrate, so it must sanitize too or a same-version corrupted
+      // envelope lands in the store unvalidated.
+      migrate: (persistedState) => sanitizePrefs(persistedState),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizePrefs(persistedState),
+      }),
     }
   )
 );
