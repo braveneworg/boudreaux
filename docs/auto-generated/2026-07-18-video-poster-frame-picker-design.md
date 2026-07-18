@@ -7,9 +7,10 @@
 ## Problem
 
 `captureVideoPoster` (`src/app/components/forms/videos/video-metadata.ts`) already
-seeks 5 evenly spaced timestamps in the video's opening window
-(`POSTER_SAMPLE_WINDOW_SECONDS = 3`, samples at ~0.3/0.9/1.5/2.1/2.7s for a ≥3s
-video, clamped for shorter files) and scores each rendered frame with
+seeks 5 evenly spaced timestamps in the 3–10s window
+(`POSTER_SAMPLE_START_SECONDS = 3` / `POSTER_SAMPLE_END_SECONDS = 10`, samples at
+3.7/5.1/6.5/7.9/9.3s for a ≥10s video; clamped to the duration, whole-video for
+clips of 3s or less) and scores each rendered frame with
 `scoreFrameQuality` (mean squared luma difference between pixel neighbors —
 flat/fade-in frames score 0, blurry frames score low). Today it JPEG-encodes
 **only the argmax frame** and discards the other four. The admin's only choices
