@@ -35,8 +35,9 @@ test.describe('Player volume persistence', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     // Video.js wraps the <audio> element in a .video-js container div and adds
-    // the vjs-tech class to the underlying media element.
-    const audio = userPage.locator('audio.vjs-tech');
+    // the vjs-tech class to the underlying media element. Scope to the
+    // data-vjs-player container to survive DOM restructuring.
+    const audio = userPage.locator('[data-vjs-player] audio.vjs-tech');
     await expect(audio).toBeAttached();
 
     // Setting .volume on the media element fires volumechange, which Video.js
@@ -56,7 +57,7 @@ test.describe('Player volume persistence', () => {
       .toBeCloseTo(0.37, 2);
 
     await userPage.reload();
-    const audioAfterReload = userPage.locator('audio.vjs-tech');
+    const audioAfterReload = userPage.locator('[data-vjs-player] audio.vjs-tech');
     await expect(audioAfterReload).toBeAttached();
 
     // The binding applies the stored volume on player ready.
