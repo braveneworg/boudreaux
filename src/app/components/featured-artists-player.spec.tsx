@@ -12,7 +12,6 @@ import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
 import { FeaturedArtistsPlayer } from './featured-artists-player';
-import { useFeaturedPlayerStore } from './use-featured-player-store';
 
 // Mock buildCdnUrl + resolveStreamUrl to return predictable URLs
 vi.mock('@/lib/utils/cdn-url', () => ({
@@ -271,18 +270,6 @@ const createWrapper = () => {
 };
 
 describe('FeaturedArtistsPlayer', () => {
-  beforeEach(() => {
-    // Reset the Zustand store to its initial state between tests so selection
-    // from one test cannot bleed into the next.
-    useFeaturedPlayerStore.setState({
-      selectedArtistId: null,
-      currentFileId: null,
-      isPlaying: false,
-      shouldAutoPlay: false,
-      playerControls: null,
-    });
-  });
-
   const mockFiles = [
     {
       id: 'file-1',
