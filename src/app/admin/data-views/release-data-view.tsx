@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   useDeleteReleaseMutation,
@@ -16,6 +16,7 @@ import type { ReleaseListItem } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 
 import { DataView } from './data-view';
+import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 
 /**
  * Computes the album artist display string from artistReleases
@@ -45,10 +46,11 @@ export const ReleaseDataView = () => {
     'publishedAt',
   ];
 
-  const [search, setSearch] = useState('');
-  const [showPublished, setShowPublished] = useState(true);
-  const [showUnpublished, setShowUnpublished] = useState(true);
-  const [showDeleted, setShowDeleted] = useState(false);
+  const { search, showPublished, showUnpublished, showDeleted } = useDataViewFilters(
+    (state) => state.releases
+  );
+  const setFilters = useDataViewFilters((state) => state.setFilters);
+  const hydrated = useDataViewFiltersHydration();
   const debouncedSearch = useDebounce(search);
 
   // Both same → no publish filter; otherwise the enabled one.
@@ -63,7 +65,10 @@ export const ReleaseDataView = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteReleasesQuery({ search: debouncedSearch, published, deleted: showDeleted });
+  } = useInfiniteReleasesQuery(
+    { search: debouncedSearch, published, deleted: showDeleted },
+    { enabled: hydrated }
+  );
 
   // Flatten the infinite pages and add the computed albumArtist field.
   const rows = useMemo(
@@ -88,7 +93,6 @@ export const ReleaseDataView = () => {
       data={{ releases: rows }}
       fieldsToShow={fieldsToShow}
       imageField="images"
-      forceHardDelete
       mutations={{
         publish: (id) => publishReleaseAsync({ releaseId: id }),
         delete: (id) => deleteReleaseAsync({ releaseId: id }),
@@ -100,13 +104,13 @@ export const ReleaseDataView = () => {
       pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
       filters={{
         search,
-        onSearchChange: setSearch,
+        onSearchChange: (value) => setFilters('releases', { search: value }),
         showPublished,
-        onShowPublishedChange: setShowPublished,
+        onShowPublishedChange: (value) => setFilters('releases', { showPublished: value }),
         showUnpublished,
-        onShowUnpublishedChange: setShowUnpublished,
+        onShowUnpublishedChange: (value) => setFilters('releases', { showUnpublished: value }),
         showDeleted,
-        onShowDeletedChange: setShowDeleted,
+        onShowDeletedChange: (value) => setFilters('releases', { showDeleted: value }),
       }}
     />
   );

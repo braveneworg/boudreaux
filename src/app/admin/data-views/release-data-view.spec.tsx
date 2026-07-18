@@ -13,6 +13,7 @@ import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 
 import { ReleaseDataView } from './release-data-view';
+import { useDataViewFilters } from './use-data-view-filters';
 
 // Mock the useInfiniteReleasesQuery hook
 vi.mock('@/lib/actions/publish-release-action', () => ({
@@ -78,6 +79,39 @@ const toInfiniteResult = (rows: unknown[]) => ({
 });
 
 describe('ReleaseDataView', () => {
+  beforeEach(async () => {
+    // Reset the filter store to defaults and clear sessionStorage
+    sessionStorage.clear();
+    useDataViewFilters.setState({
+      releases: {
+        search: '',
+        showPublished: true,
+        showUnpublished: true,
+        showDeleted: false,
+      },
+      artists: {
+        search: '',
+        showPublished: true,
+        showUnpublished: true,
+        showDeleted: false,
+      },
+      featuredArtists: {
+        search: '',
+        showPublished: true,
+        showUnpublished: true,
+        showDeleted: false,
+      },
+      videos: {
+        search: '',
+        showPublished: true,
+        showUnpublished: true,
+        showArchived: false,
+        sort: 'desc',
+      },
+    });
+    useDataViewFilters.persist.rehydrate();
+  });
+
   const mockReleaseRows = [
     {
       id: 'release-123',
@@ -318,6 +352,33 @@ describe('ReleaseDataView', () => {
     expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
   });
 
+  it('restores filter state across unmount and remount', async () => {
+    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+
+    // First render: store is hydrated and defaults are applied
+    const { unmount } = render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    // Wait for hydration to complete and the component to render
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: /show deleted/i })).toBeInTheDocument();
+    });
+
+    // Click the switch to toggle showDeleted to true
+    await userEvent.click(screen.getByRole('switch', { name: /show deleted/i }));
+    expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+
+    // Unmount, which preserves store state in sessionStorage
+    unmount();
+
+    // Remount: hydration reads from sessionStorage and restores showDeleted: true
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    // Wait for hydration and the restored filter state to render
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: /show deleted/i })).toBeChecked();
+    });
+  });
+
   it('passes a published filter to the query when the publish toggles differ', async () => {
     vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
 
@@ -326,7 +387,8 @@ describe('ReleaseDataView', () => {
     await userEvent.click(screen.getByRole('switch', { name: /show unpublished/i }));
 
     expect(useInfiniteReleasesQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ published: true })
+      expect.objectContaining({ published: true }),
+      expect.objectContaining({ enabled: true })
     );
   });
 
