@@ -106,7 +106,7 @@ export const useDataViewFilters = create<DataViewFiltersState>()(
  * @returns `true` once persisted filters (if any) have been applied.
  */
 export const useDataViewFiltersHydration = (): boolean => {
-  const [hydrated, setHydrated] = useState(useDataViewFilters.persist.hasHydrated());
+  const [hydrated, setHydrated] = useState(useDataViewFilters.persist?.hasHydrated() ?? false);
 
   useEffect(() => {
     const unsubscribe = useDataViewFilters.persist.onFinishHydration(() => setHydrated(true));
