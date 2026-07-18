@@ -12,8 +12,8 @@ interface PlayerPrefsState {
   /** Playback volume, 0..1. */
   volume: number;
   muted: boolean;
-  setVolume: (volume: number) => void;
-  setMuted: (muted: boolean) => void;
+  /** Updates both prefs in one store write; invalid fields keep their value. */
+  setPrefs: (prefs: { volume?: number; muted?: boolean }) => void;
 }
 
 const DEFAULT_PREFS = { volume: 1, muted: false };
@@ -44,8 +44,11 @@ export const usePlayerPrefs = create<PlayerPrefsState>()(
   persist(
     (set) => ({
       ...DEFAULT_PREFS,
-      setVolume: (volume) => set({ volume: clampVolume(volume) }),
-      setMuted: (muted) => set({ muted }),
+      setPrefs: ({ volume, muted }) =>
+        set((state) => ({
+          volume: typeof volume === 'number' ? clampVolume(volume) : state.volume,
+          muted: typeof muted === 'boolean' ? muted : state.muted,
+        })),
     }),
     {
       name: 'boudreaux-player-prefs',
@@ -82,13 +85,8 @@ export const bindPlayerVolumePersistence = (player: Player): void => {
   });
 
   player.on('volumechange', () => {
-    const volume = player.volume();
-    const muted = player.muted();
-    if (typeof volume === 'number') {
-      usePlayerPrefs.getState().setVolume(volume);
-    }
-    if (typeof muted === 'boolean') {
-      usePlayerPrefs.getState().setMuted(muted);
-    }
+    // One store write per event — persist serializes to localStorage on
+    // every write, and volume drags fire volumechange continuously.
+    usePlayerPrefs.getState().setPrefs({ volume: player.volume(), muted: player.muted() });
   });
 };

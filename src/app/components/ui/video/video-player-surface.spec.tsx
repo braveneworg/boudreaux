@@ -187,8 +187,7 @@ describe('VideoPlayerSurface', () => {
   });
 
   it('applies stored volume prefs when the player mounts', () => {
-    usePlayerPrefs.getState().setVolume(0.35);
-    usePlayerPrefs.getState().setMuted(true);
+    usePlayerPrefs.getState().setPrefs({ volume: 0.35, muted: true });
 
     render(<VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />);
 
