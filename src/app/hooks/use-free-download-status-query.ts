@@ -8,8 +8,7 @@ import {
   FreeStatusResponseSchema,
   type FreeStatusResponse,
 } from '@/lib/validation/bundle-download-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

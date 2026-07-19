@@ -5,8 +5,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import { linkPreviewSchema, type LinkPreview } from '@/lib/validation/link-preview-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

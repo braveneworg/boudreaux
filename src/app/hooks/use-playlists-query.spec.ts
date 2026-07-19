@@ -6,8 +6,8 @@
 import { renderHook } from '@testing-library/react';
 
 import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
+import { ResponseValidationError } from '@/utils/fetch-and-parse';
 
-import { ResponseValidationError } from './fetch-and-parse';
 import { usePlaylistsQuery } from './use-playlists-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());

@@ -9,8 +9,7 @@ import {
   videoEnrichmentStatusResponseSchema,
   type VideoEnrichmentStatusResult,
 } from '@/lib/validation/video-enrichment-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

@@ -15,8 +15,7 @@ import type {
 } from '@/lib/types/tours';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 

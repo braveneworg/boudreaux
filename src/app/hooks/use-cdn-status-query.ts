@@ -5,8 +5,7 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

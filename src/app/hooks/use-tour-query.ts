@@ -13,8 +13,7 @@ import type {
   VenueScalars as Venue,
 } from '@/lib/types/tours';
 import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

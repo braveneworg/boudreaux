@@ -8,8 +8,7 @@ import type { Artist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 import { artistSchema } from '@/lib/validation/media-models-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 

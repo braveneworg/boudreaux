@@ -7,8 +7,7 @@ import { z } from 'zod';
 import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

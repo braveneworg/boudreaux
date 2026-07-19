@@ -6,8 +6,7 @@ import { z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import { tourDateImageSchema } from '@/lib/validation/tour-models-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

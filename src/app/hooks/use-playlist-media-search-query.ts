@@ -7,8 +7,7 @@ import { PLAYLIST_SEARCH_MIN_QUERY_LENGTH } from '@/lib/constants/playlists';
 import { queryKeys } from '@/lib/query-keys';
 import type { PlaylistSearchResponse } from '@/lib/types/domain/playlist';
 import { playlistSearchResponseSchema } from '@/lib/validation/playlist-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

@@ -7,8 +7,7 @@ import { type z } from 'zod';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatWithFilesSchema } from '@/lib/validation/media-models-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

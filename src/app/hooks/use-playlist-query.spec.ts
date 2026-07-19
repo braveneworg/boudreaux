@@ -5,7 +5,8 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { ResponseValidationError } from './fetch-and-parse';
+import { ResponseValidationError } from '@/utils/fetch-and-parse';
+
 import { usePlaylistQuery } from './use-playlist-query';
 
 const mockUseQuery = vi.hoisted(() => vi.fn());

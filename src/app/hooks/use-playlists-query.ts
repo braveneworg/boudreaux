@@ -7,8 +7,7 @@ import { PLAYLISTS_PAGE_SIZE } from '@/lib/constants/playlists';
 import { queryKeys } from '@/lib/query-keys';
 import type { PlaylistListRow, PlaylistsResponse } from '@/lib/types/domain/playlist';
 import { playlistsResponseSchema } from '@/lib/validation/playlist-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 

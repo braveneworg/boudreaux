@@ -16,7 +16,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: unknown) => mockUseQuery(options),
 }));
 
-vi.mock('./fetch-and-parse', () => ({
+vi.mock('@/utils/fetch-and-parse', () => ({
   fetchAndParse: (...args: unknown[]) => mockFetchAndParse(...args),
 }));
 

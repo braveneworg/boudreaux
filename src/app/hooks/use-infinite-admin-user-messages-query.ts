@@ -11,8 +11,7 @@ import type {
 } from '@/app/api/admin/chat/users/[userId]/messages/route';
 import { queryKeys } from '@/lib/query-keys';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 

@@ -6,8 +6,7 @@ import { type z } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import { artistDetailSchema } from '@/lib/validation/media-models-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

@@ -8,8 +8,7 @@ import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 import { publishedReleaseListingSchema } from '@/lib/validation/media-models-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from './query-options';
 

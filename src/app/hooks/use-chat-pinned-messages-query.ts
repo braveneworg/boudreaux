@@ -8,8 +8,7 @@ import { z } from 'zod';
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
 import { chatMessageDtoSchema } from '@/lib/validation/chat-message-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

@@ -8,8 +8,7 @@ import { useSession } from '@/hooks/use-session';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

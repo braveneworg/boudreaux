@@ -12,7 +12,7 @@ import { useReleaseDateLookupQuery } from './use-release-date-lookup-query';
 
 const mockFetchAndParse = vi.hoisted(() => vi.fn());
 
-vi.mock('./fetch-and-parse', () => ({
+vi.mock('@/utils/fetch-and-parse', () => ({
   fetchAndParse: mockFetchAndParse,
 }));
 

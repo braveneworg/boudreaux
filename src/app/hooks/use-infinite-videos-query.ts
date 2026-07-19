@@ -6,8 +6,7 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 import { videoPageSchema, type VideoRow } from '@/lib/validation/video-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { InfiniteQueryOptionsOverride } from './query-options';
 

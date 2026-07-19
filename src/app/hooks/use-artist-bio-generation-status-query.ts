@@ -9,8 +9,7 @@ import {
   isInFlightBioStatus,
   type BioGenerationStatusResponse,
 } from '@/lib/validation/bio-generation-schema';
-
-import { parseResponse } from './fetch-and-parse';
+import { parseResponse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 

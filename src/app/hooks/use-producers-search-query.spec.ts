@@ -6,7 +6,8 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 
-import { ResponseValidationError } from './fetch-and-parse';
+import { ResponseValidationError } from '@/utils/fetch-and-parse';
+
 import { useProducersSearchQuery } from './use-producers-search-query';
 
 const mockUseQuery = vi.hoisted(() => vi.fn());

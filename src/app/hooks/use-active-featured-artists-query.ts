@@ -8,8 +8,7 @@ import type { QueryOptionsOverride } from '@/app/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 export interface ActiveFeaturedArtistsResponse {
   featuredArtists: FeaturedArtist[];

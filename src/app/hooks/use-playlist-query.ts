@@ -6,8 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { PlaylistDetailResponse } from '@/lib/types/domain/playlist';
 import { playlistDetailResponseSchema } from '@/lib/validation/playlist-schema';
-
-import { fetchAndParse } from './fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
