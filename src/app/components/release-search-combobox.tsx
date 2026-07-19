@@ -120,9 +120,7 @@ export const ReleaseSearchCombobox = () => {
       </PopoverTrigger>
       {/* Dropdown surface: paper results under a query row swiped in a light
           offset highlight of the RELEASES wordmark's cyan (#45fefc), with the
-          inner borders dropped — the important border-0 is needed because the
-          site-wide zine input border in globals.css is unlayered and outranks
-          plain utilities. */}
+          wrapper's divider dropped so the swipe reads as one strip. */}
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         {/* Server provides the matches; disable cmdk's client-side filtering. */}
         <Command
@@ -134,7 +132,6 @@ export const ReleaseSearchCombobox = () => {
             onValueChange={setSearch}
             placeholder="Search by artist, title, or catalog number..."
             aria-label="Search releases"
-            className="border-0!"
             wrapperClassName="bg-[#d0fffe]"
           />
           <CommandList onScroll={handleListScroll}>
