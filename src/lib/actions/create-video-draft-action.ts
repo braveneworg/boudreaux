@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
+import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoService } from '@/lib/services/video-service';
 import type { CreateVideoData } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -69,10 +70,41 @@ const DRAFT_FAILED: CreateVideoDraftResult = {
 };
 
 /**
+ * Pre-response `pending` handoff for the auto-kicked enrichment. The edit
+ * page's status poll only re-arms while a job is in flight, so the status must
+ * be in-flight BEFORE the client's first fetch — the dispatch itself runs
+ * post-response in `after()` (mirrors runVideoEnrichmentAction). Gated on the
+ * same conditions under which kickPostSaveEnrichment will actually dispatch.
+ * Best-effort: a failure never blocks the draft; the kick's own `processing`
+ * write self-heals the status.
+ */
+const markEnrichmentPending = async ({
+  videoId,
+  artist,
+  category,
+}: {
+  videoId: string;
+  artist: string;
+  category: VideoDraftInput['category'];
+}): Promise<void> => {
+  if (category !== 'MUSIC' || artist.trim() === '') return;
+  try {
+    await VideoRepository.setEnrichmentStatus(videoId, 'pending');
+  } catch (error) {
+    logger.warn('video_draft_enrichment_pending_failed', {
+      videoId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
  * Server Action: create the video row as an unpublished draft the moment the
  * S3 multipart upload completes, so enrichment can run while the admin is
  * still filling the form. Idempotent (an existing row returns success and
- * changes nothing — guards double-fire on flaky networks). In `after()` the
+ * changes nothing — guards double-fire on flaky networks). When enrichment
+ * will dispatch (MUSIC + non-blank artist) the job is marked `pending` before
+ * the response so the edit page's status poll engages. In `after()` the
  * post-save pipeline probes always; artist sync + enrichment run only when
  * the artist snapshot is non-blank (gate inside kickPostSaveEnrichment).
  * A failure here NEVER blocks the upload — the form falls back to
@@ -106,6 +138,11 @@ export const createVideoDraftAction = async (input: unknown): Promise<CreateVide
     }
 
     revalidatePath('/admin/videos');
+    await markEnrichmentPending({
+      videoId: response.data.id,
+      artist: data.artist ?? '',
+      category: data.category,
+    });
     after(() =>
       kickPostSaveEnrichment({
         videoId: response.data.id,
