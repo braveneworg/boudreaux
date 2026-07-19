@@ -82,6 +82,22 @@ const successToast = (page: Page, title: string): Locator =>
 const videoCardByTitle = (page: Page, title: string): Locator =>
   page.getByRole('article').filter({ has: page.getByRole('heading', { level: 2, name: title }) });
 
+/**
+ * Regression net for the panel overflowing the popover box (the panel used to
+ * hardcode `w-72` inside the `w-72` + `p-4` PopoverContent, so its content
+ * poked ~32px past the right border): no descendant of the open popover may
+ * extend beyond the popover's own right edge (0.5px subpixel tolerance).
+ */
+const expectPanelInsidePopover = async (page: Page): Promise<void> => {
+  const popover = page.locator('[data-slot="popover-content"]');
+  const overflowPx = await popover.evaluate((el) => {
+    const { right } = el.getBoundingClientRect();
+    const descendants = Array.from(el.querySelectorAll('*'));
+    return Math.max(0, ...descendants.map((d) => d.getBoundingClientRect().right - right));
+  });
+  expect(overflowPx).toBeLessThanOrEqual(0.5);
+};
+
 test.describe('Add to a playlist from a player', () => {
   test('hides the kebab from a signed-out visitor on a release page', async ({ page }) => {
     await page.goto(`/releases/${releaseId}`);
@@ -116,6 +132,7 @@ test.describe('Add to a playlist from a player', () => {
     // FocusScope autofocuses the picker's CommandInput on open — if a stray Radix
     // FocusScope stole focus to the trigger/body, this fails.
     await expect(picker).toBeFocused();
+    await expectPanelInsidePopover(userPage);
 
     // Pick the playlist → success toast (scoped Sonner locator, not bare text).
     await playlistOption(userPage, title).click();
@@ -190,6 +207,7 @@ test.describe('Add to a playlist from a player', () => {
     const picker = playlistPicker(userPage);
     await expect(picker).toBeVisible();
     await expect(picker).toBeFocused();
+    await expectPanelInsidePopover(userPage);
 
     await playlistOption(userPage, title).click();
     await expect(successToast(userPage, title)).toBeVisible();
