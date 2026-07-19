@@ -169,11 +169,9 @@ describe('ReleaseSearchCombobox', () => {
     const wrapper = document.querySelector('[data-slot="command-input-wrapper"]');
     expect(wrapper).toHaveClass('bg-[#d0fffe]');
 
-    // No inner borders: the site-wide zine input border (globals.css is
-    // unlayered, so only an important utility beats it) and the input
-    // wrapper's underline are both suppressed inside the dropdown.
-    const input = document.querySelector('[data-slot="command-input"]');
-    expect(input).toHaveClass('border-0!');
+    // No inner borders: globals.css keeps the zine box off cmdk search
+    // inputs site-wide (covered by E2E computed style), and the input
+    // wrapper's underline is suppressed inside the dropdown.
     const command = document.querySelector('[data-slot="command"]');
     expect(command?.className).toContain('**:data-[slot=command-input-wrapper]:border-b-0');
   });

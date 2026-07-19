@@ -106,6 +106,22 @@ test.describe('Contact Page', () => {
       // The combobox button should now display the selected reason
       await expect(comboboxButton).toContainText('Question');
     });
+
+    test('should render the search field without a box border', async ({ page }) => {
+      // The zine border rule in globals.css must not box the cmdk search
+      // input — it wears only the wrapper's bottom divider.
+      await page.getByRole('combobox', { name: 'Reason' }).click();
+      const searchInput = page.getByPlaceholder('Search reasons...');
+      await searchInput.waitFor({ state: 'visible', timeout: 5_000 });
+
+      const borderWidths = await searchInput.evaluate((element) => {
+        const { borderTopWidth, borderRightWidth, borderBottomWidth, borderLeftWidth } =
+          getComputedStyle(element);
+        return [borderTopWidth, borderRightWidth, borderBottomWidth, borderLeftWidth];
+      });
+
+      expect(borderWidths).toEqual(['0px', '0px', '0px', '0px']);
+    });
   });
 
   test.describe('form validation', () => {
