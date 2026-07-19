@@ -71,7 +71,7 @@ install the TanStack Query client, the Auth.js session provider, and the theme
 provider. Interactive pieces — media players, the chat drawer, forms — are Client
 Components that read server data two ways:
 
-- **Reads:** TanStack Query hooks (`src/app/hooks/`) call API routes with `fetch`,
+- **Reads:** TanStack Query hooks (`src/hooks/` and feature `_hooks/`) call API routes with `fetch`,
   forwarding an `AbortSignal` so navigations cancel in-flight requests.
 - **Writes:** React Hook Form + Zod forms submit to Server Actions.
 - **Real-time:** the Pusher client pushes chat events straight into component
@@ -103,7 +103,7 @@ interactions are client-smooth without a second fetch.
 A representative read hook — note the stable key and forwarded signal:
 
 ```ts
-// src/app/hooks/use-infinite-releases-query.ts (shape)
+// src/app/admin/data-views/_hooks/use-infinite-releases-query.ts (shape)
 export const useInfiniteReleasesQuery = (params: ReleasesQueryParams) =>
   useInfiniteQuery({
     queryKey: queryKeys.releases.adminInfinite(params),

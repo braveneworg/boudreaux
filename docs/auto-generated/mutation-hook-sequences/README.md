@@ -5,7 +5,7 @@
 # boudreaux — Mutation Hook Sequence Diagrams
 
 UML **system sequence diagrams** for every TanStack Query _mutation_ hook in
-[`src/app/hooks/mutations/`](../../../src/app/hooks/mutations/) — the write-side
+[`src/hooks/mutations/`](../../../src/hooks/mutations/) — the write-side
 companion to the read-side [query-hook-sequences](../query-hook-sequences/).
 Each traces the full integration on a write: the calling component → the hook
 (`useMutation`) → `mutationFn` → the Server Action (`'use server'`) → its

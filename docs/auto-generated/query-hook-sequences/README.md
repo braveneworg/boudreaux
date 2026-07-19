@@ -5,7 +5,7 @@
 # boudreaux — Query Hook Sequence Diagrams
 
 UML **system sequence diagrams** for every TanStack Query data hook in
-`src/app/hooks/`, tracing the full integration on each read: the calling
+`src/hooks/` and feature `_hooks/`, tracing the full integration on each read: the calling
 component → the hook (`useQuery` / `useInfiniteQuery`) → the fetch helper
 → the GET API route → its auth/rate-limit decorators → the service /
 repository layer → Prisma · MongoDB → response validation → and back to the
@@ -32,7 +32,7 @@ diagram:
 - **Client vs. server** — the hook and component run in the browser; the
   route, service, repository, and Prisma run on the server.
 - **The validation boundary** — `fetchAndParse(url, schema, opts)`
-  ([src/app/hooks/fetch-and-parse.ts](../../../src/app/hooks/fetch-and-parse.ts))
+  ([src/lib/utils/fetch-and-parse.ts](../../../src/lib/utils/fetch-and-parse.ts))
   fetches, throws `Error(errorMessage)` on a non-OK response, then calls
   `parseResponse(url, schema, body)`, which `schema.safeParse`s the body and
   throws a **`ResponseValidationError`** on a shape mismatch.

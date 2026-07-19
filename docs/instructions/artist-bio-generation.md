@@ -81,7 +81,7 @@ editor** rather than a plain textarea.
 
 | File                                                                 | Purpose                                                                                      |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `src/app/hooks/mutations/use-bio-mutations.ts`                       | **New.** `useGenerateArtistBioMutation` — wraps the action, invalidates artist caches        |
+| `src/app/components/forms/_hooks/mutations/use-bio-mutations.ts`     | **New.** `useGenerateArtistBioMutation` — wraps the action, invalidates artist caches        |
 | `src/app/artists/page.tsx`                                           | **New.** Public `/artists` index (Server Component)                                          |
 | `src/app/artists/[slug]/bio/page.tsx`                                | **New.** Full bio page (`/artists/[slug]/bio`), SSR-prefetched + hydrated                    |
 | `src/app/artists/[slug]/page.tsx`                                    | Artist detail page (wired to new content)                                                    |
