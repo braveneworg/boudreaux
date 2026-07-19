@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
@@ -19,6 +20,9 @@ import type * as VideoActionHelpers from './video-action-helpers';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
+vi.mock('@/lib/repositories/video-repository', () => ({
+  VideoRepository: { setEnrichmentStatus: vi.fn() },
+}));
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/require-role');
@@ -52,6 +56,7 @@ const validInput = {
 
 beforeEach(() => {
   afterCallbacks.length = 0;
+  vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(requireRole).mockResolvedValue(mockSession as never);
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(confirmVideoUpload).mockResolvedValue(null);
@@ -248,5 +253,50 @@ describe('createVideoDraftAction', () => {
   it('exposes the coercers used by the draft builder', () => {
     expect(parseDurationSeconds('212')).toBe(212);
     expect(parseFileSize('1024')).toBe(BigInt(1024));
+  });
+
+  // The edit page's status poll only re-arms while a job is in flight, so the
+  // `pending` handoff must land BEFORE the response (the dispatch itself runs
+  // post-response in after()) — otherwise the panel's first fetch can see a
+  // null status and never poll again.
+  it('marks enrichment pending before the response for a MUSIC draft with an artist', async () => {
+    await createVideoDraftAction(validInput);
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(ID, 'pending');
+  });
+
+  it('marks pending without waiting on the after() pipeline', async () => {
+    await createVideoDraftAction(validInput);
+
+    expect(afterCallbacks).toHaveLength(1);
+  });
+
+  it('does not mark pending when the artist snapshot is blank', async () => {
+    const { artist: _artist, ...noArtist } = validInput;
+    await createVideoDraftAction(noArtist);
+
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  });
+
+  it('does not mark pending for a non-MUSIC draft', async () => {
+    await createVideoDraftAction({ ...validInput, category: 'INFORMATIONAL' });
+
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  });
+
+  it('still succeeds when the pending write fails', async () => {
+    vi.mocked(VideoRepository.setEnrichmentStatus).mockRejectedValue(Error('db down'));
+
+    const result = await createVideoDraftAction(validInput);
+
+    expect(result).toEqual({ success: true, videoId: ID });
+  });
+
+  it('still schedules the kick when the pending write fails', async () => {
+    vi.mocked(VideoRepository.setEnrichmentStatus).mockRejectedValue(Error('db down'));
+
+    await createVideoDraftAction(validInput);
+
+    expect(afterCallbacks).toHaveLength(1);
   });
 });
