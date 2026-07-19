@@ -40,7 +40,7 @@ vi.mock('@/lib/utils/report-client-error', () => ({
   reportClientError: reportClientErrorMock,
 }));
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => useSessionMock(),
 }));
 

@@ -10,8 +10,8 @@ import md5 from 'crypto-js/md5';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { ClientSessionData } from '@/app/hooks/use-session';
 import { useFingerprint } from '@/hooks/use-fingerprint';
+import type { ClientSessionData } from '@/hooks/use-session';
 import {
   deleteChatMessageAction,
   type DeleteChatMessageScope,

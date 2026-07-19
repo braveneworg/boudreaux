@@ -59,7 +59,7 @@ vi.mock('@/lib/utils/generate-object-id', () => ({
   generateObjectId: () => 'a'.repeat(24),
 }));
 
-vi.mock('@/app/hooks/mutations/use-video-mutations', () => ({
+vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   useCreateVideoMutation: () => ({
     createVideoAsync: mocks.createVideoAsync,
     isCreatingVideo: false,

@@ -4,12 +4,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useInfinitePublishedVideosQuery } from '@/app/hooks/use-infinite-published-videos-query';
+import { useInfinitePublishedVideosQuery } from '@/hooks/use-infinite-published-videos-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 
 import { VideosContent } from './videos-content';
 
-vi.mock('@/app/hooks/use-infinite-published-videos-query', () => ({
+vi.mock('@/hooks/use-infinite-published-videos-query', () => ({
   useInfinitePublishedVideosQuery: vi.fn(),
 }));
 

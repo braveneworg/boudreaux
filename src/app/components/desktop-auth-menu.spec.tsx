@@ -12,7 +12,7 @@ import { DesktopAuthMenu } from './desktop-auth-menu';
 const mockUseSession = vi.fn();
 const mockSignOut = vi.fn();
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 

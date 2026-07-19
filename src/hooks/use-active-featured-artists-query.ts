@@ -4,7 +4,7 @@
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import type { QueryOptionsOverride } from '@/app/hooks/query-options';
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { featuredArtistSchema } from '@/lib/validation/media-models-schema';

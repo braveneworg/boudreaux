@@ -82,7 +82,7 @@ vi.mock('next/image', () => ({
 }));
 
 // Mock the useDebounce hook to return value immediately for testing
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: string) => value,
 }));
 

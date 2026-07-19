@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActiveFeaturedArtistsQuery } from '@/app/hooks/use-active-featured-artists-query';
-import { useBannersQuery } from '@/app/hooks/use-banners-query';
+import { useActiveFeaturedArtistsQuery } from '@/hooks/use-active-featured-artists-query';
+import { useBannersQuery } from '@/hooks/use-banners-query';
 
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';

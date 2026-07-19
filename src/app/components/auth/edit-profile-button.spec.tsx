@@ -35,7 +35,7 @@ vi.mock('next/link', () => ({
 
 // Mock the useIsMobile hook
 const mockUseIsMobile = vi.fn();
-vi.mock('@/app/hooks/use-mobile', () => ({
+vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => mockUseIsMobile(),
 }));
 

@@ -20,7 +20,7 @@ vi.mock('./_hooks/use-infinite-videos-query', () => ({
   useInfiniteVideosQuery: vi.fn(),
 }));
 
-vi.mock('@/app/hooks/mutations/use-video-mutations', () => ({
+vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   usePublishVideoMutation: () => ({ publishVideoAsync: mocks.publishVideoAsync }),
   useUnpublishVideoMutation: () => ({ unpublishVideoAsync: mocks.unpublishVideoAsync }),
   useArchiveVideoMutation: () => ({ archiveVideoAsync: mocks.archiveVideoAsync }),

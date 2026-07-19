@@ -9,8 +9,8 @@ import {
   useArchiveArtistMutation,
   usePublishArtistMutation,
   useRestoreArtistMutation,
-} from '@/app/hooks/mutations/use-artist-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
+} from '@/hooks/mutations/use-artist-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 

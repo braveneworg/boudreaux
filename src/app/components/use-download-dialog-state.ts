@@ -9,7 +9,7 @@ import type { Dispatch, ReactElement, SetStateAction } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { useFreeDownloadStatusQuery } from '@/app/hooks/use-free-download-status-query';
+import { useFreeDownloadStatusQuery } from '@/hooks/use-free-download-status-query';
 import { useSession } from '@/hooks/use-session';
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
 import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';

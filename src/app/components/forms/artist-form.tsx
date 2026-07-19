@@ -29,7 +29,7 @@ import {
   useArchiveArtistMutation,
   useCreateArtistMutation,
   useUpdateArtistMutation,
-} from '@/app/hooks/mutations/use-artist-mutations';
+} from '@/hooks/mutations/use-artist-mutations';
 import { useSession } from '@/hooks/use-session';
 import { queryKeys } from '@/lib/query-keys';
 import { error } from '@/lib/utils/console-logger';

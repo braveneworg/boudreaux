@@ -8,8 +8,8 @@ import { useMemo } from 'react';
 import {
   useDeleteReleaseMutation,
   usePublishReleaseMutation,
-} from '@/app/hooks/mutations/use-release-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
+} from '@/hooks/mutations/use-release-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { ReleaseListItem } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';

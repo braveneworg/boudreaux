@@ -14,8 +14,8 @@ import {
   useDeleteFeaturedArtistMutation,
   usePublishFeaturedArtistMutation,
   usePublishFeaturedArtistsMutation,
-} from '@/app/hooks/mutations/use-featured-artist-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
+} from '@/hooks/mutations/use-featured-artist-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';

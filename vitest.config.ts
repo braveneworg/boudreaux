@@ -345,7 +345,7 @@ export default defineConfig((): ViteUserConfig => {
         { find: '@/components', replacement: path.resolve(process.cwd(), './src/app/components') },
         { find: '@/lib', replacement: path.resolve(process.cwd(), './src/lib') },
         { find: '@/ui', replacement: path.resolve(process.cwd(), './src/app/components/ui') },
-        { find: '@/hooks', replacement: path.resolve(process.cwd(), './src/app/hooks') },
+        { find: '@/hooks', replacement: path.resolve(process.cwd(), './src/hooks') },
         { find: '@/utils', replacement: path.resolve(process.cwd(), './src/lib/utils') },
         { find: '@/test-utils', replacement: path.resolve(process.cwd(), './src/test-utils') },
         { find: '@/auth', replacement: path.resolve(process.cwd(), './auth.ts') },

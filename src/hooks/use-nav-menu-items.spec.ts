@@ -11,7 +11,7 @@ import { useNavMenuItems } from './use-nav-menu-items';
 
 const mockUseSession = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: mockUseSession,
 }));
 

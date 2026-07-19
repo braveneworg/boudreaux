@@ -31,7 +31,7 @@ vi.mock('next/image', () => ({
 }));
 
 // ImageHeading uses useIsMobile — stub it
-vi.mock('@/app/hooks/use-mobile', () => ({
+vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }));
 

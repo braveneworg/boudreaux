@@ -5,8 +5,8 @@
 
 import { usePathname } from 'next/navigation';
 
-import { useSession } from '@/app/hooks/use-session';
-import type { ClientSessionData } from '@/app/hooks/use-session';
+import { useSession } from '@/hooks/use-session';
+import type { ClientSessionData } from '@/hooks/use-session';
 import { CONSTANTS } from '@/lib/constants';
 import { log } from '@/lib/utils/console-logger';
 import { cn } from '@/lib/utils/tailwind-utils';

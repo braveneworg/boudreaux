@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
 
 // Mock the client session hook
 const mockUseSession = vi.fn();
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 

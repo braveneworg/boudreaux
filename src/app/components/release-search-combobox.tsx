@@ -27,11 +27,11 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   useInfinitePublishedReleasesQuery,
   usePublishedReleaseSearchQuery,
-} from '@/app/hooks/use-infinite-published-releases-query';
-import { useDebounce } from '@/hooks/use-debounce';
+} from '@/hooks/use-infinite-published-releases-query';
 import { getArtistDisplayNameForRelease, getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 /** How close to the list's bottom edge (px) before the next page loads. */

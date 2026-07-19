@@ -17,7 +17,7 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useDebounce } from '@/app/hooks/use-debounce';
+import { useDebounce } from '@/hooks/use-debounce';
 
 import { useNotificationBannerSearchQuery } from './_hooks/use-notification-banner-search-query';
 

@@ -9,7 +9,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { ClientSessionData } from '@/app/hooks/use-session';
+import type { ClientSessionData } from '@/hooks/use-session';
 import { deleteChatMessageAction } from '@/lib/actions/delete-chat-message-action';
 import { toggleChatReactionAction } from '@/lib/actions/toggle-chat-reaction-action';
 import { togglePinChatMessageAction } from '@/lib/actions/toggle-pin-chat-message-action';

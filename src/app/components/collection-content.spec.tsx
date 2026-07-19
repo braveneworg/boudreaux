@@ -9,7 +9,7 @@ import { CollectionContent } from './collection-content';
 
 const useCollectionQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-collection-query', () => ({
+vi.mock('@/hooks/use-collection-query', () => ({
   useCollectionQuery: () => useCollectionQueryMock(),
 }));
 

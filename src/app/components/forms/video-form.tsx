@@ -17,7 +17,7 @@ import {
   useCreateVideoMutation,
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
-} from '@/app/hooks/mutations/use-video-mutations';
+} from '@/hooks/mutations/use-video-mutations';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';

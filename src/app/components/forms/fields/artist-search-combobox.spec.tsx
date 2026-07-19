@@ -19,7 +19,7 @@ vi.mock('../_hooks/use-artist-list-query', () => ({
 // ---------------------------------------------------------------------------
 // Mock: useDebounce — pass-through so tests don't need fake timers
 // ---------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: unknown) => value,
 }));
 

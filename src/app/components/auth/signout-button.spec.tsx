@@ -7,13 +7,13 @@ import { SignedInToolbar } from './signout-button';
 
 // Mock the client session hook
 const mockUseSession = vi.fn();
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 
 // Mock use-mobile hook
 const mockUseIsMobile = vi.fn();
-vi.mock('@/app/hooks/use-mobile', () => ({
+vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => mockUseIsMobile(),
 }));
 

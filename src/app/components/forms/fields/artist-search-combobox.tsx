@@ -17,7 +17,7 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useDebounce } from '@/app/hooks/use-debounce';
+import { useDebounce } from '@/hooks/use-debounce';
 
 import { buildArtistListParams, getArtistDisplayName } from './artist-combobox-helpers';
 import { useArtistListQuery } from '../_hooks/use-artist-list-query';

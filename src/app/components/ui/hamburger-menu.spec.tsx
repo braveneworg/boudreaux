@@ -8,7 +8,7 @@ import { HamburgerMenu } from './hamburger-menu';
 
 const mockUseSession = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: mockUseSession,
 }));
 

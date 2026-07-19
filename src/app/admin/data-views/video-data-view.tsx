@@ -22,8 +22,8 @@ import {
   usePublishVideoMutation,
   useRestoreVideoMutation,
   useUnpublishVideoMutation,
-} from '@/app/hooks/mutations/use-video-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
+} from '@/hooks/mutations/use-video-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import type { VideoRow } from '@/lib/validation/video-schema';
 

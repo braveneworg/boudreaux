@@ -26,7 +26,7 @@
       "@/app/lib/*": ["./src/lib/*"],
       "@/utils/*": ["./src/lib/utils/*"],
       "@/ui/*": ["./src/app/components/ui/*"],
-      "@/hooks/*": ["./src/app/hooks/*"]
+      "@/hooks/*": ["./src/hooks/*"]
     },
     "types": ["vitest/globals", "node"]
   },

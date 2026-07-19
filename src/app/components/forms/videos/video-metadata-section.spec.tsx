@@ -38,7 +38,7 @@ vi.mock('../_hooks/use-artist-list-query', () => ({
 // ---------------------------------------------------------------------------
 // Mock: useDebounce — pass-through so debounced search equals input immediately
 // ---------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: unknown) => value,
 }));
 

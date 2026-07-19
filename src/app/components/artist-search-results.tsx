@@ -17,7 +17,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/app/components/ui/command';
-import { useArtistNavSearchQuery } from '@/app/hooks/use-artist-nav-search-query';
+import { useArtistNavSearchQuery } from '@/hooks/use-artist-nav-search-query';
 
 interface ArtistSearchResult {
   artistSlug: string;
