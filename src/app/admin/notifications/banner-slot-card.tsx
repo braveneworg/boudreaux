@@ -11,10 +11,6 @@ import { Loader2, Save, Trash2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { DatePicker } from '@/app/components/ui/datepicker';
-import {
-  useDeleteBannerNotificationMutation,
-  useUpsertBannerNotificationMutation,
-} from '@/app/hooks/mutations/use-banner-mutations';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { BANNER_CDN_PATH } from '@/lib/constants/banner-slots';
@@ -27,6 +23,10 @@ import {
   type BannerNotificationFormData,
 } from '@/lib/validation/banner-notification-schema';
 
+import {
+  useDeleteBannerNotificationMutation,
+  useUpsertBannerNotificationMutation,
+} from './_hooks/mutations/use-banner-mutations';
 import { NotificationSearch } from './notification-search';
 
 export interface BannerSlotFormData {

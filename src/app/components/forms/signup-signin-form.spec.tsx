@@ -256,7 +256,7 @@ interface TurnstileWidgetProps {
 const mockUseSignupStatusQuery = vi.fn<() => { data: { paused: boolean } | undefined }>(() => ({
   data: undefined,
 }));
-vi.mock('@/app/hooks/use-signup-status-query', () => ({
+vi.mock('./_hooks/use-signup-status-query', () => ({
   useSignupStatusQuery: () => mockUseSignupStatusQuery(),
 }));
 

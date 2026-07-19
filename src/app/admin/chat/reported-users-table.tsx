@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useInfiniteReportedUsersQuery } from '@/hooks/use-infinite-reported-users-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   disableChatUserAction,
@@ -24,6 +23,8 @@ import {
 } from '@/lib/actions/disable-chat-user-action';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
+
+import { useInfiniteReportedUsersQuery } from './_hooks/use-infinite-reported-users-query';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',

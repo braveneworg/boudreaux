@@ -18,9 +18,6 @@ import {
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
 } from '@/app/hooks/mutations/use-video-mutations';
-import { useVideoProbePrefillQuery } from '@/app/hooks/use-video-probe-prefill-query';
-import { useVideoProducersQuery } from '@/app/hooks/use-video-producers-query';
-import { useVideoQuery } from '@/app/hooks/use-video-query';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
@@ -28,6 +25,9 @@ import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichmen
 import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
+import { useVideoProbePrefillQuery } from './_hooks/use-video-probe-prefill-query';
+import { useVideoProducersQuery } from './_hooks/use-video-producers-query';
+import { useVideoQuery } from './_hooks/use-video-query';
 import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';

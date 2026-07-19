@@ -5,10 +5,10 @@
 
 import { Pin, SmilePlus, Trash2 } from 'lucide-react';
 
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
-
 import { ChatEmojiPicker } from './chat-emoji-picker';
 import { ChatReactionBar } from './chat-reaction-bar';
+
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 interface ChatMessageReactionBarProps {
   message: OptimisticChatMessage;

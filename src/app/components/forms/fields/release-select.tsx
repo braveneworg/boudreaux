@@ -21,7 +21,8 @@ import {
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useReleaseListQuery } from '@/app/hooks/use-release-list-query';
+
+import { useReleaseListQuery } from '../_hooks/use-release-list-query';
 
 import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 

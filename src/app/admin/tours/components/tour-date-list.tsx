@@ -24,11 +24,11 @@ import { Card, CardContent } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TicketProviderIcon } from '@/app/components/ui/ticket-provider-icon';
-import { useTourDatesQuery } from '@/app/hooks/use-tour-dates-query';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import { ArtistPillList } from './artist-pill-list';
+import { useTourDatesQuery } from '../_hooks/use-tour-dates-query';
 
 import type { HeadlinerWithRelations } from './artist-pill';
 

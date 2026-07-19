@@ -7,9 +7,8 @@ import { useState } from 'react';
 
 import { Loader2 } from 'lucide-react';
 
-import { useInfiniteToursQuery } from '@/app/hooks/use-infinite-tours-query';
-
 import { ToursPageClient } from './tours-page-client';
+import { useInfiniteToursQuery } from '../_hooks/use-infinite-tours-query';
 
 /**
  * Client content wrapper for the tours listing page.

@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { useCreateBioLinkMutation } from '@/app/hooks/mutations/use-bio-media-mutations';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { BIO_LINK_KINDS, type BioLinkKind } from '@/lib/validation/bio-link-input-schema';
+
+import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
 
 interface CustomLinkEditorProps {
   artistId: string;

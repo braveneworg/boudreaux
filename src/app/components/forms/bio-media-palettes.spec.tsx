@@ -23,11 +23,11 @@ const pending = vi.hoisted(() => ({ link: false, image: false, updating: false }
 /** Controls what `registry.getTarget()` returns for insert tests. */
 const mockGetTarget = vi.hoisted(() => vi.fn(() => null as Editor | null));
 
-vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
+vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: (artistId: string) => statusMock(artistId),
 }));
 
-vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
+vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
   useDeleteBioLinkMutation: () => ({ deleteBioLink, isDeletingBioLink: pending.link }),
   useDeleteBioImageMutation: () => ({ deleteBioImage, isDeletingBioImage: pending.image }),
   useUpdateBioImageAttributionMutation: () => ({

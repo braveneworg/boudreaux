@@ -13,7 +13,7 @@ const unlinkAccountMock = vi.hoisted(() => vi.fn());
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const reportClientErrorMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-connected-accounts', () => ({
+vi.mock('./_hooks/use-connected-accounts', () => ({
   useConnectedAccounts: () => useConnectedAccountsMock(),
 }));
 

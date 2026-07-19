@@ -10,9 +10,10 @@ import { toast } from 'sonner';
 
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import { useReleaseDateLookupQuery } from '@/app/hooks/use-release-date-lookup-query';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { DatePicker } from '@/ui/datepicker';
+
+import { useReleaseDateLookupQuery } from '../_hooks/use-release-date-lookup-query';
 
 import type { Control } from 'react-hook-form';
 

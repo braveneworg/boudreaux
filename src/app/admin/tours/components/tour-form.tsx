@@ -27,12 +27,6 @@ import {
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Textarea } from '@/app/components/ui/textarea';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import {
-  useCreateTourMutation,
-  useDeleteTourMutation,
-  useUpdateTourMutation,
-} from '@/app/hooks/mutations/use-tour-mutations';
-import { useTourImagesQuery } from '@/app/hooks/use-tour-images-query';
 import { useTourQuery } from '@/app/hooks/use-tour-query';
 import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
 import {
@@ -41,6 +35,13 @@ import {
   type TourCreateInput,
   type TourUpdateInput,
 } from '@/lib/validation/tours/tour-schema';
+
+import {
+  useCreateTourMutation,
+  useDeleteTourMutation,
+  useUpdateTourMutation,
+} from '../_hooks/mutations/use-tour-mutations';
+import { useTourImagesQuery } from '../_hooks/use-tour-images-query';
 
 /**
  * Local interface matching Prisma TourImage model.

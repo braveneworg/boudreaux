@@ -7,7 +7,7 @@ import { ChatMentionAutocomplete } from './chat-mention-autocomplete';
 
 const mockMentionQuery = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-mention-search-query', () => ({
+vi.mock('./_hooks/use-mention-search-query', () => ({
   useMentionSearchQuery: (query: string, options?: { enabled?: boolean }) =>
     mockMentionQuery(query, options),
 }));

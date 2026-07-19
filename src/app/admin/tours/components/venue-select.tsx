@@ -24,12 +24,12 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useVenueSearchQuery } from '@/app/hooks/use-venue-search-query';
 import { cn } from '@/lib/utils';
 
 import { useVenueCreateDialog } from './use-venue-create-dialog';
 import { VenueCreateDialog } from './venue-create-dialog';
 import { VenueEditDialog } from './venue-edit-dialog';
+import { useVenueSearchQuery } from '../_hooks/use-venue-search-query';
 
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 

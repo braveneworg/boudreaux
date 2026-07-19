@@ -14,10 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { usePlaylistQuery } from '@/hooks/use-playlist-query';
 import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/domain/playlist';
 import { formatDuration } from '@/lib/utils/format-duration';
 
+import { usePlaylistQuery } from './_hooks/use-playlist-query';
 import { PlaylistCoverTiles } from './playlist-cover-tiles';
 
 interface PlaylistViewProps {

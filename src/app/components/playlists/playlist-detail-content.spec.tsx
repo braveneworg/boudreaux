@@ -11,7 +11,7 @@ import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/do
 import { PlaylistDetailContent } from './playlist-detail-content';
 
 const usePlaylistQueryMock = vi.hoisted(() => vi.fn());
-vi.mock('@/hooks/use-playlist-query', () => ({ usePlaylistQuery: usePlaylistQueryMock }));
+vi.mock('./_hooks/use-playlist-query', () => ({ usePlaylistQuery: usePlaylistQueryMock }));
 vi.mock('./playlist-player', () => ({
   PlaylistPlayer: ({ items, title }: { items: Array<{ id: string }>; title: string }) => (
     <div data-testid="player" data-order={items.map(({ id }) => id).join(',')}>

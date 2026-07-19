@@ -7,9 +7,10 @@ import { useEffect } from 'react';
 
 import { toast } from 'sonner';
 
-import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
 import { error } from '@/lib/utils/console-logger';
 import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
+
+import { useFeaturedArtistQuery } from '../_hooks/use-featured-artist-query';
 
 import type { UseFormReturn } from 'react-hook-form';
 

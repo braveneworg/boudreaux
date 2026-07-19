@@ -11,7 +11,7 @@ import { PlaylistView } from './playlist-view';
 
 const usePlaylistQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-playlist-query', () => ({
+vi.mock('./_hooks/use-playlist-query', () => ({
   usePlaylistQuery: usePlaylistQueryMock,
 }));
 

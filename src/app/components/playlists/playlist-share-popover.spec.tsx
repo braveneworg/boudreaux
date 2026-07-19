@@ -11,7 +11,7 @@ import { PlaylistSharePopover } from './playlist-share-popover';
 const updatePlaylistMock = vi.hoisted(() => vi.fn());
 const isUpdatingPlaylistMock = vi.hoisted(() => ({ value: false }));
 
-vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
+vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useUpdatePlaylistMutation: () => ({
     updatePlaylist: updatePlaylistMock,
     isUpdatingPlaylist: isUpdatingPlaylistMock.value,

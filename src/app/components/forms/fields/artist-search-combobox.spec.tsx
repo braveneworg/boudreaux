@@ -12,7 +12,7 @@ import { ArtistSearchCombobox } from './artist-search-combobox';
 // Mock: useArtistListQuery
 // ---------------------------------------------------------------------------
 const mockUseArtistListQuery = vi.fn();
-vi.mock('@/app/hooks/use-artist-list-query', () => ({
+vi.mock('../_hooks/use-artist-list-query', () => ({
   useArtistListQuery: (...args: unknown[]): unknown => mockUseArtistListQuery(...args),
 }));
 

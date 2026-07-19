@@ -23,7 +23,7 @@ let mockArtistResults: MockArtistRow[] = [];
 let mockIsPending = false;
 let mockDataUndefined = false;
 
-vi.mock('@/app/hooks/use-artist-list-query', () => ({
+vi.mock('../_hooks/use-artist-list-query', () => ({
   useArtistListQuery: () => ({
     isPending: mockIsPending,
     error: null,

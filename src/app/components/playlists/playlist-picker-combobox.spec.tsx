@@ -11,7 +11,7 @@ import { PlaylistPickerCombobox } from './playlist-picker-combobox';
 
 const usePlaylistsQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-playlists-query', () => ({
+vi.mock('./_hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 

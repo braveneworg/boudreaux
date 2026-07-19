@@ -9,11 +9,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { type FieldValues, useForm, type UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import {
-  useCreateTourDateMutation,
-  useUpdateTourDateMutation,
-} from '@/app/hooks/mutations/use-tour-date-mutations';
-import { useTourDateImagesQuery } from '@/app/hooks/use-tour-date-images-query';
 import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
 import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
 import {
@@ -22,6 +17,12 @@ import {
   type TourDateCreateInput,
   type TourDateUpdateInput,
 } from '@/lib/validation/tours/tour-date-schema';
+
+import {
+  useCreateTourDateMutation,
+  useUpdateTourDateMutation,
+} from '../_hooks/mutations/use-tour-date-mutations';
+import { useTourDateImagesQuery } from '../_hooks/use-tour-date-images-query';
 
 /**
  * Local interfaces matching Prisma model shapes.

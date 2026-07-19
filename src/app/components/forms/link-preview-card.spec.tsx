@@ -11,7 +11,7 @@ import { LinkPreviewCard } from './link-preview-card';
 
 const mockUseLinkPreviewQuery = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-link-preview-query', () => ({
+vi.mock('./_hooks/use-link-preview-query', () => ({
   useLinkPreviewQuery: (url: string, options: { enabled: boolean }) =>
     mockUseLinkPreviewQuery(url, options),
 }));

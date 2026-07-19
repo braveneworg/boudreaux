@@ -20,10 +20,11 @@ import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { useSignupStatusQuery } from '@/app/hooks/use-signup-status-query';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
 import { Skeleton } from '@/ui/skeleton';
+
+import { useSignupStatusQuery } from './_hooks/use-signup-status-query';
 
 import type { Control } from 'react-hook-form';
 

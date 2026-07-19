@@ -19,7 +19,8 @@ import {
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useProducersSearchQuery } from '@/app/hooks/use-producers-search-query';
+
+import { useProducersSearchQuery } from '../_hooks/use-producers-search-query';
 
 // --------------------------------------------------------------------------
 // Public types

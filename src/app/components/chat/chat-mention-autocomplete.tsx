@@ -8,8 +8,9 @@ import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { useDebounce } from '@/hooks/use-debounce';
-import { useMentionSearchQuery, type MentionMatch } from '@/hooks/use-mention-search-query';
 import { cn } from '@/lib/utils';
+
+import { useMentionSearchQuery, type MentionMatch } from './_hooks/use-mention-search-query';
 
 interface ChatMentionAutocompleteProps {
   /** The username prefix being typed after the active `@`. */

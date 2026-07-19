@@ -13,7 +13,7 @@ import type {
 import { ArtistBioGenerationSection } from './artist-bio-generation-section';
 
 const generateMock = vi.fn();
-vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
+vi.mock('./_hooks/mutations/use-bio-mutations', () => ({
   useGenerateArtistBioMutation: () => ({
     generateArtistBio: vi.fn(),
     generateArtistBioAsync: generateMock,
@@ -26,7 +26,7 @@ vi.mock('@/app/hooks/mutations/use-bio-mutations', () => ({
 }));
 
 const createBioLinkMock = vi.fn();
-vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
+vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
   useCreateBioLinkMutation: () => ({
     createBioLink: createBioLinkMock,
     isCreatingBioLink: false,
@@ -36,7 +36,7 @@ vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
 // The polled status drives completion. A module-level value lets each test set
 // the status the (enabled) query reports back after generation is triggered.
 let statusReturn: BioGenerationStatusResult = { status: null, error: null, content: null };
-vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
+vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: () => ({
     data: statusReturn,
     isPending: false,

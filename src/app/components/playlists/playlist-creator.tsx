@@ -10,9 +10,9 @@ import { Pencil } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { usePlaylistQuery } from '@/hooks/use-playlist-query';
 import type { PlaylistDetailResponse, PlaylistSearchItem } from '@/lib/types/domain/playlist';
 
+import { usePlaylistQuery } from './_hooks/use-playlist-query';
 import { PlaylistCreatorItemList } from './playlist-creator-item-list';
 import { PlaylistCreatorSearch, type PlaylistCreatorSearchHandle } from './playlist-creator-search';
 import { PlaylistDuplicateConfirmDialog } from './playlist-duplicate-confirm-dialog';

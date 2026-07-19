@@ -10,7 +10,7 @@ import type { PlaylistDetailResponse } from '@/lib/types/domain/playlist';
 import { PlaylistPlayerDialog } from './playlist-player-dialog';
 
 const usePlaylistQueryMock = vi.hoisted(() => vi.fn());
-vi.mock('@/hooks/use-playlist-query', () => ({ usePlaylistQuery: usePlaylistQueryMock }));
+vi.mock('./_hooks/use-playlist-query', () => ({ usePlaylistQuery: usePlaylistQueryMock }));
 
 vi.mock('./playlist-download-row', () => ({
   PlaylistDownloadRow: ({ playlistId }: { playlistId: string }) => (

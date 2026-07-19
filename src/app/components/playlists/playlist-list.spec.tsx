@@ -23,11 +23,11 @@ const deletePlaylistMock = vi.hoisted(() =>
 );
 const isDeletingPlaylistMock = vi.hoisted(() => ({ value: false }));
 
-vi.mock('@/hooks/use-playlists-query', () => ({
+vi.mock('./_hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 
-vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
+vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useDeletePlaylistMutation: () => ({
     deletePlaylist: deletePlaylistMock,
     get isDeletingPlaylist() {

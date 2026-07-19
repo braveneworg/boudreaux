@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ActiveTyper } from '@/hooks/use-chat-typing';
+import type { ActiveTyper } from './_hooks/use-chat-typing';
 
 interface ChatTypingIndicatorProps {
   typers: ActiveTyper[];

@@ -21,8 +21,9 @@ import {
 } from '@/app/components/ui/command';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useArtistListQuery } from '@/app/hooks/use-artist-list-query';
 import { useDebounce } from '@/app/hooks/use-debounce';
+
+import { useArtistListQuery } from '../_hooks/use-artist-list-query';
 
 import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 

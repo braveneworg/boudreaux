@@ -100,7 +100,7 @@ vi.mock('@/ui/switch', () => ({
   Switch: (props: { id: string }) => <button type="button" id={props.id} aria-pressed={false} />,
 }));
 
-vi.mock('@/app/hooks/use-connected-accounts', () => ({
+vi.mock('./_hooks/use-connected-accounts', () => ({
   useConnectedAccounts: () => ({ accounts: [], isLoading: false, error: null, refetch: vi.fn() }),
 }));
 

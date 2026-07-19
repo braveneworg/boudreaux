@@ -15,8 +15,6 @@ import {
 import { SendHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { MentionMatch } from '@/hooks/use-mention-search-query';
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import {
   sendChatMessageAction,
   type SendChatMessageActionResult,
@@ -25,6 +23,9 @@ import type { ChatMessageDto } from '@/lib/services/chat-service';
 import { cn } from '@/lib/utils';
 
 import { ChatMentionAutocomplete } from './chat-mention-autocomplete';
+
+import type { MentionMatch } from './_hooks/use-mention-search-query';
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 interface ChatInputProps {
   fingerprint: string | null;

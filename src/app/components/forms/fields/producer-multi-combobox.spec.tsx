@@ -17,7 +17,7 @@ let mockProducerResults: ProducerPill[] = [];
 let mockIsPending = false;
 let mockDataUndefined = false;
 
-vi.mock('@/app/hooks/use-producers-search-query', () => ({
+vi.mock('../_hooks/use-producers-search-query', () => ({
   useProducersSearchQuery: () => ({
     isPending: mockIsPending,
     error: null,

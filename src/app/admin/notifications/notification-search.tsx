@@ -18,7 +18,8 @@ import {
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/app/hooks/use-debounce';
-import { useNotificationBannerSearchQuery } from '@/app/hooks/use-notification-banner-search-query';
+
+import { useNotificationBannerSearchQuery } from './_hooks/use-notification-banner-search-query';
 
 interface SearchResult {
   id: string;

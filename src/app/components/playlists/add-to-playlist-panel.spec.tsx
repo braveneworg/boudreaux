@@ -14,7 +14,7 @@ import type { UseAddToPlaylistFlowResult } from './use-add-to-playlist-flow';
 const usePlaylistsQueryMock = vi.hoisted(() => vi.fn());
 const useAddToPlaylistFlowMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-playlists-query', () => ({
+vi.mock('./_hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 

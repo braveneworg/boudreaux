@@ -19,7 +19,7 @@ vi.mock('server-only', () => ({}));
 // ---------------------------------------------------------------------------
 // Mock: useReleaseDateLookupQuery — idle (not fetching, no data)
 // ---------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
+vi.mock('../_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: () => ({
     isFetching: false,
     error: null,
@@ -31,7 +31,7 @@ vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
 // ---------------------------------------------------------------------------
 // Mock: useArtistListQuery — return empty list so comboboxes stay idle
 // ---------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-artist-list-query', () => ({
+vi.mock('../_hooks/use-artist-list-query', () => ({
   useArtistListQuery: () => ({ data: [], isLoading: false, isPending: false }),
 }));
 

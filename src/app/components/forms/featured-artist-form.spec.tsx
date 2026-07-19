@@ -8,13 +8,13 @@ import { render as rtlRender, screen, waitFor, act } from '@testing-library/reac
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import { useFeaturedArtistQuery } from '@/app/hooks/use-featured-artist-query';
+import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
+
+import { useFeaturedArtistQuery } from './_hooks/use-featured-artist-query';
 import {
   useReleaseDigitalFormatQuery,
   type ReleaseDigitalFormat,
-} from '@/app/hooks/use-release-digital-format-query';
-import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
-
+} from './_hooks/use-release-digital-format-query';
 import { FeaturedArtistForm } from './featured-artist-form';
 
 import type * as ReactHookFormTypes from 'react-hook-form';
@@ -101,7 +101,7 @@ vi.mock('@/lib/utils/console-logger', () => ({
 // Mock the featured-artist query hook so edit-mode loading is driven by the
 // hook's return value instead of a raw `fetch`. Defaults to "create mode"
 // (null data, not pending); edit-mode tests override it per-case.
-vi.mock('@/app/hooks/use-featured-artist-query', () => ({
+vi.mock('./_hooks/use-featured-artist-query', () => ({
   useFeaturedArtistQuery: vi.fn(() => ({
     data: null,
     isPending: false,
@@ -114,7 +114,7 @@ vi.mock('@/app/hooks/use-featured-artist-query', () => ({
 // path is driven by the hook's return value instead of a raw `fetch`. Defaults
 // to "no format found" (null data, not pending); each digital-format test
 // overrides it per-case.
-vi.mock('@/app/hooks/use-release-digital-format-query', () => ({
+vi.mock('./_hooks/use-release-digital-format-query', () => ({
   useReleaseDigitalFormatQuery: vi.fn(() => ({
     data: null,
     isPending: false,

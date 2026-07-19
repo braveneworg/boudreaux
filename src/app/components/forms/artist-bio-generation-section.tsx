@@ -15,15 +15,15 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Textarea } from '@/app/components/ui/textarea';
-import { useCreateBioLinkMutation } from '@/app/hooks/mutations/use-bio-media-mutations';
-import { useGenerateArtistBioMutation } from '@/app/hooks/mutations/use-bio-mutations';
-import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { cn } from '@/lib/utils';
 import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { BioProgress, GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
+import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
+import { useGenerateArtistBioMutation } from './_hooks/mutations/use-bio-mutations';
+import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
 import { BioGenerationProgressTimeline } from './bio-generation-progress-timeline';
 
 interface ArtistBioGenerationSectionProps {

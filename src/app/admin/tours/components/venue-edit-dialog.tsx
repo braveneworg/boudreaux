@@ -17,9 +17,10 @@ import {
 import { Input } from '@/app/components/ui/input';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TimezoneSelect } from '@/app/components/ui/timezone-select';
-import { useUpdateVenueMutation } from '@/app/hooks/mutations/use-venue-mutations';
-import { useVenueDetailQuery } from '@/app/hooks/use-venue-detail-query';
 import type { VenueUpdateInput } from '@/lib/validation/tours/venue-schema';
+
+import { useUpdateVenueMutation } from '../_hooks/mutations/use-venue-mutations';
+import { useVenueDetailQuery } from '../_hooks/use-venue-detail-query';
 
 import type { VenueOption } from './venue-select';
 

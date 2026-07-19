@@ -8,10 +8,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
 
 import { GravatarAvatar } from '@/components/gravatar-avatar';
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import { cn } from '@/lib/utils';
 import { parseAdminMarkdown, type AdminMarkdownNode } from '@/lib/utils/admin-markdown';
 import { tokenizeMentions, type MentionToken } from '@/lib/utils/mention-parsing';
+
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 interface ChatMessageRowProps {
   message: OptimisticChatMessage;

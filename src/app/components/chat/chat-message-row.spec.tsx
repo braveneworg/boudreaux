@@ -5,9 +5,9 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
-
 import { ChatMessageRow } from './chat-message-row';
+
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 const makeMsg = (overrides?: Partial<OptimisticChatMessage>): OptimisticChatMessage => ({
   id: 'msg-1',

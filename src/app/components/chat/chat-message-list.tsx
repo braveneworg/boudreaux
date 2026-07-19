@@ -5,10 +5,10 @@
 
 import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
-
 import { ChatLoadMoreButton } from './chat-load-more-button';
 import { ChatMessageRow } from './chat-message-row';
+
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 /**
  * Memoized row wrapper. Render props are invoked inside the memo boundary so

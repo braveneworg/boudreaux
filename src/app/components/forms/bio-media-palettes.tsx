@@ -6,15 +6,15 @@
 import type { JSX } from 'react';
 
 import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/bio-editor-insert';
+import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import type { BioStatusImage, BioStatusLink } from '@/lib/validation/bio-generation-schema';
+
 import {
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
   useUpdateBioImageAttributionMutation,
-} from '@/app/hooks/mutations/use-bio-media-mutations';
-import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
-import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
-import type { BioStatusImage, BioStatusLink } from '@/lib/validation/bio-generation-schema';
-
+} from './_hooks/mutations/use-bio-media-mutations';
+import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
 import { useBioEditorRegistry } from './bio-editor-registry';
 import { BioImagePalette } from './bio-image-palette';
 import { BioLinkPalette } from './bio-link-palette';

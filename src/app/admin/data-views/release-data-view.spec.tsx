@@ -8,10 +8,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useInfiniteReleasesQuery } from '@/app/hooks/use-infinite-releases-query';
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 
+import { useInfiniteReleasesQuery } from './_hooks/use-infinite-releases-query';
 import { ReleaseDataView } from './release-data-view';
 import { useDataViewFilters } from './use-data-view-filters';
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/actions/delete-release-action', () => ({
   deleteReleaseAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
-vi.mock('@/app/hooks/use-infinite-releases-query', () => ({
+vi.mock('./_hooks/use-infinite-releases-query', () => ({
   useInfiniteReleasesQuery: vi.fn(),
 }));
 

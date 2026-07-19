@@ -10,7 +10,6 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { ClientSessionData } from '@/app/hooks/use-session';
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import { deleteChatMessageAction } from '@/lib/actions/delete-chat-message-action';
 import { toggleChatReactionAction } from '@/lib/actions/toggle-chat-reaction-action';
 import { togglePinChatMessageAction } from '@/lib/actions/toggle-pin-chat-message-action';
@@ -19,6 +18,7 @@ import type { ChatMessageDto } from '@/lib/services/chat-service';
 
 import { ChatBody } from './chat-body';
 
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 import type * as TanstackReactQuery from '@tanstack/react-query';
 
 // ────────────────────────────────────────────────────────────────────
@@ -34,22 +34,22 @@ const useChatChannelMock = vi.hoisted(() => vi.fn());
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-vi.mock('@/hooks/use-chat-me-query', () => ({
+vi.mock('./_hooks/use-chat-me-query', () => ({
   useChatMeQuery: (...args: unknown[]) => useChatMeQueryMock(...args),
 }));
-vi.mock('@/hooks/use-infinite-chat-messages-query', () => ({
+vi.mock('./_hooks/use-infinite-chat-messages-query', () => ({
   useInfiniteChatMessagesQuery: (...args: unknown[]) => useChatMessagesQueryMock(...args),
 }));
-vi.mock('@/hooks/use-chat-pinned-messages-query', () => ({
+vi.mock('./_hooks/use-chat-pinned-messages-query', () => ({
   useChatPinnedMessagesQuery: (...args: unknown[]) => useChatPinnedMessagesQueryMock(...args),
 }));
-vi.mock('@/hooks/use-chat-typing', () => ({
+vi.mock('./_hooks/use-chat-typing', () => ({
   useChatTyping: (...args: unknown[]) => useChatTypingMock(...args),
 }));
 vi.mock('@/hooks/use-fingerprint', () => ({
   useFingerprint: (...args: unknown[]) => useFingerprintMock(...args),
 }));
-vi.mock('@/hooks/use-chat-channel', () => ({
+vi.mock('./_hooks/use-chat-channel', () => ({
   useChatChannel: (params: Parameters<typeof useChatChannelMock>[0]) => useChatChannelMock(params),
 }));
 

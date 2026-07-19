@@ -5,8 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import { useInfiniteVideosQuery } from '@/app/hooks/use-infinite-videos-query';
-
+import { useInfiniteVideosQuery } from './_hooks/use-infinite-videos-query';
 import { VideoDataView } from './video-data-view';
 
 const mocks = vi.hoisted(() => ({
@@ -17,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   deleteVideoAsync: vi.fn(),
 }));
 
-vi.mock('@/app/hooks/use-infinite-videos-query', () => ({
+vi.mock('./_hooks/use-infinite-videos-query', () => ({
   useInfiniteVideosQuery: vi.fn(),
 }));
 

@@ -8,10 +8,11 @@ import { useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { useAddPlaylistItemMutation } from '@/hooks/mutations/use-playlist-mutations';
 import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
+
+import { useAddPlaylistItemMutation } from './_hooks/mutations/use-playlist-mutations';
 
 /** Arguments for {@link useAddToPlaylistFlow}. */
 export interface UseAddToPlaylistFlowArgs {
