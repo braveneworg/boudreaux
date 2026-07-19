@@ -35,7 +35,7 @@ vi.mock('@/hooks/use-playlists-query', () => ({
   usePlaylistsQuery: playlistsQueryMock,
 }));
 
-vi.mock('@/hooks/use-playlist-mutations', () => ({
+vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
     isAddingPlaylistItem: false,

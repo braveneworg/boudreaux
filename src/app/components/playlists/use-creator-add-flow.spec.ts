@@ -11,7 +11,7 @@ import { useCreatorAddFlow } from './use-creator-add-flow';
 
 const addPlaylistItemAsyncMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-playlist-mutations', () => ({
+vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
     isAddingPlaylistItem: false,

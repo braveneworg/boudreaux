@@ -27,7 +27,7 @@ vi.mock('@/hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 
-vi.mock('@/hooks/use-playlist-mutations', () => ({
+vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
   useDeletePlaylistMutation: () => ({
     deletePlaylist: deletePlaylistMock,
     get isDeletingPlaylist() {

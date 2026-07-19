@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDeletePlaylistMutation } from '@/hooks/use-playlist-mutations';
+import { useDeletePlaylistMutation } from '@/hooks/mutations/use-playlist-mutations';
 import { usePlaylistsQuery } from '@/hooks/use-playlists-query';
 import { cn } from '@/lib/utils';
 
