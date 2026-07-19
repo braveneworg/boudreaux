@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import {
   useRemovePlaylistItemMutation,
   useReorderPlaylistItemsMutation,
-} from '@/hooks/use-playlist-mutations';
+} from '@/hooks/mutations/use-playlist-mutations';
 import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/domain/playlist';
 
 import type { PlaylistCreatorItemData } from './playlist-creator-item';

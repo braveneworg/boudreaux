@@ -12,7 +12,7 @@ import { useCreatorServerItems } from './use-creator-server-items';
 const removePlaylistItemMock = vi.hoisted(() => vi.fn());
 const reorderPlaylistItemsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/hooks/use-playlist-mutations', () => ({
+vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
   useRemovePlaylistItemMutation: () => ({
     removePlaylistItem: removePlaylistItemMock,
     isRemovingPlaylistItem: false,

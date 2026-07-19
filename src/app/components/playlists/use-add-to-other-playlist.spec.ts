@@ -12,7 +12,7 @@ import { useAddToOtherPlaylist } from './use-add-to-other-playlist';
 const addPlaylistItemAsyncMock = vi.hoisted(() => vi.fn());
 const isAddingPlaylistItemMock = vi.hoisted(() => ({ value: false }));
 
-vi.mock('@/hooks/use-playlist-mutations', () => ({
+vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
     get isAddingPlaylistItem() {
