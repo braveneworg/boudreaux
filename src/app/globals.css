@@ -309,12 +309,14 @@
    utilities. Radix Switch/Checkbox/Radio render as <button>s and native
    checkbox/radio/range/color inputs are excluded, so toggles keep their
    pill shape. The cmdk search field inside a Command popover/dialog is
-   excluded too — it wears the wrapper's bottom-border divider, not a box. */
+   excluded too — it wears the wrapper's bottom-border divider, not a box:
+   cmdk renders its own <input> with role='combobox', so the combobox
+   branch is limited to non-input triggers to keep that exclusion real. */
 input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
     [data-slot='command-input']
   ),
 textarea,
-[role='combobox'],
+[role='combobox']:not(input),
 [data-slot='select-trigger'] {
   border-radius: 0;
   border-width: 2px;
