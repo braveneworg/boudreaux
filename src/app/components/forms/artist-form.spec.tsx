@@ -8,10 +8,10 @@ import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
+import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
 import { ArtistForm } from './artist-form';
 
 /**
@@ -40,7 +40,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
 }));
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => ({ data: { user: { id: 'admin-1', role: 'admin' } }, status: 'authenticated' }),
 }));
 
@@ -120,7 +120,7 @@ vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
 
 // The bio palettes keep the generation-status query mounted in edit mode;
 // stub the hook so this suite never issues a real fetch and renders no tiles.
-vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
+vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: vi.fn(() => ({
     data: undefined,
     isPending: true,
@@ -132,7 +132,7 @@ vi.mock('@/app/hooks/use-artist-bio-generation-status-query', () => ({
 // Mock the artist-detail query hook so edit-mode loading is driven by the
 // hook's return value instead of a raw `fetch`. Create-mode tests below leave
 // it at the default (null data, not pending).
-vi.mock('@/app/hooks/use-artist-query', () => ({
+vi.mock('./_hooks/use-artist-query', () => ({
   useArtistQuery: vi.fn(() => ({
     data: null,
     isPending: false,

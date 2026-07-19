@@ -10,7 +10,7 @@ import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-ar
 import { useFeaturedArtistFormLoad } from './use-featured-artist-form-load';
 
 const useFeaturedArtistQuery = vi.hoisted(() => vi.fn());
-vi.mock('@/app/hooks/use-featured-artist-query', () => ({ useFeaturedArtistQuery }));
+vi.mock('../_hooks/use-featured-artist-query', () => ({ useFeaturedArtistQuery }));
 
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock('sonner', () => ({ toast: { error: toastError } }));

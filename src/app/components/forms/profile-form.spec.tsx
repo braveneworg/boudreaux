@@ -57,7 +57,7 @@ vi.mock('@/lib/validation/profile-schema', () => ({ profileSchema: 'profile' }))
 vi.mock('@/lib/validation/change-email-schema', () => ({ changeEmailSchema: 'email' }));
 vi.mock('@/lib/validation/change-username-schema', () => ({ changeUsernameSchema: 'username' }));
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => useSessionMock(),
 }));
 
@@ -100,7 +100,7 @@ vi.mock('@/ui/switch', () => ({
   Switch: (props: { id: string }) => <button type="button" id={props.id} aria-pressed={false} />,
 }));
 
-vi.mock('@/app/hooks/use-connected-accounts', () => ({
+vi.mock('./_hooks/use-connected-accounts', () => ({
   useConnectedAccounts: () => ({ accounts: [], isLoading: false, error: null, refetch: vi.fn() }),
 }));
 

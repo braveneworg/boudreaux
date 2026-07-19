@@ -9,7 +9,7 @@ import { DesktopMenu } from './desktop-menu';
 const mockUseSession = vi.fn();
 const mockUsePathname = vi.fn();
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 

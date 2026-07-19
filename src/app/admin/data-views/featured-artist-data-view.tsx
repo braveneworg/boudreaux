@@ -14,13 +14,13 @@ import {
   useDeleteFeaturedArtistMutation,
   usePublishFeaturedArtistMutation,
   usePublishFeaturedArtistsMutation,
-} from '@/app/hooks/mutations/use-featured-artist-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
-import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
+} from '@/hooks/mutations/use-featured-artist-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
+import { useInfiniteFeaturedArtistsQuery } from './_hooks/use-infinite-featured-artists-query';
 import { DataView } from './data-view';
 import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 

@@ -9,12 +9,12 @@ import {
   useArchiveArtistMutation,
   usePublishArtistMutation,
   useRestoreArtistMutation,
-} from '@/app/hooks/mutations/use-artist-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
-import { useInfiniteArtistsQuery } from '@/app/hooks/use-infinite-artists-query';
+} from '@/hooks/mutations/use-artist-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 
+import { useInfiniteArtistsQuery } from './_hooks/use-infinite-artists-query';
 import { DataView } from './data-view';
 import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
 

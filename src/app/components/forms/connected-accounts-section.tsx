@@ -12,7 +12,6 @@ import {
   XIcon,
   type BrandIconProps,
 } from '@/app/components/ui/brand-icons';
-import { useConnectedAccounts } from '@/app/hooks/use-connected-accounts';
 import { authClient } from '@/lib/auth-client';
 import { log } from '@/lib/utils/console-logger';
 import { reportClientError } from '@/lib/utils/report-client-error';
@@ -33,6 +32,8 @@ import { Button } from '@/ui/button';
 import { Separator } from '@/ui/separator';
 import { Skeleton } from '@/ui/skeleton';
 import { ZinePanel } from '@/ui/zine-panel';
+
+import { useConnectedAccounts } from './_hooks/use-connected-accounts';
 
 type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 

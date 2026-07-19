@@ -21,10 +21,10 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { useDebounce } from '@/hooks/use-debounce';
-import { usePlaylistMediaSearchQuery } from '@/hooks/use-playlist-media-search-query';
 import { PLAYLIST_SEARCH_MIN_QUERY_LENGTH } from '@/lib/constants/playlists';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 
+import { usePlaylistMediaSearchQuery } from './_hooks/use-playlist-media-search-query';
 import { PlaylistDuplicateConfirmDialog } from './playlist-duplicate-confirm-dialog';
 import { PlaylistPickerCombobox } from './playlist-picker-combobox';
 import { PlaylistSearchResultRow } from './playlist-search-result-row';

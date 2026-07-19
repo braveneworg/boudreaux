@@ -9,9 +9,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useInfiniteAdminUserMessagesQuery } from '@/app/admin/chat/_hooks/use-infinite-admin-user-messages-query';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { useInfiniteAdminUserMessagesQuery } from '@/hooks/use-infinite-admin-user-messages-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   disableChatUserAction,

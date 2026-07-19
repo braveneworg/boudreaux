@@ -14,9 +14,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePlaylistQuery } from '@/hooks/use-playlist-query';
 import type { PlaylistDetailResponse } from '@/lib/types/domain/playlist';
 
+import { usePlaylistQuery } from './_hooks/use-playlist-query';
 import { PlaylistDownloadRow } from './playlist-download-row';
 import { PlaylistPlayer } from './playlist-player';
 

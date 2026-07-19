@@ -27,15 +27,15 @@ const addPlaylistItemAsyncMock = vi.hoisted(() =>
   >()
 );
 
-vi.mock('@/hooks/use-playlist-media-search-query', () => ({
+vi.mock('./_hooks/use-playlist-media-search-query', () => ({
   usePlaylistMediaSearchQuery: searchQueryMock,
 }));
 
-vi.mock('@/hooks/use-playlists-query', () => ({
+vi.mock('./_hooks/use-playlists-query', () => ({
   usePlaylistsQuery: playlistsQueryMock,
 }));
 
-vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
+vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
     isAddingPlaylistItem: false,

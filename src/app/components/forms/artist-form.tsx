@@ -29,9 +29,7 @@ import {
   useArchiveArtistMutation,
   useCreateArtistMutation,
   useUpdateArtistMutation,
-} from '@/app/hooks/mutations/use-artist-mutations';
-import { useArtistBioGenerationStatusQuery } from '@/app/hooks/use-artist-bio-generation-status-query';
-import { type ArtistDetail, useArtistQuery } from '@/app/hooks/use-artist-query';
+} from '@/hooks/mutations/use-artist-mutations';
 import { useSession } from '@/hooks/use-session';
 import { queryKeys } from '@/lib/query-keys';
 import { error } from '@/lib/utils/console-logger';
@@ -41,6 +39,9 @@ import { type GeneratedBioContent } from '@/lib/validation/bio-generation-schema
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 import { ZinePanel } from '@/ui/zine-panel';
+
+import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
+import { type ArtistDetail, useArtistQuery } from './_hooks/use-artist-query';
 
 import type { UseFormReturn } from 'react-hook-form';
 

@@ -14,7 +14,7 @@ import { useAddToPlaylistFlow } from './use-add-to-playlist-flow';
 const addPlaylistItemAsyncMock = vi.hoisted(() => vi.fn());
 const isAddingPlaylistItemMock = vi.hoisted(() => ({ value: false }));
 
-vi.mock('@/hooks/mutations/use-playlist-mutations', () => ({
+vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
     get isAddingPlaylistItem() {

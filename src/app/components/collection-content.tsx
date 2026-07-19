@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 import { Loader2 } from 'lucide-react';
 
-import { useCollectionQuery } from '@/app/hooks/use-collection-query';
+import { useCollectionQuery } from '@/hooks/use-collection-query';
 
 import { CollectionList } from './collection-list';
 import { ImageHeading } from './ui/image-heading';

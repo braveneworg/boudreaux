@@ -5,9 +5,9 @@ import Link from 'next/link';
 
 import { EditIcon } from 'lucide-react';
 
-import { useIsMobile } from '@/app/hooks/use-mobile';
-import { useSession } from '@/app/hooks/use-session';
-import type { ClientSessionData } from '@/app/hooks/use-session';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useSession } from '@/hooks/use-session';
+import type { ClientSessionData } from '@/hooks/use-session';
 import { cn } from '@/lib/utils';
 
 /** Resolves the best available display name from the session user. */

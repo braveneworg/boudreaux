@@ -6,7 +6,6 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { TOURS_PAGE_SIZE } from '@/app/hooks/use-infinite-tours-query';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
@@ -14,6 +13,7 @@ import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
+import { TOURS_PAGE_SIZE } from './_hooks/use-infinite-tours-query';
 import { ToursContent } from './components/tours-content';
 
 const breadcrumbItems = [{ anchorText: 'Tours', url: '/tours', isActive: true }];

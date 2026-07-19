@@ -11,7 +11,7 @@ import { useVideoArtistReview } from './use-video-artist-review';
 
 const mockUseArtistNameLookupQuery = vi.fn();
 
-vi.mock('@/hooks/use-artist-name-lookup-query', () => ({
+vi.mock('../_hooks/use-artist-name-lookup-query', () => ({
   useArtistNameLookupQuery: (...args: unknown[]) => mockUseArtistNameLookupQuery(...args),
 }));
 

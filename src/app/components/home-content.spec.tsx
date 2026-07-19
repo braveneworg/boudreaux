@@ -10,11 +10,11 @@ import { HomeContent } from './home-content';
 const useBannersQueryMock = vi.hoisted(() => vi.fn());
 const useActiveFeaturedArtistsQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/app/hooks/use-banners-query', () => ({
+vi.mock('@/hooks/use-banners-query', () => ({
   useBannersQuery: () => useBannersQueryMock(),
 }));
 
-vi.mock('@/app/hooks/use-active-featured-artists-query', () => ({
+vi.mock('@/hooks/use-active-featured-artists-query', () => ({
   useActiveFeaturedArtistsQuery: () => useActiveFeaturedArtistsQueryMock(),
 }));
 

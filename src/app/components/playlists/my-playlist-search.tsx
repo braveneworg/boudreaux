@@ -17,8 +17,9 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { usePlaylistsQuery } from '@/hooks/use-playlists-query';
 import { cn } from '@/lib/utils';
+
+import { usePlaylistsQuery } from './_hooks/use-playlists-query';
 
 interface MyPlaylistSearchProps {
   /** Fired with the picked playlist's id; the popover closes itself. */

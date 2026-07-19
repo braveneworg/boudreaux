@@ -10,15 +10,8 @@ import md5 from 'crypto-js/md5';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { ClientSessionData } from '@/app/hooks/use-session';
-import { useChatChannel } from '@/hooks/use-chat-channel';
-import { useChatMeQuery } from '@/hooks/use-chat-me-query';
-import { useChatPinnedMessagesQuery } from '@/hooks/use-chat-pinned-messages-query';
-import { useChatReopenRefresh } from '@/hooks/use-chat-reopen-refresh';
-import { useChatTyping } from '@/hooks/use-chat-typing';
 import { useFingerprint } from '@/hooks/use-fingerprint';
-import { useInfiniteChatMessagesQuery } from '@/hooks/use-infinite-chat-messages-query';
-import { useOptimisticChat, type OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
+import type { ClientSessionData } from '@/hooks/use-session';
 import {
   deleteChatMessageAction,
   type DeleteChatMessageScope,
@@ -28,6 +21,13 @@ import { togglePinChatMessageAction } from '@/lib/actions/toggle-pin-chat-messag
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatMessageDto } from '@/lib/services/chat-service';
 
+import { useChatChannel } from './_hooks/use-chat-channel';
+import { useChatMeQuery } from './_hooks/use-chat-me-query';
+import { useChatPinnedMessagesQuery } from './_hooks/use-chat-pinned-messages-query';
+import { useChatReopenRefresh } from './_hooks/use-chat-reopen-refresh';
+import { useChatTyping } from './_hooks/use-chat-typing';
+import { useInfiniteChatMessagesQuery } from './_hooks/use-infinite-chat-messages-query';
+import { useOptimisticChat, type OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 import { ChatDeleteMessageDialog } from './chat-delete-message-dialog';
 import { ChatDisabledState } from './chat-disabled-state';
 import { ChatInput } from './chat-input';

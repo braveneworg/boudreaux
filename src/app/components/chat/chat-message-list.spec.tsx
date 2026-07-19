@@ -6,9 +6,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
-
 import { ChatMessageList } from './chat-message-list';
+
+import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
 
 const makeMsg = (id: string): OptimisticChatMessage => ({
   id,

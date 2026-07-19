@@ -26,7 +26,7 @@ export const createMockRouter = () => ({
 
 /**
  * Builds a mock client session object shaped like the data the better-auth
- * `useSession()` hook (via `@/app/hooks/use-session`) exposes as `data`.
+ * `useSession()` hook (via `@/hooks/use-session`) exposes as `data`.
  */
 export const createMockSession = (
   overrides?: Partial<{

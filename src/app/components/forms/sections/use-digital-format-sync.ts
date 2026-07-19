@@ -5,8 +5,9 @@
 
 import { useEffect } from 'react';
 
-import { useReleaseDigitalFormatQuery } from '@/app/hooks/use-release-digital-format-query';
 import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
+
+import { useReleaseDigitalFormatQuery } from '../_hooks/use-release-digital-format-query';
 
 import type { UseFormReturn } from 'react-hook-form';
 

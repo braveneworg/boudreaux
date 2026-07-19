@@ -25,13 +25,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 
+import { ArtistPill } from './artist-pill';
 import {
   useRemoveHeadlinerMutation,
   useReorderHeadlinersMutation,
   useUpdateHeadlinerSetTimeMutation,
-} from '@/app/hooks/mutations/use-tour-date-mutations';
-
-import { ArtistPill } from './artist-pill';
+} from '../_hooks/mutations/use-tour-date-mutations';
 
 import type { HeadlinerWithRelations } from './artist-pill';
 

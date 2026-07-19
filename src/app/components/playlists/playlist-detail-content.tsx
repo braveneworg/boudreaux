@@ -12,9 +12,9 @@ import { Share2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePlaylistQuery } from '@/hooks/use-playlist-query';
 import type { PlaylistDetailResponse } from '@/lib/types/domain/playlist';
 
+import { usePlaylistQuery } from './_hooks/use-playlist-query';
 import { PlaylistDownloadRow } from './playlist-download-row';
 import { PlaylistPlayer } from './playlist-player';
 import { PlaylistSharePopover } from './playlist-share-popover';

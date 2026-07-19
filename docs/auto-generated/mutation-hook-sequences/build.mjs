@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Generate one UML sequence diagram per TanStack Query *mutation* hook
-// (src/app/hooks/mutations/), then print a landscape, grayscale PDF — the
+// (src/hooks/mutations/ and feature _hooks/mutations/), then print a landscape, grayscale PDF — the
 // write-side companion to ../query-hook-sequences. Writes each diagram to
 // diagrams/*.mmd, assembles an HTML page (Mermaid from CDN), and prints to PDF
 // with headless Chromium via Playwright. No new npm dependencies.

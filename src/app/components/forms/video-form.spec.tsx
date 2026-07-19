@@ -59,7 +59,7 @@ vi.mock('@/lib/utils/generate-object-id', () => ({
   generateObjectId: () => 'a'.repeat(24),
 }));
 
-vi.mock('@/app/hooks/mutations/use-video-mutations', () => ({
+vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   useCreateVideoMutation: () => ({
     createVideoAsync: mocks.createVideoAsync,
     isCreatingVideo: false,
@@ -74,20 +74,20 @@ vi.mock('@/app/hooks/mutations/use-video-mutations', () => ({
   }),
 }));
 
-vi.mock('@/app/hooks/use-video-query', () => ({
+vi.mock('./_hooks/use-video-query', () => ({
   useVideoQuery: (id: string, options: unknown) => mocks.useVideoQuery(id, options),
 }));
 
-vi.mock('@/app/hooks/use-video-probe-prefill-query', () => ({
+vi.mock('./_hooks/use-video-probe-prefill-query', () => ({
   useVideoProbePrefillQuery: (s3Key: string, videoId: string, options: unknown) =>
     mocks.useVideoProbePrefillQuery(s3Key, videoId, options),
 }));
 
-vi.mock('@/app/hooks/use-video-producers-query', () => ({
+vi.mock('./_hooks/use-video-producers-query', () => ({
   useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
-vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
+vi.mock('./_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: () => ({
     isFetching: false,
     error: null,

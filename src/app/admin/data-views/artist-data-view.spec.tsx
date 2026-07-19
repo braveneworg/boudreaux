@@ -29,7 +29,7 @@ const render = (ui: ReactNode) => {
 };
 
 const mockUseArtistsQuery = vi.fn();
-vi.mock('@/app/hooks/use-infinite-artists-query', () => ({
+vi.mock('./_hooks/use-infinite-artists-query', () => ({
   useInfiniteArtistsQuery: (...args: unknown[]) => mockUseArtistsQuery(...args),
 }));
 

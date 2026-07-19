@@ -5,7 +5,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { SessionStatus } from '@/app/hooks/use-session';
+import type { SessionStatus } from '@/hooks/use-session';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 
 import { AddToPlaylistMenu } from './add-to-playlist-menu';

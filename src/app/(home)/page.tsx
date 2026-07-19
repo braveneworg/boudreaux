@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
-import type { ActiveFeaturedArtistsResponse } from '@/app/hooks/use-active-featured-artists-query';
 import { HomeContent } from '@/components/home-content';
+import type { ActiveFeaturedArtistsResponse } from '@/hooks/use-active-featured-artists-query';
 import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import {

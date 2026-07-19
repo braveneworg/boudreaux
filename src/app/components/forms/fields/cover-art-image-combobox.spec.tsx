@@ -6,14 +6,15 @@ import { createElement } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { ArtistDetail } from '@/app/hooks/use-artist-query';
 import type { ImageUploadActionResult } from '@/lib/actions/artist-image-actions';
 import { artistDetailSchema } from '@/lib/validation/media-models-schema';
 
 import { CoverArtImageCombobox } from './cover-art-image-combobox';
 
+import type { ArtistDetail } from '../_hooks/use-artist-query';
+
 const useArtistsQuery = vi.hoisted(() => vi.fn());
-vi.mock('@/app/hooks/use-artists-query', () => ({ useArtistsQuery }));
+vi.mock('../_hooks/use-artists-query', () => ({ useArtistsQuery }));
 
 const getArtistImagesAction = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/actions/artist-image-actions', () => ({ getArtistImagesAction }));

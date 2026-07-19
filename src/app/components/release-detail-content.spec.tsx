@@ -7,23 +7,23 @@ import { render, screen } from '@testing-library/react';
 import { ReleaseDetailContent } from './release-detail-content';
 
 const mockUseReleaseQuery = vi.fn();
-vi.mock('@/app/hooks/use-release-query', () => ({
+vi.mock('@/hooks/use-release-query', () => ({
   useReleaseQuery: (releaseId: string) => mockUseReleaseQuery(releaseId),
 }));
 
 const mockUseReleaseUserStatusQuery = vi.fn();
-vi.mock('@/app/hooks/use-release-user-status-query', () => ({
+vi.mock('@/hooks/use-release-user-status-query', () => ({
   useReleaseUserStatusQuery: (releaseId: string) => mockUseReleaseUserStatusQuery(releaseId),
 }));
 
 const mockUseReleaseDigitalFormatsQuery = vi.fn();
-vi.mock('@/app/hooks/use-release-digital-formats-query', () => ({
+vi.mock('@/hooks/use-release-digital-formats-query', () => ({
   useReleaseDigitalFormatsQuery: (releaseId: string) =>
     mockUseReleaseDigitalFormatsQuery(releaseId),
 }));
 
 const mockUseReleaseRelatedQuery = vi.fn();
-vi.mock('@/app/hooks/use-release-related-query', () => ({
+vi.mock('@/hooks/use-release-related-query', () => ({
   useReleaseRelatedQuery: (releaseId: string, artistId: string | null) =>
     mockUseReleaseRelatedQuery(releaseId, artistId),
 }));

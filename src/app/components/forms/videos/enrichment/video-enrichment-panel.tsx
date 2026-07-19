@@ -25,8 +25,8 @@ import { Skeleton } from '@/app/components/ui/skeleton';
 import {
   useApplyVideoSuggestionMutation,
   useRunVideoEnrichmentMutation,
-} from '@/app/hooks/mutations/use-video-enrichment-mutations';
-import { useVideoEnrichmentStatusQuery } from '@/app/hooks/use-video-enrichment-status-query';
+} from '@/components/forms/_hooks/mutations/use-video-enrichment-mutations';
+import { useVideoEnrichmentStatusQuery } from '@/components/forms/_hooks/use-video-enrichment-status-query';
 import { splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';

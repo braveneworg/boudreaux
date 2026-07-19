@@ -8,15 +8,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useInfiniteFeaturedArtistsQuery } from '@/app/hooks/use-infinite-featured-artists-query';
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 
+import { useInfiniteFeaturedArtistsQuery } from './_hooks/use-infinite-featured-artists-query';
 import { FeaturedArtistDataView } from './featured-artist-data-view';
 
 // Mock the useInfiniteFeaturedArtistsQuery hook
-vi.mock('@/app/hooks/use-infinite-featured-artists-query', () => ({
+vi.mock('./_hooks/use-infinite-featured-artists-query', () => ({
   useInfiniteFeaturedArtistsQuery: vi.fn(),
 }));
 

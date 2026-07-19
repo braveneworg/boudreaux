@@ -16,7 +16,7 @@ import { preconnect } from 'react-dom';
 
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-import { usePurchaseStatusQuery } from '@/app/hooks/use-purchase-status-query';
+import { usePurchaseStatusQuery } from '@/hooks/use-purchase-status-query';
 import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purchase-checkout-session-action';
 import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
 import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';

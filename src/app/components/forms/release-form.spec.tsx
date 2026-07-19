@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
-import { useReleaseDetailQuery } from '@/app/hooks/use-release-query';
+import { useReleaseDetailQuery } from '@/hooks/use-release-query';
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 
 /**
@@ -34,7 +34,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock the client session hook
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => ({
     data: { user: { id: 'user-1', name: 'Admin', role: 'admin' } },
     status: 'authenticated',
@@ -80,7 +80,7 @@ vi.mock('@/lib/utils/console-logger', () => ({
 // Mock the release-detail query hook so edit-mode loading is driven by the
 // hook's return value instead of a raw `fetch`. Defaults to "create mode"
 // (null data, not pending); edit-mode tests override it per-case.
-vi.mock('@/app/hooks/use-release-query', () => ({
+vi.mock('@/hooks/use-release-query', () => ({
   useReleaseDetailQuery: vi.fn(() => ({
     data: null,
     isPending: false,

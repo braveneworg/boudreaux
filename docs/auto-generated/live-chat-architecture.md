@@ -130,15 +130,15 @@ mutation.
   stand-in so E2E does not need real Pusher credentials.
 - [`getPusherServer`](../../src/lib/utils/pusher-server.ts) — server
   singleton. `triggerChatEvent` is a no-op in `E2E_MODE`.
-- [`useChatChannel`](../../src/app/hooks/use-chat-channel.ts) —
+- [`useChatChannel`](../../src/app/components/chat/_hooks/use-chat-channel.ts) —
   subscribes to `presence-fake-four-chat`, tracks the live member roster,
   exposes ref-stashed callback props (`onNewMessage`,
   `onReactionUpdated`, `onTyping`) so re-renders don't re-bind handlers.
   `sendTyping` is throttled to 1500 ms.
-- [`useInfiniteChatMessagesQuery`](../../src/app/hooks/use-infinite-chat-messages-query.ts)
+- [`useInfiniteChatMessagesQuery`](../../src/app/components/chat/_hooks/use-infinite-chat-messages-query.ts)
   — TanStack infinite query. Flattens pages oldest → newest. Hard cap
   at `MAX_TOTAL_MESSAGES = 200`.
-- [`useFingerprint`](../../src/app/hooks/use-fingerprint.ts) —
+- [`useFingerprint`](../../src/hooks/use-fingerprint.ts) —
   module-scoped FingerprintJS agent so the lib loads at most once per
   tab. Cancellation guard prevents post-unmount state updates.
 
@@ -185,7 +185,7 @@ All under [`src/app/components/chat/`](../../src/app/components/chat/):
 
 ### Optimistic layer (Phase 5)
 
-[`useOptimisticChat`](../../src/app/hooks/use-optimistic-chat.ts)
+[`useOptimisticChat`](../../src/app/components/chat/_hooks/use-optimistic-chat.ts)
 layers:
 
 1. `baseMessages` — persisted history from the infinite query.

@@ -21,7 +21,7 @@ import {
   useCreateFeaturedArtistMutation,
   useDeleteFeaturedArtistMutation,
   useUpdateFeaturedArtistCoverArtMutation,
-} from '@/app/hooks/mutations/use-featured-artist-mutations';
+} from '@/hooks/mutations/use-featured-artist-mutations';
 import { useSession } from '@/hooks/use-session';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';

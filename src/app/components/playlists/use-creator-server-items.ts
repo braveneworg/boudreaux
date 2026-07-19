@@ -8,11 +8,12 @@ import { useMemo, useRef, useState } from 'react';
 
 import { toast } from 'sonner';
 
+import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/domain/playlist';
+
 import {
   useRemovePlaylistItemMutation,
   useReorderPlaylistItemsMutation,
-} from '@/hooks/mutations/use-playlist-mutations';
-import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/domain/playlist';
+} from './_hooks/mutations/use-playlist-mutations';
 
 import type { PlaylistCreatorItemData } from './playlist-creator-item';
 

@@ -6,8 +6,9 @@
 import type { JSX } from 'react';
 
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { useLinkPreviewQuery } from '@/app/hooks/use-link-preview-query';
 import type { LinkPreview } from '@/lib/validation/link-preview-schema';
+
+import { useLinkPreviewQuery } from './_hooks/use-link-preview-query';
 
 interface LinkPreviewCardProps {
   url: string;

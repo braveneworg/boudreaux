@@ -16,9 +16,9 @@ import {
   CommandItem,
   CommandList,
 } from '@/app/components/ui/command';
-import { usePlaylistsQuery } from '@/hooks/use-playlists-query';
 import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 
+import { usePlaylistsQuery } from './_hooks/use-playlists-query';
 import { PlaylistCoverTiles } from './playlist-cover-tiles';
 
 /** Maximum number of rows shown at once — typing narrows the list further. */

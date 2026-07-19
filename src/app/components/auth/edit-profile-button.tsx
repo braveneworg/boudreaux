@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 import { UserIcon } from 'lucide-react';
 
-import { useIsMobile } from '@/app/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const EditProfileButton = () => {
   const isMobile = useIsMobile();

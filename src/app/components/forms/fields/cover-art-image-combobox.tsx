@@ -19,9 +19,10 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { useArtistsQuery } from '@/app/hooks/use-artists-query';
 import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
 import { cn } from '@/lib/utils';
+
+import { useArtistsQuery } from '../_hooks/use-artists-query';
 
 interface ArtistImageOption {
   id: string;

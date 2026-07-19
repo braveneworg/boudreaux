@@ -7,12 +7,11 @@ import type { ReactNode } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useCreateBioLinkMutation } from '@/app/hooks/mutations/use-bio-media-mutations';
-
+import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
 import { CustomLinkEditor } from './custom-link-editor';
 
 // Mock the mutation hook so the component test never touches TanStack Query.
-vi.mock('@/app/hooks/mutations/use-bio-media-mutations', () => ({
+vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
   useCreateBioLinkMutation: vi.fn(),
 }));
 

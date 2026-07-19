@@ -14,7 +14,7 @@ import { ChatUsersTable } from './chat-users-table';
 const useChatAdminUsersQueryMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../hooks/use-chat-admin-users-query', () => ({
+vi.mock('./_hooks/use-chat-admin-users-query', () => ({
   useChatAdminUsersQuery: (params: unknown) => useChatAdminUsersQueryMock(params),
 }));
 

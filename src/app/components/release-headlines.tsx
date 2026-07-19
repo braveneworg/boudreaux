@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 import { ChevronDown } from 'lucide-react';
 
-import { useInfinitePublishedReleasesQuery } from '@/app/hooks/use-infinite-published-releases-query';
+import { useInfinitePublishedReleasesQuery } from '@/hooks/use-infinite-published-releases-query';
 import { getArtistDisplayNameForRelease } from '@/lib/utils/release-helpers';
 
 /** How close to the pane's bottom edge (px) before the next page loads. */

@@ -23,7 +23,7 @@ let mockArtistResults: MockArtistRow[] = [];
 let mockIsPending = false;
 let mockDataUndefined = false;
 
-vi.mock('@/app/hooks/use-artist-list-query', () => ({
+vi.mock('../_hooks/use-artist-list-query', () => ({
   useArtistListQuery: () => ({
     isPending: mockIsPending,
     error: null,
@@ -35,7 +35,7 @@ vi.mock('@/app/hooks/use-artist-list-query', () => ({
 // --------------------------------------------------------------------------
 // Mock: useDebounce (return value immediately — no timer tricks needed)
 // --------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: unknown) => value,
 }));
 

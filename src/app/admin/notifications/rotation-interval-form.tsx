@@ -9,9 +9,10 @@ import { Loader2, Save } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import { useUpdateRotationIntervalMutation } from '@/app/hooks/mutations/use-banner-mutations';
 import { Label } from '@/components/ui/label';
 import { MAX_ROTATION_INTERVAL, MIN_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
+
+import { useUpdateRotationIntervalMutation } from './_hooks/mutations/use-banner-mutations';
 
 interface RotationIntervalFormProps {
   currentInterval: number;

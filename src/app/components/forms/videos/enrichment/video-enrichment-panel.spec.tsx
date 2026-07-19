@@ -23,12 +23,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-vi.mock('@/app/hooks/use-video-enrichment-status-query', () => ({
+vi.mock('@/components/forms/_hooks/use-video-enrichment-status-query', () => ({
   useVideoEnrichmentStatusQuery: (videoId: string, options: unknown) =>
     mocks.useVideoEnrichmentStatusQuery(videoId, options),
 }));
 
-vi.mock('@/app/hooks/mutations/use-video-enrichment-mutations', () => ({
+vi.mock('@/components/forms/_hooks/mutations/use-video-enrichment-mutations', () => ({
   useRunVideoEnrichmentMutation: () => ({
     runVideoEnrichment: mocks.runVideoEnrichment,
     isRunningVideoEnrichment: false,

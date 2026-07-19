@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useUpdatePlaylistMutation } from '@/hooks/mutations/use-playlist-mutations';
+
+import { useUpdatePlaylistMutation } from './_hooks/mutations/use-playlist-mutations';
 
 const SocialShareWidget = nextDynamic(
   () =>

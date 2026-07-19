@@ -17,7 +17,7 @@ let mockProducerResults: ProducerPill[] = [];
 let mockIsPending = false;
 let mockDataUndefined = false;
 
-vi.mock('@/app/hooks/use-producers-search-query', () => ({
+vi.mock('../_hooks/use-producers-search-query', () => ({
   useProducersSearchQuery: () => ({
     isPending: mockIsPending,
     error: null,
@@ -29,7 +29,7 @@ vi.mock('@/app/hooks/use-producers-search-query', () => ({
 // --------------------------------------------------------------------------
 // Mock: useDebounce (return value immediately — no timer tricks needed)
 // --------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: unknown) => value,
 }));
 

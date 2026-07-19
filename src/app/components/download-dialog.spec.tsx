@@ -33,7 +33,7 @@ const mockUseSession = vi.fn<
   }
 >();
 
-vi.mock('@/app/hooks/use-session', () => ({
+vi.mock('@/hooks/use-session', () => ({
   useSession: () => mockUseSession(),
 }));
 
@@ -156,7 +156,7 @@ let currentFreeStatusData:
 };
 const mockUseFreeDownloadStatusQuery = vi.fn(() => ({ data: currentFreeStatusData }));
 
-vi.mock('@/app/hooks/use-free-download-status-query', () => ({
+vi.mock('@/hooks/use-free-download-status-query', () => ({
   useFreeDownloadStatusQuery: () => mockUseFreeDownloadStatusQuery(),
 }));
 

@@ -8,11 +8,11 @@ import { useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { useAddPlaylistItemMutation } from '@/hooks/mutations/use-playlist-mutations';
 import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
+import { useAddPlaylistItemMutation } from './_hooks/mutations/use-playlist-mutations';
 import { draftItemFromSearchItem, type DraftItem } from './use-playlist-creator';
 
 /** The duplicate awaiting confirmation, tagged by which add path produced it. */

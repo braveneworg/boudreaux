@@ -12,11 +12,11 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Form } from '@/app/components/ui/form';
-import { useReleaseDateLookupQuery } from '@/app/hooks/use-release-date-lookup-query';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { ReleaseDateField } from './release-date-field';
+import { useReleaseDateLookupQuery } from '../_hooks/use-release-date-lookup-query';
 
 import type { UseFormSetValue } from 'react-hook-form';
 
@@ -38,7 +38,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/app/hooks/use-release-date-lookup-query', () => ({
+vi.mock('../_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: vi.fn(() => ({
     isFetching: false,
     error: null,

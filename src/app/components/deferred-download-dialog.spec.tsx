@@ -10,7 +10,7 @@ import { DeferredDownloadDialog } from './deferred-download-dialog';
 
 const mockUseReleaseUserStatusQuery = vi.fn();
 
-vi.mock('@/app/hooks/use-release-user-status-query', () => ({
+vi.mock('@/hooks/use-release-user-status-query', () => ({
   useReleaseUserStatusQuery: (...args: unknown[]) => mockUseReleaseUserStatusQuery(...args),
 }));
 

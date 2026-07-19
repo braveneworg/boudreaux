@@ -5,8 +5,9 @@
 
 import { useState } from 'react';
 
-import { useCreateVenueMutation } from '@/app/hooks/mutations/use-venue-mutations';
 import type { VenueCreateInput } from '@/lib/validation/tours/venue-schema';
+
+import { useCreateVenueMutation } from '../_hooks/mutations/use-venue-mutations';
 
 import type { VenueOption } from './venue-select';
 

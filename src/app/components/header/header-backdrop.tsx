@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useSparklingParticles } from '@/hooks/use-sparkling-particles';
+import { useSparklingParticles } from './_hooks/use-sparkling-particles';
 
 /**
  * Decorative, non-interactive backdrop for the site header: the animated

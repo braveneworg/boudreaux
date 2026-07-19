@@ -17,8 +17,8 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 
 import { Popover, PopoverAnchor, PopoverContent } from '@/app/components/ui/popover';
-import { useArtistNavSearchQuery } from '@/app/hooks/use-artist-nav-search-query';
-import { useDebounce } from '@/app/hooks/use-debounce';
+import { useArtistNavSearchQuery } from '@/hooks/use-artist-nav-search-query';
+import { useDebounce } from '@/hooks/use-debounce';
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_DELAY = 400;

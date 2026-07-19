@@ -39,22 +39,22 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 
 ## 2. Change inventory
 
-| Area            | Path                                                                                               | Purpose                                                                                 |
-| --------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Lambda          | `bio-generator/src/handler.ts`                                                                     | Orchestrates lookup → prose → assemble; returns a result envelope                       |
-| Lambda          | `bio-generator/src/{musicbrainz,wikidata,wikimedia,wikipedia,gemini}.ts`                           | External source clients (no keys except Gemini); `wikipedia.ts` pulls the article body  |
-| Lambda          | `bio-generator/src/jina.ts`                                                                        | Optional always-on Jina web-search context (merged with the Wikipedia body)             |
-| Lambda          | `bio-generator/src/lib/secrets.ts`                                                                 | Reads Gemini key + optional search key from SSM (`SSM_PATH_GEMINI_API_KEY` / `_JINA_`)  |
-| Lambda          | `bio-generator/template.yaml`                                                                      | SAM stack: function, IAM (SSM/KMS), CloudWatch alarm, SNS                               |
-| CI/CD           | `.github/workflows/deploy-bio-generator.yml`                                                       | OIDC → `sam build`/`sam deploy` on `bio-generator/**` changes                           |
-| App service     | `src/lib/services/bio-generation-service.ts`                                                       | Invokes the Lambda; fake mode; persists via repository                                  |
-| App service     | `src/lib/services/bio-image-service.ts`                                                            | Fetches → S3 `PutObject` → variants → CDN URL                                           |
-| App util        | `src/lib/utils/image-variants.ts`                                                                  | `sharp` resize → `_w{width}` (+ `.webp`) variants to S3                                 |
-| App action/hook | `src/lib/actions/generate-artist-bio-action.ts`, `src/app/hooks/mutations/use-bio-mutations.ts`    | Admin-gated Server Action + mutation hook                                               |
-| Rendering       | `src/app/components/{bio-html,artist-bio-content,artist-list-card}.tsx`, `ui/rich-text-editor.tsx` | Tiptap editor + Next `Link`/`Image` rendering                                           |
-| Data            | `prisma/schema.prisma`                                                                             | `Artist.bio/shortBio/altBio/bioGeneratedAt/bioModel`, `ArtistBioImage`, `ArtistBioLink` |
-| Config          | `next.config.ts`                                                                                   | `images.remotePatterns` for CDN + Wikimedia/picsum                                      |
-| Config          | `src/lib/config/env-validation.ts`                                                                 | Requires `BIO_GENERATOR_LAMBDA_NAME`                                                    |
+| Area            | Path                                                                                                              | Purpose                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Lambda          | `bio-generator/src/handler.ts`                                                                                    | Orchestrates lookup → prose → assemble; returns a result envelope                       |
+| Lambda          | `bio-generator/src/{musicbrainz,wikidata,wikimedia,wikipedia,gemini}.ts`                                          | External source clients (no keys except Gemini); `wikipedia.ts` pulls the article body  |
+| Lambda          | `bio-generator/src/jina.ts`                                                                                       | Optional always-on Jina web-search context (merged with the Wikipedia body)             |
+| Lambda          | `bio-generator/src/lib/secrets.ts`                                                                                | Reads Gemini key + optional search key from SSM (`SSM_PATH_GEMINI_API_KEY` / `_JINA_`)  |
+| Lambda          | `bio-generator/template.yaml`                                                                                     | SAM stack: function, IAM (SSM/KMS), CloudWatch alarm, SNS                               |
+| CI/CD           | `.github/workflows/deploy-bio-generator.yml`                                                                      | OIDC → `sam build`/`sam deploy` on `bio-generator/**` changes                           |
+| App service     | `src/lib/services/bio-generation-service.ts`                                                                      | Invokes the Lambda; fake mode; persists via repository                                  |
+| App service     | `src/lib/services/bio-image-service.ts`                                                                           | Fetches → S3 `PutObject` → variants → CDN URL                                           |
+| App util        | `src/lib/utils/image-variants.ts`                                                                                 | `sharp` resize → `_w{width}` (+ `.webp`) variants to S3                                 |
+| App action/hook | `src/lib/actions/generate-artist-bio-action.ts`, `src/app/components/forms/_hooks/mutations/use-bio-mutations.ts` | Admin-gated Server Action + mutation hook                                               |
+| Rendering       | `src/app/components/{bio-html,artist-bio-content,artist-list-card}.tsx`, `ui/rich-text-editor.tsx`                | Tiptap editor + Next `Link`/`Image` rendering                                           |
+| Data            | `prisma/schema.prisma`                                                                                            | `Artist.bio/shortBio/altBio/bioGeneratedAt/bioModel`, `ArtistBioImage`, `ArtistBioLink` |
+| Config          | `next.config.ts`                                                                                                  | `images.remotePatterns` for CDN + Wikimedia/picsum                                      |
+| Config          | `src/lib/config/env-validation.ts`                                                                                | Requires `BIO_GENERATOR_LAMBDA_NAME`                                                    |
 
 ---
 

@@ -1,10 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useIsMobile } from '@/app/hooks/use-mobile';
-import { useSession } from '@/app/hooks/use-session';
-import type { ClientSessionData } from '@/app/hooks/use-session';
 import { GravatarAvatar } from '@/components/gravatar-avatar';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useSession } from '@/hooks/use-session';
+import type { ClientSessionData } from '@/hooks/use-session';
 import { CONSTANTS } from '@/lib/constants';
 import { cn } from '@/lib/utils/tailwind-utils';
 import { VerticalSeparator } from '@/ui/vertical-separator';

@@ -27,7 +27,7 @@ import { expect, test } from '../fixtures/auth.fixture';
  *     with `E2E_MODE=true` and no Pusher credentials, so server-side
  *     `triggerChatEvent` is a no-op and the client uses a stand-in stub.
  *     Multi-client behaviour is covered by the unit tests in
- *     src/app/hooks/use-chat-channel.spec.ts.
+ *     src/app/components/chat/_hooks/use-chat-channel.spec.ts.
  *   - The rate-limit toast. Upstash is short-circuited in `E2E_MODE`, so
  *     11+ rapid sends will not produce a 429.
  */

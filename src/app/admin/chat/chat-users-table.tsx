@@ -12,10 +12,11 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { useChatAdminUsersQuery } from '@/hooks/use-chat-admin-users-query';
 import { updateChatUserAction } from '@/lib/actions/update-chat-user-action';
 import { queryKeys } from '@/lib/query-keys';
 import type { ChatUsersSortBy } from '@/lib/services/chat-admin-service';
+
+import { useChatAdminUsersQuery } from './_hooks/use-chat-admin-users-query';
 
 const DEFAULT_PER_PAGE = 50;
 

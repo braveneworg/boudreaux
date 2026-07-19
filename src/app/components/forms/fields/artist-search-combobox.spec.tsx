@@ -12,14 +12,14 @@ import { ArtistSearchCombobox } from './artist-search-combobox';
 // Mock: useArtistListQuery
 // ---------------------------------------------------------------------------
 const mockUseArtistListQuery = vi.fn();
-vi.mock('@/app/hooks/use-artist-list-query', () => ({
+vi.mock('../_hooks/use-artist-list-query', () => ({
   useArtistListQuery: (...args: unknown[]): unknown => mockUseArtistListQuery(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Mock: useDebounce — pass-through so tests don't need fake timers
 // ---------------------------------------------------------------------------
-vi.mock('@/app/hooks/use-debounce', () => ({
+vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: (value: unknown) => value,
 }));
 

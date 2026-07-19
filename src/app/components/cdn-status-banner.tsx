@@ -7,7 +7,7 @@ import { AlertCircle, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/app/components/ui/alert';
 import { Progress } from '@/app/components/ui/progress';
-import { useCdnStatusQuery } from '@/app/hooks/use-cdn-status-query';
+import { useCdnStatusQuery } from '@/hooks/use-cdn-status-query';
 
 export const CDNStatusBanner = () => {
   const { isPending: isLoading, data: status } = useCdnStatusQuery();

@@ -75,7 +75,7 @@ A component either renders a Server Action result or reads from a query hook.
 ```ts
 // A query hook owns its key + queryFn and forwards the AbortSignal so the
 // request is cancelled on unmount, invalidation, or a superseding refetch.
-// src/app/hooks/use-featured-artist-query.ts
+// src/app/components/forms/_hooks/use-featured-artist-query.ts
 export const useFeaturedArtistQuery = (
   featuredArtistId: string,
   options: QueryOptionsOverride<FeaturedArtist | null> = {}
@@ -348,7 +348,7 @@ export const deleteFeaturedArtistAction = async (featuredArtistId: string) =>
 
 ```ts
 // The mutation hook invalidates on success, which triggers the refetch.
-// src/app/hooks/mutations/use-featured-artist-mutations.ts
+// src/hooks/mutations/use-featured-artist-mutations.ts
 useMutation({
   mutationFn: ({ featuredArtistId }) => deleteFeaturedArtistAction(featuredArtistId),
   onSuccess: (result) =>

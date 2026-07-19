@@ -5,14 +5,15 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import {
-  useArtistNameLookupQuery,
-  type ArtistNameLookupResponse,
-} from '@/hooks/use-artist-name-lookup-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import { splitFeaturedArtists, splitNameCandidates } from '@/utils/artist-name-split';
 import { splitArtistNameParts, type ArtistNameParts } from '@/utils/split-artist-name-parts';
+
+import {
+  useArtistNameLookupQuery,
+  type ArtistNameLookupResponse,
+} from '../_hooks/use-artist-name-lookup-query';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

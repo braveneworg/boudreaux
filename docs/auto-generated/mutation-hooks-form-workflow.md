@@ -5,7 +5,7 @@
 # Mutation hooks ↔ forms workflow
 
 How the admin forms talk to the custom TanStack Query mutation hooks
-(`src/app/hooks/mutations/`), the shared form utilities, and the Server Actions
+(`src/hooks/mutations/` and feature `_hooks/mutations/`), the shared form utilities, and the Server Actions
 after the "idiomatic mutation hooks" refactor.
 
 ## 1. The contract at a glance

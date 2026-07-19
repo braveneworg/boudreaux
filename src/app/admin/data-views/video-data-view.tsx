@@ -22,12 +22,12 @@ import {
   usePublishVideoMutation,
   useRestoreVideoMutation,
   useUnpublishVideoMutation,
-} from '@/app/hooks/mutations/use-video-mutations';
-import { useDebounce } from '@/app/hooks/use-debounce';
-import { useInfiniteVideosQuery } from '@/app/hooks/use-infinite-videos-query';
+} from '@/hooks/mutations/use-video-mutations';
+import { useDebounce } from '@/hooks/use-debounce';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
+import { useInfiniteVideosQuery } from './_hooks/use-infinite-videos-query';
 import { LoadMoreTrigger } from './components/load-more-trigger';
 import { VideoAdminCard } from './components/video-admin-card';
 import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
