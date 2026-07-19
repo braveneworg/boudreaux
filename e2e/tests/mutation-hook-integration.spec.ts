@@ -7,7 +7,7 @@ import { expect, test } from '../fixtures/auth.fixture';
 
 /**
  * Admin → public propagation for the new TanStack Query mutation hooks
- * (src/app/hooks/mutations/). These assert the *integration path* end to end:
+ * (src/hooks/mutations/ and feature-level _hooks/mutations/). These assert the *integration path* end to end:
  * an admin write through the hook → Server Action → revalidatePath / cache
  * invalidation → the change visible on the public surface.
  *

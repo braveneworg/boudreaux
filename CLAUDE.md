@@ -50,8 +50,10 @@ src/
 │   ├── (auth)/  admin/  releases/  tours/
 │   ├── components/         # Shared feature components
 │   │   ├── ui/             # shadcn/ui primitives (@/ui/*, @/components/ui/*)
-│   │   └── forms/fields/   # Reusable RHF/Zod field components
-│   └── hooks/              # Client hooks (TanStack Query, etc.)
+│   │   ├── forms/fields/   # Reusable RHF/Zod field components
+│   │   └── */_hooks/       # Feature-scoped hooks (chat, forms, playlists, header)
+│   └── */_hooks/           # Route-scoped hooks (admin/*, tours)
+├── hooks/                  # Global client hooks (@/hooks/*), mutations/ subfolder
 ├── lib/
 │   ├── actions/            # Server Actions (mutations) — 'use server' at top
 │   ├── decorators/         # withAuth, withAdmin, withRateLimit
@@ -65,7 +67,7 @@ scripts/                    # tsx scripts (mongo backup, S3 ops, image variants)
 docs/auto-generated/        # AI-generated markdown goes here
 ```
 
-Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/app/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal except for adjacent files.
+Path aliases: `@/*`→`src/*`, `@/components/*`→`src/app/components/*`, `@/ui/*`→`src/app/components/ui/*`, `@/hooks/*`→`src/hooks/*`, `@/lib/*`→`src/lib/*`, `@/utils/*`→`src/lib/utils/*`. Use aliases for all imports — never `../../` traversal except for adjacent files.
 
 ## Commands
 

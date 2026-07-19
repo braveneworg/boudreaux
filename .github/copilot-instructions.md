@@ -75,7 +75,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - src/app/components/ - shared feature components
 - src/app/components/ui/ - shadcn/ui primitives (alias `@/ui/*` or `@/components/ui/*`)
 - src/app/components/forms/fields/ - reusable RHF/Zod field components
-- src/app/hooks/ - client-side React hooks (TanStack Query, etc.)
+- src/hooks/ - global client-side React hooks (mutations/ subfolder); feature-scoped hooks live in _hooks/ folders beside their consumers
 - src/lib/actions/ - Server Actions ('use server')
 - src/lib/repositories/ - Prisma data-access layer
 - src/lib/services/ - business logic services
