@@ -840,6 +840,23 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.bioLinks).toMatchObject({ select: { origin: true } });
     });
 
+    /**
+     * replaceBioContent persists width/height, and BioStatusImage exposes them,
+     * but the projection omitted them — so every consumer's `image.width ??
+     * fallback` silently took the fallback and the preview dialog always
+     * reserved 800x600. Only a projection-level assertion can catch this: the
+     * service specs mock this repository, so the missing columns are invisible
+     * to them.
+     */
+    it('selects the image intrinsics on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a4');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { width: true, height: true } });
+    });
+
     it('selects licenseUrl on the bioImages select', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
 

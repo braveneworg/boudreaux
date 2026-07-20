@@ -90,6 +90,8 @@ export interface BioGenerationStateRecord {
     licenseUrl: string | null;
     sourceUrl: string | null;
     originalUrl: string | null;
+    width: number | null;
+    height: number | null;
     isPrimary: boolean;
     kind: string | null;
     alt: string | null;
@@ -686,6 +688,8 @@ export class ArtistRepository {
               licenseUrl: true,
               sourceUrl: true,
               originalUrl: true,
+              width: true,
+              height: true,
               isPrimary: true,
               kind: true,
               alt: true,
