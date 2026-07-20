@@ -4,11 +4,11 @@
 import 'server-only';
 
 import { VideoRepository } from '@/lib/repositories/video-repository';
-import { videoProbeFixture } from '@/lib/services/video-enrichment-fixture';
+import { buildLocalProbeUrl, probeLocally } from '@/lib/services/video-probe-local-adapters';
 import type { SaveProbeResultData } from '@/lib/types/domain/video';
 import { loggers } from '@/lib/utils/logger';
 import { generatePresignedProbeUrl } from '@/lib/utils/s3-client';
-import { probeUrl } from '@/lib/video-probe/ffprobe';
+import { probeUrl, type ProbeUrlResult } from '@/lib/video-probe/ffprobe';
 import { normalizeProbe, redactProbeJson, type NormalizedProbe } from '@/lib/video-probe/normalize';
 import { extractProbePrefillTags, type ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
@@ -41,23 +41,31 @@ const persistFailure = async (videoId: string, s3Key: string, message: string): 
   }
 };
 
+/** True when no AWS or ffprobe is available — E2E, and local dev without media. */
+const isLocalProbe = (): boolean => process.env.BIO_GENERATOR_FAKE === 'true';
+
 /**
- * Presign → probe → normalize/redact → persist for one video. In fake mode
- * (`BIO_GENERATOR_FAKE=true` — E2E and local dev without real media/ffprobe)
- * the deterministic fixture is persisted instead of spawning ffprobe.
+ * Sign a probe URL, or build a signed-looking local one when there is no AWS.
+ */
+const resolveProbeUrl = async (s3Key: string): Promise<string> =>
+  isLocalProbe() ? buildLocalProbeUrl(s3Key) : generatePresignedProbeUrl(s3Key);
+
+/** Spawn ffprobe, or return the fixture's raw output when there is no binary. */
+const runFfprobe = async (url: string): Promise<ProbeUrlResult> =>
+  isLocalProbe() ? probeLocally(url) : probeUrl(url);
+
+/**
+ * Presign → probe → normalize/redact → persist for one video.
+ *
+ * In fake mode only the two genuinely-impossible steps are substituted — URL
+ * signing and the ffprobe spawn. `normalizeProbe`, `redactProbeJson`, the
+ * failure branch and the stale-file-race check all run for real, so an E2E
+ * assertion on the persisted scalars now exercises the code that produces them
+ * rather than restating a hand-written fixture.
  */
 const runProbe = async (videoId: string, s3Key: string): Promise<void> => {
-  if (process.env.BIO_GENERATOR_FAKE === 'true') {
-    await VideoRepository.saveProbeResult(
-      videoId,
-      s3Key,
-      buildSuccessData(videoProbeFixture.normalized, videoProbeFixture.probeData)
-    );
-    return;
-  }
-
-  const url = await generatePresignedProbeUrl(s3Key);
-  const result = await probeUrl(url);
+  const url = await resolveProbeUrl(s3Key);
+  const result = await runFfprobe(url);
 
   if (!result.ok) {
     await persistFailure(videoId, s3Key, result.error);
@@ -113,12 +121,8 @@ export class VideoProbeService {
    */
   static async probeForPrefill(s3Key: string): Promise<ProbePrefillResult> {
     try {
-      if (process.env.BIO_GENERATOR_FAKE === 'true') {
-        return { ok: true, tags: extractProbePrefillTags(videoProbeFixture.probeData) };
-      }
-
-      const url = await generatePresignedProbeUrl(s3Key);
-      const result = await probeUrl(url);
+      const url = await resolveProbeUrl(s3Key);
+      const result = await runFfprobe(url);
 
       if (!result.ok) {
         return { ok: false, error: result.error };

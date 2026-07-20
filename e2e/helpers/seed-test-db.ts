@@ -525,11 +525,14 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
   });
 
   // Probe scalars the technical-card assertions pin ('1920×1080', '4.8 Mbps',
-  // '23.976 fps'). These MUST equal videoProbeFixture.normalized: every
-  // enrichment Run re-probes and persists that fixture, so any divergence would
-  // silently change the card after the first run (and break the assertions on a
-  // retry). releasedOn intentionally differs from the fixture's releasedOn
-  // suggestion (2020-06-01) so the suggestion is emitted.
+  // '23.98 fps'). These MUST equal videoProbeFixture.normalized: every
+  // enrichment Run re-probes and persists it, so any divergence would silently
+  // change the card after the first run (and break the assertions on a retry).
+  // That coupling is now enforced by a spec — videoProbeFixture.normalized is
+  // asserted to equal normalizeProbe(videoProbeFixture.raw(...)) — so these
+  // values track the real normalizer rather than a hand-written guess.
+  // releasedOn intentionally differs from the fixture's releasedOn suggestion
+  // (2020-06-01) so the suggestion is emitted.
   const probeScalars = {
     probedAt: new Date('2026-02-02T00:00:00.000Z'),
     container: 'mov,mp4,m4a,3gp,3g2,mj2',
@@ -538,7 +541,7 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
     videoCodec: 'h264',
     audioCodec: 'aac',
     bitrateKbps: 4800,
-    frameRate: 23.976,
+    frameRate: 23.98,
     audioChannels: 2,
     audioSampleRateHz: 48000,
   };
