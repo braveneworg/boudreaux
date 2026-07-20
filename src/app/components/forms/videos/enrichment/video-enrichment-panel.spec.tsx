@@ -179,7 +179,7 @@ describe('VideoEnrichmentPanel — states', () => {
   });
 
   it('runs enrichment directly (no dialog) from the empty state', async () => {
-    render(<Harness />);
+    render(<Harness artist="Lead Act" />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Run enrichment' }));
 
@@ -257,12 +257,37 @@ describe('VideoEnrichmentPanel — states', () => {
 
     expect(screen.queryByTestId('video-artist-suggestion-card')).not.toBeInTheDocument();
   });
+
+  it('disables Run enrichment and shows the hint when the artist is blank', () => {
+    render(<Harness />);
+
+    expect(screen.getByRole('button', { name: 'Run enrichment' })).toBeDisabled();
+    expect(
+      screen.getByText('Add an artist or creator to enable web enrichment.')
+    ).toBeInTheDocument();
+  });
+
+  it('enables Run enrichment and hides the hint once an artist is set', () => {
+    render(<Harness artist="Lead Act" />);
+
+    expect(screen.getByRole('button', { name: 'Run enrichment' })).toBeEnabled();
+    expect(
+      screen.queryByText('Add an artist or creator to enable web enrichment.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables the Re-run trigger when the artist is blank', () => {
+    setStatus(succeededStatus);
+    render(<Harness />);
+
+    expect(screen.getByRole('button', { name: 'Re-run enrichment' })).toBeDisabled();
+  });
 });
 
 describe('VideoEnrichmentPanel — re-run dialog', () => {
   it('opens a confirm dialog instead of re-running immediately', async () => {
     setStatus(succeededStatus);
-    render(<Harness />);
+    render(<Harness artist="Lead Act" />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Re-run enrichment' }));
 
@@ -272,7 +297,7 @@ describe('VideoEnrichmentPanel — re-run dialog', () => {
 
   it('re-runs after the dialog is confirmed', async () => {
     setStatus(succeededStatus);
-    render(<Harness />);
+    render(<Harness artist="Lead Act" />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Re-run enrichment' }));
     await userEvent.click(screen.getByRole('button', { name: 'Re-run' }));
@@ -282,7 +307,7 @@ describe('VideoEnrichmentPanel — re-run dialog', () => {
 
   it('does not re-run when the dialog is cancelled', async () => {
     setStatus(succeededStatus);
-    render(<Harness />);
+    render(<Harness artist="Lead Act" />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Re-run enrichment' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
