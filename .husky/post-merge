@@ -18,6 +18,16 @@ if printf '%s\n' "$changed" | grep -qE '^(pnpm-lock\.yaml|package\.json)$'; then
   pnpm install
 fi
 
+# The lambdas are standalone pnpm projects; the root install above never
+# touches them, so their node_modules go stale when a merge changes their
+# lockfiles.
+for lambda_dir in bio-generator stripe-webhook; do
+  if printf '%s\n' "$changed" | grep -qE "^$lambda_dir/(pnpm-lock\.yaml|package\.json)$"; then
+    echo "📦 $lambda_dir lockfile or package.json changed — running pnpm install..."
+    pnpm install --dir "$lambda_dir"
+  fi
+done
+
 if printf '%s\n' "$changed" | grep -q '^prisma/schema\.prisma$'; then
   echo "🗄  Prisma schema changed — running pnpm exec prisma generate..."
   pnpm exec prisma generate
