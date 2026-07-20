@@ -61,18 +61,14 @@ interface RunBioGenerationParams {
  * `after()` once the action response has been sent. `runGenerationJob` records
  * its own succeeded/failed status and never throws.
  *
- * Only the synchronous fake/E2E path (`completed`) finishes in-process, so it is
- * the only outcome revalidated here; the real async path (`dispatched`) is
- * finished — and revalidated — by the Lambda callback route. `failed` no-ops.
- * The accepted trigger is audit-logged by the action, not here.
+ * Nothing is revalidated here: every run now dispatches across the seam and is
+ * finished — and revalidated — by the completion callback route, on both the
+ * real and local adapters. The accepted trigger is audit-logged by the action.
  */
 export const runBioGenerationAfterResponse = async ({
   artistId,
   links,
   description,
 }: RunBioGenerationParams): Promise<void> => {
-  const outcome = await BioGenerationService.runGenerationJob(artistId, { links, description });
-  if (outcome.status === 'completed') {
-    revalidateArtistBioPaths(outcome.slug);
-  }
+  await BioGenerationService.runGenerationJob(artistId, { links, description });
 };

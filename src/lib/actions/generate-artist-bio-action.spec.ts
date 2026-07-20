@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
-
 import { generateArtistBioAction } from './generate-artist-bio-action';
 
 vi.mock('server-only', () => ({}));
@@ -57,23 +55,13 @@ vi.mock('@/lib/utils/logger', () => ({
 
 const VALID_ID = 'a'.repeat(24);
 
-const content: GeneratedBioContent = {
-  shortBio: 'Short teaser',
-  longBio: '<p>Long</p>',
-  altBio: '<p>Punchy promo</p>',
-  genres: 'art rock',
-  images: [],
-  links: [],
-  model: 'gemini-2.5-pro',
-};
-
 beforeEach(() => {
   afterCallback = null;
   requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
   // Default: artist exists, never generated.
   getBioGenerationStateMock.mockResolvedValue({ bioStatus: null, bioStartedAt: null });
   setBioStatusMock.mockResolvedValue(undefined);
-  runGenerationJobMock.mockResolvedValue({ status: 'completed', data: content, slug: 'radiohead' });
+  runGenerationJobMock.mockResolvedValue({ status: 'dispatched' });
 });
 
 describe('generateArtistBioAction', () => {
@@ -170,20 +158,34 @@ describe('generateArtistBioAction', () => {
     expect(runGenerationJobMock).not.toHaveBeenCalled();
   });
 
-  it('revalidates but does not audit-log when the background job completes', async () => {
+  it('runs the background job with the trigger arguments', async () => {
     await generateArtistBioAction({ artistId: VALID_ID });
-    logSecurityEventMock.mockClear(); // drop the trigger-time audit
     await afterCallback?.();
 
     expect(runGenerationJobMock).toHaveBeenCalledWith(VALID_ID, {
       links: undefined,
       description: undefined,
     });
-    // Completion no longer audit-logs (moved to the trigger).
+  });
+
+  it('does not audit-log again when the background job runs', async () => {
+    await generateArtistBioAction({ artistId: VALID_ID });
+    logSecurityEventMock.mockClear(); // drop the trigger-time audit
+    await afterCallback?.();
+
     expect(logSecurityEventMock).not.toHaveBeenCalled();
-    const revalidated = revalidatePathMock.mock.calls.map(([path]) => path);
-    expect(revalidated).toContain('/artists/radiohead');
-    expect(revalidated).toContain('/artists/radiohead/bio');
+  });
+
+  /**
+   * Revalidation belongs to the completion callback route, which both the real
+   * Lambda and the local adapter POST to. This path used to revalidate for the
+   * in-process fake — an outcome the service can no longer return.
+   */
+  it('leaves revalidation to the completion callback', async () => {
+    await generateArtistBioAction({ artistId: VALID_ID });
+    await afterCallback?.();
+
+    expect(revalidatePathMock.mock.calls.map(([path]) => path)).not.toContain('/artists/radiohead');
   });
 
   it('does not revalidate when the background job is dispatched to the Lambda', async () => {
