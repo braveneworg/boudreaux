@@ -120,4 +120,59 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       await deleteUnlinkedArtistByDisplayName(DISCOVERED_FEATURE);
     }
   });
+
+  test('a blank-artist draft disables Run enrichment with a hint', async ({ adminPage }) => {
+    let videoId: string | undefined;
+    try {
+      await adminPage.goto('/admin/videos/new');
+      await expect(adminPage.getByRole('heading', { name: 'Video File' })).toBeVisible();
+
+      // No `Artist - ` prefix → the filename parser yields artist: null, so
+      // the draft row persists a BLANK artist and no enrichment auto-kicks.
+      await adminPage
+        .getByTestId('video-dropzone')
+        .locator('input[type="file"]')
+        .setInputFiles({
+          name: 'E2E Gate Song.mp4',
+          mimeType: 'video/mp4',
+          buffer: Buffer.from('e2e-not-a-real-video'),
+        });
+
+      await expect(adminPage.getByLabel('Title')).toHaveValue('E2E Gate Song', {
+        timeout: 15_000,
+      });
+      await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/);
+      videoId = adminPage.url().split('/').pop();
+      expect(videoId).toMatch(/^[0-9a-f]{24}$/);
+
+      // The fake probe's container tags carry 'E2E Probe Artist', which the
+      // client-side only-if-empty prefill writes into the LIVE Artist field —
+      // so immediately post-upload the gate is legitimately open. Wait for
+      // that prefill (proving the draft + probe round-trip completed), then
+      // reload: the edit page rehydrates from the persisted row (artist '' —
+      // the production shape when container tags lack an artist) and the
+      // probe-prefill query never runs outside a fresh upload.
+      const artistTrigger = adminPage.getByRole('combobox', { name: 'Artist / Creator' });
+      await expect(artistTrigger).toContainText('E2E Probe Artist', { timeout: 15_000 });
+      await adminPage.reload();
+
+      // Rehydrated from the row: the artist combobox is back to its blank
+      // placeholder (the persisted draft artist really is '').
+      await expect(artistTrigger).toContainText('Search or type an artist', { timeout: 15_000 });
+
+      // The panel mounts (draft + MUSIC default) but the gate holds: Run is
+      // disabled, the hint shows, and no auto-kick ever engaged the status.
+      const panel = adminPage.getByTestId('video-enrichment-panel');
+      await expect(panel).toBeVisible({ timeout: 15_000 });
+      await expect(panel.getByRole('button', { name: 'Run enrichment' })).toBeDisabled();
+      await expect(
+        panel.getByText('Add an artist or creator to enable web enrichment.')
+      ).toBeVisible();
+      await expect(panel.getByTestId('video-enrichment-status-chip')).toHaveText('Not enriched');
+    } finally {
+      if (videoId) {
+        await deleteVideoCascade(videoId);
+      }
+    }
+  });
 });

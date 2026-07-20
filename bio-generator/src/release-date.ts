@@ -173,12 +173,18 @@ const releaseDateSystemPrompt = [
   ...SHARED_SYSTEM_LINES,
 ].join(' ');
 
+/** The two-query evidence sweep — title-only when no artist is known. */
+const releaseDateQueries = (title: string, artist: string): string[] =>
+  artist
+    ? [`"${artist}" "${title}" video release date`, `${artist} ${title} premiere`]
+    : [`"${title}" video release date`, `${title} premiere`];
+
 /** Builds the release-date user prompt from the numbered evidence block. */
 const buildReleaseDatePrompt =
-  (title: string, artistDisplay: string, adminReleasedOn: string | undefined) =>
+  (title: string, artist: string, adminReleasedOn: string | undefined) =>
   (evidence: string): string =>
     [
-      `Video: "${title}" by ${artistDisplay}.`,
+      artist ? `Video: "${title}" by ${artist}.` : `Video: "${title}".`,
       adminReleasedOn ? `Admin-entered release date: ${adminReleasedOn} (verify or correct).` : '',
       'EVIDENCE:',
       evidence,
@@ -198,19 +204,17 @@ export const resolveReleaseDateSuggestion = async (
   deps: AdjudicationDeps = {}
 ): Promise<Omit<VideoSuggestion, 'field'> | null> => {
   const { title, artistDisplay, adminReleasedOn, serperKey, geminiKey } = args;
+  const artist = artistDisplay.trim();
   try {
     const outcome = await adjudicate(
       {
-        queries: [
-          `"${artistDisplay}" "${title}" video release date`,
-          `${artistDisplay} ${title} premiere`,
-        ],
+        queries: releaseDateQueries(title, artist),
         serperKey,
         geminiKey,
         model: args.model ?? DEFAULT_GEMINI_MODEL,
         schema: releaseDateAdjudicationSchema,
         systemPrompt: releaseDateSystemPrompt,
-        buildUserPrompt: buildReleaseDatePrompt(title, artistDisplay, adminReleasedOn),
+        buildUserPrompt: buildReleaseDatePrompt(title, artist, adminReleasedOn),
       },
       deps
     );

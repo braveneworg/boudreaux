@@ -47,6 +47,59 @@ describe('resolveReleaseDateSuggestion', () => {
     expect(searchWeb).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the artist in both queries when one is set', async () => {
+    const searchWeb = vi.fn().mockResolvedValue([]);
+
+    await resolveReleaseDateSuggestion(baseArgs, { searchWeb });
+
+    expect(searchWeb).toHaveBeenNthCalledWith(
+      1,
+      '"Ceschi" "Bite Through Stone" video release date',
+      'serper-key'
+    );
+    expect(searchWeb).toHaveBeenNthCalledWith(
+      2,
+      'Ceschi Bite Through Stone premiere',
+      'serper-key'
+    );
+  });
+
+  it('searches title-only queries when the artist is blank', async () => {
+    const searchWeb = vi.fn().mockResolvedValue([]);
+
+    await resolveReleaseDateSuggestion({ ...baseArgs, artistDisplay: '   ' }, { searchWeb });
+
+    expect(searchWeb).toHaveBeenNthCalledWith(
+      1,
+      '"Bite Through Stone" video release date',
+      'serper-key'
+    );
+    expect(searchWeb).toHaveBeenNthCalledWith(2, 'Bite Through Stone premiere', 'serper-key');
+  });
+
+  it('omits the artist from the adjudication prompt when blank', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveReleaseDateSuggestion(
+      { ...baseArgs, artistDisplay: '' },
+      { searchWeb, requestJson }
+    );
+
+    expect(requestJson).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userPrompt: expect.stringContaining('Video: "Bite Through Stone".'),
+      }),
+      {}
+    );
+    expect(requestJson).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userPrompt: expect.not.stringContaining('" by ') }),
+      {}
+    );
+  });
+
   it('adjudicates a differing date into a suggestion with subset-enforced sources', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const fetchFn = vi.fn().mockResolvedValue(

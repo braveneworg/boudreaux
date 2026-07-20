@@ -85,6 +85,20 @@ const VIDEO_LEVEL_FIELD_CONFIG = new Map<VideoLevelSuggestionField, VideoLevelFi
   ],
 ]);
 
+/** Copy for the blank-artist gate — asserted verbatim by unit and E2E specs. */
+const MISSING_ARTIST_HINT = 'Add an artist or creator to enable web enrichment.';
+
+/** True when the live Artist / Creator field holds a non-blank value. */
+const hasArtistValue = (artist: string | undefined): boolean => (artist ?? '').trim() !== '';
+
+/** Shared disable condition for both run affordances (busy or blank artist). */
+const isRunDisabled = (isBusy: boolean, hasArtist: boolean): boolean => isBusy || !hasArtist;
+
+/** Muted explainer rendered whenever the gate disables the run affordances. */
+const MissingArtistHint = (): React.ReactElement => (
+  <p className="text-muted-foreground text-sm">{MISSING_ARTIST_HINT}</p>
+);
+
 /** Narrow a raw suggestion field to a video-level field, or null (no `as` cast). */
 export const toVideoLevelField = (field: string): VideoLevelSuggestionField | null =>
   (VIDEO_LEVEL_SUGGESTION_FIELDS as readonly string[]).includes(field)
@@ -275,6 +289,7 @@ interface EnrichmentPanelBodyProps {
   data: VideoEnrichmentStatusResult | undefined;
   control: Control<VideoFormData>;
   isBusy: boolean;
+  hasArtist: boolean;
   onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
   onRun: () => void;
   onApplySuggestion: (
@@ -294,6 +309,7 @@ const PhaseContent = ({
   data,
   control,
   isBusy,
+  hasArtist,
   onApplyVideoSuggestion,
   onRun,
   onApplySuggestion,
@@ -303,7 +319,7 @@ const PhaseContent = ({
     case 'loading':
       return <EnrichmentSkeleton />;
     case 'empty':
-      return <RunEnrichmentButton disabled={isBusy} onRun={onRun} />;
+      return <RunEnrichmentButton disabled={isRunDisabled(isBusy, hasArtist)} onRun={onRun} />;
     case 'in-flight':
       return <VideoEnrichmentProgressTimeline progress={data?.progress} />;
     case 'failed':
@@ -331,15 +347,18 @@ const PhaseContent = ({
  * per-phase parts) to keep every component under the complexity cap.
  */
 const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElement => {
-  const { data, isBusy, onRun } = props;
+  const { data, isBusy, hasArtist, onRun } = props;
   const phase = panelPhase(data);
   const isTerminal = phase === 'succeeded' || phase === 'failed';
 
   return (
     <>
       {isTerminal ? <TerminalAnnouncement succeeded={phase === 'succeeded'} /> : null}
+      {hasArtist ? null : <MissingArtistHint />}
       <PhaseContent {...props} phase={phase} />
-      {isTerminal ? <RerunEnrichmentDialog disabled={isBusy} onConfirm={onRun} /> : null}
+      {isTerminal ? (
+        <RerunEnrichmentDialog disabled={isRunDisabled(isBusy, hasArtist)} onConfirm={onRun} />
+      ) : null}
     </>
   );
 };
@@ -350,7 +369,9 @@ const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElemen
  * with a 20-minute client give-up (mirroring the bio section's
  * CLIENT_POLL_DEADLINE pattern), a live stage timeline, and per-artist /
  * video-level suggestion review. Artist applies are pessimistic server
- * actions; video-level suggestions apply into the parent form only.
+ * actions; video-level suggestions apply into the parent form only. Run and
+ * Re-run are disabled with a hint while the live Artist / Creator field is
+ * blank (the server action refuses blank-artist runs as a backstop).
  */
 export const VideoEnrichmentPanel = ({
   videoId,
@@ -366,6 +387,9 @@ export const VideoEnrichmentPanel = ({
   const status = data?.status ?? null;
   const isInFlight = isInFlightEnrichmentStatus(status);
   const isBusy = isRunningVideoEnrichment || isApplyingVideoSuggestion;
+
+  const artistValue = useWatch({ control, name: 'artist' });
+  const hasArtist = hasArtistValue(artistValue);
 
   // Last-resort client stop: if a run never reaches a terminal status, stop
   // polling after the deadline (the server's stale-job coercion normally
@@ -418,6 +442,7 @@ export const VideoEnrichmentPanel = ({
         data={data}
         control={control}
         isBusy={isBusy}
+        hasArtist={hasArtist}
         onApplyVideoSuggestion={onApplyVideoSuggestion}
         onRun={triggerRun}
         onApplySuggestion={applySuggestion}
