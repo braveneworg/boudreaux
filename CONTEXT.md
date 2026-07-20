@@ -40,7 +40,10 @@ query construction, compare-and-swap claims, and race guards.
 _In_ `src/lib/repositories/`.
 
 **Service** — business rules and policy over one or more repositories. Returns
-`ServiceResponse`.
+`ServiceResponse`. **All business logic lives here**, and callers always go
+through a service — never past it to a repository — even when the service
+currently only forwards. See
+[ADR-0002](docs/adr/0002-business-logic-stays-in-services.md).
 _In_ `src/lib/services/`.
 
 **Server Action** — a mutation entry point (`'use server'`). Mutations go here,

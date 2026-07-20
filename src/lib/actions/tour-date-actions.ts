@@ -53,7 +53,7 @@ export const createTourDateAction = async (
     'headlinerIds',
     'timeZone',
     'utcOffset',
-  ];
+  ] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourDateCreateSchema);
 
@@ -130,7 +130,7 @@ export const updateTourDateAction = async (
     'headlinerIds',
     'timeZone',
     'utcOffset',
-  ];
+  ] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourDateUpdateSchema);
 

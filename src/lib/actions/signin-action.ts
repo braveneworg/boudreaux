@@ -63,7 +63,7 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     };
   }
 
-  const permittedFieldNames = ['email'];
+  const permittedFieldNames = ['email'] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signinSchema);
   if (parsed.success) {

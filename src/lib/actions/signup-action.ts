@@ -102,8 +102,7 @@ export const signupAction = async (
     'termsAndConditions',
     'allowSmsNotifications',
     'allowEmailNotifications',
-    'username',
-  ];
+  ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signupSchema);
 
   if (parsed.success) {
