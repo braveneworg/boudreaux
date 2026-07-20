@@ -14,6 +14,8 @@ import {
 } from '@/app/components/ui/audio/audio-controls';
 import { bindPlayerVolumePersistence } from '@/hooks/use-player-prefs';
 
+import { claimPlayback } from '../../playback-session';
+
 import type { MediaPlayerControls } from './media-player-controls';
 import type Player from 'video.js/dist/types/player';
 
@@ -116,6 +118,8 @@ const retrySourceLoad = (player: Player, sourceToRetry: string, shouldResume: bo
 };
 
 export interface PlayerInitializerRefs {
+  /** Stable per-instance identity used to claim the shared playback session. */
+  instanceIdRef: MutableRefObject<string>;
   containerRef: MutableRefObject<HTMLDivElement | null>;
   audioElRef: MutableRefObject<HTMLAudioElement | null>;
   playerRef: MutableRefObject<Player | null>;
@@ -151,6 +155,7 @@ export const createPlayerInitializer = (
   constants: PlayerInitializerConstants
 ): (() => boolean) => {
   const {
+    instanceIdRef,
     containerRef,
     audioElRef,
     playerRef,
@@ -259,6 +264,9 @@ export const createPlayerInitializer = (
       pendingResumePlaybackRef.current = false;
       transientErrorRecoveryAttemptedRef.current = false;
       player.userActive(true);
+      // Every audio player in the app is built here, so claiming the shared
+      // session once covers the release, artist, featured and playlist players.
+      claimPlayback(instanceIdRef.current, () => player.pause());
       onPlayRef.current?.();
     });
 

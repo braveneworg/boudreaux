@@ -2,16 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-// The coordinator is a module-scope singleton. Resetting the module registry
+// The session is a module-scope singleton. Resetting the module registry
 // between tests gives each test a pristine singleton without exposing a
 // test-only mutator that would weaken the module in production.
-describe('video playback coordinator', () => {
+describe('playback session', () => {
   let claimPlayback: (id: string, pause: () => void) => void;
   let releasePlayback: (id: string) => void;
 
   beforeEach(async () => {
     vi.resetModules();
-    ({ claimPlayback, releasePlayback } = await import('./video-playback-coordinator'));
+    ({ claimPlayback, releasePlayback } = await import('./playback-session'));
   });
 
   it('pauses the previous claimant when a different id claims playback', () => {

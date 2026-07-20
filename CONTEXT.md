@@ -74,3 +74,11 @@ release date, gated on the video being MUSIC-category with a known artist).
 the `bio-generator` Lambda. Has a lifecycle (`processing` → `succeeded` /
 `failed`) and reports intermediate **progress stages**. A job that never reports
 back is **stale-coerced** to failed after a deadline.
+
+**playback session** — the app-wide guarantee that at most one player is
+audible. Any player — a Release, Artist, featured or playlist audio player, or a
+Video — **claims** the session when it starts and **releases** it when it goes
+away; claiming pauses whoever held it. The session knows only `{ id, pause }`,
+which is what lets it span audio and video without either side knowing the other
+exists. Distinct from **player preferences** (volume and mute), which are shared
+by every player but are settings, not playback state.

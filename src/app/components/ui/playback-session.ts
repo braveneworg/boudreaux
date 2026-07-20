@@ -7,9 +7,13 @@ interface PlaybackClaim {
   pause: () => void;
 }
 
-// Module-scope singleton: at most one video may hold playback at a time. Both
-// the admin list and the /videos feed render many VideoPlayers; this ensures
-// starting one pauses whichever was playing.
+// Module-scope singleton: at most one player — audio or video — may hold
+// playback at a time. Every Video.js instance in the app claims through here,
+// so starting any player pauses whichever was playing, whatever its medium.
+//
+// The claim is deliberately just `{ id, pause }`. This module knows nothing
+// about tracks, releases, or videos, which is what lets one session span both
+// media without either side learning about the other.
 let current: PlaybackClaim | null = null;
 
 /**
