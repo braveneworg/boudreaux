@@ -6,6 +6,8 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
+import { isStaleJob } from '@/lib/utils/job-staleness';
+import { isInFlightBioStatus, type BioStatus } from '@/lib/validation/bio-generation-schema';
 
 interface BioInFlightState {
   bioStatus: string | null;
@@ -24,11 +26,9 @@ export const resolveInFlightBioStatus = (
   state: BioInFlightState,
   staleMs: number
 ): 'pending' | 'processing' | null => {
-  const inFlight = state.bioStatus === 'pending' || state.bioStatus === 'processing';
-  const startedAt = state.bioStartedAt?.getTime() ?? 0;
-  const isStale = Date.now() - startedAt > staleMs;
+  const inFlight = isInFlightBioStatus(state.bioStatus as BioStatus | null);
 
-  if (inFlight && !isStale) {
+  if (inFlight && !isStaleJob(state.bioStartedAt, staleMs)) {
     return state.bioStatus === 'processing' ? 'processing' : 'pending';
   }
 
