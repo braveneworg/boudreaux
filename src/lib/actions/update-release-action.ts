@@ -44,7 +44,7 @@ const PERMITTED_FIELD_NAMES = [
   'featuredUntil',
   'featuredDescription',
   'suggestedPrice',
-];
+] as const;
 
 const parseToArray = (value: string | undefined): string[] =>
   value

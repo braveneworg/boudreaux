@@ -29,7 +29,7 @@ const PERMITTED_FIELD_NAMES = [
   'digitalFormatId',
   'releaseId',
   'featuredTrackNumber',
-];
+] as const;
 
 // FormData sends all values as strings, so use z.coerce.number() for numeric fields
 // on the server side (the client schema uses z.number() for React Hook Form compatibility)

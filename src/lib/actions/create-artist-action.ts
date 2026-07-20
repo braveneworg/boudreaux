@@ -31,7 +31,7 @@ export const createArtistAction = async (
     'middleName',
     'publishedOn',
     'formedOn',
-  ];
+  ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
 
   if (parsed.success) {

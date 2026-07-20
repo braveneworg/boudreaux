@@ -39,7 +39,7 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
   'publishedAt',
   'artistDetails',
   'producers',
-];
+] as const;
 
 /** Coerce a string-or-number duration to a positive integer, or `undefined`. */
 export const parseDurationSeconds = (value: string | number | undefined): number | undefined => {
