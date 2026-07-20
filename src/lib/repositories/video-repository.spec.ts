@@ -569,6 +569,25 @@ describe('VideoRepository', () => {
       });
     });
 
+    /**
+     * A job is in flight from the moment it goes `pending` — the trigger action
+     * writes that, and only later does the service flip to `processing`. If the
+     * start time were stamped only on `processing`, every pending job would be
+     * in flight with no recorded start, which the staleness rule reads as
+     * abandoned. The status chip would jump straight to "Failed".
+     */
+    it('stamps enrichmentStartedAt when flipping to pending', async () => {
+      vi.mocked(prisma.video.update).mockResolvedValue({} as never);
+
+      await VideoRepository.setEnrichmentStatus('video-123', 'pending');
+
+      expect(prisma.video.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ enrichmentStartedAt: expect.any(Date) }),
+        })
+      );
+    });
+
     it('clears progress and error when flipping to pending', async () => {
       vi.mocked(prisma.video.update).mockResolvedValue({} as never);
 
@@ -576,7 +595,12 @@ describe('VideoRepository', () => {
 
       expect(prisma.video.update).toHaveBeenCalledWith({
         where: { id: 'video-123' },
-        data: { enrichmentStatus: 'pending', enrichmentProgress: null, enrichmentError: null },
+        data: {
+          enrichmentStatus: 'pending',
+          enrichmentProgress: null,
+          enrichmentError: null,
+          enrichmentStartedAt: expect.any(Date),
+        },
       });
     });
 

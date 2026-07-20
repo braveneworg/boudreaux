@@ -11,6 +11,7 @@ import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import { objectIdSchema } from '@/lib/validation/bio-generation-schema';
 import {
@@ -33,9 +34,8 @@ const resolveInFlightEnrichmentStatus = (state: {
   enrichmentStartedAt: Date | null;
 }): EnrichmentStatus | null => {
   const inFlight = isInFlightEnrichmentStatus(state.enrichmentStatus);
-  const startedAt = state.enrichmentStartedAt?.getTime() ?? 0;
-  const isStale = Date.now() - startedAt > STALE_JOB_MS;
-  if (inFlight && !isStale) {
+
+  if (inFlight && !isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS)) {
     return state.enrichmentStatus === 'processing' ? 'processing' : 'pending';
   }
   return null;

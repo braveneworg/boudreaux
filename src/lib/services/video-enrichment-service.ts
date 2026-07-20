@@ -23,6 +23,7 @@ import type {
   VideoEnrichmentSuggestionRecord,
 } from '@/lib/types/domain/video-enrichment';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
+import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
@@ -137,11 +138,8 @@ const toEnrichmentStatus = (status: string | null): EnrichmentStatus | null =>
     : null;
 
 /** True when a fresh (non-stale) job is already processing. */
-const isFreshlyProcessing = (state: VideoEnrichmentState): boolean => {
-  if (state.enrichmentStatus !== 'processing') return false;
-  const startedAt = state.enrichmentStartedAt?.getTime() ?? 0;
-  return Date.now() - startedAt <= STALE_JOB_MS;
-};
+const isFreshlyProcessing = (state: VideoEnrichmentState): boolean =>
+  state.enrichmentStatus === 'processing' && !isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS);
 
 /** Parse a stored progress JSON into the validated shape, or null. */
 const parseStoredProgress = (value: Json | null): VideoEnrichmentProgress | null => {
@@ -185,11 +183,8 @@ interface StatusView {
  */
 const resolveStatusView = (state: VideoEnrichmentState): StatusView => {
   const rawStatus = toEnrichmentStatus(state.enrichmentStatus);
-  const startedAtMs = state.enrichmentStartedAt?.getTime();
   const isStale =
-    isInFlightEnrichmentStatus(rawStatus) &&
-    startedAtMs !== undefined &&
-    Date.now() - startedAtMs > STALE_JOB_MS;
+    isInFlightEnrichmentStatus(rawStatus) && isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS);
   const status = isStale ? 'failed' : rawStatus;
   return {
     status,

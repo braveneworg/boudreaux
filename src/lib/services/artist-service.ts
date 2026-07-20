@@ -31,7 +31,7 @@ import { generateSlug } from '@/lib/utils/generate-slug';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object, getS3Client } from '@/lib/utils/s3-client';
-import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+import { buildMediaS3Key, extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import {
   sanitizeBioHtml,
   sanitizeBioHtmlNoImages,
@@ -72,18 +72,8 @@ export interface ImageUploadResult {
 /**
  * Generate a unique file key for S3
  */
-const generateS3Key = (artistId: string, fileName: string): string => {
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-  const sanitizedName = fileName
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .substring(0, 50);
-
-  return `media/artists/${artistId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
-};
+const generateS3Key = (artistId: string, fileName: string): string =>
+  buildMediaS3Key({ entityType: 'artists', entityId: artistId, fileName });
 
 /**
  * Map a persisted image row to the public {@link ImageUploadResult} shape,

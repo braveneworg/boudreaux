@@ -452,9 +452,18 @@ describe('presigned-upload-actions', () => {
         ]);
 
         expect(result.success).toBe(true);
-        // When there's no extension, the full filename is treated as extension
-        // The implementation uses fileName.split('.').pop() which returns 'testfile'
-        expect(result.data?.[0].s3Key).toMatch(/\.testfile$/);
+        // A name with no separator has no extension to trust, so the key falls
+        // back to the default rather than echoing the whole name back as one
+        // (`split('.').pop()` returns the entire string when there is no dot).
+        expect(result.data?.[0].s3Key).toMatch(/\.jpg$/);
+      });
+
+      it('does not let a crafted extension inject a path segment into the key', async () => {
+        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
+          { fileName: 'photo.jpg/nested/evil', contentType: 'image/jpeg', fileSize: 1024 },
+        ]);
+
+        expect(result.data?.[0].s3Key.replace('media/artists/artist-123/', '')).not.toContain('/');
       });
 
       it('should truncate long file names', async () => {

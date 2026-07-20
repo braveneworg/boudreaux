@@ -16,6 +16,7 @@ import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders'
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
+import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
@@ -831,11 +832,7 @@ export class BioGenerationService {
     // callback POST was lost). Coerce it to `failed` on read so the polling UI
     // resolves instead of hanging on `processing` forever. Non-persistent — a
     // late callback can still claim and complete the underlying row.
-    const startedAtMs = state.bioStartedAt?.getTime();
-    const isStale =
-      isInFlightBioStatus(rawStatus) &&
-      startedAtMs !== undefined &&
-      Date.now() - startedAtMs > STALE_JOB_MS;
+    const isStale = isInFlightBioStatus(rawStatus) && isStaleJob(state.bioStartedAt, STALE_JOB_MS);
 
     const status = isStale ? 'failed' : rawStatus;
     const error = isStale ? STALE_JOB_ERROR : (state.bioError ?? null);

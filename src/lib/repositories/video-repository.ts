@@ -290,8 +290,13 @@ export class VideoRepository {
    * Update the async enrichment lifecycle fields. `error` is only written when
    * explicitly provided. Flipping to `pending` clears the previous run's
    * progress AND error (a fresh trigger must never surface stale state);
-   * `processing` stamps `enrichmentStartedAt` for stale-job detection;
    * `succeeded` stamps `enrichedAt`.
+   *
+   * Both in-flight states stamp `enrichmentStartedAt`, because the staleness
+   * rule treats an in-flight job with no recorded start as abandoned. A job is
+   * in flight from `pending` — the trigger action writes that, and the service
+   * only later flips to `processing` — so stamping on `processing` alone would
+   * leave every pending job looking abandoned.
    */
   static async setEnrichmentStatus(
     videoId: string,
@@ -305,7 +310,9 @@ export class VideoRepository {
           enrichmentStatus: status,
           ...(opts.error !== undefined ? { enrichmentError: opts.error } : {}),
           ...(status === 'pending' ? { enrichmentProgress: null, enrichmentError: null } : {}),
-          ...(status === 'processing' ? { enrichmentStartedAt: new Date() } : {}),
+          ...(status === 'pending' || status === 'processing'
+            ? { enrichmentStartedAt: new Date() }
+            : {}),
           ...(status === 'succeeded' ? { enrichedAt: new Date() } : {}),
         },
       })

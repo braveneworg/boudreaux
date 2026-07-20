@@ -1722,7 +1722,11 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
   it('returns the latest progress checkpoint while processing', async () => {
     getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'processing', bioProgress: checkpoint })
+      state({
+        bioStatus: 'processing',
+        bioStartedAt: new Date(Date.now() - 60_000),
+        bioProgress: checkpoint,
+      })
     );
 
     const result = await BioGenerationService.getGenerationStatus('a1');
@@ -1812,12 +1816,75 @@ describe('BioGenerationService.getGenerationStatus', () => {
   });
 
   it('omits content while still processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(state({ bioStatus: 'processing' }));
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'processing', bioStartedAt: new Date(Date.now() - 60_000) })
+    );
 
     const result = await BioGenerationService.getGenerationStatus('a1');
 
     expect(result?.status).toBe('processing');
     expect(result?.content).toBeNull();
+  });
+
+  /**
+   * A row marked in-flight with no recorded start cannot be shown to be
+   * running. It used to read as `processing` forever, so the polling UI hung
+   * until its 20-minute client deadline; the trigger path meanwhile treated the
+   * same row as abandoned and allowed a new run. Both now agree it is stale.
+   */
+  it('coerces an in-flight job with no recorded start to failed', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'processing', bioStartedAt: null })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.status).toBe('failed');
+  });
+
+  it('surfaces the stale-job error for an in-flight job with no recorded start', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({ bioStatus: 'pending', bioStartedAt: null })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.error).toContain('timed out');
+  });
+
+  /**
+   * The intrinsics are persisted by replaceBioContent but were absent from the
+   * read projection and stripped when content was assembled, so the preview
+   * dialog always fell back to 800x600 no matter what the scrape captured.
+   */
+  it('carries the image intrinsics through to the status content', async () => {
+    getBioGenerationStateMock.mockResolvedValue(
+      state({
+        bioStatus: 'succeeded',
+        bioImages: [
+          {
+            id: 'i1',
+            url: 'u',
+            thumbnailUrl: null,
+            title: null,
+            attribution: null,
+            license: null,
+            sourceUrl: null,
+            originalUrl: null,
+            isPrimary: false,
+            kind: null,
+            alt: null,
+            origin: 'generated',
+            width: 1600,
+            height: 900,
+          },
+        ],
+      })
+    );
+
+    const result = await BioGenerationService.getGenerationStatus('a1');
+
+    expect(result?.content?.images[0]).toMatchObject({ width: 1600, height: 900 });
   });
 
   it('carries the image origin through to the status content', async () => {
