@@ -107,7 +107,9 @@ const createGuestUser = async (
     const newUser = await getPrisma().user.create({
       data: {
         email: customerEmail,
-        emailVerified: new Date(),
+        // better-auth models emailVerified as a Boolean; the payment email is
+        // Stripe-confirmed, matching the old Auth.js `new Date()` semantics.
+        emailVerified: true,
         username: placeholderUsername,
       },
     });
