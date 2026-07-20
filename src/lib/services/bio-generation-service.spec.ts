@@ -8,7 +8,11 @@ import type {
   BioGenerationResult,
 } from '@/lib/validation/bio-generation-schema';
 
-import { BioGenerationService, persistGeneratedBio } from './bio-generation-service';
+import {
+  BioGenerationService,
+  MAX_LAMBDA_RELEASES,
+  persistGeneratedBio,
+} from './bio-generation-service';
 
 import type { BioGenerationLambdaInput } from './bio-generation-fixture';
 
@@ -1444,6 +1448,45 @@ describe('BioGenerationService.runGenerationJob', () => {
           links: ['https://example.com'],
         })
       );
+    });
+
+    /**
+     * The Lambda caps `releases` at 100. It rejects an over-cap payload
+     * wholesale, and because the invoke is fire-and-forget the rejection is
+     * invisible until the 17-minute stale sweep — so the cap has to be honoured
+     * on this side, not discovered on the other.
+     */
+    it('caps the releases payload at the limit the Lambda accepts', async () => {
+      findPublishedByArtistWithCoversMock.mockResolvedValue(
+        Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
+          id: `r${index}`,
+          title: `Release ${index}`,
+          releasedOn: new Date('2020-01-01'),
+          coverArt: null,
+        }))
+      );
+
+      await BioGenerationService.runGenerationJob(artist.id, {});
+
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.releases).toHaveLength(MAX_LAMBDA_RELEASES);
+    });
+
+    it('keeps the most recent releases when it caps them', async () => {
+      findPublishedByArtistWithCoversMock.mockResolvedValue(
+        Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
+          id: `r${index}`,
+          title: `Release ${index}`,
+          releasedOn: new Date('2020-01-01'),
+          coverArt: null,
+        }))
+      );
+
+      await BioGenerationService.runGenerationJob(artist.id, {});
+
+      // The repository returns newest-first, so the cap takes from the front.
+      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
+      expect(input.releases?.[0]?.title).toBe('Release 0');
     });
 
     it('omits the real name when the artist is pseudonymous', async () => {

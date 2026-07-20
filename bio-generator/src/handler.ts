@@ -18,6 +18,7 @@ import { isReleaseDateLookupTask, runReleaseDateLookupLambda } from './release-d
 import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
+  callbackTargetSchema,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_PRO_MODEL,
 } from './types.js';
@@ -928,10 +929,24 @@ export const runLambda = async (
 
   const parsed = bioGenerationInputSchema.safeParse(event);
   if (!parsed.success) {
-    return {
-      ok: false,
+    const result = {
+      ok: false as const,
       error: `Invalid input: ${parsed.error.issues.map((i) => i.message).join(', ')}`,
     };
+    // The web invokes with `InvocationType: 'Event'`, so this return value is
+    // discarded and the artist row is already `processing`. Reporting the
+    // rejection over the callback turns a 17-minute stale-job timeout into an
+    // immediate, and legible, failure. Read from the raw event because the
+    // parse that would have given us these fields is the one that just failed.
+    const callback = callbackTargetSchema.safeParse(event);
+    if (callback.success) {
+      await deps.postCallback({
+        url: callback.data.callbackUrl,
+        jobToken: callback.data.jobToken,
+        result,
+      });
+    }
+    return result;
   }
 
   const result = await runToResult(parsed.data, deps);
