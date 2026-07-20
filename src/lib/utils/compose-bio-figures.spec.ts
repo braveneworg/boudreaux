@@ -327,3 +327,26 @@ describe('composeBioFigures round-trip through the BioFigure extension', () => {
     expect(firstFigureHtml(sanitizeBioHtml(editor.getHTML()))).toBe(figure);
   });
 });
+
+/**
+ * `assembleContent` composes figures BEFORE plain-swapping the remaining
+ * `image:N` placeholders for real URLs, and that order is load-bearing —
+ * composition matches on the `image:N` src, so a swap that ran first would
+ * leave nothing to match. The failure is silent: valid HTML, every image
+ * present, just no floated figures anywhere in any long bio.
+ *
+ * The ordering was previously recorded only in a comment on `assembleContent`.
+ */
+describe('placeholder composition ordering', () => {
+  const byIndex = new Map<number, BioFigureImageMeta>([[0, meta()]]);
+
+  it('composes a figure while the placeholder src is still unresolved', () => {
+    expect(composeBioFigures(wrapImg(0), byIndex)).toContain('<figure');
+  });
+
+  it('composes nothing once the placeholder has been swapped for a real URL', () => {
+    const alreadySwapped = '<p>Body <img src="https://cdn.example/photo.jpg"> more.</p>';
+
+    expect(composeBioFigures(alreadySwapped, byIndex)).not.toContain('<figure');
+  });
+});

@@ -22,6 +22,20 @@
  *
  * Tuples (`[A] extends [B]`) prevent distribution over unions, so nullable
  * scalars like `string | null` compare as a whole rather than member-by-member.
+ *
+ * ## Which repositories need a guard
+ *
+ * Only those that declare a hand-written record type mirroring a Prisma
+ * projection. Roughly ten of the twenty-five repositories do; the rest return
+ * primitives, counts, or Prisma rows directly, and have nothing that could
+ * drift. A repository without a guard is therefore not evidence of a gap —
+ * count the record types, not the files.
+ *
+ * `AssertExtends` is the right choice, not a weaker fallback, wherever a
+ * domain type deliberately narrows a Prisma column (see `PlaylistItemRecord`,
+ * whose `itemType` narrows a bare `string` to `'track' | 'video'`). Swapping it
+ * for `AssertExact` there would fail the build for a difference that is the
+ * whole point of the type.
  */
 
 /** `true` iff A and B are mutually assignable (exact match); otherwise `never`. */
