@@ -32,6 +32,7 @@ import {
 } from '@/hooks/mutations/use-artist-mutations';
 import { useSession } from '@/hooks/use-session';
 import { queryKeys } from '@/lib/query-keys';
+import { type FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
@@ -42,8 +43,7 @@ import { ZinePanel } from '@/ui/zine-panel';
 
 import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
 import { type ArtistDetail, useArtistQuery } from './_hooks/use-artist-query';
-
-import type { UseFormReturn } from 'react-hook-form';
+import { type SubmitMode, useEntitySubmit } from './_hooks/use-entity-submit';
 
 type FormFieldName = keyof ArtistFormData;
 
@@ -231,86 +231,9 @@ const computeIsSubmitting = ({
 const fullNameOf = (data: ArtistFormData): string =>
   data.displayName || `${data.firstName} ${data.surname}`.trim();
 
-interface SubmitArtistDeps {
-  artistForm: UseFormReturn<ArtistFormData>;
-  isPublished: boolean;
-  setIsPublished: (value: boolean) => void;
-  setArtistId: (id: string) => void;
-  createArtistAsync: ReturnType<typeof useCreateArtistMutation>['createArtistAsync'];
-  updateArtistAsync: ReturnType<typeof useUpdateArtistMutation>['updateArtistAsync'];
-}
-
-const submitArtistUpdate = async (
-  artistId: string,
-  data: ArtistFormData,
-  deps: SubmitArtistDeps
-): Promise<void> => {
-  const { artistForm, isPublished, setIsPublished, updateArtistAsync } = deps;
-  const fullName = fullNameOf(data);
-
-  const newFormState = await updateArtistAsync({ id: artistId, values: data });
-  if (!newFormState.success) {
-    toast.error('Failed to update artist. Please check the form for errors.');
-    return;
-  }
-
-  if (data.publishedOn && !isPublished) {
-    setIsPublished(true);
-    toast.success(<PublishedToastContent fullName={fullName} />);
-  } else {
-    toast.success(<UpdatedToastContent fullName={fullName} />);
-  }
-  artistForm.reset(data);
-};
-
-const submitArtistCreate = async (data: ArtistFormData, deps: SubmitArtistDeps): Promise<void> => {
-  const { artistForm, setIsPublished, setArtistId, createArtistAsync } = deps;
-  const fullName = fullNameOf(data);
-
-  const newFormState = await createArtistAsync(data);
-  if (!newFormState.success) {
-    toast.error('Failed to create artist. Please check the form for errors.');
-    return;
-  }
-
-  const createdArtistId = newFormState.data?.artistId as string | undefined;
-  if (!createdArtistId) {
-    toast.success(<ToastContent fullName={fullName} />);
-    return;
-  }
-
-  setArtistId(createdArtistId);
-  if (data.publishedOn) {
-    setIsPublished(true);
-  }
-
-  toast.success(<ToastContent fullName={fullName} />);
-  artistForm.reset(data);
-};
-
 /** Breadcrumb label for the artist form — "Edit Artist" in edit mode, "Create Artist" otherwise. */
 const artistFormBreadcrumbTitle = (isEditMode: boolean): string =>
   isEditMode ? 'Edit Artist' : 'Create Artist';
-
-/** Guard the form ref then dispatch to the create/update submit path. */
-const runArtistSubmit = async (
-  formEl: HTMLFormElement | null,
-  artistId: string | null,
-  data: ArtistFormData,
-  deps: SubmitArtistDeps
-): Promise<void> => {
-  if (!formEl) {
-    error('ArtistForm: Form reference is null on submit.');
-    toast.error('Please refresh the page and try again, or check back later.');
-    return;
-  }
-
-  if (artistId) {
-    await submitArtistUpdate(artistId, data, deps);
-  } else {
-    await submitArtistCreate(data, deps);
-  }
-};
 
 export const ArtistForm = ({
   artistId: initialArtistId,
@@ -428,19 +351,65 @@ export const ArtistForm = ({
     }
   }, [artistId, initialArtistId, returnTo, router]);
 
+  const resetArtistForm = useCallback(
+    (values: ArtistFormData): void => artistForm.reset(values),
+    [artistForm]
+  );
+
+  const createArtist = useCallback(
+    (values: ArtistFormData): Promise<FormState> => createArtistAsync(values),
+    [createArtistAsync]
+  );
+
+  const updateArtist = useCallback(
+    (id: string, values: ArtistFormData): Promise<FormState> => updateArtistAsync({ id, values }),
+    [updateArtistAsync]
+  );
+
+  /**
+   * Everything the artist form does once the write has landed: adopt the id the
+   * create returned, flip the published flag, and announce the outcome. A create
+   * always reads as "created" — only an update distinguishes publish from save.
+   */
+  const onArtistSubmitSuccess = useCallback(
+    (newFormState: FormState, data: ArtistFormData, mode: SubmitMode): void => {
+      const fullName = fullNameOf(data);
+
+      if (mode === 'update') {
+        if (data.publishedOn && !isPublished) {
+          setIsPublished(true);
+          toast.success(<PublishedToastContent fullName={fullName} />);
+        } else {
+          toast.success(<UpdatedToastContent fullName={fullName} />);
+        }
+        return;
+      }
+
+      const createdArtistId = newFormState.data?.artistId as string | undefined;
+      if (createdArtistId) {
+        setArtistId(createdArtistId);
+        if (data.publishedOn) {
+          setIsPublished(true);
+        }
+      }
+      toast.success(<ToastContent fullName={fullName} />);
+    },
+    [isPublished]
+  );
+
+  const submitArtist = useEntitySubmit<ArtistFormData, FormState>({
+    entity: 'artist',
+    reset: resetArtistForm,
+    create: createArtist,
+    update: updateArtist,
+    onSuccess: onArtistSubmitSuccess,
+  });
+
   const onSubmitArtistForm = useCallback(
     async (data: ArtistFormData): Promise<void> => {
-      const deps: SubmitArtistDeps = {
-        artistForm,
-        isPublished,
-        setIsPublished,
-        setArtistId,
-        createArtistAsync,
-        updateArtistAsync,
-      };
-      startTransition(() => runArtistSubmit(formRef.current, artistId, data, deps));
+      startTransition(() => submitArtist(formRef.current, artistId, data));
     },
-    [artistForm, artistId, isPublished, createArtistAsync, updateArtistAsync]
+    [submitArtist, artistId]
   );
 
   const isSubmitting = computeIsSubmitting({
