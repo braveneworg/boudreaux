@@ -193,6 +193,15 @@ describe('ImageUploadService', () => {
       expect(result).toContain(s3Key);
     });
 
+    it('falls back to the default region when AWS_REGION is unset', () => {
+      vi.stubEnv('CDN_DOMAIN', undefined);
+      vi.stubEnv('AWS_REGION', undefined);
+
+      const result = ImageUploadService.generateCdnUrl('media/tours/t1/poster.jpg');
+
+      expect(result).toContain('s3.us-east-1.amazonaws.com');
+    });
+
     it('should handle CDN domain with or without https protocol', () => {
       vi.stubEnv('CDN_DOMAIN', 'cdn.example.com'); // No protocol
 

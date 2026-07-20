@@ -7,7 +7,14 @@ import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repo
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
+import type {
+  VideoEnrichmentState,
+  VideoEnrichmentSuggestionRecord,
+} from '@/lib/types/domain/video-enrichment';
+import type {
+  VideoEnrichmentResult,
+  VideoSuggestionField,
+} from '@/lib/validation/video-enrichment-schema';
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
 
 import { VideoEnrichmentService } from './video-enrichment-service';
@@ -438,6 +445,169 @@ describe('runEnrichmentJob', () => {
       error: 'Video enrichment callback URL is not configured',
     });
   });
+
+  it('fails the job when the Lambda function name is unconfigured', async () => {
+    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', '');
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'Video enrichment is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+    });
+  });
+
+  it('fails the job when the video has no linked artists to enrich', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'No linked artists to enrich.',
+    });
+  });
+
+  it('never fires an invoke when the video has no linked artists', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('maps a FEATURED join row onto the featured role in the payload', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({ role: 'FEATURED' }),
+    ]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().artists).toEqual([
+      {
+        artistId: ARTIST_ID,
+        name: 'Ceschi',
+        role: 'featured',
+        known: { firstName: 'Francisco', surname: 'Ramos', displayName: 'Ceschi' },
+      },
+    ]);
+  });
+
+  it('omits the identity fields a mononym artist has left empty', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({
+        artist: {
+          displayName: 'Sole',
+          firstName: '',
+          middleName: null,
+          surname: '',
+          akaNames: null,
+          bornOn: null,
+        },
+      }),
+    ]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().artists).toEqual([
+      { artistId: ARTIST_ID, name: 'Sole', role: 'primary', known: { displayName: 'Sole' } },
+    ]);
+  });
+
+  it('sends a middle name as part of the known identity block', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({
+        artist: {
+          displayName: null,
+          firstName: 'Francisco',
+          middleName: 'Xavier',
+          surname: 'Ramos',
+          akaNames: null,
+          bornOn: null,
+        },
+      }),
+    ]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().artists).toEqual([
+      {
+        artistId: ARTIST_ID,
+        name: 'Francisco Ramos',
+        role: 'primary',
+        known: { firstName: 'Francisco', middleName: 'Xavier', surname: 'Ramos' },
+      },
+    ]);
+  });
+
+  it('omits the known block entirely for an artist shell with no identity fields', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({
+        artist: {
+          displayName: null,
+          firstName: '',
+          middleName: null,
+          surname: '',
+          akaNames: null,
+          bornOn: null,
+        },
+      }),
+    ]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().artists).toEqual([{ artistId: ARTIST_ID, name: '', role: 'primary' }]);
+  });
+
+  it('fails the job with the thrown message when the state read rejects', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'db down',
+    });
+  });
+
+  it('fails the job with a generic message when the rejection is not an Error', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue('socket hang up');
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'Video enrichment failed unexpectedly.',
+    });
+  });
+
+  it('falls back to the default 4s dwell when the delay override is not a number', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', 'not-a-number');
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+    vi.useFakeTimers();
+    try {
+      const promise = VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+      // One millisecond short of the default dwell the run must still be parked.
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(
+        vi
+          .mocked(VideoRepository.setEnrichmentStatus)
+          .mock.calls.some(([, status]) => status === 'succeeded')
+      ).toBe(false);
+
+      // Drain the remaining dwell so the run settles before timers are restored.
+      await vi.advanceTimersByTimeAsync(1);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('getEnrichmentStatus', () => {
@@ -564,6 +734,138 @@ describe('getEnrichmentStatus', () => {
 
     expect(result?.suggestions[0].sources).toEqual([]);
   });
+
+  /** A well-formed stored suggestion row, overridable one field at a time. */
+  const storedSuggestion = (
+    overrides: Partial<VideoEnrichmentSuggestionRecord> = {}
+  ): VideoEnrichmentSuggestionRecord => ({
+    id: 'c'.repeat(24),
+    videoId: VIDEO_ID,
+    artistId: ARTIST_ID,
+    field: 'bornOn',
+    value: '1985-03-15',
+    confidence: 'high',
+    sources: [{ url: 'https://musicbrainz.org/artist/x' }],
+    note: null,
+    status: 'pending',
+    appliedAt: null,
+    appliedBy: null,
+    createdAt: new Date(),
+    ...overrides,
+  });
+
+  it('surfaces the stored checkpoint while the job is still processing', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({
+        enrichmentStatus: 'processing',
+        enrichmentStartedAt: new Date(),
+        enrichmentProgress: {
+          stage: 'wikidata',
+          counts: { artists: 2 },
+          at: '2026-07-19T12:00:00.000Z',
+        },
+      })
+    );
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.progress).toEqual({
+      stage: 'wikidata',
+      counts: { artists: 2 },
+      at: '2026-07-19T12:00:00.000Z',
+    });
+  });
+
+  it('reports no progress when the stored checkpoint is malformed', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({
+        enrichmentStatus: 'processing',
+        enrichmentStartedAt: new Date(),
+        enrichmentProgress: { stage: 'not-a-stage' },
+      })
+    );
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.progress).toBeNull();
+  });
+
+  it('withholds progress once the job has left the in-flight states', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({
+        enrichmentStatus: 'succeeded',
+        enrichmentProgress: {
+          stage: 'finalizing',
+          counts: { artists: 2 },
+          at: '2026-07-19T12:00:00.000Z',
+        },
+      })
+    );
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.progress).toBeNull();
+  });
+
+  it('reads a stored status outside the lifecycle union as never-enriched', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'archived' })
+    );
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.status).toBeNull();
+  });
+
+  it('reports a null birth date for an artist with none stored', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'succeeded' })
+    );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.artists[0].current.bornOn).toBeNull();
+  });
+
+  it('omits a stored suggestion whose field is not a suggestable field', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'succeeded' })
+    );
+    vi.mocked(VideoEnrichmentSuggestionRepository.findByVideoId).mockResolvedValue([
+      storedSuggestion({ field: 'hometown' }),
+    ]);
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.suggestions).toEqual([]);
+  });
+
+  it('omits a stored suggestion whose confidence is outside the rubric', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'succeeded' })
+    );
+    vi.mocked(VideoEnrichmentSuggestionRepository.findByVideoId).mockResolvedValue([
+      storedSuggestion({ confidence: 'certain' }),
+    ]);
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.suggestions).toEqual([]);
+  });
+
+  it('omits a stored suggestion whose status is not a review state', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'succeeded' })
+    );
+    vi.mocked(VideoEnrichmentSuggestionRepository.findByVideoId).mockResolvedValue([
+      storedSuggestion({ status: 'superseded' }),
+    ]);
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.suggestions).toEqual([]);
+  });
 });
 
 describe('verifyAndClaimCallback', () => {
@@ -645,6 +947,24 @@ describe('recordProgress', () => {
     );
 
     await VideoEnrichmentService.recordProgress(VIDEO_ID, 'forged', { stage: 'wikidata' });
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the job has no stored token to verify against', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: null })
+    );
+
+    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the video no longer exists', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
+
+    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });
@@ -966,5 +1286,160 @@ describe('completeCallback', () => {
     expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
       error: 'db down',
     });
+  });
+
+  /** One artist-scoped suggestion, for the filtering/fencing cases. */
+  const artistFact = (
+    field: VideoSuggestionField,
+    value: string,
+    artistId: string = ARTIST_ID
+  ): VideoEnrichmentResult => ({
+    ok: true,
+    data: {
+      artists: [
+        {
+          artistId,
+          suggestions: [
+            {
+              field,
+              value,
+              confidence: 'medium',
+              sources: [{ url: 'https://musicbrainz.org/artist/x' }],
+            },
+          ],
+        },
+      ],
+      model: 'gemini-2.5-flash',
+    },
+  });
+
+  it('flips to failed with a generic message when persistence rejects a non-Error', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.replacePending).mockRejectedValue(
+      'socket closed'
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'Video enrichment persistence failed.',
+    });
+  });
+
+  it('persists nothing when the video disappeared before the callback landed', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).not.toHaveBeenCalled();
+  });
+
+  it('ignores a video-level field misfiled at artist scope', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('releasedOn', '2020-06-01'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops an artist suggestion whose value is only whitespace', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', '   '));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('ignores suggestions for an artist no longer linked to the video', async () => {
+    await VideoEnrichmentService.completeCallback(
+      VIDEO_ID,
+      artistFact('firstName', 'Timothy', OTHER_ID)
+    );
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops a first name that differs from the current one only by case', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', 'FRANCISCO'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops a surname that differs from the current one only by case', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('surname', 'ramos'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops a display name that differs from the current one only by case', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('displayName', 'CESCHI'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops a middle name that differs from the current one only by surrounding space', async () => {
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
+      artistRow({
+        artist: {
+          displayName: 'Ceschi',
+          firstName: 'Francisco',
+          middleName: 'Xavier',
+          surname: 'Ramos',
+          akaNames: null,
+          bornOn: null,
+        },
+      }),
+    ]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('middleName', '  Xavier  '));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('keeps a first name that genuinely differs from the current one', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', 'Franco'));
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({ artistId: ARTIST_ID, field: 'firstName', value: 'Franco' }),
+    ]);
+  });
+
+  it('fences a release date already applied or dismissed', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findExistingFacts).mockResolvedValue([
+      { artistId: null, field: 'releasedOn', value: '2020-06-01' },
+    ]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          releasedOn: {
+            value: '2020-06-01',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it('drops a description that is only whitespace', async () => {
+    vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: '   ',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 });
