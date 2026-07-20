@@ -36,7 +36,7 @@ const PERMITTED_FIELD_NAMES = [
   'diedOn',
   'formedOn',
   'publishedOn',
-];
+] as const;
 
 type ParsedArtistData = ReturnType<typeof createArtistSchema.parse>;
 
