@@ -15,9 +15,10 @@ vi.mock('@/auth', () => ({
 
 // Mock structured logging
 const authWarnMock = vi.hoisted(() => vi.fn());
+const httpErrorMock = vi.hoisted(() => vi.fn());
 const logSecurityEventMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/logger', () => ({
-  loggers: { auth: { warn: authWarnMock } },
+  loggers: { auth: { warn: authWarnMock }, http: { error: httpErrorMock } },
 }));
 vi.mock('@/lib/utils/audit-log', () => ({
   logSecurityEvent: logSecurityEventMock,
@@ -37,6 +38,7 @@ vi.mock('next/server', async () => {
 
 // Import after mocks are set up
 const { withAuth, withAdmin } = await import('./with-auth');
+const { DataError } = await import('@/lib/types/domain/errors');
 
 describe('withAuth decorator', () => {
   const mockNextResponse = NextResponse as unknown as {
@@ -606,5 +608,105 @@ describe('unauthorized access logging', () => {
 
     expect(authWarnMock).not.toHaveBeenCalled();
     expect(logSecurityEventMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The decorators are the only thing wrapping nearly every route, so they are
+ * where an uncaught throw should turn into a response. This is a BACKSTOP: a
+ * route that still has its own try/catch handles the error first and this never
+ * sees it. Its value is that deleting those per-route catches becomes safe.
+ */
+describe('error boundary', () => {
+  const request = (): NextRequest =>
+    ({
+      url: 'https://example.com/api/test',
+      method: 'GET',
+      headers: new Headers(),
+      nextUrl: new URL('https://example.com/api/test'),
+    }) as NextRequest;
+
+  const context = () => ({ params: Promise.resolve({}) });
+
+  const session = { user: { id: '1', email: 'a@b.c', name: 'T', role: 'admin' } };
+
+  const jsonMock = () => (NextResponse as unknown as { json: ReturnType<typeof vi.fn> }).json;
+
+  beforeEach(() => {
+    mockAuth.mockResolvedValue(session);
+  });
+
+  it('maps a thrown NOT_FOUND DataError to 404', async () => {
+    const handler = vi.fn().mockRejectedValue(new DataError('NOT_FOUND', 'Video not found'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith(expect.anything(), { status: 404 });
+  });
+
+  it('maps a thrown UNAVAILABLE DataError to 503', async () => {
+    const handler = vi.fn().mockRejectedValue(new DataError('UNAVAILABLE', 'db down'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith(expect.anything(), { status: 503 });
+  });
+
+  it('surfaces the DataError message to the caller', async () => {
+    const handler = vi.fn().mockRejectedValue(new DataError('NOT_FOUND', 'Video not found'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith({ error: 'Video not found' }, expect.anything());
+  });
+
+  it('maps an unrecognised throw to 500', async () => {
+    const handler = vi.fn().mockRejectedValue(new Error('boom'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith(expect.anything(), { status: 500 });
+  });
+
+  /** An unexpected fault must not leak its internals to the client. */
+  it('does not leak the message of an unrecognised throw', async () => {
+    const handler = vi.fn().mockRejectedValue(new Error('connection string: secret'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith({ error: 'Internal server error' }, expect.anything());
+  });
+
+  it('logs an unrecognised throw', async () => {
+    const handler = vi.fn().mockRejectedValue(new Error('boom'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(httpErrorMock).toHaveBeenCalled();
+  });
+
+  it('does not log a routine NOT_FOUND', async () => {
+    const handler = vi.fn().mockRejectedValue(new DataError('NOT_FOUND', 'missing'));
+
+    await withAuth(handler)(request(), context());
+
+    expect(httpErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves a successful handler response untouched', async () => {
+    const response = { type: 'json', data: { ok: true } };
+    const handler = vi.fn().mockResolvedValue(response);
+
+    const result = await withAuth(handler)(request(), context());
+
+    expect(result).toBe(response);
+  });
+
+  it('applies the same boundary to withAdmin', async () => {
+    const handler = vi.fn().mockRejectedValue(new DataError('UNAVAILABLE', 'db down'));
+
+    await withAdmin(handler)(request(), context());
+
+    expect(jsonMock()).toHaveBeenCalledWith(expect.anything(), { status: 503 });
   });
 });
