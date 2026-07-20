@@ -51,7 +51,7 @@ vi.mock('@/lib/services/video-enrichment-fixture', () => ({
       sourceCreatedAt: null,
       encoder: 'fixture',
     },
-    probeData: { format: { filename: 'fixture.mp4' } },
+    raw: (url: string) => ({ format: { filename: url } }),
   },
 }));
 
@@ -211,7 +211,7 @@ describe('VideoProbeService.probeAndPersist', () => {
     expect(JSON.stringify(vi.mocked(loggers.media.warn).mock.calls)).not.toContain('X-Amz-');
   });
 
-  it('persists the fixture without spawning ffprobe in fake mode', async () => {
+  it('does not spawn ffprobe in fake mode', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
 
     await VideoProbeService.probeAndPersist(videoId);
@@ -227,21 +227,39 @@ describe('VideoProbeService.probeAndPersist', () => {
     expect(generatePresignedProbeUrl).not.toHaveBeenCalled();
   });
 
-  it('persists the fixture data in fake mode', async () => {
+  /**
+   * The fake substitutes only the two impossible steps — signing and the spawn.
+   * It used to substitute the whole pipeline, persisting a hand-written
+   * normalized object, so a regression in `normalizeProbe` was invisible to
+   * every E2E run.
+   */
+  it('normalizes the fixture output for real in fake mode', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
 
     await VideoProbeService.probeAndPersist(videoId);
 
-    expect(VideoRepository.saveProbeResult).toHaveBeenCalledWith(
-      videoId,
-      s3Key,
-      expect.objectContaining({
-        probedAt: expect.any(Date),
-        probeError: null,
-        probeData: { format: { filename: 'fixture.mp4' } },
-        ...fixtureNormalized,
-      })
+    expect(normalizeProbe).toHaveBeenCalledWith({ format: { filename: expect.any(String) } });
+  });
+
+  it('redacts the fixture output for real in fake mode', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    await VideoProbeService.probeAndPersist(videoId);
+
+    expect(redactProbeJson).toHaveBeenCalledWith(
+      { format: { filename: expect.any(String) } },
+      s3Key
     );
+  });
+
+  /** The local URL must look presigned, or redaction has nothing to strip. */
+  it('probes a signed-looking URL in fake mode', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    await VideoProbeService.probeAndPersist(videoId);
+
+    const [raw] = vi.mocked(normalizeProbe).mock.calls[0] as [{ format: { filename: string } }];
+    expect(raw.format.filename).toContain('X-Amz-Signature=');
   });
 });
 
@@ -266,6 +284,21 @@ describe('VideoProbeService.probeForPrefill', () => {
     expect(result).toEqual({ ok: true, tags: fixtureTags });
     expect(generatePresignedProbeUrl).not.toHaveBeenCalled();
     expect(probeUrl).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Prefill used to read the tags off the fixture's pre-baked probeData. Now it
+   * extracts them from the same raw output the real path parses, so the tag
+   * extractor is genuinely exercised under E2E.
+   */
+  it('extracts prefill tags from the raw fixture output in fake mode', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    await VideoProbeService.probeForPrefill(s3Key);
+
+    expect(extractProbePrefillTags).toHaveBeenCalledWith({
+      format: { filename: expect.any(String) },
+    });
   });
 
   it('presigns the s3Key and probes the URL in real mode, returning tags on success', async () => {

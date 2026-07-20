@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { videoEnrichmentDataSchema } from '@/lib/validation/video-enrichment-schema';
+import { normalizeProbe } from '@/lib/video-probe/normalize';
 import { extractProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import { videoEnrichmentFixture, videoProbeFixture } from './video-enrichment-fixture';
@@ -20,12 +21,32 @@ describe('videoProbeFixture', () => {
     });
   });
 
-  it('keeps the raw probeData filename as a bare s3 key (no presigned URL)', () => {
-    expect(JSON.stringify(videoProbeFixture.probeData)).not.toContain('X-Amz-');
+  /**
+   * The fixture is raw ffprobe output now, so it carries the presigned URL that
+   * `redactProbeJson` exists to strip. Asserting it is *present* here is the
+   * point: it is what gives the redaction step something real to do on the fake
+   * path. See the service spec for the assertion that it does not survive.
+   */
+  it('echoes the probe URL back as the filename, the way ffprobe does', () => {
+    const raw = videoProbeFixture.raw('https://example.com/x.mp4?X-Amz-Signature=abc');
+
+    expect(JSON.stringify(raw)).toContain('X-Amz-Signature=abc');
+  });
+
+  /**
+   * The E2E seed hand-writes these same scalars and a comment says they "MUST
+   * equal videoProbeFixture.normalized". This is that comment, enforced: if the
+   * raw fixture and the normalized fixture ever disagree, the fake path would
+   * silently persist different values than the seed on the first re-probe.
+   */
+  it('normalizes its own raw output to the declared scalars', () => {
+    expect(normalizeProbe(videoProbeFixture.raw('https://example.com/x.mp4'))).toEqual(
+      videoProbeFixture.normalized
+    );
   });
 
   it('yields deterministic prefill tags for the admin form', () => {
-    expect(extractProbePrefillTags(videoProbeFixture.probeData)).toEqual({
+    expect(extractProbePrefillTags(videoProbeFixture.raw('https://example.com/x.mp4'))).toEqual({
       title: 'E2E Probe Title',
       artist: 'E2E Probe Artist',
       releasedOn: '2019-08-01',

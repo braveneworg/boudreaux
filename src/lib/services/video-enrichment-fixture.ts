@@ -6,12 +6,22 @@ import type { VideoEnrichmentData } from '@/lib/validation/video-enrichment-sche
 import type { NormalizedProbe } from '@/lib/video-probe/normalize';
 
 /**
- * Deterministic ffprobe result used when `BIO_GENERATOR_FAKE=true` (E2E and
- * local dev without ffprobe/S3). A plain 1080p h264/aac MP4; the raw
- * `probeData` filename is a bare s3Key — never a presigned URL — mirroring the
- * production redaction contract (no `X-Amz-` substring may survive).
+ * Deterministic ffprobe output used when `BIO_GENERATOR_FAKE=true` (E2E and
+ * local dev without ffprobe/S3). A plain 1080p h264/aac MP4.
+ *
+ * `raw(url)` returns what ffprobe itself would print, echoing the presigned URL
+ * back as `format.filename`. It is deliberately NOT pre-redacted: the fake path
+ * now runs the real `redactProbeJson`, so handing it clean data would defeat
+ * the check.
+ *
+ * `normalized` is what `normalizeProbe(raw(...))` must produce. The E2E seed
+ * pins these same scalars, and a spec asserts the two agree — previously that
+ * coupling was maintained by a comment alone.
  */
-export const videoProbeFixture: { normalized: NormalizedProbe; probeData: unknown } = {
+export const videoProbeFixture: {
+  normalized: NormalizedProbe;
+  raw: (url: string) => unknown;
+} = {
   normalized: {
     container: 'mov,mp4,m4a,3gp,3g2,mj2',
     width: 1920,
@@ -19,7 +29,10 @@ export const videoProbeFixture: { normalized: NormalizedProbe; probeData: unknow
     videoCodec: 'h264',
     audioCodec: 'aac',
     bitrateKbps: 4800,
-    frameRate: 23.976,
+    // 24000/1001 = 23.976…, which `parseFrameRate` rounds to 2dp. Production
+    // stores 23.98; the fixture used to declare 23.976, a value the real
+    // normalizer cannot produce.
+    frameRate: 23.98,
     audioChannels: 2,
     audioSampleRateHz: 48000,
     colorSpace: 'bt709',
@@ -28,9 +41,9 @@ export const videoProbeFixture: { normalized: NormalizedProbe; probeData: unknow
     sourceCreatedAt: new Date('2020-05-30T12:00:00.000Z'),
     encoder: 'Lavf60.16.100',
   },
-  probeData: {
+  raw: (url: string) => ({
     format: {
-      filename: 'media/videos/e2e-fixture.mp4',
+      filename: url,
       format_name: 'mov,mp4,m4a,3gp,3g2,mj2',
       duration: '245.000000',
       bit_rate: '4800000',
@@ -49,14 +62,16 @@ export const videoProbeFixture: { normalized: NormalizedProbe; probeData: unknow
         codec_name: 'h264',
         width: 1920,
         height: 1080,
+        // Real ffprobe emits both; `normalizeProbe` reads avg_frame_rate.
         r_frame_rate: '24000/1001',
+        avg_frame_rate: '24000/1001',
         color_space: 'bt709',
         color_primaries: 'bt709',
         color_transfer: 'bt709',
       },
       { codec_type: 'audio', codec_name: 'aac', channels: 2, sample_rate: '48000' },
     ],
-  },
+  }),
 };
 
 /** The deterministic sources every fixture suggestion cites. */
