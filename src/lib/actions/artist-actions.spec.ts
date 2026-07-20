@@ -36,7 +36,11 @@ describe('createArtistAction', () => {
   it('returns failure when requireRole throws', async () => {
     requireRoleMock.mockRejectedValue(new Error('forbidden'));
     const result = await createArtistAction(baseArtist as never);
-    expect(result).toEqual({ success: false, error: 'Failed to create artist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to create artist',
+      code: 'UNKNOWN',
+    });
     expect(createArtistMock).not.toHaveBeenCalled();
   });
 
@@ -66,6 +70,10 @@ describe('createArtistAction', () => {
     requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
     createArtistMock.mockRejectedValue(new Error('service down'));
     const result = await createArtistAction(baseArtist as never);
-    expect(result).toEqual({ success: false, error: 'Failed to create artist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to create artist',
+      code: 'UNKNOWN',
+    });
   });
 });

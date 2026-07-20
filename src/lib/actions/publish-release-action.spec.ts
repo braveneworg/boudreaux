@@ -77,6 +77,7 @@ describe('publishReleaseAction', () => {
     vi.mocked(ReleaseService.publishRelease).mockResolvedValue({
       success: false,
       error: 'Release not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await publishReleaseAction(releaseId);

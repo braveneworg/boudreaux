@@ -77,6 +77,7 @@ describe('unpublishVideoAction', () => {
     vi.mocked(VideoService.unpublishVideo).mockResolvedValue({
       success: false,
       error: 'Video not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await unpublishVideoAction(videoId);

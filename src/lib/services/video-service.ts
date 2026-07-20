@@ -57,7 +57,7 @@ export class VideoService {
       const video = await VideoRepository.findById(id);
 
       if (!video) {
-        return { success: false, error: 'Video not found' };
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: video };
@@ -175,7 +175,7 @@ export class VideoService {
       const existing = await VideoRepository.findById(id);
 
       if (!existing) {
-        return { success: false, error: 'Video not found' };
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
       }
 
       const s3KeysToDelete = collectVideoS3Keys(existing);

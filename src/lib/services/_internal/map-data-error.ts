@@ -40,7 +40,7 @@ const GENERIC_CODES: ReadonlySet<DataErrorCode> = new Set(['TIMEOUT', 'VALIDATIO
 export const failFromError = (
   error: unknown,
   overrides?: Partial<Record<DataErrorCode, string>>
-): { success: false; error: string } => {
+): { success: false; error: string; code: DataErrorCode } => {
   const code: DataErrorCode = error instanceof DataError ? error.code : 'UNKNOWN';
 
   if (LOGGED_CODES.has(code)) {
@@ -51,6 +51,7 @@ export const failFromError = (
   const genericFallback = GENERIC_CODES.has(code) ? overrideMap.get('UNKNOWN') : undefined;
   return {
     success: false,
+    code,
     error:
       overrideMap.get(code) ?? genericFallback ?? DEFAULT_MESSAGE.get(code) ?? 'Unexpected error',
   };

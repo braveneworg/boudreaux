@@ -80,6 +80,7 @@ describe('archiveArtistAction', () => {
     vi.mocked(ArtistService.archiveArtist).mockResolvedValue({
       success: false,
       error: 'Artist not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await archiveArtistAction(artistId);

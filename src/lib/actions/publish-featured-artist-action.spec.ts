@@ -77,6 +77,7 @@ describe('publishFeaturedArtistAction', () => {
     vi.mocked(FeaturedArtistsService.publishFeaturedArtist).mockResolvedValue({
       success: false,
       error: 'Featured artist not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await publishFeaturedArtistAction(featuredArtistId);
