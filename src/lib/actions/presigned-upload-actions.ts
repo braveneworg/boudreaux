@@ -12,28 +12,9 @@ import { auth } from '@/auth';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 
 const logger = loggers.presignedUrls;
-
-/**
- * Generate a unique file key for S3
- */
-const generateS3Key = (
-  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists' | 'videos',
-  entityId: string,
-  fileName: string
-): string => {
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-  const sanitizedName = fileName
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .substring(0, 50);
-
-  return `media/${entityType}/${entityId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
-};
 
 /**
  * Input for requesting a presigned URL
@@ -188,7 +169,7 @@ const resolveS3Key = (
   entityId: string
 ): string => {
   if (!file.existingS3Key) {
-    return generateS3Key(entityType, entityId, file.fileName);
+    return buildMediaS3Key({ entityType, entityId, fileName: file.fileName });
   }
   const expectedPrefix = `media/${entityType}/${entityId}/`;
   if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {

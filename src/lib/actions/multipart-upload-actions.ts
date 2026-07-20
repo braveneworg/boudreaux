@@ -20,6 +20,7 @@ import { VIDEO_KEY_PREFIX, VIDEO_PART_SIZE } from '@/lib/constants/video-uploads
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 import {
   abortVideoUploadSchema,
   completeVideoUploadSchema,
@@ -89,26 +90,17 @@ const guardVideoKey = (key: string): ErrorResult | null =>
     : null;
 
 /**
- * Build a collision-resistant, namespaced key for a new video object. Mirrors
- * `generateS3Key` in presigned-upload-actions (which is not exported): the
- * original name is lowercased, stripped of its extension, reduced to
- * URL-safe characters, and truncated before the timestamp + random suffix.
+ * Build a collision-resistant, namespaced key for a new video object. The
+ * extension allowlist that used to live here now applies to every media upload
+ * path — see `buildMediaS3Key`.
  */
-const buildVideoS3Key = (videoId: string, fileName: string): string => {
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  // Allowlist the extension so a crafted name (e.g. `clip.mp4/evil`) cannot
-  // inject an extra path segment into the key; fall back to `mp4` otherwise.
-  const rawExtension = fileName.split('.').pop()?.toLowerCase() ?? '';
-  const extension = /^[a-z0-9]{1,8}$/.test(rawExtension) ? rawExtension : 'mp4';
-  const sanitizedName = fileName
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .substring(0, 50);
-
-  return `${VIDEO_KEY_PREFIX}${videoId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
-};
+const buildVideoS3Key = (videoId: string, fileName: string): string =>
+  buildMediaS3Key({
+    entityType: 'videos',
+    entityId: videoId,
+    fileName,
+    fallbackExtension: 'mp4',
+  });
 
 /** Log and format a failed action into an error result. */
 const failureResult = (operation: string, prefix: string, error: unknown): ErrorResult => {

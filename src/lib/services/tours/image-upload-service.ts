@@ -10,6 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 import {
   MAX_FILE_SIZE,
   SUPPORTED_IMAGE_TYPES,
@@ -26,40 +27,14 @@ export class ImageUploadService {
    * Generate a unique S3 key for an image
    */
   static generateS3Key(tourId: string, fileName: string): string {
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-
-    // Sanitize filename: lowercase, remove special chars, truncate
-    const sanitizedName = fileName
-      .replace(/\.[^/.]+$/, '') // Remove extension
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '-') // Replace non-alphanumeric with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-      .substring(0, 50); // Truncate to reasonable length
-
-    return `media/tours/${tourId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
+    return buildMediaS3Key({ entityType: 'tours', entityId: tourId, fileName });
   }
 
   /**
    * Generate a unique S3 key for a tour date image
    */
   static generateTourDateS3Key(tourDateId: string, fileName: string): string {
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-
-    // Sanitize filename: lowercase, remove special chars, truncate
-    const sanitizedName = fileName
-      .replace(/\.[^/.]+$/, '') // Remove extension
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '-') // Replace non-alphanumeric with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-      .substring(0, 50); // Truncate to reasonable length
-
-    return `media/tour-dates/${tourDateId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
+    return buildMediaS3Key({ entityType: 'tour-dates', entityId: tourDateId, fileName });
   }
 
   /**
