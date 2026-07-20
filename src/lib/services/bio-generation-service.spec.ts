@@ -85,6 +85,29 @@ vi.mock('@/lib/utils/validate-bio-links', () => ({
   validateBioLinks: (links: Array<{ url: string }>) => validateBioLinksMock(links),
 }));
 
+/** The subset of a `fetch` init the local adapter sends (typed so calls stay inspectable). */
+type PostInit = { method: string; headers: Record<string, string>; body: string; cache: string };
+
+/**
+ * Stubbed `fetch` capturing the local (fake) adapter's progress + callback POSTs.
+ * Installed only by the fake-path suite; `mockReset()` restores this 202 default.
+ */
+const fetchMock = vi.fn(
+  async (_url: string, _init: PostInit): Promise<{ ok: boolean; status: number }> => ({
+    ok: true,
+    status: 202,
+  })
+);
+
+/** URLs the local adapter POSTed to, in call order. */
+const postedUrls = (): string[] => fetchMock.mock.calls.map(([url]) => url);
+
+/** The JSON body POSTed to `url`, or undefined when the adapter never posted there. */
+const postedBody = (url: string): Record<string, unknown> | undefined => {
+  const call = fetchMock.mock.calls.find(([posted]) => posted === url);
+  return call ? JSON.parse(call[1].body) : undefined;
+};
+
 /** Shape of a captured `InvokeCommand` instance (our mock stores its input). */
 type SentCommand = {
   input: { InvocationType?: string; FunctionName?: string; Payload?: Uint8Array };
@@ -1208,81 +1231,98 @@ describe('BioGenerationService.runGenerationJob', () => {
     delete process.env.BIO_GENERATOR_LAMBDA_NAME;
   });
 
+  // The fake is now an ADAPTER selected inside `generate`, below the dispatch
+  // seam: it POSTs a real progress checkpoint and a real completion callback to
+  // the same routes the Lambda uses, carrying the same jobToken. So the fake path
+  // dispatches exactly like the real one — it no longer persists in-process, and
+  // the artist stays `processing` until the POSTed callback completes it.
   describe('fake path', () => {
+    const progressUrl = `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/progress`;
+    const callbackUrl = `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/callback`;
+
     beforeEach(() => {
       vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+      // The local adapter derives its callback/progress URLs from the public base.
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
       // Keep unit runs instant — the observable delay is proven separately.
       vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
+      // Restores the baked-in 202 response; the adapter goes over the wire now.
+      fetchMock.mockReset();
+      vi.stubGlobal('fetch', fetchMock);
     });
 
-    it('completes synchronously and returns the persisted content', async () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('dispatches rather than completing in-process', async () => {
       const result = await BioGenerationService.runGenerationJob(artist.id, { links: ['u'] });
 
-      expect(result).toEqual({
-        status: 'completed',
-        slug: 'radiohead',
-        data: expect.objectContaining({ model: 'fake/deterministic' }),
-      });
-      expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ status: 'dispatched' });
+      expect(replaceBioContentMock).not.toHaveBeenCalled();
     });
 
-    it('flips processing then succeeded (clearing the error) without an invoke', async () => {
+    it('leaves the artist processing for the POSTed callback to finish', async () => {
       await BioGenerationService.runGenerationJob(artist.id);
 
-      expect(setBioStatusMock.mock.calls[0]).toEqual([artist.id, 'processing', undefined]);
-      expect(setBioStatusMock.mock.calls[1]).toEqual([artist.id, 'succeeded', { error: null }]);
-      expect(sendMock).not.toHaveBeenCalled();
-      expect(setBioJobTokenMock).not.toHaveBeenCalled();
+      const statuses = setBioStatusMock.mock.calls.map(([, status]) => status);
+      expect(statuses).toEqual(['processing']);
     });
 
-    it('fails when the fixture returns an error', async () => {
+    it('stores a job token exactly once without invoking the Lambda', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(setBioJobTokenMock).toHaveBeenCalledTimes(1);
+      expect(setBioJobTokenMock.mock.calls[0]).toEqual([artist.id, expect.any(String)]);
+      expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    it('posts the fixture result to the callback route under the stored job token', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      const token = setBioJobTokenMock.mock.calls[0][1];
+      expect(postedBody(callbackUrl)).toEqual({ jobToken: token, result: fakeOk });
+    });
+
+    it('posts a fixture error as the callback result rather than failing in-process', async () => {
+      // The fixture's outcome no longer decides `runGenerationJob`'s outcome: it
+      // travels on the wire, and `completeCallback` is what flips to `failed`.
       fakeBioGenerationMock.mockReturnValue({ ok: false, error: 'fixture down' });
 
       const result = await BioGenerationService.runGenerationJob(artist.id);
 
-      expect(result).toEqual({ status: 'failed', error: 'fixture down' });
-      expect(setBioStatusMock.mock.calls[1]).toEqual([
-        artist.id,
-        'failed',
-        { error: 'fixture down' },
-      ]);
-      expect(replaceBioContentMock).not.toHaveBeenCalled();
+      expect(result).toEqual({ status: 'dispatched' });
+      expect(postedBody(callbackUrl)?.result).toEqual({ ok: false, error: 'fixture down' });
     });
 
-    it('writes one synthetic vision-gating checkpoint with a candidate count', async () => {
+    it('posts the vision-gating checkpoint to the progress route, not the repository', async () => {
       await BioGenerationService.runGenerationJob(artist.id);
 
-      expect(setBioProgressMock).toHaveBeenCalledTimes(1);
-      const [id, progress] = setBioProgressMock.mock.calls[0];
-      expect(id).toBe(artist.id);
-      expect(progress).toEqual(
-        expect.objectContaining({ stage: 'vision-gating', counts: { candidates: 3 } })
-      );
-      expect(progress.at).toEqual(expect.any(String));
-    });
-
-    it('records the checkpoint before flipping to succeeded', async () => {
-      // Capture whether a succeeded flip had already happened at the instant the
-      // checkpoint is written — behaviour-focused ordering proof (no index math).
-      let succeededBeforeCheckpoint: boolean | null = null;
-      setBioProgressMock.mockImplementation(() => {
-        succeededBeforeCheckpoint = setBioStatusMock.mock.calls.some(
-          ([, status]) => status === 'succeeded'
-        );
-        return Promise.resolve();
+      const token = setBioJobTokenMock.mock.calls[0][1];
+      expect(postedBody(progressUrl)).toEqual({
+        jobToken: token,
+        stage: 'vision-gating',
+        counts: { candidates: 3 },
       });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(succeededBeforeCheckpoint).toBe(false);
+      // The server stamps `at` inside the progress route now — nothing is
+      // written straight to the repository from the generation job.
+      expect(setBioProgressMock).not.toHaveBeenCalled();
     });
 
-    it('does not write a synthetic checkpoint when the fixture fails', async () => {
+    it('posts the progress checkpoint before the completion callback', async () => {
+      await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
+    });
+
+    it('still posts the checkpoint when the fixture fails', async () => {
+      // Stage checkpoints precede the outcome on the real Lambda too, so a
+      // failing fixture must not suppress the progress POST.
       fakeBioGenerationMock.mockReturnValue({ ok: false, error: 'fixture down' });
 
       await BioGenerationService.runGenerationJob(artist.id);
 
-      expect(setBioProgressMock).not.toHaveBeenCalled();
+      expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
     });
 
     it('does not arm a timer when the fake delay is zero', async () => {
@@ -1294,22 +1334,19 @@ describe('BioGenerationService.runGenerationJob', () => {
       setTimeoutSpy.mockRestore();
     });
 
-    it('waits the configured fake delay before flipping to succeeded', async () => {
+    it('waits the configured fake delay before posting the completion callback', async () => {
       vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '4000');
       vi.useFakeTimers();
       try {
         const promise = BioGenerationService.runGenerationJob(artist.id);
-        // Let the synchronous prep + checkpoint microtasks settle; the run then
-        // parks on the delay timer, so no success flip has happened yet.
+        // Let the prep + checkpoint microtasks settle; the run then parks on the
+        // delay timer, so the completion callback has not been posted yet.
         await vi.advanceTimersByTimeAsync(0);
-        expect(setBioProgressMock).toHaveBeenCalledTimes(1);
-        expect(setBioStatusMock.mock.calls.some(([, status]) => status === 'succeeded')).toBe(
-          false
-        );
+        expect(postedUrls()).toEqual([progressUrl]);
 
         await vi.advanceTimersByTimeAsync(4000);
         await promise;
-        expect(setBioStatusMock.mock.calls.some(([, status]) => status === 'succeeded')).toBe(true);
+        expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
       } finally {
         vi.useRealTimers();
       }

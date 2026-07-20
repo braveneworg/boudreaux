@@ -38,7 +38,8 @@ import {
   type GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
 
-import { fakeBioGeneration, type BioGenerationLambdaInput } from './bio-generation-fixture';
+import { type BioGenerationLambdaInput } from './bio-generation-fixture';
+import { dispatchBioGenerationLocally } from './bio-generation-local-dispatch';
 import { BioImageService } from './bio-image-service';
 
 let lambdaClient: LambdaClient | null = null;
@@ -47,27 +48,6 @@ let lambdaClient: LambdaClient | null = null;
 // 202 immediately (then POSTs its result to the callback route), so the HTTP
 // client only needs a short timeout to cover the dispatch round-trip.
 export const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
-/**
- * Default observable in-flight window for the fake/E2E generation path only.
- * The real Lambda streams stage checkpoints through the progress channel, but
- * the in-process fixture completes instantly — so the fake path emits one
- * synthetic checkpoint and pauses this long before persisting, giving the admin
- * timeline (polled every 2.5s) a window to render and E2E a deterministic stage
- * to assert. Overridable via `BIO_GENERATOR_FAKE_DELAY_MS` (unit tests set `0`
- * so they never wait). Never used on the real dispatch path.
- */
-export const DEFAULT_BIO_GENERATOR_FAKE_DELAY_MS = 4000;
-
-/** Resolve the fake-path delay from the env, falling back to the default. */
-const resolveFakeDelayMs = (): number => {
-  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
-  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_BIO_GENERATOR_FAKE_DELAY_MS;
-};
-
-/** Resolve after `ms`; short-circuits to an already-resolved promise for `ms <= 0`. */
-const sleep = (ms: number): Promise<void> =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 
 /**
  * User-facing error the status read attaches when it coerces a timed-out
@@ -433,9 +413,9 @@ const assembleContent = ({
 
 /**
  * Re-host + sanitize + dead-link-validate + assemble raw generation data and
- * persist it, replacing the artist's bio content. Shared by the synchronous
- * fake path ({@link runFakeGeneration}) and the async callback route (which
- * persists on the Lambda's out-of-band completion). Returns the assembled
+ * persist it, replacing the artist's bio content. Reached only through the
+ * completion callback now — both the real Lambda and the local adapter POST
+ * their result there, so there is one persistence path. Returns the assembled
  * {@link GeneratedBioContent}; callers pair it with the artist slug to
  * revalidate pages. Throws on a DB error (callers map that to `failed`).
  */
@@ -515,14 +495,11 @@ export const persistGeneratedBio = async (
 
 /**
  * Discriminated outcome of {@link BioGenerationService.runGenerationJob}. The
- * synchronous fake path finishes in-process (`completed`); the real path fires
- * an async `Event` invoke (`dispatched`) whose callback later persists the
- * result; both may resolve to `failed` with a message.
+ * job is always dispatched across the seam (`dispatched`) and finished by the
+ * completion callback, whether the AWS invoke or the local adapter carried it;
+ * a run that never got that far resolves to `failed` with a message.
  */
-export type RunGenerationJobResult =
-  | { status: 'completed'; slug: string; data: GeneratedBioContent }
-  | { status: 'dispatched' }
-  | { status: 'failed'; error: string };
+export type RunGenerationJobResult = { status: 'dispatched' } | { status: 'failed'; error: string };
 
 /** The artist row, once loaded and known to exist. */
 type LoadedArtist = NonNullable<Awaited<ReturnType<typeof ArtistRepository.findById>>>;
@@ -632,34 +609,6 @@ const prepareGeneration = async (
 };
 
 /**
- * Synchronous (fake/E2E) path: run the deterministic fixture, persist it, and
- * flip the artist to `succeeded`. Finishes fully in-process — no Event invoke,
- * no callback — so E2E and local dev are unaffected by the async decoupling.
- */
-const runFakeGeneration = async (prep: GenerationPrep): Promise<RunGenerationJobResult> => {
-  const result = fakeBioGeneration(prep.input);
-  if (!result.ok) {
-    await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error: result.error });
-    return { status: 'failed', error: result.error };
-  }
-
-  // Fake/E2E observability only: emit ONE synthetic checkpoint (the artist is
-  // already `processing`) and pause briefly so the polled admin timeline is
-  // visibly exercised before the run resolves. The real Lambda owns real
-  // checkpoints via the progress channel, so this block never runs there.
-  await ArtistRepository.setBioProgress(prep.artist.id, {
-    stage: 'vision-gating',
-    counts: { candidates: 3 },
-    at: new Date().toISOString(),
-  });
-  await sleep(resolveFakeDelayMs());
-
-  const data = await persistGeneratedBio(prep.artist.id, result.data, prep.releases);
-  await ArtistRepository.setBioStatus(prep.artist.id, 'succeeded', { error: null });
-  return { status: 'completed', slug: prep.artist.slug, data };
-};
-
-/**
  * Real (async) path: mint a per-job token + callback URL, store the token, and
  * fire the `Event` invoke. Leaves the artist `processing` — the Lambda's
  * callback finishes the job. Fails (clearing the token) when the callback URL is
@@ -737,6 +686,13 @@ export class BioGenerationService {
   static async generate(
     input: BioGenerationLambdaInput
   ): Promise<{ ok: true } | { ok: false; error: string }> {
+    // Adapter selection, made once, at the seam. The local adapter POSTs the
+    // same progress and callback the Lambda does, so everything downstream of
+    // this line is identical on both paths.
+    if (process.env.BIO_GENERATOR_FAKE === 'true') {
+      return dispatchBioGenerationLocally(input);
+    }
+
     const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
     if (!functionName) {
       return {
@@ -783,9 +739,7 @@ export class BioGenerationService {
         return { status: 'failed', error: prepared.error };
       }
 
-      return process.env.BIO_GENERATOR_FAKE === 'true'
-        ? await runFakeGeneration(prepared.prep)
-        : await dispatchGeneration(prepared.prep);
+      return await dispatchGeneration(prepared.prep);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Bio generation failed unexpectedly.';
