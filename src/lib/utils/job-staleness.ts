@@ -19,6 +19,12 @@
  * generation and video enrichment. Those five sites previously spelled it two
  * different ways and disagreed on exactly the missing-`startedAt` case.
  *
+ * **Writers must uphold the matching invariant: anything that marks a job
+ * in-flight has to record `startedAt` in the same write.** A job is in flight
+ * from `pending`, not from `processing` — the trigger writes `pending` and the
+ * service flips to `processing` later. Stamping only on `processing` leaves a
+ * window where a live job looks abandoned and its status chip reads "Failed".
+ *
  * @param startedAt - When the job recorded that it began, if it ever did.
  * @param staleMs - Age past which a running job is treated as abandoned.
  */
