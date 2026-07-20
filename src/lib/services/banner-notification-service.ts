@@ -197,7 +197,7 @@ export class BannerNotificationService {
       return { success: true, data: { deleted: true } };
     } catch (error) {
       if (error instanceof DataError && error.code === 'NOT_FOUND') {
-        return { success: false, error: 'Notification not found' };
+        return { success: false, error: 'Notification not found', code: 'NOT_FOUND' };
       }
       return failFromError(error, { UNKNOWN: 'Failed to delete notification' });
     }

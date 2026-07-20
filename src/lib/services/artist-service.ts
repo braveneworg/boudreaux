@@ -360,7 +360,7 @@ const recoverArtistFromDuplicate = async (
   if (existing) {
     return { success: true, data: existing };
   }
-  return { success: false, error: 'Artist with this slug already exists' };
+  return { success: false, error: 'Artist with this slug already exists', code: 'DUPLICATE' };
 };
 
 /** The artist fields a video-enrichment suggestion may apply. */
@@ -464,7 +464,7 @@ export class ArtistService {
       const artist = await ArtistRepository.findById(id);
 
       if (!artist) {
-        return { success: false, error: 'Artist not found' };
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: artist };
@@ -481,7 +481,7 @@ export class ArtistService {
       const artist = await ArtistRepository.findBySlug(slug);
 
       if (!artist) {
-        return { success: false, error: 'Artist not found' };
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: artist as unknown as Artist };
@@ -601,13 +601,13 @@ export class ArtistService {
       const artistExists = await ArtistRepository.existsById(artistId);
 
       if (!artistExists) {
-        return { success: false, error: 'Artist not found' };
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
       const s3Bucket = process.env.S3_BUCKET;
 
       if (!s3Bucket) {
-        return { success: false, error: 'S3 bucket not configured' };
+        return { success: false, error: 'S3 bucket not configured', code: 'UNKNOWN' };
       }
 
       // Generate unique S3 key, upload the buffer, and derive its public URL.
@@ -648,7 +648,7 @@ export class ArtistService {
       const artistExists = await ArtistRepository.existsById(artistId);
 
       if (!artistExists) {
-        return { success: false, error: 'Artist not found' };
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
       const results: ImageUploadResult[] = [];
@@ -665,7 +665,7 @@ export class ArtistService {
       }
 
       if (results.length === 0 && errors.length > 0) {
-        return { success: false, error: errors.join('; ') };
+        return { success: false, error: errors.join('; '), code: 'UNKNOWN' };
       }
 
       return { success: true, data: results };
@@ -683,7 +683,7 @@ export class ArtistService {
       const image = await ImageRepository.findUniqueById(imageId);
 
       if (!image) {
-        return { success: false, error: 'Image not found' };
+        return { success: false, error: 'Image not found', code: 'NOT_FOUND' };
       }
 
       // Extract S3 key from URL (CDN/S3 styles, honouring CDN_DOMAIN).
@@ -776,7 +776,11 @@ export class ArtistService {
       const existingImages = await ImageRepository.findManyByArtistAndIds(artistId, imageIds);
 
       if (existingImages.length !== imageIds.length) {
-        return { success: false, error: 'Some images not found or do not belong to this artist' };
+        return {
+          success: false,
+          error: 'Some images not found or do not belong to this artist',
+          code: 'NOT_FOUND',
+        };
       }
 
       // Update sort order for each image
@@ -848,7 +852,7 @@ export class ArtistService {
       const artist = await ArtistRepository.findPublishedBySlugWithReleases(slug);
 
       if (!artist) {
-        return { success: false, error: 'Artist not found' };
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
       // Filter to only published, non-deleted releases (Prisma MongoDB
@@ -930,7 +934,7 @@ export class ArtistService {
   > {
     const trimmed = artistName.trim();
     if (!trimmed) {
-      return { success: false, error: 'Artist name is empty' };
+      return { success: false, error: 'Artist name is empty', code: 'INVALID_INPUT' };
     }
 
     try {

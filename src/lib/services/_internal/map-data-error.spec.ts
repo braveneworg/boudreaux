@@ -18,7 +18,7 @@ describe('failFromError', () => {
   it('uses the default message for a known code', () => {
     const result = failFromError(new DataError('NOT_FOUND', 'x'));
 
-    expect(result).toEqual({ success: false, error: 'Resource not found' });
+    expect(result).toEqual({ success: false, error: 'Resource not found', code: 'NOT_FOUND' });
   });
 
   it('prefers a caller override for the matching code', () => {
@@ -26,7 +26,11 @@ describe('failFromError', () => {
       DUPLICATE: 'Artist with this slug already exists',
     });
 
-    expect(result).toEqual({ success: false, error: 'Artist with this slug already exists' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Artist with this slug already exists',
+      code: 'DUPLICATE',
+    });
   });
 
   it('ignores overrides for non-matching codes', () => {
@@ -40,7 +44,7 @@ describe('failFromError', () => {
   it('maps a non-DataError throw to the UNKNOWN message', () => {
     const result = failFromError(new Error('boom'));
 
-    expect(result).toEqual({ success: false, error: 'Unexpected error' });
+    expect(result).toEqual({ success: false, error: 'Unexpected error', code: 'UNKNOWN' });
   });
 
   it('applies an UNKNOWN override to a non-DataError throw', () => {
@@ -78,6 +82,7 @@ describe('failFromError', () => {
     expect(failFromError(new DataError('TIMEOUT', 'x'))).toEqual({
       success: false,
       error: 'Request timed out',
+      code: 'TIMEOUT',
     });
   });
 
@@ -85,6 +90,7 @@ describe('failFromError', () => {
     expect(failFromError(new DataError('INVALID_INPUT', 'x'))).toEqual({
       success: false,
       error: 'Invalid input',
+      code: 'INVALID_INPUT',
     });
   });
 
@@ -92,6 +98,7 @@ describe('failFromError', () => {
     expect(failFromError(new DataError('LIMIT_EXCEEDED', 'x'))).toEqual({
       success: false,
       error: 'Limit exceeded',
+      code: 'LIMIT_EXCEEDED',
     });
   });
 
@@ -111,5 +118,46 @@ describe('failFromError', () => {
     failFromError(new DataError('NOT_FOUND', 'missing'));
 
     expect(loggers.database.error).not.toHaveBeenCalled();
+  });
+
+  describe('code propagation', () => {
+    it('carries the originating DataError code', () => {
+      const result = failFromError(new DataError('NOT_FOUND', 'x'));
+
+      expect(result.code).toBe('NOT_FOUND');
+    });
+
+    it('carries UNKNOWN for a throw that is not a DataError', () => {
+      const result = failFromError(new Error('boom'));
+
+      expect(result.code).toBe('UNKNOWN');
+    });
+
+    /**
+     * The regression this whole seam exists to prevent: overriding the copy
+     * must not change the code, or callers mapping code → HTTP status silently
+     * lose the ability to distinguish an outage from a generic failure.
+     */
+    it('carries the real code even when the caller overrides the message', () => {
+      const result = failFromError(new DataError('UNAVAILABLE', 'x'), {
+        UNAVAILABLE: 'Database connection failed',
+      });
+
+      expect(result.code).toBe('UNAVAILABLE');
+    });
+
+    it('keeps the overridden message alongside the unchanged code', () => {
+      const result = failFromError(new DataError('UNAVAILABLE', 'x'), {
+        UNAVAILABLE: 'Database connection failed',
+      });
+
+      expect(result.error).toBe('Database connection failed');
+    });
+
+    it('carries the specific code when a generic fallback supplies the message', () => {
+      const result = failFromError(new DataError('TIMEOUT', 'x'), { UNKNOWN: 'Failed to fetch' });
+
+      expect(result.code).toBe('TIMEOUT');
+    });
   });
 });

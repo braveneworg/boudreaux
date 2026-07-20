@@ -159,7 +159,7 @@ describe('syncVideoArtists', () => {
       { name: 'Sole', role: 'featured' },
     ]);
     vi.mocked(ArtistService.findOrCreateByName)
-      .mockResolvedValueOnce({ success: false, error: 'db down' })
+      .mockResolvedValueOnce({ success: false, error: 'db down', code: 'UNAVAILABLE' })
       .mockResolvedValueOnce({
         success: true,
         data: { id: OTHER_ID, displayName: 'Sole', firstName: 'Tim', surname: 'Holland' },

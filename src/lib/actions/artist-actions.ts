@@ -33,6 +33,6 @@ export const createArtistAction = async (artist: Artist): Promise<ServiceRespons
     return await ArtistService.createArtist(data);
   } catch (error) {
     loggers.media.error('Error creating artist', error);
-    return { success: false, error: 'Failed to create artist' };
+    return { success: false, error: 'Failed to create artist', code: 'UNKNOWN' };
   }
 };

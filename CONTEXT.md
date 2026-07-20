@@ -1,0 +1,73 @@
+# CONTEXT
+
+The shared vocabulary for this codebase. Terms here are the ones to use in code,
+comments, commit messages, and reviews — if a concept has a name in this file,
+don't invent a synonym for it.
+
+This file is deliberately small. Every entry below is grounded in code that
+exists today; it is a starting point, not a finished ubiquitous language. Add a
+term when you name a real concept, not speculatively.
+
+Architectural decisions live in [`docs/adr/`](docs/adr/). Working agreements
+live in [`AGENTS.md`](AGENTS.md).
+
+## Failure vocabulary
+
+**DataError** — a data-access or business-rule failure carrying a stable,
+vendor-neutral **DataErrorCode**. The repository layer is the only place that
+sees Prisma's error taxonomy; it translates that into a `DataError` so nothing
+above the repository depends on Prisma. Services also raise `DataError`s of
+their own for business-rule failures.
+_Defined in_ `src/lib/types/domain/errors.ts`.
+
+**DataErrorCode** — the closed union `DUPLICATE | INVALID_INPUT |
+LIMIT_EXCEEDED | NOT_FOUND | UNAVAILABLE | VALIDATION | TIMEOUT | UNKNOWN`. This
+is the **stable fact** callers branch on — HTTP status, retry policy, telemetry.
+
+**error copy** — the human-readable message on a failure. Copy is _not_ stable:
+it can be overridden per call site. **Never branch on it.** Branch on the code.
+See [ADR-0001](docs/adr/0001-service-failures-carry-a-data-error-code.md).
+
+**ServiceResponse&lt;T&gt;** — what a service call returns:
+`{ success: true, data: T } | { success: false, error: string, code: DataErrorCode }`.
+_Defined in_ `src/lib/services/service.types.d.ts`.
+
+## Layers
+
+**Repository** — the only layer permitted to import Prisma, enforced by
+`no-restricted-imports` in `eslint.config.mjs` with a small infra allowlist. Owns
+query construction, compare-and-swap claims, and race guards.
+_In_ `src/lib/repositories/`.
+
+**Service** — business rules and policy over one or more repositories. Returns
+`ServiceResponse`.
+_In_ `src/lib/services/`.
+
+**Server Action** — a mutation entry point (`'use server'`). Mutations go here,
+never to an API route.
+_In_ `src/lib/actions/`.
+
+**API route** — a query entry point (GET). Reads only; mutations belong in
+Server Actions.
+_In_ `src/app/api/`.
+
+**decorator** — a route wrapper owning a cross-cutting concern: `withAuth`,
+`withAdmin`, `withRateLimit`.
+_In_ `src/lib/decorators/`.
+
+## Domain nouns
+
+**Artist** — a person or act. Carries a generated **bio** (long, short, and alt
+variants), **bio images**, and reference links.
+
+**Release** — a published body of work by an Artist, with tracks and
+**digital formats** available for download.
+
+**Video** — an uploaded video asset with **probe** metadata (technical fields
+extracted by ffprobe) and **enrichment** (externally sourced facts such as
+release date, gated on the video being MUSIC-category with a known artist).
+
+**bio generation job** — an asynchronous run that produces an Artist's bio via
+the `bio-generator` Lambda. Has a lifecycle (`processing` → `succeeded` /
+`failed`) and reports intermediate **progress stages**. A job that never reports
+back is **stale-coerced** to failed after a deadline.

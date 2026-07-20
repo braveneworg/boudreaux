@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -22,13 +23,10 @@ export const POST = withAdmin(
       const result = await ArtistService.archiveArtist(id);
 
       if (!result.success) {
-        const status =
-          result.error === 'Artist not found'
-            ? 404
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json({ message: 'Artist archived successfully', data: result.data });

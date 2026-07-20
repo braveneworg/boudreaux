@@ -82,7 +82,7 @@ export class FeaturedArtistsService {
       const featuredArtist = await FeaturedArtistRepository.findById(id);
 
       if (!featuredArtist) {
-        return { success: false, error: 'Featured artist not found' };
+        return { success: false, error: 'Featured artist not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: featuredArtist };

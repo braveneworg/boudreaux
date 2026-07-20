@@ -108,7 +108,7 @@ export class SmsBlastService {
       const data = await UserRepository.countSmsOptedIn();
       return { success: true, data };
     } catch {
-      return { success: false, error: 'Failed to fetch recipient count' };
+      return { success: false, error: 'Failed to fetch recipient count', code: 'UNKNOWN' };
     }
   }
 
@@ -118,7 +118,7 @@ export class SmsBlastService {
       const data = await SmsBlastRepository.findRecent(limit);
       return { success: true, data };
     } catch {
-      return { success: false, error: 'Failed to fetch recent blasts' };
+      return { success: false, error: 'Failed to fetch recent blasts', code: 'UNKNOWN' };
     }
   }
 
@@ -141,7 +141,7 @@ export class SmsBlastService {
       const recipientCount = users.length;
 
       if (recipientCount === 0) {
-        return { success: false, error: 'No opted-in SMS subscribers' };
+        return { success: false, error: 'No opted-in SMS subscribers', code: 'INVALID_INPUT' };
       }
 
       const finalMessage = buildSmsBlastMessage(message);
@@ -177,6 +177,7 @@ export class SmsBlastService {
         });
         return {
           success: false,
+          code: 'UNKNOWN',
           error: `Blast sent (${sentCount} of ${recipientCount}) but history failed to record — do not resend`,
         };
       }
@@ -193,7 +194,7 @@ export class SmsBlastService {
       };
     } catch (error) {
       loggers.notifications.operationFailed('sms_blast_send', error);
-      return { success: false, error: 'Failed to send SMS blast' };
+      return { success: false, error: 'Failed to send SMS blast', code: 'UNKNOWN' };
     }
   }
 }

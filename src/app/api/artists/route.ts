@@ -10,6 +10,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { CreateArtistData } from '@/lib/types/domain/artist';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
@@ -32,10 +33,6 @@ const parsePagination = (searchParams: URLSearchParams): { skip: number; take: n
 /** Parse the tri-state `published` filter ('true' → true, 'false' → false, else undefined). */
 const parsePublished = (value: string | null): boolean | undefined =>
   value === 'true' ? true : value === 'false' ? false : undefined;
-
-/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
-const errorStatus = (error: string | undefined): number =>
-  error === 'Database unavailable' ? 503 : 500;
 
 /** Return a 401 response unless the session belongs to an authenticated admin. */
 const requireAdmin = (session: ServerSession | null): NextResponse | null =>
@@ -76,7 +73,7 @@ export async function GET(request: NextRequest) {
     const result = await ArtistService.getArtists(params);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(
@@ -113,13 +110,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
     const result = await ArtistService.createArtist(validation.data as unknown as CreateArtistData);
 
     if (!result.success) {
-      const status =
-        result.error === 'Artist with this slug already exists'
-          ? 409
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(result.data, { status: 201 });

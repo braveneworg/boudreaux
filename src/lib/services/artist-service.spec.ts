@@ -1615,13 +1615,21 @@ describe('ArtistService', () => {
     it('should return error for empty name', async () => {
       const result = await ArtistService.findOrCreateByName('');
 
-      expect(result).toEqual({ success: false, error: 'Artist name is empty' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Artist name is empty',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should return error for whitespace-only name', async () => {
       const result = await ArtistService.findOrCreateByName('   ');
 
-      expect(result).toEqual({ success: false, error: 'Artist name is empty' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Artist name is empty',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should handle P2002 slug collision by finding existing artist', async () => {
@@ -1645,7 +1653,11 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
-      expect(result).toEqual({ success: false, error: 'Database unavailable' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
     });
 
     it('should skip the slug lookup and fall back to slugifying firstName when generateSlug yields an empty string', async () => {
@@ -1974,7 +1986,11 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
-      expect(result).toEqual({ success: false, error: 'Artist with this slug already exists' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Artist with this slug already exists',
+        code: 'DUPLICATE',
+      });
     });
 
     it('should handle unexpected error in findOrCreateByName', async () => {
@@ -1985,7 +2001,11 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.findOrCreateByName('New Artist');
 
-      expect(result).toEqual({ success: false, error: 'Failed to find or create artist' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to find or create artist',
+        code: 'UNKNOWN',
+      });
     });
 
     it('should skip firstName+surname search when firstName is empty', async () => {

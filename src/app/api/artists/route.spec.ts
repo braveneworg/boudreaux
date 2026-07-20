@@ -265,6 +265,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
@@ -279,6 +280,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve artists',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
@@ -437,6 +439,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.createArtist).mockResolvedValue({
         success: false,
         error: 'Artist with this slug already exists',
+        code: 'DUPLICATE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists', {
@@ -459,6 +462,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.createArtist).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists', {
@@ -481,6 +485,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.createArtist).mockResolvedValue({
         success: false,
         error: 'Failed to create artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists', {

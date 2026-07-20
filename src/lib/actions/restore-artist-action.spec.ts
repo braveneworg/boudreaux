@@ -77,6 +77,7 @@ describe('restoreArtistAction', () => {
     vi.mocked(ArtistService.restoreArtist).mockResolvedValue({
       success: false,
       error: 'Artist not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await restoreArtistAction(artistId);
