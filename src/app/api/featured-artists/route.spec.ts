@@ -272,6 +272,7 @@ describe('Featured Artists API Routes', () => {
       vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
@@ -286,6 +287,7 @@ describe('Featured Artists API Routes', () => {
       vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve featured artists',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
@@ -380,6 +382,7 @@ describe('Featured Artists API Routes', () => {
         vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
           success: false,
           error: 'Database unavailable',
+          code: 'UNAVAILABLE',
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
@@ -392,6 +395,7 @@ describe('Featured Artists API Routes', () => {
         vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
           success: false,
           error: 'Failed to fetch artists',
+          code: 'UNKNOWN',
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
@@ -451,6 +455,7 @@ describe('Featured Artists API Routes', () => {
       vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {
@@ -469,6 +474,7 @@ describe('Featured Artists API Routes', () => {
       vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Failed to create artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {

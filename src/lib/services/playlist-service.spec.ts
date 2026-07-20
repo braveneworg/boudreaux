@@ -284,6 +284,7 @@ beforeEach(() => {
   vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValue({
     success: false,
     error: 'Release not found',
+    code: 'NOT_FOUND',
   });
   vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({ success: true, data: [] });
 });
@@ -1685,6 +1686,7 @@ describe('PlaylistService', () => {
       vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
         success: false,
         error: 'boom',
+        code: 'UNKNOWN',
       });
 
       const result = await PlaylistService.searchMedia('night', OWNER_ID);
@@ -1712,6 +1714,7 @@ describe('PlaylistService', () => {
       vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
         success: false,
         error: 'boom',
+        code: 'UNKNOWN',
       });
 
       const result = await PlaylistService.searchMedia('night', OWNER_ID);

@@ -10,6 +10,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
@@ -29,10 +30,6 @@ const parsePagination = (searchParams: URLSearchParams): { skip: number; take: n
   return { skip, take };
 };
 
-/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
-const errorStatus = (error: string | undefined): number =>
-  error === 'Database unavailable' ? 503 : 500;
-
 /** Return a 401 response unless the session belongs to an authenticated admin. */
 const requireAdmin = (session: ServerSession | null): NextResponse | null =>
   !session?.user?.id || session.user?.role !== 'admin'
@@ -47,7 +44,7 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   const result = await ReleaseService.getPublishedReleases({ skip, take, search });
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(
@@ -88,7 +85,7 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
   const result = await ReleaseService.getReleases(params);
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(
@@ -146,10 +143,7 @@ export const POST = withAdmin(async (request: NextRequest) => {
     );
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.error === 'Database unavailable' ? 503 : 400 }
-      );
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(result.data, { status: 201 });

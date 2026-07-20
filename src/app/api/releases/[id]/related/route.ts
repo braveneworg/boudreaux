@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
@@ -41,10 +42,7 @@ export const GET = withRateLimit<{ id: string }>(
     const result = await ReleaseService.getArtistOtherReleases(artistId, id);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.error === 'Database unavailable' ? 503 : 500 }
-      );
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(

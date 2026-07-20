@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export const GET = withRateLimit(
   const result = await BannerNotificationService.getActiveBanners();
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(result.data, {

@@ -80,6 +80,7 @@ describe('deleteFeaturedArtistAction', () => {
     vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
       success: false,
       error: 'Featured artist not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await deleteFeaturedArtistAction(featuredArtistId);
@@ -91,6 +92,7 @@ describe('deleteFeaturedArtistAction', () => {
     vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
       success: false,
       error: 'Featured artist not found',
+      code: 'NOT_FOUND',
     });
 
     await deleteFeaturedArtistAction(featuredArtistId);

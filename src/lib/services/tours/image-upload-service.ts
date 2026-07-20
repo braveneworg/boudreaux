@@ -96,7 +96,7 @@ export class ImageUploadService {
       // Validate file
       const validation = this.validateImageFile(request.mimeType, request.fileSize);
       if (!validation.valid) {
-        return { success: false, error: validation.error || 'Invalid file' };
+        return { success: false, error: validation.error || 'Invalid file', code: 'VALIDATION' };
       }
 
       // Generate S3 key
@@ -131,7 +131,7 @@ export class ImageUploadService {
       };
     } catch (error) {
       loggers.media.error('Error generating presigned URL', error);
-      return { success: false, error: 'Failed to generate upload URL' };
+      return { success: false, error: 'Failed to generate upload URL', code: 'UNKNOWN' };
     }
   }
 
@@ -148,7 +148,7 @@ export class ImageUploadService {
       // Validate file
       const validation = this.validateImageFile(request.mimeType, request.fileSize);
       if (!validation.valid) {
-        return { success: false, error: validation.error || 'Invalid file' };
+        return { success: false, error: validation.error || 'Invalid file', code: 'VALIDATION' };
       }
 
       // Generate S3 key for tour date
@@ -183,7 +183,7 @@ export class ImageUploadService {
       };
     } catch (error) {
       loggers.media.error('Error generating tour date presigned URL', error);
-      return { success: false, error: 'Failed to generate upload URL' };
+      return { success: false, error: 'Failed to generate upload URL', code: 'UNKNOWN' };
     }
   }
 
@@ -205,7 +205,7 @@ export class ImageUploadService {
       return { success: true, data: undefined };
     } catch (error) {
       loggers.media.error('Error deleting from S3', error);
-      return { success: false, error: 'Failed to delete file from S3' };
+      return { success: false, error: 'Failed to delete file from S3', code: 'UNKNOWN' };
     }
   }
 }

@@ -99,7 +99,7 @@ export class ReleaseService {
       const release = await ReleaseRepository.findById(id);
 
       if (!release) {
-        return { success: false, error: 'Release not found' };
+        return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: release };
@@ -163,7 +163,7 @@ export class ReleaseService {
       const existing = await ReleaseRepository.findForDeletion(id);
 
       if (!existing) {
-        return { success: false, error: 'Release not found' };
+        return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
       }
 
       // Collect S3 keys (digital-format files + image/coverArt URLs) for cleanup.
@@ -325,7 +325,7 @@ export class ReleaseService {
       const release = await ReleaseRepository.findPublishedWithTracks(id);
 
       if (!release) {
-        return { success: false, error: 'Release not found' };
+        return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
       }
 
       return { success: true, data: release };

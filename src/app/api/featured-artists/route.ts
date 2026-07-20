@@ -13,6 +13,7 @@ import { FeaturedArtistsService } from '@/lib/services/featured-artists-service'
 import type { CreateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
@@ -37,10 +38,6 @@ const parsePagination = (searchParams: URLSearchParams): { skip: number; take: n
 const parsePublished = (value: string | null): boolean | undefined =>
   value === 'true' ? true : value === 'false' ? false : undefined;
 
-/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
-const errorStatus = (error: string | undefined): number =>
-  error === 'Database unavailable' ? 503 : 500;
-
 /** Return a 401 response unless the session belongs to an authenticated admin. */
 const requireAdmin = (session: ServerSession | null): NextResponse | null =>
   !session?.user?.id || session.user?.role !== 'admin'
@@ -59,7 +56,7 @@ const handleActiveListing = async (searchParams: URLSearchParams): Promise<NextR
   const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), limit);
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(
@@ -100,7 +97,7 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
   const result = await FeaturedArtistsService.getAllFeaturedArtists(params);
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(
@@ -162,8 +159,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
     );
 
     if (!result.success) {
-      const status = result.error === 'Database unavailable' ? 503 : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(serializeForResponse(result.data), { status: 201 });

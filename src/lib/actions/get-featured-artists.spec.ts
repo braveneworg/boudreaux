@@ -68,6 +68,7 @@ describe('getFeaturedArtistsAction', () => {
     vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const result = await getFeaturedArtistsAction();

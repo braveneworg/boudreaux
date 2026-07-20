@@ -79,6 +79,7 @@ describe('Artist by Slug API Route', () => {
       vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
         success: false,
         error: 'Artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/slug/non-existent');
@@ -93,6 +94,7 @@ describe('Artist by Slug API Route', () => {
       vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/slug/john-doe');
@@ -107,6 +109,7 @@ describe('Artist by Slug API Route', () => {
       vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/slug/john-doe');
@@ -183,6 +186,7 @@ describe('Artist by Slug API Route', () => {
       vi.mocked(ArtistService.getArtistBySlugWithReleases).mockResolvedValue({
         success: false,
         error: 'Artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(

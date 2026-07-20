@@ -482,6 +482,7 @@ describe('findOrCreateReleaseAction', () => {
       mockReleaseServiceCreate.mockResolvedValue({
         success: false,
         error: 'Database error',
+        code: 'UNKNOWN',
       });
 
       const metadata: ReleaseMetadata = {
@@ -914,6 +915,7 @@ describe('findOrCreateReleaseAction', () => {
       vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
         success: false,
         error: 'Artist name is empty',
+        code: 'INVALID_INPUT',
       });
 
       const result = await findOrCreateReleaseAction({

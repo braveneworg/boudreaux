@@ -77,6 +77,7 @@ describe('archiveVideoAction', () => {
     vi.mocked(VideoService.archiveVideo).mockResolvedValue({
       success: false,
       error: 'Video not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await archiveVideoAction(videoId);

@@ -11,6 +11,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
@@ -36,13 +37,7 @@ export const GET = withRateLimit<{ id: string }>(
     const result = await ArtistService.getArtistById(id);
 
     if (!result.success) {
-      const status =
-        result.error === 'Artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(result.data, {
@@ -75,15 +70,10 @@ export const PUT = withAdmin(
       );
 
       if (!result.success) {
-        const status =
-          result.error === 'Artist not found'
-            ? 404
-            : result.error === 'Artist with this slug already exists'
-              ? 409
-              : result.error === 'Database unavailable'
-                ? 503
-                : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json(result.data);
@@ -115,15 +105,10 @@ export const PATCH = withAdmin(
       );
 
       if (!result.success) {
-        const status =
-          result.error === 'Artist not found'
-            ? 404
-            : result.error === 'Artist with this slug already exists'
-              ? 409
-              : result.error === 'Database unavailable'
-                ? 503
-                : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json(result.data);
@@ -146,13 +131,10 @@ export const DELETE = withAdmin(
       const result = await ArtistService.deleteArtist(id);
 
       if (!result.success) {
-        const status =
-          result.error === 'Artist not found'
-            ? 404
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json({ message: 'Artist deleted successfully', data: result.data });

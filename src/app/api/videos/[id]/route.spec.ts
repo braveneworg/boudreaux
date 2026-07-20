@@ -69,6 +69,7 @@ describe('GET /api/videos/[id]', () => {
     vi.mocked(VideoService.getVideoById).mockResolvedValue({
       success: false,
       error: 'Video not found',
+      code: 'NOT_FOUND',
     });
 
     const response = await GET(request(), context(VALID_ID));
@@ -154,6 +155,7 @@ describe('GET /api/videos/[id]', () => {
     vi.mocked(VideoService.getVideoById).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const response = await GET(request(), context(VALID_ID));
@@ -165,6 +167,7 @@ describe('GET /api/videos/[id]', () => {
     vi.mocked(VideoService.getVideoById).mockResolvedValue({
       success: false,
       error: 'Failed to retrieve video',
+      code: 'UNKNOWN',
     });
 
     const response = await GET(request(), context(VALID_ID));

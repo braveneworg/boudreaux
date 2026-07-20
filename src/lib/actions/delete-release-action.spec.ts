@@ -80,6 +80,7 @@ describe('deleteReleaseAction', () => {
     vi.mocked(ReleaseService.deleteRelease).mockResolvedValue({
       success: false,
       error: 'Release not found',
+      code: 'NOT_FOUND',
     });
 
     const result = await deleteReleaseAction(releaseId);

@@ -8,6 +8,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 
@@ -28,10 +29,6 @@ const isValidSlug = (slug: string): boolean => {
     /^[a-z0-9-]+$/.test(slug)
   );
 };
-
-/** Map a service error to a 404 (not found), 503 (DB unavailable), or 500 status. */
-const errorStatus = (error: string | undefined): number =>
-  error === 'Artist not found' ? 404 : error === 'Database unavailable' ? 503 : 500;
 
 /**
  * GET /api/artist/slug/[slug]
@@ -59,7 +56,7 @@ export const GET = withRateLimit<{ slug: string }>(
       : await ArtistService.getArtistBySlug(slug);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     const responseData = withReleases

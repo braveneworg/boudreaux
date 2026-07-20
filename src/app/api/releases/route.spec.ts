@@ -240,6 +240,7 @@ describe('Release API Routes', () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/releases');
@@ -254,6 +255,7 @@ describe('Release API Routes', () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve releases',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/releases');
@@ -380,6 +382,7 @@ describe('Release API Routes', () => {
         vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
           success: false,
           error: 'Database unavailable',
+          code: 'UNAVAILABLE',
         });
 
         const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
@@ -392,6 +395,7 @@ describe('Release API Routes', () => {
         vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
           success: false,
           error: 'Failed to fetch',
+          code: 'UNKNOWN',
         });
 
         const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
@@ -542,10 +546,11 @@ describe('Release API Routes', () => {
       expect(ReleaseService.createRelease).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when title already exists', async () => {
+    it('should return 409 when title already exists', async () => {
       vi.mocked(ReleaseService.createRelease).mockResolvedValue({
         success: false,
         error: 'Release with this title already exists',
+        code: 'DUPLICATE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/releases', {
@@ -562,7 +567,7 @@ describe('Release API Routes', () => {
       const response = await POST(request, emptyContext);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(409);
       expect(data).toEqual({ error: 'Release with this title already exists' });
     });
 
@@ -570,6 +575,7 @@ describe('Release API Routes', () => {
       vi.mocked(ReleaseService.createRelease).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/releases', {
@@ -594,6 +600,7 @@ describe('Release API Routes', () => {
       vi.mocked(ReleaseService.createRelease).mockResolvedValue({
         success: false,
         error: 'Failed to create release',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/releases', {
@@ -610,7 +617,7 @@ describe('Release API Routes', () => {
       const response = await POST(request, emptyContext);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Failed to create release' });
     });
 

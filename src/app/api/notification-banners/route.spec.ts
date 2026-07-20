@@ -64,6 +64,7 @@ describe('GET /api/notification-banners', () => {
     vi.mocked(BannerNotificationService.getActiveBanners).mockResolvedValue({
       success: false,
       error: 'Database error',
+      code: 'UNKNOWN',
     } as never);
 
     const request = new NextRequest('http://localhost:3000/api/notification-banners');
