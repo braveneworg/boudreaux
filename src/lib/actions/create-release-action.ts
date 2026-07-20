@@ -120,7 +120,7 @@ export const createReleaseAction = async (
     'description',
     'publishedAt',
     'suggestedPrice',
-  ];
+  ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
 
   if (parsed.success) {

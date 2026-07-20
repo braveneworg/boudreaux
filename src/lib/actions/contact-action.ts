@@ -115,7 +115,14 @@ export const contactAction = async (
   });
   if (guardError) return guardError;
 
-  const permittedFieldNames = ['reason', 'firstName', 'lastName', 'email', 'phone', 'message'];
+  const permittedFieldNames = [
+    'reason',
+    'firstName',
+    'lastName',
+    'email',
+    'phone',
+    'message',
+  ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, contactSchema);
 
   if (!parsed.success) {

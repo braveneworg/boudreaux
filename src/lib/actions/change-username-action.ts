@@ -104,7 +104,7 @@ export const changeUsernameAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const permittedFieldNames = ['username', 'confirmUsername'];
+  const permittedFieldNames = ['username', 'confirmUsername'] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, changeUsernameSchema);
 
   // Handle Zod validation errors
