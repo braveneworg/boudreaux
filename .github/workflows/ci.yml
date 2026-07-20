@@ -32,6 +32,51 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm exec tsc --noEmit
 
+  # ── Lambda quality (bio-generator + stripe-webhook) ───────────────────────
+  # The lambdas are standalone pnpm projects excluded from the root tsconfig,
+  # so the quality job above never typechecks them, and their vitest suites
+  # otherwise run only at deploy time (bio-generator) or not at all
+  # (stripe-webhook). Gate both on every push/PR here.
+  lambda-quality:
+    name: Lambda Type Check & Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-tools
+
+      - name: Install dependencies (bio-generator)
+        working-directory: bio-generator
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (bio-generator)
+        working-directory: bio-generator
+        run: pnpm run typecheck
+
+      - name: Run tests (bio-generator)
+        working-directory: bio-generator
+        run: pnpm run test:run
+
+      - name: Install dependencies (stripe-webhook)
+        working-directory: stripe-webhook
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client (stripe-webhook)
+        working-directory: stripe-webhook
+        run: pnpm exec prisma generate --schema=../prisma/schema.prisma
+
+      - name: Typecheck (stripe-webhook)
+        working-directory: stripe-webhook
+        run: pnpm run typecheck
+
+      - name: Run tests (stripe-webhook)
+        working-directory: stripe-webhook
+        run: pnpm run test:run
+
   # ── Unit tests (sharded) ───────────────────────────────────────────────────
   # The 310-file suite is split into two parallel jobs. Each shard runs with
   # the vmThreads pool (≈3× faster than forks) and stores its results plus

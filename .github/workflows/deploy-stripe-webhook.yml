@@ -51,6 +51,14 @@ jobs:
         working-directory: stripe-webhook
         run: pnpm exec prisma generate --schema=../prisma/schema.prisma
 
+      - name: Typecheck
+        working-directory: stripe-webhook
+        run: pnpm run typecheck
+
+      - name: Run tests
+        working-directory: stripe-webhook
+        run: pnpm run test:run
+
       - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
         run: |

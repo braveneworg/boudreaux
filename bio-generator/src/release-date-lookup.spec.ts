@@ -40,12 +40,21 @@ describe('runReleaseDateLookupLambda', () => {
   });
 
   it('returns ok:false for invalid input', async () => {
-    const out = await runReleaseDateLookupLambda({ task: 'release-date-lookup' }, {});
+    const deps = {
+      getSerperApiKey: vi.fn(),
+      getGeminiApiKey: vi.fn(),
+      resolveReleaseDateSuggestion: vi.fn(),
+    };
+    const out = await runReleaseDateLookupLambda({ task: 'release-date-lookup' }, deps);
     expect(out.ok).toBe(false);
   });
 
   it('returns result:null when Serper has no key configured', async () => {
-    const deps = { getSerperApiKey: vi.fn().mockResolvedValue(null), getGeminiApiKey: vi.fn() };
+    const deps = {
+      getSerperApiKey: vi.fn().mockResolvedValue(null),
+      getGeminiApiKey: vi.fn(),
+      resolveReleaseDateSuggestion: vi.fn(),
+    };
     const out = await runReleaseDateLookupLambda(
       { task: 'release-date-lookup', title: 'Song' },
       deps

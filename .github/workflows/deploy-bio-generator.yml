@@ -43,6 +43,10 @@ jobs:
         working-directory: bio-generator
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck
+        working-directory: bio-generator
+        run: pnpm run typecheck
+
       - name: Run tests
         working-directory: bio-generator
         run: pnpm run test:run
