@@ -60,7 +60,8 @@ const runEnrichmentAfterResponse = async (videoId: string): Promise<void> => {
  * Triggers (or re-triggers) async probe + web enrichment for a video.
  * Admin-only. Marks the job `pending`, schedules the heavy work via `after()`,
  * and returns immediately; the admin page polls the enrichment endpoint. A
- * run already in flight (and not stale) is not duplicated.
+ * run already in flight (and not stale) is not duplicated, and a video whose
+ * persisted artist is blank is refused before any status write.
  *
  * @param videoId - The video to probe and enrich.
  * @returns `{ success, status }` once accepted, or a typed error.
@@ -79,6 +80,15 @@ export const runVideoEnrichmentAction = async (
     const state = await VideoRepository.getEnrichmentState(videoId);
     if (!state) {
       return { success: false, error: 'Video not found.' };
+    }
+
+    // Manual-path artist gate: the automatic kicks already require a
+    // non-blank artist, and a blank one has no linked artists to enrich.
+    if (state.artist.trim() === '') {
+      return {
+        success: false,
+        error: 'Add an artist or creator and save before running enrichment.',
+      };
     }
 
     // Don't start a second run while one is genuinely in flight.

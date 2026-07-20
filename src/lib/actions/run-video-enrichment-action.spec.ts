@@ -85,6 +85,19 @@ describe('runVideoEnrichmentAction', () => {
     expect(result).toEqual({ success: false, error: 'Video not found.' });
   });
 
+  it('refuses to run when the persisted artist is blank', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
+
+    const result = await runVideoEnrichmentAction(VIDEO_ID);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Add an artist or creator and save before running enrichment.',
+    });
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
   it('echoes a fresh in-flight status instead of double-triggering', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({ enrichmentStatus: 'processing', enrichmentStartedAt: new Date() })
