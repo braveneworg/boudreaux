@@ -302,11 +302,26 @@ const shouldSkipLinkValidation = (): boolean =>
   process.env.E2E_MODE === 'true' ||
   process.env.NEXT_PUBLIC_E2E_MODE === 'true';
 
-/** Builds the lambda-input releases payload from the label's own catalog. */
+/**
+ * Mirrors `bioGenerationInputSchema`'s `.max(100)` on `releases` in the Lambda
+ * (`bio-generator/src/types.ts`). The two projects deploy separately and cannot
+ * share a module, so this constant is a deliberate copy — see the wire-contract
+ * parity test in `bio-generation-schema.spec.ts`.
+ */
+export const MAX_LAMBDA_RELEASES = 100;
+
+/**
+ * Builds the lambda-input releases payload from the label's own catalog.
+ *
+ * Capped: the Lambda rejects an over-cap payload wholesale, and the invoke is
+ * fire-and-forget, so exceeding it would strand the job until the stale sweep
+ * rather than dropping the extra releases. The repository orders newest-first,
+ * so the cap keeps the most recent chronology anchors.
+ */
 const toLambdaReleases = (
   releases: ReleaseCoverSource[]
 ): NonNullable<BioGenerationLambdaInput['releases']> =>
-  releases.map((release) => ({
+  releases.slice(0, MAX_LAMBDA_RELEASES).map((release) => ({
     title: release.title,
     releasedOn: toIsoDate(release.releasedOn),
     url: `/releases/${release.id}`,

@@ -105,6 +105,20 @@ export const bioGenerationInputSchema = z.object({
 
 export type BioGenerationInput = z.infer<typeof bioGenerationInputSchema>;
 
+/**
+ * The minimum an event must carry for the Lambda to report back at all: the
+ * completion URL and the per-job token.
+ *
+ * Parsed separately from `bioGenerationInputSchema` on purpose. When the full
+ * input parse fails there is no parsed output to read the callback details
+ * from, and those are exactly the details needed to tell the web app that the
+ * job is dead — otherwise it waits out the 17-minute stale sweep.
+ */
+export const callbackTargetSchema = z.object({
+  callbackUrl: z.string().url(),
+  jobToken: z.string().min(1),
+});
+
 /** A discovered image with the attribution/license required to display it. */
 export const bioImageSchema = z.object({
   url: z.string().url(),

@@ -6,6 +6,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { MAX_LAMBDA_RELEASES } from '@/lib/services/bio-generation-service';
+
 import {
   BIO_PROGRESS_STAGES,
   bioGenerationCallbackSchema,
@@ -498,5 +500,28 @@ describe('stage-list wire-contract parity (web ↔ Lambda)', () => {
 
     // Order-sensitive equality: a reorder in either list is a wire-contract break.
     expect(lambdaStages).toEqual([...BIO_PROGRESS_STAGES]);
+  });
+
+  /**
+   * The web caps `releases` before dispatch so it never sends a payload the
+   * Lambda will reject. If the Lambda's cap moves and this one does not, the
+   * mismatch is otherwise invisible until a real artist crosses the smaller of
+   * the two and the job hangs for 17 minutes.
+   */
+  it('MAX_LAMBDA_RELEASES matches the releases cap in bio-generator/src/types.ts', () => {
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const typesPath = resolve(currentDir, '../../..', 'bio-generator/src/types.ts');
+    const source = readFileSync(typesPath, 'utf8');
+
+    // Scope to the `releases:` field so another `.max()` in the file cannot
+    // produce a false pass.
+    const releasesBlock = /releases:\s*z\s*[\s\S]*?\.max\((\d+)\)/.exec(source);
+    expect(
+      releasesBlock,
+      'releases .max(...) not found in bio-generator/src/types.ts'
+    ).not.toBeNull();
+    if (!releasesBlock) return;
+
+    expect(Number(releasesBlock[1])).toBe(MAX_LAMBDA_RELEASES);
   });
 });

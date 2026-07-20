@@ -1743,6 +1743,57 @@ describe('lambdaHandler', () => {
     expect(postCallback).not.toHaveBeenCalled();
   });
 
+  /**
+   * The web invokes with `InvocationType: 'Event'`, so this return value is
+   * discarded and the artist row is already `processing`. Without a callback,
+   * a rejected input orphans the job until the 17-minute stale sweep — the
+   * slowest possible way to learn the two sides disagree about the payload.
+   */
+  it('posts a failure callback when the input fails validation', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await runLambda(
+      {
+        artistId: 'a1',
+        // displayName is required — this event is invalid.
+        callbackUrl: 'https://app.example/cb',
+        jobToken: 'tok-1',
+      },
+      deps
+    );
+
+    expect(postCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://app.example/cb',
+        jobToken: 'tok-1',
+        result: expect.objectContaining({ ok: false }),
+      })
+    );
+  });
+
+  it('reports why the input was rejected in the failure callback', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await runLambda(
+      { artistId: 'a1', callbackUrl: 'https://app.example/cb', jobToken: 'tok-1' },
+      deps
+    );
+
+    const { result } = postCallback.mock.calls[0][0];
+    expect(result.error).toContain('Invalid input');
+  });
+
+  it('does not post a failure callback when the invalid input has no job token', async () => {
+    const postCallback = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({ postCallback });
+
+    await runLambda({ artistId: 'a1', callbackUrl: 'https://app.example/cb' }, deps);
+
+    expect(postCallback).not.toHaveBeenCalled();
+  });
+
   it('ignores an AWS context passed as the second argument (regression: v4.183.0 hang)', async () => {
     // AWS invokes the handler as (event, context). The context object is NOT a
     // deps bag — it has no getGeminiApiKey/postCallback — so binding it to `deps`
