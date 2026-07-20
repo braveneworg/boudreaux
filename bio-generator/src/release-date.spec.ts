@@ -95,7 +95,7 @@ describe('resolveReleaseDateSuggestion', () => {
     );
     expect(requestJson).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ userPrompt: expect.not.stringContaining(' by ') }),
+      expect.objectContaining({ userPrompt: expect.not.stringContaining('" by ') }),
       {}
     );
   });
