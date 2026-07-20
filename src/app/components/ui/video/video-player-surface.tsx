@@ -14,7 +14,7 @@ import { bindPlayerVolumePersistence } from '@/hooks/use-player-prefs';
 import { cn } from '@/lib/utils';
 
 import { getVideoMimeType } from './get-video-mime-type';
-import { claimPlayback, releasePlayback } from './video-playback-coordinator';
+import { claimPlayback, releasePlayback } from '../playback-session';
 
 export interface VideoPlayerSurfaceProps {
   title: string;

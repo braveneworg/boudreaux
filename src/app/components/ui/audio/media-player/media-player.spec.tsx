@@ -10,6 +10,9 @@ import videojs from 'video.js';
 import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
 
 import { MediaPlayer } from './media-player';
+import { claimPlayback, releasePlayback } from '../../playback-session';
+
+import type * as PlaybackSession from '../../playback-session';
 
 // Hoisted state for video.js mock (vi.mock factories are hoisted, so they
 // cannot reference spec-module-scope let/const directly; use vi.hoisted).
@@ -62,6 +65,17 @@ vi.mock('video.js', () => {
   );
 
   return { default: mockVideojs };
+});
+
+// Spy on the real playback session rather than replacing it: the tests below
+// assert both its observable effect (a rival claimant is paused) and the
+// claim/release id symmetry, which needs the genuine singleton underneath.
+vi.mock('../../playback-session', async (importOriginal) => {
+  const actual = await importOriginal<typeof PlaybackSession>();
+  return {
+    claimPlayback: vi.fn(actual.claimPlayback),
+    releasePlayback: vi.fn(actual.releasePlayback),
+  };
 });
 
 // Mock LazyControls to avoid async/dynamic behavior in tests.
@@ -396,6 +410,82 @@ describe('MediaPlayer', () => {
       );
 
       expect(container.firstChild).toHaveClass('custom-class');
+    });
+  });
+
+  /**
+   * The audio player and every VideoPlayer share one playback session, so
+   * starting either medium pauses the other. Before this, only videos claimed
+   * the session: starting a video left a playing release player audible
+   * underneath it.
+   */
+  describe('shared playback session', () => {
+    /**
+     * The video.js mock hands every instance the same player object, so
+     * `on` accumulates handlers from earlier renders in this file. Take the
+     * most recently registered one — it belongs to the player just rendered,
+     * whatever ran before.
+     */
+    const getPlayHandler = (): (() => void) => {
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        on: ReturnType<typeof vi.fn>;
+      };
+      const call = player.on.mock.calls.filter(([event]) => event === 'play').at(-1);
+      if (!call) throw new Error('no play handler registered');
+      return call[1] as () => void;
+    };
+
+    it('pauses a playing video when the audio player starts', () => {
+      const pauseVideo = vi.fn();
+      claimPlayback('a-video', pauseVideo);
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+        </MediaPlayer>
+      );
+      act(() => getPlayHandler()());
+
+      expect(pauseVideo).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the same id it claimed when it unmounts', () => {
+      vi.mocked(claimPlayback).mockClear();
+      vi.mocked(releasePlayback).mockClear();
+
+      const { unmount } = render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+        </MediaPlayer>
+      );
+      act(() => getPlayHandler()());
+      const claimedId = vi.mocked(claimPlayback).mock.calls.at(-1)?.[0];
+      unmount();
+
+      // Asymmetry here would strand a disposed player as the session's
+      // claimant, so the next player would "pause" something already gone.
+      expect(vi.mocked(releasePlayback)).toHaveBeenCalledWith(claimedId);
+    });
+
+    /**
+     * Regression: the init effect used to `return` bare after a successful
+     * immediate init, which is the common path — so the disposing cleanup was
+     * unreachable and every audio player leaked its Video.js instance and
+     * listeners on unmount.
+     */
+    it('disposes the player when it unmounts', () => {
+      const { unmount } = render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+        </MediaPlayer>
+      );
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        dispose: ReturnType<typeof vi.fn>;
+      };
+      player.dispose.mockClear();
+      unmount();
+
+      expect(player.dispose).toHaveBeenCalledTimes(1);
     });
   });
 

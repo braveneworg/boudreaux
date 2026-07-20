@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 import {
   createPlayerInitializer,
   clearPlayerErrorState,
   getAudioMimeType,
 } from './create-player-initializer';
+import { releasePlayback } from '../../playback-session';
 
 import type Player from 'video.js/dist/types/player';
 
@@ -59,6 +60,8 @@ export const Controls = ({
   autoPlay = false,
   controlsRef,
 }: MediaControlsProps) => {
+  const instanceId = useId();
+  const instanceIdRef = useRef(instanceId);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Player | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
@@ -103,6 +106,7 @@ export const Controls = ({
 
     const initPlayer = createPlayerInitializer(
       {
+        instanceIdRef,
         containerRef,
         audioElRef,
         playerRef,
@@ -122,8 +126,25 @@ export const Controls = ({
       { SKIP_TIME, DOUBLE_CLICK_THRESHOLD, REWIND_THRESHOLD }
     );
 
-    // Try to initialize immediately
-    if (initPlayer()) return;
+    let isUnmounted = false;
+
+    const cleanup = () => {
+      isUnmounted = true;
+      // Released unconditionally: a player disposed mid-playback must not stay
+      // the session's claimant, or the next player would "pause" a dead one.
+      releasePlayback(instanceIdRef.current);
+      if (playerRef.current) {
+        playerRef.current.dispose();
+        playerRef.current = null;
+        audioElRef.current = null;
+        isInitializedRef.current = false;
+      }
+    };
+
+    // Try to initialize immediately. Returning `cleanup` on this path too is
+    // load-bearing: the immediate success case is the common one, so an early
+    // bare `return` here left every audio player undisposed on unmount.
+    if (initPlayer()) return cleanup;
 
     // If Video.js wasn't ready, retry with increasing delays.
     // This handles the case where client-side navigation causes
@@ -134,7 +155,9 @@ export const Controls = ({
 
     const retryInit = () => {
       retryCount++;
-      if (retryCount > maxRetries || isInitializedRef.current) return;
+      // `cleanup` resets `isInitializedRef`, so an in-flight retry would
+      // happily build a player for an unmounted component without this guard.
+      if (isUnmounted || retryCount > maxRetries || isInitializedRef.current) return;
 
       if (!initPlayer()) {
         const delay = retryDelays[Math.min(retryCount, retryDelays.length - 1)];
@@ -144,19 +167,12 @@ export const Controls = ({
 
     // Start retry loop with requestAnimationFrame to wait for next paint
     requestAnimationFrame(() => {
-      if (!isInitializedRef.current) {
+      if (!isUnmounted && !isInitializedRef.current) {
         retryInit();
       }
     });
 
-    return () => {
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
-        audioElRef.current = null;
-        isInitializedRef.current = false;
-      }
-    };
+    return cleanup;
   }, []);
 
   // Update source when audioSrc changes (without recreating player)

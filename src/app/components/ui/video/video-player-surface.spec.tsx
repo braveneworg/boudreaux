@@ -6,7 +6,7 @@ import videojs from 'video.js';
 
 import { usePlayerPrefs } from '@/hooks/use-player-prefs';
 
-import { claimPlayback } from './video-playback-coordinator';
+import { claimPlayback } from '../playback-session';
 import { VideoPlayerSurface } from './video-player-surface';
 
 interface FakePlayer {
