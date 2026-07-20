@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { useEntitySubmit } from '@/app/components/forms/_hooks/use-entity-submit';
 import type {
   ExistingFormat,
   ExtractedAudioMetadata,
@@ -38,6 +39,7 @@ import {
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
 import { type DigitalFormatType } from '@/lib/constants/digital-formats';
+import { type FormState } from '@/lib/types/form-state';
 import { type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
@@ -191,24 +193,6 @@ const applyExtractedMetadata = (
   }
 };
 
-interface ImageUploadHandle {
-  images: ImageItem[];
-  uploadImages: (imagesToUpload: ImageItem[], targetId: string, title: string) => Promise<void>;
-  resetImagesReordered: () => void;
-}
-
-interface SubmitReleaseDeps {
-  releaseForm: UseFormReturn<ReleaseFormData>;
-  imageHandle: ImageUploadHandle;
-  isPublished: boolean;
-  setIsPublished: (value: boolean) => void;
-  setReleaseId: (id: string) => void;
-  router: ReturnType<typeof useRouter>;
-  preGeneratedId: string;
-  createReleaseAsync: ReturnType<typeof useCreateReleaseMutation>['createReleaseAsync'];
-  updateReleaseAsync: ReturnType<typeof useUpdateReleaseMutation>['updateReleaseAsync'];
-}
-
 const pendingImages = (images: ImageItem[]): ImageItem[] =>
   images.filter((img) => img.file && !img.uploadedUrl);
 
@@ -232,91 +216,6 @@ const computeIsDirty = (
   imagesReordered: boolean,
   hasPendingImages: boolean
 ): boolean => formIsDirty || imagesReordered || hasPendingImages;
-
-const submitReleaseUpdate = async (
-  releaseId: string,
-  data: ReleaseFormData,
-  deps: SubmitReleaseDeps
-): Promise<void> => {
-  const { releaseForm, imageHandle, isPublished, setIsPublished, updateReleaseAsync } = deps;
-  const title = data.title;
-
-  const newFormState = await updateReleaseAsync({ id: releaseId, values: data });
-  if (!newFormState.success) {
-    toast.error('Failed to update release. Please check the form for errors.');
-    return;
-  }
-
-  const imagesToUpload = pendingImages(imageHandle.images);
-  if (imagesToUpload.length > 0) {
-    await imageHandle.uploadImages(imagesToUpload, releaseId, title);
-  }
-
-  if (data.publishedAt && !isPublished) {
-    setIsPublished(true);
-    toast.success(<PublishedToastContent title={title} />);
-  } else {
-    toast.success(<UpdatedToastContent title={title} />);
-  }
-  releaseForm.reset(data);
-  imageHandle.resetImagesReordered();
-};
-
-const submitReleaseCreate = async (
-  data: ReleaseFormData,
-  deps: SubmitReleaseDeps
-): Promise<void> => {
-  const { releaseForm, imageHandle, setIsPublished, setReleaseId, router, preGeneratedId } = deps;
-  const title = data.title;
-
-  const newFormState = await deps.createReleaseAsync({ ...data, preGeneratedId });
-  if (!newFormState.success) {
-    toast.error('Failed to create release. Please check the form for errors.');
-    return;
-  }
-
-  const createdReleaseId = newFormState.data?.releaseId as string | undefined;
-  if (!createdReleaseId) {
-    toast.success(<ToastContent title={title} />);
-    return;
-  }
-
-  setReleaseId(createdReleaseId);
-  router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
-  if (data.publishedAt) {
-    setIsPublished(true);
-  }
-
-  const imagesToUpload = pendingImages(imageHandle.images);
-  if (imagesToUpload.length > 0) {
-    await imageHandle.uploadImages(imagesToUpload, createdReleaseId, title);
-  } else {
-    toast.success(<ToastContent title={title} />);
-  }
-
-  releaseForm.reset(data);
-  imageHandle.resetImagesReordered();
-};
-
-/** Guard the form ref then dispatch to the create/update submit path. */
-const runReleaseSubmit = async (
-  formEl: HTMLFormElement | null,
-  releaseId: string | null,
-  data: ReleaseFormData,
-  deps: SubmitReleaseDeps
-): Promise<void> => {
-  if (!formEl) {
-    error('ReleaseForm: Form reference is null on submit.');
-    toast.error('Please refresh the page and try again, or check back later.');
-    return;
-  }
-
-  if (releaseId) {
-    await submitReleaseUpdate(releaseId, data, deps);
-  } else {
-    await submitReleaseCreate(data, deps);
-  }
-};
 
 /** Toggle a format in the list, falling back to DIGITAL when none remain. */
 const computeNextFormats = (
@@ -459,37 +358,90 @@ export const ReleaseForm = ({
     [images]
   );
 
+  const resetReleaseForm = useCallback(
+    (values: ReleaseFormData): void => releaseForm.reset(values),
+    [releaseForm]
+  );
+
+  const createRelease = useCallback(
+    (values: ReleaseFormData): Promise<FormState> =>
+      createReleaseAsync({ ...values, preGeneratedId }),
+    [createReleaseAsync, preGeneratedId]
+  );
+
+  const updateRelease = useCallback(
+    (id: string, values: ReleaseFormData): Promise<FormState> => updateReleaseAsync({ id, values }),
+    [updateReleaseAsync]
+  );
+
+  /**
+   * Everything the release form does once the write has landed: flush any images
+   * the user staged before saving, adopt the id a create returned and route to
+   * its edit page, flip the published flag, and announce the outcome. Awaited by
+   * `useEntitySubmit` before the form resets, so the image upload still lands
+   * ahead of the success toast the way it did before.
+   *
+   * Branches on `releaseId` rather than the hook's `mode` because the update path
+   * needs the id itself as the upload target — they are the same signal, since
+   * the hook derives `mode` from exactly this value.
+   */
+  const onReleaseSubmitSuccess = useCallback(
+    async (newFormState: FormState, data: ReleaseFormData): Promise<void> => {
+      const title = data.title;
+
+      if (releaseId) {
+        const staged = pendingImages(images.images);
+        if (staged.length > 0) {
+          await uploadImages(staged, releaseId, title);
+        }
+        if (data.publishedAt && !isPublished) {
+          setIsPublished(true);
+          toast.success(<PublishedToastContent title={title} />);
+        } else {
+          toast.success(<UpdatedToastContent title={title} />);
+        }
+        images.resetImagesReordered();
+        return;
+      }
+
+      const createdReleaseId = newFormState.data?.releaseId as string | undefined;
+      if (!createdReleaseId) {
+        toast.success(<ToastContent title={title} />);
+        return;
+      }
+
+      setReleaseId(createdReleaseId);
+      router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
+      if (data.publishedAt) {
+        setIsPublished(true);
+      }
+
+      // The image upload announces itself via `SavedWithImagesToast`, so the
+      // plain "created" toast is only for a release saved without new images.
+      const staged = pendingImages(images.images);
+      if (staged.length > 0) {
+        await uploadImages(staged, createdReleaseId, title);
+      } else {
+        toast.success(<ToastContent title={title} />);
+      }
+      images.resetImagesReordered();
+    },
+    [images, uploadImages, releaseId, isPublished, router]
+  );
+
+  const submitRelease = useEntitySubmit<ReleaseFormData, FormState>({
+    entity: 'release',
+    reset: resetReleaseForm,
+    create: createRelease,
+    update: updateRelease,
+    onSuccess: onReleaseSubmitSuccess,
+  });
+
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData): Promise<void> => {
-      const deps: SubmitReleaseDeps = {
-        releaseForm,
-        imageHandle: {
-          images: images.images,
-          uploadImages,
-          resetImagesReordered: images.resetImagesReordered,
-        },
-        isPublished,
-        setIsPublished,
-        setReleaseId,
-        router,
-        preGeneratedId,
-        createReleaseAsync,
-        updateReleaseAsync,
-      };
-      startTransition(() => runReleaseSubmit(formRef.current, releaseId, data, deps));
+      startTransition(() => submitRelease(formRef.current, releaseId, data));
     },
-    [
-      images.images,
-      images.resetImagesReordered,
-      uploadImages,
-      releaseId,
-      isPublished,
-      releaseForm,
-      router,
-      preGeneratedId,
-      createReleaseAsync,
-      updateReleaseAsync,
-    ]
+    [submitRelease, releaseId]
   );
 
   const isSubmitting = computeIsSubmitting({
