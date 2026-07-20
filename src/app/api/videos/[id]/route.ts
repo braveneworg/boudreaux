@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { VideoService } from '@/lib/services/video-service';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { toAdminVideoDetailRow } from '@/lib/utils/to-public-video-row';
@@ -14,13 +15,6 @@ export const dynamic = 'force-dynamic';
 
 /** Signed URLs are per-user; never share-cache the payload. */
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
-
-/** Map a detail-route service error to its HTTP status. */
-const errorStatus = (error: string): number => {
-  if (error === 'Video not found') return 404;
-  if (error === 'Database unavailable') return 503;
-  return 500;
-};
 
 /**
  * GET /api/videos/[id]
@@ -39,7 +33,7 @@ export const GET = withAdmin<{ id: string }>(async (_request, context) => {
     const result = await VideoService.getVideoById(id);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     // The canonical detail stripper drops only the always-internal secret fields

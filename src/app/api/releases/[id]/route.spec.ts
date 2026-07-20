@@ -105,6 +105,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
         success: false,
         error: 'Release not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -121,6 +122,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -137,6 +139,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve release',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(
@@ -203,6 +206,7 @@ describe('Release by ID API Routes', () => {
         vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValue({
           success: false,
           error: 'Release not found',
+          code: 'NOT_FOUND',
         });
 
         const request = new NextRequest(
@@ -253,6 +257,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Release not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -273,6 +278,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Release with this title already exists',
+        code: 'DUPLICATE',
       });
 
       const request = new NextRequest(
@@ -293,6 +299,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -313,6 +320,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Failed to update release',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(
@@ -428,6 +436,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.deleteRelease).mockResolvedValue({
         success: false,
         error: 'Release not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -447,6 +456,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.deleteRelease).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -466,6 +476,7 @@ describe('Release by ID API Routes', () => {
       vi.mocked(ReleaseService.deleteRelease).mockResolvedValue({
         success: false,
         error: 'Failed to delete release',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(

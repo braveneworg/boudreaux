@@ -12,6 +12,7 @@ import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
@@ -45,13 +46,7 @@ export const GET = withRateLimit<{ id: string }>(
       : await ReleaseService.getReleaseById(id);
 
     if (!result.success) {
-      const status =
-        result.error === 'Release not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     const responseData = withTracks
@@ -88,15 +83,10 @@ export const PATCH = withAdmin(
       );
 
       if (!result.success) {
-        const status =
-          result.error === 'Release not found'
-            ? 404
-            : result.error === 'Release with this title already exists'
-              ? 409
-              : result.error === 'Database unavailable'
-                ? 503
-                : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json(serializeForResponse(result.data));
@@ -119,13 +109,10 @@ export const DELETE = withAdmin(
       const result = await ReleaseService.deleteRelease(id);
 
       if (!result.success) {
-        const status =
-          result.error === 'Release not found'
-            ? 404
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json({ message: 'Release deleted successfully' });

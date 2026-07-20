@@ -82,6 +82,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
         success: false,
         error: 'Featured artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -98,6 +99,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -114,6 +116,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
         success: false,
         error: 'Failed to retrieve featured artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(
@@ -202,6 +205,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Featured artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -222,6 +226,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -242,6 +247,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Failed to update featured artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(
@@ -387,6 +393,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Featured artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest(
@@ -406,6 +413,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest(
@@ -425,6 +433,7 @@ describe('Featured Artist by ID API Routes', () => {
       vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
         success: false,
         error: 'Failed to delete featured artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest(

@@ -9,6 +9,7 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { UpdateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
@@ -33,13 +34,7 @@ export const GET = withRateLimit<{ id: string }>(
     const result = await FeaturedArtistsService.getFeaturedArtistById(id);
 
     if (!result.success) {
-      const status =
-        result.error === 'Featured artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     return NextResponse.json(serializeForResponse(result.data), {
@@ -86,13 +81,10 @@ export const PATCH = withAdmin(
       const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
 
       if (!result.success) {
-        const status =
-          result.error === 'Featured artist not found'
-            ? 404
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json(serializeForResponse(result.data));
@@ -115,13 +107,10 @@ export const DELETE = withAdmin(
       const result = await FeaturedArtistsService.hardDeleteFeaturedArtist(id);
 
       if (!result.success) {
-        const status =
-          result.error === 'Featured artist not found'
-            ? 404
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-        return NextResponse.json({ error: result.error }, { status });
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
       }
 
       return NextResponse.json({ message: 'Featured artist deleted successfully' });

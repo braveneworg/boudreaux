@@ -355,6 +355,7 @@ describe('GET /api/videos', () => {
     vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const response = await call('?listing=published');
@@ -366,6 +367,7 @@ describe('GET /api/videos', () => {
     vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
       success: false,
       error: 'Failed to retrieve videos',
+      code: 'UNKNOWN',
     });
 
     const response = await call('?listing=published');
@@ -377,6 +379,7 @@ describe('GET /api/videos', () => {
     vi.mocked(VideoService.getVideos).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const response = await call();

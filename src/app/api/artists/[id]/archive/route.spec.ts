@@ -73,6 +73,7 @@ describe('Artist Archive API Route', () => {
       vi.mocked(ArtistService.archiveArtist).mockResolvedValue({
         success: false,
         error: 'Artist not found',
+        code: 'NOT_FOUND',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/non-existent/archive', {
@@ -89,6 +90,7 @@ describe('Artist Archive API Route', () => {
       vi.mocked(ArtistService.archiveArtist).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/artist-123/archive', {
@@ -105,6 +107,7 @@ describe('Artist Archive API Route', () => {
       vi.mocked(ArtistService.archiveArtist).mockResolvedValue({
         success: false,
         error: 'Failed to archive artist',
+        code: 'UNKNOWN',
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists/artist-123/archive', {

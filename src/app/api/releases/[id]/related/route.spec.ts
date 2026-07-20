@@ -61,6 +61,7 @@ describe('GET /api/releases/[id]/related', () => {
     vi.mocked(ReleaseService.getArtistOtherReleases).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const request = new NextRequest(
@@ -75,6 +76,7 @@ describe('GET /api/releases/[id]/related', () => {
     vi.mocked(ReleaseService.getArtistOtherReleases).mockResolvedValue({
       success: false,
       error: 'Failed to fetch',
+      code: 'UNKNOWN',
     });
 
     const request = new NextRequest(

@@ -9,6 +9,7 @@ import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { type ArtistNameFields, getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -41,8 +42,6 @@ interface ArtistSearchCandidate extends ArtistNameFields {
 
 const CACHE_HEADER = 'public, s-maxage=60, stale-while-revalidate=300';
 
-const errorStatus = (error: string): number => (error === 'Database unavailable' ? 503 : 500);
-
 const mapArtistToComboboxResult = (artist: ArtistSearchCandidate): ArtistSearchResult => {
   const releases = (artist.releases?.map((ar) => ar.release) ?? []).filter(
     (r) => r.publishedAt != null && r.deletedOn == null
@@ -61,7 +60,7 @@ const handleFullFormat = async (query: string): Promise<NextResponse> => {
     : { success: true as const, data: [] };
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return NextResponse.json(
@@ -99,7 +98,7 @@ export const GET = withRateLimit(
     const result = await ArtistService.searchPublishedArtists({ search: query, take: 20 });
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
     const results = result.data.map((artist) =>

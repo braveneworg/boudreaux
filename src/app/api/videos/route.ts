@@ -10,6 +10,7 @@ import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { VideoService } from '@/lib/services/video-service';
 import type { Video, VideoListFilters } from '@/lib/types/domain/video';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import type { VideoRowWithStream } from '@/lib/utils/to-public-video-row';
@@ -45,10 +46,6 @@ const parsePublished = (searchParams: URLSearchParams): boolean | null => {
   return null;
 };
 
-/** Map a service error to a 503 (DB unavailable) or 500 (generic) status. */
-const errorStatus = (error: string | undefined): number =>
-  error === 'Database unavailable' ? 503 : 500;
-
 /** Drop internal fields, attach signed stream URLs, then BigInt-serialize for JSON. */
 const buildRows = (videos: Video[]): VideoRowWithStream[] =>
   serializeForResponse(videos.map(toPublicVideoRow));
@@ -70,7 +67,7 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   const result = await VideoService.getPublishedVideos({ sort, skip, take });
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return pageResponse(result.data, skip, take);
@@ -100,7 +97,7 @@ const handleAdminListing = async (
   const result = await VideoService.getVideos(filters);
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: errorStatus(result.error) });
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
   return pageResponse(result.data, skip, take);

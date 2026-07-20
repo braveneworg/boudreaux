@@ -228,6 +228,7 @@ describe('GET /api/artists/search', () => {
     vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
       success: false,
       error: 'Failed to search artists',
+      code: 'UNKNOWN',
     });
 
     const request = createRequest('test');
@@ -242,6 +243,7 @@ describe('GET /api/artists/search', () => {
     vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
       success: false,
       error: 'Database unavailable',
+      code: 'UNAVAILABLE',
     });
 
     const request = createRequest('test');
@@ -452,6 +454,7 @@ describe('GET /api/artists/search', () => {
       vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
         success: false,
         error: 'Database unavailable',
+        code: 'UNAVAILABLE',
       });
 
       const request = createFullRequest('test');
@@ -464,6 +467,7 @@ describe('GET /api/artists/search', () => {
       vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
         success: false,
         error: 'Failed to search',
+        code: 'UNKNOWN',
       });
 
       const request = createFullRequest('test');
