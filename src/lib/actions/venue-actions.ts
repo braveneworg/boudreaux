@@ -35,7 +35,7 @@ export const createVenueAction = async (
     'capacity',
     'notes',
     'timeZone',
-  ];
+  ] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, venueCreateSchema);
 
@@ -118,7 +118,7 @@ export const updateVenueAction = async (
     'capacity',
     'notes',
     'timeZone',
-  ];
+  ] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, venueUpdateSchema);
 

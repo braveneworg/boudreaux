@@ -20,7 +20,12 @@ export const changeEmailAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const permittedFieldNames = ['email', 'confirmEmail', 'previousEmail', 'allowEmailNotifications'];
+  const permittedFieldNames = [
+    'email',
+    'confirmEmail',
+    'previousEmail',
+    'allowEmailNotifications',
+  ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
 
   if (parsed.success) {

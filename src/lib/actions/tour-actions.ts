@@ -27,7 +27,7 @@ export const createTourAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
-  const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'];
+  const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourCreateSchema);
 
@@ -89,7 +89,7 @@ export const updateTourAction = async (
     throw new Error('Invalid admin session: missing user id for audit logging.');
   }
 
-  const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'];
+  const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourUpdateSchema);
 

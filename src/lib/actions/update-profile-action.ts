@@ -33,7 +33,7 @@ export const updateProfileAction = async (
     'country',
     'allowSmsNotifications',
     'allowEmailNotifications',
-  ];
+  ] as const;
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);
 

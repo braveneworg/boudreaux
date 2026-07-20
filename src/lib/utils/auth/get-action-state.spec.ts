@@ -36,7 +36,7 @@ describe('get-action-state', () => {
       formData.append('maliciousField', 'malicious-value');
       formData.append('anotherBadField', 'bad-value');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { formState } = getActionState(formData, permittedFields, mockSchema);
 
       expect(formState.fields.email).toBe('test@example.com');
@@ -49,7 +49,7 @@ describe('get-action-state', () => {
       formData.append('email', 'test@example.com');
       formData.append('termsAndConditions', 'on');
 
-      const permittedFields: string[] = [];
+      const permittedFields = [] as const;
       const { formState } = getActionState(formData, permittedFields, mockSchema);
 
       expect(Object.keys(formState.fields)).toHaveLength(0);
@@ -60,7 +60,7 @@ describe('get-action-state', () => {
     it('should convert "on" to true', () => {
       formData.append('termsAndConditions', 'on');
 
-      const permittedFields = ['termsAndConditions'];
+      const permittedFields = ['termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
@@ -72,7 +72,7 @@ describe('get-action-state', () => {
     it('should convert "off" to false', () => {
       formData.append('termsAndConditions', 'off');
 
-      const permittedFields = ['termsAndConditions'];
+      const permittedFields = ['termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
@@ -84,7 +84,7 @@ describe('get-action-state', () => {
     it('should convert "false" string to false for termsAndConditions field', () => {
       formData.append('termsAndConditions', 'false');
 
-      const permittedFields = ['termsAndConditions'];
+      const permittedFields = ['termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
@@ -97,7 +97,7 @@ describe('get-action-state', () => {
       formData.append('email', 'test@example.com');
       formData.append('username', 'testuser');
 
-      const permittedFields = ['email', 'username'];
+      const permittedFields = ['email', 'username'] as const;
       const { parsed } = getActionState(formData, permittedFields, mixedTestSchema);
 
       expect(parsed.success).toBe(true);
@@ -109,7 +109,7 @@ describe('get-action-state', () => {
 
   describe('form state initialization', () => {
     it('should initialize form state with correct structure', () => {
-      const permittedFields = ['email'];
+      const permittedFields = ['email'] as const;
       const { formState } = getActionState(formData, permittedFields, mockSchema);
 
       expect(formState).toHaveProperty('errors');
@@ -129,7 +129,7 @@ describe('get-action-state', () => {
       formData.append('email', 'test@example.com');
       formData.append('termsAndConditions', 'on');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(true);
@@ -145,7 +145,7 @@ describe('get-action-state', () => {
       formData.append('email', 'invalid-email');
       formData.append('termsAndConditions', 'on');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(false);
@@ -161,7 +161,7 @@ describe('get-action-state', () => {
       // Only email, missing termsAndConditions
       formData.append('email', 'test@example.com');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(false);
@@ -177,7 +177,7 @@ describe('get-action-state', () => {
 
   describe('edge cases', () => {
     it('should handle empty FormData', () => {
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { formState, parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(formState.fields).toEqual({});
@@ -188,7 +188,7 @@ describe('get-action-state', () => {
       formData.append('email', '');
       formData.append('termsAndConditions', '');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { formState } = getActionState(formData, permittedFields, mockSchema);
 
       expect(formState.fields.email).toBe('');
@@ -199,7 +199,7 @@ describe('get-action-state', () => {
       formData.append('email', 'invalid-email');
       formData.append('termsAndConditions', 'off');
 
-      const permittedFields = ['email', 'termsAndConditions'];
+      const permittedFields = ['email', 'termsAndConditions'] as const;
       const { formState } = getActionState(formData, permittedFields, mockSchema);
 
       expect(formState.fields.email).toBe('invalid-email');
@@ -212,7 +212,7 @@ describe('get-action-state', () => {
       const arraySchema = z.object({ tags: z.array(z.string()) });
       formData.append('tags', '["tag1","tag2","tag3"]');
 
-      const permittedFields = ['tags'];
+      const permittedFields = ['tags'] as const;
       const { parsed } = getActionState(formData, permittedFields, arraySchema);
 
       expect(parsed.success).toBe(true);
@@ -224,7 +224,7 @@ describe('get-action-state', () => {
       const arraySchema = z.object({ ids: z.array(z.string()) });
       formData.append('ids', '["id1","id2"]');
 
-      const permittedFields = ['ids'];
+      const permittedFields = ['ids'] as const;
       const { parsed } = getActionState(formData, permittedFields, arraySchema);
 
       expect(parsed.success).toBe(true);
@@ -236,7 +236,7 @@ describe('get-action-state', () => {
       const stringSchema = z.object({ value: z.string() });
       formData.append('value', '[invalid json');
 
-      const permittedFields = ['value'];
+      const permittedFields = ['value'] as const;
       const { parsed } = getActionState(formData, permittedFields, stringSchema);
 
       expect(parsed.success).toBe(true);
@@ -248,7 +248,7 @@ describe('get-action-state', () => {
       const stringSchema = z.object({ data: z.string() });
       formData.append('data', '{"key":"value"}');
 
-      const permittedFields = ['data'];
+      const permittedFields = ['data'] as const;
       const { parsed } = getActionState(formData, permittedFields, stringSchema);
 
       expect(parsed.success).toBe(true);
@@ -263,7 +263,7 @@ describe('get-action-state', () => {
       formData.append('duration', '180');
       formData.append('position', '3');
 
-      const permittedFields = ['duration', 'position'];
+      const permittedFields = ['duration', 'position'] as const;
       const { parsed } = getActionState(formData, permittedFields, numberSchema);
 
       expect(parsed.success).toBe(true);
@@ -279,7 +279,7 @@ describe('get-action-state', () => {
       const numberSchema = z.object({ fontSize: z.number() });
       formData.append('fontSize', '2.5');
 
-      const permittedFields = ['fontSize'];
+      const permittedFields = ['fontSize'] as const;
       const { parsed } = getActionState(formData, permittedFields, numberSchema);
 
       expect(parsed.success).toBe(true);
@@ -291,7 +291,7 @@ describe('get-action-state', () => {
       const optionalSchema = z.object({ value: z.string().optional() });
       formData.append('value', '');
 
-      const permittedFields = ['value'];
+      const permittedFields = ['value'] as const;
       const { parsed } = getActionState(formData, permittedFields, optionalSchema);
 
       expect(parsed.success).toBe(true);
@@ -303,7 +303,7 @@ describe('get-action-state', () => {
       const stringSchema = z.object({ url: z.string() });
       formData.append('url', 'https://example.com');
 
-      const permittedFields = ['url'];
+      const permittedFields = ['url'] as const;
       const { parsed } = getActionState(formData, permittedFields, stringSchema);
 
       expect(parsed.success).toBe(true);
@@ -315,7 +315,7 @@ describe('get-action-state', () => {
       const optionalSchema = z.object({ value: z.string().optional() });
       formData.append('value', 'NaN');
 
-      const permittedFields = ['value'];
+      const permittedFields = ['value'] as const;
       const { parsed } = getActionState(formData, permittedFields, optionalSchema);
 
       expect(parsed.success).toBe(true);
