@@ -9,17 +9,17 @@ Branch: `fix/enrichment-artist-gate`
 Two gaps in the video web-enrichment feature:
 
 1. **Web enrichment can be triggered without an Artist / Creator.** All
-   *automatic* enrichment kicks already gate on
+   _automatic_ enrichment kicks already gate on
    `category === 'MUSIC' && artist.trim() !== ''`
    (`kickPostSaveEnrichment` in `src/lib/actions/video-action-helpers.ts`,
    `markEnrichmentPending` in `src/lib/actions/create-video-draft-action.ts`).
-   But the *manual* path does not: on a draft edit page (row auto-created at
+   But the _manual_ path does not: on a draft edit page (row auto-created at
    upload-complete, Artist / Creator still blank), the Web Enrichment panel
    renders whenever `videoId && category === 'MUSIC'`, its "Run enrichment"
    button is enabled, and `runVideoEnrichmentAction` accepts the run. The job
    then limps to `failed: "No linked artists to enrich."` — and on the
    E2E/fake path (`BIO_GENERATOR_FAKE=true`, `runFakeEnrichment`) it bogusly
-   *succeeds* with fixture suggestions despite zero linked artists.
+   _succeeds_ with fixture suggestions despite zero linked artists.
 
 2. **Title-only release-date lookup is accidental, not first-class.** The
    "Find release date" button already enables on title alone and already

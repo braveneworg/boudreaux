@@ -27,10 +27,12 @@
 ### Task 1: Lambda — title-only release-date queries and prompt
 
 **Files:**
+
 - Modify: `bio-generator/src/release-date.ts` (queries + prompt builder + `resolveReleaseDateSuggestion`)
 - Test: `bio-generator/src/release-date.spec.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks (fully independent).
 - Produces: no exported-surface change — `resolveReleaseDateSuggestion(args, deps)` keeps its exact signature; `artistDisplay: string` may now be blank/whitespace and is handled first-class. Callers (`video-enrichment.ts`, `release-date-lookup.ts`) are untouched.
 
@@ -44,58 +46,54 @@ Expected: completes without error; `bio-generator/node_modules` exists.
 In `bio-generator/src/release-date.spec.ts`, add inside the existing `describe('resolveReleaseDateSuggestion', …)` block (after the `'returns null when both queries yield no evidence'` test). The file's existing `baseArgs` has `title: 'Bite Through Stone'`, `artistDisplay: 'Ceschi'`, `serperKey: 'serper-key'`; `evidence` and `adjudication` are the existing fixtures:
 
 ```ts
-  it('keeps the artist in both queries when one is set', async () => {
-    const searchWeb = vi.fn().mockResolvedValue([]);
+it('keeps the artist in both queries when one is set', async () => {
+  const searchWeb = vi.fn().mockResolvedValue([]);
 
-    await resolveReleaseDateSuggestion(baseArgs, { searchWeb });
+  await resolveReleaseDateSuggestion(baseArgs, { searchWeb });
 
-    expect(searchWeb).toHaveBeenNthCalledWith(
-      1,
-      '"Ceschi" "Bite Through Stone" video release date',
-      'serper-key'
-    );
-    expect(searchWeb).toHaveBeenNthCalledWith(
-      2,
-      'Ceschi Bite Through Stone premiere',
-      'serper-key'
-    );
-  });
+  expect(searchWeb).toHaveBeenNthCalledWith(
+    1,
+    '"Ceschi" "Bite Through Stone" video release date',
+    'serper-key'
+  );
+  expect(searchWeb).toHaveBeenNthCalledWith(2, 'Ceschi Bite Through Stone premiere', 'serper-key');
+});
 
-  it('searches title-only queries when the artist is blank', async () => {
-    const searchWeb = vi.fn().mockResolvedValue([]);
+it('searches title-only queries when the artist is blank', async () => {
+  const searchWeb = vi.fn().mockResolvedValue([]);
 
-    await resolveReleaseDateSuggestion({ ...baseArgs, artistDisplay: '   ' }, { searchWeb });
+  await resolveReleaseDateSuggestion({ ...baseArgs, artistDisplay: '   ' }, { searchWeb });
 
-    expect(searchWeb).toHaveBeenNthCalledWith(
-      1,
-      '"Bite Through Stone" video release date',
-      'serper-key'
-    );
-    expect(searchWeb).toHaveBeenNthCalledWith(2, 'Bite Through Stone premiere', 'serper-key');
-  });
+  expect(searchWeb).toHaveBeenNthCalledWith(
+    1,
+    '"Bite Through Stone" video release date',
+    'serper-key'
+  );
+  expect(searchWeb).toHaveBeenNthCalledWith(2, 'Bite Through Stone premiere', 'serper-key');
+});
 
-  it('omits the artist from the adjudication prompt when blank', async () => {
-    const searchWeb = vi.fn().mockResolvedValue(evidence);
-    const requestJson = vi.fn().mockResolvedValue(adjudication);
+it('omits the artist from the adjudication prompt when blank', async () => {
+  const searchWeb = vi.fn().mockResolvedValue(evidence);
+  const requestJson = vi.fn().mockResolvedValue(adjudication);
 
-    await resolveReleaseDateSuggestion(
-      { ...baseArgs, artistDisplay: '' },
-      { searchWeb, requestJson }
-    );
+  await resolveReleaseDateSuggestion(
+    { ...baseArgs, artistDisplay: '' },
+    { searchWeb, requestJson }
+  );
 
-    expect(requestJson).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        userPrompt: expect.stringContaining('Video: "Bite Through Stone".'),
-      }),
-      {}
-    );
-    expect(requestJson).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ userPrompt: expect.not.stringContaining(' by ') }),
-      {}
-    );
-  });
+  expect(requestJson).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      userPrompt: expect.stringContaining('Video: "Bite Through Stone".'),
+    }),
+    {}
+  );
+  expect(requestJson).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ userPrompt: expect.not.stringContaining(' by ') }),
+    {}
+  );
+});
 ```
 
 - [ ] **Step 3: Run the spec to verify the new tests fail**
@@ -189,10 +187,12 @@ git commit -m "fix: 🐛 title-only release-date queries"
 ### Task 2: Server action — refuse a blank persisted artist
 
 **Files:**
+
 - Modify: `src/lib/actions/run-video-enrichment-action.ts` (insert one guard after the not-found check, ~line 82)
 - Test: `src/lib/actions/run-video-enrichment-action.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `VideoEnrichmentState.artist: string` (already on the state — `dispatchEnrichment` reads it as `artistDisplay`).
 - Produces: `runVideoEnrichmentAction` may now return `{ success: false, error: 'Add an artist or creator and save before running enrichment.' }`. The client mutation hook (`useRunVideoEnrichmentMutation`) already toasts `result.error` on any `success: false` — no client plumbing changes.
 
@@ -206,18 +206,18 @@ Expected: completes without error.
 In `src/lib/actions/run-video-enrichment-action.spec.ts`, add inside the existing `describe('runVideoEnrichmentAction', …)` block, after the `'returns an error when the video does not exist'` test. The file's existing `baseState(overrides)` helper and `VIDEO_ID` constant are reused; `afterMock` is the file's hoisted `next/server` `after` spy:
 
 ```ts
-  it('refuses to run when the persisted artist is blank', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
+it('refuses to run when the persisted artist is blank', async () => {
+  vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
 
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
+  const result = await runVideoEnrichmentAction(VIDEO_ID);
 
-    expect(result).toEqual({
-      success: false,
-      error: 'Add an artist or creator and save before running enrichment.',
-    });
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
-    expect(afterMock).not.toHaveBeenCalled();
+  expect(result).toEqual({
+    success: false,
+    error: 'Add an artist or creator and save before running enrichment.',
   });
+  expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  expect(afterMock).not.toHaveBeenCalled();
+});
 ```
 
 - [ ] **Step 3: Run the spec to verify it fails**
@@ -230,22 +230,22 @@ Expected: the new test FAILS — the action currently returns `{ success: true, 
 In `src/lib/actions/run-video-enrichment-action.ts`, directly after:
 
 ```ts
-    if (!state) {
-      return { success: false, error: 'Video not found.' };
-    }
+if (!state) {
+  return { success: false, error: 'Video not found.' };
+}
 ```
 
 insert:
 
 ```ts
-    // Manual-path artist gate: the automatic kicks already require a
-    // non-blank artist, and a blank one has no linked artists to enrich.
-    if (state.artist.trim() === '') {
-      return {
-        success: false,
-        error: 'Add an artist or creator and save before running enrichment.',
-      };
-    }
+// Manual-path artist gate: the automatic kicks already require a
+// non-blank artist, and a blank one has no linked artists to enrich.
+if (state.artist.trim() === '') {
+  return {
+    success: false,
+    error: 'Add an artist or creator and save before running enrichment.',
+  };
+}
 ```
 
 Also update the action's JSDoc first paragraph to mention the gate — replace the sentence `A run already in flight (and not stale) is not duplicated.` with `A run already in flight (and not stale) is not duplicated, and a video whose persisted artist is blank is refused before any status write.`
@@ -267,10 +267,12 @@ git commit -m "fix: 🐛 gate manual enrichment on artist"
 ### Task 3: Panel — disable Run/Re-run and show the hint
 
 **Files:**
+
 - Modify: `src/app/components/forms/videos/enrichment/video-enrichment-panel.tsx`
 - Test: `src/app/components/forms/videos/enrichment/video-enrichment-panel.spec.tsx`
 
 **Interfaces:**
+
 - Consumes: the panel's existing `control: Control<VideoFormData>` prop (the form's `artist` field is watched from it — no new props on `VideoEnrichmentPanel`).
 - Produces: internal only — `EnrichmentPanelBodyProps` gains `hasArtist: boolean`; the hint copy is the Global Constraints string, also asserted by Task 4's E2E.
 
@@ -396,8 +398,8 @@ const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElemen
 (e) In `VideoEnrichmentPanel`, watch the artist and thread the flag. After the existing `const isBusy = …` line, add:
 
 ```tsx
-  const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
-  const hasArtist = hasArtistValue(artistValue);
+const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
+const hasArtist = hasArtistValue(artistValue);
 ```
 
 and add `hasArtist={hasArtist}` to the `<EnrichmentPanelBody …>` JSX props.
@@ -421,9 +423,11 @@ git commit -m "fix: 🐛 gate enrichment panel on artist"
 ### Task 4: E2E — blank-artist draft shows the disabled gate
 
 **Files:**
+
 - Modify: `e2e/tests/admin-video-draft-upload.spec.ts` (add a second test to the existing describe)
 
 **Interfaces:**
+
 - Consumes: the Task 3 hint copy (`Add an artist or creator to enable web enrichment.`) and disabled Run button; `deleteVideoCascade` from `../helpers/e2e-db` (already imported in this file); the filename-parser behavior that a name without `Artist - ` yields `artist: null` so the draft persists a blank artist.
 - Produces: nothing consumed later.
 
@@ -432,45 +436,45 @@ git commit -m "fix: 🐛 gate enrichment panel on artist"
 In `e2e/tests/admin-video-draft-upload.spec.ts`, add inside the existing `test.describe('Admin video draft-upload — pre-save enrichment', …)` block, after the existing test:
 
 ```ts
-  test('a blank-artist draft disables Run enrichment with a hint', async ({ adminPage }) => {
-    let videoId: string | undefined;
-    try {
-      await adminPage.goto('/admin/videos/new');
-      await expect(adminPage.getByRole('heading', { name: 'Video File' })).toBeVisible();
+test('a blank-artist draft disables Run enrichment with a hint', async ({ adminPage }) => {
+  let videoId: string | undefined;
+  try {
+    await adminPage.goto('/admin/videos/new');
+    await expect(adminPage.getByRole('heading', { name: 'Video File' })).toBeVisible();
 
-      // No `Artist - ` prefix → the filename parser yields artist: null, so
-      // the draft row persists a BLANK artist and no enrichment auto-kicks.
-      await adminPage
-        .getByTestId('video-dropzone')
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: 'E2E Gate Song.mp4',
-          mimeType: 'video/mp4',
-          buffer: Buffer.from('e2e-not-a-real-video'),
-        });
-
-      await expect(adminPage.getByLabel('Title')).toHaveValue('E2E Gate Song', {
-        timeout: 15_000,
+    // No `Artist - ` prefix → the filename parser yields artist: null, so
+    // the draft row persists a BLANK artist and no enrichment auto-kicks.
+    await adminPage
+      .getByTestId('video-dropzone')
+      .locator('input[type="file"]')
+      .setInputFiles({
+        name: 'E2E Gate Song.mp4',
+        mimeType: 'video/mp4',
+        buffer: Buffer.from('e2e-not-a-real-video'),
       });
-      await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/);
-      videoId = adminPage.url().split('/').pop();
-      expect(videoId).toMatch(/^[0-9a-f]{24}$/);
 
-      // The panel mounts (draft + MUSIC default) but the gate holds: Run is
-      // disabled, the hint shows, and no auto-kick ever engaged the status.
-      const panel = adminPage.getByTestId('video-enrichment-panel');
-      await expect(panel).toBeVisible({ timeout: 15_000 });
-      await expect(panel.getByRole('button', { name: 'Run enrichment' })).toBeDisabled();
-      await expect(
-        panel.getByText('Add an artist or creator to enable web enrichment.')
-      ).toBeVisible();
-      await expect(panel.getByTestId('video-enrichment-status-chip')).toHaveText('Not enriched');
-    } finally {
-      if (videoId) {
-        await deleteVideoCascade(videoId);
-      }
+    await expect(adminPage.getByLabel('Title')).toHaveValue('E2E Gate Song', {
+      timeout: 15_000,
+    });
+    await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/);
+    videoId = adminPage.url().split('/').pop();
+    expect(videoId).toMatch(/^[0-9a-f]{24}$/);
+
+    // The panel mounts (draft + MUSIC default) but the gate holds: Run is
+    // disabled, the hint shows, and no auto-kick ever engaged the status.
+    const panel = adminPage.getByTestId('video-enrichment-panel');
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('button', { name: 'Run enrichment' })).toBeDisabled();
+    await expect(
+      panel.getByText('Add an artist or creator to enable web enrichment.')
+    ).toBeVisible();
+    await expect(panel.getByTestId('video-enrichment-status-chip')).toHaveText('Not enriched');
+  } finally {
+    if (videoId) {
+      await deleteVideoCascade(videoId);
     }
-  });
+  }
+});
 ```
 
 - [ ] **Step 2: Start the isolated E2E database**
