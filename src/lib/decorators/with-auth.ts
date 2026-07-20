@@ -14,7 +14,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 import { auth } from '@/auth';
+import { DataError } from '@/lib/types/domain/errors';
 import { extractRequestMetadata, logSecurityEvent } from '@/lib/utils/audit-log';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { resolveRequestId, runWithRequestContext } from '@/lib/utils/request-context';
 
@@ -34,6 +36,38 @@ type AuthenticatedHandler<TParams = unknown> = (
   context: { params: Promise<TParams> },
   session: Session
 ) => Promise<NextResponse> | NextResponse;
+
+/**
+ * Run a route handler, turning an uncaught throw into a response.
+ *
+ * A {@link DataError} carries a vendor-neutral code, so its status comes from
+ * the single {@link httpStatusForCode} table and its message — already
+ * user-facing — is surfaced. Anything else is an unexpected fault: it is logged
+ * with its detail and answered with a generic 500, so internals never reach the
+ * client.
+ *
+ * This is a **backstop**. A route with its own `try`/`catch` handles the error
+ * first and this never sees it; the point is that removing those per-route
+ * catches (91 of them, 35 returning a byte-identical 500) becomes safe.
+ */
+const runWithErrorBoundary = async (
+  request: NextRequest,
+  run: () => Promise<NextResponse> | NextResponse
+): Promise<NextResponse> => {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof DataError) {
+      return NextResponse.json({ error: error.message }, { status: httpStatusForCode(error.code) });
+    }
+
+    loggers.http.error('Unhandled route error', error, {
+      path: request.nextUrl.pathname,
+      method: request.method,
+    });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+};
 
 const logUnauthorized = (request: NextRequest, status: 401 | 403, userId?: string): void => {
   const { ip, userAgent } = extractRequestMetadata(request);
@@ -69,7 +103,9 @@ export const withAuth =
       }
 
       // Call the original handler with session
-      return handler(request, context as { params: Promise<TParams> }, session as Session);
+      return runWithErrorBoundary(request, () =>
+        handler(request, context as { params: Promise<TParams> }, session as Session)
+      );
     });
 
 // Admin role decorator
@@ -97,5 +133,7 @@ export const withAdmin =
         );
       }
 
-      return handler(request, context as { params: Promise<TParams> }, session as Session);
+      return runWithErrorBoundary(request, () =>
+        handler(request, context as { params: Promise<TParams> }, session as Session)
+      );
     });
