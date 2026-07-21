@@ -6,6 +6,7 @@ import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
+import { localCompleteUpload, localRecordPart, localStartUpload } from './multipart-local-adapters';
 import {
   buildVideoCreateInput,
   buildVideoUpdateInput,
@@ -255,15 +256,52 @@ describe('VIDEO_PERMITTED_FIELD_NAMES', () => {
   });
 });
 
-describe('confirmVideoUpload — E2E mode', () => {
-  it('confirms without an S3 HEAD in E2E mode', async () => {
+/**
+ * Local (E2E) mode: the existence check is answered by the local upload store
+ * rather than skipped. A key whose upload really completed confirms; one that
+ * was never uploaded is rejected exactly as a missing S3 object would be.
+ */
+describe('confirmVideoUpload — local mode', () => {
+  /** Drive a real local upload to completion for `s3Key`. */
+  const completeLocalUpload = (s3Key: string): void => {
+    const uploadId = localStartUpload({ s3Key });
+    const eTag = localRecordPart({
+      uploadId,
+      partNumber: 1,
+      body: new TextEncoder().encode('bytes'),
+    });
+    localCompleteUpload({ s3Key, uploadId, parts: [{ partNumber: 1, eTag: eTag ?? '' }] });
+  };
+
+  beforeEach(() => {
     vi.stubEnv('E2E_MODE', 'true');
-    await expect(confirmVideoUpload('media/videos/v1/x.mp4', 'v1')).resolves.toBeNull();
+  });
+
+  it('confirms a key whose local upload completed', async () => {
+    const s3Key = `media/videos/${videoId}/confirmed.mp4`;
+    completeLocalUpload(s3Key);
+
+    await expect(confirmVideoUpload(s3Key, videoId)).resolves.toBeNull();
+  });
+
+  it('makes no S3 HEAD call', async () => {
+    const s3Key = `media/videos/${videoId}/no-head.mp4`;
+    completeLocalUpload(s3Key);
+
+    await confirmVideoUpload(s3Key, videoId);
+
     expect(verifyS3ObjectExists).not.toHaveBeenCalled();
   });
 
-  it('still rejects a wrong-namespace key in E2E mode', async () => {
-    vi.stubEnv('E2E_MODE', 'true');
-    await expect(confirmVideoUpload('media/other/x.mp4', 'v1')).resolves.toMatch(/Invalid S3 key/);
+  it('rejects a key that was never uploaded', async () => {
+    await expect(
+      confirmVideoUpload(`media/videos/${videoId}/never-uploaded.mp4`, videoId)
+    ).resolves.toMatch(/File not found/);
+  });
+
+  it('still rejects a wrong-namespace key', async () => {
+    await expect(confirmVideoUpload('media/other/x.mp4', videoId)).resolves.toMatch(
+      /Invalid S3 key/
+    );
   });
 });

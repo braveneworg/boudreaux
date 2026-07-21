@@ -12,6 +12,11 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 
 import {
+  LOCAL_PART_SINK_PATH,
+  localObjectExists,
+  localRecordPart,
+} from './multipart-local-adapters';
+import {
   abortVideoUploadAction,
   completeVideoUploadAction,
   initiateVideoUploadAction,
@@ -588,5 +593,171 @@ describe('abortVideoUploadAction', () => {
     await abortVideoUploadAction(validInput);
 
     expect(loggers.s3.error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Local (E2E) mode: the four actions substitute the S3 SDK for the local
+ * adapters, and nothing else about them changes. The adapters are NOT mocked
+ * here — these tests drive a whole upload through them the way the browser
+ * does, so the seam is exercised end to end.
+ */
+describe('multipart actions — local mode', () => {
+  const initiateInput = {
+    videoId: VALID_VIDEO_ID,
+    fileName: 'local-clip.mp4',
+    contentType: 'video/mp4',
+    fileSize: 12,
+  };
+
+  /** Run the full local flow, returning the key, upload id, and part ETags. */
+  const runLocalUpload = async (
+    partBodies: string[]
+  ): Promise<{
+    s3Key: string;
+    uploadId: string;
+    parts: Array<{ partNumber: number; eTag: string }>;
+  }> => {
+    const initiated = await initiateVideoUploadAction(initiateInput);
+    if (!initiated.success || !initiated.data) throw new Error('initiate failed');
+    const { s3Key, uploadId } = initiated.data;
+    const parts = partBodies.map((text, index) => ({
+      partNumber: index + 1,
+      eTag:
+        localRecordPart({
+          uploadId,
+          partNumber: index + 1,
+          body: new TextEncoder().encode(text),
+        }) ?? '',
+    }));
+    return { s3Key, uploadId, parts };
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('E2E_MODE', 'true');
+  });
+
+  it('initiates without calling S3', async () => {
+    await initiateVideoUploadAction(initiateInput);
+
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('returns a key under the video namespace', async () => {
+    const result = await initiateVideoUploadAction(initiateInput);
+
+    expect(result.data?.s3Key.startsWith(`media/videos/${VALID_VIDEO_ID}/`)).toBe(true);
+  });
+
+  it('returns the same part sizing the real path does', async () => {
+    const result = await initiateVideoUploadAction(initiateInput);
+
+    expect(result.data?.partSize).toBe(VIDEO_PART_SIZE);
+  });
+
+  it('still enforces the admin gate', async () => {
+    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+
+    const result = await initiateVideoUploadAction(initiateInput);
+
+    expect(result.success).toBe(false);
+  });
+
+  it('still rejects a video/quicktime upload', async () => {
+    const result = await initiateVideoUploadAction({
+      ...initiateInput,
+      fileName: 'clip.mov',
+      contentType: 'video/quicktime',
+    });
+
+    expect(result.error).toContain('MP4');
+  });
+
+  it('presigns part URLs pointing at the local sink', async () => {
+    const { s3Key, uploadId } = await runLocalUpload([]);
+
+    const result = await presignVideoPartsAction({ s3Key, uploadId, partNumbers: [1, 2] });
+
+    expect(result.data?.map((part) => part.url)).toEqual([
+      `${LOCAL_PART_SINK_PATH}?uploadId=${encodeURIComponent(uploadId)}&partNumber=1`,
+      `${LOCAL_PART_SINK_PATH}?uploadId=${encodeURIComponent(uploadId)}&partNumber=2`,
+    ]);
+  });
+
+  it('never signs a real S3 URL when presigning locally', async () => {
+    const { s3Key, uploadId } = await runLocalUpload([]);
+
+    await presignVideoPartsAction({ s3Key, uploadId, partNumbers: [1] });
+
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('still rejects a key outside the video namespace when presigning', async () => {
+    const { uploadId } = await runLocalUpload([]);
+
+    const result = await presignVideoPartsAction({
+      s3Key: `media/audio/${VALID_VIDEO_ID}/clip.mp4`,
+      uploadId,
+      partNumbers: [1],
+    });
+
+    expect(result.error).toContain('Invalid S3 key');
+  });
+
+  it('completes with the size of the parts actually delivered', async () => {
+    const { s3Key, uploadId, parts } = await runLocalUpload(['12345', '678']);
+
+    const result = await completeVideoUploadAction({ s3Key, uploadId, parts });
+
+    expect(result.data?.fileSize).toBe(8);
+  });
+
+  it('makes the completed object visible to the existence check', async () => {
+    const { s3Key, uploadId, parts } = await runLocalUpload(['abc']);
+
+    await completeVideoUploadAction({ s3Key, uploadId, parts });
+
+    expect(localObjectExists(s3Key)).toBe(true);
+  });
+
+  it('fails loudly when completing an upload id it never issued', async () => {
+    const { s3Key } = await runLocalUpload(['abc']);
+
+    const result = await completeVideoUploadAction({
+      s3Key,
+      uploadId: 'never-issued',
+      parts: [{ partNumber: 1, eTag: '"abc"' }],
+    });
+
+    expect(result.error).toContain('unknown upload id');
+  });
+
+  it('leaves no object behind when the complete fails', async () => {
+    const { s3Key } = await runLocalUpload(['abc']);
+
+    await completeVideoUploadAction({
+      s3Key,
+      uploadId: 'never-issued',
+      parts: [{ partNumber: 1, eTag: '"abc"' }],
+    });
+
+    expect(localObjectExists(s3Key)).toBe(false);
+  });
+
+  it('aborts without calling S3', async () => {
+    const { s3Key, uploadId } = await runLocalUpload(['abc']);
+
+    const result = await abortVideoUploadAction({ s3Key, uploadId });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('discards the aborted upload so it can no longer complete', async () => {
+    const { s3Key, uploadId, parts } = await runLocalUpload(['abc']);
+    await abortVideoUploadAction({ s3Key, uploadId });
+
+    const result = await completeVideoUploadAction({ s3Key, uploadId, parts });
+
+    expect(result.success).toBe(false);
   });
 });

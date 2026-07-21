@@ -30,6 +30,13 @@ import {
 import type { ActionResult } from '@/types/digital-format';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
+import {
+  isLocalMultipartUpload,
+  localAbortUpload,
+  localCompleteUpload,
+  localPartUploadUrl,
+  localStartUpload,
+} from './multipart-local-adapters';
 
 const logger = loggers.s3;
 
@@ -109,6 +116,146 @@ const failureResult = (operation: string, prefix: string, error: unknown): Error
   return { success: false, error: `${prefix}: ${message}` };
 };
 
+/*
+ * ── The seam ──────────────────────────────────────────────────────────────
+ *
+ * The four operations below are the only things these actions cannot do
+ * without AWS. Each has a real S3 implementation and a local one, chosen by a
+ * single selector, so the admin gate, Zod validation, and key guard in every
+ * action run identically on both paths — and so the browser uploader runs for
+ * real under E2E instead of being short-circuited. See
+ * `multipart-local-adapters.ts` for why this is the lowest workable seam.
+ */
+
+interface StartUploadParams {
+  s3Key: string;
+  contentType: string;
+  videoId: string;
+  fileName: string;
+}
+
+interface SignPartUrlsParams {
+  s3Key: string;
+  uploadId: string;
+  partNumbers: number[];
+}
+
+interface FinishUploadParams {
+  s3Key: string;
+  uploadId: string;
+  parts: Array<{ partNumber: number; eTag: string }>;
+}
+
+interface DiscardUploadParams {
+  s3Key: string;
+  uploadId: string;
+}
+
+const s3StartUpload = async ({
+  s3Key,
+  contentType,
+  videoId,
+  fileName,
+}: StartUploadParams): Promise<string | undefined> => {
+  const response = await getS3Client().send(
+    new CreateMultipartUploadCommand({
+      Bucket: getS3BucketName(),
+      Key: s3Key,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
+      Metadata: {
+        entityType: 'videos',
+        entityId: videoId,
+        originalFileName: fileName,
+        uploadedAt: new Date().toISOString(),
+      },
+    })
+  );
+  return response.UploadId;
+};
+
+/** Begin the upload; `undefined` when no upload id came back. */
+const startUpload = async (params: StartUploadParams): Promise<string | undefined> =>
+  isLocalMultipartUpload() ? localStartUpload({ s3Key: params.s3Key }) : s3StartUpload(params);
+
+const s3SignPartUrls = async ({
+  s3Key,
+  uploadId,
+  partNumbers,
+}: SignPartUrlsParams): Promise<Array<{ partNumber: number; url: string }>> => {
+  const s3Client = getS3Client();
+  const bucket = getS3BucketName();
+  return Promise.all(
+    partNumbers.map(async (partNumber) => ({
+      partNumber,
+      url: await getSignedUrl(
+        s3Client,
+        new UploadPartCommand({
+          Bucket: bucket,
+          Key: s3Key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+        }),
+        { expiresIn: PRESIGNED_URL_EXPIRATION.UPLOAD }
+      ),
+    }))
+  );
+};
+
+/** The URL the browser should PUT each part to. */
+const signPartUrls = async (
+  params: SignPartUrlsParams
+): Promise<Array<{ partNumber: number; url: string }>> =>
+  isLocalMultipartUpload()
+    ? params.partNumbers.map((partNumber) => ({
+        partNumber,
+        url: localPartUploadUrl({ uploadId: params.uploadId, partNumber }),
+      }))
+    : s3SignPartUrls(params);
+
+const s3FinishUpload = async ({
+  s3Key,
+  uploadId,
+  parts,
+}: FinishUploadParams): Promise<number | undefined> => {
+  const s3Client = getS3Client();
+  const bucket = getS3BucketName();
+
+  const sortedParts = [...parts]
+    .sort((a, b) => a.partNumber - b.partNumber)
+    .map((part) => ({ PartNumber: part.partNumber, ETag: part.eTag }));
+
+  await s3Client.send(
+    new CompleteMultipartUploadCommand({
+      Bucket: bucket,
+      Key: s3Key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: sortedParts },
+    })
+  );
+
+  const head = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key }));
+  return head.ContentLength === undefined ? undefined : Number(head.ContentLength);
+};
+
+/** Assemble the parts and return the object's authoritative size. */
+const finishUpload = async (params: FinishUploadParams): Promise<number | undefined> =>
+  isLocalMultipartUpload() ? localCompleteUpload(params) : s3FinishUpload(params);
+
+const s3DiscardUpload = async ({ s3Key, uploadId }: DiscardUploadParams): Promise<void> => {
+  await getS3Client().send(
+    new AbortMultipartUploadCommand({
+      Bucket: getS3BucketName(),
+      Key: s3Key,
+      UploadId: uploadId,
+    })
+  );
+};
+
+/** Throw away an unfinished upload and its parts. */
+const discardUpload = async (params: DiscardUploadParams): Promise<void> =>
+  isLocalMultipartUpload() ? localAbortUpload(params.uploadId) : s3DiscardUpload(params);
+
 /**
  * Server Action: begin a multipart upload for a video and return the S3 key,
  * upload id, and the part sizing the client should use.
@@ -128,26 +275,10 @@ export const initiateVideoUploadAction = async (
     }
     const { videoId, fileName, contentType, fileSize } = parsed.data;
 
-    const s3Client = getS3Client();
-    const bucket = getS3BucketName();
     const s3Key = buildVideoS3Key(videoId, fileName);
+    const uploadId = await startUpload({ s3Key, contentType, videoId, fileName });
 
-    const response = await s3Client.send(
-      new CreateMultipartUploadCommand({
-        Bucket: bucket,
-        Key: s3Key,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: {
-          entityType: 'videos',
-          entityId: videoId,
-          originalFileName: fileName,
-          uploadedAt: new Date().toISOString(),
-        },
-      })
-    );
-
-    if (!response.UploadId) {
+    if (!uploadId) {
       return { success: false, error: 'S3 did not return an upload id' };
     }
 
@@ -155,7 +286,7 @@ export const initiateVideoUploadAction = async (
       success: true,
       data: {
         s3Key,
-        uploadId: response.UploadId,
+        uploadId,
         partSize: VIDEO_PART_SIZE,
         partCount: Math.ceil(fileSize / VIDEO_PART_SIZE),
       },
@@ -185,34 +316,16 @@ export const presignVideoPartsAction = async (
     const keyError = guardVideoKey(s3Key);
     if (keyError) return keyError;
 
-    const s3Client = getS3Client();
-    const bucket = getS3BucketName();
-
-    const urls = await Promise.all(
-      partNumbers.map(async (partNumber) => {
-        const url = await getSignedUrl(
-          s3Client,
-          new UploadPartCommand({
-            Bucket: bucket,
-            Key: s3Key,
-            UploadId: uploadId,
-            PartNumber: partNumber,
-          }),
-          { expiresIn: PRESIGNED_URL_EXPIRATION.UPLOAD }
-        );
-        return { partNumber, url };
-      })
-    );
-
-    return { success: true, data: urls };
+    return { success: true, data: await signPartUrls({ s3Key, uploadId, partNumbers }) };
   } catch (error) {
     return failureResult('presignVideoParts', 'Failed to presign video parts', error);
   }
 };
 
 /**
- * Server Action: complete a multipart upload, then HEAD-verify the assembled
- * object and return its authoritative size.
+ * Server Action: complete a multipart upload and return the assembled object's
+ * authoritative size (an S3 `HeadObject`, or the local store's total of the
+ * delivered parts — see {@link finishUpload}).
  */
 export const completeVideoUploadAction = async (
   input: CompleteVideoUploadRequest
@@ -230,28 +343,12 @@ export const completeVideoUploadAction = async (
     const keyError = guardVideoKey(s3Key);
     if (keyError) return keyError;
 
-    const s3Client = getS3Client();
-    const bucket = getS3BucketName();
-
-    const sortedParts = [...parts]
-      .sort((a, b) => a.partNumber - b.partNumber)
-      .map((part) => ({ PartNumber: part.partNumber, ETag: part.eTag }));
-
-    await s3Client.send(
-      new CompleteMultipartUploadCommand({
-        Bucket: bucket,
-        Key: s3Key,
-        UploadId: uploadId,
-        MultipartUpload: { Parts: sortedParts },
-      })
-    );
-
-    const head = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key }));
-    if (head.ContentLength === undefined) {
+    const fileSize = await finishUpload({ s3Key, uploadId, parts });
+    if (fileSize === undefined) {
       return { success: false, error: 'Uploaded video could not be verified in storage' };
     }
 
-    return { success: true, data: { s3Key, fileSize: Number(head.ContentLength) } };
+    return { success: true, data: { s3Key, fileSize } };
   } catch (error) {
     return failureResult('completeVideoUpload', 'Failed to complete video upload', error);
   }
@@ -279,11 +376,7 @@ export const abortVideoUploadAction = async (
     if (keyError) return keyError;
 
     try {
-      const s3Client = getS3Client();
-      const bucket = getS3BucketName();
-      await s3Client.send(
-        new AbortMultipartUploadCommand({ Bucket: bucket, Key: s3Key, UploadId: uploadId })
-      );
+      await discardUpload({ s3Key, uploadId });
     } catch (error) {
       logger.error('Failed to abort multipart video upload', error);
     }

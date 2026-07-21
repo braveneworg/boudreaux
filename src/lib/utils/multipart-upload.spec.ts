@@ -1133,17 +1133,3 @@ describe('uploadVideoMultipart — 403 re-presign RPC rejection', () => {
     expect(abortMock).toHaveBeenCalledTimes(1);
   });
 });
-
-describe('uploadVideoMultipart — E2E mode', () => {
-  it('short-circuits to a deterministic success in E2E mode', async () => {
-    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
-    const onProgress = vi.fn();
-    const file = new File(['abc'], 'clip.mp4', { type: 'video/mp4' });
-    await expect(uploadVideoMultipart(file, { videoId: 'vid1', onProgress })).resolves.toEqual({
-      success: true,
-      s3Key: 'media/videos/vid1/e2e-upload.mp4',
-      fileSize: 3,
-    });
-    expect(onProgress).toHaveBeenCalledWith(1);
-  });
-});
