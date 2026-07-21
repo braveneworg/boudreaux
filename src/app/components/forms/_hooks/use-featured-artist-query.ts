@@ -7,7 +7,7 @@ import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { featuredArtistSchema } from '@/lib/validation/media-models-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /**
  * Fetches a single featured artist from the `/api/featured-artists/[id]` route
@@ -26,17 +26,12 @@ import { parseResponse } from '@/utils/fetch-and-parse';
 const fetchFeaturedArtist = async (
   featuredArtistId: string,
   signal?: AbortSignal
-): Promise<FeaturedArtist | null> => {
-  const url = `/api/featured-artists/${encodeURIComponent(featuredArtistId)}`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw Error('Failed to fetch featured artist');
-  }
-  return parseResponse(url, featuredArtistSchema, await response.json());
-};
+): Promise<FeaturedArtist | null> =>
+  fetchAndParse(
+    `/api/featured-artists/${encodeURIComponent(featuredArtistId)}`,
+    featuredArtistSchema,
+    { signal, errorMessage: 'Failed to fetch featured artist', fallbackByStatus: { 404: null } }
+  );
 
 /**
  * React Query hook for fetching a single featured artist by id.

@@ -6,7 +6,7 @@ import { type z, type ZodType } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
 import { publishedReleaseDetailSchema, releaseSchema } from '@/lib/validation/media-models-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -39,17 +39,12 @@ const fetchReleaseById = async <T>(
   schema: ZodType<T>,
   withTracks: boolean,
   signal?: AbortSignal
-): Promise<T | null> => {
-  const url = `/api/releases/${encodeURIComponent(releaseId)}${withTracks ? '?withTracks=true' : ''}`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw Error('Failed to fetch release');
-  }
-  return parseResponse(url, schema, await response.json());
-};
+): Promise<T | null> =>
+  fetchAndParse(
+    `/api/releases/${encodeURIComponent(releaseId)}${withTracks ? '?withTracks=true' : ''}`,
+    schema,
+    { signal, errorMessage: 'Failed to fetch release', fallbackByStatus: { 404: null } }
+  );
 
 /**
  * React Query hook for fetching a single release for the public release page —

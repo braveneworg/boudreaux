@@ -10,7 +10,7 @@ import {
   videoEnrichmentStatusResponseSchema,
   type VideoEnrichmentStatusResult,
 } from '@/lib/validation/video-enrichment-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** Poll cadence while an enrichment job is pending/processing. */
 const POLL_INTERVAL_MS = 2500;
@@ -26,14 +26,12 @@ const POLL_INTERVAL_MS = 2500;
 const fetchVideoEnrichmentStatus = async (
   videoId: string,
   signal?: AbortSignal
-): Promise<VideoEnrichmentStatusResult> => {
-  const url = `/api/videos/${encodeURIComponent(videoId)}/enrichment`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch video enrichment status');
-  }
-  return parseResponse(url, videoEnrichmentStatusResponseSchema, await response.json());
-};
+): Promise<VideoEnrichmentStatusResult> =>
+  fetchAndParse(
+    `/api/videos/${encodeURIComponent(videoId)}/enrichment`,
+    videoEnrichmentStatusResponseSchema,
+    { signal, errorMessage: 'Failed to fetch video enrichment status' }
+  );
 
 /**
  * Polls a video's async web-enrichment status. The query refetches on an
