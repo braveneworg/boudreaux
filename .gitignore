@@ -79,10 +79,6 @@ e2e/.auth/
 !.claude/settings.json
 
 
-# agent-skills local issue tracker — working state, never committed
-# (see docs/agents/issue-tracker.md)
-.scratch/
-
 # AI agent configs
 .adal/
 .agent/
