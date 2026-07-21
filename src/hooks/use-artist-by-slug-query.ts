@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import { artistWithPublishedReleasesSchema } from '@/lib/validation/media-models-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -21,19 +21,12 @@ import type { QueryOptionsOverride } from './query-options';
  * @returns The parsed JSON response for the artist, or `null` if not found.
  * @throws If the response status is not OK and not a 404.
  */
-const fetchArtistBySlug = async (slug: string, signal?: AbortSignal) => {
-  const url = `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`;
-  const response = await fetch(url, {
-    signal,
-  });
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw Error('Failed to fetch artist');
-  }
-  return parseResponse(url, artistWithPublishedReleasesSchema, await response.json());
-};
+const fetchArtistBySlug = async (slug: string, signal?: AbortSignal) =>
+  fetchAndParse(
+    `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`,
+    artistWithPublishedReleasesSchema,
+    { signal, errorMessage: 'Failed to fetch artist', fallbackByStatus: { 404: null } }
+  );
 
 /**
  * React Query hook for fetching a single artist by slug.

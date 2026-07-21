@@ -10,7 +10,7 @@ import {
   isInFlightBioStatus,
   type BioGenerationStatusResponse,
 } from '@/lib/validation/bio-generation-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** Poll cadence while a generation job is pending/processing. */
 const POLL_INTERVAL_MS = 2500;
@@ -26,14 +26,12 @@ const POLL_INTERVAL_MS = 2500;
 const fetchBioGenerationStatus = async (
   artistId: string,
   signal?: AbortSignal
-): Promise<BioGenerationStatusResponse> => {
-  const url = `/api/artists/${encodeURIComponent(artistId)}/bio-generation`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Error('Failed to fetch bio generation status');
-  }
-  return parseResponse(url, bioGenerationStatusResponseSchema, await response.json());
-};
+): Promise<BioGenerationStatusResponse> =>
+  fetchAndParse(
+    `/api/artists/${encodeURIComponent(artistId)}/bio-generation`,
+    bioGenerationStatusResponseSchema,
+    { signal, errorMessage: 'Failed to fetch bio generation status' }
+  );
 
 /**
  * Polls an artist's async bio-generation status. The query refetches on an
