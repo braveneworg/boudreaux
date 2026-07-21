@@ -7,12 +7,20 @@ import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helper
 /**
  * Keystone E2E for the upload → draft → pre-save enrichment flow.
  *
- * With NEXT_PUBLIC_E2E_MODE/E2E_MODE/BIO_GENERATOR_FAKE all true
- * (playwright.config.ts) the multipart upload short-circuits instantly and
- * offline: picking a file writes the fake s3Key, the filename parser prefills
- * the metadata, and upload-complete creates an UNPUBLISHED draft row whose URL
+ * The multipart upload runs FOR REAL here. With E2E_MODE true
+ * (playwright.config.ts) only the S3 calls themselves are substituted, below
+ * the four multipart Server Actions: the browser uploader genuinely initiates,
+ * presigns a just-in-time batch, PUTs each part slice over its XHR worker pool
+ * to a local sink route, collects the returned ETags, and completes — and the
+ * `fileSize` the form persists is the size the parts actually delivered. The
+ * confirm-time existence check is answered honestly too, from the local store's
+ * record of the completed upload. See `src/lib/actions/multipart-local-adapters.ts`.
+ *
+ * So: picking a file really uploads it, the filename parser prefills the
+ * metadata, and upload-complete creates an UNPUBLISHED draft row whose URL
  * swaps in place to the edit route (history.replaceState — the mounted form
- * survives). The draft's post-save pipeline auto-kicks the fake enrichment,
+ * survives). With BIO_GENERATOR_FAKE true the draft's post-save pipeline
+ * auto-kicks the fake enrichment,
  * which completes in ~4s with the deterministic videoEnrichmentFixture: a
  * video-level description and a discovered featured artist 'E2E Discovered
  * Feature'. Applying the description fills the form; applying the featured

@@ -22,11 +22,7 @@ import {
   initiateVideoUploadAction,
   presignVideoPartsAction,
 } from '@/lib/actions/multipart-upload-actions';
-import {
-  VIDEO_KEY_PREFIX,
-  VIDEO_PART_URL_BATCH_MAX,
-  VIDEO_UPLOAD_CONCURRENCY,
-} from '@/lib/constants/video-uploads';
+import { VIDEO_PART_URL_BATCH_MAX, VIDEO_UPLOAD_CONCURRENCY } from '@/lib/constants/video-uploads';
 
 export interface MultipartUploadOptions {
   videoId: string;
@@ -463,17 +459,6 @@ export const uploadVideoMultipart = async (
   file: File,
   options: MultipartUploadOptions
 ): Promise<MultipartUploadSuccess | MultipartUploadFailure> => {
-  // E2E has no S3: short-circuit to a deterministic key under the video's
-  // namespace so confirmVideoUpload's prefix check still holds downstream.
-  if (process.env.NEXT_PUBLIC_E2E_MODE === 'true') {
-    options.onProgress?.(1);
-    return {
-      success: true,
-      s3Key: `${VIDEO_KEY_PREFIX}${options.videoId}/e2e-upload.mp4`,
-      fileSize: file.size,
-    };
-  }
-
   const resolved = resolveOptions(options);
   if (resolved.signal?.aborted) {
     return { success: false, error: 'Upload aborted before it started', aborted: true };

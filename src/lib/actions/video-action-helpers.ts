@@ -10,6 +10,7 @@ import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
+import { isLocalMultipartUpload, localObjectExists } from './multipart-local-adapters';
 
 /** FormData fields the create/update video actions accept (preGeneratedId read raw). */
 export const VIDEO_PERMITTED_FIELD_NAMES = [
@@ -42,6 +43,18 @@ export const parseFileSize = (value: string | number | undefined): bigint | unde
 };
 
 /**
+ * Whether the uploaded object is really there — an S3 HEAD, or the local
+ * upload store's record of a completed multipart upload when there is no AWS.
+ *
+ * The local answer is a real one: only a key the browser actually finished
+ * uploading passes. This used to be an unconditional `return null` in E2E,
+ * which meant the check was not merely faked but skipped — a create that never
+ * uploaded anything confirmed happily.
+ */
+const objectExists = async (s3Key: string): Promise<boolean> =>
+  isLocalMultipartUpload() ? localObjectExists(s3Key) : verifyS3ObjectExists(s3Key);
+
+/**
  * Confirm the uploaded S3 object for a video create/replace: the key must sit
  * under `media/videos/{videoId}/` (no traversal) and the object must exist.
  * Returns a user-facing error message, or `null` when the object is confirmed.
@@ -54,10 +67,7 @@ export const confirmVideoUpload = async (
   if (videoId === undefined || isInvalidS3Key(s3Key, expectedPrefix)) {
     return `Invalid S3 key: must start with ${expectedPrefix}`;
   }
-  // E2E runs without S3 — the namespace check above still guards the key shape.
-  if (process.env.E2E_MODE === 'true') return null;
-  const exists = await verifyS3ObjectExists(s3Key);
-  if (!exists) {
+  if (!(await objectExists(s3Key))) {
     return 'File not found in S3 storage. Upload may have failed.';
   }
   return null;

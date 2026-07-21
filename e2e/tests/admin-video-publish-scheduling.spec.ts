@@ -20,12 +20,15 @@ import { scrollToLoad } from '../helpers/infinite-scroll';
  *
  * Read-only: these specs never mutate the shared seed, so they stay parallel-safe.
  *
- * NOT covered here (infeasible without real S3 upload in the E2E harness):
+ * NOT covered here (by choice, not by impossibility):
  * - Creating a new video through the full create→schedule UI flow. The admin
- *   upload requires a real multipart S3 upload, which is unavailable in the E2E
- *   environment. The scheduling semantics are fully covered by unit tests in
- *   `src/lib/repositories/video-repository.spec.ts` and by the seeded fixture
- *   assertions below.
+ *   multipart upload is no longer a blocker — it runs for real under E2E now
+ *   that only the S3 calls are substituted, below the multipart Server Actions
+ *   (see `admin-video-draft-upload.spec.ts`, which drives an upload end to
+ *   end). This spec stays read-only and seed-driven so it remains parallel-safe
+ *   against the count-pinning specs; the scheduling semantics themselves are
+ *   covered by unit tests in `src/lib/repositories/video-repository.spec.ts`
+ *   and by the seeded fixture assertions below.
  */
 
 test.describe('Video publish scheduling — Scheduled badge', () => {
