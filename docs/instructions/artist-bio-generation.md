@@ -132,7 +132,7 @@ editor** rather than a plain textarea.
 
 **Web app** (repo root):
 
-- **Node** `v24.14.1` (from `.nvmrc` — use `nvm use`, never a global install)
+- **Node** `v24.18.0` (from `.nvmrc` — use `nvm use`, never a global install)
 - **pnpm** `11.x` (via `corepack`)
 - **MongoDB** with a replica set (Prisma transactions in `replaceBioContent` require it)
 - AWS account/credentials only for **real** generation (S3 re-hosting + Lambda invoke). Local
@@ -179,7 +179,7 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 
 ```bash
 # --- Web app (repo root) ---
-nvm use                       # Node 24.14.1 from .nvmrc
+nvm use                       # Node 24.18.0 from .nvmrc
 corepack enable
 pnpm install                  # pulls @aws-sdk/client-lambda, @tiptap/*, html-react-parser
 pnpm exec prisma generate     # regenerate client for the new models/fields

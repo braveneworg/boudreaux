@@ -1,7 +1,7 @@
 ARG NODE=node:24.18.0-alpine
 FROM ${NODE} AS dependencies
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@11.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
