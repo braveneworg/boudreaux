@@ -14,7 +14,8 @@ roles to the actual label strings used in this repo's issue tracker.
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use
 the corresponding label string from this table.
 
-In this repo's local-markdown tracker, these strings are the `Status:` values
-written near the top of each issue file.
+In this repo's tracker these are GitHub issue labels, applied with
+`gh issue edit <number> --add-label "..."`. If a label doesn't exist yet,
+create it first with `gh label create <name>`.
 
 Edit the right-hand column to match whatever vocabulary you actually use.

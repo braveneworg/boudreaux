@@ -165,13 +165,13 @@ Per-repo config for the engineering skills (`to-tickets`, `triage`, `to-spec`,
 
 ### Issue tracker
 
-Local markdown — issues and specs live under `.scratch/<feature-slug>/`
-(gitignored, never committed). See `docs/agents/issue-tracker.md`.
+GitHub Issues on `braveneworg/boudreaux`, driven via the `gh` CLI.
+See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
 Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`,
-`ready-for-human`, `wontfix`), recorded as `Status:` lines in issue files.
+`ready-for-human`, `wontfix`), applied as GitHub issue labels.
 See `docs/agents/triage-labels.md`.
 
 ### Domain docs
