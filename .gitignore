@@ -71,7 +71,8 @@ e2e/.auth/
 *.archive
 
 /public/media
-.claude
+.claude/*
+!.claude/settings.json
 
 
 # AI agent configs
