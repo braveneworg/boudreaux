@@ -9,6 +9,11 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
 import { VideoRepository } from '@/lib/repositories/video-repository';
+import {
+  planVideoPostSave,
+  runVideoPostSave,
+  videoPostSaveHasWork,
+} from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { CreateVideoData } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -17,12 +22,7 @@ import { loggers } from '@/lib/utils/logger';
 import { videoDraftSchema, type VideoDraftInput } from '@/lib/validation/video-draft-schema';
 import { parseVideoFilename } from '@/utils/parse-video-filename';
 
-import {
-  confirmVideoUpload,
-  kickPostSaveEnrichment,
-  parseDurationSeconds,
-  parseFileSize,
-} from './video-action-helpers';
+import { confirmVideoUpload, parseDurationSeconds, parseFileSize } from './video-action-helpers';
 
 const logger = loggers.media;
 
@@ -73,21 +73,12 @@ const DRAFT_FAILED: CreateVideoDraftResult = {
  * Pre-response `pending` handoff for the auto-kicked enrichment. The edit
  * page's status poll only re-arms while a job is in flight, so the status must
  * be in-flight BEFORE the client's first fetch — the dispatch itself runs
- * post-response in `after()` (mirrors runVideoEnrichmentAction). Gated on the
- * same conditions under which kickPostSaveEnrichment will actually dispatch.
- * Best-effort: a failure never blocks the draft; the kick's own `processing`
- * write self-heals the status.
+ * post-response in `after()` (mirrors runVideoEnrichmentAction). The caller
+ * gates this on the plan's own `dispatchEnrichment`, so the marker and the
+ * dispatch can never disagree. Best-effort: a failure never blocks the draft;
+ * the run's own `processing` write self-heals the status.
  */
-const markEnrichmentPending = async ({
-  videoId,
-  artist,
-  category,
-}: {
-  videoId: string;
-  artist: string;
-  category: VideoDraftInput['category'];
-}): Promise<void> => {
-  if (category !== 'MUSIC' || artist.trim() === '') return;
+const markEnrichmentPending = async (videoId: string): Promise<void> => {
   try {
     await VideoRepository.setEnrichmentStatus(videoId, 'pending');
   } catch (error) {
@@ -138,20 +129,24 @@ export const createVideoDraftAction = async (input: unknown): Promise<CreateVide
     }
 
     revalidatePath('/admin/videos');
-    await markEnrichmentPending({
-      videoId: response.data.id,
-      artist: data.artist ?? '',
-      category: data.category,
+
+    const artist = data.artist ?? '';
+    const plan = planVideoPostSave({
+      intent: 'draft',
+      next: { artist, category: data.category, s3Key: data.s3Key },
     });
-    after(() =>
-      kickPostSaveEnrichment({
-        videoId: response.data.id,
-        artist: data.artist ?? '',
-        category: data.category,
-        reProbe: true,
-        artistDetails: data.artistDetails,
-      })
-    );
+
+    if (plan.dispatchEnrichment) await markEnrichmentPending(response.data.id);
+    if (videoPostSaveHasWork(plan)) {
+      after(() =>
+        runVideoPostSave({
+          videoId: response.data.id,
+          artist,
+          artistDetails: data.artistDetails,
+          plan,
+        })
+      );
+    }
     return { success: true, videoId: response.data.id };
   } catch (error) {
     logger.error('video_draft_create_error', {
