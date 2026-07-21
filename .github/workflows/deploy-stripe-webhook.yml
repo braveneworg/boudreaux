@@ -27,7 +27,7 @@ jobs:
           node-version: "24.18.0"
 
       - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@11.15.0 --activate
+        run: corepack enable && corepack prepare pnpm@11.15.1 --activate
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6

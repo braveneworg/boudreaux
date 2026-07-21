@@ -17,7 +17,7 @@ this guide is the developer-focused, day-to-day version.
 > **TL;DR — run it locally with zero AWS:**
 >
 > ```bash
-> nvm use && corepack enable && corepack prepare pnpm@11.8.0 --activate
+> nvm use && corepack enable && corepack prepare pnpm@11.15.1 --activate
 > pnpm install
 > pnpm exec prisma db push
 > BIO_GENERATOR_FAKE=true pnpm run dev
@@ -50,7 +50,7 @@ fake mode.
 | Tool                 | Version                 | How                                                                                                                             |
 | -------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Node.js              | **v24.14.1** (`.nvmrc`) | `nvm use` (or `nvm install`). **Always run this before `pnpm` and `git push`** — the pre-push hook's `tsc` fails on older Node. |
-| pnpm                 | **11.8.0**              | `corepack enable && corepack prepare pnpm@11.8.0 --activate`                                                                    |
+| pnpm                 | **11.15.1**             | `corepack enable && corepack prepare pnpm@11.15.1 --activate`                                                                   |
 | Docker               | any recent              | Only for E2E (isolated MongoDB on `localhost:27018`)                                                                            |
 | AWS CLI v2 + SAM CLI | latest                  | Only if you deploy the Lambda manually (CI does it for you)                                                                     |
 
@@ -130,7 +130,7 @@ BIO_GENERATOR_LAMBDA_NAME="fakefour-bio-generator"
 ```bash
 # 1. Toolchain
 nvm use                                          # Node v24.14.1 from .nvmrc
-corepack enable && corepack prepare pnpm@11.8.0 --activate
+corepack enable && corepack prepare pnpm@11.15.1 --activate
 
 # 2. Install (postinstall runs `prisma generate`)
 pnpm install

@@ -63,7 +63,7 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 | Requirement    | Version / Source                                                                                                            |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Node.js        | **24** (`.nvmrc`; the web app's pre-push hook and the Lambda runtime both need 24 — `nvm use` before any `pnpm`/`git push`) |
-| pnpm           | **11.3.0** (`corepack prepare pnpm@11.3.0 --activate`)                                                                      |
+| pnpm           | **11.15.1** (`corepack prepare pnpm@11.15.1 --activate`)                                                                    |
 | AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                       |
 | AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                       |
 | AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                             |
@@ -307,7 +307,7 @@ aws ssm put-parameter \
 ```bash
 # 0. Toolchain
 nvm use                                   # Node 24 from .nvmrc
-corepack enable && corepack prepare pnpm@11.3.0 --activate
+corepack enable && corepack prepare pnpm@11.15.1 --activate
 
 # 1. Web app deps + Prisma client (adds the new bio fields/models)
 pnpm install
