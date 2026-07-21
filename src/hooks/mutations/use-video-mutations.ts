@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
-
 import { archiveVideoAction } from '@/lib/actions/archive-video-action';
 import { createVideoAction } from '@/lib/actions/create-video-action';
 import { deleteVideoAction } from '@/lib/actions/delete-video-action';
@@ -16,6 +14,10 @@ import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
+
+import { useEntityMutation } from './use-entity-mutation';
+
+import type { Query, QueryClient } from '@tanstack/react-query';
 
 /**
  * Returns true for every `videos.*` query except `videos.probePrefill`.
@@ -42,29 +44,15 @@ const invalidateVideoQueries = (queryClient: QueryClient): Promise<unknown> =>
  * caches are invalidated on a successful result.
  */
 export const useCreateVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createVideo,
-    mutateAsync: createVideoAsync,
-    isPending: isCreatingVideo,
-    isError: isCreateVideoError,
-    error: createVideoError,
-    data: createdVideo,
-    reset: resetCreateVideo,
-  } = useMutation<FormState, Error, VideoFormData & { preGeneratedId?: string }>({
-    mutationFn: (values) => createVideoAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    VideoFormData & { preGeneratedId?: string }
+  >(
+    (values) => createVideoAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateVideoQueries
+  );
 
-  return {
-    createVideo,
-    createVideoAsync,
-    isCreatingVideo,
-    isCreateVideoError,
-    createVideoError,
-    createdVideo,
-    resetCreateVideo,
-  };
+  return { createVideo: mutate, createVideoAsync: mutateAsync, isCreatingVideo: isPending };
 };
 
 /**
@@ -72,30 +60,15 @@ export const useCreateVideoMutation = () => {
  * {@link useCreateVideoMutation} for the result/invalidation contract.
  */
 export const useUpdateVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateVideo,
-    mutateAsync: updateVideoAsync,
-    isPending: isUpdatingVideo,
-    isError: isUpdateVideoError,
-    error: updateVideoError,
-    data: updatedVideo,
-    reset: resetUpdateVideo,
-  } = useMutation<FormState, Error, { id: string; values: VideoFormData }>({
-    mutationFn: ({ id, values }) =>
-      updateVideoAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { id: string; values: VideoFormData }
+  >(
+    ({ id, values }) => updateVideoAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateVideoQueries
+  );
 
-  return {
-    updateVideo,
-    updateVideoAsync,
-    isUpdatingVideo,
-    isUpdateVideoError,
-    updateVideoError,
-    updatedVideo,
-    resetUpdateVideo,
-  };
+  return { updateVideo: mutate, updateVideoAsync: mutateAsync, isUpdatingVideo: isPending };
 };
 
 /**
@@ -103,27 +76,12 @@ export const useUpdateVideoMutation = () => {
  * Invalidates the video caches on a successful result.
  */
 export const usePublishVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: publishVideo,
-    mutateAsync: publishVideoAsync,
-    isPending: isPublishingVideo,
-    isError: isPublishVideoError,
-    error: publishVideoError,
-    reset: resetPublishVideo,
-  } = useMutation<AdminActionResult, Error, { videoId: string }>({
-    mutationFn: ({ videoId }) => publishVideoAction(videoId),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string }
+  >(({ videoId }) => publishVideoAction(videoId), invalidateVideoQueries);
 
-  return {
-    publishVideo,
-    publishVideoAsync,
-    isPublishingVideo,
-    isPublishVideoError,
-    publishVideoError,
-    resetPublishVideo,
-  };
+  return { publishVideo: mutate, publishVideoAsync: mutateAsync, isPublishingVideo: isPending };
 };
 
 /**
@@ -131,26 +89,15 @@ export const usePublishVideoMutation = () => {
  * Invalidates the video caches on a successful result.
  */
 export const useUnpublishVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: unpublishVideo,
-    mutateAsync: unpublishVideoAsync,
-    isPending: isUnpublishingVideo,
-    isError: isUnpublishVideoError,
-    error: unpublishVideoError,
-    reset: resetUnpublishVideo,
-  } = useMutation<AdminActionResult, Error, { videoId: string }>({
-    mutationFn: ({ videoId }) => unpublishVideoAction(videoId),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string }
+  >(({ videoId }) => unpublishVideoAction(videoId), invalidateVideoQueries);
 
   return {
-    unpublishVideo,
-    unpublishVideoAsync,
-    isUnpublishingVideo,
-    isUnpublishVideoError,
-    unpublishVideoError,
-    resetUnpublishVideo,
+    unpublishVideo: mutate,
+    unpublishVideoAsync: mutateAsync,
+    isUnpublishingVideo: isPending,
   };
 };
 
@@ -159,27 +106,12 @@ export const useUnpublishVideoMutation = () => {
  * Invalidates the video caches on a successful result.
  */
 export const useArchiveVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: archiveVideo,
-    mutateAsync: archiveVideoAsync,
-    isPending: isArchivingVideo,
-    isError: isArchiveVideoError,
-    error: archiveVideoError,
-    reset: resetArchiveVideo,
-  } = useMutation<AdminActionResult, Error, { videoId: string }>({
-    mutationFn: ({ videoId }) => archiveVideoAction(videoId),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string }
+  >(({ videoId }) => archiveVideoAction(videoId), invalidateVideoQueries);
 
-  return {
-    archiveVideo,
-    archiveVideoAsync,
-    isArchivingVideo,
-    isArchiveVideoError,
-    archiveVideoError,
-    resetArchiveVideo,
-  };
+  return { archiveVideo: mutate, archiveVideoAsync: mutateAsync, isArchivingVideo: isPending };
 };
 
 /**
@@ -187,27 +119,12 @@ export const useArchiveVideoMutation = () => {
  * Invalidates the video caches on a successful result.
  */
 export const useRestoreVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: restoreVideo,
-    mutateAsync: restoreVideoAsync,
-    isPending: isRestoringVideo,
-    isError: isRestoreVideoError,
-    error: restoreVideoError,
-    reset: resetRestoreVideo,
-  } = useMutation<AdminActionResult, Error, { videoId: string }>({
-    mutationFn: ({ videoId }) => restoreVideoAction(videoId),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string }
+  >(({ videoId }) => restoreVideoAction(videoId), invalidateVideoQueries);
 
-  return {
-    restoreVideo,
-    restoreVideoAsync,
-    isRestoringVideo,
-    isRestoreVideoError,
-    restoreVideoError,
-    resetRestoreVideo,
-  };
+  return { restoreVideo: mutate, restoreVideoAsync: mutateAsync, isRestoringVideo: isPending };
 };
 
 /**
@@ -216,25 +133,10 @@ export const useRestoreVideoMutation = () => {
  * result so listings drop the removed video.
  */
 export const useDeleteVideoMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: deleteVideo,
-    mutateAsync: deleteVideoAsync,
-    isPending: isDeletingVideo,
-    isError: isDeleteVideoError,
-    error: deleteVideoError,
-    reset: resetDeleteVideo,
-  } = useMutation<AdminActionResult, Error, { videoId: string }>({
-    mutationFn: ({ videoId }) => deleteVideoAction(videoId),
-    onSuccess: (result) => (result.success ? invalidateVideoQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string }
+  >(({ videoId }) => deleteVideoAction(videoId), invalidateVideoQueries);
 
-  return {
-    deleteVideo,
-    deleteVideoAsync,
-    isDeletingVideo,
-    isDeleteVideoError,
-    deleteVideoError,
-    resetDeleteVideo,
-  };
+  return { deleteVideo: mutate, deleteVideoAsync: mutateAsync, isDeletingVideo: isPending };
 };

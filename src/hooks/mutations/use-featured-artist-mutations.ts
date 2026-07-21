@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
@@ -18,6 +16,10 @@ import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
+
+import { useEntityMutation } from './use-entity-mutation';
+
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Invalidate the featured-artist caches (admin listing, active list) so the
@@ -33,33 +35,22 @@ const invalidateFeaturedArtistQueries = (queryClient: QueryClient): Promise<unkn
  * The featured-artist caches are invalidated on a successful result.
  */
 export const useCreateFeaturedArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createFeaturedArtist,
-    mutateAsync: createFeaturedArtistAsync,
-    isPending: isCreatingFeaturedArtist,
-    isError: isCreateFeaturedArtistError,
-    error: createFeaturedArtistError,
-    data: createdFeaturedArtist,
-    reset: resetCreateFeaturedArtist,
-  } = useMutation<FormState, Error, FeaturedArtistFormData & { artistIds: string[] }>({
-    mutationFn: (values) =>
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    FeaturedArtistFormData & { artistIds: string[] }
+  >(
+    (values) =>
       createFeaturedArtistAction(
         EMPTY_FORM_STATE,
         objectToFormData(values, { repeatKeys: ['artistIds'] })
       ),
-    onSuccess: (result) =>
-      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
-  });
+    invalidateFeaturedArtistQueries
+  );
 
   return {
-    createFeaturedArtist,
-    createFeaturedArtistAsync,
-    isCreatingFeaturedArtist,
-    isCreateFeaturedArtistError,
-    createFeaturedArtistError,
-    createdFeaturedArtist,
-    resetCreateFeaturedArtist,
+    createFeaturedArtist: mutate,
+    createFeaturedArtistAsync: mutateAsync,
+    isCreatingFeaturedArtist: isPending,
   };
 };
 
@@ -67,32 +58,19 @@ export const useCreateFeaturedArtistMutation = () => {
  * Mutation hook wrapping {@link updateFeaturedArtistCoverArtAction}.
  */
 export const useUpdateFeaturedArtistCoverArtMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateFeaturedArtistCoverArt,
-    mutateAsync: updateFeaturedArtistCoverArtAsync,
-    isPending: isUpdatingFeaturedArtistCoverArt,
-    isError: isUpdateFeaturedArtistCoverArtError,
-    error: updateFeaturedArtistCoverArtError,
-    reset: resetUpdateFeaturedArtistCoverArt,
-  } = useMutation<
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
     UpdateFeaturedArtistCoverArtResult,
-    Error,
     { featuredArtistId: string; coverArt: string }
-  >({
-    mutationFn: ({ featuredArtistId, coverArt }) =>
+  >(
+    ({ featuredArtistId, coverArt }) =>
       updateFeaturedArtistCoverArtAction(featuredArtistId, coverArt),
-    onSuccess: (result) =>
-      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
-  });
+    invalidateFeaturedArtistQueries
+  );
 
   return {
-    updateFeaturedArtistCoverArt,
-    updateFeaturedArtistCoverArtAsync,
-    isUpdatingFeaturedArtistCoverArt,
-    isUpdateFeaturedArtistCoverArtError,
-    updateFeaturedArtistCoverArtError,
-    resetUpdateFeaturedArtistCoverArt,
+    updateFeaturedArtistCoverArt: mutate,
+    updateFeaturedArtistCoverArtAsync: mutateAsync,
+    isUpdatingFeaturedArtistCoverArt: isPending,
   };
 };
 
@@ -102,27 +80,18 @@ export const useUpdateFeaturedArtistCoverArtMutation = () => {
  * successful result so the admin listing and home-page carousel drop the entry.
  */
 export const useDeleteFeaturedArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: deleteFeaturedArtist,
-    mutateAsync: deleteFeaturedArtistAsync,
-    isPending: isDeletingFeaturedArtist,
-    isError: isDeleteFeaturedArtistError,
-    error: deleteFeaturedArtistError,
-    reset: resetDeleteFeaturedArtist,
-  } = useMutation<AdminActionResult, Error, { featuredArtistId: string }>({
-    mutationFn: ({ featuredArtistId }) => deleteFeaturedArtistAction(featuredArtistId),
-    onSuccess: (result) =>
-      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { featuredArtistId: string }
+  >(
+    ({ featuredArtistId }) => deleteFeaturedArtistAction(featuredArtistId),
+    invalidateFeaturedArtistQueries
+  );
 
   return {
-    deleteFeaturedArtist,
-    deleteFeaturedArtistAsync,
-    isDeletingFeaturedArtist,
-    isDeleteFeaturedArtistError,
-    deleteFeaturedArtistError,
-    resetDeleteFeaturedArtist,
+    deleteFeaturedArtist: mutate,
+    deleteFeaturedArtistAsync: mutateAsync,
+    isDeletingFeaturedArtist: isPending,
   };
 };
 
@@ -133,27 +102,18 @@ export const useDeleteFeaturedArtistMutation = () => {
  * set to the landing page. Invalidates the featured-artist caches on success.
  */
 export const usePublishFeaturedArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: publishFeaturedArtist,
-    mutateAsync: publishFeaturedArtistAsync,
-    isPending: isPublishingFeaturedArtist,
-    isError: isPublishFeaturedArtistError,
-    error: publishFeaturedArtistError,
-    reset: resetPublishFeaturedArtist,
-  } = useMutation<AdminActionResult, Error, { featuredArtistId: string }>({
-    mutationFn: ({ featuredArtistId }) => publishFeaturedArtistAction(featuredArtistId),
-    onSuccess: (result) =>
-      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { featuredArtistId: string }
+  >(
+    ({ featuredArtistId }) => publishFeaturedArtistAction(featuredArtistId),
+    invalidateFeaturedArtistQueries
+  );
 
   return {
-    publishFeaturedArtist,
-    publishFeaturedArtistAsync,
-    isPublishingFeaturedArtist,
-    isPublishFeaturedArtistError,
-    publishFeaturedArtistError,
-    resetPublishFeaturedArtist,
+    publishFeaturedArtist: mutate,
+    publishFeaturedArtistAsync: mutateAsync,
+    isPublishingFeaturedArtist: isPending,
   };
 };
 
@@ -163,26 +123,14 @@ export const usePublishFeaturedArtistMutation = () => {
  * immediately.
  */
 export const usePublishFeaturedArtistsMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: publishFeaturedArtists,
-    mutateAsync: publishFeaturedArtistsAsync,
-    isPending: isPublishingFeaturedArtists,
-    isError: isPublishFeaturedArtistsError,
-    error: publishFeaturedArtistsError,
-    reset: resetPublishFeaturedArtists,
-  } = useMutation<AdminActionResult, Error, void>({
-    mutationFn: () => publishFeaturedArtistsToSiteAction(),
-    onSuccess: (result) =>
-      result.success ? invalidateFeaturedArtistQueries(queryClient) : undefined,
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<AdminActionResult>(
+    () => publishFeaturedArtistsToSiteAction(),
+    invalidateFeaturedArtistQueries
+  );
 
   return {
-    publishFeaturedArtists,
-    publishFeaturedArtistsAsync,
-    isPublishingFeaturedArtists,
-    isPublishFeaturedArtistsError,
-    publishFeaturedArtistsError,
-    resetPublishFeaturedArtists,
+    publishFeaturedArtists: mutate,
+    publishFeaturedArtistsAsync: mutateAsync,
+    isPublishingFeaturedArtists: isPending,
   };
 };

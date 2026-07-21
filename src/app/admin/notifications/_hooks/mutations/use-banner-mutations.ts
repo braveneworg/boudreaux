@@ -3,8 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
+import { useEntityMutation } from '@/hooks/mutations/use-entity-mutation';
 import {
   createOrUpdateBannerNotificationAction,
   deleteBannerNotificationAction,
@@ -15,6 +14,8 @@ import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { BannerNotificationFormData } from '@/lib/validation/banner-notification-schema';
+
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Invalidate the banner caches so the home-page banner carousel/strip reflects
@@ -29,82 +30,41 @@ const invalidateBannerQueries = (queryClient: QueryClient): Promise<unknown> =>
  * banner caches are invalidated on a successful result.
  */
 export const useUpsertBannerNotificationMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: upsertBanner,
-    mutateAsync: upsertBannerAsync,
-    isPending: isUpsertingBanner,
-    isError: isUpsertBannerError,
-    error: upsertBannerError,
-    data: savedBanner,
-    reset: resetUpsertBanner,
-  } = useMutation<FormState, Error, BannerNotificationFormData>({
-    mutationFn: (values) =>
-      createOrUpdateBannerNotificationAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    BannerNotificationFormData
+  >(
+    (values) => createOrUpdateBannerNotificationAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateBannerQueries
+  );
 
-  return {
-    upsertBanner,
-    upsertBannerAsync,
-    isUpsertingBanner,
-    isUpsertBannerError,
-    upsertBannerError,
-    savedBanner,
-    resetUpsertBanner,
-  };
+  return { upsertBanner: mutate, upsertBannerAsync: mutateAsync, isUpsertingBanner: isPending };
 };
 
 /**
  * Mutation hook wrapping {@link deleteBannerNotificationAction}.
  */
 export const useDeleteBannerNotificationMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: deleteBanner,
-    mutateAsync: deleteBannerAsync,
-    isPending: isDeletingBanner,
-    isError: isDeleteBannerError,
-    error: deleteBannerError,
-    reset: resetDeleteBanner,
-  } = useMutation<AdminActionResult, Error, { slotNumber: number }>({
-    mutationFn: ({ slotNumber }) => deleteBannerNotificationAction(slotNumber),
-    onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { slotNumber: number }
+  >(({ slotNumber }) => deleteBannerNotificationAction(slotNumber), invalidateBannerQueries);
 
-  return {
-    deleteBanner,
-    deleteBannerAsync,
-    isDeletingBanner,
-    isDeleteBannerError,
-    deleteBannerError,
-    resetDeleteBanner,
-  };
+  return { deleteBanner: mutate, deleteBannerAsync: mutateAsync, isDeletingBanner: isPending };
 };
 
 /**
  * Mutation hook wrapping {@link updateRotationIntervalAction}.
  */
 export const useUpdateRotationIntervalMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateRotationInterval,
-    mutateAsync: updateRotationIntervalAsync,
-    isPending: isUpdatingRotationInterval,
-    isError: isUpdateRotationIntervalError,
-    error: updateRotationIntervalError,
-    reset: resetUpdateRotationInterval,
-  } = useMutation<AdminActionResult, Error, { interval: number }>({
-    mutationFn: ({ interval }) => updateRotationIntervalAction(interval),
-    onSuccess: (result) => (result.success ? invalidateBannerQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { interval: number }
+  >(({ interval }) => updateRotationIntervalAction(interval), invalidateBannerQueries);
 
   return {
-    updateRotationInterval,
-    updateRotationIntervalAsync,
-    isUpdatingRotationInterval,
-    isUpdateRotationIntervalError,
-    updateRotationIntervalError,
-    resetUpdateRotationInterval,
+    updateRotationInterval: mutate,
+    updateRotationIntervalAsync: mutateAsync,
+    isUpdatingRotationInterval: isPending,
   };
 };
