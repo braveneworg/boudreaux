@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm exec vitest run)",
+      "Bash(pnpm exec vitest run *)",
+      "Bash(pnpm run typecheck)",
+      "Bash(pnpm run typecheck *)",
+      "Bash(git fetch origin)",
+      "Bash(git fetch origin *)",
+      "Bash(pnpm run test:run)",
+      "Bash(pnpm run test:run *)",
+      "Bash(pnpm run format:check)",
+      "Bash(pnpm run format:check *)",
+      "Bash(pnpm run test:coverage:check)",
+      "Bash(pnpm run test:coverage:check *)",
+      "Bash(gh run watch *)"
+    ]
+  }
+}
