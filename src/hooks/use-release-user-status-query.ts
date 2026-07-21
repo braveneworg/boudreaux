@@ -8,7 +8,7 @@ import { useSession } from '@/hooks/use-session';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';
 
@@ -49,22 +49,12 @@ const releaseUserStatusResponseSchema = z.object({
 const fetchReleaseUserStatus = async (
   releaseId: string,
   signal?: AbortSignal
-): Promise<ReleaseUserStatusResponse | null> => {
-  const response = await fetch(`/api/releases/${encodeURIComponent(releaseId)}/user-status`, {
-    signal,
-  });
-  if (response.status === 401) {
-    return null;
-  }
-  if (!response.ok) {
-    throw Error('Failed to fetch release user status');
-  }
-  return parseResponse(
+): Promise<ReleaseUserStatusResponse | null> =>
+  fetchAndParse(
     `/api/releases/${encodeURIComponent(releaseId)}/user-status`,
     releaseUserStatusResponseSchema,
-    await response.json()
+    { signal, errorMessage: 'Failed to fetch release user status', fallbackByStatus: { 401: null } }
   );
-};
 
 /**
  * React Query hook for fetching the current user's status for a release.

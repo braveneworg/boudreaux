@@ -71,6 +71,74 @@ describe('fetchAndParse', () => {
   });
 });
 
+describe('fetchAndParse — fallbackByStatus', () => {
+  it('returns the mapped fallback instead of throwing on a matching status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    await expect(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 404: null } })
+    ).resolves.toBeNull();
+  });
+
+  it('maps a status other than 404 just as readily', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+
+    await expect(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 401: null } })
+    ).resolves.toBeNull();
+  });
+
+  it('maps several statuses from one call', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }));
+
+    await expect(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 401: null, 403: null } })
+    ).resolves.toBeNull();
+  });
+
+  it('throws for an unmapped status even when other statuses are mapped', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await expect(
+      fetchAndParse('/api/thing', schema, {
+        fallbackByStatus: { 404: null },
+        errorMessage: 'Failed to fetch thing',
+      })
+    ).rejects.toThrow('Failed to fetch thing');
+  });
+
+  it('does not consult the map on a successful response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 'a', count: 2 }) })
+    );
+
+    await expect(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 200: null } })
+    ).resolves.toEqual({ id: 'a', count: 2 });
+  });
+
+  it('returns a non-null fallback value when one is mapped', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    await expect(
+      fetchAndParse('/api/things', z.array(schema), { fallbackByStatus: { 404: [] } })
+    ).resolves.toEqual([]);
+  });
+
+  // A fallback of `undefined` must be distinguishable from an absent key, so the
+  // lookup tests key presence rather than truthiness of the mapped value.
+  it('honours an explicitly-mapped undefined fallback rather than throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    await expect(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 404: undefined } })
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('parseResponse', () => {
   it('returns the schema-parsed body when valid', () => {
     expect(parseResponse('/api/thing', schema, { id: 'a', count: 2 })).toEqual({

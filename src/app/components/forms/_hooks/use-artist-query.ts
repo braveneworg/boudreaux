@@ -7,7 +7,7 @@ import { type z } from 'zod';
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { artistDetailSchema } from '@/lib/validation/media-models-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** The parsed `Artist` shape returned by `GET /api/artists/[id]`. */
 export type ArtistDetail = z.infer<typeof artistDetailSchema>;
@@ -28,17 +28,12 @@ export type ArtistDetail = z.infer<typeof artistDetailSchema>;
 export const fetchArtistById = async (
   artistId: string,
   signal?: AbortSignal
-): Promise<ArtistDetail | null> => {
-  const url = `/api/artists/${encodeURIComponent(artistId)}`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw Error('Failed to fetch artist');
-  }
-  return parseResponse(url, artistDetailSchema, await response.json());
-};
+): Promise<ArtistDetail | null> =>
+  fetchAndParse(`/api/artists/${encodeURIComponent(artistId)}`, artistDetailSchema, {
+    signal,
+    errorMessage: 'Failed to fetch artist',
+    fallbackByStatus: { 404: null },
+  });
 
 /**
  * React Query hook for fetching a single artist by id.

@@ -9,6 +9,7 @@ import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
+import { updateFeaturedArtistAction } from '@/lib/actions/update-featured-artist-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -20,7 +21,14 @@ import {
   usePublishFeaturedArtistMutation,
   usePublishFeaturedArtistsMutation,
   useUpdateFeaturedArtistCoverArtMutation,
+  useUpdateFeaturedArtistMutation,
 } from './use-featured-artist-mutations';
+
+/** Variables accepted by the whole-entity featured-artist update mutation. */
+type UpdateVariables = {
+  featuredArtistId: string;
+  values: FeaturedArtistFormData & { artistIds: string[] };
+};
 
 const useMutationMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -41,6 +49,9 @@ vi.mock('@/lib/actions/publish-featured-artist-action', () => ({
 }));
 vi.mock('@/lib/actions/publish-featured-artists-action', () => ({
   publishFeaturedArtistsToSiteAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/update-featured-artist-action', () => ({
+  updateFeaturedArtistAction: vi.fn(),
 }));
 vi.mock('@/lib/actions/update-featured-artist-cover-art-action', () => ({
   updateFeaturedArtistCoverArtAction: vi.fn(),
@@ -114,6 +125,59 @@ describe('useCreateFeaturedArtistMutation', () => {
 
   it('does not invalidate on failure', async () => {
     const opts = getOptions(useCreateFeaturedArtistMutation);
+
+    await opts.onSuccess(failState, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateFeaturedArtistMutation', () => {
+  const updateValues: FeaturedArtistFormData & { artistIds: string[] } = {
+    position: 2,
+    digitalFormatId: 'a'.repeat(24),
+    releaseId: 'b'.repeat(24),
+    artistIds: ['x', 'y'],
+  };
+
+  it('addresses the update action with the featured artist id', async () => {
+    vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
+
+    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
+
+    expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[0]).toBe('fa-1');
+  });
+
+  it('calls the update action with the empty form state', async () => {
+    vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
+
+    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
+
+    expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[1]).toBe(EMPTY_FORM_STATE);
+  });
+
+  it('appends artistIds individually to the form data', async () => {
+    vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
+
+    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
+
+    const formData = vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[2] as FormData;
+    expect(formData.getAll('artistIds')).toEqual(['x', 'y']);
+  });
+
+  it('invalidates the featured-artist cache on success', async () => {
+    const opts = getOptions(useUpdateFeaturedArtistMutation);
+
+    await opts.onSuccess(okState, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.featuredArtists.all });
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useUpdateFeaturedArtistMutation);
 
     await opts.onSuccess(failState, {});
 

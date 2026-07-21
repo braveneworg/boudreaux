@@ -21,6 +21,7 @@ import {
   useCreateFeaturedArtistMutation,
   useDeleteFeaturedArtistMutation,
   useUpdateFeaturedArtistCoverArtMutation,
+  useUpdateFeaturedArtistMutation,
 } from '@/hooks/mutations/use-featured-artist-mutations';
 import { useSession } from '@/hooks/use-session';
 import type { FormState } from '@/lib/types/form-state';
@@ -49,33 +50,10 @@ const initialFormState: FormState = {
 };
 
 /**
- * Builds the PATCH payload for an edit submission: drops empty values, coerces
- * numeric fields, and attaches derived artist IDs. Extracted as a pure helper to
- * keep the edit handler under the cyclomatic-complexity ceiling.
+ * Composes a toast message from the server error map. Extracted as a pure
+ * helper to keep the submit handlers under the cyclomatic-complexity ceiling.
  */
-const buildPatchBody = (
-  values: FeaturedArtistFormData,
-  derivedArtistIds: string[]
-): Record<string, unknown> => {
-  const patchEntries = new Map<string, unknown>();
-  for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined && value !== null && value !== '') {
-      const isNumericField = key === 'position' || key === 'featuredTrackNumber';
-      patchEntries.set(key, isNumericField ? Number(value) : value);
-    }
-  }
-  if (derivedArtistIds.length > 0) {
-    patchEntries.set('artistIds', derivedArtistIds);
-  }
-  return Object.fromEntries(patchEntries);
-};
-
-/**
- * Composes the toast message for a failed create submission from the server
- * error map. Extracted as a pure helper to keep the create handler under the
- * cyclomatic-complexity ceiling.
- */
-const buildCreateErrorMessage = (errors: FormState['errors']): string => {
+const buildErrorMessage = (errors: FormState['errors'], fallback: string): string => {
   const generalMsg = errors?.general?.[0];
   if (generalMsg) return generalMsg;
   const errorDetails = errors
@@ -83,8 +61,14 @@ const buildCreateErrorMessage = (errors: FormState['errors']): string => {
         .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
         .join('; ')
     : 'Unknown error';
-  return `Failed to create featured artist: ${errorDetails}`;
+  return `${fallback}: ${errorDetails}`;
 };
+
+const buildCreateErrorMessage = (errors: FormState['errors']): string =>
+  buildErrorMessage(errors, 'Failed to create featured artist');
+
+const buildEditErrorMessage = (errors: FormState['errors']): string =>
+  buildErrorMessage(errors, 'Failed to update featured artist');
 
 const ToastContent = ({
   displayName,
@@ -111,6 +95,7 @@ export const FeaturedArtistForm = ({
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
   const { createFeaturedArtistAsync } = useCreateFeaturedArtistMutation();
+  const { updateFeaturedArtistAsync } = useUpdateFeaturedArtistMutation();
   const { updateFeaturedArtistCoverArtAsync } = useUpdateFeaturedArtistCoverArtMutation();
   const { deleteFeaturedArtistAsync } = useDeleteFeaturedArtistMutation();
   const { data: _session } = useSession();
@@ -222,19 +207,17 @@ export const FeaturedArtistForm = ({
   };
 
   const handleEditSubmit = async (values: FeaturedArtistFormData, id: string) => {
-    const patchBody = buildPatchBody(values, derivedArtistIds);
-    const response = await fetch(`/api/featured-artists/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patchBody),
+    const result = await updateFeaturedArtistAsync({
+      featuredArtistId: id,
+      values: { ...values, artistIds: derivedArtistIds },
     });
-    if (response.ok) {
+    setFormState(result);
+    if (result.success) {
       const displayName = form.getValues('displayName');
       toast.success(<ToastContent displayName={displayName || ''} isEditMode />);
       router.push('/admin?entity=featuredArtist');
     } else {
-      const errorData = await response.json();
-      toast.error(errorData.error || 'Failed to update featured artist');
+      toast.error(buildEditErrorMessage(result.errors));
     }
   };
 
