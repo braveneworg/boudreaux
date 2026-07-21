@@ -4,22 +4,10 @@
 import 'server-only';
 
 import { VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
-import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
-import { ProducerService } from '@/lib/services/producer-service';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
-import { VideoProbeService } from '@/lib/services/video-probe-service';
-import type {
-  CreateVideoData,
-  UpdateVideoData,
-  Video,
-  VideoCategory,
-} from '@/lib/types/domain/video';
-import { loggers } from '@/lib/utils/logger';
+import type { CreateVideoData, UpdateVideoData, Video } from '@/lib/types/domain/video';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
-import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
-import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
 
 import { isInvalidS3Key } from './confirm-upload-action-helpers';
 
@@ -153,121 +141,4 @@ export const deleteReplacedVideoAssets = (
   Promise.allSettled(keysToDelete.map((key) => deleteS3Object(key))).catch(() => {
     // Silently ignore — S3 cleanup is best-effort.
   });
-};
-
-const logger = loggers.media;
-
-/** Safe, always-string rendering of an unknown error. */
-const toMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
-/** The linked artist's matchable display name (mirrors the enrichment service). */
-const linkedNameFor = (row: VideoArtistWithArtist): string =>
-  (
-    row.artist.displayName?.trim() || `${row.artist.firstName} ${row.artist.surname}`.trim()
-  ).toLowerCase();
-
-/** True when one provided part differs from the stored value (undefined = not provided). */
-const detailPartDiffers = (stored: string | null, provided: string | undefined): boolean =>
-  provided !== undefined && (stored ?? '').trim() !== provided.trim();
-
-/**
- * True when any admin-reviewed artist detail actually differs from the linked
- * artists' stored name parts (an unmatched sourceName counts as a change).
- * Lets the update action skip re-kicking enrichment for a no-op save.
- */
-export const artistDetailsDiffer = (
-  details: VideoArtistDetail[],
-  rows: VideoArtistWithArtist[]
-): boolean =>
-  details.some((detail) => {
-    const match = rows.find((row) => linkedNameFor(row) === detail.sourceName.trim().toLowerCase());
-    if (!match) return true;
-    return (
-      detailPartDiffers(match.artist.firstName, detail.firstName) ||
-      detailPartDiffers(match.artist.middleName, detail.middleName) ||
-      detailPartDiffers(match.artist.surname, detail.surname) ||
-      detailPartDiffers(match.artist.displayName, detail.displayName)
-    );
-  });
-
-/** Input for the post-save enrichment kick (runs inside `after()`). */
-export interface KickPostSaveEnrichmentInput {
-  videoId: string;
-  /** The admin-entered display artist string — the source of the artist sync. */
-  artist: string;
-  category: VideoCategory;
-  /** Probe (or re-probe) the file — true on create and on file replacement. */
-  reProbe: boolean;
-  /** Admin-reviewed artist name details forwarded to syncVideoArtists. */
-  artistDetails?: VideoArtistDetail[];
-}
-
-/**
- * Post-save enrichment kick: sync `VideoArtist` links from the artist string,
- * probe the file when it is new/replaced, then dispatch the async web
- * enrichment for MUSIC videos. Each stage is independently best-effort — a
- * failure is logged and the remaining stages still run. Never throws, so the
- * admin's already-successful save can never be failed retroactively by
- * background work.
- *
- * When `artist` is blank (e.g. a draft row created before the admin typed one),
- * the artist-sync and enrichment-dispatch stages are skipped entirely — no
- * "Unknown Artist" shell is ever minted. The probe stage still runs regardless
- * of whether an artist is present.
- *
- * Producer sync is intentionally NOT performed here — see
- * {@link syncVideoProducersAfterSave} which runs in a separate `after()` call
- * so that clearing all producers (producers: []) is always persisted regardless
- * of whether any enrichment-relevant field changed.
- */
-export const kickPostSaveEnrichment = async ({
-  videoId,
-  artist,
-  category,
-  reProbe,
-  artistDetails,
-}: KickPostSaveEnrichmentInput): Promise<void> => {
-  const hasArtist = artist.trim() !== '';
-
-  if (hasArtist) {
-    try {
-      await VideoEnrichmentService.syncVideoArtists(videoId, artist, artistDetails);
-    } catch (error) {
-      logger.warn('Post-save video artist sync failed', { videoId, error: toMessage(error) });
-    }
-  }
-
-  if (reProbe) {
-    try {
-      await VideoProbeService.probeAndPersist(videoId);
-    } catch (error) {
-      logger.warn('Post-save video probe failed', { videoId, error: toMessage(error) });
-    }
-  }
-
-  if (category === 'MUSIC' && hasArtist) {
-    try {
-      await VideoEnrichmentService.runEnrichmentJob(videoId);
-    } catch (error) {
-      logger.warn('Post-save enrichment dispatch failed', { videoId, error: toMessage(error) });
-    }
-  }
-};
-
-/** Best-effort producer-join sync (runs in `after()`, never fails the save). */
-export const syncVideoProducersAfterSave = async ({
-  videoId,
-  producers,
-  createdBy,
-}: {
-  videoId: string;
-  producers: VideoProducerInput[];
-  createdBy?: string;
-}): Promise<void> => {
-  try {
-    await ProducerService.syncVideoProducers(videoId, producers, createdBy);
-  } catch (error) {
-    logger.warn('Post-save video producer sync failed', { videoId, error: toMessage(error) });
-  }
 };

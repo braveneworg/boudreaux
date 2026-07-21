@@ -8,8 +8,13 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
-import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import type { ServiceResponse } from '@/lib/services/service.types';
+import {
+  planVideoPostSave,
+  runVideoPostSave,
+  syncVideoProducersAfterSave,
+  videoPostSaveHasWork,
+} from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { Video } from '@/lib/types/domain/video';
 import type { FormState } from '@/lib/types/form-state';
@@ -23,12 +28,9 @@ import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
 import {
-  artistDetailsDiffer,
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
-  kickPostSaveEnrichment,
-  syncVideoProducersAfterSave,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -58,58 +60,6 @@ const applyUpdateResult = (
     mapVideoServiceError(response.error || 'Failed to update video', formState);
   }
   formState.success = response.success;
-};
-
-/**
- * Schedule the post-update enrichment kick when the update changed something
- * enrichment cares about. An artist-string change or a file replacement kicks
- * immediately (re-syncing `VideoArtist` links and, for a replacement, re-probing)
- * — and, via the kick's own category gate, re-dispatches the async web
- * enrichment for a MUSIC video.
- *
- * Otherwise, when only `artistDetails` are supplied — the common case in the
- * draft flow, where an ordinary save must not re-run a job that already ran at
- * upload-complete — the change check is deferred into `after()`: it reads the
- * linked artists off the request path and only kicks when the details actually
- * differ from the stored name parts (see {@link artistDetailsDiffer}). No-op
- * when nothing relevant changed.
- *
- * Producer sync is NOT included here — it runs in its own `after()` call in
- * {@link runVideoUpdate} so that clearing all producers persists correctly.
- */
-const scheduleUpdateEnrichment = (
-  current: Video,
-  data: VideoFormData,
-  s3KeyReplaced: boolean
-): void => {
-  const artistChanged = data.artist !== current.artist;
-  if (artistChanged || s3KeyReplaced) {
-    after(() =>
-      kickPostSaveEnrichment({
-        videoId: current.id,
-        artist: data.artist,
-        category: data.category,
-        reProbe: s3KeyReplaced,
-        artistDetails: data.artistDetails,
-      })
-    );
-    return;
-  }
-  const details = data.artistDetails;
-  if (!details?.length) return;
-  // Details-only saves are common in the draft flow — verify an ACTUAL change
-  // against the linked artists before re-running a job that already ran.
-  after(async () => {
-    const rows = await VideoArtistRepository.findByVideoId(current.id);
-    if (!artistDetailsDiffer(details, rows)) return;
-    await kickPostSaveEnrichment({
-      videoId: current.id,
-      artist: data.artist,
-      category: data.category,
-      reProbe: false,
-      artistDetails: details,
-    });
-  });
 };
 
 /**
@@ -156,9 +106,9 @@ const runVideoUpdate = async (
     deleteReplacedVideoAssets(current, data, s3KeyReplaced);
     revalidatePath('/admin/videos');
     revalidatePath('/videos');
-    // Sync producers whenever the field was present in the payload — even when
-    // empty ([] means "clear all"), so clearing to zero is always persisted.
-    if (data.producers !== undefined) {
+
+    const plan = planVideoPostSave({ intent: 'update', next: data, previous: current });
+    if (plan.syncProducers) {
       after(() =>
         syncVideoProducersAfterSave({
           videoId,
@@ -167,7 +117,16 @@ const runVideoUpdate = async (
         })
       );
     }
-    scheduleUpdateEnrichment(current, data, s3KeyReplaced);
+    if (videoPostSaveHasWork(plan)) {
+      after(() =>
+        runVideoPostSave({
+          videoId,
+          artist: data.artist,
+          artistDetails: data.artistDetails,
+          plan,
+        })
+      );
+    }
   }
 };
 

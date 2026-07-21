@@ -4,17 +4,14 @@
 import { revalidatePath } from 'next/cache';
 
 import { VideoRepository } from '@/lib/repositories/video-repository';
+import { runVideoPostSave } from '@/lib/services/video-post-save-service';
+import type * as VideoPostSaveService from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { createVideoDraftAction } from './create-video-draft-action';
-import {
-  confirmVideoUpload,
-  kickPostSaveEnrichment,
-  parseDurationSeconds,
-  parseFileSize,
-} from './video-action-helpers';
+import { confirmVideoUpload, parseDurationSeconds, parseFileSize } from './video-action-helpers';
 
 import type * as VideoActionHelpers from './video-action-helpers';
 
@@ -26,14 +23,16 @@ vi.mock('@/lib/repositories/video-repository', () => ({
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/require-role');
-// Mock only the two integration helpers; keep the coercers real via importActual.
+// Mock only the executor; the planner stays real so these tests exercise the
+// actual gate that decides both the `pending` write and the dispatch.
+vi.mock('@/lib/services/video-post-save-service', async (importOriginal) => {
+  const actual = await importOriginal<typeof VideoPostSaveService>();
+  return { ...actual, runVideoPostSave: vi.fn() };
+});
+// Mock only the integration helper; keep the coercers real via importActual.
 vi.mock('./video-action-helpers', async (importOriginal) => {
   const actual = await importOriginal<typeof VideoActionHelpers>();
-  return {
-    ...actual,
-    confirmVideoUpload: vi.fn(),
-    kickPostSaveEnrichment: vi.fn(),
-  };
+  return { ...actual, confirmVideoUpload: vi.fn() };
 });
 
 // Capture after() callbacks so tests can inspect / run them on demand.
@@ -60,7 +59,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue(mockSession as never);
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(confirmVideoUpload).mockResolvedValue(null);
-  vi.mocked(kickPostSaveEnrichment).mockResolvedValue(undefined);
+  vi.mocked(runVideoPostSave).mockResolvedValue(undefined);
   vi.mocked(VideoService.getVideoById).mockResolvedValue({ success: false } as never);
   vi.mocked(VideoService.createVideo).mockResolvedValue({
     success: true,
@@ -109,13 +108,17 @@ describe('createVideoDraftAction', () => {
     expect(input.releasedOn).toBeInstanceOf(Date);
   });
 
-  it('kicks the post-save pipeline with reProbe', async () => {
+  it('kicks the post-save pipeline with a probing plan', async () => {
     await createVideoDraftAction(validInput);
 
     await afterCallbacks[0]?.();
 
-    expect(kickPostSaveEnrichment).toHaveBeenCalledWith(
-      expect.objectContaining({ videoId: ID, artist: 'Alpha', reProbe: true })
+    expect(runVideoPostSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        videoId: ID,
+        artist: 'Alpha',
+        plan: expect.objectContaining({ probe: true }),
+      })
     );
   });
 
@@ -146,8 +149,12 @@ describe('createVideoDraftAction', () => {
     await createVideoDraftAction(noArtist);
     await afterCallbacks[0]?.();
 
-    expect(kickPostSaveEnrichment).toHaveBeenCalledWith(
-      expect.objectContaining({ videoId: ID, artist: '', reProbe: true })
+    expect(runVideoPostSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        videoId: ID,
+        artist: '',
+        plan: expect.objectContaining({ probe: true, syncArtists: false }),
+      })
     );
   });
 
