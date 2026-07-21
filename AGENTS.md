@@ -105,6 +105,7 @@ e2e/                    # Playwright (fixtures, helpers, tests)
 scripts/                # tsx scripts (mongo backup, S3 ops, image variants)
 docs/lessons/           # Categorized lessons (see above)
 docs/auto-generated/    # AI-generated markdown goes here
+docs/agents/            # Engineering-skills config (see Agent skills below)
 ```
 
 ## Commands
@@ -156,3 +157,24 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - When editing a line, confirm nearby comments are still accurate.
 - Refactor with confidence — tests, types, and review catch mistakes. Update
   or remove tests to match the new structure; no orphaned tests or code.
+
+## Agent skills
+
+Per-repo config for the engineering skills (`to-tickets`, `triage`, `to-spec`,
+`wayfinder`, …). Skills resolve these pointers at runtime.
+
+### Issue tracker
+
+Local markdown — issues and specs live under `.scratch/<feature-slug>/`
+(gitignored, never committed). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`), recorded as `Status:` lines in issue files.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the root is the glossary; decisions live in
+`docs/adr/`. See `docs/agents/domain.md`.
