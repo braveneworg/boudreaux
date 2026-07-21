@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.256.0] - 2026-07-21
+
+### Fixed
+
+- fix: 🐛 patch brace-expansion, js-yaml, body-parser (#643)
+
+## [4.255.0] - 2026-07-21
+
+### Changed
+
+- chore: 🔧 update pnpm to 11.15.1 and drop engines.pnpm (#642)
+
 ## [4.254.0] - 2026-07-21
 
 ### Changed
