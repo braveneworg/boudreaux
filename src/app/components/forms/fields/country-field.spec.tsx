@@ -82,10 +82,8 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
 
 // Helper component that renders CountryField with form context
 const CountryFieldWithContext = ({ onUserInteraction }: { onUserInteraction?: () => void }) => {
-  const { control, setValue } = useFormContext<ProfileFormData>();
-  return (
-    <CountryField control={control} setValue={setValue} onUserInteraction={onUserInteraction} />
-  );
+  const { control } = useFormContext<ProfileFormData>();
+  return <CountryField control={control} onUserInteraction={onUserInteraction} />;
 };
 
 describe('CountryField', () => {
@@ -146,17 +144,6 @@ describe('CountryField', () => {
 
     expect(onUserInteraction).toHaveBeenCalledTimes(1);
   });
-
-  it('should pass through control and setValue props to ComboboxField', () => {
-    render(
-      <TestWrapper>
-        <CountryFieldWithContext />
-      </TestWrapper>
-    );
-
-    expect(screen.getByTestId('combobox-field')).toBeInTheDocument();
-  });
-
   it('should have correct option structure for countries', () => {
     render(
       <TestWrapper>

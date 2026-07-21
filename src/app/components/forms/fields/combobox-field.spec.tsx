@@ -4,7 +4,6 @@
 import React from 'react';
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
 
 import { ComboboxField } from './combobox-field';
@@ -416,18 +415,6 @@ describe('ComboboxField', () => {
     expect(screen.getByTestId('form-message')).toBeInTheDocument();
     expect(screen.getByTestId('popover')).toBeInTheDocument();
   });
-
-  it('passes setValue prop when provided', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <ComboboxField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    expect(screen.getByTestId('combobox-trigger')).toBeInTheDocument();
-  });
-
   it('displays placeholder when field has no value', () => {
     render(
       <TestWrapper>
@@ -440,53 +427,6 @@ describe('ComboboxField', () => {
     // The trigger should show the placeholder when no value
     expect(trigger).toHaveTextContent('Select an option...');
   });
-
-  it('calls setValue with correct parameters when option is selected', async () => {
-    const setValue = vi.fn();
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-
-    render(
-      <TestWrapper>
-        <ComboboxField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    const trigger = screen.getByTestId('combobox-trigger');
-
-    // Open the popover
-    await user.click(trigger);
-
-    // Find and click an option
-    const option = screen.getByText('Option 1');
-    await user.click(option);
-
-    // Verify setValue was called with correct parameters
-    expect(setValue).toHaveBeenCalledWith('testCombobox', 'option1', {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  });
-
-  it('calls both setValue and field.onChange when option selected', async () => {
-    const setValue = vi.fn();
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-
-    render(
-      <TestWrapper>
-        <ComboboxField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    const trigger = screen.getByTestId('combobox-trigger');
-    await user.click(trigger);
-
-    const option = screen.getByText('Option 1');
-    await user.click(option);
-
-    // Both setValue and field.onChange should be called
-    expect(setValue).toHaveBeenCalled();
-  });
-
   describe('Focus and Keyboard Behavior', () => {
     it('opens popover when user types an alphanumeric key', async () => {
       render(
@@ -764,28 +704,6 @@ describe('ComboboxField', () => {
         expect(popover).toHaveAttribute('data-open', 'false');
       });
     });
-
-    it('does not call setValue when not provided but option is selected', async () => {
-      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-
-      // Open the popover
-      await user.click(trigger);
-
-      // Find and click an option
-      const option = screen.getByText('Option 1');
-
-      // This should not throw even though setValue is undefined
-      await expect(user.click(option)).resolves.not.toThrow();
-    });
-
     it('does not open popover when typing alphanumeric key if popover is already open', () => {
       const { container } = render(
         <TestWrapper>
@@ -806,55 +724,6 @@ describe('ComboboxField', () => {
       // Popover should still be open (the !open check prevents reopening)
       expect(popover).toBeInTheDocument();
     });
-
-    it('handles selecting an option without setValue provided', async () => {
-      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-      await user.click(trigger);
-
-      // Select an option when setValue is not provided
-      const option = screen.getByText('Option 1');
-      await user.click(option);
-
-      // Should close popover successfully
-      const popover = screen.getByTestId('popover');
-      await waitFor(() => {
-        expect(popover).toHaveAttribute('data-open', 'false');
-      });
-    });
-
-    it('calls field.onChange even when setValue is not provided', async () => {
-      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-
-      // Open the popover
-      await user.click(trigger);
-
-      // Find and click an option
-      const option = screen.getByText('Option 2');
-      await user.click(option);
-
-      // Verify the form still works without setValue (uses field.onChange)
-      const popover = screen.getByTestId('popover');
-      await waitFor(() => {
-        expect(popover).toHaveAttribute('data-open', 'false');
-      });
-    });
-
     it('opens popover when user types underscore character', async () => {
       render(
         <TestWrapper>
@@ -970,24 +839,6 @@ describe('ComboboxField', () => {
       expect(popover).toHaveAttribute('data-open', 'true');
     });
   });
-
-  it('does not call setValue or field.onChange when selected option is not found', () => {
-    const setValue = vi.fn();
-
-    render(
-      <TestWrapper>
-        <ComboboxField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    // Click the bad-select trigger to simulate onSelect with a non-matching value
-    const badSelectTrigger = screen.getByTestId('bad-select-option 1');
-    fireEvent.click(badSelectTrigger);
-
-    // setValue should NOT have been called since selectedOption was undefined
-    expect(setValue).not.toHaveBeenCalled();
-  });
-
   it('shows opacity-100 check icon when field value matches an option', () => {
     comboboxFieldInitialValue = 'option1';
 

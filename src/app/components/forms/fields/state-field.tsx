@@ -10,15 +10,14 @@ import type { ProfileFormData } from '@/lib/validation/profile-schema';
 
 import { ComboboxField } from './combobox-field';
 
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 interface StateFieldProps {
   control: Control<ProfileFormData>;
   onUserInteraction?: () => void;
-  setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export const StateField = ({ control, onUserInteraction, setValue }: StateFieldProps) => {
+export const StateField = ({ control, onUserInteraction }: StateFieldProps) => {
   const stateOptions = US_STATES.map((state) => ({
     value: state.code,
     label: `${state.name} - ${state.code}`,
@@ -36,7 +35,6 @@ export const StateField = ({ control, onUserInteraction, setValue }: StateFieldP
       options={stateOptions}
       popoverWidth="w-[300px]"
       onUserInteraction={onUserInteraction}
-      setValue={setValue}
     />
   );
 };

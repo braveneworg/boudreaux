@@ -28,11 +28,10 @@ import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
 
 import type { TrackOption } from './use-digital-format-sync';
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 interface MediaAssociationsSectionProps {
   control: Control<FeaturedArtistFormData>;
-  setValue: UseFormSetValue<FeaturedArtistFormData>;
   formatStatus: 'idle' | 'loading' | 'found' | 'missing';
   formatFileCount: number;
   formatTracks: TrackOption[];
@@ -42,7 +41,6 @@ interface MediaAssociationsSectionProps {
 
 export const MediaAssociationsSection = ({
   control,
-  setValue,
   formatStatus,
   formatFileCount,
   formatTracks,
@@ -63,7 +61,7 @@ export const MediaAssociationsSection = ({
           name="releaseId"
           label="Release"
           placeholder="Select a release..."
-          setValue={setValue}
+          validateOnChange
           onReleaseChange={onReleaseChange}
         />
 

@@ -309,12 +309,12 @@ describe('ArtistMultiSelect', () => {
     it('renders the component with label', () => {
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -326,13 +326,13 @@ describe('ArtistMultiSelect', () => {
     it('renders with custom placeholder', () => {
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
               placeholder="Choose artists..."
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -344,13 +344,13 @@ describe('ArtistMultiSelect', () => {
     it('renders disabled when disabled prop is true', () => {
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
               disabled
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -365,12 +365,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -387,12 +387,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -414,13 +414,13 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
               searchPlaceholder="Find artists..."
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -442,12 +442,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -465,12 +465,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -487,12 +487,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -511,12 +511,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -537,12 +537,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -566,13 +566,13 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
               releaseId="release-123"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -594,13 +594,13 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
               releaseId="release-123"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -622,12 +622,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -648,12 +648,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -678,7 +678,6 @@ describe('ArtistMultiSelect', () => {
   describe('badge removal', () => {
     it('removes artist when clicking badge remove button', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-      const mockSetValue = vi.fn();
 
       render(
         <TestWrapper>
@@ -687,7 +686,7 @@ describe('ArtistMultiSelect', () => {
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={mockSetValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -720,12 +719,12 @@ describe('ArtistMultiSelect', () => {
     it('disables trigger button when disabled prop is true', () => {
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               disabled
             />
           )}
@@ -741,12 +740,12 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -783,12 +782,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -807,12 +806,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -831,12 +830,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -857,12 +856,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -896,12 +895,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -924,12 +923,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={[
                 {
                   id: 'artist-1',
@@ -952,12 +951,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={[
                 { id: 'artist-1', displayName: 'Artist One' },
                 { id: 'artist-2', displayName: 'Artist Two' },
@@ -978,12 +977,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -1007,12 +1006,12 @@ describe('ArtistMultiSelect', () => {
     it('does not render badges when initialArtists is empty and no selections made', () => {
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={[]}
             />
           )}
@@ -1030,12 +1029,12 @@ describe('ArtistMultiSelect', () => {
       // First render seeds the cache with initialArtists
       const { rerender } = render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={initialArtists}
             />
           )}
@@ -1045,12 +1044,12 @@ describe('ArtistMultiSelect', () => {
       // Re-render with same initialArtists — should hit the `changed ? next : prev` false branch
       rerender(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={initialArtists}
             />
           )}
@@ -1069,12 +1068,12 @@ describe('ArtistMultiSelect', () => {
       // Override mock to expose onEscapeKeyDown
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -1099,12 +1098,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -1125,8 +1124,8 @@ describe('ArtistMultiSelect', () => {
     });
   });
 
-  describe('handleSelect without setValue', () => {
-    it('toggles selection via field.onChange when setValue is not provided', async () => {
+  describe('handleSelect without validateOnChange', () => {
+    it('toggles selection via field.onChange when validateOnChange is omitted', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
@@ -1149,8 +1148,8 @@ describe('ArtistMultiSelect', () => {
     });
   });
 
-  describe('handleRemove without setValue', () => {
-    it('removes artist via field.onChange when setValue is not provided', async () => {
+  describe('handleRemove without validateOnChange', () => {
+    it('removes artist via field.onChange when validateOnChange is omitted', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
@@ -1189,12 +1188,12 @@ describe('ArtistMultiSelect', () => {
 
       const { rerender } = render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={[{ id: 'artist-1', displayName: 'Artist One' }]}
             />
           )}
@@ -1207,12 +1206,12 @@ describe('ArtistMultiSelect', () => {
       // the `changed = true` branch inside the initialArtists useEffect
       rerender(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
               initialArtists={[
                 { id: 'artist-1', displayName: 'Artist One' },
                 { id: 'artist-new', displayName: 'New Artist' },
@@ -1237,12 +1236,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>
@@ -1281,12 +1280,12 @@ describe('ArtistMultiSelect', () => {
 
       render(
         <TestWrapper>
-          {({ control, setValue }) => (
+          {({ control }) => (
             <ArtistMultiSelect
               control={control}
               name="artistIds"
               label="Artists"
-              setValue={setValue}
+              validateOnChange
             />
           )}
         </TestWrapper>

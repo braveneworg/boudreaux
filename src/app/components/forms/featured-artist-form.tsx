@@ -295,7 +295,6 @@ export const FeaturedArtistForm = ({
           <div className="space-y-6">
             <MediaAssociationsSection
               control={control}
-              setValue={setValue}
               formatStatus={formatStatus}
               formatFileCount={formatFileCount}
               formatTracks={formatTracks}

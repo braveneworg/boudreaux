@@ -185,18 +185,6 @@ describe('StateField', () => {
     // Should not throw any errors
     expect(firstStateOption).toBeInTheDocument();
   });
-
-  it('passes setValue prop when provided', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <StateField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    expect(screen.getByTestId('combobox-field')).toBeInTheDocument();
-  });
-
   it('uses correct field name for state', () => {
     render(
       <TestWrapper>

@@ -173,41 +173,6 @@ describe('SwitchField', () => {
 
     expect(screen.getByTestId('form-label')).toHaveClass('cursor-pointer');
   });
-
-  it('calls setValue with correct parameters when toggled on', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <SwitchField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByTestId('switch-input'));
-
-    expect(setValue).toHaveBeenCalledWith('testSwitch', true, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  });
-
-  it('calls both setValue and onUserInteraction when both provided', () => {
-    const setValue = vi.fn();
-    const onUserInteraction = vi.fn();
-    render(
-      <TestWrapper>
-        <SwitchField {...defaultProps} setValue={setValue} onUserInteraction={onUserInteraction} />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByTestId('switch-input'));
-
-    expect(onUserInteraction).toHaveBeenCalledTimes(1);
-    expect(setValue).toHaveBeenCalledWith('testSwitch', true, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  });
-
   it('renders all form structure components', () => {
     render(
       <TestWrapper>
