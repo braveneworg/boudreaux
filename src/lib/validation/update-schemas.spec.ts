@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
   updateArtistSchema,
-  updateFeaturedArtistSchema,
   updateNotificationBannerSchema,
   updateReleaseSchema,
 } from './update-schemas';
@@ -55,37 +54,6 @@ describe('update-schemas', () => {
     it('should accept valid createdBy ObjectId', () => {
       const result = updateArtistSchema.safeParse({ createdBy: validObjectId });
       expect(result.success).toBe(true);
-    });
-  });
-
-  describe('updateFeaturedArtistSchema', () => {
-    it('should accept an empty object', () => {
-      const result = updateFeaturedArtistSchema.safeParse({});
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept a single field update', () => {
-      const result = updateFeaturedArtistSchema.safeParse({ displayName: 'Updated Name' });
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate position as non-negative integer', () => {
-      expect(updateFeaturedArtistSchema.safeParse({ position: -1 }).success).toBe(false);
-      expect(updateFeaturedArtistSchema.safeParse({ position: 0 }).success).toBe(true);
-    });
-
-    it('should validate digitalFormatId as ObjectId', () => {
-      expect(updateFeaturedArtistSchema.safeParse({ digitalFormatId: 'not-valid' }).success).toBe(
-        false
-      );
-      expect(updateFeaturedArtistSchema.safeParse({ digitalFormatId: validObjectId }).success).toBe(
-        true
-      );
-    });
-
-    it('should reject description exceeding max length', () => {
-      const result = updateFeaturedArtistSchema.safeParse({ description: 'x'.repeat(2001) });
-      expect(result.success).toBe(false);
     });
   });
 

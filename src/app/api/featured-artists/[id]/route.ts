@@ -8,13 +8,10 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import type { UpdateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 /**
  * GET /api/featured-artists/[id]
@@ -45,55 +42,6 @@ export const GET = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
-
-/**
- * PATCH /api/featured-artists/[id]
- * Update a featured artist by ID
- */
-export const PATCH = withAdmin(
-  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-      const body = await request.json();
-      const validation = validateBody(updateFeaturedArtistSchema, body);
-
-      if (!validation.success) {
-        return validation.response;
-      }
-
-      // Convert date strings to Date objects for the domain DateTime fields
-      const { artistIds, ...scalarData } = validation.data;
-      const updateData: UpdateFeaturedArtistData = {
-        ...(scalarData as Record<string, unknown>),
-        ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
-        ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
-        ...(scalarData.featuredUntil && {
-          featuredUntil: new Date(scalarData.featuredUntil),
-        }),
-        // Reconnect artists: clear existing connections and set the new ones
-        ...(artistIds && {
-          artists: {
-            set: artistIds.map((artistId: string) => ({ id: artistId })),
-          },
-        }),
-      };
-
-      const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json(serializeForResponse(result.data));
-    } catch (error) {
-      loggers.media.error('FeaturedArtist PATCH error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);
 
 /**
  * DELETE /api/featured-artists/[id]
