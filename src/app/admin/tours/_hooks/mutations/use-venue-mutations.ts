@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
+import { useEntityMutation } from '@/hooks/mutations/use-entity-mutation';
 import { createVenueAction, updateVenueAction } from '@/lib/actions/venue-actions';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { VenueCreateInput, VenueUpdateInput } from '@/lib/validation/tours/venue-schema';
+
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Invalidate the venue caches plus the tour caches — tour dates embed venue
@@ -27,29 +28,12 @@ const invalidateVenueQueries = (queryClient: QueryClient): Promise<unknown> =>
  * invalidated on a successful result.
  */
 export const useCreateVenueMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createVenue,
-    mutateAsync: createVenueAsync,
-    isPending: isCreatingVenue,
-    isError: isCreateVenueError,
-    error: createVenueError,
-    data: createdVenue,
-    reset: resetCreateVenue,
-  } = useMutation<FormState, Error, VenueCreateInput>({
-    mutationFn: (values) => createVenueAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateVenueQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, VenueCreateInput>(
+    (values) => createVenueAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateVenueQueries
+  );
 
-  return {
-    createVenue,
-    createVenueAsync,
-    isCreatingVenue,
-    isCreateVenueError,
-    createVenueError,
-    createdVenue,
-    resetCreateVenue,
-  };
+  return { createVenue: mutate, createVenueAsync: mutateAsync, isCreatingVenue: isPending };
 };
 
 /**
@@ -58,28 +42,14 @@ export const useCreateVenueMutation = () => {
  * result/invalidation contract.
  */
 export const useUpdateVenueMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateVenue,
-    mutateAsync: updateVenueAsync,
-    isPending: isUpdatingVenue,
-    isError: isUpdateVenueError,
-    error: updateVenueError,
-    data: updatedVenue,
-    reset: resetUpdateVenue,
-  } = useMutation<FormState, Error, { id: string; values: VenueUpdateInput }>({
-    mutationFn: ({ id, values }) =>
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { id: string; values: VenueUpdateInput }
+  >(
+    ({ id, values }) =>
       updateVenueAction(id, EMPTY_FORM_STATE, objectToFormData(values, { keepEmptyStrings: true })),
-    onSuccess: (result) => (result.success ? invalidateVenueQueries(queryClient) : undefined),
-  });
+    invalidateVenueQueries
+  );
 
-  return {
-    updateVenue,
-    updateVenueAsync,
-    isUpdatingVenue,
-    isUpdateVenueError,
-    updateVenueError,
-    updatedVenue,
-    resetUpdateVenue,
-  };
+  return { updateVenue: mutate, updateVenueAsync: mutateAsync, isUpdatingVenue: isPending };
 };
