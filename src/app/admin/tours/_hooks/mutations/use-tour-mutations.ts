@@ -3,14 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
+import { useEntityMutation } from '@/hooks/mutations/use-entity-mutation';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { createTourAction, deleteTourAction, updateTourAction } from '@/lib/actions/tour-actions';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { TourCreateInput, TourUpdateInput } from '@/lib/validation/tours/tour-schema';
+
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Invalidate the tour caches (infinite listing, detail, and dates) so an edited
@@ -26,29 +27,12 @@ const invalidateTourQueries = (queryClient: QueryClient): Promise<unknown> =>
  * field errors, and the tour caches are invalidated on a successful result.
  */
 export const useCreateTourMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createTour,
-    mutateAsync: createTourAsync,
-    isPending: isCreatingTour,
-    isError: isCreateTourError,
-    error: createTourError,
-    data: createdTour,
-    reset: resetCreateTour,
-  } = useMutation<FormState, Error, TourCreateInput>({
-    mutationFn: (values) => createTourAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, TourCreateInput>(
+    (values) => createTourAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateTourQueries
+  );
 
-  return {
-    createTour,
-    createTourAsync,
-    isCreatingTour,
-    isCreateTourError,
-    createTourError,
-    createdTour,
-    resetCreateTour,
-  };
+  return { createTour: mutate, createTourAsync: mutateAsync, isCreatingTour: isPending };
 };
 
 /**
@@ -57,30 +41,16 @@ export const useCreateTourMutation = () => {
  * result/invalidation contract.
  */
 export const useUpdateTourMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateTour,
-    mutateAsync: updateTourAsync,
-    isPending: isUpdatingTour,
-    isError: isUpdateTourError,
-    error: updateTourError,
-    data: updatedTour,
-    reset: resetUpdateTour,
-  } = useMutation<FormState, Error, { id: string; values: TourUpdateInput }>({
-    mutationFn: ({ id, values }) =>
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { id: string; values: TourUpdateInput }
+  >(
+    ({ id, values }) =>
       updateTourAction(id, EMPTY_FORM_STATE, objectToFormData(values, { keepEmptyStrings: true })),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+    invalidateTourQueries
+  );
 
-  return {
-    updateTour,
-    updateTourAsync,
-    isUpdatingTour,
-    isUpdateTourError,
-    updateTourError,
-    updatedTour,
-    resetUpdateTour,
-  };
+  return { updateTour: mutate, updateTourAsync: mutateAsync, isUpdatingTour: isPending };
 };
 
 /**
@@ -88,25 +58,10 @@ export const useUpdateTourMutation = () => {
  * on success so the removed tour disappears from listings immediately.
  */
 export const useDeleteTourMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: deleteTour,
-    mutateAsync: deleteTourAsync,
-    isPending: isDeletingTour,
-    isError: isDeleteTourError,
-    error: deleteTourError,
-    reset: resetDeleteTour,
-  } = useMutation<AdminActionResult, Error, { tourId: string }>({
-    mutationFn: ({ tourId }) => deleteTourAction(tourId),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { tourId: string }
+  >(({ tourId }) => deleteTourAction(tourId), invalidateTourQueries);
 
-  return {
-    deleteTour,
-    deleteTourAsync,
-    isDeletingTour,
-    isDeleteTourError,
-    deleteTourError,
-    resetDeleteTour,
-  };
+  return { deleteTour: mutate, deleteTourAsync: mutateAsync, isDeletingTour: isPending };
 };

@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
@@ -15,6 +13,10 @@ import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
+
+import { useEntityMutation } from './use-entity-mutation';
+
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Invalidate every cached surface an artist mutation can affect: the artist
@@ -34,29 +36,12 @@ const invalidateArtistQueries = (queryClient: QueryClient): Promise<unknown> =>
  * invalidated on a successful result.
  */
 export const useCreateArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createArtist,
-    mutateAsync: createArtistAsync,
-    isPending: isCreatingArtist,
-    isError: isCreateArtistError,
-    error: createArtistError,
-    data: createdArtist,
-    reset: resetCreateArtist,
-  } = useMutation<FormState, Error, ArtistFormData>({
-    mutationFn: (values) => createArtistAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, ArtistFormData>(
+    (values) => createArtistAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateArtistQueries
+  );
 
-  return {
-    createArtist,
-    createArtistAsync,
-    isCreatingArtist,
-    isCreateArtistError,
-    createArtistError,
-    createdArtist,
-    resetCreateArtist,
-  };
+  return { createArtist: mutate, createArtistAsync: mutateAsync, isCreatingArtist: isPending };
 };
 
 /**
@@ -65,30 +50,15 @@ export const useCreateArtistMutation = () => {
  * {@link useCreateArtistMutation} for the result/invalidation contract.
  */
 export const useUpdateArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateArtist,
-    mutateAsync: updateArtistAsync,
-    isPending: isUpdatingArtist,
-    isError: isUpdateArtistError,
-    error: updateArtistError,
-    data: updatedArtist,
-    reset: resetUpdateArtist,
-  } = useMutation<FormState, Error, { id: string; values: ArtistFormData }>({
-    mutationFn: ({ id, values }) =>
-      updateArtistAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { id: string; values: ArtistFormData }
+  >(
+    ({ id, values }) => updateArtistAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateArtistQueries
+  );
 
-  return {
-    updateArtist,
-    updateArtistAsync,
-    isUpdatingArtist,
-    isUpdateArtistError,
-    updateArtistError,
-    updatedArtist,
-    resetUpdateArtist,
-  };
+  return { updateArtist: mutate, updateArtistAsync: mutateAsync, isUpdatingArtist: isPending };
 };
 
 /**
@@ -97,27 +67,12 @@ export const useUpdateArtistMutation = () => {
  * Invalidates the artist/release caches on a successful result.
  */
 export const useArchiveArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: archiveArtist,
-    mutateAsync: archiveArtistAsync,
-    isPending: isArchivingArtist,
-    isError: isArchiveArtistError,
-    error: archiveArtistError,
-    reset: resetArchiveArtist,
-  } = useMutation<AdminActionResult, Error, { artistId: string }>({
-    mutationFn: ({ artistId }) => archiveArtistAction(artistId),
-    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { artistId: string }
+  >(({ artistId }) => archiveArtistAction(artistId), invalidateArtistQueries);
 
-  return {
-    archiveArtist,
-    archiveArtistAsync,
-    isArchivingArtist,
-    isArchiveArtistError,
-    archiveArtistError,
-    resetArchiveArtist,
-  };
+  return { archiveArtist: mutate, archiveArtistAsync: mutateAsync, isArchivingArtist: isPending };
 };
 
 /**
@@ -125,27 +80,12 @@ export const useArchiveArtistMutation = () => {
  * Invalidates the artist/release caches on a successful result.
  */
 export const usePublishArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: publishArtist,
-    mutateAsync: publishArtistAsync,
-    isPending: isPublishingArtist,
-    isError: isPublishArtistError,
-    error: publishArtistError,
-    reset: resetPublishArtist,
-  } = useMutation<AdminActionResult, Error, { artistId: string }>({
-    mutationFn: ({ artistId }) => publishArtistAction(artistId),
-    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { artistId: string }
+  >(({ artistId }) => publishArtistAction(artistId), invalidateArtistQueries);
 
-  return {
-    publishArtist,
-    publishArtistAsync,
-    isPublishingArtist,
-    isPublishArtistError,
-    publishArtistError,
-    resetPublishArtist,
-  };
+  return { publishArtist: mutate, publishArtistAsync: mutateAsync, isPublishingArtist: isPending };
 };
 
 /**
@@ -154,25 +94,10 @@ export const usePublishArtistMutation = () => {
  * successful result.
  */
 export const useRestoreArtistMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: restoreArtist,
-    mutateAsync: restoreArtistAsync,
-    isPending: isRestoringArtist,
-    isError: isRestoreArtistError,
-    error: restoreArtistError,
-    reset: resetRestoreArtist,
-  } = useMutation<AdminActionResult, Error, { artistId: string }>({
-    mutationFn: ({ artistId }) => restoreArtistAction(artistId),
-    onSuccess: (result) => (result.success ? invalidateArtistQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { artistId: string }
+  >(({ artistId }) => restoreArtistAction(artistId), invalidateArtistQueries);
 
-  return {
-    restoreArtist,
-    restoreArtistAsync,
-    isRestoringArtist,
-    isRestoreArtistError,
-    restoreArtistError,
-    resetRestoreArtist,
-  };
+  return { restoreArtist: mutate, restoreArtistAsync: mutateAsync, isRestoringArtist: isPending };
 };

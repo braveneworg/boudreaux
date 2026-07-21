@@ -3,8 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-
+import { useEntityMutation } from '@/hooks/mutations/use-entity-mutation';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import {
   createTourDateAction,
@@ -22,6 +21,8 @@ import type {
   TourDateUpdateInput,
 } from '@/lib/validation/tours/tour-date-schema';
 
+import type { QueryClient } from '@tanstack/react-query';
+
 /**
  * Invalidate the tour caches. Tour dates and headliners render inside the tour
  * detail/listing queries, so any tour-date mutation refreshes the same keys.
@@ -35,28 +36,15 @@ const invalidateTourQueries = (queryClient: QueryClient): Promise<unknown> =>
  * invalidated on a successful result.
  */
 export const useCreateTourDateMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: createTourDate,
-    mutateAsync: createTourDateAsync,
-    isPending: isCreatingTourDate,
-    isError: isCreateTourDateError,
-    error: createTourDateError,
-    data: createdTourDate,
-    reset: resetCreateTourDate,
-  } = useMutation<FormState, Error, TourDateCreateInput>({
-    mutationFn: (values) => createTourDateAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, TourDateCreateInput>(
+    (values) => createTourDateAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateTourQueries
+  );
 
   return {
-    createTourDate,
-    createTourDateAsync,
-    isCreatingTourDate,
-    isCreateTourDateError,
-    createTourDateError,
-    createdTourDate,
-    resetCreateTourDate,
+    createTourDate: mutate,
+    createTourDateAsync: mutateAsync,
+    isCreatingTourDate: isPending,
   };
 };
 
@@ -65,29 +53,18 @@ export const useCreateTourDateMutation = () => {
  * the tour-date form normalizes blanks out before submitting.
  */
 export const useUpdateTourDateMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateTourDate,
-    mutateAsync: updateTourDateAsync,
-    isPending: isUpdatingTourDate,
-    isError: isUpdateTourDateError,
-    error: updateTourDateError,
-    data: updatedTourDate,
-    reset: resetUpdateTourDate,
-  } = useMutation<FormState, Error, { id: string; values: TourDateUpdateInput }>({
-    mutationFn: ({ id, values }) =>
-      updateTourDateAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { id: string; values: TourDateUpdateInput }
+  >(
+    ({ id, values }) => updateTourDateAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
+    invalidateTourQueries
+  );
 
   return {
-    updateTourDate,
-    updateTourDateAsync,
-    isUpdatingTourDate,
-    isUpdateTourDateError,
-    updateTourDateError,
-    updatedTourDate,
-    resetUpdateTourDate,
+    updateTourDate: mutate,
+    updateTourDateAsync: mutateAsync,
+    isUpdatingTourDate: isPending,
   };
 };
 
@@ -95,26 +72,15 @@ export const useUpdateTourDateMutation = () => {
  * Mutation hook wrapping {@link deleteTourDateAction}.
  */
 export const useDeleteTourDateMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: deleteTourDate,
-    mutateAsync: deleteTourDateAsync,
-    isPending: isDeletingTourDate,
-    isError: isDeleteTourDateError,
-    error: deleteTourDateError,
-    reset: resetDeleteTourDate,
-  } = useMutation<AdminActionResult, Error, { tourDateId: string }>({
-    mutationFn: ({ tourDateId }) => deleteTourDateAction(tourDateId),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { tourDateId: string }
+  >(({ tourDateId }) => deleteTourDateAction(tourDateId), invalidateTourQueries);
 
   return {
-    deleteTourDate,
-    deleteTourDateAsync,
-    isDeletingTourDate,
-    isDeleteTourDateError,
-    deleteTourDateError,
-    resetDeleteTourDate,
+    deleteTourDate: mutate,
+    deleteTourDateAsync: mutateAsync,
+    isDeletingTourDate: isPending,
   };
 };
 
@@ -122,31 +88,19 @@ export const useDeleteTourDateMutation = () => {
  * Mutation hook wrapping {@link updateHeadlinerSetTimeAction}.
  */
 export const useUpdateHeadlinerSetTimeMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: updateHeadlinerSetTime,
-    mutateAsync: updateHeadlinerSetTimeAsync,
-    isPending: isUpdatingHeadlinerSetTime,
-    isError: isUpdateHeadlinerSetTimeError,
-    error: updateHeadlinerSetTimeError,
-    reset: resetUpdateHeadlinerSetTime,
-  } = useMutation<
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
     AdminActionResult,
-    Error,
     { headlinerId: string; setTime: string | null; tourDateId?: string; artistId?: string }
-  >({
-    mutationFn: ({ headlinerId, setTime, tourDateId, artistId }) =>
+  >(
+    ({ headlinerId, setTime, tourDateId, artistId }) =>
       updateHeadlinerSetTimeAction(headlinerId, setTime, tourDateId, artistId),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+    invalidateTourQueries
+  );
 
   return {
-    updateHeadlinerSetTime,
-    updateHeadlinerSetTimeAsync,
-    isUpdatingHeadlinerSetTime,
-    isUpdateHeadlinerSetTimeError,
-    updateHeadlinerSetTimeError,
-    resetUpdateHeadlinerSetTime,
+    updateHeadlinerSetTime: mutate,
+    updateHeadlinerSetTimeAsync: mutateAsync,
+    isUpdatingHeadlinerSetTime: isPending,
   };
 };
 
@@ -154,31 +108,19 @@ export const useUpdateHeadlinerSetTimeMutation = () => {
  * Mutation hook wrapping {@link removeHeadlinerAction}.
  */
 export const useRemoveHeadlinerMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: removeHeadliner,
-    mutateAsync: removeHeadlinerAsync,
-    isPending: isRemovingHeadliner,
-    isError: isRemoveHeadlinerError,
-    error: removeHeadlinerError,
-    reset: resetRemoveHeadliner,
-  } = useMutation<
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
     AdminActionResult,
-    Error,
     { headlinerId: string; tourDateId?: string; artistId?: string }
-  >({
-    mutationFn: ({ headlinerId, tourDateId, artistId }) =>
+  >(
+    ({ headlinerId, tourDateId, artistId }) =>
       removeHeadlinerAction(headlinerId, tourDateId, artistId),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+    invalidateTourQueries
+  );
 
   return {
-    removeHeadliner,
-    removeHeadlinerAsync,
-    isRemovingHeadliner,
-    isRemoveHeadlinerError,
-    removeHeadlinerError,
-    resetRemoveHeadliner,
+    removeHeadliner: mutate,
+    removeHeadlinerAsync: mutateAsync,
+    isRemovingHeadliner: isPending,
   };
 };
 
@@ -186,25 +128,17 @@ export const useRemoveHeadlinerMutation = () => {
  * Mutation hook wrapping {@link reorderHeadlinersAction}.
  */
 export const useReorderHeadlinersMutation = () => {
-  const queryClient = useQueryClient();
-  const {
-    mutate: reorderHeadliners,
-    mutateAsync: reorderHeadlinersAsync,
-    isPending: isReorderingHeadliners,
-    isError: isReorderHeadlinersError,
-    error: reorderHeadlinersError,
-    reset: resetReorderHeadliners,
-  } = useMutation<AdminActionResult, Error, { tourDateId: string; headlinerIds: string[] }>({
-    mutationFn: ({ tourDateId, headlinerIds }) => reorderHeadlinersAction(tourDateId, headlinerIds),
-    onSuccess: (result) => (result.success ? invalidateTourQueries(queryClient) : undefined),
-  });
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { tourDateId: string; headlinerIds: string[] }
+  >(
+    ({ tourDateId, headlinerIds }) => reorderHeadlinersAction(tourDateId, headlinerIds),
+    invalidateTourQueries
+  );
 
   return {
-    reorderHeadliners,
-    reorderHeadlinersAsync,
-    isReorderingHeadliners,
-    isReorderHeadlinersError,
-    reorderHeadlinersError,
-    resetReorderHeadliners,
+    reorderHeadliners: mutate,
+    reorderHeadlinersAsync: mutateAsync,
+    isReorderingHeadliners: isPending,
   };
 };
