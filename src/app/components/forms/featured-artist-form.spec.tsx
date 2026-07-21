@@ -6,6 +6,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
@@ -142,15 +143,13 @@ vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
   ),
 }));
 
+// The real ReleaseSelect writes the picked release through `field.onChange`.
+// This stub reaches the same form via context and hands its setter to the
+// tests, so they can drive a selection without rendering the combobox.
 vi.mock('@/app/components/forms/fields/release-select', () => ({
-  ReleaseSelect: ({
-    name,
-    setValue,
-  }: {
-    name: string;
-    setValue?: (name: string, value: string, options?: Record<string, boolean>) => void;
-  }) => {
-    capturedReleaseSelectSetValue = setValue;
+  ReleaseSelect: ({ name }: { name: string }) => {
+    const { setValue } = useFormContext();
+    capturedReleaseSelectSetValue = setValue as typeof capturedReleaseSelectSetValue;
     return <div data-testid={`release-select-${name}`}>ReleaseSelect</div>;
   },
 }));

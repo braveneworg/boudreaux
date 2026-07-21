@@ -8,7 +8,7 @@ import React from 'react';
 import { FormField, FormItem, FormLabel, FormControl } from '@/app/components/ui/form';
 import { Switch } from '@/app/components/ui/switch';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 interface SwitchFieldProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -19,14 +19,13 @@ interface SwitchFieldProps<
   label: React.ReactNode;
   id: string;
   onUserInteraction?: () => void;
-  setValue?: UseFormSetValue<TFieldValues>;
 }
 
 /**
  * Boolean form control rendered as an accessible toggle switch (the project's
  * mobile-first replacement for checkboxes). Integrates with React Hook Form via
- * `FormField`, optionally mirroring the value through `setValue` and notifying a
- * dirty-tracking callback. The whole row is a generous tap target for touch.
+ * `FormField`, notifying a dirty-tracking callback. The whole row is a generous
+ * tap target for touch.
  */
 export const SwitchField = <
   TFieldValues extends FieldValues = FieldValues,
@@ -37,7 +36,6 @@ export const SwitchField = <
   label,
   id,
   onUserInteraction,
-  setValue,
 }: SwitchFieldProps<TFieldValues, TName>) => (
   <FormField
     control={control}
@@ -49,12 +47,6 @@ export const SwitchField = <
             checked={!!field.value}
             onCheckedChange={(checked) => {
               onUserInteraction?.();
-              if (setValue) {
-                setValue(name, checked as TFieldValues[TName], {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              }
               field.onChange(checked);
             }}
             id={id}

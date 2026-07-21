@@ -149,19 +149,6 @@ describe('TextField', () => {
     expect(screen.getByTestId('form-message')).toBeInTheDocument();
     expect(screen.getByTestId('text-input')).toBeInTheDocument();
   });
-
-  it('passes setValue prop when provided', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <TextField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    // The component should render without errors when setValue is provided
-    expect(screen.getByTestId('text-input')).toBeInTheDocument();
-  });
-
   it('handles different field names', () => {
     render(
       <TestWrapper>
@@ -169,60 +156,6 @@ describe('TextField', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByTestId('text-input')).toBeInTheDocument();
-  });
-
-  it('calls setValue with value on input change when setValue is provided', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <TextField {...defaultProps} setValue={setValue} />
-      </TestWrapper>
-    );
-
-    const input = screen.getByTestId('text-input');
-    fireEvent.change(input, { target: { value: 'new value' } });
-
-    expect(setValue).toHaveBeenCalledWith('testField', 'new value', {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  });
-
-  it('calls setValue in useEffect when value prop is provided', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <TextField {...defaultProps} setValue={setValue} value="initial value" />
-      </TestWrapper>
-    );
-
-    expect(setValue).toHaveBeenCalledWith('testField', 'initial value', {
-      shouldDirty: true,
-      shouldValidate: false,
-    });
-  });
-
-  it('does not call setValue in useEffect when value is empty', () => {
-    const setValue = vi.fn();
-    render(
-      <TestWrapper>
-        <TextField {...defaultProps} setValue={setValue} value="" />
-      </TestWrapper>
-    );
-
-    // setValue should not be called with empty value
-    expect(setValue).not.toHaveBeenCalled();
-  });
-
-  it('does not call setValue in useEffect when setValue is not provided', () => {
-    render(
-      <TestWrapper>
-        <TextField {...defaultProps} value="some value" />
-      </TestWrapper>
-    );
-
-    // Should render without errors
     expect(screen.getByTestId('text-input')).toBeInTheDocument();
   });
 });

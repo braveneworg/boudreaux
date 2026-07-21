@@ -8,7 +8,7 @@ import React from 'react';
 import { Checkbox } from '@/app/components/ui/checkbox';
 import { FormField, FormItem, FormLabel, FormControl } from '@/app/components/ui/form';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 interface CheckboxFieldProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -19,7 +19,6 @@ interface CheckboxFieldProps<
   label: React.ReactNode;
   id: string;
   onUserInteraction?: () => void;
-  setValue?: UseFormSetValue<TFieldValues>;
 }
 
 export const CheckboxField = <
@@ -31,7 +30,6 @@ export const CheckboxField = <
   label,
   id,
   onUserInteraction,
-  setValue,
 }: CheckboxFieldProps<TFieldValues, TName>) => (
   <FormField
     control={control}
@@ -44,12 +42,6 @@ export const CheckboxField = <
             onCheckedChange={(checked) => {
               onUserInteraction?.();
               const boolValue = checked === true;
-              if (setValue) {
-                setValue(name, boolValue as TFieldValues[TName], {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              }
               field.onChange(boolValue);
             }}
             id={id}

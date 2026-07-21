@@ -22,9 +22,10 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/hooks/use-debounce';
 
+import { useFieldValidator } from './use-field-validator';
 import { useReleaseListQuery } from '../_hooks/use-release-list-query';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 export interface ReleaseOption {
   id: string;
@@ -65,7 +66,11 @@ interface ReleaseSelectProps<
   searchPlaceholder?: string;
   emptyMessage?: string;
   popoverWidth?: string;
-  setValue?: UseFormSetValue<TFieldValues>;
+  /**
+   * Report validation errors as soon as a release is picked or cleared rather
+   * than waiting for the first submit. See {@link useFieldValidator}.
+   */
+  validateOnChange?: boolean;
   disabled?: boolean;
   showCreateLink?: boolean;
   onReleaseChange?: (release: ReleaseOption | null) => void;
@@ -83,12 +88,13 @@ export const ReleaseSelect = <
   searchPlaceholder = 'Search releases...',
   emptyMessage = 'No releases found.',
   popoverWidth = 'w-[400px]',
-  setValue,
+  validateOnChange,
   disabled = false,
   showCreateLink = true,
   onReleaseChange,
   artistIds,
 }: ReleaseSelectProps<TFieldValues, TName>) => {
+  const validateField = useFieldValidator<TFieldValues>(name, validateOnChange);
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
@@ -133,25 +139,15 @@ export const ReleaseSelect = <
 
           const newRelease = releases.find((r) => r.id === releaseId) || null;
 
-          if (setValue) {
-            setValue(name, releaseId as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange(releaseId);
+          validateField();
           onReleaseChange?.(newRelease);
           setOpen(false);
         };
 
         const handleClear = () => {
-          if (setValue) {
-            setValue(name, '' as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange('');
+          validateField();
           onReleaseChange?.(null);
         };
 

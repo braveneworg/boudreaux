@@ -10,15 +10,14 @@ import type { ProfileFormData } from '@/lib/validation/profile-schema';
 
 import { ComboboxField } from './combobox-field';
 
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 interface CountryFieldProps {
   control: Control<ProfileFormData>;
   onUserInteraction?: () => void;
-  setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export const CountryField = ({ control, onUserInteraction, setValue }: CountryFieldProps) => {
+export const CountryField = ({ control, onUserInteraction }: CountryFieldProps) => {
   const countryOptions = COUNTRIES.map((country) => ({
     value: country.code,
     label: country.name,
@@ -36,7 +35,6 @@ export const CountryField = ({ control, onUserInteraction, setValue }: CountryFi
       options={countryOptions}
       popoverWidth="w-[400px]"
       onUserInteraction={onUserInteraction}
-      setValue={setValue}
     />
   );
 };

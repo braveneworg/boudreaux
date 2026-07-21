@@ -70,7 +70,6 @@ const renderContactForm = (overrides?: Partial<React.ComponentProps<typeof Conta
     setIsVerified: vi.fn(),
     onTurnstileToken: vi.fn(),
     state: defaultState,
-    setValue: vi.fn(),
     ...overrides,
   };
 
@@ -88,7 +87,7 @@ const renderContactForm = (overrides?: Partial<React.ComponentProps<typeof Conta
     });
     return (
       <FormProvider {...methods}>
-        <ContactForm {...defaultProps} control={methods.control} setValue={methods.setValue} />
+        <ContactForm {...defaultProps} control={methods.control} />
       </FormProvider>
     );
   };

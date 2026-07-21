@@ -15,7 +15,7 @@ import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/lib/types/form-state';
 import { CONTACT_REASONS, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
 
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 interface ContactFormProps {
   control: Control<ContactFormSchemaType>;
@@ -24,7 +24,6 @@ interface ContactFormProps {
   setIsVerified: (isVerified: boolean) => void;
   onTurnstileToken: (token: string) => void;
   state: FormState;
-  setValue: UseFormSetValue<ContactFormSchemaType>;
 }
 
 export const ContactForm = ({
@@ -34,7 +33,6 @@ export const ContactForm = ({
   setIsVerified,
   onTurnstileToken,
   state,
-  setValue,
 }: ContactFormProps) => {
   return (
     <div className="animate-in fade-in space-y-6 duration-300">
@@ -47,7 +45,7 @@ export const ContactForm = ({
         emptyMessage="No matching reason"
         options={[...CONTACT_REASONS]}
         popoverWidth="w-full"
-        setValue={setValue}
+        validateOnChange
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -56,14 +54,14 @@ export const ContactForm = ({
           name="firstName"
           label="First name"
           placeholder="First name"
-          setValue={setValue}
+          validateOnChange
         />
         <TextField
           control={control}
           name="lastName"
           label="Last name"
           placeholder="Last name"
-          setValue={setValue}
+          validateOnChange
         />
       </div>
 
@@ -73,7 +71,7 @@ export const ContactForm = ({
         label="Email"
         placeholder="Email address"
         type="email"
-        setValue={setValue}
+        validateOnChange
       />
 
       <TextField
@@ -82,7 +80,7 @@ export const ContactForm = ({
         label="Phone (optional)"
         placeholder="Phone number"
         type="tel"
-        setValue={setValue}
+        validateOnChange
       />
 
       <FormField
