@@ -25,7 +25,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 
 import { useReleaseListQuery } from '../_hooks/use-release-list-query';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 export interface ReleaseOption {
   id: string;
@@ -44,7 +44,6 @@ interface ReleaseMultiSelectProps<
   searchPlaceholder?: string;
   emptyMessage?: string;
   popoverWidth?: string;
-  setValue?: UseFormSetValue<TFieldValues>;
   trackId?: string | null;
   disabled?: boolean;
   onReleasesChange?: (releases: ReleaseOption[]) => void;
@@ -61,7 +60,6 @@ export const ReleaseMultiSelect = <
   searchPlaceholder = 'Search releases...',
   emptyMessage = 'No releases found.',
   popoverWidth = 'w-[400px]',
-  setValue,
   trackId,
   disabled = false,
   onReleasesChange,
@@ -116,12 +114,6 @@ export const ReleaseMultiSelect = <
             ? selectedIds.filter((id) => id !== releaseId)
             : [...selectedIds, releaseId];
 
-          if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange(newValue);
 
           // Notify parent of selected releases
@@ -133,12 +125,6 @@ export const ReleaseMultiSelect = <
 
         const handleRemove = (releaseId: string) => {
           const newValue = selectedIds.filter((id) => id !== releaseId);
-          if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange(newValue);
 
           // Notify parent of selected releases

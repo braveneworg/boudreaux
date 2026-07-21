@@ -23,9 +23,10 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/hooks/use-debounce';
 
+import { useFieldValidator } from './use-field-validator';
 import { useArtistListQuery } from '../_hooks/use-artist-list-query';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 export interface ArtistOption {
   id: string;
@@ -192,7 +193,11 @@ interface ArtistMultiSelectProps<
   searchPlaceholder?: string;
   emptyMessage?: string;
   popoverWidth?: string;
-  setValue?: UseFormSetValue<TFieldValues>;
+  /**
+   * Report validation errors as soon as the selection changes rather than
+   * waiting for the first submit. See {@link useFieldValidator}.
+   */
+  validateOnChange?: boolean;
   releaseId?: string | null;
   disabled?: boolean;
   initialArtists?: ArtistOption[];
@@ -209,11 +214,12 @@ export const ArtistMultiSelect = <
   searchPlaceholder = 'Search artists...',
   emptyMessage = 'No artists found.',
   popoverWidth = 'w-[calc(100vw-2rem)] sm:w-[400px]',
-  setValue,
+  validateOnChange,
   releaseId,
   disabled = false,
   initialArtists = [],
 }: ArtistMultiSelectProps<TFieldValues, TName>) => {
+  const validateField = useFieldValidator<TFieldValues>(name, validateOnChange);
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
@@ -257,24 +263,14 @@ export const ArtistMultiSelect = <
             ? selectedIds.filter((id) => id !== artistId)
             : [...selectedIds, artistId];
 
-          if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange(newValue);
+          validateField();
         };
 
         const handleRemove = (artistId: string) => {
           const newValue = selectedIds.filter((id) => id !== artistId);
-          if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
-              shouldDirty: true,
-              shouldValidate: true,
-            });
-          }
           field.onChange(newValue);
+          validateField();
         };
 
         // Get selected artists for display from cache (persists across searches)

@@ -192,7 +192,6 @@ const ContactPage = () => {
                 setIsVerified={setIsVerified}
                 onTurnstileToken={setTurnstileToken}
                 state={state}
-                setValue={form.setValue}
               />
             </form>
           </FormProvider>

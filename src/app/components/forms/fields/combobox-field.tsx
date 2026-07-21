@@ -19,7 +19,9 @@ import {
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 
-import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+import { useFieldValidator } from './use-field-validator';
+
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 interface ComboboxOption {
   value: string;
@@ -40,7 +42,11 @@ interface ComboboxFieldProps<
   options: ComboboxOption[];
   popoverWidth?: string;
   onUserInteraction?: () => void;
-  setValue?: UseFormSetValue<TFieldValues>;
+  /**
+   * Report validation errors as soon as a selection is made rather than waiting
+   * for the first submit. See {@link useFieldValidator}.
+   */
+  validateOnChange?: boolean;
 }
 
 export const ComboboxField = <
@@ -56,8 +62,9 @@ export const ComboboxField = <
   options,
   popoverWidth = 'w-[300px]',
   onUserInteraction,
-  setValue,
+  validateOnChange,
 }: ComboboxFieldProps<TFieldValues, TName>) => {
+  const validateField = useFieldValidator<TFieldValues>(name, validateOnChange);
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -141,13 +148,8 @@ export const ComboboxField = <
                             (opt) => (opt.searchValue || opt.label.toLowerCase()) === currentValue
                           );
                           if (selectedOption) {
-                            if (setValue) {
-                              setValue(name, selectedOption.value as TFieldValues[TName], {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              });
-                            }
                             field.onChange(selectedOption.value);
+                            validateField();
                           }
                           setSearchValue('');
                           setOpen(false);

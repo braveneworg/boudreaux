@@ -104,7 +104,7 @@ export const ReleaseBasicInfoSection = ({
       placeholder="Select artists..."
       searchPlaceholder="Search artists..."
       emptyMessage="No artists found."
-      setValue={setValue}
+      validateOnChange
       releaseId={releaseId}
       disabled={isSubmitting}
     />
