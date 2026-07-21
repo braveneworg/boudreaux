@@ -8,6 +8,7 @@ import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist
 import { publishFeaturedArtistAction } from '@/lib/actions/publish-featured-artist-action';
 import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
+import { updateFeaturedArtistAction } from '@/lib/actions/update-featured-artist-action';
 import {
   updateFeaturedArtistCoverArtAction,
   type UpdateFeaturedArtistCoverArtResult,
@@ -51,6 +52,33 @@ export const useCreateFeaturedArtistMutation = () => {
     createFeaturedArtist: mutate,
     createFeaturedArtistAsync: mutateAsync,
     isCreatingFeaturedArtist: isPending,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link updateFeaturedArtistAction} — the whole-entity
+ * edit save. Takes the same values as the create hook plus the row's id, and
+ * appends `artistIds` individually so the action can read them via
+ * `FormData.getAll`. The featured-artist caches are invalidated on success.
+ */
+export const useUpdateFeaturedArtistMutation = () => {
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    FormState,
+    { featuredArtistId: string; values: FeaturedArtistFormData & { artistIds: string[] } }
+  >(
+    ({ featuredArtistId, values }) =>
+      updateFeaturedArtistAction(
+        featuredArtistId,
+        EMPTY_FORM_STATE,
+        objectToFormData(values, { repeatKeys: ['artistIds'] })
+      ),
+    invalidateFeaturedArtistQueries
+  );
+
+  return {
+    updateFeaturedArtist: mutate,
+    updateFeaturedArtistAsync: mutateAsync,
+    isUpdatingFeaturedArtist: isPending,
   };
 };
 

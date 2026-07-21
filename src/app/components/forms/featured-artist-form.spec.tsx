@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
+import { updateFeaturedArtistAction } from '@/lib/actions/update-featured-artist-action';
 
 import { useFeaturedArtistQuery } from './_hooks/use-featured-artist-query';
 import {
@@ -92,6 +93,10 @@ vi.mock('@/lib/actions/create-featured-artist-action', () => ({
 
 vi.mock('@/lib/actions/delete-featured-artist-action', () => ({
   deleteFeaturedArtistAction: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/update-featured-artist-action', () => ({
+  updateFeaturedArtistAction: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/console-logger', () => ({
@@ -599,6 +604,126 @@ describe('FeaturedArtistForm', () => {
 
       await waitFor(() => {
         expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to load featured artist data');
+      });
+    });
+  });
+
+  // The edit save previously went out as a raw PATCH to
+  // `/api/featured-artists/[id]` and had no coverage at all. It now runs through
+  // the same Server Action + mutation hook stack as every other entity form.
+  describe('edit save', () => {
+    const useFeaturedArtistQueryMock = vi.mocked(useFeaturedArtistQuery);
+    const featuredArtistId = '507f1f77bcf86cd799439011';
+    const artistId = 'a'.repeat(24);
+
+    const save = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    };
+
+    beforeEach(() => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: {
+          id: featuredArtistId,
+          displayName: 'Alpha',
+          description: 'A description',
+          coverArt: 'https://cdn.example.com/cover.jpg',
+          position: 2,
+          featuredOn: new Date('2026-07-01'),
+          featuredUntil: null,
+          digitalFormatId: 'c'.repeat(24),
+          releaseId: 'd'.repeat(24),
+          featuredTrackNumber: null,
+          artists: [{ id: artistId, displayName: 'Alpha', firstName: 'A', surname: 'B' }],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as never);
+      // The digital-format sync clears `digitalFormatId` whenever the watched
+      // release resolves no MP3 format, which would fail validation before the
+      // submit ever reaches the action.
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat('c'.repeat(24), 1),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      vi.mocked(updateFeaturedArtistAction).mockResolvedValue({ fields: {}, success: true });
+    });
+
+    afterEach(() => {
+      useFeaturedArtistQueryMock.mockReturnValue({
+        data: null,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+    });
+
+    it('saves through the update action addressed by id', async () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[0]).toBe(featuredArtistId);
+      });
+    });
+
+    it('carries the loaded artist ids through as repeated form entries', async () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() => {
+        const formData = vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[2] as FormData;
+        expect(formData.getAll('artistIds')).toEqual([artistId]);
+      });
+    });
+
+    it('navigates back to the admin listing on success', async () => {
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist');
+      });
+    });
+
+    it('shows the server error and stays put when the update fails', async () => {
+      vi.mocked(updateFeaturedArtistAction).mockResolvedValue({
+        fields: {},
+        success: false,
+        errors: { general: ['Featured artist not found'] },
+      });
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Featured artist not found');
+      });
+    });
+
+    it('shows a generic error toast when the update action throws', async () => {
+      vi.mocked(updateFeaturedArtistAction).mockRejectedValue(new Error('boom'));
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() => {
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+          'An unexpected error occurred while saving.'
+        );
       });
     });
   });
