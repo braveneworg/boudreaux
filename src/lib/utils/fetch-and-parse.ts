@@ -5,14 +5,27 @@ import { z, type ZodType } from 'zod';
 
 /**
  * Options controlling a {@link fetchAndParse} request.
+ *
+ * @typeParam TFallback - Union of the values mapped by `fallbackByStatus`.
+ *   Defaults to `never` when the option is omitted, so the return type of a
+ *   call that does not opt in stays exactly `T`.
  */
-interface FetchAndParseOptions {
+interface FetchAndParseOptions<TFallback> {
   /** TanStack Query abort signal, forwarded to `fetch` for automatic cancellation. */
   signal?: AbortSignal;
   /** Cache mode forwarded to `fetch` (e.g. `'no-store'` for never-cached endpoints). */
   cache?: globalThis.RequestCache;
-  /** Message thrown when the response status is not OK. */
+  /** Message thrown when the response status is not OK and is not mapped below. */
   errorMessage?: string;
+  /**
+   * HTTP statuses to resolve with a value instead of throwing — the common case
+   * being `{ 404: null }` for a detail endpoint whose absence is a legitimate
+   * result rather than a failure, or `{ 401: null }` for a signed-out read.
+   *
+   * The status is matched by key presence, so mapping one explicitly to
+   * `undefined` resolves rather than throws.
+   */
+  fallbackByStatus?: Partial<Record<number, TFallback>>;
 }
 
 /**
@@ -23,20 +36,35 @@ interface FetchAndParseOptions {
  * Forwards the optional `AbortSignal` to `fetch` so the request is cancelled
  * automatically on unmount, invalidation, or a superseding refetch.
  *
+ * A non-OK status throws `errorMessage` unless `fallbackByStatus` maps it, in
+ * which case the mapped value resolves and the body is never read.
+ *
  * @typeParam T - The validated response type produced by `schema`.
+ * @typeParam TFallback - Union of the `fallbackByStatus` values, inferred from
+ *   the option and `never` when it is omitted.
  * @param url - The API route URL to request.
  * @param schema - Zod schema describing the expected response body.
- * @param options - Optional `signal`, `cache` mode, and `errorMessage`.
- * @returns The parsed, schema-validated response body.
- * @throws If the response status is not OK, or the body fails schema validation.
+ * @param options - Optional `signal`, `cache` mode, `errorMessage`, and
+ *   `fallbackByStatus`.
+ * @returns The parsed, schema-validated response body, or the value mapped for
+ *   the response status.
+ * @throws If the status is not OK and unmapped, or the body fails validation.
  */
-export const fetchAndParse = async <T>(
+export const fetchAndParse = async <T, TFallback = never>(
   url: string,
   schema: ZodType<T>,
-  { signal, cache, errorMessage = 'Request failed' }: FetchAndParseOptions = {}
-): Promise<T> => {
+  {
+    signal,
+    cache,
+    errorMessage = 'Request failed',
+    fallbackByStatus,
+  }: FetchAndParseOptions<TFallback> = {}
+): Promise<T | TFallback> => {
   const response = await fetch(url, { signal, ...(cache ? { cache } : {}) });
   if (!response.ok) {
+    if (fallbackByStatus && Object.hasOwn(fallbackByStatus, response.status)) {
+      return fallbackByStatus[response.status] as TFallback;
+    }
     throw new Error(errorMessage);
   }
   const body: unknown = await response.json();
@@ -70,7 +98,9 @@ export class ResponseValidationError extends Error {
  * `error`.
  *
  * Use this directly when a hook needs response handling {@link fetchAndParse}
- * does not cover (e.g. mapping a 401 to `null` before validating the body).
+ * does not cover — unwrapping an envelope before validating, composing a
+ * timeout into the signal, or deriving the thrown message from the error body.
+ * Mapping a status to a value is covered: pass `fallbackByStatus` instead.
  *
  * @typeParam T - The validated response type produced by `schema`.
  * @param url - The API route the body came from (included in the error message).

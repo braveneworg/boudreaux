@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { videoRowSchema, type VideoRow } from '@/lib/validation/video-schema';
-import { parseResponse } from '@/utils/fetch-and-parse';
+import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /**
  * Fetches a single video by id from the admin-only `/api/videos/[id]` route
@@ -21,17 +21,12 @@ import { parseResponse } from '@/utils/fetch-and-parse';
  * @returns The parsed video, or `null` when not found (404).
  * @throws If the response status is not OK (other than 404).
  */
-const fetchVideoById = async (id: string, signal?: AbortSignal): Promise<VideoRow | null> => {
-  const url = `/api/videos/${encodeURIComponent(id)}`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw Error('Failed to fetch video');
-  }
-  return parseResponse(url, videoRowSchema, await response.json());
-};
+const fetchVideoById = async (id: string, signal?: AbortSignal): Promise<VideoRow | null> =>
+  fetchAndParse(`/api/videos/${encodeURIComponent(id)}`, videoRowSchema, {
+    signal,
+    errorMessage: 'Failed to fetch video',
+    fallbackByStatus: { 404: null },
+  });
 
 /**
  * React Query hook for fetching a single video for the admin edit form.
