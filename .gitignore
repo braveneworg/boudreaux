@@ -70,6 +70,10 @@ e2e/.auth/
 /backups
 *.archive
 
+# generated architecture docs — kept locally, never committed
+# (regenerate with docs/architectural-diagrams/build-pdf.js)
+/docs/architectural-diagrams/
+
 /public/media
 .claude/*
 !.claude/settings.json
