@@ -5,7 +5,12 @@
 import { NextResponse } from 'next/server';
 
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
-import { MAX_FREE_DOWNLOAD_QUOTA, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
+import {
+  FREE_FORMAT_TYPES,
+  MAX_FREE_DOWNLOAD_QUOTA,
+  VALID_FORMAT_TYPES,
+  isFreeFormatType,
+} from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { withLogging } from '@/lib/decorators/with-logging';
@@ -94,6 +99,41 @@ const logFailedDownload = async (args: {
   });
 };
 
+// A non-purchaser may only pull free formats (MP3_320KBPS / AAC) through the
+// freemium path. Lossless masters (FLAC/WAV/AIFF/ALAC) — and any other paid
+// format — require a purchase; the freemium quota is keyed on unique releases,
+// not format, so without this gate it would hand out lossless masters for free.
+const enforceFreeFormatRestriction = async (args: {
+  downloadEventRepo: DownloadEventRepository;
+  request: Request;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+}): Promise<NextResponse | null> => {
+  const { downloadEventRepo, request, userId, releaseId, formatType } = args;
+  if (isFreeFormatType(formatType)) {
+    return null;
+  }
+
+  await logFailedDownload({
+    repo: downloadEventRepo,
+    request,
+    userId,
+    releaseId,
+    formatType,
+    errorCode: 'PURCHASE_REQUIRED',
+  });
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'PURCHASE_REQUIRED',
+      message: `This format requires a purchase. Free downloads are limited to ${FREE_FORMAT_TYPES.join(', ')}.`,
+      contactSupportUrl: '/support',
+    },
+    { status: 403 }
+  );
+};
+
 const enforceFreemiumQuota = async (args: {
   quotaService: QuotaEnforcementService;
   downloadEventRepo: DownloadEventRepository;
@@ -103,6 +143,17 @@ const enforceFreemiumQuota = async (args: {
   formatType: DigitalFormatType;
 }): Promise<NextResponse | null> => {
   const { quotaService, downloadEventRepo, request, userId, releaseId, formatType } = args;
+
+  // Free formats only for non-purchasers — lossless masters need a purchase.
+  const formatResponse = await enforceFreeFormatRestriction({
+    downloadEventRepo,
+    request,
+    userId,
+    releaseId,
+    formatType,
+  });
+  if (formatResponse) return formatResponse;
+
   const quotaCheck = await quotaService.checkFreeDownloadQuota({ kind: 'user', userId }, releaseId);
 
   if (!quotaCheck.allowed) {
@@ -266,7 +317,7 @@ export const GET = withLogging<{ id: string; formatType: string }>('DOWNLOADS')(
       // Step 3: Check purchase status
       const hasPurchased = await authService.checkPurchaseStatus(userId, releaseId);
 
-      // Step 4: If no purchase, check freemium quota
+      // Step 4: If no purchase, restrict to free formats + enforce the quota
       if (!hasPurchased) {
         const quotaResponse = await enforceFreemiumQuota({
           quotaService,
