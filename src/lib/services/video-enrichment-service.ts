@@ -22,6 +22,7 @@ import type {
   VideoEnrichmentState,
   VideoEnrichmentSuggestionRecord,
 } from '@/lib/types/domain/video-enrichment';
+import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
@@ -109,10 +110,6 @@ const tokensMatch = (a: string, b: string): boolean => {
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 };
 
-/** The best display name for a linked artist (mirrors the bio derivation). */
-const displayNameFor = (row: VideoArtistWithArtist): string =>
-  row.artist.displayName?.trim() || `${row.artist.firstName} ${row.artist.surname}`.trim();
-
 /** Map join rows onto the Lambda's `artists` payload, dropping empty knowns. */
 const toLambdaArtists = (rows: VideoArtistWithArtist[]): VideoEnrichmentLambdaInput['artists'] =>
   rows.slice(0, MAX_LAMBDA_ARTISTS).map((row) => {
@@ -126,7 +123,7 @@ const toLambdaArtists = (rows: VideoArtistWithArtist[]): VideoEnrichmentLambdaIn
     };
     return {
       artistId: row.artistId,
-      name: displayNameFor(row),
+      name: deriveArtistDisplayName(row.artist),
       role: row.role === 'PRIMARY' ? ('primary' as const) : ('featured' as const),
       ...(Object.keys(known).length > 0 ? { known } : {}),
     };
@@ -201,7 +198,7 @@ const toStatusArtist = (
   row: VideoArtistWithArtist
 ): VideoEnrichmentStatusResult['artists'][number] => ({
   artistId: row.artistId,
-  displayName: displayNameFor(row),
+  displayName: deriveArtistDisplayName(row.artist),
   role: row.role,
   current: {
     firstName: row.artist.firstName,
@@ -400,7 +397,7 @@ const knownArtistNames = (
   rows: VideoArtistWithArtist[]
 ): Set<string> =>
   new Set([
-    ...rows.map((row) => displayNameFor(row).toLowerCase()),
+    ...rows.map((row) => deriveArtistDisplayName(row.artist).toLowerCase()),
     ...splitFeaturedArtists(state.artist).map((part) => part.name.toLowerCase()),
   ]);
 

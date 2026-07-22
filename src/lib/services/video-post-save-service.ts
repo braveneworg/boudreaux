@@ -11,6 +11,7 @@ import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type { VideoCategory } from '@/lib/types/domain/video';
+import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
@@ -154,11 +155,9 @@ export const planVideoPostSave = (input: VideoPostSaveInput): VideoPostSavePlan 
 export const videoPostSaveHasWork = (plan: VideoPostSavePlan): boolean =>
   plan.syncArtists || plan.probe || plan.dispatchEnrichment || plan.confirmArtistDetailsChanged;
 
-/** The linked artist's matchable display name (mirrors the enrichment service). */
+/** The linked artist's matchable display name (lowercased for comparison). */
 const linkedNameFor = (row: VideoArtistWithArtist): string =>
-  (
-    row.artist.displayName?.trim() || `${row.artist.firstName} ${row.artist.surname}`.trim()
-  ).toLowerCase();
+  deriveArtistDisplayName(row.artist).toLowerCase();
 
 /** True when one provided part differs from the stored value (undefined = not provided). */
 const detailPartDiffers = (stored: string | null, provided: string | undefined): boolean =>
