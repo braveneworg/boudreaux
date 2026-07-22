@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  isInFlightEnrichmentStatus,
   videoEnrichmentStatusResponseSchema,
   type VideoEnrichmentStatusResult,
 } from '@/lib/validation/video-enrichment-schema';
+import { isInFlightJobStatus } from '@/utils/async-job-lifecycle';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** Poll cadence while an enrichment job is pending/processing. */
@@ -63,7 +63,7 @@ export const useVideoEnrichmentStatusQuery = (
     ...options,
     enabled: (options.enabled ?? true) && !!videoId,
     refetchInterval: (query) =>
-      isInFlightEnrichmentStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
+      isInFlightJobStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
   });
 
   return { isPending, error, data, refetch };

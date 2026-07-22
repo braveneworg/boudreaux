@@ -6,8 +6,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { BioGenerationService } from '@/lib/services/bio-generation-service';
-import { isStaleJob } from '@/lib/utils/job-staleness';
-import { isInFlightBioStatus, type BioStatus } from '@/lib/validation/bio-generation-schema';
+import { blocksNewTrigger, toAsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 interface BioInFlightState {
   bioStatus: string | null;
@@ -15,21 +14,20 @@ interface BioInFlightState {
 }
 
 /**
- * If a bio job is genuinely in flight (status `pending`/`processing`) and not
- * yet stale, return the status to echo back to the caller so a duplicate run is
- * not started; otherwise return `null` to signal the caller may proceed.
+ * If a bio job blocks a new trigger ({@link blocksNewTrigger}: genuinely in
+ * flight and not yet stale), return the status to echo back to the caller so a
+ * duplicate run is not started; otherwise return `null` to signal the caller
+ * may proceed.
  *
  * @param state - The artist's current bio status + start time.
- * @param staleMs - Age past which an in-flight job is treated as abandoned.
  */
 export const resolveInFlightBioStatus = (
-  state: BioInFlightState,
-  staleMs: number
+  state: BioInFlightState
 ): 'pending' | 'processing' | null => {
-  const inFlight = isInFlightBioStatus(state.bioStatus as BioStatus | null);
+  const status = toAsyncJobStatus(state.bioStatus);
 
-  if (inFlight && !isStaleJob(state.bioStartedAt, staleMs)) {
-    return state.bioStatus === 'processing' ? 'processing' : 'pending';
+  if (blocksNewTrigger(status, state.bioStartedAt)) {
+    return status === 'processing' ? 'processing' : 'pending';
   }
 
   return null;

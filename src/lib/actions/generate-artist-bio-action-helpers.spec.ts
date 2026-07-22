@@ -14,10 +14,7 @@ const fresh = (): Date => new Date(Date.now() - 60_000);
 
 describe('resolveInFlightBioStatus', () => {
   it('echoes processing for a fresh processing job', () => {
-    const status = resolveInFlightBioStatus(
-      { bioStatus: 'processing', bioStartedAt: fresh() },
-      STALE_MS
-    );
+    const status = resolveInFlightBioStatus({ bioStatus: 'processing', bioStartedAt: fresh() });
 
     expect(status).toBe('processing');
   });
@@ -28,43 +25,34 @@ describe('resolveInFlightBioStatus', () => {
    * what stops a second trigger starting a duplicate run in that window.
    */
   it('echoes pending for a fresh pending job', () => {
-    const status = resolveInFlightBioStatus(
-      { bioStatus: 'pending', bioStartedAt: fresh() },
-      STALE_MS
-    );
+    const status = resolveInFlightBioStatus({ bioStatus: 'pending', bioStartedAt: fresh() });
 
     expect(status).toBe('pending');
   });
 
   it('allows a new run once an in-flight job has gone stale', () => {
-    const status = resolveInFlightBioStatus(
-      { bioStatus: 'processing', bioStartedAt: new Date(Date.now() - (STALE_MS + 60_000)) },
-      STALE_MS
-    );
+    const status = resolveInFlightBioStatus({
+      bioStatus: 'processing',
+      bioStartedAt: new Date(Date.now() - (STALE_MS + 60_000)),
+    });
 
     expect(status).toBeNull();
   });
 
   it('allows a new run when an in-flight job never recorded a start', () => {
-    const status = resolveInFlightBioStatus(
-      { bioStatus: 'processing', bioStartedAt: null },
-      STALE_MS
-    );
+    const status = resolveInFlightBioStatus({ bioStatus: 'processing', bioStartedAt: null });
 
     expect(status).toBeNull();
   });
 
   it('allows a new run for a terminal status', () => {
-    const status = resolveInFlightBioStatus(
-      { bioStatus: 'succeeded', bioStartedAt: fresh() },
-      STALE_MS
-    );
+    const status = resolveInFlightBioStatus({ bioStatus: 'succeeded', bioStartedAt: fresh() });
 
     expect(status).toBeNull();
   });
 
   it('allows a new run when no bio has ever been generated', () => {
-    const status = resolveInFlightBioStatus({ bioStatus: null, bioStartedAt: null }, STALE_MS);
+    const status = resolveInFlightBioStatus({ bioStatus: null, bioStartedAt: null });
 
     expect(status).toBeNull();
   });

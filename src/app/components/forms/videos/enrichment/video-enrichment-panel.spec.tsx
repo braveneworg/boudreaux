@@ -8,9 +8,9 @@ import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
+import { CLIENT_POLL_DEADLINE_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import { VideoEnrichmentPanel } from './video-enrichment-panel';
 
@@ -443,9 +443,7 @@ describe('VideoEnrichmentPanel — poll deadline give-up', () => {
       vi.advanceTimersByTime(CLIENT_POLL_DEADLINE_MS);
     });
 
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
-      'Enrichment timed out. Re-run to try again.'
-    );
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(STALE_JOB_TIMEOUT_MESSAGE);
     const lastCall = mocks.useVideoEnrichmentStatusQuery.mock.calls.at(-1);
     expect((lastCall?.[1] as { enabled: boolean }).enabled).toBe(false);
     vi.useRealTimers();

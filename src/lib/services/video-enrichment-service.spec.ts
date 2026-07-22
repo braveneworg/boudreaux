@@ -16,6 +16,7 @@ import type {
   VideoSuggestionField,
 } from '@/lib/validation/video-enrichment-schema';
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
+import { STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import { VideoEnrichmentService } from './video-enrichment-service';
 
@@ -639,7 +640,7 @@ describe('getEnrichmentStatus', () => {
 
     expect(result).toMatchObject({
       status: 'failed',
-      error: 'Video enrichment timed out. Please try again.',
+      error: STALE_JOB_TIMEOUT_MESSAGE,
     });
   });
 
