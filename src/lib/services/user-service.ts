@@ -102,7 +102,11 @@ export const UserService = {
     try {
       const newUser = await UserRepository.createGuest({
         email,
-        emailVerified: true,
+        // Unverified: a guest account is seeded from the checkout email, which
+        // is NOT proof the buyer controls that inbox. Ownership is proven only
+        // when they complete the magic-link sign-in (createPurchaseSessionAction
+        // no longer mints a session directly). See #665.
+        emailVerified: false,
         username: placeholderUsername,
       });
       return { id: newUser.id, created: true };

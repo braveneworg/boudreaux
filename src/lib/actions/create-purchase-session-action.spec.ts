@@ -3,20 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 
 vi.mock('server-only', () => ({}));
 
 const mockAuth = vi.fn();
-const mockCreatePurchaseSession = vi.fn();
+const mockSignInMagicLink = vi.fn();
 vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 
-// The action now mints the session via the better-auth server-only endpoint
-// (`auth.api.createPurchaseSession`) instead of encoding a legacy JWT session.
+// #665: the action no longer mints a session from the checkout sessionId. It
+// requires email-ownership proof — a magic link sent to the purchase owner's
+// email (`auth.api.signInMagicLink`). Verification, not a raw session, is the
+// gate to downloading.
 vi.mock('@/lib/auth', () => ({
   auth: {
-    api: { createPurchaseSession: (...args: unknown[]) => mockCreatePurchaseSession(...args) },
+    api: { signInMagicLink: (...args: unknown[]) => mockSignInMagicLink(...args) },
   },
 }));
 
@@ -33,6 +36,12 @@ vi.mock('@/lib/utils/rate-limit', () => ({
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
     findBySessionId: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: {
+    findEmailById: vi.fn(),
   },
 }));
 
@@ -56,7 +65,8 @@ describe('createPurchaseSessionAction', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'development');
     limiterCheckMock.mockResolvedValue(undefined);
-    mockCreatePurchaseSession.mockResolvedValue({ status: true });
+    mockSignInMagicLink.mockResolvedValue(undefined);
+    vi.mocked(UserRepository.findEmailById).mockResolvedValue({ email: 'buyer@x.io' });
   });
 
   afterEach(() => {
@@ -70,7 +80,7 @@ describe('createPurchaseSessionAction', () => {
 
     expect(result).toEqual({ success: true });
     expect(PurchaseRepository.findBySessionId).not.toHaveBeenCalled();
-    expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
+    expect(mockSignInMagicLink).not.toHaveBeenCalled();
   });
 
   it('returns rate_limited for unauthenticated callers over the limit', async () => {
@@ -101,7 +111,7 @@ describe('createPurchaseSessionAction', () => {
     const result = await createPurchaseSessionAction({ sessionId: 'invalid_id' });
 
     expect(result).toEqual({ success: false, error: 'invalid_session_id' });
-    expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
+    expect(mockSignInMagicLink).not.toHaveBeenCalled();
   });
 
   it('rejects empty session IDs', async () => {
@@ -117,33 +127,47 @@ describe('createPurchaseSessionAction', () => {
       mockAuth.mockResolvedValue(null);
     });
 
-    it('resolves the userId from the purchase trust anchor (Stripe session id)', async () => {
+    it('resolves the purchase from the trust anchor and requires verification', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
 
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({ success: true, verificationRequired: true });
       expect(PurchaseRepository.findBySessionId).toHaveBeenCalledWith('cs_test_123');
     });
 
-    it('mints a better-auth session for the resolved userId with the request headers', async () => {
+    it('sends a magic link to the purchase owner’s email instead of minting a session', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
+      vi.mocked(UserRepository.findEmailById).mockResolvedValue({ email: 'owner@x.io' });
 
       await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
 
-      expect(mockCreatePurchaseSession).toHaveBeenCalledWith({
-        body: { userId: 'user-123' },
-        headers: requestHeaders,
-      });
+      expect(UserRepository.findEmailById).toHaveBeenCalledWith('user-123');
+      expect(mockSignInMagicLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ email: 'owner@x.io' }),
+          headers: requestHeaders,
+        })
+      );
     });
 
-    it('returns user_not_found and mints NO session when no purchase exists', async () => {
+    it('returns user_not_found and sends NO magic link when no purchase exists', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_missing' });
 
       expect(result).toEqual({ success: false, error: 'user_not_found' });
-      expect(mockCreatePurchaseSession).not.toHaveBeenCalled();
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
+    });
+
+    it('returns user_not_found when the purchase owner has no resolvable email', async () => {
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
+      vi.mocked(UserRepository.findEmailById).mockResolvedValue(null);
+
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
+
+      expect(result).toEqual({ success: false, error: 'user_not_found' });
+      expect(mockSignInMagicLink).not.toHaveBeenCalled();
     });
   });
 
@@ -152,9 +176,9 @@ describe('createPurchaseSessionAction', () => {
       mockAuth.mockResolvedValue(null);
     });
 
-    it('returns server_error when session creation throws (e.g. ban gate or missing user)', async () => {
+    it('returns server_error when sending the magic link throws', async () => {
       vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
-      mockCreatePurchaseSession.mockRejectedValue(new Error('FORBIDDEN'));
+      mockSignInMagicLink.mockRejectedValue(new Error('send failed'));
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
 

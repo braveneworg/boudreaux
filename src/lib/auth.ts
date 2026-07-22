@@ -10,7 +10,6 @@ import { admin, magicLink } from 'better-auth/plugins';
 
 import { startAppleSecretExpiryMonitor } from '@/lib/auth/apple-secret-expiry-monitor';
 import { assertNotBanEvading } from '@/lib/auth/ban-evasion-hook';
-import { purchaseSessionPlugin } from '@/lib/auth/purchase-session-plugin';
 import {
   accountLinkingConfig,
   buildSocialProvidersConfig,
@@ -216,11 +215,6 @@ export const auth = betterAuth({
       },
     }),
     admin(),
-    // Server-only endpoint for Stripe post-purchase auto-login. Mints a real
-    // better-auth session for an already-resolved userId; never on the public
-    // HTTP router (SERVER_ONLY). Must precede nextCookies() so its Set-Cookie is
-    // forwarded to Next.
-    purchaseSessionPlugin,
     // nextCookies() MUST be last so it can set cookies on the response.
     nextCookies(),
   ],
