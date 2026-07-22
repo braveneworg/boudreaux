@@ -2,51 +2,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import {
+  SUGGESTION_CONFIDENCES,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
+  VIDEO_PROGRESS_STAGES,
+  VIDEO_SUGGESTION_FIELDS,
+  videoSuggestionSourceSchema,
+} from '@fakefour/job-contract';
 import { z } from 'zod';
 
 import type { VideoCategory } from '@/lib/types/domain/video';
 import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
-import { httpUrlSchema, objectIdSchema } from './bio-generation-schema';
+import { objectIdSchema } from './bio-generation-schema';
 
-/**
- * The only artist/video fields a suggestion may target. `suggestion.field`
- * always maps through an explicit whitelist switch downstream — never a
- * dynamic Prisma key.
- */
-export const VIDEO_SUGGESTION_FIELDS = [
-  'firstName',
-  'middleName',
-  'surname',
-  'akaNames',
-  'bornOn',
-  'displayName',
-  'releasedOn',
-  'description',
-  'featuredArtist',
-] as const;
-export type VideoSuggestionField = (typeof VIDEO_SUGGESTION_FIELDS)[number];
-
-/**
- * Video-level fields (persisted with `artistId: null`). These are applied
- * client-side into the RHF edit form — never server-applied — because a
- * `videos.detail` refetch would wipe dirty edits. The apply action rejects an
- * `apply` op for every one of these (dismiss stays allowed).
- */
-export const VIDEO_LEVEL_SUGGESTION_FIELDS = [
-  'releasedOn',
-  'description',
-  'featuredArtist',
-] as const;
-export type VideoLevelSuggestionField = (typeof VIDEO_LEVEL_SUGGESTION_FIELDS)[number];
-
-/**
- * Confidence rubric (see the design spec): high = MusicBrainz ≥95 + Wikidata
- * corroboration of the specific fact + music-occupation gate; medium =
- * structured-source but not fully corroborated; low = web/LLM-only.
- */
-export const SUGGESTION_CONFIDENCES = ['high', 'medium', 'low'] as const;
-export type SuggestionConfidence = (typeof SUGGESTION_CONFIDENCES)[number];
+// The suggestion field/confidence lists, the enrichment progress stages, and the
+// source-link schema are single-sourced in `@fakefour/job-contract` (the Lambda
+// carries the same definitions) and re-exported here; the kept schemas below
+// still enum over the field lists and reuse the source schema.
+export {
+  SUGGESTION_CONFIDENCES,
+  VIDEO_LEVEL_SUGGESTION_FIELDS,
+  VIDEO_PROGRESS_STAGES,
+  VIDEO_SUGGESTION_FIELDS,
+  videoSuggestionSourceSchema,
+};
+export type {
+  SuggestionConfidence,
+  VideoLevelSuggestionField,
+  VideoProgressStage,
+  VideoSuggestionField,
+} from '@fakefour/job-contract';
 
 /**
  * Async enrichment lifecycle states (null = never enriched) — the shared
@@ -97,96 +83,22 @@ export const isEnrichmentEligible = (input: EnrichmentEligibilityInput): boolean
   enrichmentIneligibilityReason(input) === null;
 
 /**
- * Ordered stages the Lambda checkpoints through. Wire contract with
- * `bio-generator/src/types.ts` `VIDEO_PROGRESS_STAGES` — keep in lockstep
- * (the two projects cannot share a module).
+ * The suggestion, generation-data, result-envelope, and callback shapes are
+ * single-sourced in `@fakefour/job-contract` and re-exported here. The web's
+ * boundary strictness (http(s)-only source URLs, ObjectId artist ids) is now
+ * the shared contract — the Lambda types against the same definitions, so drift
+ * is impossible and a malformed Lambda response is still rejected here.
  */
-export const VIDEO_PROGRESS_STAGES = [
-  'musicbrainz',
-  'wikidata',
-  'web-search',
-  'adjudicating',
-  'finalizing',
-] as const;
-export type VideoProgressStage = (typeof VIDEO_PROGRESS_STAGES)[number];
-
-/**
- * One provenance link backing a suggestion. The URL is persisted and later
- * rendered as an admin-UI href, so it is length-bounded on top of the
- * http(s)-scheme check.
- */
-export const videoSuggestionSourceSchema = z.object({
-  url: httpUrlSchema.max(2048),
-  label: z.string().max(200).optional(),
-});
-
-/** One reviewable fact the Lambda proposes for an artist (or the video). */
-export const videoSuggestionSchema = z.object({
-  field: z.enum(VIDEO_SUGGESTION_FIELDS),
-  value: z.string().min(1).max(500),
-  confidence: z.enum(SUGGESTION_CONFIDENCES),
-  sources: z.array(videoSuggestionSourceSchema).max(10),
-  note: z.string().max(500).optional(),
-});
-export type VideoSuggestion = z.infer<typeof videoSuggestionSchema>;
-
-/**
- * A video-level suggestion — the fielded suggestion shape without its `field`
- * discriminator (the `video` object keys it by position instead). Backs the
- * release date and each discovered featured artist.
- */
-const videoLevelSuggestionSchema = videoSuggestionSchema.omit({ field: true });
-
-/**
- * A synthesized video description (2–4 sentences). Widens the base 500-char
- * value cap to 2000 — long-form prose, unlike the short fielded facts.
- */
-const videoDescriptionSuggestionSchema = videoLevelSuggestionSchema.extend({
-  value: z.string().min(1).max(2000),
-});
-
-/**
- * The successful payload the Lambda returns. Kept in lockstep with
- * `bio-generator/src/types.ts` `videoEnrichmentResultSchema` — validated at
- * the callback boundary so a malformed Lambda response is never trusted.
- */
-export const videoEnrichmentDataSchema = z.object({
-  artists: z
-    .array(
-      z.object({
-        artistId: objectIdSchema,
-        suggestions: z.array(videoSuggestionSchema).max(12),
-      })
-    )
-    .max(10),
-  video: z
-    .object({
-      releasedOn: videoLevelSuggestionSchema.optional(),
-      description: videoDescriptionSuggestionSchema.optional(),
-      featuredArtists: z.array(videoLevelSuggestionSchema).max(5).optional(),
-    })
-    .optional(),
-  model: z.string().max(100),
-});
-export type VideoEnrichmentData = z.infer<typeof videoEnrichmentDataSchema>;
-
-/** Discriminated result envelope so the callback can branch cheaply. */
-export const videoEnrichmentResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), data: videoEnrichmentDataSchema }),
-  z.object({ ok: z.literal(false), error: z.string().max(2000) }),
-]);
-export type VideoEnrichmentResult = z.infer<typeof videoEnrichmentResultSchema>;
-
-/**
- * Body the Lambda POSTs to the async completion callback route. The
- * server-minted job token is far shorter than 200 chars — the cap only
- * bounds hostile payloads.
- */
-export const videoEnrichmentCallbackSchema = z.object({
-  jobToken: z.string().min(1).max(200),
-  result: videoEnrichmentResultSchema,
-});
-export type VideoEnrichmentCallback = z.infer<typeof videoEnrichmentCallbackSchema>;
+export {
+  videoSuggestionSchema,
+  videoEnrichmentDataSchema,
+  videoEnrichmentResultSchema,
+  videoEnrichmentCallbackSchema,
+  type VideoSuggestion,
+  type VideoEnrichmentData,
+  type VideoEnrichmentResult,
+  type VideoEnrichmentCallback,
+} from '@fakefour/job-contract';
 
 /**
  * A single progress checkpoint as persisted on the video and served by the
@@ -199,18 +111,13 @@ export const videoEnrichmentProgressSchema = z.object({
 });
 export type VideoEnrichmentProgress = z.infer<typeof videoEnrichmentProgressSchema>;
 
-/**
- * Body the Lambda POSTs to the progress route. `at` is accepted for forward
- * compatibility but IGNORED — the server stamps its own time on write (the
- * shared Lambda progress helper does not send it, mirroring the bio channel).
- */
-export const videoEnrichmentProgressPostSchema = z.object({
-  jobToken: z.string().min(1).max(200),
-  stage: z.enum(VIDEO_PROGRESS_STAGES),
-  counts: z.record(z.string(), z.number().int().min(0)).optional(),
-  at: z.string().datetime().optional(),
-});
-export type VideoEnrichmentProgressPost = z.infer<typeof videoEnrichmentProgressPostSchema>;
+// The progress-route POST body is single-sourced in `@fakefour/job-contract`
+// and re-exported here (the persisted `videoEnrichmentProgressSchema` above,
+// which requires a server-stamped `at`, stays web-only).
+export {
+  videoEnrichmentProgressPostSchema,
+  type VideoEnrichmentProgressPost,
+} from '@fakefour/job-contract';
 
 /** Wire schema for GET /api/videos/[id]/enrichment — THE pinned status shape. */
 export const videoEnrichmentStatusResponseSchema = z.object({
