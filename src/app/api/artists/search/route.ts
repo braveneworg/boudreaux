@@ -8,7 +8,8 @@ import { NextResponse } from 'next/server';
 import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
-import { type ArtistNameFields, getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import type { ArtistSearchMatch } from '@/lib/types/domain/artist';
+import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 
@@ -25,31 +26,16 @@ interface ArtistSearchResult {
   releases: Array<{ id: string; title: string }>;
 }
 
-interface ArtistRelationEntry {
-  release: {
-    id: string;
-    title: string;
-    publishedAt: Date | null | undefined;
-    deletedOn: Date | null | undefined;
-  };
-}
-
-interface ArtistSearchCandidate extends ArtistNameFields {
-  slug: string;
-  images?: Array<{ src: string }> | null;
-  releases?: ArtistRelationEntry[] | null;
-}
-
 const CACHE_HEADER = 'public, s-maxage=60, stale-while-revalidate=300';
 
-const mapArtistToComboboxResult = (artist: ArtistSearchCandidate): ArtistSearchResult => {
-  const releases = (artist.releases?.map((ar) => ar.release) ?? []).filter(
-    (r) => r.publishedAt != null && r.deletedOn == null
-  );
+const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResult => {
+  const releases = artist.releases
+    .map(({ release }) => release)
+    .filter((r) => r.publishedAt != null && r.deletedOn == null);
   return {
     artistSlug: artist.slug,
     artistName: getArtistDisplayName(artist),
-    thumbnailSrc: artist.images?.[0]?.src ?? null,
+    thumbnailSrc: artist.images[0]?.src ?? null,
     releases: releases.map((r) => ({ id: r.id, title: r.title })),
   };
 };
@@ -101,9 +87,7 @@ export const GET = withRateLimit(
       return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
-    const results = result.data.map((artist) =>
-      mapArtistToComboboxResult(artist as ArtistSearchCandidate)
-    );
+    const results = result.data.map(mapArtistToComboboxResult);
 
     return NextResponse.json({ results }, { headers: { 'Cache-Control': CACHE_HEADER } });
   } catch (error) {
