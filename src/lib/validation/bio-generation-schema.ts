@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { BIO_PROGRESS_STAGES } from '@fakefour/job-contract';
 import { z } from 'zod';
 
 import type { AssertExtends } from '@/lib/types/assert';
@@ -176,24 +177,17 @@ export type BioGenerationCallback = z.infer<typeof bioGenerationCallbackSchema>;
 
 /**
  * Ordered generation stages the Lambda checkpoints through. This exact order is
- * the admin timeline's display order AND the Lambda's wire contract — keep the
- * two projects in lockstep (they cannot share a module).
+ * the admin timeline's display order AND the Lambda's wire contract; it is
+ * single-sourced in `@fakefour/job-contract` and re-exported here so existing
+ * import sites stay unchanged. `bioProgressPostSchema` (the POST body) and its
+ * types live in the package too — the Lambda consumes the same definitions.
  */
-export const BIO_PROGRESS_STAGES = [
-  'musicbrainz',
-  'wikidata',
-  'commons',
-  'cover-art',
-  'web-search',
-  'link-follow',
-  'vision-gating',
-  'drafting',
-  'synthesizing',
-  'quality-pass',
-  'finalizing',
-] as const;
-
-export type BioProgressStage = (typeof BIO_PROGRESS_STAGES)[number];
+export { BIO_PROGRESS_STAGES };
+export {
+  bioProgressPostSchema,
+  type BioProgressStage,
+  type BioProgressPost,
+} from '@fakefour/job-contract';
 
 /**
  * A single generation progress checkpoint as persisted on the artist and served
@@ -211,20 +205,6 @@ export type BioProgress = z.infer<typeof bioProgressSchema>;
 
 /** The progress payload minus the server-stamped `at` — what a recorder supplies. */
 export type BioProgressPayload = Omit<BioProgress, 'at'>;
-
-/**
- * Body the bio-generator Lambda POSTs to the progress route. Carries the per-job
- * token (verified, never claimed) and the checkpoint fields; the server stamps
- * `at` on write, so it is intentionally absent here.
- */
-export const bioProgressPostSchema = z.object({
-  jobToken: z.string().min(1),
-  stage: z.enum(BIO_PROGRESS_STAGES),
-  detail: z.string().max(300).optional(),
-  counts: z.record(z.string(), z.number().int().min(0)).optional(),
-});
-
-export type BioProgressPost = z.infer<typeof bioProgressPostSchema>;
 
 /** Sanitized content the Server Action returns to the admin form for preview. */
 export interface GeneratedBioContent {

@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - "bio-generator/**"
+      # The Lambda bundles the shared wire contract, so a change to it must
+      # redeploy the Lambda — otherwise the web app ships the new contract and
+      # the Lambda keeps the old one, silently splitting it at runtime.
+      - "packages/job-contract/**"
       - ".github/workflows/deploy-bio-generator.yml"
   workflow_dispatch:
 

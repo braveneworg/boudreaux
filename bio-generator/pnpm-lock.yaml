@@ -17,6 +17,9 @@ importers:
       '@aws-sdk/client-ssm':
         specifier: ^3.1064.0
         version: 3.1071.0
+      '@fakefour/job-contract':
+        specifier: file:../packages/job-contract
+        version: file:../packages/job-contract(zod@4.4.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -352,6 +355,11 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fakefour/job-contract@file:../packages/job-contract':
+    resolution: {directory: ../packages/job-contract, type: directory}
+    peerDependencies:
+      zod: ^4.0.0
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
@@ -1306,6 +1314,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.1':
     optional: true
+
+  '@fakefour/job-contract@file:../packages/job-contract(zod@4.4.3)':
+    dependencies:
+      zod: 4.4.3
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 

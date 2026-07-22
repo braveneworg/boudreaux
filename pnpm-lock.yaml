@@ -68,6 +68,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.7)
+      '@fakefour/job-contract':
+        specifier: file:./packages/job-contract
+        version: file:packages/job-contract(zod@4.4.3)
       '@fingerprintjs/fingerprintjs':
         specifier: ^5.2.0
         version: 5.2.0
@@ -1283,6 +1286,11 @@ packages:
   '@eslint/plugin-kit@0.7.2':
     resolution: {integrity: sha512-+CNAzxglkrpNf/kKywqQfk74QjtceuOE7Qm+AF8miRvPF/wmmK5+OJOgVh3AVTT3RP2mH3+FOaxlE5v72owk0A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@fakefour/job-contract@file:packages/job-contract':
+    resolution: {directory: packages/job-contract, type: directory}
+    peerDependencies:
+      zod: ^4.0.0
 
   '@faker-js/faker@9.9.0':
     resolution: {integrity: sha512-OEl393iCOoo/z8bMezRlJu+GlRGlsKbUAN7jKB6LhnKoqKve5DXRpalbItIIcwnCjs1k/FOPjFzcA6Qn+H+YbA==}
@@ -8067,6 +8075,10 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
+
+  '@fakefour/job-contract@file:packages/job-contract(zod@4.4.3)':
+    dependencies:
+      zod: 4.4.3
 
   '@faker-js/faker@9.9.0': {}
 

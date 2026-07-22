@@ -15,6 +15,7 @@
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1085.0",
     "@aws-sdk/client-ssm": "^3.1064.0",
+    "@fakefour/job-contract": "file:../packages/job-contract",
     "zod": "^4.4.3"
   },
   "devDependencies": {

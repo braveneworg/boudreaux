@@ -142,6 +142,9 @@ const buildResponseHeaders = () => [
 ];
 
 const config = {
+  // The shared wire contract (`@fakefour/job-contract`) ships raw TypeScript with
+  // no build step, so Next must transpile it out of node_modules like app code.
+  transpilePackages: ['@fakefour/job-contract'],
   // Use full CDN URL for all static assets in production
   // This eliminates the need for NGINX redirects and avoids 301 caching issues
   // Skip CDN prefix for E2E builds so assets are served locally
