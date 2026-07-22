@@ -6,6 +6,7 @@ import 'server-only';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
+import { MAX_LAMBDA_RELEASES } from '@fakefour/job-contract';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
@@ -299,13 +300,10 @@ const shouldSkipLinkValidation = (): boolean =>
   process.env.E2E_MODE === 'true' ||
   process.env.NEXT_PUBLIC_E2E_MODE === 'true';
 
-/**
- * Mirrors `bioGenerationInputSchema`'s `.max(100)` on `releases` in the Lambda
- * (`bio-generator/src/types.ts`). The two projects deploy separately and cannot
- * share a module, so this constant is a deliberate copy — see the wire-contract
- * parity test in `bio-generation-schema.spec.ts`.
- */
-export const MAX_LAMBDA_RELEASES = 100;
+// The `releases` cap the web enforces before invoke, single-sourced with the
+// Lambda's `bioGenerationInputSchema.releases.max(...)` in
+// `@fakefour/job-contract`. Re-exported for the callers that import it here.
+export { MAX_LAMBDA_RELEASES };
 
 /**
  * Builds the lambda-input releases payload from the label's own catalog.

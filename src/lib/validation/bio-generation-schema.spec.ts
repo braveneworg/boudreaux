@@ -2,12 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import { MAX_LAMBDA_RELEASES } from '@/lib/services/bio-generation-service';
-
 import {
   BIO_PROGRESS_STAGES,
   bioGenerationCallbackSchema,
@@ -448,35 +442,10 @@ describe('bio status schemas origin field', () => {
   });
 });
 
-describe('wire-contract parity (web ↔ Lambda)', () => {
-  // The stage-list is now single-sourced in `@fakefour/job-contract` (both
-  // projects import it), so its disk-scrape parity test is gone — the shared
-  // module makes drift impossible. The `MAX_LAMBDA_RELEASES` scrape below stays
-  // until that constant is migrated too (#664).
-
-  /**
-   * The web caps `releases` before dispatch so it never sends a payload the
-   * Lambda will reject. If the Lambda's cap moves and this one does not, the
-   * mismatch is otherwise invisible until a real artist crosses the smaller of
-   * the two and the job hangs for 17 minutes.
-   */
-  it('MAX_LAMBDA_RELEASES matches the releases cap in bio-generator/src/types.ts', () => {
-    const currentDir = dirname(fileURLToPath(import.meta.url));
-    const typesPath = resolve(currentDir, '../../..', 'bio-generator/src/types.ts');
-    const source = readFileSync(typesPath, 'utf8');
-
-    // Scope to the `releases:` field so another `.max()` in the file cannot
-    // produce a false pass.
-    const releasesBlock = /releases:\s*z\s*[\s\S]*?\.max\((\d+)\)/.exec(source);
-    expect(
-      releasesBlock,
-      'releases .max(...) not found in bio-generator/src/types.ts'
-    ).not.toBeNull();
-    if (!releasesBlock) return;
-
-    expect(Number(releasesBlock[1])).toBe(MAX_LAMBDA_RELEASES);
-  });
-});
+// The web/Lambda wire-contract parity is now enforced by the shared
+// `@fakefour/job-contract` module (both projects import the same definitions),
+// so the disk-scrape parity tests (stage list in #663, MAX_LAMBDA_RELEASES
+// here) are gone — the shared source makes drift structurally impossible.
 
 // The bio job timeout-ordering invariants (stale window > Lambda ceiling,
 // client poll deadline > stale window) are owned by the shared lifecycle

@@ -38,58 +38,29 @@ export const DEFAULT_GEMINI_PRO_MODEL = 'gemini-2.5-pro';
 export { BIO_PROGRESS_STAGES as PROGRESS_STAGES } from '@fakefour/job-contract';
 export type { BioProgressStage as ProgressStage } from '@fakefour/job-contract';
 
-/** ISO calendar-date string in the form YYYY-MM-DD. */
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
-
 /**
- * Input the web app sends to the Lambda. Names drive the metadata lookup;
- * `links` and `description` are optional admin-supplied context. The LLM only
- * writes prose — it never invents the image/link URLs returned to the caller.
+ * Bio-generation wire shapes — the invoke input, the discovered image/link
+ * shapes, the generation-data payload, its result envelope, and the completion
+ * callback body — are single-sourced in `@fakefour/job-contract` and re-exported
+ * here under the Lambda's existing names, so handler.ts / gemini.ts / callback.ts
+ * import sites are unchanged. `bioGenerationInputSchema` caps `releases` at the
+ * shared `MAX_LAMBDA_RELEASES`.
  */
-export const bioGenerationInputSchema = z.object({
-  artistId: z.string().min(1),
-  displayName: z.string().min(1),
-  realName: z.string().optional(),
-  akaNames: z.string().optional(),
-  links: z.array(z.string().url()).max(20).optional(),
-  /**
-   * Admin-supplied reference photos of the artist — used by the Rekognition
-   * face stage to score how strongly a candidate matches the known subject.
-   */
-  referenceImageUrls: z.array(z.string().url()).max(5).optional(),
-  description: z.string().max(2000).optional(),
-  existingGenres: z.string().optional(),
-  bornOn: isoDate.optional(),
-  diedOn: isoDate.optional(),
-  formedOn: isoDate.optional(),
-  /** Async completion callback URL the Lambda POSTs its result to (absent = synchronous/no callback). */
-  callbackUrl: z.string().url().optional(),
-  /** Opaque per-job token echoed back in the callback so the web app can match the in-flight job. */
-  jobToken: z.string().min(1).optional(),
-  /**
-   * Best-effort progress endpoint the Lambda POSTs stage checkpoints to as it
-   * works (verified with the same per-job `jobToken`). Absent → no progress
-   * reporting, and generation behaves byte-identically to before.
-   */
-  progressUrl: z.string().url().optional(),
-  /**
-   * The label's own published releases for this artist — authoritative
-   * chronology anchors AND allow-listed internal link targets
-   * (`/releases/<id>` paths) the prose may cite.
-   */
-  releases: z
-    .array(
-      z.object({
-        title: z.string().min(1),
-        releasedOn: isoDate.optional(),
-        url: z.string().min(1),
-      })
-    )
-    .max(100)
-    .optional(),
-});
-
-export type BioGenerationInput = z.infer<typeof bioGenerationInputSchema>;
+export {
+  MAX_LAMBDA_RELEASES,
+  bioGenerationInputSchema,
+  bioImageSchema,
+  bioLinkSchema,
+  bioGenerationDataSchema,
+  bioGenerationResultSchema,
+  bioGenerationCallbackSchema,
+  type BioGenerationInput,
+  type BioImage,
+  type BioLink,
+  type BioGenerationData,
+  type BioGenerationResult,
+  type BioGenerationCallback,
+} from '@fakefour/job-contract';
 
 /**
  * The minimum an event must carry for the Lambda to report back at all: the
@@ -104,70 +75,6 @@ export const callbackTargetSchema = z.object({
   callbackUrl: z.string().url(),
   jobToken: z.string().min(1),
 });
-
-/** A discovered image with the attribution/license required to display it. */
-export const bioImageSchema = z.object({
-  url: z.string().url(),
-  thumbnailUrl: z.string().url().nullable().optional(),
-  title: z.string().nullable().optional(),
-  attribution: z.string(),
-  license: z.string().nullable().optional(),
-  /** Machine-readable license page from Commons `extmetadata.LicenseUrl`, when known. */
-  licenseUrl: z.string().url().nullable().optional(),
-  sourceUrl: z.string().url().nullable().optional(),
-  width: z.number().int().positive().nullable().optional(),
-  height: z.number().int().positive().nullable().optional(),
-  isPrimary: z.boolean(),
-  /** Subject classification from provenance or the vision pass. */
-  kind: z.enum(['photo', 'cover']).nullable().optional(),
-  /** Short accessible description, written by the vision pass when available. */
-  alt: z.string().nullable().optional(),
-  /**
-   * Rekognition face signal: whether a face was detected in the image. `null`
-   * means the image was not analyzed. Ranking signal only — never a hard gate.
-   */
-  hasFace: z.boolean().nullable().optional(),
-  /**
-   * Rekognition face signal: the max CompareFaces similarity (0..100) against
-   * the admin reference images. `null` means not analyzed (or no face detected).
-   * Ranking signal only — never a hard gate.
-   */
-  faceScore: z.number().min(0).max(100).nullable().optional(),
-});
-
-export type BioImage = z.infer<typeof bioImageSchema>;
-
-/** A discovered external link (Wikipedia, official site, MusicBrainz, social, streaming). */
-export const bioLinkSchema = z.object({
-  label: z.string().min(1),
-  url: z.string().url(),
-  kind: z
-    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'press', 'other'])
-    .optional(),
-});
-
-export type BioLink = z.infer<typeof bioLinkSchema>;
-
-/** The successful payload the Lambda returns to the web app. */
-export const bioGenerationDataSchema = z.object({
-  shortBio: z.string(),
-  longBio: z.string(),
-  altBio: z.string(),
-  genres: z.string().nullable().optional(),
-  images: z.array(bioImageSchema),
-  links: z.array(bioLinkSchema),
-  model: z.string(),
-});
-
-export type BioGenerationData = z.infer<typeof bioGenerationDataSchema>;
-
-/** Discriminated result envelope so the caller can branch on success cheaply. */
-export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), data: bioGenerationDataSchema }),
-  z.object({ ok: z.literal(false), error: z.string() }),
-]);
-
-export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
 
 /** A single fact-check violation flagged by the critic pass. */
 export const bioCritiqueViolationSchema = z.object({
@@ -236,145 +143,29 @@ export interface ArtistFacts {
 }
 
 /**
- * Ordered stages the video-enrichment mode checkpoints through. Wire contract
- * with the web counterpart `VIDEO_PROGRESS_STAGES` in
- * `src/lib/validation/video-enrichment-schema.ts` — keep in lockstep (the two
- * projects cannot share a module).
+ * Video-enrichment wire shapes — the progress stages, the invoke input, and the
+ * suggestion/result shapes — are single-sourced in `@fakefour/job-contract` and
+ * re-exported here under the Lambda's existing names (handler.ts /
+ * video-enrichment.ts import sites unchanged). The shared schemas carry the
+ * STRICTER of the two projects' validators (http(s)-only source URLs, ObjectId
+ * artist ids); the Lambda uses them only for typing — it never runtime-parses
+ * its own output — so the added strictness is a no-op at runtime here and lives
+ * where it matters: the web's callback-boundary parse.
  */
-export const VIDEO_PROGRESS_STAGES = [
-  'musicbrainz',
-  'wikidata',
-  'web-search',
-  'adjudicating',
-  'finalizing',
-] as const;
-
-/** A single video-enrichment checkpoint stage name. */
-export type VideoProgressStage = (typeof VIDEO_PROGRESS_STAGES)[number];
-
-/** Identity fields the web app already holds for a linked artist. */
-export const videoKnownIdentitySchema = z.object({
-  firstName: z.string().optional(),
-  middleName: z.string().optional(),
-  surname: z.string().optional(),
-  displayName: z.string().optional(),
-  akaNames: z.string().optional(),
-  bornOn: isoDate.optional(),
-});
-
-/**
- * Input the web app sends for `task: 'video-enrichment'`. The `known` block
- * lets the Lambda skip facts the label already has; `callbackUrl`/
- * `progressUrl`/`jobToken` mirror the bio pipeline's async plumbing. The
- * `jobToken` cap (≤200) matches the web callback/progress POST schemas in
- * `src/lib/validation/video-enrichment-schema.ts`.
- */
-export const videoEnrichmentInputSchema = z.object({
-  task: z.literal('video-enrichment'),
-  videoId: z.string().min(1),
-  title: z.string().min(1),
-  artistDisplay: z.string().min(1),
-  releasedOn: isoDate.optional(),
-  artists: z
-    .array(
-      z.object({
-        artistId: z.string().min(1),
-        name: z.string().min(1),
-        role: z.enum(['primary', 'featured']),
-        known: videoKnownIdentitySchema.optional(),
-      })
-    )
-    .min(1)
-    .max(10),
-  callbackUrl: z.string().url().optional(),
-  progressUrl: z.string().url().optional(),
-  jobToken: z.string().min(1).max(200).optional(),
-});
-
-export type VideoEnrichmentInput = z.infer<typeof videoEnrichmentInputSchema>;
-
-/**
- * One provenance link backing a suggestion. The `url` cap (≤2048) and `label`
- * cap (≤200) mirror the web's `videoSuggestionSourceSchema` — keep in lockstep.
- */
-export const videoSuggestionSourceSchema = z.object({
-  url: z.string().url().max(2048),
-  label: z.string().max(200).optional(),
-});
-
-/**
- * One reviewable fact. Mirrors the web's `videoSuggestionSchema` in
- * `src/lib/validation/video-enrichment-schema.ts` — keep in lockstep.
- */
-export const videoSuggestionSchema = z.object({
-  field: z.enum([
-    'firstName',
-    'middleName',
-    'surname',
-    'akaNames',
-    'bornOn',
-    'displayName',
-    'releasedOn',
-    'description',
-    'featuredArtist',
-  ]),
-  value: z.string().min(1).max(500),
-  confidence: z.enum(['high', 'medium', 'low']),
-  sources: z.array(videoSuggestionSourceSchema).max(10),
-  note: z.string().max(500).optional(),
-});
-
-export type VideoSuggestion = z.infer<typeof videoSuggestionSchema>;
-
-/**
- * A video-level suggestion — the fielded suggestion shape without its `field`
- * discriminator (the `video` object keys it by position instead). Backs the
- * release date and each discovered featured artist. Mirrors the web's
- * `videoLevelSuggestionSchema` — keep in lockstep.
- */
-const videoLevelSuggestionSchema = videoSuggestionSchema.omit({ field: true });
-
-/**
- * A synthesized video description (2–4 sentences). Widens the base 500-char
- * value cap to 2000 — long-form prose, unlike the short fielded facts. Mirrors
- * the web's `videoDescriptionSuggestionSchema` — keep in lockstep.
- */
-const videoDescriptionSuggestionSchema = videoLevelSuggestionSchema.extend({
-  value: z.string().min(1).max(2000),
-});
-
-/** The successful video-enrichment payload (mirrors the web schema). */
-export const videoEnrichmentDataSchema = z.object({
-  artists: z
-    .array(
-      z.object({
-        artistId: z.string().min(1),
-        suggestions: z.array(videoSuggestionSchema).max(12),
-      })
-    )
-    .max(10),
-  video: z
-    .object({
-      releasedOn: videoLevelSuggestionSchema.optional(),
-      description: videoDescriptionSuggestionSchema.optional(),
-      featuredArtists: z.array(videoLevelSuggestionSchema).max(5).optional(),
-    })
-    .optional(),
-  model: z.string().max(100),
-});
-
-export type VideoEnrichmentData = z.infer<typeof videoEnrichmentDataSchema>;
-
-/**
- * Discriminated result envelope for the video-enrichment mode. The failure
- * `error` cap (≤2000) mirrors the web's `videoEnrichmentResultSchema`.
- */
-export const videoEnrichmentResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), data: videoEnrichmentDataSchema }),
-  z.object({ ok: z.literal(false), error: z.string().max(2000) }),
-]);
-
-export type VideoEnrichmentResult = z.infer<typeof videoEnrichmentResultSchema>;
+export {
+  VIDEO_PROGRESS_STAGES,
+  videoKnownIdentitySchema,
+  videoEnrichmentInputSchema,
+  videoSuggestionSourceSchema,
+  videoSuggestionSchema,
+  videoEnrichmentDataSchema,
+  videoEnrichmentResultSchema,
+  type VideoProgressStage,
+  type VideoEnrichmentInput,
+  type VideoSuggestion,
+  type VideoEnrichmentData,
+  type VideoEnrichmentResult,
+} from '@fakefour/job-contract';
 
 export const releaseDateLookupInputSchema = z.object({
   task: z.literal('release-date-lookup'),

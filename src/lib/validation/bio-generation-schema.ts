@@ -2,7 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { BIO_PROGRESS_STAGES } from '@fakefour/job-contract';
+import {
+  BIO_PROGRESS_STAGES,
+  bioImageSchema as bioGenerationImageSchema,
+  bioLinkSchema as bioGenerationLinkSchema,
+} from '@fakefour/job-contract';
 import { z } from 'zod';
 
 import type { AssertExtends } from '@/lib/types/assert';
@@ -36,26 +40,12 @@ export const generateArtistBioInputSchema = z.object({
 export type GenerateArtistBioInput = z.infer<typeof generateArtistBioInputSchema>;
 
 /**
- * Contract the Lambda returns. Kept in lockstep with `bio-generator/src/types.ts`
- * (the two projects cannot share a module). Validated at the invoke boundary so
- * a malformed Lambda response is treated as a failure, not trusted blindly.
+ * The image + link the Lambda returns, single-sourced in
+ * `@fakefour/job-contract` and re-exported here so import sites are unchanged.
+ * Validated at the invoke boundary so a malformed Lambda response is treated as
+ * a failure, not trusted blindly.
  */
-export const bioGenerationImageSchema = z.object({
-  url: z.string().url(),
-  thumbnailUrl: z.string().url().nullable().optional(),
-  title: z.string().nullable().optional(),
-  attribution: z.string(),
-  license: z.string().nullable().optional(),
-  licenseUrl: z.string().url().nullable().optional(),
-  sourceUrl: z.string().url().nullable().optional(),
-  width: z.number().int().positive().nullable().optional(),
-  height: z.number().int().positive().nullable().optional(),
-  isPrimary: z.boolean(),
-  kind: z.enum(['photo', 'cover']).nullable().optional(),
-  alt: z.string().nullable().optional(),
-  hasFace: z.boolean().nullable().optional(),
-  faceScore: z.number().min(0).max(100).nullable().optional(),
-});
+export { bioGenerationImageSchema, bioGenerationLinkSchema };
 
 /**
  * Content fields of the persisted bio-image row (`ArtistBioImageRecord`) that
@@ -69,25 +59,15 @@ type BioImageContentField = keyof Omit<
   'artistId' | 'createdAt' | 'id' | 'origin' | 'originalUrl' | 'sortOrder'
 >;
 
-// Coverage ties to the domain bio-image row. The runtime schemas here stay
-// deliberately stricter than the media-models row mirror (URL formats, kind
-// enum, 0-100 faceScore) because they validate the Lambda invoke boundary, so
-// they cannot be derived from it — but a field added to the domain row (as
-// hasFace/faceScore once were, by hand, in two places) fails typecheck here
-// until the wire schemas carry it too.
+// Coverage ties the shared wire image schema to the domain bio-image row: a
+// field added to the row (as hasFace/faceScore once were, by hand, in two
+// places) fails typecheck here until the shared schema in
+// @fakefour/job-contract carries it too.
 type _BioImageContentCoverage = AssertExtends<
   BioImageContentField,
   keyof z.infer<typeof bioGenerationImageSchema>
 >;
 const _bioImageContentCoverage: _BioImageContentCoverage = true;
-
-export const bioGenerationLinkSchema = z.object({
-  label: z.string().min(1),
-  url: z.string().url(),
-  kind: z
-    .enum(['wikipedia', 'official', 'musicbrainz', 'social', 'streaming', 'press', 'other'])
-    .optional(),
-});
 
 /**
  * A link URL as persisted: absolute http(s) or a site-relative path
@@ -148,32 +128,17 @@ export type BioStatusImage = z.infer<typeof bioStatusImageSchema>;
 /** Inferred type for a persisted bio link row (has DB id). */
 export type BioStatusLink = z.infer<typeof bioStatusLinkSchema>;
 
-export const bioGenerationDataSchema = z.object({
-  shortBio: z.string(),
-  longBio: z.string(),
-  altBio: z.string(),
-  genres: z.string().nullable().optional(),
-  images: z.array(bioGenerationImageSchema),
-  links: z.array(bioGenerationLinkSchema),
-  model: z.string(),
-});
-
-export type BioGenerationData = z.infer<typeof bioGenerationDataSchema>;
-
-export const bioGenerationResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), data: bioGenerationDataSchema }),
-  z.object({ ok: z.literal(false), error: z.string() }),
-]);
-
-export type BioGenerationResult = z.infer<typeof bioGenerationResultSchema>;
-
-/** Body the bio-generator Lambda POSTs to the async completion callback route. */
-export const bioGenerationCallbackSchema = z.object({
-  jobToken: z.string().min(1),
-  result: bioGenerationResultSchema,
-});
-
-export type BioGenerationCallback = z.infer<typeof bioGenerationCallbackSchema>;
+// The generation-data payload, its discriminated result envelope, and the
+// completion-callback body are single-sourced in `@fakefour/job-contract` and
+// re-exported here (the Lambda consumes the same definitions).
+export {
+  bioGenerationDataSchema,
+  bioGenerationResultSchema,
+  bioGenerationCallbackSchema,
+  type BioGenerationData,
+  type BioGenerationResult,
+  type BioGenerationCallback,
+} from '@fakefour/job-contract';
 
 /**
  * Ordered generation stages the Lambda checkpoints through. This exact order is
