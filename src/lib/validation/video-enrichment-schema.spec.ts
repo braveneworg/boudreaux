@@ -4,13 +4,10 @@
 
 import {
   applyVideoSuggestionInputSchema,
-  ENRICHMENT_STATUSES,
   enrichmentIneligibilityReason,
   hasEnrichableArtist,
   isEnrichableCategory,
   isEnrichmentEligible,
-  isInFlightEnrichmentStatus,
-  STALE_JOB_MS,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_PROGRESS_STAGES,
   VIDEO_SUGGESTION_FIELDS,
@@ -62,10 +59,6 @@ describe('video-enrichment-schema', () => {
     expect(VIDEO_LEVEL_SUGGESTION_FIELDS).toEqual(['releasedOn', 'description', 'featuredArtist']);
   });
 
-  it('pins the enrichment lifecycle statuses', () => {
-    expect(ENRICHMENT_STATUSES).toEqual(['pending', 'processing', 'succeeded', 'failed']);
-  });
-
   it('pins the progress stages in timeline order', () => {
     expect(VIDEO_PROGRESS_STAGES).toEqual([
       'musicbrainz',
@@ -76,27 +69,8 @@ describe('video-enrichment-schema', () => {
     ]);
   });
 
-  it('re-exports the 17-minute stale-job window', () => {
-    expect(STALE_JOB_MS).toBe(17 * 60 * 1000);
-  });
-
-  describe('isInFlightEnrichmentStatus', () => {
-    it('treats pending as in flight', () => {
-      expect(isInFlightEnrichmentStatus('pending')).toBe(true);
-    });
-
-    it('treats processing as in flight', () => {
-      expect(isInFlightEnrichmentStatus('processing')).toBe(true);
-    });
-
-    it('treats succeeded as terminal', () => {
-      expect(isInFlightEnrichmentStatus('succeeded')).toBe(false);
-    });
-
-    it('treats null as not in flight', () => {
-      expect(isInFlightEnrichmentStatus(null)).toBe(false);
-    });
-  });
+  // The lifecycle union, in-flight predicate, and stale-window constant are
+  // owned by the shared module and asserted in `@/utils/async-job-lifecycle.spec.ts`.
 
   describe('enrichment eligibility', () => {
     it('a MUSIC video with an artist is eligible', () => {

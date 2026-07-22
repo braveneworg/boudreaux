@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { STALE_JOB_MS } from '@/lib/validation/bio-generation-schema';
 import type {
   BioGenerationData,
   BioGenerationResult,
 } from '@/lib/validation/bio-generation-schema';
+import { STALE_JOB_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import {
   BioGenerationService,
@@ -2031,7 +2031,7 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     const result = await BioGenerationService.getGenerationStatus('a1');
 
-    expect(result?.error).toBe('Bio generation timed out. Please try again.');
+    expect(result?.error).toBe(STALE_JOB_TIMEOUT_MESSAGE);
   });
 
   it('coerces a stale pending job (dispatch never started) to failed', async () => {

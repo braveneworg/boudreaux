@@ -16,7 +16,6 @@ import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders'
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
-import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
@@ -27,8 +26,6 @@ import {
 import { validateBioLinks } from '@/lib/utils/validate-bio-links';
 import {
   bioProgressSchema,
-  isInFlightBioStatus,
-  STALE_JOB_MS,
   type BioGenerationData,
   type BioGenerationResult,
   type BioGenerationStatusResult,
@@ -37,6 +34,11 @@ import {
   type BioStatus,
   type GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
+import {
+  isInFlightJobStatus,
+  resolveStaleJobView,
+  toAsyncJobStatus,
+} from '@/utils/async-job-lifecycle';
 
 import { type BioGenerationLambdaInput } from './bio-generation-fixture';
 import { dispatchBioGenerationLocally } from './bio-generation-local-dispatch';
@@ -48,12 +50,6 @@ let lambdaClient: LambdaClient | null = null;
 // 202 immediately (then POSTs its result to the callback route), so the HTTP
 // client only needs a short timeout to cover the dispatch round-trip.
 export const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
-/**
- * User-facing error the status read attaches when it coerces a timed-out
- * in-flight job (older than {@link STALE_JOB_MS}) to `failed`.
- */
-const STALE_JOB_ERROR = 'Bio generation timed out. Please try again.';
 
 const getLambdaClient = (): LambdaClient => {
   if (!lambdaClient) {
@@ -794,23 +790,20 @@ export class BioGenerationService {
       return null;
     }
 
-    const rawStatus = (state.bioStatus as BioStatus | null) ?? null;
-
-    // A job still in flight past STALE_JOB_MS is dead: the Lambda's 15-minute
-    // timeout has elapsed with no completion callback (killed mid-run, or the
-    // callback POST was lost). Coerce it to `failed` on read so the polling UI
-    // resolves instead of hanging on `processing` forever. Non-persistent — a
-    // late callback can still claim and complete the underlying row.
-    const isStale = isInFlightBioStatus(rawStatus) && isStaleJob(state.bioStartedAt, STALE_JOB_MS);
-
-    const status = isStale ? 'failed' : rawStatus;
-    const error = isStale ? STALE_JOB_ERROR : (state.bioError ?? null);
+    // The shared read-time stale coercion: an in-flight job past STALE_JOB_MS
+    // reads as `failed` with the timeout copy (non-persistent — a late
+    // completion callback can still claim the underlying row).
+    const { status, error } = resolveStaleJobView({
+      status: toAsyncJobStatus(state.bioStatus),
+      startedAt: state.bioStartedAt,
+      error: state.bioError ?? null,
+    });
     const content = BioGenerationService.buildBioContent(state, status);
 
     // Surface progress only while the (post-coercion) status is in flight; once
     // terminal — succeeded, failed, or stale-coerced to failed — there is no
     // live stage to show, so the timeline resolves rather than lingering.
-    const progress = isInFlightBioStatus(status) ? parseStoredProgress(state.bioProgress) : null;
+    const progress = isInFlightJobStatus(status) ? parseStoredProgress(state.bioProgress) : null;
 
     return { status, error, content, progress };
   }

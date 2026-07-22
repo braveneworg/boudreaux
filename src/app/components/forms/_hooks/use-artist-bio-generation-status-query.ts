@@ -7,9 +7,9 @@ import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import {
   bioGenerationStatusResponseSchema,
-  isInFlightBioStatus,
   type BioGenerationStatusResponse,
 } from '@/lib/validation/bio-generation-schema';
+import { isInFlightJobStatus } from '@/utils/async-job-lifecycle';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** Poll cadence while a generation job is pending/processing. */
@@ -63,7 +63,7 @@ export const useArtistBioGenerationStatusQuery = (
     ...options,
     enabled: (options.enabled ?? true) && !!artistId,
     refetchInterval: (query) =>
-      isInFlightBioStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
+      isInFlightJobStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
   });
 
   return { isPending, error, data, refetch };

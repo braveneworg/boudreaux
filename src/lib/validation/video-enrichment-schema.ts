@@ -5,6 +5,7 @@
 import { z } from 'zod';
 
 import type { VideoCategory } from '@/lib/types/domain/video';
+import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { httpUrlSchema, objectIdSchema } from './bio-generation-schema';
 
@@ -47,13 +48,12 @@ export type VideoLevelSuggestionField = (typeof VIDEO_LEVEL_SUGGESTION_FIELDS)[n
 export const SUGGESTION_CONFIDENCES = ['high', 'medium', 'low'] as const;
 export type SuggestionConfidence = (typeof SUGGESTION_CONFIDENCES)[number];
 
-/** Async enrichment lifecycle states (null = never enriched). */
-export const ENRICHMENT_STATUSES = ['pending', 'processing', 'succeeded', 'failed'] as const;
-export type EnrichmentStatus = (typeof ENRICHMENT_STATUSES)[number];
-
-/** In-flight states — polling continues only while the job is one of these. */
-export const isInFlightEnrichmentStatus = (status: string | null | undefined): boolean =>
-  status === 'pending' || status === 'processing';
+/**
+ * Async enrichment lifecycle states (null = never enriched) — the shared
+ * async-job lifecycle. Decisions (gates, staleness, the client deadline) live
+ * in `@/utils/async-job-lifecycle`; this module keeps only the wire shapes.
+ */
+export type EnrichmentStatus = AsyncJobStatus;
 
 /** The one category whose videos carry web enrichment. */
 export const isEnrichableCategory = (category: VideoCategory | null | undefined): boolean =>
@@ -214,7 +214,7 @@ export type VideoEnrichmentProgressPost = z.infer<typeof videoEnrichmentProgress
 
 /** Wire schema for GET /api/videos/[id]/enrichment — THE pinned status shape. */
 export const videoEnrichmentStatusResponseSchema = z.object({
-  status: z.enum(ENRICHMENT_STATUSES).nullable(),
+  status: z.enum(ASYNC_JOB_STATUSES).nullable(),
   error: z.string().nullable(),
   progress: videoEnrichmentProgressSchema.nullable(),
   enrichedAt: z.string().nullable(),
@@ -272,5 +272,3 @@ export type RunVideoEnrichmentActionResult =
 export type ApplyVideoSuggestionActionResult =
   | { success: true; op: 'apply' | 'dismiss' }
   | { success: false; error: string };
-
-export { STALE_JOB_MS } from './bio-generation-schema';

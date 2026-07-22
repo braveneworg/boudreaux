@@ -18,36 +18,7 @@ import {
   bioProgressSchema,
   bioStatusImageSchema,
   bioStatusLinkSchema,
-  CLIENT_POLL_DEADLINE_MS,
-  isInFlightBioStatus,
-  STALE_JOB_MS,
 } from './bio-generation-schema';
-
-describe('isInFlightBioStatus', () => {
-  it('returns true for a pending job', () => {
-    expect(isInFlightBioStatus('pending')).toBe(true);
-  });
-
-  it('returns true for a processing job', () => {
-    expect(isInFlightBioStatus('processing')).toBe(true);
-  });
-
-  it('returns false for a succeeded job', () => {
-    expect(isInFlightBioStatus('succeeded')).toBe(false);
-  });
-
-  it('returns false for a failed job', () => {
-    expect(isInFlightBioStatus('failed')).toBe(false);
-  });
-
-  it('returns false when the artist has never generated (null)', () => {
-    expect(isInFlightBioStatus(null)).toBe(false);
-  });
-
-  it('returns false when the status is undefined', () => {
-    expect(isInFlightBioStatus(undefined)).toBe(false);
-  });
-});
 
 describe('bioGenerationStatusResponseSchema content rows', () => {
   const baseContent = {
@@ -528,28 +499,6 @@ describe('stage-list wire-contract parity (web ↔ Lambda)', () => {
   });
 });
 
-/**
- * Three timeouts have to stay in a fixed order for a stuck bio job to resolve
- * the way the UI expects. Until now that ordering lived only in the doc
- * comments on the constants, so any one of them could be tuned in isolation
- * without anything failing.
- */
-describe('bio job timeout ordering', () => {
-  /**
-   * The Lambda's own ceiling is 900s (`bio-generator/template.yaml`). A stale
-   * window at or below it would declare a healthy, still-running job dead and
-   * let a duplicate run supersede it.
-   */
-  it('waits longer than the Lambda can run before calling a job stale', () => {
-    expect(STALE_JOB_MS).toBeGreaterThan(15 * 60 * 1000);
-  });
-
-  /**
-   * The server's stale coercion is what normally resolves the polling UI. If
-   * the client gave up first it would report a timeout for a job the server
-   * was about to mark failed, so the client deadline is the last resort.
-   */
-  it('lets the server resolve a stale job before the client stops polling', () => {
-    expect(CLIENT_POLL_DEADLINE_MS).toBeGreaterThan(STALE_JOB_MS);
-  });
-});
+// The bio job timeout-ordering invariants (stale window > Lambda ceiling,
+// client poll deadline > stale window) are owned by the shared lifecycle
+// module and asserted in `@/utils/async-job-lifecycle.spec.ts`.

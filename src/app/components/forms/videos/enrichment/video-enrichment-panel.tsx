@@ -28,17 +28,20 @@ import {
 } from '@/components/forms/_hooks/mutations/use-video-enrichment-mutations';
 import { useVideoEnrichmentStatusQuery } from '@/components/forms/_hooks/use-video-enrichment-status-query';
 import { splitFeaturedArtists } from '@/lib/utils/artist-name-split';
-import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import {
   hasEnrichableArtist,
-  isInFlightEnrichmentStatus,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
 } from '@/lib/validation/video-enrichment-schema';
 import type {
   VideoEnrichmentStatusResult,
   VideoLevelSuggestionField,
 } from '@/lib/validation/video-enrichment-schema';
+import {
+  CLIENT_POLL_DEADLINE_MS,
+  isInFlightJobStatus,
+  STALE_JOB_TIMEOUT_MESSAGE,
+} from '@/utils/async-job-lifecycle';
 
 import { VideoArtistSuggestionCard } from './video-artist-suggestion-card';
 import { VideoEnrichmentProgressTimeline } from './video-enrichment-progress-timeline';
@@ -279,7 +282,7 @@ const panelPhase = (data: VideoEnrichmentStatusResult | undefined): PanelPhase =
   if (data === undefined) return 'loading';
   const { status } = data;
   if (status === null) return 'empty';
-  if (isInFlightEnrichmentStatus(status)) return 'in-flight';
+  if (isInFlightJobStatus(status)) return 'in-flight';
   return status === 'succeeded' ? 'succeeded' : 'failed';
 };
 
@@ -383,7 +386,7 @@ export const VideoEnrichmentPanel = ({
     useApplyVideoSuggestionMutation(videoId);
 
   const status = data?.status ?? null;
-  const isInFlight = isInFlightEnrichmentStatus(status);
+  const isInFlight = isInFlightJobStatus(status);
   const isBusy = isRunningVideoEnrichment || isApplyingVideoSuggestion;
 
   const artistValue = useWatch({ control, name: 'artist' });
@@ -395,7 +398,7 @@ export const VideoEnrichmentPanel = ({
   useEffect(() => {
     if (!isInFlight || gaveUp) return;
     const timeoutId = setTimeout(() => {
-      toast.error('Enrichment timed out. Re-run to try again.');
+      toast.error(STALE_JOB_TIMEOUT_MESSAGE);
       setGaveUp(true);
     }, CLIENT_POLL_DEADLINE_MS);
     return () => clearTimeout(timeoutId);
