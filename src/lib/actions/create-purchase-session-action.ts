@@ -10,6 +10,7 @@ import { headers } from 'next/headers';
 import { auth as getServerAuthSession } from '@/auth';
 import { auth } from '@/lib/auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 
@@ -33,19 +34,25 @@ interface CreatePurchaseSessionInput {
 interface CreatePurchaseSessionResult {
   success: boolean;
   error?: string;
+  /**
+   * True when the caller was an unauthenticated guest: no session was minted —
+   * a magic link was sent and they must complete it to sign in and download.
+   */
+  verificationRequired?: boolean;
 }
 
 /**
- * Create a better-auth session for a user after a completed purchase, enabling
- * immediate downloads without requiring a separate magic-link sign-in.
+ * After a completed guest purchase, require email-ownership proof before the
+ * buyer can download — do NOT mint a session directly from the checkout id.
  *
- * The Stripe checkout session ID is the trust anchor — only a client that
- * initiated the checkout possesses it. It is resolved to a userId via the PWYW
- * purchase record; the session itself is minted by the server-only better-auth
- * endpoint `auth.api.createPurchaseSession`, which creates a real session (the
- * ban-evasion `session.create.before` hook still applies) and sets the
- * better-auth session cookie (forwarded to the response by `nextCookies()`).
- * The default better-auth session lifetime applies (7 days).
+ * The Stripe checkout session ID proves only that the caller *initiated that
+ * checkout*, not that they own the account the purchase resolved to. An
+ * attacker can initiate a guest checkout with a victim's email; binding the
+ * purchase to (or creating) that account and then minting a session from the
+ * sessionId would be an account takeover (#665). So instead of minting, we send
+ * a better-auth magic link to the purchase owner's email — only the true inbox
+ * owner can complete it, sign in, and download. Already-authenticated callers
+ * are untouched (they can download immediately).
  */
 export const createPurchaseSessionAction = async (
   input: CreatePurchaseSessionInput
@@ -75,18 +82,23 @@ export const createPurchaseSessionAction = async (
       return { success: false, error: 'user_not_found' };
     }
 
-    // Mint a real better-auth session + cookie for the resolved userId via the
-    // server-only endpoint. Forward the request headers so the session captures
-    // ip/user-agent; `nextCookies()` sets the signed session cookie on the
-    // Next response.
-    await auth.api.createPurchaseSession({
-      body: { userId: purchase.userId },
+    const owner = await UserRepository.findEmailById(purchase.userId);
+    if (!owner?.email) {
+      return { success: false, error: 'user_not_found' };
+    }
+
+    // Require verification: send a magic link to the purchase owner's email.
+    // Only the inbox owner can complete it — this proves ownership before any
+    // session exists. Forward the request headers so better-auth captures
+    // ip/user-agent for the sign-in.
+    await auth.api.signInMagicLink({
+      body: { email: owner.email, callbackURL: '/', errorCallbackURL: '/signin' },
       headers: await headers(),
     });
 
-    return { success: true };
+    return { success: true, verificationRequired: true };
   } catch (error) {
-    loggers.payments.error('createPurchaseSession: failed to create session', error);
+    loggers.payments.error('createPurchaseSessionAction: failed to send verification', error);
     return { success: false, error: 'server_error' };
   }
 };

@@ -245,6 +245,30 @@ describe('PurchaseCheckoutStep', () => {
     });
   });
 
+  it('shows the verification message and does NOT call onConfirmed when verification is required', async () => {
+    mockUseQuery.mockReturnValue({ data: { confirmed: true } });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'cs_test_session',
+    });
+    // A guest purchase now requires magic-link verification (#665): no session
+    // is minted, so the flow must not advance to the download step.
+    mockCreatePurchaseSessionAction.mockResolvedValue({
+      success: true,
+      verificationRequired: true,
+    });
+
+    const onConfirmed = vi.fn();
+    const props = buildProps({ onConfirmed });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/check your email/i)).toBeDefined();
+    });
+    expect(onConfirmed).not.toHaveBeenCalled();
+  });
+
   describe('useQuery polling branches', () => {
     it('refetchInterval returns false when confirmed is true', async () => {
       let capturedConfig: Record<string, unknown> = {};

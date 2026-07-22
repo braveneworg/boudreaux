@@ -136,6 +136,64 @@ const PurchaseCheckoutForm = ({
 };
 
 /**
+ * Terminal step for a confirmed guest purchase that now requires magic-link
+ * verification before download (#665) — no session was auto-minted.
+ */
+const PurchaseVerificationStep = ({ customerEmail }: { customerEmail?: string | null }) => (
+  <>
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <CheckCircle2Icon className="size-5 text-green-500" />
+        Payment received!
+      </DialogTitle>
+      <DialogDescription>
+        Your payment was received. Check your email
+        {customerEmail ? ` (${customerEmail})` : ''} to sign in and download your purchase.
+      </DialogDescription>
+    </DialogHeader>
+  </>
+);
+
+/** In-flight step shown after payment while the webhook confirmation is polled. */
+const PurchasePendingStep = ({
+  timedOut,
+  isLoggingIn,
+}: {
+  timedOut: boolean;
+  isLoggingIn: boolean;
+}) => (
+  <>
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <CheckCircle2Icon className="size-5 text-green-500" />
+        Payment received!
+      </DialogTitle>
+      <DialogDescription>
+        {timedOut ? (
+          <>
+            This is taking longer than expected. Your payment was received &mdash; please check your
+            email for a download link or contact{' '}
+            <a href="mailto:support@fakefourinc.com" className="underline">
+              support@fakefourinc.com
+            </a>
+          </>
+        ) : isLoggingIn ? (
+          'Setting up your account...'
+        ) : (
+          'Confirming your purchase...'
+        )}
+      </DialogDescription>
+    </DialogHeader>
+
+    {!timedOut && (
+      <div className="flex items-center justify-center py-6" role="status">
+        <Loader2Icon className="size-6 animate-spin text-zinc-950" />
+      </div>
+    )}
+  </>
+);
+
+/**
  * Checkout step for the PWYW release purchase flow.
  *
  * Creates a Stripe Checkout Session on mount, renders the embedded
@@ -219,6 +277,7 @@ export const PurchaseCheckoutStep = ({
   });
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
 
   useEffect(() => {
     if (!purchaseStatus?.confirmed || !sessionId) return;
@@ -228,10 +287,17 @@ export const PurchaseCheckoutStep = ({
     const loginAndConfirm = async () => {
       setIsLoggingIn(true);
       try {
-        await createPurchaseSessionAction({ sessionId });
+        const result = await createPurchaseSessionAction({ sessionId });
+        // A guest purchase no longer auto-logs-in (#665): the server sent a
+        // magic link, so keep the buyer on this step with the "check your
+        // email" prompt instead of advancing to the download step.
+        if (!cancelled && result.verificationRequired) {
+          setVerificationRequired(true);
+          return;
+        }
       } catch {
-        // Auto-login is best-effort — proceed to the success step even if it
-        // fails. The user can still sign in manually via magic link.
+        // Best-effort — an already-authenticated buyer proceeds; a guest whose
+        // send failed can still sign in manually via magic link.
       }
       if (!cancelled) {
         onConfirmed();
@@ -273,38 +339,16 @@ export const PurchaseCheckoutStep = ({
     );
   }
 
-  if (paymentComplete) {
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2Icon className="size-5 text-green-500" />
-            Payment received!
-          </DialogTitle>
-          <DialogDescription>
-            {timedOut ? (
-              <>
-                This is taking longer than expected. Your payment was received &mdash; please check
-                your email for a download link or contact{' '}
-                <a href="mailto:support@fakefourinc.com" className="underline">
-                  support@fakefourinc.com
-                </a>
-              </>
-            ) : isLoggingIn ? (
-              'Setting up your account...'
-            ) : (
-              'Confirming your purchase...'
-            )}
-          </DialogDescription>
-        </DialogHeader>
+  // #665: a confirmed guest purchase requires magic-link verification — no
+  // session was minted, so surface the "check your email" prompt instead of
+  // advancing to the download step. Terminal state; takes priority over the
+  // in-flight paymentComplete UI.
+  if (verificationRequired) {
+    return <PurchaseVerificationStep customerEmail={customerEmail} />;
+  }
 
-        {!timedOut && (
-          <div className="flex items-center justify-center py-6" role="status">
-            <Loader2Icon className="size-6 animate-spin text-zinc-950" />
-          </div>
-        )}
-      </>
-    );
+  if (paymentComplete) {
+    return <PurchasePendingStep timedOut={timedOut} isLoggingIn={isLoggingIn} />;
   }
 
   return (

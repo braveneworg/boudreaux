@@ -131,6 +131,16 @@ describe('UserService', () => {
       });
     });
 
+    it('creates the guest with emailVerified:false (unverified until magic-link)', async () => {
+      vi.mocked(UserRepository.createGuest).mockResolvedValue({ id: 'new-id' });
+
+      await UserService.createGuestPurchaser('g@x.io');
+
+      expect(UserRepository.createGuest).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'g@x.io', emailVerified: false })
+      );
+    });
+
     it('recovers the existing user when create races on a DUPLICATE DataError', async () => {
       vi.mocked(UserRepository.createGuest).mockRejectedValue(dataError('DUPLICATE'));
       vi.mocked(UserRepository.findIdByEmail).mockResolvedValue({ id: 'raced-id' });
