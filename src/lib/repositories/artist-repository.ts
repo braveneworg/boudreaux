@@ -7,8 +7,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   Artist,
-  ArtistBioImageRecord,
-  ArtistBioLinkRecord,
   ArtistDetail,
   ArtistListFilters,
   ArtistListWithBio,
@@ -16,8 +14,6 @@ import type {
   ArtistScalars,
   ArtistSearchMatch,
   ArtistWithPublishedReleases,
-  CreateArtistBioImageData,
-  CreateArtistBioLinkData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -40,14 +36,6 @@ type ArtistNameSelect = {
 /** Count filters for the admin dashboard (Prisma-free at the boundary). */
 export interface ArtistCountFilters {
   published?: boolean;
-}
-
-/** Bio image row projection used by the save-time full re-host pass. */
-export interface BioImageRehostRow {
-  id: string;
-  url: string;
-  thumbnailUrl: string | null;
-  originalUrl: string | null;
 }
 
 /**
@@ -725,133 +713,6 @@ export class ArtistRepository {
           },
         },
       })
-    );
-  }
-
-  /** Deletes a single discovered bio link row (palette X). */
-  static async deleteBioLink(linkId: string): Promise<void> {
-    await prisma.artistBioLink.delete({ where: { id: linkId } });
-  }
-
-  /** Deletes a single discovered bio image row (palette X) and returns its
-   *  stored URLs so the caller can clean up the CDN thumbnail. */
-  static async deleteBioImage(
-    imageId: string
-  ): Promise<{ url: string; thumbnailUrl: string | null }> {
-    const removed = await prisma.artistBioImage.delete({
-      where: { id: imageId },
-      select: { url: true, thumbnailUrl: true },
-    });
-    return removed;
-  }
-
-  /** Lists an artist's bio image rows with the URLs needed to decide whether a
-   *  save-time full re-host is required (thumbnail → originalUrl upgrade). */
-  static async findBioImagesForRehost(artistId: string): Promise<BioImageRehostRow[]> {
-    return runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId },
-        select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
-      })
-    );
-  }
-
-  /** Lists an artist's admin-uploaded (`origin: 'custom'`) bio image URLs in
-   *  sort order — used to seed the Lambda's face-matching reference images. */
-  static async findCustomBioImageUrls(artistId: string): Promise<string[]> {
-    const rows = await runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId, origin: 'custom' },
-        orderBy: { sortOrder: 'asc' },
-        select: { url: true },
-      })
-    );
-    return rows.map(({ url }) => url);
-  }
-
-  /** Points a bio image row at its upgraded (fully re-hosted) CDN URL. */
-  static async updateBioImageUrl(imageId: string, url: string): Promise<void> {
-    await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { url } }));
-  }
-
-  /** Creates a single bio image row (manual upload / curated addition),
-   *  appending it after the artist's current highest `sortOrder`. */
-  static async createBioImage(data: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
-    const isPrimary = data.isPrimary ?? false;
-    return runQuery(async () => {
-      const { _max } = await prisma.artistBioImage.aggregate({
-        where: { artistId: data.artistId },
-        _max: { sortOrder: true },
-      });
-      const sortOrder = (_max.sortOrder ?? -1) + 1;
-      return prisma.artistBioImage.create({
-        data: {
-          artistId: data.artistId,
-          url: data.url,
-          thumbnailUrl: data.thumbnailUrl,
-          title: data.title,
-          attribution: data.attribution,
-          license: data.license,
-          licenseUrl: data.licenseUrl,
-          sourceUrl: data.sourceUrl,
-          originalUrl: data.originalUrl,
-          width: data.width,
-          height: data.height,
-          isPrimary,
-          kind: data.kind,
-          alt: data.alt,
-          // The manual/RTE-upload path only ever creates custom rows, so a
-          // regeneration preserves them (see `replaceBioContent`).
-          origin: data.origin ?? 'custom',
-          sortOrder,
-        },
-      });
-    }) as Promise<ArtistBioImageRecord>;
-  }
-
-  /** Creates a single bio link row (admin-authored custom link), appending it
-   *  after the artist's current highest `sortOrder`. */
-  static async createBioLink(data: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
-    return runQuery(async () => {
-      const { _max } = await prisma.artistBioLink.aggregate({
-        where: { artistId: data.artistId },
-        _max: { sortOrder: true },
-      });
-      const sortOrder = (_max.sortOrder ?? -1) + 1;
-      return prisma.artistBioLink.create({
-        data: {
-          artistId: data.artistId,
-          label: data.label,
-          url: data.url,
-          kind: data.kind,
-          // The admin-authored path only ever creates custom rows, so a
-          // regeneration preserves them (see `replaceBioContent`).
-          origin: data.origin ?? 'custom',
-          sortOrder,
-        },
-      });
-    }) as Promise<ArtistBioLinkRecord>;
-  }
-
-  /** Finds one bio link row for an artist by exact URL, or null when none.
-   *  Used to dedupe the admin add-link path so the same URL is never stored
-   *  twice (whether it was previously added as custom or discovered). */
-  static async findBioLinkByUrl(
-    artistId: string,
-    url: string
-  ): Promise<ArtistBioLinkRecord | null> {
-    return runQuery(() =>
-      prisma.artistBioLink.findFirst({ where: { artistId, url } })
-    ) as Promise<ArtistBioLinkRecord | null>;
-  }
-
-  /** Updates a single bio image row's attribution text (admin edit). */
-  static async updateBioImageAttribution(
-    imageId: string,
-    attribution: string | null
-  ): Promise<void> {
-    await runQuery(() =>
-      prisma.artistBioImage.update({ where: { id: imageId }, data: { attribution } })
     );
   }
 

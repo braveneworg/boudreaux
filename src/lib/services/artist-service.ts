@@ -6,8 +6,12 @@ import 'server-only';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 import {
-  ArtistRepository,
+  ArtistBioImageRepository,
   type BioImageRehostRow,
+} from '@/lib/repositories/artist-bio-image-repository';
+import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
+import {
+  ArtistRepository,
   type EnrichedArtistFieldUpdate,
 } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
@@ -237,7 +241,7 @@ const rehostOne = async (
   try {
     const rehosted = await BioImageService.rehostWithVariants(plan.source, artistId, index);
     if (plan.rowId) {
-      await ArtistRepository.updateBioImageUrl(plan.rowId, rehosted.url);
+      await ArtistBioImageRepository.updateUrl(plan.rowId, rehosted.url);
     }
     return withReplacedSrc(result, src, rehosted.url);
   } catch (error) {
@@ -271,7 +275,7 @@ const finalizeBioImages = async (
   // when a later iteration aborts the loop.
   let result = { ...data };
   try {
-    const rows = await ArtistRepository.findBioImagesForRehost(artistId);
+    const rows = await ArtistBioImageRepository.findForRehost(artistId);
     const cdnPrefix = buildCdnUrl('');
     const srcs = [...new Set([...collectImgSrcs(data.bio), ...collectImgSrcs(data.altBio)])].filter(
       (src) => needsFullRehost(src, cdnPrefix)
@@ -965,20 +969,20 @@ export class ArtistService {
 
   /** Deletes a single discovered bio link row (admin palette X). */
   static async deleteBioLink(linkId: string): Promise<void> {
-    await ArtistRepository.deleteBioLink(linkId);
+    await ArtistBioLinkRepository.delete(linkId);
   }
 
   /** Deletes a single discovered bio image row (admin palette X) and performs
    *  best-effort cleanup of its CDN thumbnail. */
   static async deleteBioImage(imageId: string): Promise<void> {
-    const removed = await ArtistRepository.deleteBioImage(imageId);
+    const removed = await ArtistBioImageRepository.delete(imageId);
     await cleanupBioMediaObject(removed.url);
     await cleanupBioMediaObject(removed.thumbnailUrl);
   }
 
   /** Persists one manually-added bio image and returns the created row. */
   static async createBioImage(input: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
-    return ArtistRepository.createBioImage(input);
+    return ArtistBioImageRepository.create(input);
   }
 
   /** Persists one admin-authored bio link and returns the created row.
@@ -989,15 +993,15 @@ export class ArtistService {
    *  `@@unique([artistId, url])` index then rejects the loser, so a `DUPLICATE`
    *  is recovered by re-reading and returning the row the winner persisted. */
   static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
-    const existing = await ArtistRepository.findBioLinkByUrl(input.artistId, input.url);
+    const existing = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
     if (existing) {
       return existing;
     }
     try {
-      return await ArtistRepository.createBioLink(input);
+      return await ArtistBioLinkRepository.create(input);
     } catch (error) {
       if (error instanceof DataError && error.code === 'DUPLICATE') {
-        const raced = await ArtistRepository.findBioLinkByUrl(input.artistId, input.url);
+        const raced = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
         if (raced) {
           return raced;
         }
@@ -1011,7 +1015,7 @@ export class ArtistService {
     imageId: string,
     attribution: string | null
   ): Promise<void> {
-    await ArtistRepository.updateBioImageAttribution(imageId, attribution);
+    await ArtistBioImageRepository.updateAttribution(imageId, attribution);
   }
 
   /**

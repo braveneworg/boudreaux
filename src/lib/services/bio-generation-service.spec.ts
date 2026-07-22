@@ -54,7 +54,12 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     claimBioJobToken: (id: string, token: string) => claimBioJobTokenMock(id, token),
     setBioProgress: (id: string, progress: unknown) => setBioProgressMock(id, progress),
     getBioGenerationState: (id: string) => getBioGenerationStateMock(id),
-    findCustomBioImageUrls: (id: string) => findCustomBioImageUrlsMock(id),
+  },
+}));
+
+vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
+  ArtistBioImageRepository: {
+    findCustomUrls: (id: string) => findCustomBioImageUrlsMock(id),
   },
 }));
 
