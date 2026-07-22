@@ -188,6 +188,58 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     expect(mockIncrementQuota).not.toHaveBeenCalled();
   });
 
+  // #666 — a non-purchaser may only pull free formats (MP3_320KBPS / AAC) via
+  // the freemium path. Lossless masters (FLAC/WAV/AIFF/ALAC) require a purchase.
+  it('should return 403 PURCHASE_REQUIRED when a non-purchaser requests a lossless format', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+
+    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'FLAC'));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('PURCHASE_REQUIRED');
+  });
+
+  it('does not consult the freemium quota for a lossless non-purchaser request', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+
+    await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'WAV'));
+
+    expect(mockCheckFreeDownloadQuota).not.toHaveBeenCalled();
+    expect(mockIncrementQuota).not.toHaveBeenCalled();
+  });
+
+  it('logs a failed download event for a lossless non-purchaser request', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+
+    await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'ALAC'));
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, errorCode: 'PURCHASE_REQUIRED' })
+    );
+  });
+
+  it('allows a non-purchaser to download a free lossy format (AAC)', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
+
+    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'AAC'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+  });
+
+  it('allows a purchaser to download a lossless format', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(true);
+
+    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'FLAC'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+  });
+
   it('should return 410 for deleted format outside grace period for non-purchaser', async () => {
     const deletedFormat = { ...mockFormat, deletedAt: new Date() };
     mockCheckFormatExists.mockResolvedValue(deletedFormat);
