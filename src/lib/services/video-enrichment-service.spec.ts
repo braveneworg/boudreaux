@@ -286,6 +286,14 @@ describe('runEnrichmentJob', () => {
     expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
   });
 
+  it('does nothing for a MUSIC video whose artist is blank', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  });
+
   it('refuses to double-dispatch while a processing job is fresh', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({ enrichmentStatus: 'processing', enrichmentStartedAt: new Date() })

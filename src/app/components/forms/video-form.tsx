@@ -21,7 +21,10 @@ import {
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
-import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
+import {
+  isEnrichableCategory,
+  type VideoLevelSuggestionField,
+} from '@/lib/validation/video-enrichment-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
@@ -258,14 +261,18 @@ const resolvePersistedRow = (
   effectiveVideoId: videoId ?? draftId ?? undefined,
 });
 
-/** MUSIC-only, row-required: mounts as soon as a draft/edit row exists. */
+/**
+ * Category-gated (the artist half of eligibility is handled inside the panel,
+ * which must render for an artist-less MUSIC video to show the add-artist
+ * hint), row-required: mounts as soon as a draft/edit row exists.
+ */
 const EnrichmentPanelMount = ({
   videoId,
   category,
   control,
   onApplyVideoSuggestion,
 }: EnrichmentPanelMountProps): React.ReactElement | null =>
-  videoId !== undefined && category === 'MUSIC' ? (
+  videoId !== undefined && isEnrichableCategory(category) ? (
     <VideoEnrichmentErrorBoundary>
       <VideoEnrichmentPanel
         videoId={videoId}

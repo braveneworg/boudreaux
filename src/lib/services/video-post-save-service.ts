@@ -13,6 +13,10 @@ import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type { VideoCategory } from '@/lib/types/domain/video';
 import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
+import {
+  hasEnrichableArtist,
+  isEnrichmentEligible,
+} from '@/lib/validation/video-enrichment-schema';
 import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
 
 const logger = loggers.media;
@@ -72,21 +76,17 @@ export interface VideoPostSavePlan {
   syncProducers: boolean;
 }
 
-/** Enrichment is dispatched only for a MUSIC video that actually names an artist. */
-const dispatchesEnrichment = (next: SavedVideoValues, hasArtist: boolean): boolean =>
-  hasArtist && next.category === 'MUSIC';
-
 /**
  * A freshly uploaded file (draft or create). The file has never been probed, so
  * it always is; the artist stages run only once an artist is present, so a
  * blank-artist draft never mints an "Unknown Artist" shell.
  */
 const planNewVideo = (next: SavedVideoValues, intent: VideoSaveIntent): VideoPostSavePlan => {
-  const hasArtist = next.artist.trim() !== '';
+  const hasArtist = hasEnrichableArtist(next.artist);
   return {
     syncArtists: hasArtist,
     probe: true,
-    dispatchEnrichment: dispatchesEnrichment(next, hasArtist),
+    dispatchEnrichment: isEnrichmentEligible(next),
     confirmArtistDetailsChanged: false,
     // A draft carries no producers; a create has nothing to clear, so an empty
     // list is a no-op rather than a sync.
@@ -103,7 +103,7 @@ const planUpdatedVideo = (
   next: SavedVideoValues,
   previous: PreviousVideoValues
 ): VideoPostSavePlan => {
-  const hasArtist = next.artist.trim() !== '';
+  const hasArtist = hasEnrichableArtist(next.artist);
   const fileReplaced = next.s3Key !== previous.s3Key;
   // `undefined` means the payload omitted producers; `[]` means "clear all".
   const syncProducers = next.producers !== undefined;
@@ -112,7 +112,7 @@ const planUpdatedVideo = (
     return {
       syncArtists: hasArtist,
       probe: fileReplaced,
-      dispatchEnrichment: dispatchesEnrichment(next, hasArtist),
+      dispatchEnrichment: isEnrichmentEligible(next),
       confirmArtistDetailsChanged: false,
       syncProducers,
     };
@@ -122,7 +122,7 @@ const planUpdatedVideo = (
     return {
       syncArtists: hasArtist,
       probe: false,
-      dispatchEnrichment: dispatchesEnrichment(next, hasArtist),
+      dispatchEnrichment: isEnrichmentEligible(next),
       confirmArtistDetailsChanged: true,
       syncProducers,
     };

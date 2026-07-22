@@ -4,6 +4,8 @@
 
 import { z } from 'zod';
 
+import type { VideoCategory } from '@/lib/types/domain/video';
+
 import { httpUrlSchema, objectIdSchema } from './bio-generation-schema';
 
 /**
@@ -52,6 +54,47 @@ export type EnrichmentStatus = (typeof ENRICHMENT_STATUSES)[number];
 /** In-flight states — polling continues only while the job is one of these. */
 export const isInFlightEnrichmentStatus = (status: string | null | undefined): boolean =>
   status === 'pending' || status === 'processing';
+
+/** The one category whose videos carry web enrichment. */
+export const isEnrichableCategory = (category: VideoCategory | null | undefined): boolean =>
+  category === 'MUSIC';
+
+/** A video can only be enriched when its artist/creator field names someone. */
+export const hasEnrichableArtist = (artist: string | null | undefined): boolean =>
+  (artist ?? '').trim() !== '';
+
+/** The two facts enrichment eligibility is decided on. */
+export interface EnrichmentEligibilityInput {
+  category: VideoCategory | null | undefined;
+  artist: string | null | undefined;
+}
+
+/** Which half of the eligibility rule a video fails, for per-half copy. */
+export type EnrichmentIneligibilityReason = 'category' | 'artist';
+
+/**
+ * The single authority on enrichment eligibility: a MUSIC video that names an
+ * artist. The conjunction of the two halves exists only here — every gate
+ * (the post-save planner, the enrichment service's execution backstop, the
+ * manual trigger action, and the admin UI) consumes this, the boolean
+ * `isEnrichmentEligible`, or a single half above. Never restate the rule
+ * inline: the halves drifting apart is exactly how a video gets stranded at
+ * `pending` (a trigger accepts what dispatch later refuses).
+ *
+ * @returns The failing half, or `null` when the video is eligible.
+ */
+export const enrichmentIneligibilityReason = ({
+  category,
+  artist,
+}: EnrichmentEligibilityInput): EnrichmentIneligibilityReason | null => {
+  if (!isEnrichableCategory(category)) return 'category';
+  if (!hasEnrichableArtist(artist)) return 'artist';
+  return null;
+};
+
+/** Boolean view of {@link enrichmentIneligibilityReason} for yes/no gates. */
+export const isEnrichmentEligible = (input: EnrichmentEligibilityInput): boolean =>
+  enrichmentIneligibilityReason(input) === null;
 
 /**
  * Ordered stages the Lambda checkpoints through. Wire contract with
