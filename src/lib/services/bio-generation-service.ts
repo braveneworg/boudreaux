@@ -8,6 +8,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 
+import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import type { ReleaseCoverSource } from '@/lib/types/domain/release';
@@ -586,7 +587,7 @@ const prepareGeneration = async (
 
   // Admin-uploaded custom bio images round out the artist's own images as face
   // references. A lookup failure degrades to artist images only (never fatal).
-  const customBioImageUrls = await ArtistRepository.findCustomBioImageUrls(artist.id).catch(
+  const customBioImageUrls = await ArtistBioImageRepository.findCustomUrls(artist.id).catch(
     (error) => {
       loggers.media.warn('bio_custom_reference_images_failed', {
         artistId: artist.id,

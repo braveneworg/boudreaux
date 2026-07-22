@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
+import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
@@ -56,15 +58,26 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     archive: vi.fn(),
     existsById: vi.fn(),
     connectToRelease: vi.fn(),
-    deleteBioLink: vi.fn(),
-    deleteBioImage: vi.fn(),
-    findBioImagesForRehost: vi.fn(),
-    updateBioImageUrl: vi.fn(),
-    createBioImage: vi.fn(),
-    createBioLink: vi.fn(),
-    findBioLinkByUrl: vi.fn(),
-    updateBioImageAttribution: vi.fn(),
     updateEnrichedField: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
+  ArtistBioImageRepository: {
+    create: vi.fn(),
+    delete: vi.fn(),
+    findForRehost: vi.fn(),
+    findCustomUrls: vi.fn(),
+    updateUrl: vi.fn(),
+    updateAttribution: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/artist-bio-link-repository', () => ({
+  ArtistBioLinkRepository: {
+    create: vi.fn(),
+    delete: vi.fn(),
+    findByUrl: vi.fn(),
   },
 }));
 
@@ -471,8 +484,8 @@ describe('ArtistService', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example');
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
-      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([]);
-      vi.mocked(ArtistRepository.updateBioImageUrl).mockResolvedValue(undefined);
+      vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([]);
+      vi.mocked(ArtistBioImageRepository.updateUrl).mockResolvedValue(undefined);
       vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(true);
       vi.mocked(BioImageService.rehostWithVariants).mockResolvedValue({
         url: FULL,
@@ -486,7 +499,7 @@ describe('ArtistService', () => {
     });
 
     it('re-hosts a thumbnail src to full variants and rewrites the html', async () => {
-      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+      vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([thumbnailRow]);
 
       await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
 
@@ -495,11 +508,11 @@ describe('ArtistService', () => {
     });
 
     it('upgrades the matching bio image row url', async () => {
-      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([thumbnailRow]);
+      vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([thumbnailRow]);
 
       await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
 
-      expect(vi.mocked(ArtistRepository.updateBioImageUrl)).toHaveBeenCalledWith('img-1', FULL);
+      expect(vi.mocked(ArtistBioImageRepository.updateUrl)).toHaveBeenCalledWith('img-1', FULL);
     });
 
     it('skips an external src that resolves to a private address', async () => {
@@ -531,7 +544,7 @@ describe('ArtistService', () => {
     it('skips finalization entirely when no bio fields are updated', async () => {
       await ArtistService.updateArtist('a1', { displayName: 'X' });
 
-      expect(vi.mocked(ArtistRepository.findBioImagesForRehost)).not.toHaveBeenCalled();
+      expect(vi.mocked(ArtistBioImageRepository.findForRehost)).not.toHaveBeenCalled();
     });
 
     it('keeps a completed html replacement when a later iteration throws', async () => {
@@ -542,7 +555,7 @@ describe('ArtistService', () => {
         thumbnailUrl: THUMB2,
         originalUrl: 'https://upload.wikimedia.org/full2.jpg',
       };
-      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+      vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([
         thumbnailRow,
         secondRow,
       ]);
@@ -564,7 +577,7 @@ describe('ArtistService', () => {
 
     it('leaves the failed iteration source untouched when the loop aborts', async () => {
       const THUMB2 = 'https://cdn.example/media/artists/a1/bio/thumbs/1-xyz.webp';
-      vi.mocked(ArtistRepository.findBioImagesForRehost).mockResolvedValue([
+      vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([
         thumbnailRow,
         {
           id: 'img-2',
@@ -2178,11 +2191,11 @@ describe('ArtistService', () => {
 
   describe('deleteBioLink', () => {
     it('delegates to the repository without returning a value', async () => {
-      vi.mocked(ArtistRepository.deleteBioLink).mockResolvedValue(undefined as never);
+      vi.mocked(ArtistBioLinkRepository.delete).mockResolvedValue(undefined as never);
 
       await ArtistService.deleteBioLink('link-1');
 
-      expect(ArtistRepository.deleteBioLink).toHaveBeenCalledWith('link-1');
+      expect(ArtistBioLinkRepository.delete).toHaveBeenCalledWith('link-1');
     });
   });
 
@@ -2196,7 +2209,7 @@ describe('ArtistService', () => {
     });
 
     it('removes the CDN bio thumbnail after deleting the row', async () => {
-      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
         url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
         thumbnailUrl: null,
       });
@@ -2207,7 +2220,7 @@ describe('ArtistService', () => {
     });
 
     it('also cleans up a non-null thumbnailUrl that is a bio url', async () => {
-      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
         url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
         thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
       });
@@ -2216,7 +2229,7 @@ describe('ArtistService', () => {
     });
 
     it('does not touch S3 for a non-bio url', async () => {
-      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
         url: 'https://upload.wikimedia.org/photo.jpg',
         thumbnailUrl: null,
       });
@@ -2225,7 +2238,7 @@ describe('ArtistService', () => {
     });
 
     it('still succeeds when thumbnail cleanup fails', async () => {
-      vi.mocked(ArtistRepository.deleteBioImage).mockResolvedValue({
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
         url: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
         thumbnailUrl: null,
       });
@@ -2237,14 +2250,14 @@ describe('ArtistService', () => {
   describe('createBioImage', () => {
     it('delegates to the repository and returns the created row', async () => {
       const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
-      vi.mocked(ArtistRepository.createBioImage).mockResolvedValue(row as never);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValue(row as never);
 
       const result = await ArtistService.createBioImage({
         artistId: 'a1',
         url: 'https://cdn/x.webp',
       });
 
-      expect(ArtistRepository.createBioImage).toHaveBeenCalledWith({
+      expect(ArtistBioImageRepository.create).toHaveBeenCalledWith({
         artistId: 'a1',
         url: 'https://cdn/x.webp',
       });
@@ -2254,9 +2267,9 @@ describe('ArtistService', () => {
 
   describe('createBioLink', () => {
     it('creates a new row when no existing link has that URL', async () => {
-      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
       const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
-      vi.mocked(ArtistRepository.createBioLink).mockResolvedValue(row as never);
+      vi.mocked(ArtistBioLinkRepository.create).mockResolvedValue(row as never);
 
       const result = await ArtistService.createBioLink({
         artistId: 'a1',
@@ -2264,8 +2277,8 @@ describe('ArtistService', () => {
         url: 'https://cdn/x',
       });
 
-      expect(ArtistRepository.findBioLinkByUrl).toHaveBeenCalledWith('a1', 'https://cdn/x');
-      expect(ArtistRepository.createBioLink).toHaveBeenCalledWith({
+      expect(ArtistBioLinkRepository.findByUrl).toHaveBeenCalledWith('a1', 'https://cdn/x');
+      expect(ArtistBioLinkRepository.create).toHaveBeenCalledWith({
         artistId: 'a1',
         label: 'Site',
         url: 'https://cdn/x',
@@ -2283,7 +2296,7 @@ describe('ArtistService', () => {
         origin: 'custom',
         sortOrder: 2,
       };
-      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(existing);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(existing);
 
       const result = await ArtistService.createBioLink({
         artistId: 'a1',
@@ -2292,7 +2305,7 @@ describe('ArtistService', () => {
       });
 
       expect(result).toBe(existing);
-      expect(ArtistRepository.createBioLink).not.toHaveBeenCalled();
+      expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
 
     it('returns the raced row when a concurrent create loses the unique index', async () => {
@@ -2305,10 +2318,10 @@ describe('ArtistService', () => {
         origin: 'custom',
         sortOrder: 3,
       };
-      vi.mocked(ArtistRepository.findBioLinkByUrl)
+      vi.mocked(ArtistBioLinkRepository.findByUrl)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(raced);
-      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
@@ -2322,8 +2335,8 @@ describe('ArtistService', () => {
     });
 
     it('rethrows a non-duplicate data error from the create', async () => {
-      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
         new DataError('UNAVAILABLE', 'Connection failed')
       );
 
@@ -2333,8 +2346,8 @@ describe('ArtistService', () => {
     });
 
     it('rethrows the duplicate error when the post-conflict re-read finds nothing', async () => {
-      vi.mocked(ArtistRepository.findBioLinkByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.createBioLink).mockRejectedValue(
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
@@ -2346,11 +2359,11 @@ describe('ArtistService', () => {
 
   describe('updateBioImageAttribution', () => {
     it('delegates the attribution update to the repository', async () => {
-      vi.mocked(ArtistRepository.updateBioImageAttribution).mockResolvedValue(undefined as never);
+      vi.mocked(ArtistBioImageRepository.updateAttribution).mockResolvedValue(undefined as never);
 
       await ArtistService.updateBioImageAttribution('img-1', 'Credit');
 
-      expect(ArtistRepository.updateBioImageAttribution).toHaveBeenCalledWith('img-1', 'Credit');
+      expect(ArtistBioImageRepository.updateAttribution).toHaveBeenCalledWith('img-1', 'Credit');
     });
   });
 
