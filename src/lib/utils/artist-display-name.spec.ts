@@ -4,7 +4,41 @@
 
 import type { ArtistScalars } from '@/lib/types/domain/artist';
 
-import { getArtistDisplayNameForTour } from './artist-display-name';
+import { deriveArtistDisplayName, getArtistDisplayNameForTour } from './artist-display-name';
+
+describe('deriveArtistDisplayName', () => {
+  it('prefers the trimmed displayName when present', () => {
+    expect(
+      deriveArtistDisplayName({
+        displayName: '  MF DOOM  ',
+        firstName: 'Daniel',
+        surname: 'Dumile',
+      })
+    ).toBe('MF DOOM');
+  });
+
+  it('falls back to "first surname" when displayName is null', () => {
+    expect(
+      deriveArtistDisplayName({ displayName: null, firstName: 'Daniel', surname: 'Dumile' })
+    ).toBe('Daniel Dumile');
+  });
+
+  it('treats a whitespace-only displayName as absent', () => {
+    expect(
+      deriveArtistDisplayName({ displayName: '   ', firstName: 'Daniel', surname: 'Dumile' })
+    ).toBe('Daniel Dumile');
+  });
+
+  it('drops the surrounding space when one name part is empty', () => {
+    expect(deriveArtistDisplayName({ displayName: null, firstName: 'Ceschi', surname: '' })).toBe(
+      'Ceschi'
+    );
+  });
+
+  it('returns an empty string when no name material exists', () => {
+    expect(deriveArtistDisplayName({ displayName: null, firstName: '', surname: '' })).toBe('');
+  });
+});
 
 describe('getArtistDisplayNameForTour', () => {
   const baseArtist: ArtistScalars = {
