@@ -267,31 +267,6 @@ describe('GET /api/artists/search', () => {
     expect(body).toEqual({ error: 'Internal server error' });
   });
 
-  it('should handle artist with no releases array', async () => {
-    const mockArtists = [
-      {
-        id: 'artist-1',
-        firstName: 'John',
-        surname: 'Doe',
-        displayName: 'John Doe',
-        slug: 'john-doe',
-        images: [],
-        releases: undefined,
-      },
-    ];
-
-    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
-      success: true,
-      data: mockArtists as never,
-    });
-
-    const request = createRequest('john');
-    const response = await GET(request, dummyContext);
-    const body = await response.json();
-
-    expect(body.results[0].releases).toEqual([]);
-  });
-
   it('should return multiple artists in results', async () => {
     const mockArtists = [
       {

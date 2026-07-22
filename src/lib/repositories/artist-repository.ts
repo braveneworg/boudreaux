@@ -14,6 +14,7 @@ import type {
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistScalars,
+  ArtistSearchMatch,
   ArtistWithPublishedReleases,
   CreateArtistBioImageData,
   CreateArtistBioLinkData,
@@ -131,6 +132,17 @@ const artistListWithBioInclude = {
   bioImages: { where: { isPrimary: true }, orderBy: { sortOrder: 'asc' }, take: 3 },
 } as const satisfies Prisma.ArtistInclude;
 
+/** Public-search include — first image plus release joins carrying the narrow
+ * release projection the search consumes. */
+const artistSearchInclude = {
+  images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+  releases: {
+    include: {
+      release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
+    },
+  },
+} as const satisfies Prisma.ArtistInclude;
+
 /** Public artist-detail include — full nested release + bio graph. */
 const artistWithPublishedReleasesInclude = {
   images: true,
@@ -171,8 +183,13 @@ type _ArtistWithPublishedReleasesDrift = AssertExact<
   ArtistWithPublishedReleases,
   Prisma.ArtistGetPayload<{ include: typeof artistWithPublishedReleasesInclude }>
 >;
+type _ArtistSearchMatchDrift = AssertExact<
+  ArtistSearchMatch,
+  Prisma.ArtistGetPayload<{ include: typeof artistSearchInclude }>
+>;
 const _artistDrift: _ArtistDrift = true;
 const _artistDetailDrift: _ArtistDetailDrift = true;
+const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
 const _artistListWithBioDrift: _ArtistListWithBioDrift = true;
 const _artistWithPublishedReleasesDrift: _ArtistWithPublishedReleasesDrift = true;
 
@@ -426,23 +443,16 @@ export class ArtistRepository {
     search,
     skip = 0,
     take = 50,
-  }: ArtistListFilters): Promise<Artist[]> {
+  }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     return runQuery(() =>
       prisma.artist.findMany({
         where: buildSearchWhere(search),
         skip,
         take,
         orderBy: { displayName: 'asc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-          releases: {
-            include: {
-              release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
-            },
-          },
-        },
+        include: artistSearchInclude,
       })
-    ) as unknown as Promise<Artist[]>;
+    );
   }
 
   /**
