@@ -24,14 +24,10 @@ import type {
 } from '@/lib/types/domain/video-enrichment';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
-import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
-  ENRICHMENT_STATUSES,
   isEnrichmentEligible,
-  isInFlightEnrichmentStatus,
-  STALE_JOB_MS,
   SUGGESTION_CONFIDENCES,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_SUGGESTION_FIELDS,
@@ -48,6 +44,12 @@ import {
   type VideoSuggestionField,
 } from '@/lib/validation/video-enrichment-schema';
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
+import {
+  isInFlightJobStatus,
+  resolveStaleJobView,
+  runnerShouldSkip,
+  toAsyncJobStatus,
+} from '@/utils/async-job-lifecycle';
 
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
@@ -57,9 +59,6 @@ let lambdaClient: LambdaClient | null = null;
 
 /** Short timeout: the Event invoke returns 202 immediately (see bio service). */
 const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
-/** Error the status read attaches when coercing a stale in-flight job. */
-const STALE_JOB_ERROR = 'Video enrichment timed out. Please try again.';
 
 /** Hard cap mirrored by the Lambda's input schema (`artists: 1..10`). */
 const MAX_LAMBDA_ARTISTS = 10;
@@ -129,16 +128,6 @@ const toLambdaArtists = (rows: VideoArtistWithArtist[]): VideoEnrichmentLambdaIn
     };
   });
 
-/** Narrow a stored status string to the lifecycle union (null when unknown). */
-const toEnrichmentStatus = (status: string | null): EnrichmentStatus | null =>
-  status && (ENRICHMENT_STATUSES as readonly string[]).includes(status)
-    ? (status as EnrichmentStatus)
-    : null;
-
-/** True when a fresh (non-stale) job is already processing. */
-const isFreshlyProcessing = (state: VideoEnrichmentState): boolean =>
-  state.enrichmentStatus === 'processing' && !isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS);
-
 /** Parse a stored progress JSON into the validated shape, or null. */
 const parseStoredProgress = (value: Json | null): VideoEnrichmentProgress | null => {
   const parsed = videoEnrichmentProgressSchema.safeParse(value);
@@ -175,21 +164,20 @@ interface StatusView {
 }
 
 /**
- * Apply the 17-minute read-time stale coercion: an in-flight job older than
- * {@link STALE_JOB_MS} reads as `failed` with a timeout error (non-persistent —
- * a late callback can still claim). Progress surfaces only while in flight.
+ * The shared read-time stale coercion: an in-flight job older than the stale
+ * window reads as `failed` with the timeout copy (non-persistent — a late
+ * callback can still claim). Progress surfaces only while in flight.
  */
 const resolveStatusView = (state: VideoEnrichmentState): StatusView => {
-  const rawStatus = toEnrichmentStatus(state.enrichmentStatus);
-  const isStale =
-    isInFlightEnrichmentStatus(rawStatus) && isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS);
-  const status = isStale ? 'failed' : rawStatus;
+  const { status, error } = resolveStaleJobView({
+    status: toAsyncJobStatus(state.enrichmentStatus),
+    startedAt: state.enrichmentStartedAt,
+    error: state.enrichmentError ?? null,
+  });
   return {
     status,
-    error: isStale ? STALE_JOB_ERROR : (state.enrichmentError ?? null),
-    progress: isInFlightEnrichmentStatus(status)
-      ? parseStoredProgress(state.enrichmentProgress)
-      : null,
+    error,
+    progress: isInFlightJobStatus(status) ? parseStoredProgress(state.enrichmentProgress) : null,
   };
 };
 
@@ -626,7 +614,10 @@ export class VideoEnrichmentService {
   static async runEnrichmentJob(videoId: string): Promise<void> {
     try {
       const state = await VideoRepository.getEnrichmentState(videoId);
-      if (!state || !isEnrichmentEligible(state) || isFreshlyProcessing(state)) return;
+      if (!state || !isEnrichmentEligible(state)) return;
+      if (runnerShouldSkip(toAsyncJobStatus(state.enrichmentStatus), state.enrichmentStartedAt)) {
+        return;
+      }
 
       await VideoRepository.setEnrichmentStatus(videoId, 'processing', { error: null });
       const rows = await VideoArtistRepository.findByVideoId(videoId);

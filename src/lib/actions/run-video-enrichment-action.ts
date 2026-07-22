@@ -11,17 +11,15 @@ import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import { objectIdSchema } from '@/lib/validation/bio-generation-schema';
 import {
   enrichmentIneligibilityReason,
-  isInFlightEnrichmentStatus,
-  STALE_JOB_MS,
   type EnrichmentIneligibilityReason,
   type EnrichmentStatus,
   type RunVideoEnrichmentActionResult,
 } from '@/lib/validation/video-enrichment-schema';
+import { blocksNewTrigger, toAsyncJobStatus } from '@/utils/async-job-lifecycle';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 const logger = loggers.media;
@@ -43,18 +41,19 @@ const ineligibleCopyFor = (reason: EnrichmentIneligibilityReason): string => {
 };
 
 /**
- * If an enrichment job is genuinely in flight (`pending`/`processing`) and not
- * yet stale, return that status so the caller echoes it instead of starting a
- * duplicate run; otherwise null (mirrors `resolveInFlightBioStatus`).
+ * If an enrichment job blocks a new trigger ({@link blocksNewTrigger}:
+ * genuinely in flight and not yet stale), return that status so the caller
+ * echoes it instead of starting a duplicate run; otherwise null (mirrors
+ * `resolveInFlightBioStatus`).
  */
 const resolveInFlightEnrichmentStatus = (state: {
   enrichmentStatus: string | null;
   enrichmentStartedAt: Date | null;
 }): EnrichmentStatus | null => {
-  const inFlight = isInFlightEnrichmentStatus(state.enrichmentStatus);
+  const status = toAsyncJobStatus(state.enrichmentStatus);
 
-  if (inFlight && !isStaleJob(state.enrichmentStartedAt, STALE_JOB_MS)) {
-    return state.enrichmentStatus === 'processing' ? 'processing' : 'pending';
+  if (blocksNewTrigger(status, state.enrichmentStartedAt)) {
+    return status === 'processing' ? 'processing' : 'pending';
   }
   return null;
 };

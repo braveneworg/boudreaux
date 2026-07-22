@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { AssertExtends } from '@/lib/types/assert';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
+import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
 
@@ -264,33 +265,12 @@ export interface GeneratedBioContent {
   model: string;
 }
 
-/** Async bio-generation lifecycle states (null = never generated). */
-export const BIO_STATUSES = ['pending', 'processing', 'succeeded', 'failed'] as const;
-export type BioStatus = (typeof BIO_STATUSES)[number];
-
-/** In-flight states — polling continues only while the job is one of these. */
-export const isInFlightBioStatus = (status: BioStatus | null | undefined): boolean =>
-  status === 'pending' || status === 'processing';
-
 /**
- * A job is considered stale (abandoned — the server restarted mid-run, the
- * Lambda was killed at its 15-minute timeout, or the completion callback was
- * lost) once it has been `pending`/`processing` longer than this. Must exceed
- * the Lambda's 15-minute timeout so a healthy in-flight job is never treated as
- * dead. Used both to let a new trigger supersede an abandoned run and to resolve
- * the polling UI — the status read coerces a job older than this to `failed`.
+ * Async bio-generation lifecycle states (null = never generated) — the shared
+ * async-job lifecycle. Decisions (gates, staleness, the client deadline) live
+ * in `@/utils/async-job-lifecycle`; this module keeps only the wire shapes.
  */
-export const STALE_JOB_MS = 17 * 60 * 1000;
-
-/**
- * Client-side poll deadline: how long the admin form keeps polling a triggered
- * run before giving up and surfacing a timeout. Must exceed {@link STALE_JOB_MS}
- * so the server's stale-job coercion (which flips the job to `failed`) resolves
- * the UI first in normal operation; this is the last-resort stop for when the
- * status endpoint never returns a terminal status at all (e.g. it is
- * unreachable and every poll fails).
- */
-export const CLIENT_POLL_DEADLINE_MS = 20 * 60 * 1000;
+export type BioStatus = AsyncJobStatus;
 
 /**
  * Result of *triggering* async bio generation. Generation now runs in the
@@ -317,7 +297,7 @@ export interface BioGenerationStatusResult {
 
 /** Wire schema for the bio-generation status route, validated on the client. */
 export const bioGenerationStatusResponseSchema = z.object({
-  status: z.enum(BIO_STATUSES).nullable(),
+  status: z.enum(ASYNC_JOB_STATUSES).nullable(),
   error: z.string().nullable(),
   content: z
     .object({

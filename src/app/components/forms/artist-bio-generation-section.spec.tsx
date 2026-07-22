@@ -4,11 +4,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type {
   BioGenerationStatusResult,
   GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
+import { CLIENT_POLL_DEADLINE_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import { ArtistBioGenerationSection } from './artist-bio-generation-section';
 
@@ -300,7 +300,7 @@ describe('ArtistBioGenerationSection', () => {
         vi.advanceTimersByTime(CLIENT_POLL_DEADLINE_MS + 1000);
       });
 
-      expect(toastError).toHaveBeenCalledWith('Bio generation timed out. Please try again.');
+      expect(toastError).toHaveBeenCalledWith(STALE_JOB_TIMEOUT_MESSAGE);
     } finally {
       vi.useRealTimers();
     }

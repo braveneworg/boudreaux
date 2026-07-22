@@ -12,7 +12,6 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
-  STALE_JOB_MS,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -55,7 +54,7 @@ export const generateArtistBioAction = async (
     }
 
     // Don't start a second run while one is genuinely in flight.
-    const inFlightStatus = resolveInFlightBioStatus(state, STALE_JOB_MS);
+    const inFlightStatus = resolveInFlightBioStatus(state);
     if (inFlightStatus) {
       return { success: true, status: inFlightStatus };
     }

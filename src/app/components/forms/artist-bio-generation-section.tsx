@@ -18,8 +18,8 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
-import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { BioProgress, GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
+import { CLIENT_POLL_DEADLINE_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
 import { useGenerateArtistBioMutation } from './_hooks/mutations/use-bio-mutations';
@@ -158,7 +158,7 @@ export const ArtistBioGenerationSection = ({
   useEffect(() => {
     if (!active) return;
     const timeoutId = setTimeout(() => {
-      toast.error('Bio generation timed out. Please try again.');
+      toast.error(STALE_JOB_TIMEOUT_MESSAGE);
       setActive(false);
     }, CLIENT_POLL_DEADLINE_MS);
     return () => clearTimeout(timeoutId);

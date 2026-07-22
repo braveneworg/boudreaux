@@ -70,10 +70,22 @@ variants), **bio images**, and reference links.
 extracted by ffprobe) and **enrichment** (externally sourced facts such as
 release date, gated on the video being MUSIC-category with a known artist).
 
+**async job lifecycle** — the shared shape of every background job (bio
+generation, video enrichment): `pending → processing → succeeded/failed`, an
+atomic token claim, progress checkpoints, and client polling. Its decisions
+live in one pure, client-safe module with two deliberately different gate
+questions: **blocksNewTrigger** (a fresh `pending` blocks a new trigger — a
+queued job is a job) and **runnerShouldSkip** (only a fresh `processing` blocks
+the runner — `pending` is the handoff it consumes; collapsing the two
+deadlocks). An in-flight job older than the **stale window** (`STALE_JOB_MS`,
+above the Lambda's ceiling) is **stale-coerced** to `failed` on read, without
+writing; the **client poll deadline** (`CLIENT_POLL_DEADLINE_MS`) exceeds the
+stale window so the server's coercion resolves the UI first.
+_Defined in_ `src/lib/utils/async-job-lifecycle.ts`.
+
 **bio generation job** — an asynchronous run that produces an Artist's bio via
-the `bio-generator` Lambda. Has a lifecycle (`processing` → `succeeded` /
-`failed`) and reports intermediate **progress stages**. A job that never reports
-back is **stale-coerced** to failed after a deadline.
+the `bio-generator` Lambda, following the **async job lifecycle** and reporting
+intermediate **progress stages**.
 
 **playback session** — the app-wide guarantee that at most one player is
 audible. Any player — a Release, Artist, featured or playlist audio player, or a
