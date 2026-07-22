@@ -6,7 +6,7 @@ import { type z } from 'zod';
 
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
-import { artistDetailSchema } from '@/lib/validation/media-models-schema';
+import { artistDetailSchema } from '@/lib/validation/media/artist-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 /** The parsed `Artist` shape returned by `GET /api/artists/[id]`. */

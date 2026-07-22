@@ -11,7 +11,7 @@ import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
  * returned by the `/api/videos` route handlers.
  *
  * Two wire-format facts are handled so runtime values match the Prisma-derived
- * TypeScript types (see `media-models-schema`):
+ * TypeScript types (see `media/shared-schema`):
  * - `DateTime` fields arrive as ISO strings → `z.coerce.date()` rebuilds `Date`.
  * - the `BigInt` `fileSize` is serialized to `number` → `z.coerce.bigint()`
  *   restores `bigint`.

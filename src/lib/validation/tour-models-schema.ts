@@ -4,7 +4,7 @@
 import { z } from 'zod';
 
 import type { TourWithRelations } from '@/lib/repositories/tours/tour-repository';
-import { artistScalarSchema } from '@/lib/validation/media-models-schema';
+import { artistScalarSchema } from '@/lib/validation/media/shared-schema';
 
 /**
  * Strict Zod schema mirroring the serialized `TourWithRelations` row returned

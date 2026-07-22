@@ -6,7 +6,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { queryKeys } from '@/lib/query-keys';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { publishedReleaseListingSchema } from '@/lib/validation/media-models-schema';
+import { publishedReleaseListingSchema } from '@/lib/validation/media/release-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 

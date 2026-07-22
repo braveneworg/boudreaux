@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { type z, type ZodType } from 'zod';
 
 import { queryKeys } from '@/lib/query-keys';
-import { publishedReleaseDetailSchema, releaseSchema } from '@/lib/validation/media-models-schema';
+import { publishedReleaseDetailSchema, releaseSchema } from '@/lib/validation/media/release-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';

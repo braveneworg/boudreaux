@@ -7,7 +7,7 @@ import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { ReleaseListItem } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { releaseListItemSchema } from '@/lib/validation/media-models-schema';
+import { releaseListItemSchema } from '@/lib/validation/media/release-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 

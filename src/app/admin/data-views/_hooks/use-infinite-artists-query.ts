@@ -7,7 +7,7 @@ import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { Artist } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { artistSchema } from '@/lib/validation/media-models-schema';
+import { artistSchema } from '@/lib/validation/media/artist-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
