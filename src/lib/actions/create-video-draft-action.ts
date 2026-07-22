@@ -96,10 +96,10 @@ const markEnrichmentPending = async (videoId: string): Promise<void> => {
  * changes nothing — guards double-fire on flaky networks). When enrichment
  * will dispatch (MUSIC + non-blank artist) the job is marked `pending` before
  * the response so the edit page's status poll engages. In `after()` the
- * post-save pipeline probes always; artist sync + enrichment run only when
- * the artist snapshot is non-blank (gate inside kickPostSaveEnrichment).
- * A failure here NEVER blocks the upload — the form falls back to
- * create-on-submit.
+ * post-save pipeline runs the {@link planVideoPostSave} plan: the probe
+ * always, artist sync when the artist snapshot is non-blank, and enrichment
+ * only when the video is enrichment-eligible. A failure here NEVER blocks
+ * the upload — the form falls back to create-on-submit.
  */
 export const createVideoDraftAction = async (input: unknown): Promise<CreateVideoDraftResult> => {
   const session = await requireRole('admin');
