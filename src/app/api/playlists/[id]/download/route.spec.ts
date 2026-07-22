@@ -55,7 +55,9 @@ vi.mock('@/lib/utils/zip-stream', async () => {
 });
 
 const PLAYLIST_ID = '507f1f77bcf86cd799439011';
-const LOCK_KEY = `user:user-1|playlist:${PLAYLIST_ID}|AAC`;
+// #667: subject-only lock key — a subject's concurrent free downloads serialize
+// on the shared per-subject quota, not per (playlist, format).
+const LOCK_KEY = `user:user-1`;
 
 const manifest: PlaylistDownloadManifest = {
   playlistTitle: 'Morning Mix!',

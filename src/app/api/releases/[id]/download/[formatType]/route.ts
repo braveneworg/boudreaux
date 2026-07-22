@@ -17,6 +17,7 @@ import { withLogging } from '@/lib/decorators/with-logging';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { DownloadAuthorizationService } from '@/lib/services/download-authorization-service';
+import { freeDownloadLockService } from '@/lib/services/free-download-lock-service';
 import { QuotaEnforcementService } from '@/lib/services/quota-enforcement-service';
 import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
@@ -184,6 +185,38 @@ const enforceFreemiumQuota = async (args: {
   return null;
 };
 
+// #667: the freemium quota check and the charge are separate awaits; without
+// serialization, N concurrent requests for distinct releases all read the same
+// pre-charge count and each consume a slot, exceeding the cap. Hold a
+// per-subject in-process lock across the whole check-and-charge (authoritative
+// on the single-container deployment). The window is tiny — no streaming here —
+// so a colliding request is rare and gets a retryable 409.
+const enforceFreemiumQuotaLocked = async (args: {
+  quotaService: QuotaEnforcementService;
+  downloadEventRepo: DownloadEventRepository;
+  request: Request;
+  userId: string;
+  releaseId: string;
+  formatType: DigitalFormatType;
+}): Promise<NextResponse | null> => {
+  const lockKey = `user:${args.userId}`;
+  if (!freeDownloadLockService.acquire(lockKey)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'LOCK_HELD',
+        message: 'A free download is already in progress. Please try again.',
+      },
+      { status: 409 }
+    );
+  }
+  try {
+    return await enforceFreemiumQuota(args);
+  } finally {
+    freeDownloadLockService.release(lockKey);
+  }
+};
+
 const enforceSoftDeleteGrace = async (args: {
   authService: DownloadAuthorizationService;
   downloadEventRepo: DownloadEventRepository;
@@ -318,8 +351,9 @@ export const GET = withLogging<{ id: string; formatType: string }>('DOWNLOADS')(
       const hasPurchased = await authService.checkPurchaseStatus(userId, releaseId);
 
       // Step 4: If no purchase, restrict to free formats + enforce the quota
+      // (serialized per subject to make the check-and-charge atomic).
       if (!hasPurchased) {
-        const quotaResponse = await enforceFreemiumQuota({
+        const quotaResponse = await enforceFreemiumQuotaLocked({
           quotaService,
           downloadEventRepo,
           request,

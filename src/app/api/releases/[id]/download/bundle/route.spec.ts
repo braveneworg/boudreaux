@@ -1957,18 +1957,17 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency loc
     expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
   });
 
-  it('uses lock key composed of subjectKey + releaseId + sortedFormatKey', async () => {
+  // #667: the lock key is the SUBJECT only (not release/format-scoped) so a
+  // subject's concurrent free downloads across releases/format-sets serialize
+  // on the one per-subject quota instead of racing on distinct keys.
+  it('uses a subject-only lock key (not release/format-scoped)', async () => {
     await GET(makeFreeRequest('MP3_320KBPS,AAC'), makeParams());
-    expect(mockLockAcquire).toHaveBeenCalledWith(
-      'guest:guest-visitor-1|507f1f77bcf86cd799439011|AAC-MP3_320KBPS'
-    );
+    expect(mockLockAcquire).toHaveBeenCalledWith('guest:guest-visitor-1');
   });
 
-  it('releases the lock at the end of a successful free download', async () => {
+  it('releases the subject lock at the end of a successful free download', async () => {
     await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
-    expect(mockLockRelease).toHaveBeenCalledWith(
-      'guest:guest-visitor-1|507f1f77bcf86cd799439011|MP3_320KBPS'
-    );
+    expect(mockLockRelease).toHaveBeenCalledWith('guest:guest-visitor-1');
   });
 
   it('keys cap by userId (NOT visitorId) for authenticated free-flow users', async () => {
@@ -1989,12 +1988,10 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency loc
     expect(mockResolveVisitorIdentity).not.toHaveBeenCalled();
   });
 
-  it('uses subjectKey "user:<id>" in the lock key for authenticated users', async () => {
+  it('uses subjectKey "user:<id>" as the lock key for authenticated users', async () => {
     mockGetSession.mockResolvedValueOnce({ user: { id: 'user-123' } });
     await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
-    expect(mockLockAcquire).toHaveBeenCalledWith(
-      'user:user-123|507f1f77bcf86cd799439011|MP3_320KBPS'
-    );
+    expect(mockLockAcquire).toHaveBeenCalledWith('user:user-123');
   });
 });
 

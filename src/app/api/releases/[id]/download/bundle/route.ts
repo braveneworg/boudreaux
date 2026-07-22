@@ -1599,8 +1599,10 @@ const assembleGate = (args: {
       : freeSubject !== null
         ? `guest:${freeSubject.visitorId}`
         : null;
-  const lockKey =
-    freeSubjectKey !== null ? `${freeSubjectKey}|${releaseId}|${sortedFormatKey}` : null;
+  // #667: key the collision lock by SUBJECT only — not release/format-scoped —
+  // so a subject's concurrent free downloads serialize on the shared per-subject
+  // quota instead of racing on distinct keys and each drawing it down.
+  const lockKey = freeSubjectKey;
 
   return {
     request: args.request,
