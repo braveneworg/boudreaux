@@ -18,6 +18,8 @@ import type {
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
+  ArtistScalars,
+  ArtistSearchMatch,
   ArtistWithPublishedReleases,
   CreateArtistBioImageData,
   CreateArtistBioLinkData,
@@ -466,7 +468,7 @@ export class ArtistService {
   /**
    * Get an artist by slug
    */
-  static async getArtistBySlug(slug: string): Promise<ServiceResponse<Artist>> {
+  static async getArtistBySlug(slug: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
       const artist = await ArtistRepository.findBySlug(slug);
 
@@ -474,7 +476,7 @@ export class ArtistService {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
-      return { success: true, data: artist as unknown as Artist };
+      return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }
@@ -522,10 +524,10 @@ export class ArtistService {
   /**
    * Delete an artist by ID (hard delete)
    */
-  static async deleteArtist(id: string): Promise<ServiceResponse<Artist>> {
+  static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
       const artist = await ArtistRepository.delete(id);
-      return { success: true, data: artist as unknown as Artist };
+      return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
         NOT_FOUND: 'Artist not found',
@@ -537,10 +539,10 @@ export class ArtistService {
   /**
    * Soft delete an artist (archive)
    */
-  static async archiveArtist(id: string): Promise<ServiceResponse<Artist>> {
+  static async archiveArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
       const artist = await ArtistRepository.archive(id);
-      return { success: true, data: artist as unknown as Artist };
+      return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
         NOT_FOUND: 'Artist not found',
@@ -805,7 +807,7 @@ export class ArtistService {
    */
   static async searchPublishedArtists(
     params?: ArtistListFilters
-  ): Promise<ServiceResponse<Artist[]>> {
+  ): Promise<ServiceResponse<ArtistSearchMatch[]>> {
     try {
       const artists = await ArtistRepository.searchPublished(params ?? {});
       return { success: true, data: artists };

@@ -9,10 +9,12 @@ import type {
   Artist,
   ArtistBioImageRecord,
   ArtistBioLinkRecord,
+  ArtistDetail,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
   ArtistScalars,
+  ArtistSearchMatch,
   ArtistWithPublishedReleases,
   CreateArtistBioImageData,
   CreateArtistBioLinkData,
@@ -120,9 +122,25 @@ const artistAdminInclude = {
   releases: { include: { release: true } },
 } as const satisfies Prisma.ArtistInclude;
 
+/** By-id include — ordered images only (the `GET /api/artists/[id]` shape). */
+const artistDetailInclude = {
+  images: { orderBy: { sortOrder: 'asc' } },
+} as const satisfies Prisma.ArtistInclude;
+
 /** Public artists-index include — primary bio images beside the short bio. */
 const artistListWithBioInclude = {
   bioImages: { where: { isPrimary: true }, orderBy: { sortOrder: 'asc' }, take: 3 },
+} as const satisfies Prisma.ArtistInclude;
+
+/** Public-search include — first image plus release joins carrying the narrow
+ * release projection the search consumes. */
+const artistSearchInclude = {
+  images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+  releases: {
+    include: {
+      release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
+    },
+  },
 } as const satisfies Prisma.ArtistInclude;
 
 /** Public artist-detail include — full nested release + bio graph. */
@@ -153,6 +171,10 @@ type _ArtistDrift = AssertExact<
   Artist,
   Prisma.ArtistGetPayload<{ include: typeof artistAdminInclude }>
 >;
+type _ArtistDetailDrift = AssertExact<
+  ArtistDetail,
+  Prisma.ArtistGetPayload<{ include: typeof artistDetailInclude }>
+>;
 type _ArtistListWithBioDrift = AssertExact<
   ArtistListWithBio,
   Prisma.ArtistGetPayload<{ include: typeof artistListWithBioInclude }>
@@ -161,7 +183,13 @@ type _ArtistWithPublishedReleasesDrift = AssertExact<
   ArtistWithPublishedReleases,
   Prisma.ArtistGetPayload<{ include: typeof artistWithPublishedReleasesInclude }>
 >;
+type _ArtistSearchMatchDrift = AssertExact<
+  ArtistSearchMatch,
+  Prisma.ArtistGetPayload<{ include: typeof artistSearchInclude }>
+>;
 const _artistDrift: _ArtistDrift = true;
+const _artistDetailDrift: _ArtistDetailDrift = true;
+const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
 const _artistListWithBioDrift: _ArtistListWithBioDrift = true;
 const _artistWithPublishedReleasesDrift: _ArtistWithPublishedReleasesDrift = true;
 
@@ -311,7 +339,7 @@ export class ArtistRepository {
     return runQuery(() =>
       prisma.artist.findUnique({
         where: { id },
-        include: { images: { orderBy: { sortOrder: 'asc' } } },
+        include: artistDetailInclude,
       })
     ) as Promise<Artist | null>;
   }
@@ -415,23 +443,16 @@ export class ArtistRepository {
     search,
     skip = 0,
     take = 50,
-  }: ArtistListFilters): Promise<Artist[]> {
+  }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     return runQuery(() =>
       prisma.artist.findMany({
         where: buildSearchWhere(search),
         skip,
         take,
         orderBy: { displayName: 'asc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-          releases: {
-            include: {
-              release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
-            },
-          },
-        },
+        include: artistSearchInclude,
       })
-    ) as unknown as Promise<Artist[]>;
+    );
   }
 
   /**

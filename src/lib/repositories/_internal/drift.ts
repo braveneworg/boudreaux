@@ -36,10 +36,11 @@
  * whose `itemType` narrows a bare `string` to `'track' | 'video'`). Swapping it
  * for `AssertExact` there would fail the build for a difference that is the
  * whole point of the type.
+ *
+ * The assertion types themselves live in `@/lib/types/assert` so non-repository
+ * layers (e.g. validation wire-schema coverage ties) can use them without
+ * importing repository internals; this module re-exports them for the
+ * repository-side usage described above.
  */
 
-/** `true` iff A and B are mutually assignable (exact match); otherwise `never`. */
-export type AssertExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
-
-/** `true` iff A is assignable to B (one-directional); otherwise `never`. */
-export type AssertExtends<A, B> = [A] extends [B] ? true : never;
+export type { AssertExact, AssertExtends } from '@/lib/types/assert';

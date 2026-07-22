@@ -20,7 +20,7 @@ import { VideoRepository } from '@/lib/repositories/video-repository';
 import type { VideoSummary } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
-import type { Artist } from '@/lib/types/domain/artist';
+import type { ArtistSearchMatch } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import type {
   AddPlaylistItemData,
@@ -531,7 +531,7 @@ const releaseDetailToSearchItems = (
  * match order, skipping unpublished/soft-deleted releases and duplicates,
  * bounded by {@link ARTIST_EXPANSION_LIMIT} release fetches in total.
  */
-const collectArtistReleaseTargets = (artists: Artist[]): ArtistReleaseTarget[] => {
+const collectArtistReleaseTargets = (artists: ArtistSearchMatch[]): ArtistReleaseTarget[] => {
   const targets: ArtistReleaseTarget[] = [];
   const seen = new Set<string>();
   for (const artist of artists) {

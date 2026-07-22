@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import type { ArtistDetail, ArtistScalars } from '@/lib/types/domain/artist';
+import type { ReleaseDigitalFormatRecord } from '@/lib/types/domain/release';
 import type {
   Artist,
   ArtistWithPublishedReleases,
@@ -156,7 +158,7 @@ export const digitalFormatWithFilesSchema = z.object({
   createdAt: date,
   updatedAt: date,
   files: z.array(digitalFormatFileSchema),
-});
+}) satisfies z.ZodType<ReleaseDigitalFormatRecord>;
 
 /** All scalar fields of the `Artist` model (no relations included). */
 export const artistScalarSchema = z.object({
@@ -209,7 +211,7 @@ export const artistScalarSchema = z.object({
   isActive: z.boolean(),
   instruments: nullableString,
   featuredArtistId: nullableString,
-});
+}) satisfies z.ZodType<ArtistScalars>;
 
 /** All scalar fields of the `Release` model (no relations included). */
 const releaseScalarSchema = z.object({
@@ -268,7 +270,7 @@ export const artistSchema = artistScalarSchema.extend({
  */
 export const artistDetailSchema = artistScalarSchema.extend({
   images: z.array(imageSchema),
-});
+}) satisfies z.ZodType<ArtistDetail>;
 
 /** `Release` with the relations selected by the `Release` domain type. */
 export const releaseSchema = releaseScalarSchema.extend({
