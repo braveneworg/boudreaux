@@ -4,6 +4,8 @@
 
 import { z } from 'zod';
 
+import type { AssertExtends } from '@/lib/types/assert';
+import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 
 const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
@@ -53,6 +55,30 @@ export const bioGenerationImageSchema = z.object({
   faceScore: z.number().min(0).max(100).nullable().optional(),
 });
 
+/**
+ * Content fields of the persisted bio-image row (`ArtistBioImageRecord`) that
+ * the Lambda contract must carry — everything except DB bookkeeping (`id`,
+ * `artistId`, `sortOrder`, `createdAt`), repository-stamped provenance
+ * (`origin`), and the rehost-only `originalUrl`, none of which the Lambda
+ * produces.
+ */
+type BioImageContentField = keyof Omit<
+  ArtistBioImageRecord,
+  'artistId' | 'createdAt' | 'id' | 'origin' | 'originalUrl' | 'sortOrder'
+>;
+
+// Coverage ties to the domain bio-image row. The runtime schemas here stay
+// deliberately stricter than the media-models row mirror (URL formats, kind
+// enum, 0-100 faceScore) because they validate the Lambda invoke boundary, so
+// they cannot be derived from it — but a field added to the domain row (as
+// hasFace/faceScore once were, by hand, in two places) fails typecheck here
+// until the wire schemas carry it too.
+type _BioImageContentCoverage = AssertExtends<
+  BioImageContentField,
+  keyof z.infer<typeof bioGenerationImageSchema>
+>;
+const _bioImageContentCoverage: _BioImageContentCoverage = true;
+
 export const bioGenerationLinkSchema = z.object({
   label: z.string().min(1),
   url: z.string().url(),
@@ -84,6 +110,14 @@ export const bioStatusImageSchema = bioGenerationImageSchema.extend({
   attribution: z.string().nullable(),
   origin: bioOriginSchema,
 });
+
+// Same coverage tie for the status wire, which additionally carries the DB row
+// `id` and `origin` (still no `artistId`/`sortOrder`/`createdAt`/`originalUrl`).
+type _BioStatusImageCoverage = AssertExtends<
+  BioImageContentField | 'id' | 'origin',
+  keyof z.infer<typeof bioStatusImageSchema>
+>;
+const _bioStatusImageCoverage: _BioStatusImageCoverage = true;
 
 /** Persisted bio link row as returned by the status endpoint (DB row id included). */
 export const bioStatusLinkSchema = z.object({

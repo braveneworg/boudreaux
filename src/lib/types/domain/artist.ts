@@ -190,6 +190,15 @@ export interface ArtistListWithBio extends ArtistScalars {
   bioImages: ArtistBioImageRecord[];
 }
 
+/**
+ * By-id artist payload: scalars plus ordered images only — the shape
+ * `ArtistRepository.findById` fetches and `GET /api/artists/[id]` returns
+ * (narrower than the admin `Artist`, which also carries labels/urls/releases).
+ */
+export interface ArtistDetail extends ArtistScalars {
+  images: ImageRecord[];
+}
+
 /** Narrow name projection used by the find-or-create-by-name flow. */
 export interface ArtistNameRecord {
   id: string;
