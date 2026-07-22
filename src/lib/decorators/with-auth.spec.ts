@@ -159,6 +159,58 @@ describe('withAuth decorator', () => {
     });
   });
 
+  describe('banned accounts', () => {
+    it('should return 403 when the authenticated user is banned', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ banned: true }));
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = withAuth(mockHandler);
+
+      const result = await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Account suspended' },
+        init: { status: 403 },
+      });
+    });
+
+    it('should call the handler when banned is explicitly false', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ banned: false }));
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = withAuth(mockHandler);
+
+      await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(mockHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call the handler when banned is null', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ banned: null }));
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = withAuth(mockHandler);
+
+      await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(mockHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should log a security event with the banned user id', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ id: '42', banned: true }));
+
+      const wrappedHandler = withAuth(createMockHandler());
+
+      await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(logSecurityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'api.unauthorized_access', userId: '42' })
+      );
+    });
+  });
+
   describe('context and parameters', () => {
     it('should pass request context with parameters correctly', async () => {
       const mockSession = createMockSession();
@@ -427,6 +479,41 @@ describe('withAdmin decorator', () => {
         type: 'json',
         data: { error: 'Authentication required' },
         init: { status: 401 },
+      });
+    });
+  });
+
+  describe('banned admin accounts', () => {
+    it('should return 403 Account suspended when a banned admin hits an admin route', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ role: 'admin', banned: true }));
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = await withAdmin(mockHandler);
+
+      const result = await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Account suspended' },
+        init: { status: 403 },
+      });
+    });
+
+    it('should block a banned admin before the role check runs', async () => {
+      mockAuth.mockResolvedValue(createMockSession({ role: 'user', banned: true }));
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = await withAdmin(mockHandler);
+
+      const result = await wrappedHandler(createMockRequest(), createMockContext());
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      // Suspended takes precedence over the "insufficient permissions" role error.
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Account suspended' },
+        init: { status: 403 },
       });
     });
   });

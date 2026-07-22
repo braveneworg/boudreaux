@@ -102,6 +102,14 @@ export const withAuth =
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
       }
 
+      // Defense-in-depth on top of better-auth ban enforcement: a just-banned
+      // user can still present a session cookie within the cookie-cache window,
+      // so refuse it centrally rather than relying on session revocation alone.
+      if (session.user.banned) {
+        logUnauthorized(request, 403, session.user.id);
+        return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+      }
+
       // Call the original handler with session
       return runWithErrorBoundary(request, () =>
         handler(request, context as { params: Promise<TParams> }, session as Session)
@@ -122,6 +130,13 @@ export const withAdmin =
       if (!session?.user?.id) {
         logUnauthorized(request, 401);
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
+
+      // A banned account is refused before the role check, so a banned admin is
+      // suspended rather than told it has insufficient permissions.
+      if (session.user.banned) {
+        logUnauthorized(request, 403, session.user.id);
+        return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
       }
 
       // Check role authorization
