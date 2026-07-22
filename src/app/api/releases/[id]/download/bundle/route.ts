@@ -1233,10 +1233,17 @@ const resolveBundleSetup = async (
     };
   }
 
-  const accessResponse = await verifyBundleAccess(isFreeMode, userId, releaseId, isFreeOnlyRequest);
-  if (accessResponse) {
-    return { kind: 'response', response: accessResponse };
+  const access = await verifyBundleAccess(isFreeMode, userId, releaseId, isFreeOnlyRequest);
+  if (access.kind === 'response') {
+    return { kind: 'response', response: access.response };
   }
+
+  // #668: the free-tier cap + quota must key on the delivered format set and
+  // purchase entitlement, not the client-supplied `mode` flag. A free-only
+  // request from a caller with no purchase is a free-tier download — treat it
+  // as such for all downstream accounting even when `mode=free` was omitted.
+  // A purchaser keeps the paid path (per-release cap, no free-tier draw-down).
+  const effectiveFreeMode = isFreeMode || (isFreeOnlyRequest && !access.hasEntitlement);
 
   // Step 5: Fetch release title for ZIP filename
   const release = await ReleaseService.findPublishedTitleById(releaseId);
@@ -1268,7 +1275,7 @@ const resolveBundleSetup = async (
       releaseId,
       requestedFormats,
       mode,
-      isFreeMode,
+      isFreeMode: effectiveFreeMode,
       userId,
       identity,
       respondFlags,
@@ -1454,20 +1461,29 @@ const resolveFreeVisitorIdentity = async (
   };
 };
 
+/** Access outcome: an early reject `Response`, or whether the caller is entitled by purchase. */
+type BundleAccessResult =
+  | { kind: 'response'; response: Response }
+  | { kind: 'ok'; hasEntitlement: boolean };
+
 /**
  * Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset).
- * Free mode skips both — guest downloads are gated by the freemium quota
- * service (added in US2/US3). The per-release download cap is still enforced for
- * paid/free-only authenticated downloads. Returns a reject `Response` or `null`.
+ * Explicit free mode skips both — guest downloads are gated by the freemium
+ * quota service (added in US2/US3). Otherwise the purchase entitlement is
+ * resolved and returned: a free-only request from a non-entitled caller is
+ * allowed through here (no purchase required for free formats) but flagged
+ * `hasEntitlement: false` so the caller treats it as a free-tier download and
+ * still applies the rolling cap + quota (#668). Returns a reject `Response`
+ * (mixed formats without purchase, or download-limit reached) otherwise.
  */
 const verifyBundleAccess = async (
   isFreeMode: boolean,
   userId: string | null,
   releaseId: string,
   isFreeOnlyRequest: boolean
-): Promise<Response | null> => {
+): Promise<BundleAccessResult> => {
   if (isFreeMode) {
-    return null;
+    return { kind: 'ok', hasEntitlement: false };
   }
   // Non-null assertion equivalent: userId is guaranteed by the auth gate above.
   const access = await PurchaseService.getDownloadAccess(
@@ -1476,24 +1492,30 @@ const verifyBundleAccess = async (
   );
 
   if (!access.allowed && access.reason === 'no_purchase' && !isFreeOnlyRequest) {
-    return Response.json(
-      { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+    return {
+      kind: 'response',
+      response: Response.json(
+        { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      ),
+    };
   }
 
   if (!access.allowed && access.reason === 'download_limit_reached') {
-    return Response.json(
-      {
-        success: false,
-        error: 'DOWNLOAD_LIMIT',
-        message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
-        resetInHours: access.resetInHours,
-      },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+    return {
+      kind: 'response',
+      response: Response.json(
+        {
+          success: false,
+          error: 'DOWNLOAD_LIMIT',
+          message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
+          resetInHours: access.resetInHours,
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      ),
+    };
   }
-  return null;
+  return { kind: 'ok', hasEntitlement: access.allowed };
 };
 
 /**

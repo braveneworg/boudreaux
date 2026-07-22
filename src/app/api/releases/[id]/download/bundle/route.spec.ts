@@ -2869,3 +2869,107 @@ describe('GET /api/releases/[id]/download/bundle — additional branch coverage'
     consoleSpy.mockRestore();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #668 — a free-only request from a non-purchaser must be capped/quota'd even
+// when `mode=free` is omitted. `isFreeMode` (client-supplied) must not be the
+// sole gate for the free-tier accounting; the delivered format set + purchase
+// entitlement decide it server-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle — free-only without mode=free (#668)', () => {
+  const NON_PURCHASER = {
+    allowed: false,
+    reason: 'no_purchase' as const,
+    downloadCount: 0,
+    lastDownloadedAt: null,
+    resetInHours: null,
+  };
+
+  beforeEach(() => {
+    // A non-free-mode request always carries a session (the 401 gate), so the
+    // newly-covered case is always an authenticated user keyed by userId.
+    mockGetSession.mockResolvedValue({ user: { id: 'user-123' } });
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  afterEach(async () => {
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+
+  it('enforces the free-tier cap for a non-purchaser requesting free-only formats', async () => {
+    mockGetDownloadAccess.mockResolvedValue(NON_PURCHASER);
+
+    await GET(makeJsonRequest('AAC'), makeParams());
+
+    expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: { kind: 'user', userId: 'user-123' },
+        releaseId: '507f1f77bcf86cd799439011',
+      })
+    );
+  });
+
+  it('returns 403 CAP_REACHED when a free-only non-purchaser is over the cap', async () => {
+    mockGetDownloadAccess.mockResolvedValue(NON_PURCHASER);
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+
+    const response = await GET(makeJsonRequest('AAC'), makeParams());
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.errorCode).toBe('CAP_REACHED');
+  });
+
+  it('records the free-tier download for a non-purchaser free-only request', async () => {
+    mockGetDownloadAccess.mockResolvedValue(NON_PURCHASER);
+
+    await GET(makeRequest('AAC'), makeParams());
+
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: { kind: 'user', userId: 'user-123' } })
+    );
+  });
+
+  it('does NOT enforce the free-tier cap for a purchaser downloading free-only formats', async () => {
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: true,
+      reason: null,
+      downloadCount: 1,
+      lastDownloadedAt: null,
+      resetInHours: null,
+    });
+
+    await GET(makeRequest('AAC'), makeParams());
+
+    expect(mockAssertFreeDownloadAllowed).not.toHaveBeenCalled();
+  });
+
+  it('still returns 403 PURCHASE_REQUIRED for a non-purchaser mixing free and paid formats', async () => {
+    mockGetDownloadAccess.mockResolvedValue(NON_PURCHASER);
+
+    const response = await GET(makeRequest('AAC,FLAC'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('PURCHASE_REQUIRED');
+  });
+});
