@@ -194,24 +194,27 @@ type QuotaGate =
   | { kind: 'response'; response: NextResponse };
 
 /**
- * AAC gate: acquire the per-(user, playlist, format) collision lock around
- * the check-and-charge (skipped for preflight — it never charges), then run
- * the all-or-nothing quota check. MP3 is free/unlimited and bypasses both.
+ * AAC gate: acquire the per-subject collision lock around the check-and-charge
+ * (skipped for preflight — it never charges), then run the all-or-nothing quota
+ * check. MP3 is free/unlimited and bypasses both.
  */
 const gateAacQuota = async (args: {
   userId: string;
-  playlistId: string;
   format: FreeFormatType;
   manifest: PlaylistDownloadManifest;
   respondPreflight: boolean;
   lock: LockHandle;
 }): Promise<QuotaGate> => {
-  const { userId, playlistId, format, manifest, respondPreflight, lock } = args;
+  const { userId, format, manifest, respondPreflight, lock } = args;
   if (format !== 'AAC') {
     return { kind: 'ok', chargeableReleaseIds: [] };
   }
   if (!respondPreflight) {
-    lock.key = `user:${userId}|playlist:${playlistId}|${format}`;
+    // #667: subject-only lock key — the freemium quota is per subject (5 unique
+    // releases), so serialize a subject's concurrent AAC downloads across ALL
+    // playlists/formats. A per-(playlist, format) key let different playlists
+    // race and each pass the shared all-or-nothing check, exceeding the cap.
+    lock.key = `user:${userId}`;
     lock.acquired = freeDownloadLockService.acquire(lock.key);
     if (!lock.acquired) {
       return {
@@ -405,11 +408,10 @@ export const GET = withAuth<{ id: string }>(async (request, context, session) =>
   try {
     const setup = await resolvePlaylistDownload(request, context, session.user.id);
     if (setup.kind === 'response') return setup.response;
-    const { manifest, format, respondPreflight, playlistId } = setup;
+    const { manifest, format, respondPreflight } = setup;
 
     const gate = await gateAacQuota({
       userId: session.user.id,
-      playlistId,
       format,
       manifest,
       respondPreflight,

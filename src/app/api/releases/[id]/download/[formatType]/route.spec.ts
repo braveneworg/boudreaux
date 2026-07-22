@@ -55,6 +55,15 @@ vi.mock('@/lib/services/quota-enforcement-service', () => {
   };
 });
 
+const mockLockAcquire = vi.fn().mockReturnValue(true);
+const mockLockRelease = vi.fn();
+vi.mock('@/lib/services/free-download-lock-service', () => ({
+  freeDownloadLockService: {
+    acquire: (...args: unknown[]) => mockLockAcquire(...args),
+    release: (...args: unknown[]) => mockLockRelease(...args),
+  },
+}));
+
 const makeRequest = (): NextRequest =>
   new NextRequest(
     'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS',
@@ -238,6 +247,49 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
+  });
+
+  // #667 — the freemium check-and-charge must be serialized per subject so N
+  // concurrent requests for distinct releases can't all read the same pre-charge
+  // count and each consume a quota slot.
+  it('serializes the freemium check-and-charge behind the subject lock', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
+
+    await GET(makeRequest(), makeParams());
+
+    expect(mockLockAcquire).toHaveBeenCalledWith('user:user-123');
+    expect(mockLockRelease).toHaveBeenCalledWith('user:user-123');
+  });
+
+  it('returns 409 LOCK_HELD and does not charge when the subject lock is held', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockLockAcquire.mockReturnValueOnce(false);
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe('LOCK_HELD');
+    expect(mockCheckFreeDownloadQuota).not.toHaveBeenCalled();
+    expect(mockIncrementQuota).not.toHaveBeenCalled();
+  });
+
+  it('releases the subject lock even when the quota is exceeded', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
+
+    await GET(makeRequest(), makeParams());
+
+    expect(mockLockRelease).toHaveBeenCalledWith('user:user-123');
+  });
+
+  it('does not acquire the subject lock for a purchaser', async () => {
+    mockCheckPurchaseStatus.mockResolvedValue(true);
+
+    await GET(makeRequest(), makeParams());
+
+    expect(mockLockAcquire).not.toHaveBeenCalled();
   });
 
   it('should return 410 for deleted format outside grace period for non-purchaser', async () => {
