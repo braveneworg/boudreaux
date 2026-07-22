@@ -448,32 +448,11 @@ describe('bio status schemas origin field', () => {
   });
 });
 
-describe('stage-list wire-contract parity (web ↔ Lambda)', () => {
-  it('BIO_PROGRESS_STAGES exactly matches PROGRESS_STAGES in bio-generator/src/types.ts, order-sensitive', () => {
-    // Read the Lambda types file from disk so any drift between the two projects
-    // causes an immediate spec failure — not a silent 202-null route ignore.
-    // The spec runs in the node project (*.spec.ts), so node:fs is available.
-    const currentDir = dirname(fileURLToPath(import.meta.url));
-    const typesPath = resolve(currentDir, '../../..', 'bio-generator/src/types.ts');
-    const source = readFileSync(typesPath, 'utf8');
-
-    // Scope the match to the PROGRESS_STAGES const declaration only so an
-    // unrelated string array in the same file cannot produce a false negative.
-    const blockMatch = /export const PROGRESS_STAGES\s*=\s*\[([\s\S]*?)\]\s*as const/.exec(source);
-    expect(
-      blockMatch,
-      'PROGRESS_STAGES declaration not found in bio-generator/src/types.ts'
-    ).not.toBeNull();
-    // The expect above throws when null; this narrowing makes the type system
-    // aware that blockMatch is non-null on the lines that follow.
-    if (!blockMatch) return;
-
-    // Extract single-quoted string literals from the matched array body.
-    const lambdaStages = [...blockMatch[1].matchAll(/'([^']+)'/g)].map(([, s]) => s);
-
-    // Order-sensitive equality: a reorder in either list is a wire-contract break.
-    expect(lambdaStages).toEqual([...BIO_PROGRESS_STAGES]);
-  });
+describe('wire-contract parity (web ↔ Lambda)', () => {
+  // The stage-list is now single-sourced in `@fakefour/job-contract` (both
+  // projects import it), so its disk-scrape parity test is gone — the shared
+  // module makes drift impossible. The `MAX_LAMBDA_RELEASES` scrape below stays
+  // until that constant is migrated too (#664).
 
   /**
    * The web caps `releases` before dispatch so it never sends a payload the

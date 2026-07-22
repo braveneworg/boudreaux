@@ -30,27 +30,13 @@ export const DEFAULT_GEMINI_PRO_MODEL = 'gemini-2.5-pro';
 /**
  * Ordered generation stages the Lambda checkpoints through as it works, POSTed
  * best-effort to the web app's progress endpoint so the admin timeline can show
- * live status. This list AND its order are a wire contract: it MUST stay in
- * lockstep with the web counterpart `BIO_PROGRESS_STAGES` in
- * `src/lib/validation/bio-generation-schema.ts` (the two projects cannot share a
- * module).
+ * live status. This list AND its order are a wire contract — single-sourced in
+ * `@fakefour/job-contract` and re-exported here under the Lambda's existing
+ * names so `handler.ts` / `progress.ts` import sites are unchanged. The web app
+ * consumes the same definitions, so the two projects can no longer drift.
  */
-export const PROGRESS_STAGES = [
-  'musicbrainz',
-  'wikidata',
-  'commons',
-  'cover-art',
-  'web-search',
-  'link-follow',
-  'vision-gating',
-  'drafting',
-  'synthesizing',
-  'quality-pass',
-  'finalizing',
-] as const;
-
-/** A single generation checkpoint stage name (see {@link PROGRESS_STAGES}). */
-export type ProgressStage = (typeof PROGRESS_STAGES)[number];
+export { BIO_PROGRESS_STAGES as PROGRESS_STAGES } from '@fakefour/job-contract';
+export type { BioProgressStage as ProgressStage } from '@fakefour/job-contract';
 
 /** ISO calendar-date string in the form YYYY-MM-DD. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
