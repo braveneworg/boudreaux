@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import { artistWithPublishedReleasesSchema } from '@/lib/validation/media-models-schema';
+import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 import type { QueryOptionsOverride } from './query-options';

@@ -7,7 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { ImageUploadActionResult } from '@/lib/actions/artist-image-actions';
-import { artistDetailSchema } from '@/lib/validation/media-models-schema';
+import { artistDetailSchema } from '@/lib/validation/media/artist-schema';
 
 import { CoverArtImageCombobox } from './cover-art-image-combobox';
 

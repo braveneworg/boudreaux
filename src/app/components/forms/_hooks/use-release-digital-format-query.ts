@@ -7,7 +7,7 @@ import { type z } from 'zod';
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
-import { digitalFormatWithFilesSchema } from '@/lib/validation/media-models-schema';
+import { digitalFormatWithFilesSchema } from '@/lib/validation/media/digital-format-schema';
 import { parseResponse } from '@/utils/fetch-and-parse';
 
 /** The single digital format (with its child files) for one release + format. */
