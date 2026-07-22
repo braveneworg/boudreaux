@@ -15,14 +15,32 @@ import { isStaleJob } from '@/lib/utils/job-staleness';
 import { loggers } from '@/lib/utils/logger';
 import { objectIdSchema } from '@/lib/validation/bio-generation-schema';
 import {
+  enrichmentIneligibilityReason,
   isInFlightEnrichmentStatus,
   STALE_JOB_MS,
+  type EnrichmentIneligibilityReason,
   type EnrichmentStatus,
   type RunVideoEnrichmentActionResult,
 } from '@/lib/validation/video-enrichment-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 const logger = loggers.media;
+
+/** Actionable copy per failing half of the eligibility rule. */
+const ineligibleCopyFor = (reason: EnrichmentIneligibilityReason): string => {
+  switch (reason) {
+    case 'category':
+      return 'Enrichment runs only on videos in the MUSIC category.';
+    case 'artist':
+      return 'Add an artist or creator and save before running enrichment.';
+    default: {
+      // Unreachable while every reason has a case above; a new reason added
+      // to the union stops compiling here.
+      const unhandled: never = reason;
+      return unhandled;
+    }
+  }
+};
 
 /**
  * If an enrichment job is genuinely in flight (`pending`/`processing`) and not
@@ -82,13 +100,12 @@ export const runVideoEnrichmentAction = async (
       return { success: false, error: 'Video not found.' };
     }
 
-    // Manual-path artist gate: the automatic kicks already require a
-    // non-blank artist, and a blank one has no linked artists to enrich.
-    if (state.artist.trim() === '') {
-      return {
-        success: false,
-        error: 'Add an artist or creator and save before running enrichment.',
-      };
+    // Eligibility gate — checked BEFORE any status write, so an ineligible
+    // video can never be stranded at `pending` awaiting a dispatch that the
+    // service would refuse.
+    const ineligibleReason = enrichmentIneligibilityReason(state);
+    if (ineligibleReason) {
+      return { success: false, error: ineligibleCopyFor(ineligibleReason) };
     }
 
     // Don't start a second run while one is genuinely in flight.

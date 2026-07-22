@@ -98,6 +98,21 @@ describe('runVideoEnrichmentAction', () => {
     expect(afterMock).not.toHaveBeenCalled();
   });
 
+  it('refuses a non-MUSIC video even when it has an artist (no pending write)', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ category: 'INFORMATIONAL', artist: 'Ceschi' })
+    );
+
+    const result = await runVideoEnrichmentAction(VIDEO_ID);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Enrichment runs only on videos in the MUSIC category.',
+    });
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
   it('echoes a fresh in-flight status instead of double-triggering', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({ enrichmentStatus: 'processing', enrichmentStartedAt: new Date() })

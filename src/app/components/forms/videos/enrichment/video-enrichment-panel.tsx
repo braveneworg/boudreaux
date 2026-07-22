@@ -31,6 +31,7 @@ import { splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { CLIENT_POLL_DEADLINE_MS } from '@/lib/validation/bio-generation-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import {
+  hasEnrichableArtist,
   isInFlightEnrichmentStatus,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
 } from '@/lib/validation/video-enrichment-schema';
@@ -87,9 +88,6 @@ const VIDEO_LEVEL_FIELD_CONFIG = new Map<VideoLevelSuggestionField, VideoLevelFi
 
 /** Copy for the blank-artist gate — asserted verbatim by unit and E2E specs. */
 const MISSING_ARTIST_HINT = 'Add an artist or creator to enable web enrichment.';
-
-/** True when the live Artist / Creator field holds a non-blank value. */
-const hasArtistValue = (artist: string | undefined): boolean => (artist ?? '').trim() !== '';
 
 /** Shared disable condition for both run affordances (busy or blank artist). */
 const isRunDisabled = (isBusy: boolean, hasArtist: boolean): boolean => isBusy || !hasArtist;
@@ -389,7 +387,7 @@ export const VideoEnrichmentPanel = ({
   const isBusy = isRunningVideoEnrichment || isApplyingVideoSuggestion;
 
   const artistValue = useWatch({ control, name: 'artist' });
-  const hasArtist = hasArtistValue(artistValue);
+  const hasArtist = hasEnrichableArtist(artistValue);
 
   // Last-resort client stop: if a run never reaches a terminal status, stop
   // polling after the deadline (the server's stale-job coercion normally

@@ -28,6 +28,7 @@ import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
   ENRICHMENT_STATUSES,
+  isEnrichmentEligible,
   isInFlightEnrichmentStatus,
   STALE_JOB_MS,
   SUGGESTION_CONFIDENCES,
@@ -617,7 +618,8 @@ export class VideoEnrichmentService {
   }
 
   /**
-   * Run enrichment as a background job. MUSIC-only (others return silently);
+   * Run enrichment as a background job. Ineligible videos (see
+   * `isEnrichmentEligible`: non-MUSIC or blank artist) return silently;
    * refuses to double-dispatch while a non-stale job is already `processing`
    * (a `pending` handoff from the trigger action proceeds). The fake/E2E path
    * finishes in-process; the real path fires an Event invoke and leaves the
@@ -627,7 +629,7 @@ export class VideoEnrichmentService {
   static async runEnrichmentJob(videoId: string): Promise<void> {
     try {
       const state = await VideoRepository.getEnrichmentState(videoId);
-      if (!state || state.category !== 'MUSIC' || isFreshlyProcessing(state)) return;
+      if (!state || !isEnrichmentEligible(state) || isFreshlyProcessing(state)) return;
 
       await VideoRepository.setEnrichmentStatus(videoId, 'processing', { error: null });
       const rows = await VideoArtistRepository.findByVideoId(videoId);

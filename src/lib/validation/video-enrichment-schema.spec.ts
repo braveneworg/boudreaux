@@ -5,6 +5,10 @@
 import {
   applyVideoSuggestionInputSchema,
   ENRICHMENT_STATUSES,
+  enrichmentIneligibilityReason,
+  hasEnrichableArtist,
+  isEnrichableCategory,
+  isEnrichmentEligible,
   isInFlightEnrichmentStatus,
   STALE_JOB_MS,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
@@ -91,6 +95,54 @@ describe('video-enrichment-schema', () => {
 
     it('treats null as not in flight', () => {
       expect(isInFlightEnrichmentStatus(null)).toBe(false);
+    });
+  });
+
+  describe('enrichment eligibility', () => {
+    it('a MUSIC video with an artist is eligible', () => {
+      expect(isEnrichmentEligible({ category: 'MUSIC', artist: 'Ceschi' })).toBe(true);
+    });
+
+    it('a non-MUSIC video with an artist is not eligible', () => {
+      expect(isEnrichmentEligible({ category: 'INFORMATIONAL', artist: 'Ceschi' })).toBe(false);
+    });
+
+    it('a MUSIC video with a blank artist is not eligible', () => {
+      expect(isEnrichmentEligible({ category: 'MUSIC', artist: '   ' })).toBe(false);
+    });
+
+    it('a missing category is not eligible', () => {
+      expect(isEnrichmentEligible({ category: null, artist: 'Ceschi' })).toBe(false);
+    });
+
+    it('isEnrichableCategory accepts only MUSIC', () => {
+      expect(isEnrichableCategory('MUSIC')).toBe(true);
+    });
+
+    it('isEnrichableCategory rejects other categories', () => {
+      expect(isEnrichableCategory('INFORMATIONAL')).toBe(false);
+    });
+
+    it('reports a category reason for a non-MUSIC video', () => {
+      expect(enrichmentIneligibilityReason({ category: 'INFORMATIONAL', artist: 'Ceschi' })).toBe(
+        'category'
+      );
+    });
+
+    it('reports an artist reason for a MUSIC video with a blank artist', () => {
+      expect(enrichmentIneligibilityReason({ category: 'MUSIC', artist: ' ' })).toBe('artist');
+    });
+
+    it('reports no reason for an eligible video', () => {
+      expect(enrichmentIneligibilityReason({ category: 'MUSIC', artist: 'Ceschi' })).toBeNull();
+    });
+
+    it('hasEnrichableArtist rejects undefined', () => {
+      expect(hasEnrichableArtist(undefined)).toBe(false);
+    });
+
+    it('hasEnrichableArtist accepts a padded name', () => {
+      expect(hasEnrichableArtist('  Ceschi  ')).toBe(true);
     });
   });
 
