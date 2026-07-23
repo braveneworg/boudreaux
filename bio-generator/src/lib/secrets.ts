@@ -23,7 +23,12 @@ let cachedYoutubeApiKey: string | null = null;
 const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({ Name: path, WithDecryption: true });
   const result = await ssmClient.send(command);
-  const value = result.Parameter?.Value;
+  // Trimmed on the way out: a key stored with a trailing newline (the usual
+  // result of piping a file into put-parameter) reaches the provider verbatim
+  // and is rejected as malformed. That surfaces as a lookup which merely "found
+  // nothing", so the real cause stays invisible. A whitespace-only value is
+  // treated as no value at all.
+  const value = result.Parameter?.Value?.trim();
 
   if (!value) {
     throw new Error(`SSM parameter ${path} returned no value`);

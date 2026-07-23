@@ -4,6 +4,17 @@
 
 import { findYoutubeReleaseDate, scoreYoutubeCandidate } from './youtube.js';
 
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+
+vi.mock('./lib/log.js', () => ({
+  logEvent,
+  toErrorMessage: (err: unknown) => String(err),
+}));
+
+beforeEach(() => {
+  logEvent.mockClear();
+});
+
 interface Item {
   title: string;
   channelTitle: string;
@@ -156,6 +167,39 @@ describe('findYoutubeReleaseDate', () => {
     const match = await findYoutubeReleaseDate({ ...target, apiKey: 'yt-key' }, fetchFn);
 
     expect(match).toBeNull();
+  });
+
+  it('logs the reason Google rejected the request, not just the status', async () => {
+    // A rejected key answers 400 keyInvalid; without the reason this is
+    // indistinguishable in the logs from "the search found nothing".
+    const body = JSON.stringify({
+      error: {
+        code: 400,
+        message: 'API key not valid. Please pass a valid API key.',
+        errors: [{ reason: 'keyInvalid' }],
+      },
+    });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(body, { status: 400 }));
+
+    await findYoutubeReleaseDate({ ...target, apiKey: 'bad-key' }, fetchFn);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'youtube_search_failed',
+      expect.objectContaining({ status: 400, reason: 'keyInvalid' })
+    );
+  });
+
+  it('still logs a status when the error body is not parseable', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('<html>nope</html>', { status: 503 }));
+
+    await findYoutubeReleaseDate({ ...target, apiKey: 'yt-key' }, fetchFn);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'youtube_search_failed',
+      expect.objectContaining({ status: 503 })
+    );
   });
 
   it('degrades to null when the fetch rejects', async () => {

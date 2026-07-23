@@ -7,6 +7,7 @@ import {
   getGeminiApiKey,
   getScrapeApiKey,
   getSerperApiKey,
+  getYoutubeApiKey,
 } from './secrets.js';
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
@@ -146,5 +147,71 @@ describe('getSerperApiKey', () => {
     expect(result).toBeNull();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('getYoutubeApiKey', () => {
+  beforeEach(() => {
+    __resetSecretsCacheForTests();
+    send.mockReset();
+    delete process.env.SSM_PATH_YOUTUBE_API_KEY;
+  });
+
+  it('returns null when the SSM path env var is unset', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(getYoutubeApiKey()).resolves.toBeNull();
+
+    expect(send).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('returns the decrypted parameter value when configured', async () => {
+    process.env.SSM_PATH_YOUTUBE_API_KEY = '/fakefour/youtube/api-key';
+    send.mockResolvedValue({ Parameter: { Value: 'yt-123' } });
+
+    await expect(getYoutubeApiKey()).resolves.toBe('yt-123');
+  });
+
+  it('returns null (degrades) when the SSM lookup fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.SSM_PATH_YOUTUBE_API_KEY = '/fakefour/youtube/api-key';
+    send.mockRejectedValue(new Error('AccessDenied'));
+
+    await expect(getYoutubeApiKey()).resolves.toBeNull();
+
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe('stored secret hygiene', () => {
+  beforeEach(() => {
+    __resetSecretsCacheForTests();
+    send.mockReset();
+  });
+
+  // A key pasted into SSM with a trailing newline is indistinguishable from a
+  // clean one until the provider rejects it: YouTube answers `400 keyInvalid`,
+  // which reads as "the lookup found nothing" rather than "your key is wrong".
+  it('trims surrounding whitespace from a stored key', async () => {
+    process.env.SSM_PATH_YOUTUBE_API_KEY = '/fakefour/youtube/api-key';
+    send.mockResolvedValue({ Parameter: { Value: '  yt-123\n' } });
+
+    await expect(getYoutubeApiKey()).resolves.toBe('yt-123');
+  });
+
+  it('trims the required Gemini key too', async () => {
+    process.env.SSM_PATH_GEMINI_API_KEY = '/fakefour/gemini/api-key';
+    send.mockResolvedValue({ Parameter: { Value: '\tgmi-123\n' } });
+
+    await expect(getGeminiApiKey()).resolves.toBe('gmi-123');
+  });
+
+  it('treats a whitespace-only value as no value', async () => {
+    process.env.SSM_PATH_GEMINI_API_KEY = '/fakefour/gemini/api-key';
+    send.mockResolvedValue({ Parameter: { Value: '   ' } });
+
+    await expect(getGeminiApiKey()).rejects.toThrow('returned no value');
   });
 });
