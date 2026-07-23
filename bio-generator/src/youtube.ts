@@ -38,6 +38,27 @@ interface YoutubeSearchResponse {
   }>;
 }
 
+/** Google's error envelope, when the response carries one. */
+interface YoutubeErrorResponse {
+  error?: { message?: string; errors?: Array<{ reason?: string }> };
+}
+
+/**
+ * Google's own reason for refusing the request — `keyInvalid`,
+ * `accessNotConfigured`, `quotaExceeded`, and so on. Worth the extra read:
+ * logging only the status makes a rejected key look identical to a search that
+ * legitimately found nothing, which is precisely how a broken lookup hides.
+ * Never throws, and the body carries no credential.
+ */
+const readErrorReason = async (response: Response): Promise<string | undefined> => {
+  try {
+    const body = (await response.json()) as YoutubeErrorResponse;
+    return body.error?.errors?.[0]?.reason ?? body.error?.message;
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Comparable form of a title or name: bracketed decorations are dropped, so
  * "(Animated Video)" / "[HD]" never defeat a match, and the rest is reduced to
@@ -141,7 +162,11 @@ export const findYoutubeReleaseDate = async (
     });
     const response = await fetchFn(`${YOUTUBE_SEARCH_ENDPOINT}?${params.toString()}`);
     if (!response.ok) {
-      logEvent('warn', 'youtube_search_failed', { status: response.status });
+      const reason = await readErrorReason(response);
+      logEvent('warn', 'youtube_search_failed', {
+        status: response.status,
+        ...(reason ? { reason } : {}),
+      });
       return null;
     }
 
