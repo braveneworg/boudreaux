@@ -3,14 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import {
   FreeStatusResponseSchema,
   type FreeStatusResponse,
 } from '@/lib/validation/bundle-download-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 /**
  * Fetches a release's free-download status from the

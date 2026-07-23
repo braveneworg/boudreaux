@@ -7,7 +7,7 @@ import { Loader2Icon } from 'lucide-react';
 
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-import { useReleaseDigitalFormatsQuery } from '@/hooks/use-release-digital-formats-query';
+import { useReleaseDigitalFormatsQuery } from '@/hooks/queries/use-release-digital-formats-query';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {

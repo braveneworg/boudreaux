@@ -4,10 +4,9 @@
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { parseResponse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 interface CollectionResponse {
   purchases: Array<{

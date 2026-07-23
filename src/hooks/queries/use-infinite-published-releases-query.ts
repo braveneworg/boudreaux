@@ -3,14 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
+import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 import { publishedReleaseListingSchema } from '@/lib/validation/media/release-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { InfiniteQueryOptionsOverride, QueryOptionsOverride } from './query-options';
 
 /** One skip/offset page of published releases returned by `/api/releases?listing=published`. */
 export type PublishedReleasesPaginatedResponse = PaginatedResponse<PublishedReleaseListing>;

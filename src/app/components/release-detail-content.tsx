@@ -5,10 +5,10 @@
 
 import { Loader2 } from 'lucide-react';
 
-import { useReleaseDigitalFormatsQuery } from '@/hooks/use-release-digital-formats-query';
-import { useReleaseQuery } from '@/hooks/use-release-query';
-import { useReleaseRelatedQuery } from '@/hooks/use-release-related-query';
-import { useReleaseUserStatusQuery } from '@/hooks/use-release-user-status-query';
+import { useReleaseDigitalFormatsQuery } from '@/hooks/queries/use-release-digital-formats-query';
+import { useReleaseQuery } from '@/hooks/queries/use-release-query';
+import { useReleaseRelatedQuery } from '@/hooks/queries/use-release-related-query';
+import { useReleaseUserStatusQuery } from '@/hooks/queries/use-release-user-status-query';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import { ArtistReleasesCarousel } from './artist-releases-carousel';

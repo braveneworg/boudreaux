@@ -5,7 +5,7 @@
 
 import { Loader2 } from 'lucide-react';
 
-import { useTourQuery } from '@/hooks/use-tour-query';
+import { useTourQuery } from '@/hooks/queries/use-tour-query';
 
 import { TourDetail } from './tour-detail';
 

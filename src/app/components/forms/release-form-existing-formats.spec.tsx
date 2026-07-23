@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
-import { type ReleaseDetail, useReleaseDetailQuery } from '@/hooks/use-release-query';
+import { type ReleaseDetail, useReleaseDetailQuery } from '@/hooks/queries/use-release-query';
 
 /**
  * Regression coverage for the edit-mode digital-formats checkmarks.
@@ -78,7 +78,7 @@ vi.mock('@/app/components/ui/image-uploader', () => ({
   ImageUploader: () => <div data-testid="image-uploader" />,
 }));
 
-vi.mock('@/hooks/use-release-query', () => ({
+vi.mock('@/hooks/queries/use-release-query', () => ({
   useReleaseDetailQuery: vi.fn(),
 }));
 

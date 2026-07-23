@@ -5,12 +5,13 @@
 
 import { renderHook } from '@testing-library/react';
 
+import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
+
 import {
   PUBLISHED_VIDEOS_PAGE_SIZE,
   useInfinitePublishedVideosQuery,
 } from './use-infinite-published-videos-query';
 
-import type { InfiniteQueryOptionsOverride } from './query-options';
 import type { PublishedVideosPaginatedResponse } from './use-infinite-published-videos-query';
 
 const useInfiniteQueryMock = vi.hoisted(() => vi.fn());

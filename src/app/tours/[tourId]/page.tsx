@@ -8,7 +8,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { TourDetailContent } from '@/app/tours/components/tour-detail-content';
-import type { TourWithRelations } from '@/hooks/use-tour-query';
+import type { TourWithRelations } from '@/hooks/queries/use-tour-query';
 import { queryKeys } from '@/lib/query-keys';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { getQueryClient } from '@/lib/utils/get-query-client';

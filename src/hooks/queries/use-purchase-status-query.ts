@@ -4,10 +4,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 /** Strict schema for the `/api/releases/{releaseId}/purchase-status` response. */
 const purchaseStatusResponseSchema = z.object({ confirmed: z.boolean() });

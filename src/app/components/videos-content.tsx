@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
-import { useInfinitePublishedVideosQuery } from '@/hooks/use-infinite-published-videos-query';
+import { useInfinitePublishedVideosQuery } from '@/hooks/queries/use-infinite-published-videos-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 
 import { VideoCard } from './video-card';

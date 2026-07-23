@@ -8,7 +8,7 @@ import type { MouseEvent, ReactElement } from 'react';
 
 import nextDynamic from 'next/dynamic';
 
-import { useReleaseUserStatusQuery } from '@/hooks/use-release-user-status-query';
+import { useReleaseUserStatusQuery } from '@/hooks/queries/use-release-user-status-query';
 import { cn } from '@/lib/utils';
 
 import { DownloadTriggerButton } from './download-trigger-button';

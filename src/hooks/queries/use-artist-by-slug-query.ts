@@ -3,11 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 /**
  * Fetches a single artist by slug from the `/api/artists/slug/:slug` route

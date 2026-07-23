@@ -3,12 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
+import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
 import { videoPageSchema, type VideoRow } from '@/lib/validation/video-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { InfiniteQueryOptionsOverride } from './query-options';
 
 /** One skip/offset page of published videos returned by `/api/videos?listing=published`. */
 export type PublishedVideosPaginatedResponse = PaginatedResponse<VideoRow>;

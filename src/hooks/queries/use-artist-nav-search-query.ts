@@ -4,10 +4,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 interface ArtistNavSearchResult {
   artistSlug: string;

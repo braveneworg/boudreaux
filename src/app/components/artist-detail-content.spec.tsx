@@ -6,7 +6,7 @@ import { render, screen } from '@testing-library/react';
 import { ArtistDetailContent } from './artist-detail-content';
 
 const useArtistBySlugQueryMock = vi.fn();
-vi.mock('@/hooks/use-artist-by-slug-query', () => ({
+vi.mock('@/hooks/queries/use-artist-by-slug-query', () => ({
   useArtistBySlugQuery: (slug: string) => useArtistBySlugQueryMock(slug),
 }));
 
