@@ -7,6 +7,10 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 # Prisma schema is needed because the `postinstall` script runs `prisma generate`
 COPY prisma ./prisma
+# The `@fakefour/job-contract` package is a local `file:` dependency, so its
+# source must be present before `--frozen-lockfile` resolves it — otherwise the
+# install fails with ENOENT on packages/job-contract.
+COPY packages ./packages
 # Install ALL dependencies (including dev) for building
 # Use cache mount for pnpm store to speed up installs
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
