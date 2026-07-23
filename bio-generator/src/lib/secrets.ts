@@ -17,6 +17,9 @@ let cachedScrapeApiKey: string | null = null;
 /** Cached once per cold start — the optional Serper (Google Images) key. */
 let cachedSerperApiKey: string | null = null;
 
+/** Cached once per cold start — the optional YouTube Data API key. */
+let cachedYoutubeApiKey: string | null = null;
+
 const fetchSsmParameter = async (path: string): Promise<string> => {
   const command = new GetParameterCommand({ Name: path, WithDecryption: true });
   const result = await ssmClient.send(command);
@@ -108,9 +111,40 @@ export const getSerperApiKey = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Resolves the YouTube Data API key used to date a music video from its own
+ * upload. Optional, like the Serper key: when `SSM_PATH_YOUTUBE_API_KEY` is
+ * unset (or the lookup fails) this returns `null` and the caller falls through
+ * to the web adjudication rather than failing the lookup.
+ *
+ * @returns The decrypted key, or `null` when no key is configured.
+ */
+export const getYoutubeApiKey = async (): Promise<string | null> => {
+  if (cachedYoutubeApiKey) {
+    return cachedYoutubeApiKey;
+  }
+
+  const path = process.env.SSM_PATH_YOUTUBE_API_KEY;
+  if (!path) {
+    logEvent('warn', 'youtube_key_unset', {
+      hint: 'set SSM_PATH_YOUTUBE_API_KEY; youtube release-date lookup skipped',
+    });
+    return null;
+  }
+
+  try {
+    cachedYoutubeApiKey = await fetchSsmParameter(path);
+    return cachedYoutubeApiKey;
+  } catch (err) {
+    logEvent('warn', 'youtube_key_unavailable', { error: toErrorMessage(err) });
+    return null;
+  }
+};
+
 /** Test-only reset of the cold-start cache. */
 export const __resetSecretsCacheForTests = (): void => {
   cachedGeminiApiKey = null;
   cachedScrapeApiKey = null;
   cachedSerperApiKey = null;
+  cachedYoutubeApiKey = null;
 };

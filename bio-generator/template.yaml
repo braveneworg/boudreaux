@@ -50,6 +50,7 @@ Resources:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/gemini/api-key'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/jina/api-key'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/serper/api-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/youtube/api-key'
             - Effect: Allow
               Action:
                 - kms:Decrypt
@@ -70,6 +71,10 @@ Resources:
           # Optional Serper (Google Images) key. Serper requires a key, so an
           # absent parameter simply skips the Serper image search entirely.
           SSM_PATH_SERPER_API_KEY: '/fakefour/serper/api-key'
+          # Optional YouTube Data API key — tier 1 of the release-date lookup,
+          # where a video's own upload date is its premiere date. An absent
+          # parameter falls the lookup through to the web adjudicator.
+          SSM_PATH_YOUTUBE_API_KEY: '/fakefour/youtube/api-key'
           # The Gemini model ids intentionally ship in code (DEFAULT_GEMINI_MODEL /
           # DEFAULT_GEMINI_PRO_MODEL, src/types.ts) rather than template parameters:
           # CloudFormation keeps a parameter's previous value across deploys, which
