@@ -10,6 +10,10 @@ vi.mock('@aws-sdk/cloudfront-signer', () => ({
   getSignedUrl: vi.fn(({ url }: { url: string }) => `${url}?Signature=signed&Key-Pair-Id=KP1`),
 }));
 
+/** A PEM-shaped fake — the signer is mocked, so the body need not be a real key. */
+const FAKE_PEM = '-----BEGIN PRIVATE KEY-----\nMIIfakefakefake\n-----END PRIVATE KEY-----';
+const FAKE_PEM_BASE64 = Buffer.from(FAKE_PEM).toString('base64');
+
 const ENV_KEYS = [
   'CLOUDFRONT_KEY_PAIR_ID',
   'CLOUDFRONT_PRIVATE_KEY_BASE64',
@@ -28,7 +32,7 @@ describe('signStreamUrl', () => {
 
   it('returns null when s3Key is missing', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
-    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem').toString('base64'));
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', FAKE_PEM_BASE64);
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     expect(signStreamUrl(null)).toBeNull();
@@ -42,7 +46,7 @@ describe('signStreamUrl', () => {
 
   it('signs the URL when fully configured (no Content-Disposition for streaming)', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
-    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem').toString('base64'));
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', FAKE_PEM_BASE64);
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     const result = signStreamUrl('releases/abc/digital-formats/MP3_320KBPS/track.mp3');
@@ -56,19 +60,33 @@ describe('signStreamUrl', () => {
 
   it('strips https:// prefix and trailing slash from CDN domain', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
-    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem').toString('base64'));
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', FAKE_PEM_BASE64);
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com/');
 
     const result = signStreamUrl('a/b.mp3');
     expect(result?.startsWith('https://cdn.example.com/a/b.mp3')).toBe(true);
   });
 
-  it('decodes base64 PEM when CLOUDFRONT_PRIVATE_KEY_BASE64 is set', () => {
+  it('signs when the key is stored as a raw PEM rather than base64', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
-    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem-content').toString('base64'));
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', FAKE_PEM);
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     expect(signStreamUrl('a/b.mp3')).toContain('https://cdn.example.com/a/b.mp3');
+  });
+
+  it('fails closed with null and a diagnostic when the key does not resolve', () => {
+    const errSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', 'not-a-pem-and-not-base64-of-one');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
+
+    expect(signStreamUrl('a/b.mp3')).toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining('CLOUDFRONT_PRIVATE_KEY_BASE64'),
+      expect.anything()
+    );
+    errSpy.mockRestore();
   });
 
   it('returns null and logs when the signer throws', async () => {
@@ -77,7 +95,7 @@ describe('signStreamUrl', () => {
       throw Error('boom');
     });
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
-    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem').toString('base64'));
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', FAKE_PEM_BASE64);
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
     const errSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 

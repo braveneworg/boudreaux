@@ -15,3 +15,10 @@ paths = ['''bio-generator/src/.*\.spec\.ts$''']
 [[allowlists]]
 description = "E2E test AUTH_SECRET is a hardcoded non-secret placeholder shared by the Playwright harness (config, global setup, disposable-session helper); the real AUTH_SECRET lives only in the deploy environment"
 regexes = ['''e2e-test-secret-key-that-is-at-least-32-characters-long''']
+
+[[allowlists]]
+description = "CloudFront signing unit tests use PEM-shaped placeholder keys (MIIfake…) to exercise key resolution/validation; the real CLOUDFRONT_PRIVATE_KEY_BASE64 lives only in the deploy environment"
+paths = [
+  '''src/lib/utils/cloudfront-key\.spec\.ts$''',
+  '''src/lib/utils/sign-stream-url\.spec\.ts$''',
+]
