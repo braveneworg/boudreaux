@@ -6,6 +6,7 @@ import 'server-only';
 
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 
+import { resolveCloudfrontPrivateKey } from '@/lib/utils/cloudfront-key';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
 import { loggers } from '@/lib/utils/logger';
 
@@ -39,16 +40,20 @@ const getCloudFrontSigningConfig = (): {
   cdnDomain: string;
 } | null => {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
-  const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
+  const rawPrivateKey = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
 
-  if (!keyPairId || !base64Pem || !cdnDomainRaw) {
+  if (!keyPairId || !rawPrivateKey || !cdnDomainRaw) {
     return null;
   }
 
-  // The PEM is stored base64-encoded to avoid multi-line / `\n`-escaping
-  // issues in env files; decode it back to the real PEM the signer needs.
-  const privateKey = Buffer.from(base64Pem, 'base64').toString('utf8');
+  // Resolve the base64-encoded PEM (tolerating a raw or `\n`-escaped PEM), and
+  // fail closed with a diagnostic rather than an opaque OpenSSL error when the
+  // secret is malformed — see resolveCloudfrontPrivateKey.
+  const privateKey = resolveCloudfrontPrivateKey(rawPrivateKey);
+  if (!privateKey) {
+    return null;
+  }
 
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 

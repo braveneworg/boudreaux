@@ -7,6 +7,7 @@ import 'server-only';
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 
 import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
+import { resolveCloudfrontPrivateKey } from '@/lib/utils/cloudfront-key';
 import { loggers } from '@/lib/utils/logger';
 
 const logger = loggers.s3;
@@ -21,7 +22,9 @@ interface StreamSigningConfig {
  * Resolve the CloudFront signing identity for streaming URLs.
  *
  * Returns `null` when any required env var is missing (e.g. dev / E2E /
- * preview environments where the CloudFront key pair is not provisioned).
+ * preview environments where the CloudFront key pair is not provisioned) OR
+ * when the private key is present but does not resolve to a PEM (a
+ * misconfigured secret — see {@link resolveCloudfrontPrivateKey}).
  * How callers handle that `null` depends on the asset: audio/public assets
  * may fall back to an unsigned CDN URL via `buildCdnUrl`, but VIDEO keys
  * must NEVER get an unsigned fallback — videos fail closed (signed access
@@ -29,14 +32,17 @@ interface StreamSigningConfig {
  */
 const getStreamSigningConfig = (): StreamSigningConfig | null => {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
-  const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
+  const rawPrivateKey = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
 
-  if (!keyPairId || !base64Pem || !cdnDomainRaw) {
+  if (!keyPairId || !rawPrivateKey || !cdnDomainRaw) {
     return null;
   }
 
-  const privateKey = Buffer.from(base64Pem, 'base64').toString('utf8');
+  const privateKey = resolveCloudfrontPrivateKey(rawPrivateKey);
+  if (!privateKey) {
+    return null;
+  }
 
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 

@@ -133,7 +133,7 @@ describe('generateCloudFrontSignedUrl', () => {
     expect(url).toMatch(/^https:\/\/cdn\.example\.com\/releases\/abc\/track\.mp3\?/);
   });
 
-  it('returns null and logs when the signing call throws (e.g. malformed PEM)', () => {
+  it('returns null and logs a diagnostic when the key does not resolve to a PEM', () => {
     vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
     vi.stubEnv(
       'CLOUDFRONT_PRIVATE_KEY_BASE64',
@@ -149,12 +149,28 @@ describe('generateCloudFrontSignedUrl', () => {
       expiresInSeconds: 3600,
     });
 
+    // The malformed key is now caught at resolution, before the signer, with a
+    // named diagnostic rather than an opaque OpenSSL DECODER error.
     expect(url).toBeNull();
     expect(loggerSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CloudFront signing failed'),
+      expect.stringContaining('CLOUDFRONT_PRIVATE_KEY_BASE64'),
       expect.anything()
     );
 
     loggerSpy.mockRestore();
+  });
+
+  it('signs when the key is stored as a raw PEM rather than base64', () => {
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', TEST_PRIVATE_KEY);
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
+
+    const url = generateCloudFrontSignedUrl({
+      s3Key: 'releases/abc/track.mp3',
+      fileName: 'track.mp3',
+      expiresInSeconds: 3600,
+    });
+
+    expect(url).toContain('https://cdn.example.com/releases/abc/track.mp3');
   });
 });
