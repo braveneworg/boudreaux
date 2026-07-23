@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { generateKeyPairSync } from 'node:crypto';
+
 import { loggers } from '@/lib/utils/logger';
 
 import { signStreamUrl } from './sign-stream-url';
@@ -10,8 +12,12 @@ vi.mock('@aws-sdk/cloudfront-signer', () => ({
   getSignedUrl: vi.fn(({ url }: { url: string }) => `${url}?Signature=signed&Key-Pair-Id=KP1`),
 }));
 
-/** A PEM-shaped fake — the signer is mocked, so the body need not be a real key. */
-const FAKE_PEM = '-----BEGIN PRIVATE KEY-----\nMIIfakefakefake\n-----END PRIVATE KEY-----';
+/** A real key — the resolver parses it, though the signer itself is mocked. */
+const FAKE_PEM = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+}).privateKey.trim();
 const FAKE_PEM_BASE64 = Buffer.from(FAKE_PEM).toString('base64');
 
 const ENV_KEYS = [
