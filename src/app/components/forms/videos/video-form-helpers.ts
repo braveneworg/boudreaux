@@ -58,8 +58,16 @@ export const mapVideoToFormValues = (video: VideoRow): VideoFormData => ({
 
 /**
  * Pre-populate title/artist/releasedOn/durationSeconds from a freshly-selected
- * file — but only where the admin has left the field empty, so an edit (or a
- * value they already typed) is never clobbered.
+ * file.
+ *
+ * Replacing a file (a new file swapped for one already uploaded in create mode,
+ * or the stored file in edit mode) re-derives these file-driven details from the
+ * new file, overwriting the previous values — replacing the file is a signal the
+ * details should follow it. A first selection instead fills only blanks, so a
+ * value the admin pre-typed is never clobbered. Either way a field is only ever
+ * written when the new file actually yields a value, so a parse miss never wipes
+ * an existing detail. The replace is detected from the already-present `s3Key`
+ * (set on an edit-mode load and after the first successful upload).
  */
 export const applyVideoPrefill = (
   form: UseFormReturn<VideoFormData>,
@@ -67,21 +75,23 @@ export const applyVideoPrefill = (
   duration: number | undefined
 ): void => {
   const values = form.getValues();
-  const setIfEmpty = (
-    name: 'title' | 'artist' | 'releasedOn',
-    current: string | undefined,
+  const isReplace = Boolean(values.s3Key);
+  const setField = (
+    name: 'title' | 'artist' | 'releasedOn' | 'durationSeconds',
+    current: string | number | undefined,
     value: string | undefined
   ): void => {
-    if (!current && value) {
-      form.setValue(name, value, { shouldDirty: true, shouldValidate: true });
-    }
+    if (!value || (!isReplace && current)) return;
+    form.setValue(name, value, { shouldDirty: true, shouldValidate: true });
   };
-  setIfEmpty('title', values.title, tags.title);
-  setIfEmpty('artist', values.artist, tags.artist);
-  setIfEmpty('releasedOn', values.releasedOn, tags.releasedOn);
-  if (!values.durationSeconds && duration !== undefined) {
-    form.setValue('durationSeconds', String(duration), { shouldDirty: true, shouldValidate: true });
-  }
+  setField('title', values.title, tags.title);
+  setField('artist', values.artist, tags.artist);
+  setField('releasedOn', values.releasedOn, tags.releasedOn);
+  setField(
+    'durationSeconds',
+    values.durationSeconds,
+    duration === undefined ? undefined : String(duration)
+  );
 };
 
 /**

@@ -8,6 +8,7 @@ import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 import {
   applyServerFieldErrors,
   applyServerProbePrefill,
+  applyVideoPrefill,
   buildVideoDefaults,
   formatDateForForm,
   mapVideoToFormValues,
@@ -15,6 +16,7 @@ import {
   validateVideoFile,
 } from './video-form-helpers';
 
+import type { ExtractedVideoTags } from './video-metadata';
 import type { UseFormReturn } from 'react-hook-form';
 
 const baseVideo: VideoRow = {
@@ -281,6 +283,118 @@ describe('applyServerProbePrefill', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+});
+
+// ── applyVideoPrefill ─────────────────────────────────────────────────────────
+
+const fileTags: ExtractedVideoTags = {
+  title: 'Filename Title',
+  artist: 'Filename Artist',
+  releasedOn: '2022-03-04',
+};
+
+describe('applyVideoPrefill', () => {
+  describe('first selection (no file uploaded yet)', () => {
+    it('fills an empty title from the file tags', () => {
+      const form = makeForm({ s3Key: '', title: '' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('title', 'Filename Title', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('fills an empty artist and releasedOn from the file tags', () => {
+      const form = makeForm({ s3Key: '', artist: '', releasedOn: '' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('artist', 'Filename Artist', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2022-03-04', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('does not clobber a title the admin pre-typed before choosing a file', () => {
+      const form = makeForm({ s3Key: '', title: 'Typed Title' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).not.toHaveBeenCalledWith('title', 'Filename Title', expect.anything());
+    });
+  });
+
+  describe('replacing an already-selected file', () => {
+    it('overwrites the existing title from the new file', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', title: 'Old Title' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('title', 'Filename Title', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('overwrites the existing artist from the new file', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', artist: 'Old Artist' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('artist', 'Filename Artist', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('overwrites the existing releasedOn from the new file', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', releasedOn: '2010-10-10' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2022-03-04', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('overwrites the existing duration from the new file', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', durationSeconds: '90' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).toHaveBeenCalledWith('durationSeconds', '200', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    });
+
+    it('keeps the existing artist when the new file yields no artist', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', artist: 'Old Artist' });
+      applyVideoPrefill(form, { title: 'Filename Title' }, 200);
+
+      expect(form.setValue).not.toHaveBeenCalledWith(
+        'artist',
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it('never overwrites a field to an empty value', () => {
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', releasedOn: '2010-10-10' });
+      applyVideoPrefill(form, { title: 'Filename Title' }, undefined);
+
+      expect(form.setValue).not.toHaveBeenCalledWith(
+        'releasedOn',
+        expect.anything(),
+        expect.anything()
+      );
+      expect(form.setValue).not.toHaveBeenCalledWith(
+        'durationSeconds',
+        expect.anything(),
+        expect.anything()
+      );
+    });
   });
 });
 
