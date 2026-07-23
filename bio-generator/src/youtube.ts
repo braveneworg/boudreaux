@@ -44,18 +44,25 @@ interface YoutubeErrorResponse {
 }
 
 /**
- * Google's own reason for refusing the request — `keyInvalid`,
- * `accessNotConfigured`, `quotaExceeded`, and so on. Worth the extra read:
- * logging only the status makes a rejected key look identical to a search that
- * legitimately found nothing, which is precisely how a broken lookup hides.
- * Never throws, and the body carries no credential.
+ * Google's reason code AND human-readable message for refusing the request.
+ * Both are logged: the reason code (`keyInvalid`, `accessNotConfigured`,
+ * `quotaExceeded`, …) is stable to branch on, but it is often generic — a bare
+ * `badRequest` says nothing, while the message names the actual cause (e.g.
+ * "API keys with referer restrictions cannot be used with this API"). Logging
+ * only the status makes a rejected key look identical to a search that found
+ * nothing, which is precisely how a broken lookup hides. Never throws, and the
+ * response body carries no credential (the key travels in the request URL).
  */
-const readErrorReason = async (response: Response): Promise<string | undefined> => {
+const readYoutubeError = async (
+  response: Response
+): Promise<{ reason?: string; message?: string }> => {
   try {
     const body = (await response.json()) as YoutubeErrorResponse;
-    return body.error?.errors?.[0]?.reason ?? body.error?.message;
+    const reason = body.error?.errors?.[0]?.reason;
+    const message = body.error?.message;
+    return { ...(reason ? { reason } : {}), ...(message ? { message } : {}) };
   } catch {
-    return undefined;
+    return {};
   }
 };
 
@@ -162,10 +169,11 @@ export const findYoutubeReleaseDate = async (
     });
     const response = await fetchFn(`${YOUTUBE_SEARCH_ENDPOINT}?${params.toString()}`);
     if (!response.ok) {
-      const reason = await readErrorReason(response);
+      const { reason, message } = await readYoutubeError(response);
       logEvent('warn', 'youtube_search_failed', {
         status: response.status,
         ...(reason ? { reason } : {}),
+        ...(message ? { message } : {}),
       });
       return null;
     }
