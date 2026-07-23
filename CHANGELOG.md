@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.273.0] - 2026-07-23
+
+### Changed
+
+- refactor(bio): migrate the remaining web/Lambda wire shapes to the contract package (#678)
+- refactor(bio): share the progress wire contract via a package (#677)
+
+### Fixed
+
+- fix(docker): copy job-contract package into the website image (#680)
+- fix(video): re-derive details from the new file on replace (#679)
+
 ## [4.272.0] - 2026-07-22
 
 ### Fixed
