@@ -169,9 +169,10 @@ describe('findYoutubeReleaseDate', () => {
     expect(match).toBeNull();
   });
 
-  it('logs the reason Google rejected the request, not just the status', async () => {
+  it('logs the reason AND full message Google returned, not just the status', async () => {
     // A rejected key answers 400 keyInvalid; without the reason this is
-    // indistinguishable in the logs from "the search found nothing".
+    // indistinguishable in the logs from "the search found nothing", and the
+    // reason code alone is often generic — the message names the actual cause.
     const body = JSON.stringify({
       error: {
         code: 400,
@@ -186,7 +187,50 @@ describe('findYoutubeReleaseDate', () => {
     expect(logEvent).toHaveBeenCalledWith(
       'warn',
       'youtube_search_failed',
-      expect.objectContaining({ status: 400, reason: 'keyInvalid' })
+      expect.objectContaining({
+        status: 400,
+        reason: 'keyInvalid',
+        message: 'API key not valid. Please pass a valid API key.',
+      })
+    );
+  });
+
+  it('surfaces the message for a generic badRequest the reason code cannot explain', async () => {
+    // The reason `badRequest` is generic; the message is what actually names the
+    // cause (e.g. a referrer-restricted key rejected on a server-side call).
+    const body = JSON.stringify({
+      error: {
+        code: 400,
+        message: 'API keys with referer restrictions cannot be used with this API.',
+        errors: [{ reason: 'badRequest' }],
+      },
+    });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(body, { status: 400 }));
+
+    await findYoutubeReleaseDate({ ...target, apiKey: 'yt-key' }, fetchFn);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'youtube_search_failed',
+      expect.objectContaining({
+        reason: 'badRequest',
+        message: expect.stringContaining('referer restrictions'),
+      })
+    );
+  });
+
+  it('logs the message even when no reason code is present', async () => {
+    const body = JSON.stringify({
+      error: { code: 403, message: 'The request is missing a valid API key.' },
+    });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(body, { status: 403 }));
+
+    await findYoutubeReleaseDate({ ...target, apiKey: 'yt-key' }, fetchFn);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'youtube_search_failed',
+      expect.objectContaining({ status: 403, message: 'The request is missing a valid API key.' })
     );
   });
 
