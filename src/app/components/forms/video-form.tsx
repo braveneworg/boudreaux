@@ -34,6 +34,7 @@ import { useVideoQuery } from './_hooks/use-video-query';
 import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
+import { useReleaseDateAutoFill } from './videos/use-release-date-autofill';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoDraft } from './videos/use-video-draft';
 import { useVideoPosterUpload } from './videos/use-video-poster-upload';
@@ -342,6 +343,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const selectedPosterBlob = selectedCandidateBlob(posterCandidates, selectedCandidateIndex);
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
+  useReleaseDateAutoFill({ uploadStatus: upload.status, form });
 
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {
