@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { ArrowRight, Loader2, Music2 } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
-import { useArtistBySlugQuery } from '@/hooks/use-artist-by-slug-query';
+import { useArtistBySlugQuery } from '@/hooks/queries/use-artist-by-slug-query';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { toBioTeaser } from '@/lib/utils/bio-teaser';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';

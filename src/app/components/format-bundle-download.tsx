@@ -9,7 +9,7 @@ import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
-import { useReleaseDigitalFormatsQuery } from '@/hooks/use-release-digital-formats-query';
+import { useReleaseDigitalFormatsQuery } from '@/hooks/queries/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import {
   FORMAT_LABELS,

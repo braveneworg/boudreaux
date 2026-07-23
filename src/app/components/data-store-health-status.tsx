@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 
-import { useHealthStatusQuery } from '@/hooks/use-health-status-query';
+import { useHealthStatusQuery } from '@/hooks/queries/use-health-status-query';
 
 import { HealthStatusIcon } from './health-status-icon';
 import { HealthStatusMessage } from './health-status-message';

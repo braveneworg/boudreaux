@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
-import { useDownloadQuotaQuery } from '@/hooks/use-download-quota-query';
+import { useDownloadQuotaQuery } from '@/hooks/queries/use-download-quota-query';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
 /**

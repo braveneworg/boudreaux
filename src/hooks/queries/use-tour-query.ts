@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type {
   ArtistScalars as Artist,
@@ -14,8 +15,6 @@ import type {
 } from '@/lib/types/tours';
 import { tourWithRelationsSchema } from '@/lib/validation/tour-models-schema';
 import { parseResponse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 export type TourWithRelations = Tour & {
   tourDates: Array<

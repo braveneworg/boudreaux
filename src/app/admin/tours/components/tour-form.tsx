@@ -27,7 +27,7 @@ import {
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Textarea } from '@/app/components/ui/textarea';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { useTourQuery } from '@/hooks/use-tour-query';
+import { useTourQuery } from '@/hooks/queries/use-tour-query';
 import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
 import {
   tourCreateSchema,

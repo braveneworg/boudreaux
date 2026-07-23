@@ -15,7 +15,7 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { ImageHeading } from '@/components/ui/image-heading';
-import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/use-infinite-published-releases-query';
+import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/queries/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';
 import { computeNextSkip } from '@/lib/types/pagination';

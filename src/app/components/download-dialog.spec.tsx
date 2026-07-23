@@ -156,7 +156,7 @@ let currentFreeStatusData:
 };
 const mockUseFreeDownloadStatusQuery = vi.fn(() => ({ data: currentFreeStatusData }));
 
-vi.mock('@/hooks/use-free-download-status-query', () => ({
+vi.mock('@/hooks/queries/use-free-download-status-query', () => ({
   useFreeDownloadStatusQuery: () => mockUseFreeDownloadStatusQuery(),
 }));
 

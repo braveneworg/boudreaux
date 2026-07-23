@@ -4,12 +4,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { ReleaseCarouselItem } from '@/lib/types/media-models';
 import { releaseCarouselItemSchema } from '@/lib/validation/media/release-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 interface ReleaseRelatedResponse {
   releases: ReleaseCarouselItem[];

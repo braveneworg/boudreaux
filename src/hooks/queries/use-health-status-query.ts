@@ -4,12 +4,11 @@
 import { useQuery, type QueryFunctionContext } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 import { parseResponse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 const healthStatusSchema = z.object({
   status: z.enum(['healthy', 'unhealthy', 'error']),

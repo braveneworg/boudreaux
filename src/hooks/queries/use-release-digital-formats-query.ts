@@ -4,12 +4,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { QueryOptionsOverride } from '@/hooks/query-options';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
-
-import type { QueryOptionsOverride } from './query-options';
 
 interface ReleaseDigitalFormatsResponse {
   formats: Array<{

@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/components/ui/table';
-import { useDownloadAnalyticsQuery } from '@/hooks/use-download-analytics-query';
+import { useDownloadAnalyticsQuery } from '@/hooks/queries/use-download-analytics-query';
 
 interface DownloadAnalyticsDashboardProps {
   releaseId: string;

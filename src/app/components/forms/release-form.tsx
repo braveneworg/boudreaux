@@ -31,7 +31,7 @@ import {
   useUpdateReleaseCoverArtMutation,
   useUpdateReleaseMutation,
 } from '@/hooks/mutations/use-release-mutations';
-import { type ReleaseDetail, useReleaseDetailQuery } from '@/hooks/use-release-query';
+import { type ReleaseDetail, useReleaseDetailQuery } from '@/hooks/queries/use-release-query';
 import { useSession } from '@/hooks/use-session';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
 import {

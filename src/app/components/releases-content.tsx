@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 import { Loader2 } from 'lucide-react';
 
-import { useInfinitePublishedReleasesQuery } from '@/hooks/use-infinite-published-releases-query';
+import { useInfinitePublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 import {
