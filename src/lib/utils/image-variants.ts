@@ -5,7 +5,7 @@ import 'server-only';
 
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import mime from 'mime';
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 
 import {
   IMAGE_VARIANT_DEVICE_SIZES,
@@ -82,7 +82,7 @@ export const generateVariantsFromBuffer = async (
   // concurrently instead of serializing one S3 round trip after another.
   const upload = async (
     key: string,
-    pipeline: sharp.Sharp,
+    pipeline: Sharp,
     variantContentType: string
   ): Promise<void> => {
     await s3Client.send(
