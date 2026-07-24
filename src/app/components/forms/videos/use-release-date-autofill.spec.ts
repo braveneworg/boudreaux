@@ -72,7 +72,9 @@ const renderAutoFill = ({ uploadStatus = 'success', releasedOn = '' }: RenderArg
       defaultValues: { title: 'My Bad', artist: 'Ceschi', releasedOn },
     });
     useReleaseDateAutoFill({ uploadStatus, form });
-    return { form };
+    // Read dirtyFields during render so the proxy tracks it for the assertions.
+    const { dirtyFields } = form.formState;
+    return { form, releasedOnDirty: Boolean(dirtyFields.releasedOn) };
   });
   return result;
 };
@@ -94,6 +96,15 @@ describe('useReleaseDateAutoFill', () => {
     await act(async () => {});
 
     expect(result.current.form.getValues('releasedOn')).toBe('');
+  });
+
+  it('does not mark the auto-filled date dirty (so enrichment can override it)', async () => {
+    mockLookup({ releasedOn: '2019-08-04' });
+    const result = renderAutoFill();
+
+    await act(async () => {});
+
+    expect(result.current.releasedOnDirty).toBe(false);
   });
 
   it('never clobbers a release date the admin already set', async () => {
