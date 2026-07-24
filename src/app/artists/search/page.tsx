@@ -43,7 +43,12 @@ export default async function ArtistSearchPage({ searchParams }: ArtistSearchPag
   if (query) {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.artists.search(query),
-      queryFn: () => fetchApi(`/api/artists/search?q=${encodeURIComponent(query)}&format=full`),
+      // Prefetch the exact combobox request `useArtistNavSearchQuery` makes (no
+      // `format=full`) so the dehydrated entry under this shared key matches the
+      // `{ results }` shape `ArtistSearchResultsPanel` reads. Fetching the
+      // `format=full` `{ artists }` envelope here poisoned the cache on direct
+      // landings and rendered the empty state (#659).
+      queryFn: () => fetchApi(`/api/artists/search?q=${encodeURIComponent(query)}`),
     });
   }
 
