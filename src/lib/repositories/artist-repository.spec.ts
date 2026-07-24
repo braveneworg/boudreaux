@@ -4,11 +4,22 @@
 
 import { Prisma } from '@prisma/client';
 
+import type { AssertExact } from '@/lib/types/assert';
+import type { ArtistDetail } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 
 import { ArtistRepository } from './artist-repository';
 
 vi.mock('server-only', () => ({}));
+
+// Type honesty (#661): findById fetches only `artistDetailInclude` (scalars +
+// ordered images), so its non-null return must be exactly `ArtistDetail` — never
+// the admin `Artist` with phantom `labels`/`urls`/`releases`. If the return type
+// ever re-widens to `Artist`, this exact-match assertion fails `pnpm run
+// typecheck`, catching any caller that would trust relations the query omits.
+type FindByIdResult = NonNullable<Awaited<ReturnType<typeof ArtistRepository.findById>>>;
+type _FindByIdIsArtistDetail = AssertExact<FindByIdResult, ArtistDetail>;
+const _findByIdIsArtistDetail: _FindByIdIsArtistDetail = true;
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
