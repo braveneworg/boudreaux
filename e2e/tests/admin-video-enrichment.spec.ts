@@ -61,9 +61,11 @@ test.describe('Admin video enrichment', () => {
     // MusicBrainz source; the release-date suggestion renders separately.
     await expect(leadCard.getByText('1985-03-15')).toBeVisible();
     await expect(leadCard.getByText('High', { exact: true })).toBeVisible();
-    await expect(
-      panel.getByTestId('video-release-date-suggestion').getByText('2020-06-01')
-    ).toBeVisible();
+    // The fetched release date auto-applies into the form, so the card shows the
+    // value (exact, to skip the "Current: …" copy) and flips to Applied.
+    const releaseDateCard = panel.getByTestId('video-release-date-suggestion');
+    await expect(releaseDateCard.getByText('2020-06-01', { exact: true })).toBeVisible();
+    await expect(releaseDateCard.getByText('Applied', { exact: true })).toBeVisible();
 
     // The fixture also emits video-level description + featured-artist cards.
     const descriptionCard = panel.getByTestId('video-description-suggestion');
@@ -71,10 +73,14 @@ test.describe('Admin video enrichment', () => {
     await expect(descriptionCard).toBeVisible();
     await expect(featuredCard).toBeVisible();
 
-    // Applying the description writes it into the mounted form (client-only —
-    // video-level applies never hit the server) and flips the card to Applied.
-    await descriptionCard.getByRole('button', { name: 'Apply Description suggestion' }).click();
-    await expect(adminPage.getByLabel('Description')).toHaveValue(/deterministic E2E description/);
+    // The description suggestion is an editable textarea; applying writes the
+    // current text into the mounted form (client-only — video-level applies
+    // never hit the server) and flips the card to Applied. `getByLabel` is
+    // exact so it targets the form field, not the card's "Suggested description".
+    await descriptionCard.getByRole('button', { name: 'Use this description' }).click();
+    await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
+      /deterministic E2E description/
+    );
     await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
 
     // Dismissing the featured-artist card IS server-side for video-level fields;

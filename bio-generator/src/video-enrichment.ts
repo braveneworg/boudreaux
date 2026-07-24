@@ -601,18 +601,19 @@ const mergeReleaseDate = (
   };
 };
 
-/** Verified-fact lines fed to the description synthesis (credits, dates). */
-const descriptionFacts = (
-  recording: MusicBrainzRecordingCandidate | null,
-  adminReleasedOn: string | undefined
-): string[] => {
+/**
+ * Verified-fact lines fed to the description synthesis (credits + the MB
+ * first-release date). The authoritative release date is passed separately as
+ * the prompt headline (the resolved date), so no admin date is fed here — that
+ * is exactly the stale value the description must not echo.
+ */
+const descriptionFacts = (recording: MusicBrainzRecordingCandidate | null): string[] => {
   const facts: string[] = [];
   const credits = recording?.credits.map((credit) => credit.name).filter(Boolean) ?? [];
   if (credits.length > 0) facts.push(`Credited artists: ${credits.join(', ')}.`);
   if (recording && isFullDate(recording.firstReleaseDate)) {
     facts.push(`MusicBrainz first-release date: ${recording.firstReleaseDate}.`);
   }
-  if (adminReleasedOn) facts.push(`Admin-entered release date: ${adminReleasedOn.slice(0, 10)}.`);
   return facts;
 };
 
@@ -635,6 +636,44 @@ const buildVideoBlock = ({
     ...(featuredArtists.length > 0 ? { featuredArtists } : {}),
   };
   return releasedOn || description || featuredArtists.length > 0 ? video : null;
+};
+
+interface SynthesizeDescriptionArgs {
+  input: VideoEnrichmentInput;
+  recording: MusicBrainzRecordingCandidate | null;
+  /** The merged/resolved release-date suggestion (its value leads the prose). */
+  releasedOn: VideoLevelSuggestion | null;
+  keys: { gemini: string; serper: string | null };
+  model: string;
+  deps: VideoEnrichmentDeps;
+}
+
+/**
+ * Synthesizes the description from the RESOLVED release date (the suggestion's
+ * value, else the admin date), skipped without a Serper key. Extracted so the
+ * resolved-date fallback stays out of runVideoEnrichment's complexity budget.
+ */
+const synthesizeDescription = ({
+  input,
+  recording,
+  releasedOn,
+  keys,
+  model,
+  deps,
+}: SynthesizeDescriptionArgs): Promise<VideoLevelSuggestion | null> => {
+  if (!keys.serper) return Promise.resolve(null);
+  return deps.resolveDescriptionSuggestion(
+    {
+      title: input.title,
+      artistDisplay: input.artistDisplay,
+      releasedOn: releasedOn?.value ?? input.releasedOn,
+      facts: descriptionFacts(recording),
+      serperKey: keys.serper,
+      geminiKey: keys.gemini,
+      model,
+    },
+    { searchWeb: deps.searchSerperWeb }
+  );
 };
 
 /**
@@ -697,23 +736,19 @@ export const runVideoEnrichment = async (
         { searchWeb: deps.searchSerperWeb }
       )
     : null;
-  const description = keys.serper
-    ? await deps.resolveDescriptionSuggestion(
-        {
-          title: input.title,
-          artistDisplay: input.artistDisplay,
-          releasedOn: input.releasedOn,
-          facts: descriptionFacts(recording, input.releasedOn),
-          serperKey: keys.serper,
-          geminiKey: keys.gemini,
-          model,
-        },
-        { searchWeb: deps.searchSerperWeb }
-      )
-    : null;
+  // Resolve the release date BEFORE synthesizing the description so the prose
+  // advertises the corrected date rather than the stale admin-entered one.
+  const releasedOn = mergeReleaseDate(recording, webReleasedOn, input.releasedOn);
+  const description = await synthesizeDescription({
+    input,
+    recording,
+    releasedOn,
+    keys,
+    model,
+    deps,
+  });
 
   await report('finalizing');
-  const releasedOn = mergeReleaseDate(recording, webReleasedOn, input.releasedOn);
   const video = buildVideoBlock({
     releasedOn,
     description,

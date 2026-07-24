@@ -347,7 +347,7 @@ describe('runVideoEnrichment', () => {
     expect(deps.resolveDescriptionSuggestion).not.toHaveBeenCalled();
   });
 
-  it('feeds the credited names, MB date, and admin date as description facts', async () => {
+  it('feeds the credited names and the resolved date as description facts', async () => {
     const resolveDescriptionSuggestion = vi.fn().mockResolvedValue(null);
     const deps = buildDeps({
       resolveDescriptionSuggestion,
@@ -367,9 +367,31 @@ describe('runVideoEnrichment', () => {
       expect.arrayContaining([
         expect.stringContaining('Ceschi'),
         expect.stringContaining('2019-05-01'),
-        expect.stringContaining('2021-04-09'),
       ])
     );
+  });
+
+  it('builds the description from the resolved date, not the stale admin date', async () => {
+    // baseInput.releasedOn is 2021-04-09 (stale); MusicBrainz has the true
+    // 2019-05-01. The description prose must advertise the resolved date, and
+    // the stale admin date must never reach the description inputs.
+    const resolveDescriptionSuggestion = vi.fn().mockResolvedValue(null);
+    const deps = buildDeps({
+      resolveDescriptionSuggestion,
+      searchRecordingCandidates: vi.fn().mockResolvedValue([
+        recording({
+          title: 'Bite Through Stone',
+          firstReleaseDate: '2019-05-01',
+          credits: [{ mbid: 'mb-c', name: 'Ceschi' }],
+        }),
+      ]),
+    });
+
+    await runVideoEnrichment(baseInput, deps);
+
+    const [args] = resolveDescriptionSuggestion.mock.calls[0];
+    expect(args.releasedOn).toBe('2019-05-01');
+    expect(JSON.stringify(args.facts)).not.toContain('2021-04-09');
   });
 
   it('posts progress checkpoints when the event carries progress plumbing', async () => {

@@ -344,25 +344,28 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     });
   });
 
-  it('routes the release-date apply into the form callback, never the server', async () => {
+  it('auto-applies the release-date suggestion into the form, never the server', async () => {
     const onApply = vi.fn();
     setStatus(succeededStatus);
     render(<Harness onApply={onApply} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Apply Release date suggestion' }));
-
-    expect(onApply).toHaveBeenCalledWith('releasedOn', '2020-06-01');
+    // No click: the fetched date is applied automatically on arrival.
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith('releasedOn', '2020-06-01'));
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
   });
 
-  it('dismisses the release-date suggestion server-side', async () => {
-    setStatus(succeededStatus);
+  it('dismisses a video-level suggestion server-side', async () => {
+    // Release date auto-applies, so its card no longer shows Dismiss; the
+    // featured-artist card stays pending and exercises the same dismiss path.
+    setStatus({ ...succeededStatus, suggestions: [featuredArtistSuggestion] });
     render(<Harness />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Dismiss Release date suggestion' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Dismiss Featured artist suggestion' })
+    );
 
     expect(mocks.applyVideoSuggestion).toHaveBeenCalledWith({
-      suggestionId: 's3',
+      suggestionId: 's5',
       op: 'dismiss',
     });
   });
@@ -372,17 +375,30 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
     render(<Harness onApply={onApply} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Apply Description suggestion' }));
+    await userEvent.click(screen.getByRole('button', { name: /use this description/i }));
 
     expect(onApply).toHaveBeenCalledWith('description', descriptionSuggestion.value);
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
+  });
+
+  it('applies the admin-edited description text through the form callback', async () => {
+    const onApply = vi.fn();
+    setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
+    render(<Harness onApply={onApply} />);
+
+    const textarea = screen.getByRole('textbox', { name: /suggested description/i });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, 'Edited in the panel.');
+    await userEvent.click(screen.getByRole('button', { name: /use this description/i }));
+
+    expect(onApply).toHaveBeenCalledWith('description', 'Edited in the panel.');
   });
 
   it('marks the description card applied once the form holds the value', async () => {
     setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
     render(<Harness />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Apply Description suggestion' }));
+    await userEvent.click(screen.getByRole('button', { name: /use this description/i }));
 
     const card = screen.getByTestId('video-description-suggestion');
     expect(within(card).getByText('Applied')).toBeInTheDocument();

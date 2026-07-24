@@ -43,6 +43,8 @@ import {
   STALE_JOB_TIMEOUT_MESSAGE,
 } from '@/utils/async-job-lifecycle';
 
+import { EditableDescriptionSuggestion } from './editable-description-suggestion';
+import { useAutoApplyReleaseDateSuggestion } from './use-autoapply-release-date';
 import { VideoArtistSuggestionCard } from './video-artist-suggestion-card';
 import { VideoEnrichmentProgressTimeline } from './video-enrichment-progress-timeline';
 import { VideoEnrichmentStatusChip } from './video-enrichment-status-chip';
@@ -186,6 +188,18 @@ const VideoLevelSuggestionList = ({
         const field = toVideoLevelField(suggestion.field);
         const config = field === null ? undefined : VIDEO_LEVEL_FIELD_CONFIG.get(field);
         if (field === null || config === undefined) return null;
+        if (field === 'description') {
+          return (
+            <EditableDescriptionSuggestion
+              key={suggestion.id}
+              suggestion={suggestion}
+              currentDescription={description ?? ''}
+              isBusy={isBusy}
+              onApply={(value) => onApplyVideoSuggestion('description', value)}
+              onDismiss={() => onDismissSuggestion(suggestion)}
+            />
+          );
+        }
         const { applyLabel, testId } = config;
         return (
           <VideoFieldSuggestion
@@ -391,6 +405,14 @@ export const VideoEnrichmentPanel = ({
 
   const artistValue = useWatch({ control, name: 'artist' });
   const hasArtist = hasEnrichableArtist(artistValue);
+
+  // The fetched release date should be used automatically — apply the suggestion
+  // into the form the moment it appears, unless the admin has edited the field.
+  useAutoApplyReleaseDateSuggestion({
+    suggestions: data?.suggestions ?? [],
+    control,
+    onApply: onApplyVideoSuggestion,
+  });
 
   // Last-resort client stop: if a run never reaches a terminal status, stop
   // polling after the deadline (the server's stale-job coercion normally
