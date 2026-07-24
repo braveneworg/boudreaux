@@ -67,6 +67,9 @@ export const useReleaseDateAutoFill = ({
     // lags its store subscription on the first render, so an already-populated
     // date can still read as empty here and would be overwritten.
     if (!data?.releasedOn || getValues('releasedOn')?.trim()) return;
-    setValue('releasedOn', data.releasedOn, { shouldDirty: true, shouldValidate: true });
+    // shouldDirty:false ON PURPOSE — this is an automated fill, not a hand edit.
+    // Leaving it clean lets the later enrichment run's release-date suggestion
+    // auto-apply over it (its dirty-guard only protects a value the admin typed).
+    setValue('releasedOn', data.releasedOn, { shouldDirty: false, shouldValidate: true });
   }, [data, getValues, setValue]);
 };
