@@ -322,14 +322,19 @@ export class ArtistRepository {
     ) as Promise<Artist>;
   }
 
-  /** Find an artist by id, including images ordered by sortOrder. */
-  static async findById(id: string): Promise<Artist | null> {
+  /**
+   * Find an artist by id, including images ordered by sortOrder. The query pulls
+   * only `artistDetailInclude` (scalars + images), so the honest return is
+   * `ArtistDetail` — not the admin `Artist`, which also carries labels/urls/
+   * releases the by-id shape omits.
+   */
+  static async findById(id: string): Promise<ArtistDetail | null> {
     return runQuery(() =>
       prisma.artist.findUnique({
         where: { id },
         include: artistDetailInclude,
       })
-    ) as Promise<Artist | null>;
+    );
   }
 
   /** Find an artist by slug (no relations). */

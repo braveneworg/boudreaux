@@ -19,6 +19,7 @@ import type {
   Artist,
   ArtistBioImageRecord,
   ArtistBioLinkRecord,
+  ArtistDetail,
   ArtistListFilters,
   ArtistListWithBio,
   ArtistNameRecord,
@@ -453,9 +454,13 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by ID
+   * Get an artist by ID.
+   *
+   * Returns the honest `ArtistDetail` shape (scalars + images) the by-id query
+   * fetches — narrower than the admin `Artist`, so callers can never trust
+   * labels/urls/releases that aren't loaded.
    */
-  static async getArtistById(id: string): Promise<ServiceResponse<Artist>> {
+  static async getArtistById(id: string): Promise<ServiceResponse<ArtistDetail>> {
     try {
       const artist = await ArtistRepository.findById(id);
 
