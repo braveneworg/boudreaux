@@ -415,6 +415,11 @@ jobs:
         run: bash scripts/ci/whitelist-runner-ip.sh "${{ steps.ip.outputs.ipv4 }}"
 
       - name: Create .env for remote
+        env:
+          # Handled separately below so their value is normalized to a single
+          # line — see the newline-stripping block after the heredoc.
+          CLOUDFRONT_PRIVATE_KEY_BASE64: ${{ secrets.CLOUDFRONT_PRIVATE_KEY_BASE64 }}
+          APPLE_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}
         run: |
           cat > .env.deploy << 'EOF'
           NEXT_APP_WEBSITE_IMAGE=${{ env.WEBSITE_IMAGE }}
@@ -432,7 +437,6 @@ jobs:
           APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
           APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}
           APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}
-          APPLE_PRIVATE_KEY_BASE64=${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}
           APPLE_APP_BUNDLE_IDENTIFIER=${{ secrets.APPLE_APP_BUNDLE_IDENTIFIER }}
           EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
           EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}
@@ -449,7 +453,6 @@ jobs:
           CDN_DOMAIN=${{ secrets.CDN_DOMAIN }}
           NEXT_PUBLIC_CDN_DOMAIN=${{ secrets.NEXT_PUBLIC_CDN_DOMAIN }}
           CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID }}
-          CLOUDFRONT_PRIVATE_KEY_BASE64=${{ secrets.CLOUDFRONT_PRIVATE_KEY_BASE64 }}
           NEXT_PUBLIC_HOST_NAME=${{ secrets.NEXT_PUBLIC_HOST_NAME }}
           NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
           STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
@@ -473,6 +476,18 @@ jobs:
           SMS_PROVIDER=${{ vars.SMS_PROVIDER || 'noop' }}
           SNS_SMS_ORIGINATION_NUMBER=${{ vars.SNS_SMS_ORIGINATION_NUMBER }}
           EOF
+
+          # Base64-encoded private keys can be stored line-wrapped (multi-line):
+          # `base64` wraps at 76 columns, `openssl base64` at 64. Compose's
+          # env-file parser reads only the FIRST line of an unquoted value, so a
+          # wrapped key reaches the container truncated (the CloudFront signing
+          # incident: a header-only PEM that fails to parse). Collapse each to a
+          # single line so the whole value survives regardless of how it was
+          # encoded. `tr -d '\r\n'` on an already-single-line value is a no-op.
+          {
+            printf 'CLOUDFRONT_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$CLOUDFRONT_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
+            printf 'APPLE_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$APPLE_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
+          } >> .env.deploy
 
       - name: Upload compose + env
         uses: appleboy/scp-action@v1.0.0
