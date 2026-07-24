@@ -34,7 +34,7 @@ import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helper
  */
 
 /** The apply-button accessible name is the aria-label `Apply <field label> suggestion`. */
-const APPLY_DESCRIPTION = 'Apply Description suggestion';
+const APPLY_DESCRIPTION = 'Use this description';
 const APPLY_FEATURED_ARTIST = 'Apply Featured artist suggestion';
 
 /** The discovered featured artist the fake fixture emits (video-enrichment-fixture.ts). */
@@ -93,7 +93,7 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
 
       // Apply the description into the form (client-only; the card flips applied).
       await descriptionCard.getByRole('button', { name: APPLY_DESCRIPTION }).click();
-      await expect(adminPage.getByLabel('Description')).toHaveValue(
+      await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
         /deterministic E2E description/
       );
       await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
