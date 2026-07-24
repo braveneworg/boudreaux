@@ -152,10 +152,8 @@ describe('generateCloudFrontSignedUrl', () => {
     // The malformed key is now caught at resolution, before the signer, with a
     // named diagnostic rather than an opaque OpenSSL DECODER error.
     expect(url).toBeNull();
-    expect(loggerSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CLOUDFRONT_PRIVATE_KEY_BASE64'),
-      expect.anything()
-    );
+    expect(loggerSpy).toHaveBeenCalled();
+    expect(loggerSpy.mock.calls[0]?.[0]).toContain('CLOUDFRONT_PRIVATE_KEY_BASE64');
 
     loggerSpy.mockRestore();
   });

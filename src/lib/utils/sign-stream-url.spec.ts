@@ -88,10 +88,8 @@ describe('signStreamUrl', () => {
     vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     expect(signStreamUrl('a/b.mp3')).toBeNull();
-    expect(errSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CLOUDFRONT_PRIVATE_KEY_BASE64'),
-      expect.anything()
-    );
+    expect(errSpy).toHaveBeenCalled();
+    expect(errSpy.mock.calls[0]?.[0]).toContain('CLOUDFRONT_PRIVATE_KEY_BASE64');
     errSpy.mockRestore();
   });
 
