@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 
 import { imageToWebpDataUri } from './thumbnail-data-uri';
 
@@ -16,7 +16,7 @@ const makeImage = (width: number, height: number): Promise<Buffer> =>
     .toBuffer();
 
 // Decode a `data:image/webp;base64,…` URI back to sharp metadata.
-const dataUriMetadata = (dataUri: string): Promise<sharp.Metadata> => {
+const dataUriMetadata = (dataUri: string): Promise<Metadata> => {
   const base64 = dataUri.replace(/^data:image\/webp;base64,/, '');
   return sharp(Buffer.from(base64, 'base64')).metadata();
 };
