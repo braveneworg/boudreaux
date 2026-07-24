@@ -5,13 +5,26 @@ import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-re
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ImageRepository } from '@/lib/repositories/image-repository';
-import type { CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
+import type { AssertExact } from '@/lib/types/assert';
+import type { ArtistDetail, CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
 import { BioImageService } from './bio-image-service';
+
+// Type honesty (#661): getArtistById surfaces ArtistRepository.findById, which
+// fetches only scalars + images. A server-side caller must never be able to
+// trust phantom `labels`/`urls`/`releases`, so the success `data` must be exactly
+// `ArtistDetail`, not the admin `Artist`. Re-widening the return fails `pnpm run
+// typecheck` here.
+type GetArtistByIdSuccessData = Extract<
+  Awaited<ReturnType<typeof ArtistService.getArtistById>>,
+  { success: true }
+>['data'];
+type _GetArtistByIdIsArtistDetail = AssertExact<GetArtistByIdSuccessData, ArtistDetail>;
+const _getArtistByIdIsArtistDetail: _GetArtistByIdIsArtistDetail = true;
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
