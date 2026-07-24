@@ -91,23 +91,6 @@ Shipped: digital formats + S3 presigned up/download + freemium quota; Stripe
 PWYW checkout + download gate; tour management + admin CRUD; release search +
 media player; playlists; videos.
 
-## Project structure
-
-```text
-src/
-├── app/                # App Router pages, layouts, API routes (api/ = GET + Stripe webhook)
-│   ├── components/     # Shared feature components; ui/ = shadcn primitives; forms/fields/
-│   └── */_hooks/       # Feature/route-scoped hooks
-├── hooks/              # Global client hooks, mutations/ subfolder
-├── lib/                # actions/, decorators/, repositories/, services/, validation/, email/, utils/
-prisma/schema.prisma    # MongoDB schema
-e2e/                    # Playwright (fixtures, helpers, tests)
-scripts/                # tsx scripts (mongo backup, S3 ops, image variants)
-docs/lessons/           # Categorized lessons (see above)
-docs/auto-generated/    # AI-generated markdown goes here
-docs/agents/            # Engineering-skills config (see Agent skills below)
-```
-
 ## Commands
 
 ```bash
