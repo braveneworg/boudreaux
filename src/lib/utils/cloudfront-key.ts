@@ -57,6 +57,10 @@ export const resolveCloudfrontPrivateKey = (rawEnvValue: string): string | null 
       'CLOUDFRONT_PRIVATE_KEY_BASE64 is set but did not resolve to a PEM private key — ' +
         'expected base64 of a PEM (or a PEM directly). Likely double-encoded, truncated, ' +
         'or the wrong value.',
+      // No underlying error here; the diagnostic facts ride the third (data)
+      // argument. Passing them as the second arg would String()-coerce the
+      // object to "[object Object]" and drop every field.
+      undefined,
       {
         rawLength: trimmed.length,
         decodedLength: decoded.length,
@@ -73,10 +77,10 @@ export const resolveCloudfrontPrivateKey = (rawEnvValue: string): string | null 
       'CLOUDFRONT_PRIVATE_KEY_BASE64 has a PEM header but its body is not a parseable ' +
         'private key — likely truncated or corrupted (a header-only value is ~28 chars, ' +
         'a full RSA-2048 key ~1700).',
-      {
-        candidateLength: candidate.length,
-        error: err instanceof Error ? err.message : String(err),
-      }
+      // The crypto error rides the second (error) argument so the Logger
+      // extracts its message/stack; candidateLength rides the third (data) arg.
+      err,
+      { candidateLength: candidate.length }
     );
     return null;
   }

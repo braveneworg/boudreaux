@@ -58,13 +58,18 @@ describe('resolveCloudfrontPrivateKey', () => {
     errSpy.mockRestore();
   });
 
-  it('logs a diagnostic naming a non-PEM value', () => {
+  it('logs a diagnostic naming a non-PEM value in the structured-data argument', () => {
     const errSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
     resolveCloudfrontPrivateKey('utter-garbage-value');
 
+    // The Logger signature is error(message, error?, data?). The diagnostic
+    // facts must ride the THIRD (data) argument — passing them as the second
+    // arg makes the Logger String()-coerce the whole object to "[object Object]"
+    // and drop the fields (the prod bug this test guards against).
     expect(errSpy).toHaveBeenCalledWith(
       expect.stringContaining('did not resolve to a PEM'),
+      undefined,
       expect.objectContaining({ decodedStartsWithDashes: false })
     );
     errSpy.mockRestore();
@@ -83,10 +88,15 @@ describe('resolveCloudfrontPrivateKey', () => {
 
     resolveCloudfrontPrivateKey(CORRUPT_PEM);
 
-    expect(errSpy).toHaveBeenCalledWith(
-      expect.stringContaining('not a parseable'),
-      expect.objectContaining({ candidateLength: CORRUPT_PEM.length })
-    );
+    // candidateLength must reach the THIRD (data) argument; the crypto error
+    // rides the SECOND (error) argument so the Logger extracts its message/stack.
+    const [message, errorArg, data] = errSpy.mock.calls[0] ?? [];
+    expect(message).toContain('not a parseable');
+    // The caught crypto error rides the second (error) argument — proven by its
+    // message — NOT a plain data object (which the Logger String()-coerces to
+    // "[object Object]"). Duck-typed, since a cross-realm Error fails instanceof.
+    expect((errorArg as { message?: string } | undefined)?.message).toContain('DECODER');
+    expect(data).toEqual(expect.objectContaining({ candidateLength: CORRUPT_PEM.length }));
     errSpy.mockRestore();
   });
 
