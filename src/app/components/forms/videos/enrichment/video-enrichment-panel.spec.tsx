@@ -449,6 +449,46 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
   });
 });
 
+describe('VideoEnrichmentPanel — dismissed video-level descriptions', () => {
+  const dismissedDescription = { ...descriptionSuggestion, status: 'dismissed' as const };
+
+  it('collapses a dismissed description to a muted Dismissed line', () => {
+    setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
+    render(<Harness />);
+
+    expect(screen.getByText('Description: Dismissed')).toBeInTheDocument();
+  });
+
+  it('gives a dismissed description no active apply control', () => {
+    setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
+    render(<Harness />);
+
+    expect(screen.queryByRole('button', { name: /use this description/i })).not.toBeInTheDocument();
+  });
+
+  it('gives a dismissed description no editable textarea', () => {
+    setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
+    render(<Harness />);
+
+    expect(
+      screen.queryByRole('textbox', { name: /suggested description/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps only the pending description actionable when a dismissed one also exists', () => {
+    setStatus({
+      ...succeededStatus,
+      suggestions: [
+        { ...dismissedDescription, id: 's4d', value: 'Stale prose about a former artist.' },
+        descriptionSuggestion,
+      ],
+    });
+    render(<Harness />);
+
+    expect(screen.getAllByRole('button', { name: /use this description/i })).toHaveLength(1);
+  });
+});
+
 describe('VideoEnrichmentPanel — poll deadline give-up', () => {
   it('toasts and disables polling when an in-flight job outlives the deadline', () => {
     vi.useFakeTimers();
