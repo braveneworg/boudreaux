@@ -51,6 +51,18 @@ export const EditableDescriptionSuggestion = ({
     setText(suggestion.value);
   }, [suggestion.value]);
 
+  // A dismissed row survives as a re-run fence (never `replacePending`d away).
+  // Collapse it to a muted one-liner — never an active editable suggestion —
+  // mirroring `SuggestionFieldRow`, so a stale dismissal can't masquerade as a
+  // second live description alongside the fresh pending one.
+  if (suggestion.status === 'dismissed') {
+    return (
+      <div data-testid="video-description-suggestion">
+        <p className="text-sm text-zinc-500">Description: Dismissed</p>
+      </div>
+    );
+  }
+
   const isApplied = currentDescription === text;
 
   return (
