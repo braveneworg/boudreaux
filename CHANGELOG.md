@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.291.0] - 2026-07-26
+
+### Fixed
+
+- fix(video): 🐛 never fill release date from the video file (#699)
+
 ## [4.290.0] - 2026-07-26
 
 ### Fixed
