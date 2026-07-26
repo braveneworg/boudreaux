@@ -49,7 +49,6 @@ describe('videoProbeFixture', () => {
     expect(extractProbePrefillTags(videoProbeFixture.raw('https://example.com/x.mp4'))).toEqual({
       title: 'E2E Probe Title',
       artist: 'E2E Probe Artist',
-      releasedOn: '2019-08-01',
       description: 'E2E probe description',
       durationSeconds: 245,
     });

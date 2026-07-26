@@ -18,7 +18,6 @@ const okResponse = {
   tags: {
     title: 'My Video',
     artist: 'Test Artist',
-    releasedOn: '2024-01-01',
     description: 'A description',
     durationSeconds: 120,
   },

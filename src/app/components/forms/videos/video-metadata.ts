@@ -15,7 +15,6 @@ import { parseVideoFilename } from '@/utils/parse-video-filename';
 export interface ExtractedVideoTags {
   title: string;
   artist?: string;
-  releasedOn?: string;
 }
 
 /** Fold filename feat-clauses into a container artist, skipping known names. */
@@ -27,20 +26,6 @@ const supplementFeatured = (containerArtist: string, parsedFeatured: string[]): 
   if (extras.length === 0 || parts.length === 0) return containerArtist;
   const [primary, ...featured] = parts;
   return composeArtistString(primary.name, [...featured.map((part) => part.name), ...extras]);
-};
-
-/** Resolve an ISO date (YYYY-MM-DD) from music-metadata's `date`/`year` fields. */
-const resolveReleasedOn = (date?: string, year?: number): string | undefined => {
-  if (date) {
-    const parsed = new Date(date);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(0, 10);
-    }
-  }
-  if (year) {
-    return `${year}-01-01`;
-  }
-  return undefined;
 };
 
 /**
@@ -70,12 +55,14 @@ export const extractVideoDuration = (file: File): Promise<number | undefined> =>
   });
 
 /**
- * Extract title/artist/release-date tags from a video container. music-metadata
- * is imported lazily so the parser stays out of initial bundles. Container tags
- * are the preferred source; the file name (parsed via {@link parseVideoFilename})
+ * Extract title/artist tags from a video container. music-metadata is imported
+ * lazily so the parser stays out of initial bundles. Container tags are the
+ * preferred source; the file name (parsed via {@link parseVideoFilename})
  * supplies the cleaned title and artist when tags lack them, and folds in any
  * feat-clause names it finds even when the container already carries an artist.
- * A title is always guaranteed, including when parsing throws.
+ * A title is always guaranteed, including when parsing throws. The release date
+ * is intentionally NOT extracted — the container `date` tag is usually the
+ * encode/export timestamp, so the field is left to the admin or web enrichment.
  */
 export const extractVideoTags = async (file: File): Promise<ExtractedVideoTags> => {
   const parsed = parseVideoFilename(file.name);
@@ -90,8 +77,6 @@ export const extractVideoTags = async (file: File): Promise<ExtractedVideoTags> 
       ? supplementFeatured(common.artist, parsed.featuredArtists)
       : parsedArtist;
     if (artist) tags.artist = artist;
-    const releasedOn = resolveReleasedOn(common.date, common.year);
-    if (releasedOn) tags.releasedOn = releasedOn;
     return tags;
   } catch {
     return { title: parsed.title, ...(parsedArtist ? { artist: parsedArtist } : {}) };
