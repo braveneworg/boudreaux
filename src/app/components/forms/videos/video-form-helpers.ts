@@ -57,8 +57,9 @@ export const mapVideoToFormValues = (video: VideoRow): VideoFormData => ({
 });
 
 /**
- * Pre-populate title/artist/releasedOn/durationSeconds from a freshly-selected
- * file.
+ * Pre-populate title/artist/durationSeconds from a freshly-selected file. The
+ * release date is intentionally not filled from the file — its container date
+ * tag is usually the encode timestamp, so it stays admin/enrichment-driven.
  *
  * Replacing a file (a new file swapped for one already uploaded in create mode,
  * or the stored file in edit mode) re-derives these file-driven details from the
@@ -77,7 +78,7 @@ export const applyVideoPrefill = (
   const values = form.getValues();
   const isReplace = Boolean(values.s3Key);
   const setField = (
-    name: 'title' | 'artist' | 'releasedOn' | 'durationSeconds',
+    name: 'title' | 'artist' | 'durationSeconds',
     current: string | number | undefined,
     value: string | undefined
   ): void => {
@@ -86,7 +87,6 @@ export const applyVideoPrefill = (
   };
   setField('title', values.title, tags.title);
   setField('artist', values.artist, tags.artist);
-  setField('releasedOn', values.releasedOn, tags.releasedOn);
   setField(
     'durationSeconds',
     values.durationSeconds,
@@ -109,7 +109,7 @@ export const applyServerProbePrefill = (
 ): void => {
   const values = form.getValues();
   const setIfEmpty = (
-    name: 'title' | 'artist' | 'releasedOn' | 'description',
+    name: 'title' | 'artist' | 'description',
     current: string | undefined,
     value: string | null
   ): void => {
@@ -119,7 +119,6 @@ export const applyServerProbePrefill = (
   };
   setIfEmpty('title', values.title, tags.title);
   setIfEmpty('artist', values.artist, tags.artist);
-  setIfEmpty('releasedOn', values.releasedOn, tags.releasedOn);
   setIfEmpty('description', values.description, tags.description);
   if (!values.durationSeconds && tags.durationSeconds !== null) {
     form.setValue('durationSeconds', String(tags.durationSeconds), {

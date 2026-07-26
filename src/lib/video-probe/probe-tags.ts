@@ -10,13 +10,14 @@
 export interface ProbePrefillTags {
   title: string | null;
   artist: string | null;
-  /** YYYY-MM-DD — from the `date` tag ONLY; never from encode-time stamps. */
-  releasedOn: string | null;
   /** From `comment` tag, falling back to `description`. */
   description: string | null;
   /** `format.duration` parsed, rounded, must be > 0. */
   durationSeconds: number | null;
 }
+// The release date is deliberately never prefilled from the file: container
+// `date`/`creation_time` tags carry the encode/export timestamp far more often
+// than a real release date. It is set only by the admin or by web enrichment.
 
 // ── Private guards (same pattern as normalize.ts, kept decoupled) ──────────
 
@@ -43,16 +44,6 @@ const lowercaseTags = (tags: Record<string, unknown>): Record<string, unknown> =
 // ── Field parsers ─────────────────────────────────────────────────────────
 
 /**
- * Parse an ISO or bare-year date string to YYYY-MM-DD, else null.
- * "2019" → "2019-01-01"; "2019-08-01" → "2019-08-01"; "not-a-date" → null.
- */
-const parseReleasedOn = (value: string | null): string | null => {
-  if (value === null) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-};
-
-/**
  * Parse ffprobe's duration string ("245.000000") to a rounded positive integer.
  * Zero, negative, non-finite, or non-numeric input → null.
  */
@@ -72,7 +63,6 @@ export const extractProbePrefillTags = (raw: unknown): ProbePrefillTags => {
   const NULL_RESULT: ProbePrefillTags = {
     title: null,
     artist: null,
-    releasedOn: null,
     description: null,
     durationSeconds: null,
   };
@@ -85,12 +75,11 @@ export const extractProbePrefillTags = (raw: unknown): ProbePrefillTags => {
   const rawTags = isRecord(format.tags) ? format.tags : null;
   const tags = rawTags !== null ? lowercaseTags(rawTags) : {};
 
-  const { title: t, artist: a, album_artist: aa, date: d, comment: c, description: desc } = tags;
+  const { title: t, artist: a, album_artist: aa, comment: c, description: desc } = tags;
   const title = asString(t);
   const artist = asString(a) ?? asString(aa);
-  const releasedOn = parseReleasedOn(asString(d));
   const description = asString(c) ?? asString(desc);
   const durationSeconds = parseDuration(format.duration);
 
-  return { title, artist, releasedOn, description, durationSeconds };
+  return { title, artist, description, durationSeconds };
 };

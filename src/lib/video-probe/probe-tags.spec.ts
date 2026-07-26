@@ -8,12 +8,17 @@ import { extractProbePrefillTags, type ProbePrefillTags } from './probe-tags';
 const NULL_TAGS: ProbePrefillTags = {
   title: null,
   artist: null,
-  releasedOn: null,
   description: null,
   durationSeconds: null,
 };
 
 describe('extractProbePrefillTags', () => {
+  // ── Release date is NEVER prefilled from the file (admin/enrichment only) ─
+  it('never emits a release date, even from a container date tag', () => {
+    const raw = { format: { duration: '100.0', tags: { date: '2019-08-01' } } };
+    expect(extractProbePrefillTags(raw)).not.toHaveProperty('releasedOn');
+  });
+
   // ── Case 1: Lowercase MP4-style tags ────────────────────────────────────
   it('extracts all fields from lowercase MP4-style tags', () => {
     const raw = {
@@ -30,7 +35,6 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: 'My Song',
       artist: 'The Band',
-      releasedOn: '2023-06-15',
       description: 'Live performance',
       durationSeconds: 245,
     });
@@ -52,7 +56,6 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: 'Matroska Track',
       artist: 'MKV Artist',
-      releasedOn: '2021-03-20',
       description: 'Festival recording',
       durationSeconds: 181,
     });
@@ -102,67 +105,7 @@ describe('extractProbePrefillTags', () => {
     expect(result.description).toBe('Uppercase description');
   });
 
-  // ── Case 4: creation_time / quicktime date must NOT become releasedOn ───
-  it('returns releasedOn: null when only creation_time is present', () => {
-    const raw = {
-      format: {
-        duration: '60.000000',
-        tags: {
-          creation_time: '2024-01-15T10:30:00.000000Z',
-        },
-      },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBeNull();
-  });
-
-  it('returns releasedOn: null when only com.apple.quicktime.creationdate is present', () => {
-    const raw = {
-      format: {
-        duration: '60.000000',
-        tags: {
-          'com.apple.quicktime.creationdate': '2024-01-15T10:30:00.000000Z',
-        },
-      },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBeNull();
-  });
-
-  it('returns releasedOn: null when only both encode-time tags are present', () => {
-    const raw = {
-      format: {
-        duration: '60.000000',
-        tags: {
-          creation_time: '2024-01-15T10:30:00.000000Z',
-          'com.apple.quicktime.creationdate': '2024-01-15T10:30:00.000000Z',
-        },
-      },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBeNull();
-  });
-
-  // ── Case 5: date parsing ─────────────────────────────────────────────────
-  it('parses bare year "2019" to "2019-01-01"', () => {
-    const raw = {
-      format: { duration: '100.0', tags: { date: '2019' } },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBe('2019-01-01');
-  });
-
-  it('parses full date "2019-08-01" to "2019-08-01"', () => {
-    const raw = {
-      format: { duration: '100.0', tags: { date: '2019-08-01' } },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBe('2019-08-01');
-  });
-
-  it('returns releasedOn: null for unparseable date string', () => {
-    const raw = {
-      format: { duration: '100.0', tags: { date: 'not-a-date' } },
-    };
-    expect(extractProbePrefillTags(raw).releasedOn).toBeNull();
-  });
-
-  // ── Case 6: duration parsing ─────────────────────────────────────────────
+  // ── Case 4: duration parsing ─────────────────────────────────────────────
   it('parses duration "245.000000" to 245', () => {
     const raw = {
       format: { duration: '245.000000', tags: {} },
@@ -190,7 +133,7 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw).durationSeconds).toBeNull();
   });
 
-  // ── Case 7: junk / degenerate input shapes ───────────────────────────────
+  // ── Case 5: junk / degenerate input shapes ───────────────────────────────
   it('returns all-null for null input', () => {
     expect(extractProbePrefillTags(null)).toEqual(NULL_TAGS);
   });
@@ -211,7 +154,7 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags({ format: { tags: 'nope' } })).toEqual(NULL_TAGS);
   });
 
-  // ── Case 8: empty-string tag values count as absent ──────────────────────
+  // ── Case 6: empty-string tag values count as absent ──────────────────────
   it('treats empty-string tag values as null', () => {
     const raw = {
       format: {
@@ -227,7 +170,6 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: null,
       artist: null,
-      releasedOn: null,
       description: null,
       durationSeconds: 100,
     });

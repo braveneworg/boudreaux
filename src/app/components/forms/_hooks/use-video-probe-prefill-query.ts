@@ -13,7 +13,6 @@ import { fetchAndParse } from '@/utils/fetch-and-parse';
 const probePrefillTagsSchema = z.object({
   title: z.string().nullable(),
   artist: z.string().nullable(),
-  releasedOn: z.string().nullable(),
   description: z.string().nullable(),
   durationSeconds: z.number().nullable(),
 });

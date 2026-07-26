@@ -163,13 +163,12 @@ const makeForm = (overrides: Partial<VideoFormData> = {}): UseFormReturn<VideoFo
 const fullTags: ProbePrefillTags = {
   title: 'Probed Title',
   artist: 'Probed Artist',
-  releasedOn: '2023-05-10',
   description: 'A probed description',
   durationSeconds: 245,
 };
 
 describe('applyServerProbePrefill', () => {
-  it('fills empty title, artist, releasedOn, and description from non-null tags', () => {
+  it('fills empty title, artist, and description from non-null tags', () => {
     const form = makeForm();
     applyServerProbePrefill(form, fullTags);
 
@@ -181,21 +180,27 @@ describe('applyServerProbePrefill', () => {
       shouldDirty: true,
       shouldValidate: true,
     });
-    expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2023-05-10', {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
     expect(form.setValue).toHaveBeenCalledWith('description', 'A probed description', {
       shouldDirty: true,
       shouldValidate: true,
     });
   });
 
+  it('never fills the release date from the probe tags', () => {
+    const form = makeForm();
+    applyServerProbePrefill(form, fullTags);
+
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'releasedOn',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
   it('leaves already-populated fields untouched', () => {
     const form = makeForm({
       title: 'User Title',
       artist: 'User Artist',
-      releasedOn: '2020-01-01',
       description: 'User description',
       durationSeconds: '90',
     });
@@ -203,11 +208,6 @@ describe('applyServerProbePrefill', () => {
 
     expect(form.setValue).not.toHaveBeenCalledWith('title', expect.anything(), expect.anything());
     expect(form.setValue).not.toHaveBeenCalledWith('artist', expect.anything(), expect.anything());
-    expect(form.setValue).not.toHaveBeenCalledWith(
-      'releasedOn',
-      expect.anything(),
-      expect.anything()
-    );
     expect(form.setValue).not.toHaveBeenCalledWith(
       'description',
       expect.anything(),
@@ -225,7 +225,6 @@ describe('applyServerProbePrefill', () => {
     applyServerProbePrefill(form, {
       title: null,
       artist: null,
-      releasedOn: null,
       description: null,
       durationSeconds: null,
     });
@@ -240,7 +239,6 @@ describe('applyServerProbePrefill', () => {
     applyServerProbePrefill(form, {
       title: null,
       artist: null,
-      releasedOn: null,
       description: null,
       durationSeconds: 120,
     });
@@ -291,7 +289,6 @@ describe('applyServerProbePrefill', () => {
 const fileTags: ExtractedVideoTags = {
   title: 'Filename Title',
   artist: 'Filename Artist',
-  releasedOn: '2022-03-04',
 };
 
 describe('applyVideoPrefill', () => {
@@ -306,18 +303,25 @@ describe('applyVideoPrefill', () => {
       });
     });
 
-    it('fills an empty artist and releasedOn from the file tags', () => {
-      const form = makeForm({ s3Key: '', artist: '', releasedOn: '' });
+    it('fills an empty artist from the file tags', () => {
+      const form = makeForm({ s3Key: '', artist: '' });
       applyVideoPrefill(form, fileTags, 200);
 
       expect(form.setValue).toHaveBeenCalledWith('artist', 'Filename Artist', {
         shouldDirty: true,
         shouldValidate: true,
       });
-      expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2022-03-04', {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+    });
+
+    it('never fills the release date from the file tags', () => {
+      const form = makeForm({ s3Key: '', releasedOn: '' });
+      applyVideoPrefill(form, fileTags, 200);
+
+      expect(form.setValue).not.toHaveBeenCalledWith(
+        'releasedOn',
+        expect.anything(),
+        expect.anything()
+      );
     });
 
     it('does not clobber a title the admin pre-typed before choosing a file', () => {
@@ -349,14 +353,15 @@ describe('applyVideoPrefill', () => {
       });
     });
 
-    it('overwrites the existing releasedOn from the new file', () => {
+    it('never touches the release date when replacing the file', () => {
       const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', releasedOn: '2010-10-10' });
       applyVideoPrefill(form, fileTags, 200);
 
-      expect(form.setValue).toHaveBeenCalledWith('releasedOn', '2022-03-04', {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+      expect(form.setValue).not.toHaveBeenCalledWith(
+        'releasedOn',
+        expect.anything(),
+        expect.anything()
+      );
     });
 
     it('overwrites the existing duration from the new file', () => {
@@ -381,14 +386,9 @@ describe('applyVideoPrefill', () => {
     });
 
     it('never overwrites a field to an empty value', () => {
-      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', releasedOn: '2010-10-10' });
+      const form = makeForm({ s3Key: 'media/videos/v1/old.mp4', durationSeconds: '90' });
       applyVideoPrefill(form, { title: 'Filename Title' }, undefined);
 
-      expect(form.setValue).not.toHaveBeenCalledWith(
-        'releasedOn',
-        expect.anything(),
-        expect.anything()
-      );
       expect(form.setValue).not.toHaveBeenCalledWith(
         'durationSeconds',
         expect.anything(),

@@ -224,28 +224,21 @@ describe('extractVideoDuration', () => {
 });
 
 describe('extractVideoTags', () => {
-  it('maps title, artist, and an ISO release date', async () => {
+  it('never emits a release date from the container date tag', async () => {
     parseBlobMock.mockResolvedValue({
       common: { title: 'Live at the Venue', artist: 'The Band', date: '2024-03-15' },
+    });
+    await expect(extractVideoTags(videoFile('clip.mp4'))).resolves.not.toHaveProperty('releasedOn');
+  });
+
+  it('maps title and artist from the container tags', async () => {
+    parseBlobMock.mockResolvedValue({
+      common: { title: 'Live at the Venue', artist: 'The Band' },
     });
     await expect(extractVideoTags(videoFile('clip.mp4'))).resolves.toEqual({
       title: 'Live at the Venue',
       artist: 'The Band',
-      releasedOn: '2024-03-15',
     });
-  });
-
-  it('falls back to the year as a January 1st date', async () => {
-    parseBlobMock.mockResolvedValue({ common: { title: 'Session', year: 2019 } });
-    await expect(extractVideoTags(videoFile('clip.mp4'))).resolves.toEqual({
-      title: 'Session',
-      releasedOn: '2019-01-01',
-    });
-  });
-
-  it('omits releasedOn for an invalid date with no year', async () => {
-    parseBlobMock.mockResolvedValue({ common: { title: 'Session', date: 'not-a-date' } });
-    await expect(extractVideoTags(videoFile('clip.mp4'))).resolves.toEqual({ title: 'Session' });
   });
 
   it('derives the title from the filename when tags have none', async () => {

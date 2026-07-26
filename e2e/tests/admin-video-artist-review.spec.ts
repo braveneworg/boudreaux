@@ -228,8 +228,10 @@ test.describe('Admin video — probe-metadata endpoint contract', () => {
     expect(body.ok).toBe(true);
     expect(body.tags?.title).toBe('E2E Probe Title');
     expect(body.tags?.artist).toBe('E2E Probe Artist');
-    // date tag '2019-08-01' → releasedOn after parseReleasedOn (ISO truncation).
-    expect(body.tags?.releasedOn).toBe('2019-08-01');
+    // The release date is never derived from the file's date/creation tags —
+    // the endpoint omits it even though the fixture carries a '2019-08-01' date
+    // tag (the field is admin/enrichment-driven only).
+    expect(body.tags?.releasedOn).toBeUndefined();
     // comment tag 'E2E probe description' → description (primary, falls back from comment).
     expect(body.tags?.description).toBe('E2E probe description');
     expect(body.tags?.durationSeconds).toBe(245);
