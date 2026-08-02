@@ -81,7 +81,7 @@ export const ZinePanel = ({
   <section
     data-slot="zine-panel"
     className={cn(
-      'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-t-2 border-l-2 border-black',
+      'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-2 border-black',
       ACCENT_CLASS.get(accent),
       className
     )}
