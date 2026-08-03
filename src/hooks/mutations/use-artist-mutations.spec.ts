@@ -7,6 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { deleteArtistAction } from '@/lib/actions/delete-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
@@ -17,6 +18,7 @@ import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 import {
   useArchiveArtistMutation,
   useCreateArtistMutation,
+  useDeleteArtistMutation,
   usePublishArtistMutation,
   useRestoreArtistMutation,
   useUpdateArtistMutation,
@@ -33,6 +35,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/actions/create-artist-action', () => ({ createArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/update-artist-action', () => ({ updateArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/archive-artist-action', () => ({ archiveArtistAction: vi.fn() }));
+vi.mock('@/lib/actions/delete-artist-action', () => ({ deleteArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/publish-artist-action', () => ({ publishArtistAction: vi.fn() }));
 vi.mock('@/lib/actions/restore-artist-action', () => ({ restoreArtistAction: vi.fn() }));
 
@@ -214,6 +217,34 @@ describe('useRestoreArtistMutation', () => {
 
   it('does not invalidate when the action reports failure', async () => {
     const opts = getOptions(useRestoreArtistMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDeleteArtistMutation', () => {
+  it('calls deleteArtistAction with the artist id', async () => {
+    vi.mocked(deleteArtistAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ artistId: string }>(useDeleteArtistMutation);
+
+    await opts.mutationFn({ artistId: 'a1' });
+
+    expect(deleteArtistAction).toHaveBeenCalledWith('a1');
+  });
+
+  it('invalidates artist and release caches on success', async () => {
+    const opts = getOptions(useDeleteArtistMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
+  });
+
+  it('does not invalidate when the action reports failure', async () => {
+    const opts = getOptions(useDeleteArtistMutation);
 
     await opts.onSuccess({ success: false }, {});
 

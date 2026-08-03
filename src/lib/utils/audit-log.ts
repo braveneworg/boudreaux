@@ -28,6 +28,7 @@ export type AuditEvent =
   | 'media.artist.archived'
   | 'media.artist.restored'
   | 'media.artist.published'
+  | 'media.artist.deleted'
   | 'media.featured_artist.created'
   | 'media.featured_artist.updated'
   | 'media.featured_artist.deleted'

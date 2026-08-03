@@ -262,13 +262,91 @@ describe('ArtistRepository', () => {
   });
 
   describe('delete', () => {
-    it('deletes an artist by id', async () => {
-      vi.mocked(prisma.artist.delete).mockResolvedValue({ id: 'a' } as never);
+    const buildDeleteTx = () => ({
+      artistMember: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistLabel: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistRelease: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistFeaturedArtist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistUrl: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistBioImage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistBioLink: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      videoArtist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      image: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      url: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artist: { delete: vi.fn().mockResolvedValue({ id: 'a' }) },
+    });
+
+    it('deletes an artist by id inside a single transaction', async () => {
+      const tx = buildDeleteTx();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
 
       const result = await ArtistRepository.delete('a');
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.delete).toHaveBeenCalledWith({ where: { id: 'a' } });
+      expect(tx.artist.delete).toHaveBeenCalledWith({ where: { id: 'a' } });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('deletes the join rows scoped to the artist first', async () => {
+      const tx = buildDeleteTx();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.delete('a');
+
+      const byArtist = { where: { artistId: 'a' } };
+      expect(tx.artistLabel.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.artistRelease.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.artistFeaturedArtist.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.artistUrl.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.artistBioImage.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.artistBioLink.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.videoArtist.deleteMany).toHaveBeenCalledWith(byArtist);
+    });
+
+    it('deletes band-membership rows in both directions', async () => {
+      const tx = buildDeleteTx();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.delete('a');
+
+      expect(tx.artistMember.deleteMany).toHaveBeenCalledWith({
+        where: { OR: [{ artistId: 'a' }, { memberId: 'a' }] },
+      });
+    });
+
+    it('deletes artist-scoped gallery images and urls', async () => {
+      const tx = buildDeleteTx();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.delete('a');
+
+      const byArtist = { where: { artistId: 'a' } };
+      expect(tx.image.deleteMany).toHaveBeenCalledWith(byArtist);
+      expect(tx.url.deleteMany).toHaveBeenCalledWith(byArtist);
+    });
+
+    it('removes every related row before the artist row', async () => {
+      const tx = buildDeleteTx();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.delete('a');
+
+      const artistOrder = tx.artist.delete.mock.invocationCallOrder[0];
+      const relatedOrders = [
+        tx.artistMember.deleteMany,
+        tx.artistLabel.deleteMany,
+        tx.artistRelease.deleteMany,
+        tx.artistFeaturedArtist.deleteMany,
+        tx.artistUrl.deleteMany,
+        tx.artistBioImage.deleteMany,
+        tx.artistBioLink.deleteMany,
+        tx.videoArtist.deleteMany,
+        tx.image.deleteMany,
+        tx.url.deleteMany,
+      ].map((mock) => mock.mock.invocationCallOrder[0]);
+      expect(relatedOrders.map((order) => order < artistOrder)).toEqual(
+        Array.from({ length: 10 }, () => true)
+      );
     });
   });
 
