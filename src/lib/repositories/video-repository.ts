@@ -281,9 +281,21 @@ export class VideoRepository {
     return result.count > 0;
   }
 
-  /** Hard-delete a video by id. */
+  /**
+   * Hard-delete a video by id, removing its join rows (artist credits,
+   * producer credits, enrichment suggestions) in the same transaction first.
+   * Prisma emulates `onDelete: Restrict` on MongoDB, so a bare `video.delete`
+   * throws while any row still references the video.
+   */
   static async delete(id: string): Promise<Video> {
-    return runQuery(() => prisma.video.delete({ where: { id } }));
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.videoArtist.deleteMany({ where: { videoId: id } });
+        await tx.videoProducer.deleteMany({ where: { videoId: id } });
+        await tx.videoEnrichmentSuggestion.deleteMany({ where: { videoId: id } });
+        return tx.video.delete({ where: { id } });
+      })
+    );
   }
 
   /**

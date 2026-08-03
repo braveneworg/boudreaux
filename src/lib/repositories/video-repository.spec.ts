@@ -12,19 +12,27 @@ import { VideoRepository, type VideoSummary } from './video-repository';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    video: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-      updateMany: vi.fn(),
+vi.mock('@/lib/prisma', () => {
+  const video = {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
+    updateMany: vi.fn(),
+  };
+  const videoArtist = { deleteMany: vi.fn() };
+  const videoProducer = { deleteMany: vi.fn() };
+  const videoEnrichmentSuggestion = { deleteMany: vi.fn() };
+  const tx = { video, videoArtist, videoProducer, videoEnrichmentSuggestion };
+  return {
+    prisma: {
+      ...tx,
+      $transaction: vi.fn(async (fn: (txClient: typeof tx) => Promise<unknown>) => fn(tx)),
     },
-  },
-}));
+  };
+});
 
 describe('VideoRepository', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -454,6 +462,42 @@ describe('VideoRepository', () => {
 
       expect(result).toEqual(mockVideo);
       expect(prisma.video.delete).toHaveBeenCalledWith({ where: { id: 'video-123' } });
+    });
+
+    it('deletes the join rows scoped to the video', async () => {
+      vi.mocked(prisma.video.delete).mockResolvedValue(mockVideo as never);
+
+      await VideoRepository.delete('video-123');
+
+      const byVideo = { where: { videoId: 'video-123' } };
+      expect(prisma.videoArtist.deleteMany).toHaveBeenCalledWith(byVideo);
+      expect(prisma.videoProducer.deleteMany).toHaveBeenCalledWith(byVideo);
+      expect(prisma.videoEnrichmentSuggestion.deleteMany).toHaveBeenCalledWith(byVideo);
+    });
+
+    it('removes every join row before the video row', async () => {
+      vi.mocked(prisma.video.delete).mockResolvedValue(mockVideo as never);
+
+      await VideoRepository.delete('video-123');
+
+      const artistOrder = vi.mocked(prisma.videoArtist.deleteMany).mock.invocationCallOrder[0];
+      const producerOrder = vi.mocked(prisma.videoProducer.deleteMany).mock.invocationCallOrder[0];
+      const suggestionOrder = vi.mocked(prisma.videoEnrichmentSuggestion.deleteMany).mock
+        .invocationCallOrder[0];
+      const videoOrder = vi.mocked(prisma.video.delete).mock.invocationCallOrder[0];
+      expect([
+        artistOrder < videoOrder,
+        producerOrder < videoOrder,
+        suggestionOrder < videoOrder,
+      ]).toEqual([true, true, true]);
+    });
+
+    it('runs the cascade inside a single transaction', async () => {
+      vi.mocked(prisma.video.delete).mockResolvedValue(mockVideo as never);
+
+      await VideoRepository.delete('video-123');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 
