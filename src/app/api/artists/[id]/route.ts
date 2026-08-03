@@ -119,28 +119,5 @@ export const PATCH = withAdmin(
   }
 );
 
-/**
- * DELETE /api/artist/[id]
- * Delete an artist by ID (hard delete)
- */
-export const DELETE = withAdmin(
-  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-
-      const result = await ArtistService.deleteArtist(id);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json({ message: 'Artist deleted successfully', data: result.data });
-    } catch (error) {
-      loggers.media.error('Artist DELETE error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);
+// Hard delete moved to the `deleteArtistAction` Server Action (mutations are
+// Server Actions per src/AGENTS.md); this route serves reads and form updates.

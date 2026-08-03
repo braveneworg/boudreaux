@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 
 import { ArtistService } from '@/lib/services/artist-service';
 
-import { GET, PUT, PATCH, DELETE } from './route';
+import { GET, PUT, PATCH } from './route';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -472,104 +472,6 @@ describe('Artist by ID API Routes', () => {
       expect(ArtistService.updateArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         genres: 'Rock',
       });
-    });
-  });
-
-  describe('DELETE /api/artists/[id]', () => {
-    it('should delete an artist successfully', async () => {
-      vi.mocked(ArtistService.deleteArtist).mockResolvedValue({
-        success: true,
-        data: mockArtist as never,
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ message: 'Artist deleted successfully', data: mockArtist });
-      expect(ArtistService.deleteArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
-    });
-
-    it('should return 404 when artist not found', async () => {
-      vi.mocked(ArtistService.deleteArtist).mockResolvedValue({
-        success: false,
-        error: 'Artist not found',
-        code: 'NOT_FOUND',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/artists/507f1f77bcf86cd799439012',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439012'));
-      const data = await response.json();
-
-      expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Artist not found' });
-    });
-
-    it('should return 503 when database is unavailable', async () => {
-      vi.mocked(ArtistService.deleteArtist).mockResolvedValue({
-        success: false,
-        error: 'Database unavailable',
-        code: 'UNAVAILABLE',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(503);
-      expect(data).toEqual({ error: 'Database unavailable' });
-    });
-
-    it('should return 500 for other service errors', async () => {
-      vi.mocked(ArtistService.deleteArtist).mockResolvedValue({
-        success: false,
-        error: 'Failed to delete artist',
-        code: 'UNKNOWN',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to delete artist' });
-    });
-
-    it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(ArtistService.deleteArtist).mockRejectedValue(Error('Unexpected error'));
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal server error' });
     });
   });
 });
