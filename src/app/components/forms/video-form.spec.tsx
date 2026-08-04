@@ -9,6 +9,8 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
+import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
@@ -44,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   buildArtistDetails: vi.fn(),
   updateDraft: vi.fn(),
   useVideoDraft: vi.fn(),
+  getPosterDraftFields: vi.fn(),
   /** Overridable per-test poster-upload behaviour; default replays the real hook. */
   posterUploadImpl: vi.fn(),
 }));
@@ -145,7 +148,8 @@ vi.mock('@/app/components/forms/videos/use-video-poster-upload', () => ({
         setIsUploading(false);
       }
     };
-    return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster };
+    const clearUploadedPoster = (): void => setUploadedPosterUrl(null);
+    return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster, clearUploadedPoster };
   },
 }));
 
@@ -156,6 +160,21 @@ vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
 vi.mock('@/app/components/forms/videos/use-video-draft', () => ({
   useVideoDraft: (...args: unknown[]) => mocks.useVideoDraft(...args),
 }));
+
+// Delegate to the REAL strip hook — every other poster test keeps exercising it
+// — and swap only `getPosterDraftFields` for a sentinel-returning spy, so the
+// `getPosterFields` seam handed to the (wholesale-mocked) draft hook can be
+// asserted end to end.
+vi.mock('@/app/components/forms/videos/use-video-poster-strip', async (importOriginal) => {
+  const actual = await importOriginal<typeof videoPosterStrip>();
+  const useStubbedDraftFieldsStrip = (
+    args: Parameters<typeof actual.useVideoPosterStrip>[0]
+  ): ReturnType<typeof actual.useVideoPosterStrip> => ({
+    ...actual.useVideoPosterStrip(args),
+    getPosterDraftFields: mocks.getPosterDraftFields,
+  });
+  return { ...actual, useVideoPosterStrip: useStubbedDraftFieldsStrip };
+});
 
 vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
   VideoArtistReviewSection: ({
@@ -307,6 +326,11 @@ const fillRequiredFields = async (user: ReturnType<typeof userEvent.setup>): Pro
 
 const PROBE_IDLE_RESULT = { data: undefined, isPending: false, isError: false };
 
+/** Identity-checkable stand-in for whatever the strip hook hands the draft. */
+const POSTER_DRAFT_FIELDS: DraftPosterFields = {
+  posterUrl: 'https://cdn.example.com/sentinel-poster.jpg',
+};
+
 beforeEach(() => {
   mocks.useVideoQuery.mockReturnValue(CREATE_MODE_QUERY);
   mocks.useVideoProbePrefillQuery.mockReturnValue(PROBE_IDLE_RESULT);
@@ -323,6 +347,7 @@ beforeEach(() => {
     buildArtistDetails: mocks.buildArtistDetails,
   });
   mocks.useVideoDraft.mockReturnValue({ draftId: null, handleUploadComplete: vi.fn() });
+  mocks.getPosterDraftFields.mockResolvedValue(POSTER_DRAFT_FIELDS);
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
     fields: {},
@@ -837,6 +862,94 @@ describe('VideoForm — edit mode', () => {
   });
 });
 
+describe('VideoForm — draft poster-fields seam', () => {
+  it('resolves the strip hook fields through the getPosterFields handed to the draft hook', async () => {
+    render(<VideoForm />);
+
+    const [draftArgs] = mocks.useVideoDraft.mock.calls[0] as [
+      { getPosterFields: () => Promise<DraftPosterFields> },
+    ];
+
+    // Identity, not shape: only the live ref wiring can return this object.
+    await expect(draftArgs.getPosterFields()).resolves.toBe(POSTER_DRAFT_FIELDS);
+  });
+});
+
+describe('VideoForm — reset on a refetched video row', () => {
+  const asVideoRow = (video: unknown) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: video,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  /** What an instant poster pick produces: same row id, new object identity. */
+  const refetchedRow = {
+    ...editVideo,
+    title: 'Server Title',
+    description: 'Server description',
+    posterUrl: 'https://cdn.example.com/candidate-3.jpg',
+  };
+
+  const typeUnsavedTitle = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.clear(screen.getByLabelText('Title'));
+    await user.type(screen.getByLabelText('Title'), 'Unsaved Title');
+  };
+
+  it('keeps an unsaved title edit when the row is refetched', async () => {
+    asVideoRow(editVideo);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await typeUnsavedTitle(user);
+    asVideoRow(refetchedRow);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Unsaved Title'));
+  });
+
+  it('takes the refetched server value for a field the admin has not touched', async () => {
+    asVideoRow(editVideo);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await typeUnsavedTitle(user);
+    asVideoRow(refetchedRow);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('Server description')
+    );
+  });
+
+  it('fully populates a pristine form on the first load', async () => {
+    asVideoRow(editVideo);
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('An existing description')
+    );
+  });
+
+  it('keeps a field written before the query settled — the accepted keepDirtyValues trade-off', async () => {
+    // Documented semantic side effect of `keepDirtyValues`: anything written
+    // with `shouldDirty: true` while the row was still in flight now survives
+    // the load reset instead of being replaced by the server value.
+    asVideoRow(null);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await user.type(screen.getByLabelText('Title'), 'Typed Before Load');
+    asVideoRow(editVideo);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Typed Before Load'));
+  });
+});
+
 describe('VideoForm — poster', () => {
   it('shows the uploaded poster preview after a manual upload succeeds', async () => {
     const user = setup();
@@ -979,6 +1092,58 @@ describe('VideoForm — stored poster candidates on an edit visit', () => {
         'src',
         'https://cdn.example.com/existing-poster.jpg'
       )
+    );
+  });
+
+  it('drops a session manual poster so the preview follows the picked frame', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    // A manual upload takes display precedence over the stored strip…
+    await screen.findByRole('radio', { name: 'Frame at 6.5s' });
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    // …until a thumb is picked and persists, which must win the preview back.
+    await user.click(screen.getByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/candidate-3.jpg'
+      )
+    );
+  });
+
+  it('keeps the session manual poster in the preview when the pick fails', async () => {
+    asEditModeWithCandidates();
+    mocks.selectVideoPosterAsync.mockResolvedValue({ success: false, error: 'boom' });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await screen.findByRole('radio', { name: 'Frame at 6.5s' });
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalled());
+    expect(screen.getByAltText('Video poster')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/poster.jpg'
     );
   });
 

@@ -110,9 +110,11 @@ const PosterCandidateStrip = ({
  * candidates on a later edit visit. Picking is instant: the parent persists
  * the choice as soon as a row exists, and otherwise Save auto-commits the
  * visible candidate, so there is no explicit commit button. The manual picker
- * shares the same presign + PUT path and hides the strip for the rest of the
- * session once used (a stored strip returns on the next visit, with no thumb
- * highlighted). The form submits fine without any poster.
+ * shares the same presign + PUT path; while its upload is the displayed poster
+ * it hides a strip of frames captured this session, but a stored strip stays
+ * visible (with no thumb highlighted) so a saved frame can still be picked back
+ * — and the parent forgets the session upload once such a pick persists, handing
+ * the preview to the picked frame. The form submits fine without any poster.
  */
 export const VideoPosterSection = ({
   control,

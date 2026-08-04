@@ -28,6 +28,12 @@ export interface UseVideoPosterStripArgs {
   isPersisted: boolean;
   effectiveVideoId: string | undefined;
   preGeneratedId: string;
+  /**
+   * Called only after a pick has actually persisted. `VideoForm` uses it to
+   * forget a poster uploaded this session, whose display precedence would
+   * otherwise keep the preview on the manual image the pick just replaced.
+   */
+  onPosterPersisted?: () => void;
 }
 
 export interface UseVideoPosterStripResult {
@@ -99,6 +105,7 @@ export const useVideoPosterStrip = ({
   isPersisted,
   effectiveVideoId,
   preGeneratedId,
+  onPosterPersisted,
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
   const [freshSelectedIndex, setFreshSelectedIndex] = useState(0);
@@ -133,13 +140,14 @@ export const useVideoPosterStrip = ({
       const previousPosterUrl = form.getValues('posterUrl') ?? '';
       form.setValue('posterUrl', candidateUrl, { shouldDirty: false });
       if (await didPersistPoster(selectVideoPosterAsync, effectiveVideoId, candidateUrl)) {
+        onPosterPersisted?.();
         toast.success('Poster updated.');
         return;
       }
       form.setValue('posterUrl', previousPosterUrl, { shouldDirty: false });
       toast.error('Could not set the poster — try again.');
     },
-    [effectiveVideoId, form, selectVideoPosterAsync]
+    [effectiveVideoId, form, selectVideoPosterAsync, onPosterPersisted]
   );
 
   const handleSelectCandidate = useCallback(

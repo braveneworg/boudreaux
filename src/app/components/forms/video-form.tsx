@@ -172,11 +172,18 @@ interface UseVideoFormResetArgs {
 /**
  * Resets the form to the loaded video's values once the query settles.
  * Extracted to keep `VideoForm` under the ESLint complexity cap.
+ *
+ * `keepDirtyValues` because this runs on every new `video` identity, not just
+ * the first load: an instant poster pick invalidates the video query, and the
+ * refetched row would otherwise wipe whatever the admin has typed but not yet
+ * saved. Accepted trade-off — a field written with `shouldDirty: true` before
+ * the query settles (a probe/enrichment prefill) also survives the load reset
+ * instead of taking the server value.
  */
 const useVideoFormReset = ({ isEditMode, video, form }: UseVideoFormResetArgs): void => {
   useEffect(() => {
     if (isEditMode && video) {
-      form.reset(mapVideoToFormValues(video));
+      form.reset(mapVideoToFormValues(video), { keepDirtyValues: true });
     }
   }, [isEditMode, video, form]);
 };
@@ -332,14 +339,20 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   });
 
   const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
+  // Owned by the form (not the section) so Save can auto-commit the visible
+  // candidate frame before submit and the footer can gate on the in-flight PUT.
+  const poster = useVideoPosterUpload({ preGeneratedId, setValue });
   // Owns the candidate strip: fresh capture this session, else the row's stored
-  // candidates; a pick persists instantly once isPersisted.
+  // candidates; a pick persists instantly once isPersisted. A persisted pick
+  // drops any poster uploaded this session, so the preview follows the pick
+  // instead of staying on the out-ranking manual image.
   const posterStrip = useVideoPosterStrip({
     form,
     video,
     isPersisted,
     effectiveVideoId,
     preGeneratedId,
+    onPosterPersisted: poster.clearUploadedPoster,
   });
   useEffect(() => {
     getPosterDraftFieldsRef.current = posterStrip.getPosterDraftFields;
@@ -351,9 +364,6 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     onPosterCandidates: posterStrip.handlePosterCandidates,
     onUploadComplete: handleUploadComplete,
   });
-  // Owned by the form (not the section) so Save can auto-commit the visible
-  // candidate frame before submit and the footer can gate on the in-flight PUT.
-  const poster = useVideoPosterUpload({ preGeneratedId, setValue });
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
   useReleaseDateAutoFill({ uploadStatus: upload.status, form });

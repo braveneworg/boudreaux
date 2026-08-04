@@ -22,13 +22,17 @@ export interface UseVideoPosterUploadResult {
   isUploading: boolean;
   errorMessage: string | null;
   uploadPoster: (file: File) => Promise<void>;
+  /** Forget this session's upload so it stops out-ranking the live `posterUrl`. */
+  clearUploadedPoster: () => void;
 }
 
 /**
  * Presign-and-PUT flow for a video poster image. Replace-only: a success writes
  * the hidden `posterUrl` field and remembers the CDN URL; a failure leaves the
  * existing value untouched and surfaces an inline message. There is deliberately
- * no clear/remove operation.
+ * no poster-REMOVE operation — `clearUploadedPoster` only drops this session's
+ * display precedence (so a later candidate pick can own the preview) and never
+ * touches the persisted `posterUrl`.
  */
 export const useVideoPosterUpload = ({
   preGeneratedId,
@@ -65,5 +69,7 @@ export const useVideoPosterUpload = ({
     [preGeneratedId, setValue]
   );
 
-  return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster };
+  const clearUploadedPoster = useCallback((): void => setUploadedPosterUrl(null), []);
+
+  return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster, clearUploadedPoster };
 };

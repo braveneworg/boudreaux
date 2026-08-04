@@ -70,11 +70,14 @@ interface RenderStripOptions {
   /** Seeds the form's `posterUrl`; omitted leaves the field unset entirely. */
   posterUrl?: string;
   storedCandidates?: VideoPosterCandidate[];
+  onPosterPersisted?: () => void;
 }
 
 interface StripHarness {
   strip: UseVideoPosterStripResult;
   form: UseFormReturn<VideoFormData>;
+  /** Read during render — RHF's `formState` only tracks what a render subscribes to. */
+  isDirty: boolean;
 }
 
 /** A video row carrying only the fields the strip hook reads. */
@@ -90,6 +93,7 @@ const renderStrip = ({
   effectiveVideoId,
   posterUrl,
   storedCandidates,
+  onPosterPersisted,
 }: RenderStripOptions = {}): { current: StripHarness } => {
   const { result } = renderHook(() => {
     const form = useForm<VideoFormData>({ defaultValues: { posterUrl } });
@@ -99,8 +103,9 @@ const renderStrip = ({
       isPersisted,
       effectiveVideoId,
       preGeneratedId: VIDEO_ID,
+      onPosterPersisted,
     });
-    return { form, strip };
+    return { form, strip, isDirty: form.formState.isDirty };
   });
   return result;
 };
@@ -258,6 +263,18 @@ describe('useVideoPosterStrip — selecting after a row exists', () => {
     expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Could not set the poster — try again.');
   });
 
+  it('leaves the form pristine — the optimistic write must not dirty it', async () => {
+    // Load-bearing: `VideoForm`'s reset keeps dirty values across a refetch, so
+    // a dirtied `posterUrl` would survive (and re-submit) a reverted pick.
+    mocks.alignedNow = UPLOADED;
+    const harness = renderStrip({ isPersisted: true, effectiveVideoId: VIDEO_ID });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(harness.current.isDirty).toBe(false);
+  });
+
   it('reverts the optimistic poster when the mutation throws', async () => {
     mocks.alignedNow = UPLOADED;
     mocks.selectVideoPosterAsync.mockRejectedValue(new Error('network down'));
@@ -358,6 +375,37 @@ describe('useVideoPosterStrip — stored candidates on revisit', () => {
     await act(async () => harness.current.strip.handleSelectCandidate(2));
 
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Poster updated.');
+  });
+});
+
+describe('useVideoPosterStrip — persisted-pick notification', () => {
+  /** A session manual poster is live, so the caller must be told to drop it. */
+  const renderWithCallback = (onPosterPersisted: () => void): { current: StripHarness } =>
+    renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      storedCandidates: UPLOADED,
+      posterUrl: MANUAL_POSTER_URL,
+      onPosterPersisted,
+    });
+
+  it('notifies the caller once a pick has persisted', async () => {
+    const onPosterPersisted = vi.fn();
+    const harness = renderWithCallback(onPosterPersisted);
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(onPosterPersisted).toHaveBeenCalledTimes(1);
+  });
+
+  it('never notifies the caller when the persist fails', async () => {
+    mocks.selectVideoPosterAsync.mockResolvedValue({ success: false, error: 'boom' });
+    const onPosterPersisted = vi.fn();
+    const harness = renderWithCallback(onPosterPersisted);
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(onPosterPersisted).not.toHaveBeenCalled();
   });
 });
 
