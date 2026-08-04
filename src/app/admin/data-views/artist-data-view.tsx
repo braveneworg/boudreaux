@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 
 import {
   useArchiveArtistMutation,
+  useDeleteArtistMutation,
   usePublishArtistMutation,
   useRestoreArtistMutation,
 } from '@/hooks/mutations/use-artist-mutations';
@@ -22,6 +23,7 @@ export const ArtistDataView = () => {
   const { publishArtistAsync } = usePublishArtistMutation();
   const { archiveArtistAsync } = useArchiveArtistMutation();
   const { restoreArtistAsync } = useRestoreArtistMutation();
+  const { deleteArtistAsync } = useDeleteArtistMutation();
   const fieldsToShow = [
     'firstName',
     'middleName',
@@ -79,6 +81,7 @@ export const ArtistDataView = () => {
         publish: (id) => publishArtistAsync({ artistId: id }),
         delete: (id) => archiveArtistAsync({ artistId: id }),
         restore: (id) => restoreArtistAsync({ artistId: id }),
+        hardDelete: (id) => deleteArtistAsync({ artistId: id }),
       }}
       refetch={refetch}
       isPending={isPending}

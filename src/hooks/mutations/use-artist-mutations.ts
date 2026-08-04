@@ -5,6 +5,7 @@
 
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { deleteArtistAction } from '@/lib/actions/delete-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
@@ -100,4 +101,20 @@ export const useRestoreArtistMutation = () => {
   >(({ artistId }) => restoreArtistAction(artistId), invalidateArtistQueries);
 
   return { restoreArtist: mutate, restoreArtistAsync: mutateAsync, isRestoringArtist: isPending };
+};
+
+/**
+ * Mutation hook wrapping {@link deleteArtistAction} (a hard delete — the
+ * repository cascade removes the artist row plus every referencing row, and
+ * gallery images are best-effort deleted from S3). The admin list offers this
+ * only on archived rows, behind a confirmation dialog. Invalidates the
+ * artist/release caches on a successful result.
+ */
+export const useDeleteArtistMutation = () => {
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { artistId: string }
+  >(({ artistId }) => deleteArtistAction(artistId), invalidateArtistQueries);
+
+  return { deleteArtist: mutate, deleteArtistAsync: mutateAsync, isDeletingArtist: isPending };
 };

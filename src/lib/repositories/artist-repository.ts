@@ -409,9 +409,32 @@ export class ArtistRepository {
     ) as Promise<Artist>;
   }
 
-  /** Hard-delete an artist by id. */
+  /**
+   * Hard-delete an artist by id, removing every row that references it in the
+   * same transaction first: catalog joins (labels, releases, featured-artist
+   * links, urls, bio images/links, video credits), band memberships in both
+   * directions, and artist-scoped gallery Image/Url rows. Prisma emulates
+   * `onDelete: Restrict` on MongoDB, so a bare `artist.delete` throws while
+   * any required back-relation row still references the artist.
+   * (`TourDateHeadliner` declares `onDelete: Cascade` and is emulated by the
+   * client on the final delete.)
+   */
   static async delete(id: string): Promise<ArtistScalars> {
-    return runQuery(() => prisma.artist.delete({ where: { id } })) as Promise<ArtistScalars>;
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.artistMember.deleteMany({ where: { OR: [{ artistId: id }, { memberId: id }] } });
+        await tx.artistLabel.deleteMany({ where: { artistId: id } });
+        await tx.artistRelease.deleteMany({ where: { artistId: id } });
+        await tx.artistFeaturedArtist.deleteMany({ where: { artistId: id } });
+        await tx.artistUrl.deleteMany({ where: { artistId: id } });
+        await tx.artistBioImage.deleteMany({ where: { artistId: id } });
+        await tx.artistBioLink.deleteMany({ where: { artistId: id } });
+        await tx.videoArtist.deleteMany({ where: { artistId: id } });
+        await tx.image.deleteMany({ where: { artistId: id } });
+        await tx.url.deleteMany({ where: { artistId: id } });
+        return tx.artist.delete({ where: { id } });
+      })
+    ) as Promise<ArtistScalars>;
   }
 
   /** Soft-delete (archive) an artist by setting deletedOn to now. */

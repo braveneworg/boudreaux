@@ -194,6 +194,106 @@ describe('DataView entity mutations', () => {
     await waitFor(() => expect(onRestoreEntity).toHaveBeenCalledWith('a-2'));
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Successfully restored artist - Joe Doe');
   });
+
+  it('offers Delete Forever on an archived row when a hard delete is wired', () => {
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: {
+        publish: okMutation,
+        delete: okMutation,
+        restore: okMutation,
+        hardDelete: okMutation,
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete Forever' })).toBeInTheDocument();
+  });
+
+  it('does not offer Delete Forever when no hard delete is wired', () => {
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: { publish: okMutation, delete: okMutation, restore: okMutation },
+    });
+
+    expect(screen.queryByRole('button', { name: 'Delete Forever' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer Delete Forever on an active row', () => {
+    renderDataView({
+      data: { artists: [activeArtist] },
+      mutations: {
+        publish: okMutation,
+        delete: okMutation,
+        restore: okMutation,
+        hardDelete: okMutation,
+      },
+    });
+
+    expect(screen.queryByRole('button', { name: 'Delete Forever' })).not.toBeInTheDocument();
+  });
+
+  it('permanently deletes an archived entity after confirmation and toasts success', async () => {
+    const onHardDeleteEntity = vi.fn(() => Promise.resolve({ success: true }));
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: {
+        publish: okMutation,
+        delete: okMutation,
+        restore: okMutation,
+        hardDelete: onHardDeleteEntity,
+      },
+    });
+
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Delete Forever' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(onHardDeleteEntity).toHaveBeenCalledWith('a-2'));
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
+      'Successfully permanently deleted artist - Joe Doe'
+    );
+  });
+
+  it('warns that a permanent delete cannot be undone before confirming', async () => {
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: {
+        publish: okMutation,
+        delete: okMutation,
+        restore: okMutation,
+        hardDelete: okMutation,
+      },
+    });
+
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Delete Forever' }));
+
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
+  });
+
+  it('toasts the error when a hard delete reports failure', async () => {
+    const onHardDeleteEntity = vi.fn(() => Promise.resolve({ success: false, error: 'Boom' }));
+    renderDataView({
+      data: { artists: [deletedArtist] },
+      mutations: {
+        publish: okMutation,
+        delete: okMutation,
+        restore: okMutation,
+        hardDelete: onHardDeleteEntity,
+      },
+    });
+
+    const user = setup();
+    await user.click(screen.getByRole('button', { name: 'Delete Forever' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        'Failed to permanently delete artist: Boom'
+      )
+    );
+  });
 });
 
 describe('DataView card rendering', () => {

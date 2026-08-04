@@ -24,10 +24,15 @@ export interface EntityMutations {
   delete: EntityMutation;
   /** Restores a soft-deleted entity. Omitted for hard-delete-only entities. */
   restore?: EntityMutation;
+  /**
+   * Permanently deletes a soft-deleted entity. When wired, archived rows offer
+   * a "Delete Forever" action beside Restore, behind its own confirmation.
+   */
+  hardDelete?: EntityMutation;
 }
 
 /** Past-tense verb describing a completed mutation, used in toast copy. */
-export type MutationVerb = 'publish' | 'delete' | 'restore';
+export type MutationVerb = 'publish' | 'delete' | 'restore' | 'hardDelete';
 
 /** Controlled search + visibility filters surfaced by the DataView toolbar. */
 export interface DataViewFilters {

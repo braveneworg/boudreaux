@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 
 import type { DataViewFilters } from '@/app/admin/data-views/data-view-types';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
+import { deleteArtistAction } from '@/lib/actions/delete-artist-action';
 import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 
@@ -45,12 +46,16 @@ vi.mock('@/lib/actions/archive-artist-action', () => ({
 vi.mock('@/lib/actions/restore-artist-action', () => ({
   restoreArtistAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
+vi.mock('@/lib/actions/delete-artist-action', () => ({
+  deleteArtistAction: vi.fn(() => Promise.resolve({ success: true })),
+}));
 
 type EntityMutation = (id: string) => Promise<{ success: boolean; error?: string }>;
 type EntityMutations = {
   publish: EntityMutation;
   delete: EntityMutation;
   restore?: EntityMutation;
+  hardDelete?: EntityMutation;
 };
 
 interface DataViewMockProps {
@@ -107,6 +112,13 @@ vi.mock('./data-view', () => ({
           onClick={() => void mutations.restore?.('artist-1')}
         >
           restore
+        </button>
+        <button
+          type="button"
+          data-testid="invoke-hard-delete"
+          onClick={() => void mutations.hardDelete?.('artist-1')}
+        >
+          hard delete
         </button>
       </div>
     );
@@ -196,6 +208,17 @@ describe('ArtistDataView', () => {
       expect(publishArtistAction).toHaveBeenCalledWith('artist-1');
       expect(archiveArtistAction).toHaveBeenCalledWith('artist-1');
       expect(restoreArtistAction).toHaveBeenCalledWith('artist-1');
+    });
+  });
+
+  it('wires the hard delete to deleteArtistAction', async () => {
+    mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+
+    render(<ArtistDataView />);
+    fireEvent.click(screen.getByTestId('invoke-hard-delete'));
+
+    await waitFor(() => {
+      expect(deleteArtistAction).toHaveBeenCalledWith('artist-1');
     });
   });
 

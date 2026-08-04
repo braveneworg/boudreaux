@@ -531,11 +531,26 @@ export class ArtistService {
   }
 
   /**
-   * Delete an artist by ID (hard delete)
+   * Delete an artist by ID (hard delete). The repository cascade removes the
+   * artist row and everything referencing it in one transaction; gallery-image
+   * S3 keys are collected before that cascade deletes the Image rows, then
+   * cleaned up best-effort (fire-and-forget) — an S3 or lookup failure never
+   * blocks the delete.
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
+      const images = await ImageRepository.findManyByArtist(id).catch((): ImageRecord[] => []);
+
       const artist = await ArtistRepository.delete(id);
+
+      const s3Bucket = process.env.S3_BUCKET;
+      if (s3Bucket) {
+        const keys = images
+          .map((image) => (image.src ? extractS3KeyFromUrl(image.src) : null))
+          .filter((key): key is string => key !== null);
+        void Promise.allSettled(keys.map((key) => deleteImageFromS3(s3Bucket, key)));
+      }
+
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {

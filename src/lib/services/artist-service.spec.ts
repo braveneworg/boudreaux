@@ -613,6 +613,12 @@ describe('ArtistService', () => {
   });
 
   describe('deleteArtist', () => {
+    beforeEach(() => {
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([]);
+    });
+
     it('should delete an artist successfully', async () => {
       vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
 
@@ -620,6 +626,68 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(ArtistRepository.delete).toHaveBeenCalledWith('artist-123');
+    });
+
+    it('best-effort deletes the gallery images from S3', async () => {
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([
+        { id: 'img-1', src: 'https://cdn.example.com/media/artists/artist-123/image.jpg' },
+        { id: 'img-2', src: null },
+      ] as never);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true });
+      expect(mockS3Send).toHaveBeenCalledTimes(1);
+      expect(mockS3Send.mock.calls[0][0].params).toMatchObject({
+        Bucket: 'test-bucket',
+        Key: 'media/artists/artist-123/image.jpg',
+      });
+    });
+
+    it('collects the gallery images before the cascade delete removes them', async () => {
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      await ArtistService.deleteArtist('artist-123');
+
+      const lookupOrder = vi.mocked(ImageRepository.findManyByArtist).mock.invocationCallOrder[0];
+      const deleteOrder = vi.mocked(ArtistRepository.delete).mock.invocationCallOrder[0];
+      expect(lookupOrder).toBeLessThan(deleteOrder);
+    });
+
+    it('skips S3 cleanup when the bucket is not configured', async () => {
+      vi.stubEnv('S3_BUCKET', undefined);
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([
+        { id: 'img-1', src: 'https://cdn.example.com/media/artists/artist-123/image.jpg' },
+      ] as never);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true });
+      expect(mockS3Send).not.toHaveBeenCalled();
+    });
+
+    it('still deletes the artist when the gallery-image lookup fails', async () => {
+      vi.mocked(ImageRepository.findManyByArtist).mockRejectedValue(Error('lookup down'));
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true, data: mockArtist });
+      expect(mockS3Send).not.toHaveBeenCalled();
+    });
+
+    it('an S3 failure never fails the delete', async () => {
+      mockS3Send.mockRejectedValueOnce(Error('s3 down'));
+      vi.mocked(ImageRepository.findManyByArtist).mockResolvedValue([
+        { id: 'img-1', src: 'https://cdn.example.com/media/artists/artist-123/image.jpg' },
+      ] as never);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true, data: mockArtist });
     });
 
     it('should return error when artist not found', async () => {

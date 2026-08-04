@@ -33,10 +33,13 @@ interface DataViewCardProps<T extends Record<string, unknown>> {
   supportsSoftDelete: boolean;
   /** Whether a restore handler is wired (soft-delete-only entities). */
   canRestore: boolean;
+  /** Whether a permanent-delete handler is wired (shown on archived rows only). */
+  canHardDelete: boolean;
   resolveDisplayName: (item: T) => string;
   onPublish: (item: T) => void;
   onDelete: (item: T) => void;
   onRestore: (item: T) => void;
+  onHardDelete: (item: T) => void;
 }
 
 /** A single entity row: thumbnails, info link, fields, and edit/publish/delete actions. */
@@ -50,10 +53,12 @@ export const DataViewCard = <T extends Record<string, unknown>>({
   isPending,
   supportsSoftDelete,
   canRestore,
+  canHardDelete,
   resolveDisplayName,
   onPublish,
   onDelete,
   onRestore,
+  onHardDelete,
 }: DataViewCardProps<T>): ReactElement => {
   const id = item.id as string;
   const displayName = resolveDisplayName(item);
@@ -101,6 +106,14 @@ export const DataViewCard = <T extends Record<string, unknown>>({
           displayName={displayName}
           onConfirm={() => (showRestore ? onRestore(item) : onDelete(item))}
         />
+        {showRestore && canHardDelete && (
+          <DeleteRestoreEntityDialog
+            showRestore={false}
+            permanent
+            displayName={displayName}
+            onConfirm={() => onHardDelete(item)}
+          />
+        )}
       </div>
     </Card>
   );

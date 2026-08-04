@@ -31,9 +31,19 @@ export type {
   DataViewProps,
 } from './data-view-types';
 
+/** Maps a mutation verb to the infinitive phrase used in failure-toast copy. */
+const toActionLabel = (verb: MutationVerb): string =>
+  verb === 'hardDelete' ? 'permanently delete' : verb;
+
 /** Maps a mutation verb to its past tense for success-toast copy. */
 const toPastTense = (verb: MutationVerb): string =>
-  verb === 'publish' ? 'published' : verb === 'delete' ? 'deleted' : 'restored';
+  verb === 'publish'
+    ? 'published'
+    : verb === 'delete'
+      ? 'deleted'
+      : verb === 'hardDelete'
+        ? 'permanently deleted'
+        : 'restored';
 
 /** Props for the internal {@link DataViewBody} list + refresh-overlay region. */
 interface DataViewBodyProps<T extends Record<string, unknown>> {
@@ -47,12 +57,14 @@ interface DataViewBodyProps<T extends Record<string, unknown>> {
   isPending: boolean;
   supportsSoftDelete: boolean;
   canRestore: boolean;
+  canHardDelete: boolean;
   pagination?: DataViewProps<T>['pagination'];
   showRefreshSkeleton: boolean;
   resolveDisplayName: (item: T) => string;
   onPublish: (item: T) => void;
   onDelete: (item: T) => void;
   onRestore: (item: T) => void;
+  onHardDelete: (item: T) => void;
 }
 
 /**
@@ -70,12 +82,14 @@ const DataViewBody = <T extends Record<string, unknown>>({
   isPending,
   supportsSoftDelete,
   canRestore,
+  canHardDelete,
   pagination,
   showRefreshSkeleton,
   resolveDisplayName,
   onPublish,
   onDelete,
   onRestore,
+  onHardDelete,
 }: DataViewBodyProps<T>): ReactElement => (
   <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
     {items.length > 0 ? (
@@ -93,10 +107,12 @@ const DataViewBody = <T extends Record<string, unknown>>({
                 isPending={isPending}
                 supportsSoftDelete={supportsSoftDelete}
                 canRestore={canRestore}
+                canHardDelete={canHardDelete}
                 resolveDisplayName={resolveDisplayName}
                 onPublish={onPublish}
                 onDelete={onDelete}
                 onRestore={onRestore}
+                onHardDelete={onHardDelete}
               />
             </li>
           ))}
@@ -183,12 +199,12 @@ export const DataView = <T extends Record<string, unknown>>({
           refetch();
         } else {
           toast.error(
-            `Failed to ${verb} ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+            `Failed to ${toActionLabel(verb)} ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
           );
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        toast.error(`Failed to ${verb} ${entityDisplayLabel}: ${message}`);
+        toast.error(`Failed to ${toActionLabel(verb)} ${entityDisplayLabel}: ${message}`);
       }
     },
     [entityDisplayLabel, refetch, resolveDisplayName]
@@ -206,6 +222,13 @@ export const DataView = <T extends Record<string, unknown>>({
     (item: T) =>
       mutations.restore ? runEntityMutation('restore', item, mutations.restore) : undefined,
     [runEntityMutation, mutations.restore]
+  );
+  const handleHardDelete = useCallback(
+    (item: T) =>
+      mutations.hardDelete
+        ? runEntityMutation('hardDelete', item, mutations.hardDelete)
+        : undefined,
+    [runEntityMutation, mutations.hardDelete]
   );
 
   // Show the full-area skeleton on a refetch (e.g. after publish/delete/restore),
@@ -243,12 +266,14 @@ export const DataView = <T extends Record<string, unknown>>({
           isPending={isPending}
           supportsSoftDelete={supportsSoftDelete}
           canRestore={!!mutations.restore}
+          canHardDelete={!!mutations.hardDelete}
           pagination={pagination}
           showRefreshSkeleton={showRefreshSkeleton}
           resolveDisplayName={resolveDisplayName}
           onPublish={handlePublish}
           onDelete={handleDelete}
           onRestore={handleRestore}
+          onHardDelete={handleHardDelete}
         />
       </div>
     </ImagePreviewProvider>
