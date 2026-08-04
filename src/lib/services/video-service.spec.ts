@@ -8,6 +8,7 @@ import type {
   UpdateVideoData,
   Video,
   VideoListFilters,
+  VideoPosterCandidate,
 } from '@/lib/types/domain/video';
 
 import { VideoService } from './video-service';
@@ -392,6 +393,60 @@ describe('VideoService', () => {
       const result = await VideoService.restoreVideo('video-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to restore video' });
+    });
+  });
+
+  describe('selectVideoPoster', () => {
+    const stored: VideoPosterCandidate = {
+      url: 'https://cdn.example.com/media/videos/video-123/poster-candidate-1.jpg',
+      atSeconds: 3.7,
+      score: 12,
+    };
+
+    it('sets posterUrl when the URL is a stored candidate', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: [stored],
+      });
+      const updated = { ...mockVideo, posterUrl: stored.url, posterCandidates: [stored] };
+      vi.mocked(VideoRepository.update).mockResolvedValue(updated);
+
+      const result = await VideoService.selectVideoPoster('video-123', stored.url);
+
+      expect(result).toMatchObject({ success: true, data: updated });
+      expect(VideoRepository.update).toHaveBeenCalledWith('video-123', { posterUrl: stored.url });
+    });
+
+    it('fails when the URL is not a stored candidate', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: [stored],
+      });
+
+      const result = await VideoService.selectVideoPoster(
+        'video-123',
+        'https://cdn.example.com/media/videos/video-123/other.jpg'
+      );
+
+      expect(result).toMatchObject({ success: false });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('fails when the video is missing', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(null);
+
+      const result = await VideoService.selectVideoPoster('video-123', stored.url);
+
+      expect(result).toMatchObject({ success: false, error: 'Video not found' });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('maps an unknown error to a failure response', async () => {
+      vi.mocked(VideoRepository.findById).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await VideoService.selectVideoPoster('video-123', stored.url);
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to set the poster' });
     });
   });
 

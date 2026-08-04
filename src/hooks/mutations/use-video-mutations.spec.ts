@@ -10,6 +10,7 @@ import { createVideoAction } from '@/lib/actions/create-video-action';
 import { deleteVideoAction } from '@/lib/actions/delete-video-action';
 import { publishVideoAction } from '@/lib/actions/publish-video-action';
 import { restoreVideoAction } from '@/lib/actions/restore-video-action';
+import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -21,6 +22,7 @@ import {
   useDeleteVideoMutation,
   usePublishVideoMutation,
   useRestoreVideoMutation,
+  useSelectVideoPosterMutation,
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
 } from './use-video-mutations';
@@ -53,6 +55,9 @@ vi.mock('@/lib/actions/unpublish-video-action', () => ({ unpublishVideoAction: v
 vi.mock('@/lib/actions/archive-video-action', () => ({ archiveVideoAction: vi.fn() }));
 vi.mock('@/lib/actions/restore-video-action', () => ({ restoreVideoAction: vi.fn() }));
 vi.mock('@/lib/actions/delete-video-action', () => ({ deleteVideoAction: vi.fn() }));
+vi.mock('@/lib/actions/select-video-poster-action', () => ({
+  selectVideoPosterAction: vi.fn(),
+}));
 
 interface MutationOptions<TVariables> {
   mutationFn: (variables: TVariables) => Promise<unknown>;
@@ -315,6 +320,35 @@ describe('useDeleteVideoMutation', () => {
 
   it('does not invalidate on failure', async () => {
     const opts = getOptions(useDeleteVideoMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useSelectVideoPosterMutation', () => {
+  it('calls selectVideoPosterAction with the video id and candidate url', async () => {
+    vi.mocked(selectVideoPosterAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ videoId: string; candidateUrl: string }>(
+      useSelectVideoPosterMutation
+    );
+
+    await opts.mutationFn({ videoId: 'v-1', candidateUrl: 'https://cdn.example.com/p.jpg' });
+
+    expect(selectVideoPosterAction).toHaveBeenCalledWith('v-1', 'https://cdn.example.com/p.jpg');
+  });
+
+  it('invalidates the videos cache on success', async () => {
+    const opts = getOptions(useSelectVideoPosterMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useSelectVideoPosterMutation);
 
     await opts.onSuccess({ success: false }, {});
 

@@ -118,6 +118,37 @@ export class VideoService {
     }
   }
 
+  /**
+   * Set the live poster to one of the video's STORED candidate frames. The
+   * membership check is the injection guard: only a URL already persisted in
+   * `posterCandidates` can become `posterUrl` through this path.
+   */
+  static async selectVideoPoster(
+    id: string,
+    candidateUrl: string
+  ): Promise<ServiceResponse<Video>> {
+    try {
+      const video = await VideoRepository.findById(id);
+      if (!video) {
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
+      }
+      if (!video.posterCandidates.some((candidate) => candidate.url === candidateUrl)) {
+        return {
+          success: false,
+          error: "Poster is not one of this video's candidates",
+          code: 'INVALID_INPUT',
+        };
+      }
+      const updated = await VideoRepository.update(id, { posterUrl: candidateUrl });
+      return { success: true, data: updated };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Video not found',
+        UNKNOWN: 'Failed to set the poster',
+      });
+    }
+  }
+
   /** Unpublish a video by clearing `publishedAt` to null. */
   static async unpublishVideo(id: string): Promise<ServiceResponse<Video>> {
     try {
