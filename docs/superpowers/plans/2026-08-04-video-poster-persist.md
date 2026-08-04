@@ -1292,7 +1292,15 @@ const response = await VideoService.updateVideo(videoId, {
 
 Read `delete-video-action.ts`; it already best-effort deletes the video `s3Key` + the poster key from `posterUrl`. Write a failing test: a video with 2 stored candidates → `deleteS3Object` called for BOTH candidate keys (plus the existing keys, deduplicated — `posterUrl` may BE a candidate). Implement by mapping `video.posterCandidates` through `extractS3KeyFromUrl` + `isVideoNamespacedKey` into the existing keys-to-delete collection, deduplicating with a `Set`.
 
-- [ ] **Step 9: Submit path merges candidates**
+- [ ] **Step 9: Submit path merges candidates AND the picked posterUrl**
+
+CORRECTION (final-review Critical, spec §7): this step originally merged only
+`posterCandidates`, dropping §7's requirement that a file replace also carries
+the new frame's `posterUrl` — which left the live poster pointing at a deleted
+old-candidate object. The submitted posterUrl must be
+`posterFields.posterUrl ?? resolvedPoster.posterUrl`, and
+`replacedCandidateKeys` must spare the key an unchanged `posterUrl` still
+references. Landed in `fix(video): 🐛 replace keeps picked poster`.
 
 In `video-form.tsx` `onValidSubmit`, before `submitVideo` — the fresh capture's surviving uploads ride every create/update submit (the server drops them unless the file is new):
 
