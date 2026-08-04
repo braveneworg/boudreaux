@@ -322,6 +322,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     preGeneratedId,
     isEditMode,
     getArtistDetails: buildArtistDetails,
+    // TODO(Task 7): wire to usePosterCandidateUploads().getSettledAligned() +
+    // the selected-candidate index instead of this always-empty stub.
+    getPosterFields: async () => ({}),
   });
   // Capturing a fresh candidate set pre-selects the sharpest frame, so the
   // Save auto-upload commits exactly what the old single-winner capture did.
