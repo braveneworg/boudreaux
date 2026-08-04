@@ -1335,7 +1335,7 @@ git add -A && git commit -m "feat(video): ✨ replace+cleanup candidates"
 
 - [ ] **Step 1: Seed three stored candidates onto Golf**
 
-In `prisma/seed.ts` `createDefaultVideos`, inside the `prisma.video.create` data (after `posterUrl: null,`):
+CORRECTION (found in execution): the E2E DB is seeded by `e2e/helpers/seed-test-db.ts` (via `e2e/global-setup.ts`), NOT `prisma/seed.ts` (dev DB only). The two files mirror the same rows — edit BOTH identically. In each seed's video-create data (after `posterUrl: null,`):
 
 ```ts
           // Stored poster candidates for the E2E poster-select spec (Golf only).
