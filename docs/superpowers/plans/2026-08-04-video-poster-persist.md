@@ -211,10 +211,13 @@ describe('posterCandidatesSchema', () => {
 import { z } from 'zod';
 
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
+import { isHttpUrl } from '@/lib/utils/is-http-url';
 
 /** One stored poster-frame candidate as accepted from the client. */
 export const videoPosterCandidateSchema = z.object({
-  url: z.string().url().max(2048),
+  // Never bare z.string().url() — it admits javascript:/data: schemes; mirror
+  // the isHttpUrl refinement pattern from bio-link-input-schema.
+  url: z.string().max(2048).refine(isHttpUrl, { message: 'Must be an http(s) URL' }),
   atSeconds: z.number().min(0),
   score: z.number().min(0),
 }) satisfies z.ZodType<VideoPosterCandidate>;
@@ -305,9 +308,11 @@ it('accepts posterUrl and posterCandidates', () => {
 Then in `src/lib/validation/video-draft-schema.ts`, after `artistDetails`:
 
 ```ts
-  posterUrl: z.string().url().max(2048).optional(),
+  posterUrl: z.string().max(2048).refine(isHttpUrl, { message: 'Must be an http(s) URL' }).optional(),
   posterCandidates: posterCandidatesSchema.optional(),
 ```
+
+(import `isHttpUrl` from `@/lib/utils/is-http-url` — never bare `z.string().url()`, which admits `javascript:`/`data:` schemes)
 
 with `import { posterCandidatesSchema } from './video-poster-candidate-schema';`.
 
@@ -548,7 +553,7 @@ import { VideoService } from '@/lib/services/video-service';
 
 import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
-const candidateUrlSchema = z.string().url().max(2048);
+const candidateUrlSchema = z.string().max(2048).refine(isHttpUrl); // isHttpUrl from '@/lib/utils/is-http-url' — never bare .url()
 
 /**
  * Server Action: instant-persist an admin's poster pick. Validates the shape
