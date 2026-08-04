@@ -54,4 +54,13 @@ describe('videoDraftSchema', () => {
     });
     expect(parsed.success).toBe(true);
   });
+
+  it('rejects a javascript: scheme in posterUrl', () => {
+    expect(
+      videoDraftSchema.safeParse({
+        ...validDraft,
+        posterUrl: 'javascript:alert(1)',
+      }).success
+    ).toBe(false);
+  });
 });

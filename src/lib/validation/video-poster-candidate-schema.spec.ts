@@ -23,6 +23,12 @@ describe('videoPosterCandidateSchema', () => {
     );
   });
 
+  it('rejects a javascript: scheme URL', () => {
+    expect(
+      videoPosterCandidateSchema.safeParse({ ...candidate, url: 'javascript:alert(1)' }).success
+    ).toBe(false);
+  });
+
   it('rejects a negative atSeconds', () => {
     expect(videoPosterCandidateSchema.safeParse({ ...candidate, atSeconds: -1 }).success).toBe(
       false

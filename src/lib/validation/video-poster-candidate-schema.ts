@@ -4,10 +4,11 @@
 import { z } from 'zod';
 
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
+import { isHttpUrl } from '@/lib/utils/is-http-url';
 
 /** One stored poster-frame candidate as accepted from the client. */
 export const videoPosterCandidateSchema = z.object({
-  url: z.string().url().max(2048),
+  url: z.string().max(2048).refine(isHttpUrl, { message: 'Must be an http(s) URL' }),
   atSeconds: z.number().min(0),
   score: z.number().min(0),
 }) satisfies z.ZodType<VideoPosterCandidate>;
