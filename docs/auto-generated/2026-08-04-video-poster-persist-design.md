@@ -176,6 +176,11 @@ model Video {
 - **Pre-feature videos**: empty list → no strip, unchanged.
 - **Save racing candidate uploads**: `posterUrl` already set by draft creation
   or the fallback path covers it; last write wins harmlessly.
+- **Selected frame's upload failed on a file replace**: the submit falls back
+  to the existing `posterUrl` (old frame) while the NEW candidate set persists
+  — a later revisit shows the strip with nothing highlighted (the poster is
+  not one of the current candidates). Accepted trade-off; picking any frame
+  re-syncs it.
 - **E2E fake-upload mode**: garbage bytes → `[]` candidates → nothing
   persisted; specs that exercise the strip need a stubbed candidate fixture
   (same pattern as the existing `NEXT_PUBLIC_E2E_MODE` upload fake).
