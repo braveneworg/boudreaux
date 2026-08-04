@@ -19,6 +19,7 @@ type VideoSecretField = 'probeData' | 'enrichmentJobToken' | 'enrichmentProgress
 type VideoListingOnlyInternalField =
   | 'createdBy'
   | 'updatedBy'
+  | 'posterCandidates'
   | 'probedAt'
   | 'probeError'
   | 'container'
@@ -71,6 +72,7 @@ export type VideoRowWithStream = Omit<Video, VideoInternalField> & { streamUrl: 
 export const toPublicVideoRow = ({
   createdBy: _createdBy,
   updatedBy: _updatedBy,
+  posterCandidates: _posterCandidates,
   probedAt: _probedAt,
   probeError: _probeError,
   container: _container,

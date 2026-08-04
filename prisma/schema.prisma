@@ -991,25 +991,33 @@ enum VideoCategory {
   INFORMATIONAL
 }
 
+/// A captured, scored poster-frame candidate persisted at upload time.
+type VideoPosterCandidate {
+  url       String
+  atSeconds Float
+  score     Float
+}
+
 model Video {
-  id              String        @id @default(auto()) @map("_id") @db.ObjectId
-  title           String
-  artist          String
-  category        VideoCategory
-  description     String?
-  releasedOn      DateTime
-  durationSeconds Int?
-  s3Key           String
-  fileName        String
-  fileSize        BigInt?
-  mimeType        String
-  posterUrl       String?
-  publishedAt     DateTime?
-  archivedAt      DateTime?
-  createdBy       String?       @db.ObjectId
-  updatedBy       String?       @db.ObjectId
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id               String                 @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  artist           String
+  category         VideoCategory
+  description      String?
+  releasedOn       DateTime
+  durationSeconds  Int?
+  s3Key            String
+  fileName         String
+  fileSize         BigInt?
+  mimeType         String
+  posterUrl        String?
+  posterCandidates VideoPosterCandidate[] // Captured frame choices; posterUrl selects one
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  createdBy        String?                @db.ObjectId
+  updatedBy        String?                @db.ObjectId
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   // ffprobe technical metadata — written by the server-side probe pipeline.
   // All optional: rows predating the feature (and failed probes) leave them unset.

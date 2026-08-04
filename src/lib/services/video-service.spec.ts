@@ -48,6 +48,7 @@ describe('VideoService', () => {
     fileSize: BigInt(1024 * 1024),
     mimeType: 'video/mp4',
     posterUrl: null,
+    posterCandidates: [],
     publishedAt: null,
     archivedAt: null,
     createdBy: null,
