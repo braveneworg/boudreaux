@@ -142,6 +142,11 @@ model Video {
   (§2), the selected blob still uploads at Save exactly as today. Manual
   poster upload persists via Save, unchanged (instant-persist for manual
   uploads is out of scope).
+- Submit precedence mirrors the preview (added at final review): a poster
+  manually uploaded this session out-ranks a landed fresh-frame pick, which
+  out-ranks the existing/fallback `posterUrl` — including on a file replace,
+  where the session manual poster wins over the new frame (§7's "replaces
+  posterUrl" yields to §4's display priority in that one case, deliberately).
 
 ### 7. File replace — candidates follow the file
 

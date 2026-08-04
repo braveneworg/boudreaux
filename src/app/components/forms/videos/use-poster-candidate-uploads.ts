@@ -51,8 +51,9 @@ const uploadOne = async (
  * fan-out settles, the older run's network resolution is discarded rather
  * than clobbering `alignedNow` with stale, index-misaligned candidates. That
  * holds for a capture that produced nothing too — it resets the state without
- * a network call, so the previous file's frames can never be persisted for a
- * new one.
+ * a network call, so THIS hook never hands a previous file's frames to a new
+ * one. (A stale frame can still reach a submit through the form's `posterUrl`
+ * field when a draft already wrote it — that lives outside this hook.)
  */
 export const usePosterCandidateUploads = ({
   preGeneratedId,

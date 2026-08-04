@@ -433,10 +433,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       // The fresh capture's surviving uploads ride every create/update submit —
       // the server drops them unless the file is new (resolvePersistableCandidates).
       const posterFields = await posterStrip.getPosterDraftFields();
-      // Snapshot before any commit: a poster uploaded this session is what the
-      // preview shows (it out-ranks everything there), so it must out-rank the
-      // capture at submit too — and `clearUploadedPoster` already nulls it when
-      // an instant pick persists, keeping the two in step.
+      // A poster uploaded this session is what the preview shows (it out-ranks
+      // everything there), so it must out-rank the capture at submit too. This
+      // is the render-closure value the submit was created with — freshness is
+      // guaranteed by the useCallback dep, and `clearUploadedPoster` nulls it
+      // when an instant pick persists, keeping preview and submit in step.
       const sessionManualPoster = poster.uploadedPosterUrl;
       // Commit the visible candidate frame before submit so Save (or Publish)
       // persists the poster the admin can see, not the empty default.
