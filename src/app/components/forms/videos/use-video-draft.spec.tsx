@@ -5,6 +5,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { useForm } from 'react-hook-form';
 
 import { createVideoDraftAction } from '@/lib/actions/create-video-draft-action';
+import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { useVideoDraft } from './use-video-draft';
@@ -16,6 +17,22 @@ vi.mock('@/lib/actions/create-video-draft-action', () => ({
 }));
 
 const ID = '507f1f77bcf86cd799439011';
+
+const posterFields: { posterUrl: string; posterCandidates: VideoPosterCandidate[] } = {
+  posterUrl: 'https://cdn.example.com/media/videos/vid1/poster-candidate-2.jpg',
+  posterCandidates: [
+    {
+      url: 'https://cdn.example.com/media/videos/vid1/poster-candidate-1.jpg',
+      atSeconds: 3.7,
+      score: 12,
+    },
+    {
+      url: 'https://cdn.example.com/media/videos/vid1/poster-candidate-2.jpg',
+      atSeconds: 6.5,
+      score: 15,
+    },
+  ],
+};
 
 /** Build a real RHF form seeded with the uploaded triple + category. */
 const buildForm = (
@@ -49,6 +66,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -72,6 +90,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => details,
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -93,6 +112,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -113,6 +133,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: true,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -131,6 +152,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -154,6 +176,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -175,6 +198,7 @@ describe('useVideoDraft', () => {
         preGeneratedId: ID,
         isEditMode: false,
         getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
       })
     );
 
@@ -183,5 +207,82 @@ describe('useVideoDraft', () => {
     await waitFor(() => expect(createVideoDraftAction).toHaveBeenCalledTimes(1));
     expect(result.current.draftId).toBeNull();
     expect(historySpy).not.toHaveBeenCalled();
+  });
+
+  it('awaits getPosterFields before creating the draft and sends the fields with it', async () => {
+    vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+    const form = buildForm();
+    const callOrder: string[] = [];
+    const getPosterFields = vi.fn(async () => {
+      callOrder.push('getPosterFields');
+      return posterFields;
+    });
+    vi.mocked(createVideoDraftAction).mockImplementation(async () => {
+      callOrder.push('createVideoDraftAction');
+      return { success: true, videoId: ID };
+    });
+
+    const { result } = renderHook(() =>
+      useVideoDraft({
+        form: form.current,
+        preGeneratedId: ID,
+        isEditMode: false,
+        getArtistDetails: () => [],
+        getPosterFields,
+      })
+    );
+
+    act(() => result.current.handleUploadComplete());
+
+    await waitFor(() => expect(result.current.draftId).toBe(ID));
+    expect(callOrder).toEqual(['getPosterFields', 'createVideoDraftAction']);
+    expect(createVideoDraftAction).toHaveBeenCalledWith(expect.objectContaining(posterFields));
+  });
+
+  it('writes the draft posterUrl into the form without dirtying', async () => {
+    vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+    const form = buildForm();
+    const setValueSpy = vi.spyOn(form.current, 'setValue');
+
+    const { result } = renderHook(() =>
+      useVideoDraft({
+        form: form.current,
+        preGeneratedId: ID,
+        isEditMode: false,
+        getArtistDetails: () => [],
+        getPosterFields: async () => posterFields,
+      })
+    );
+
+    act(() => result.current.handleUploadComplete());
+
+    await waitFor(() => expect(result.current.draftId).toBe(ID));
+    expect(setValueSpy).toHaveBeenCalledWith('posterUrl', posterFields.posterUrl, {
+      shouldDirty: false,
+    });
+  });
+
+  it('sends no poster fields and never touches posterUrl when getPosterFields resolves empty', async () => {
+    vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+    const form = buildForm();
+    const setValueSpy = vi.spyOn(form.current, 'setValue');
+
+    const { result } = renderHook(() =>
+      useVideoDraft({
+        form: form.current,
+        preGeneratedId: ID,
+        isEditMode: false,
+        getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
+      })
+    );
+
+    act(() => result.current.handleUploadComplete());
+
+    await waitFor(() => expect(result.current.draftId).toBe(ID));
+    const payload = vi.mocked(createVideoDraftAction).mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('posterUrl');
+    expect(payload).not.toHaveProperty('posterCandidates');
+    expect(setValueSpy).not.toHaveBeenCalledWith('posterUrl', expect.anything(), expect.anything());
   });
 });

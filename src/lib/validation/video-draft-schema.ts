@@ -4,9 +4,11 @@
 import { z } from 'zod';
 
 import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
+import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import { videoArtistDetailSchema } from './video-artist-detail-schema';
+import { posterCandidatesSchema } from './video-poster-candidate-schema';
 
 /**
  * Lenient payload for the draft row created at upload-complete: only the
@@ -26,6 +28,12 @@ export const videoDraftSchema = z.object({
   durationSeconds: z.union([z.string(), z.number()]).optional(),
   fileSize: z.union([z.string(), z.number()]).optional(),
   artistDetails: z.array(videoArtistDetailSchema).max(20).optional(),
+  posterUrl: z
+    .string()
+    .max(2048)
+    .refine(isHttpUrl, { message: 'Must be an http(s) URL' })
+    .optional(),
+  posterCandidates: posterCandidatesSchema.optional(),
 });
 
 export type VideoDraftInput = z.infer<typeof videoDraftSchema>;

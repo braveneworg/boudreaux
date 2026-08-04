@@ -14,6 +14,16 @@ import type { Json } from './shared';
  */
 export type VideoCategory = 'MUSIC' | 'INFORMATIONAL';
 
+/** A captured, scored poster-frame candidate persisted at upload time. */
+export interface VideoPosterCandidate {
+  /** CDN URL of the uploaded candidate JPEG. */
+  url: string;
+  /** Timestamp the frame was sampled at. */
+  atSeconds: number;
+  /** Client `scoreFrameQuality` result — higher is sharper. */
+  score: number;
+}
+
 /**
  * Scalar fields of the Prisma `Video` model (no relations). Declared as a `type`
  * (not an `interface`) so video payloads built on it remain assignable to
@@ -32,6 +42,7 @@ export type Video = {
   fileSize: bigint | null;
   mimeType: string;
   posterUrl: string | null;
+  posterCandidates: VideoPosterCandidate[];
   publishedAt: Date | null;
   archivedAt: Date | null;
   createdBy: string | null;
@@ -85,6 +96,7 @@ export interface CreateVideoData {
   fileSize?: bigint | null;
   mimeType: string;
   posterUrl?: string | null;
+  posterCandidates?: VideoPosterCandidate[];
   publishedAt?: Date | null;
   archivedAt?: Date | null;
   createdBy?: string | null;

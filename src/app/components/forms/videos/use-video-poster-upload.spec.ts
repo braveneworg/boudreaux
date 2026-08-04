@@ -108,6 +108,36 @@ describe('useVideoPosterUpload', () => {
     expect(result.current.errorMessage).toBe('Failed to upload the poster.');
   });
 
+  it('drops the session poster URL when cleared', async () => {
+    getPresignedUploadUrlsActionMock.mockResolvedValue({ success: true, data: [presignedTarget] });
+    uploadFileToS3Mock.mockResolvedValue({ success: true, cdnUrl: 'https://cdn/poster.jpg' });
+
+    const { result } = renderUpload();
+
+    await act(async () => {
+      await result.current.uploadPoster(posterFile());
+    });
+    act(() => result.current.clearUploadedPoster());
+
+    expect(result.current.uploadedPosterUrl).toBeNull();
+  });
+
+  it('leaves the persisted posterUrl field untouched when cleared', async () => {
+    getPresignedUploadUrlsActionMock.mockResolvedValue({ success: true, data: [presignedTarget] });
+    uploadFileToS3Mock.mockResolvedValue({ success: true, cdnUrl: 'https://cdn/poster.jpg' });
+
+    const { result, setValue } = renderUpload();
+
+    await act(async () => {
+      await result.current.uploadPoster(posterFile());
+    });
+    act(() => result.current.clearUploadedPoster());
+
+    // Clearing only drops session display precedence — there is still no
+    // poster-REMOVE operation, so the form field keeps the uploaded URL.
+    expect(setValue).toHaveBeenCalledTimes(1);
+  });
+
   it('clears isUploading after the flow settles', async () => {
     getPresignedUploadUrlsActionMock.mockResolvedValue({ success: true, data: [presignedTarget] });
     uploadFileToS3Mock.mockResolvedValue({ success: true, cdnUrl: 'https://cdn/poster.jpg' });

@@ -21,18 +21,24 @@ import type { ServiceResponse } from './service.types';
 /**
  * Collect the S3 keys to remove when a video is hard-deleted:
  * always the stored `s3Key`; plus the key derived from `posterUrl` when set
- * and extractable. URL→key extraction (CDN and S3 styles) is delegated to
- * {@link extractS3KeyFromUrl}.
+ * and extractable; plus every stored candidate frame key. URL→key extraction
+ * (CDN and S3 styles) is delegated to {@link extractS3KeyFromUrl}. `posterUrl`
+ * may itself BE one of the candidates, so keys are deduplicated via a `Set`.
  */
-const collectVideoS3Keys = ({ s3Key, posterUrl }: Video): string[] => {
-  const keys: string[] = [s3Key];
+const collectVideoS3Keys = ({ s3Key, posterUrl, posterCandidates }: Video): string[] => {
+  const keys = new Set<string>([s3Key]);
 
   if (posterUrl) {
     const posterKey = extractS3KeyFromUrl(posterUrl);
-    if (isVideoNamespacedKey(posterKey)) keys.push(posterKey);
+    if (isVideoNamespacedKey(posterKey)) keys.add(posterKey);
   }
 
-  return keys;
+  posterCandidates.forEach((candidate) => {
+    const candidateKey = extractS3KeyFromUrl(candidate.url);
+    if (isVideoNamespacedKey(candidateKey)) keys.add(candidateKey);
+  });
+
+  return [...keys];
 };
 
 export class VideoService {
@@ -114,6 +120,37 @@ export class VideoService {
       return failFromError(error, {
         NOT_FOUND: 'Video not found',
         UNKNOWN: 'Failed to publish video',
+      });
+    }
+  }
+
+  /**
+   * Set the live poster to one of the video's STORED candidate frames. The
+   * membership check is the injection guard: only a URL already persisted in
+   * `posterCandidates` can become `posterUrl` through this path.
+   */
+  static async selectVideoPoster(
+    id: string,
+    candidateUrl: string
+  ): Promise<ServiceResponse<Video>> {
+    try {
+      const video = await VideoRepository.findById(id);
+      if (!video) {
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
+      }
+      if (!video.posterCandidates.some((candidate) => candidate.url === candidateUrl)) {
+        return {
+          success: false,
+          error: "Poster is not one of this video's candidates",
+          code: 'INVALID_INPUT',
+        };
+      }
+      const updated = await VideoRepository.update(id, { posterUrl: candidateUrl });
+      return { success: true, data: updated };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Video not found',
+        UNKNOWN: 'Failed to set the poster',
       });
     }
   }

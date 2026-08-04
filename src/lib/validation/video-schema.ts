@@ -47,6 +47,10 @@ export const videoRowSchema = z.object({
   fileSize: z.coerce.bigint().nullable(),
   mimeType: z.string(),
   posterUrl: nullableString,
+  // Stored candidate frames — admin detail wire only; stripped from listings.
+  posterCandidates: z
+    .array(z.object({ url: z.string(), atSeconds: z.number(), score: z.number() }))
+    .optional(),
   publishedAt: nullableDate,
   archivedAt: nullableDate,
   // Internal audit ObjectIds — stripped from the public listing/SSR payloads, so

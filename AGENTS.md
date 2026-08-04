@@ -69,6 +69,7 @@ subdirectories:
 | `react-nextjs/`   | UI components, dynamic imports, Radix, bundling             |
 | `prisma-mongo/`   | schema, seed, or query changes                              |
 | `tooling/`        | shell-heavy work, lint config, stress-repro runs            |
+| `validation/`     | Zod schemas, validating external input                      |
 
 When corrected — or when you catch your own mistake — add the lesson as a new
 file in the matching category (create a new category directory if none fits)

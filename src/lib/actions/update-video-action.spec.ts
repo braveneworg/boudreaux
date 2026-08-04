@@ -68,6 +68,7 @@ const currentVideo = {
   fileSize: BigInt(1000),
   mimeType: 'video/mp4',
   posterUrl: 'https://cdn.example.com/old-poster.jpg',
+  posterCandidates: [],
   publishedAt: null,
   archivedAt: null,
   createdBy: 'user-123',
@@ -700,6 +701,38 @@ describe('updateVideoAction', () => {
       for (const cb of afterCallbacks) await cb();
 
       expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Poster candidates', () => {
+    const posterCandidates = [
+      { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 1, score: 0.9 },
+      { url: 'https://cdn.example.com/candidate-2.jpg', atSeconds: 2, score: 0.8 },
+    ];
+
+    beforeEach(() => {
+      // Namespaced-to-this-video for every candidate, regardless of input URL.
+      vi.mocked(extractS3KeyFromUrl).mockReturnValue(`media/videos/${videoId}/candidate.jpg`);
+    });
+
+    it('includes candidates in the update payload when the file was replaced', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterCandidates });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterCandidates })
+      );
+    });
+
+    it('omits candidates from the update payload when the s3Key is unchanged', async () => {
+      mockParsedSuccess({ ...parsedData, posterCandidates });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
+      expect(Object.prototype.hasOwnProperty.call(updateCall, 'posterCandidates')).toBe(false);
     });
   });
 });

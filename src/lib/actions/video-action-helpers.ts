@@ -4,7 +4,12 @@
 import 'server-only';
 
 import { isVideoNamespacedKey, VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
-import type { CreateVideoData, UpdateVideoData, Video } from '@/lib/types/domain/video';
+import type {
+  CreateVideoData,
+  UpdateVideoData,
+  Video,
+  VideoPosterCandidate,
+} from '@/lib/types/domain/video';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
@@ -25,6 +30,7 @@ export const VIDEO_PERMITTED_FIELD_NAMES = [
   'fileSize',
   'mimeType',
   'posterUrl',
+  'posterCandidates',
   'publishedAt',
   'artistDetails',
   'producers',
@@ -77,11 +83,14 @@ export const confirmVideoUpload = async (
  * Build the repository create payload from parsed form data. The
  * pre-generated ObjectId becomes the document id (threaded structurally into
  * the Prisma create, mirroring the release create), and `createdBy` is stamped.
+ * `candidates` — resolved by the caller via {@link resolvePersistableCandidates}
+ * — is included only when defined.
  */
 export const buildVideoCreateInput = (
   data: VideoFormData,
   preGeneratedId: string | undefined,
-  userId: string
+  userId: string,
+  candidates: VideoPosterCandidate[] | undefined
 ): CreateVideoData => ({
   ...(preGeneratedId !== undefined ? { id: preGeneratedId } : {}),
   title: data.title,
@@ -95,6 +104,7 @@ export const buildVideoCreateInput = (
   fileSize: parseFileSize(data.fileSize),
   mimeType: data.mimeType,
   posterUrl: data.posterUrl || undefined,
+  ...(candidates !== undefined ? { posterCandidates: candidates } : {}),
   publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
   createdBy: userId,
 });
@@ -124,11 +134,75 @@ export const isPosterReplaced = (current: Video, data: VideoFormData): boolean =
   data.posterUrl !== undefined && data.posterUrl !== '' && data.posterUrl !== current.posterUrl;
 
 /**
+ * Whether EVERY candidate URL resolves to an S3 key inside this video's own
+ * namespace (`media/videos/{videoId}/…`) — the write-path injection guard for
+ * admin-supplied candidate lists.
+ */
+export const areCandidatesForVideo = (
+  candidates: VideoPosterCandidate[],
+  videoId: string
+): boolean =>
+  candidates.every((candidate) =>
+    (extractS3KeyFromUrl(candidate.url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`)
+  );
+
+/**
+ * Candidate list an action may persist: present, namespaced to THIS video, and
+ * — for updates — only alongside an actual file replace (`s3KeyReplaced`).
+ * Anything else resolves to `undefined` (field omitted; never blocks the save).
+ */
+export const resolvePersistableCandidates = (
+  data: VideoFormData,
+  videoId: string | undefined,
+  s3KeyReplaced: boolean
+): VideoPosterCandidate[] | undefined =>
+  s3KeyReplaced &&
+  videoId !== undefined &&
+  data.posterCandidates !== undefined &&
+  data.posterCandidates.length > 0 &&
+  areCandidatesForVideo(data.posterCandidates, videoId)
+    ? data.posterCandidates
+    : undefined;
+
+/** Whether `url` is one of the video's stored candidate frames. */
+const isStoredCandidateUrl = (current: Video, url: string | null): boolean =>
+  url !== null && current.posterCandidates.some((candidate) => candidate.url === url);
+
+/**
+ * The old candidate key the live poster still points at, or `null`. Only an
+ * UNCHANGED `posterUrl` retains one: a replace that ships its own new poster
+ * (the normal path — spec §7 replaces both halves) leaves nothing behind.
+ */
+const retainedPosterKey = (current: Video, data: VideoFormData): string | null =>
+  current.posterUrl && data.posterUrl === current.posterUrl
+    ? extractS3KeyFromUrl(current.posterUrl)
+    : null;
+
+/**
+ * Old candidate keys freed when a file replace ships a fresh candidate set —
+ * except the object an unchanged `posterUrl` still references. Deleting that
+ * one would leave the row pointing at a 404 poster on every surface.
+ */
+const replacedCandidateKeys = (
+  current: Video,
+  data: VideoFormData,
+  s3KeyReplaced: boolean
+): string[] => {
+  if (!s3KeyReplaced || data.posterCandidates === undefined) return [];
+  const retained = retainedPosterKey(current, data);
+  return current.posterCandidates
+    .map((candidate) => extractS3KeyFromUrl(candidate.url))
+    .filter(isVideoNamespacedKey)
+    .filter((key) => key !== retained);
+};
+
+/**
  * Best-effort, fire-and-forget cleanup of S3 objects a successful update
- * orphaned: the old video key (when the file was replaced) and the old poster
- * key (when the poster was replaced). Failures are swallowed by
- * {@link deleteS3Object}, which logs and never throws; lifecycle rules sweep the
- * rest.
+ * orphaned: the old video key (file replaced), the old poster key (poster
+ * replaced — unless it is a stored candidate, which must survive a
+ * candidate-to-candidate switch), and the old candidate set (file replaced
+ * with a fresh capture, minus whichever frame an unchanged poster still
+ * points at). Failures are swallowed by {@link deleteS3Object}.
  */
 export const deleteReplacedVideoAssets = (
   current: Video,
@@ -140,9 +214,16 @@ export const deleteReplacedVideoAssets = (
   if (s3KeyReplaced) {
     keysToDelete.push(current.s3Key);
   }
-  if (isPosterReplaced(current, data) && current.posterUrl) {
+  keysToDelete.push(...replacedCandidateKeys(current, data, s3KeyReplaced));
+  if (
+    isPosterReplaced(current, data) &&
+    current.posterUrl &&
+    !isStoredCandidateUrl(current, current.posterUrl)
+  ) {
     const oldPosterKey = extractS3KeyFromUrl(current.posterUrl);
-    if (isVideoNamespacedKey(oldPosterKey)) keysToDelete.push(oldPosterKey);
+    if (isVideoNamespacedKey(oldPosterKey) && !keysToDelete.includes(oldPosterKey)) {
+      keysToDelete.push(oldPosterKey);
+    }
   }
   if (keysToDelete.length === 0) return;
 

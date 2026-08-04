@@ -98,6 +98,7 @@ const mockVideo: Video = {
   fileSize: null,
   mimeType: 'video/mp4',
   posterUrl: null,
+  posterCandidates: [],
   publishedAt: new Date('2026-01-02T00:00:00.000Z'),
   archivedAt: null,
   createdBy: null,
@@ -183,6 +184,7 @@ describe('VideosPage', () => {
     const {
       createdBy: _createdBy,
       updatedBy: _updatedBy,
+      posterCandidates: _posterCandidates,
       probedAt: _probedAt,
       probeError: _probeError,
       container: _container,

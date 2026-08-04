@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
 import { videoArtistDetailSchema } from '@/lib/validation/video-artist-detail-schema';
+import { posterCandidatesSchema } from '@/lib/validation/video-poster-candidate-schema';
 import { videoProducerSchema } from '@/lib/validation/video-producer-schema';
 
 /**
@@ -56,6 +57,7 @@ export const videoFormSchema = z.object({
     message: 'Only MP4 and WebM videos are supported',
   }),
   posterUrl: z.string().url({ message: 'Poster must be a valid URL' }).optional().or(z.literal('')),
+  posterCandidates: posterCandidatesSchema.optional(),
   publishedAt: z.string().optional().or(z.literal('')),
   artistDetails: z.array(videoArtistDetailSchema).max(20).optional(),
   producers: z.array(videoProducerSchema).max(20).optional(),

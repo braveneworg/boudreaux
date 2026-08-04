@@ -9,6 +9,7 @@ import { deleteVideoAction } from '@/lib/actions/delete-video-action';
 import { publishVideoAction } from '@/lib/actions/publish-video-action';
 import { restoreVideoAction } from '@/lib/actions/restore-video-action';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
+import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
@@ -139,4 +140,25 @@ export const useDeleteVideoMutation = () => {
   >(({ videoId }) => deleteVideoAction(videoId), invalidateVideoQueries);
 
   return { deleteVideo: mutate, deleteVideoAsync: mutateAsync, isDeletingVideo: isPending };
+};
+
+/**
+ * Mutation hook wrapping {@link selectVideoPosterAction} — the instant-persist
+ * poster pick from the candidate strip. Invalidates the video caches on a
+ * successful result so the detail and listings refetch the new poster.
+ */
+export const useSelectVideoPosterMutation = () => {
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string; candidateUrl: string }
+  >(
+    ({ videoId, candidateUrl }) => selectVideoPosterAction(videoId, candidateUrl),
+    invalidateVideoQueries
+  );
+
+  return {
+    selectVideoPoster: mutate,
+    selectVideoPosterAsync: mutateAsync,
+    isSelectingVideoPoster: isPending,
+  };
 };

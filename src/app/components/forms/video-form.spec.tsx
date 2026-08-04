@@ -9,6 +9,8 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
+import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
@@ -29,6 +31,7 @@ const singleCandidate = (): PosterCandidate => posterCandidate('jpeg', 1);
 const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
   updateVideoAsync: vi.fn(),
+  selectVideoPosterAsync: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
   useVideoProducersQuery: vi.fn(),
@@ -43,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   buildArtistDetails: vi.fn(),
   updateDraft: vi.fn(),
   useVideoDraft: vi.fn(),
+  getPosterDraftFields: vi.fn(),
   /** Overridable per-test poster-upload behaviour; default replays the real hook. */
   posterUploadImpl: vi.fn(),
 }));
@@ -71,6 +75,10 @@ vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   useUnpublishVideoMutation: () => ({
     unpublishVideoAsync: vi.fn().mockResolvedValue({ success: true }),
     isUnpublishingVideo: false,
+  }),
+  useSelectVideoPosterMutation: () => ({
+    selectVideoPosterAsync: mocks.selectVideoPosterAsync,
+    isSelectingVideoPoster: false,
   }),
 }));
 
@@ -140,7 +148,8 @@ vi.mock('@/app/components/forms/videos/use-video-poster-upload', () => ({
         setIsUploading(false);
       }
     };
-    return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster };
+    const clearUploadedPoster = (): void => setUploadedPosterUrl(null);
+    return { uploadedPosterUrl, isUploading, errorMessage, uploadPoster, clearUploadedPoster };
   },
 }));
 
@@ -151,6 +160,21 @@ vi.mock('@/app/components/forms/videos/use-video-artist-review', () => ({
 vi.mock('@/app/components/forms/videos/use-video-draft', () => ({
   useVideoDraft: (...args: unknown[]) => mocks.useVideoDraft(...args),
 }));
+
+// Delegate to the REAL strip hook — every other poster test keeps exercising it
+// — and swap only `getPosterDraftFields` for a sentinel-returning spy, so the
+// `getPosterFields` seam handed to the (wholesale-mocked) draft hook can be
+// asserted end to end.
+vi.mock('@/app/components/forms/videos/use-video-poster-strip', async (importOriginal) => {
+  const actual = await importOriginal<typeof videoPosterStrip>();
+  const useStubbedDraftFieldsStrip = (
+    args: Parameters<typeof actual.useVideoPosterStrip>[0]
+  ): ReturnType<typeof actual.useVideoPosterStrip> => ({
+    ...actual.useVideoPosterStrip(args),
+    getPosterDraftFields: mocks.getPosterDraftFields,
+  });
+  return { ...actual, useVideoPosterStrip: useStubbedDraftFieldsStrip };
+});
 
 vi.mock('@/app/components/forms/videos/video-artist-review-section', () => ({
   VideoArtistReviewSection: ({
@@ -302,6 +326,20 @@ const fillRequiredFields = async (user: ReturnType<typeof userEvent.setup>): Pro
 
 const PROBE_IDLE_RESULT = { data: undefined, isPending: false, isError: false };
 
+/** Identity-checkable stand-in for whatever the strip hook hands the draft. */
+const POSTER_DRAFT_FIELDS: DraftPosterFields = {
+  posterUrl: 'https://cdn.example.com/sentinel-poster.jpg',
+};
+
+/**
+ * The default: no capture survived, so the strip contributes no poster fields
+ * — matching `captureVideoPosterCandidates`'s own `[]` default. Tests that
+ * model a landed capture override it; a resolved `posterUrl` here outranks the
+ * Save-time auto-commit, which would otherwise silently rewrite every
+ * poster assertion in this file.
+ */
+const NO_POSTER_DRAFT_FIELDS: DraftPosterFields = {};
+
 beforeEach(() => {
   mocks.useVideoQuery.mockReturnValue(CREATE_MODE_QUERY);
   mocks.useVideoProbePrefillQuery.mockReturnValue(PROBE_IDLE_RESULT);
@@ -318,12 +356,14 @@ beforeEach(() => {
     buildArtistDetails: mocks.buildArtistDetails,
   });
   mocks.useVideoDraft.mockReturnValue({ draftId: null, handleUploadComplete: vi.fn() });
+  mocks.getPosterDraftFields.mockResolvedValue(NO_POSTER_DRAFT_FIELDS);
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
     fields: {},
     data: { videoId: 'created-video-id' },
   });
   mocks.updateVideoAsync.mockResolvedValue({ success: true, fields: {}, data: { videoId: 'v1' } });
+  mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
   mocks.uploadVideoMultipart.mockResolvedValue({
     success: true,
     s3Key: 'media/videos/aaa/clip.mp4',
@@ -831,6 +871,238 @@ describe('VideoForm — edit mode', () => {
   });
 });
 
+describe('VideoForm — draft poster-fields seam', () => {
+  it('resolves the strip hook fields through the getPosterFields handed to the draft hook', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue(POSTER_DRAFT_FIELDS);
+    render(<VideoForm />);
+
+    const [draftArgs] = mocks.useVideoDraft.mock.calls[0] as [
+      { getPosterFields: () => Promise<DraftPosterFields> },
+    ];
+
+    // Identity, not shape: only the live ref wiring can return this object.
+    await expect(draftArgs.getPosterFields()).resolves.toBe(POSTER_DRAFT_FIELDS);
+  });
+});
+
+describe('VideoForm — submit merges surviving uploaded candidates', () => {
+  const posterCandidates = [
+    { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 1, score: 0.9 },
+  ];
+
+  it('includes posterCandidates in the create payload when the strip resolves survivors', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterCandidates })
+      )
+    );
+  });
+
+  it('omits posterCandidates from the create payload when the strip resolves none', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({});
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    const payload = mocks.createVideoAsync.mock.calls[0][0];
+    expect(Object.prototype.hasOwnProperty.call(payload, 'posterCandidates')).toBe(false);
+  });
+
+  it('includes posterCandidates in an update (edit save) payload too', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ values: expect.objectContaining({ posterCandidates }) })
+      )
+    );
+  });
+});
+
+describe('VideoForm — submit poster URL after a file replace', () => {
+  const freshCandidates = [
+    { url: 'https://cdn.example.com/media/videos/v1/fresh-1.jpg', atSeconds: 4, score: 0.9 },
+  ];
+
+  const asEditMode = () =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  /** Edit an existing video, drop a replacement file, then Save. */
+  const replaceFileAndSave = async (): Promise<void> => {
+    mocks.uploadVideoMultipart.mockResolvedValue({
+      success: true,
+      s3Key: 'media/videos/v1/replacement.mp4',
+      fileSize: 9000,
+    });
+    asEditMode();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await uploadVideoFile(user, 'replacement.mp4', 'Replace video file');
+    await screen.findByText('replacement.mp4');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+  };
+
+  it('sends the freshly captured frame URL, not the replaced row poster', async () => {
+    // The new file's frames replace BOTH halves of the poster (spec §7); the
+    // old row poster points at a frame of a video that no longer exists.
+    mocks.getPosterDraftFields.mockResolvedValue({
+      posterUrl: freshCandidates[0].url,
+      posterCandidates: freshCandidates,
+    });
+
+    await replaceFileAndSave();
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.objectContaining({ posterUrl: freshCandidates[0].url }),
+        })
+      )
+    );
+  });
+
+  it('keeps the existing poster when the fresh capture uploaded nothing', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates: freshCandidates });
+
+    await replaceFileAndSave();
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.objectContaining({ posterUrl: editVideo.posterUrl }),
+        })
+      )
+    );
+  });
+
+  it('keeps the existing poster on an edit save with no capture at all', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({});
+    asEditMode();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          values: expect.objectContaining({ posterUrl: editVideo.posterUrl }),
+        })
+      )
+    );
+  });
+});
+
+describe('VideoForm — reset on a refetched video row', () => {
+  const asVideoRow = (video: unknown) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: video,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  /** What an instant poster pick produces: same row id, new object identity. */
+  const refetchedRow = {
+    ...editVideo,
+    title: 'Server Title',
+    description: 'Server description',
+    posterUrl: 'https://cdn.example.com/candidate-3.jpg',
+  };
+
+  const typeUnsavedTitle = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.clear(screen.getByLabelText('Title'));
+    await user.type(screen.getByLabelText('Title'), 'Unsaved Title');
+  };
+
+  it('keeps an unsaved title edit when the row is refetched', async () => {
+    asVideoRow(editVideo);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await typeUnsavedTitle(user);
+    asVideoRow(refetchedRow);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Unsaved Title'));
+  });
+
+  it('takes the refetched server value for a field the admin has not touched', async () => {
+    asVideoRow(editVideo);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await typeUnsavedTitle(user);
+    asVideoRow(refetchedRow);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('Server description')
+    );
+  });
+
+  it('fully populates a pristine form on the first load', async () => {
+    asVideoRow(editVideo);
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Description')).toHaveValue('An existing description')
+    );
+  });
+
+  it('keeps a field written before the query settled — the accepted keepDirtyValues trade-off', async () => {
+    // Documented semantic side effect of `keepDirtyValues`: anything written
+    // with `shouldDirty: true` while the row was still in flight now survives
+    // the load reset instead of being replaced by the server value.
+    asVideoRow(null);
+    const user = setup();
+    const { rerender } = render(<VideoForm videoId="v1" />);
+
+    await user.type(screen.getByLabelText('Title'), 'Typed Before Load');
+    asVideoRow(editVideo);
+    rerender(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Typed Before Load'));
+  });
+});
+
 describe('VideoForm — poster', () => {
   it('shows the uploaded poster preview after a manual upload succeeds', async () => {
     const user = setup();
@@ -898,7 +1170,164 @@ describe('VideoForm — poster', () => {
   });
 });
 
+describe('VideoForm — stored poster candidates on an edit visit', () => {
+  const storedCandidates = [
+    { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 3.7, score: 4 },
+    { url: 'https://cdn.example.com/existing-poster.jpg', atSeconds: 5.1, score: 9 },
+    { url: 'https://cdn.example.com/candidate-3.jpg', atSeconds: 6.5, score: 2 },
+  ];
+
+  const asEditModeWithCandidates = () =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: { ...editVideo, posterCandidates: storedCandidates },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  it('hydrates the strip from the row when no capture happened this session', async () => {
+    asEditModeWithCandidates();
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findAllByRole('radio', { name: /^Frame at/ })).toHaveLength(3);
+  });
+
+  it('highlights the stored frame the live poster points at', async () => {
+    asEditModeWithCandidates();
+    render(<VideoForm videoId="v1" />);
+
+    expect(
+      await screen.findByRole('radio', { name: 'Frame at 5.1s', checked: true })
+    ).toBeInTheDocument();
+  });
+
+  it('persists a stored frame pick instantly', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+        videoId: 'v1',
+        candidateUrl: 'https://cdn.example.com/candidate-3.jpg',
+      })
+    );
+  });
+
+  it('moves the preview to the picked frame', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/candidate-3.jpg'
+      )
+    );
+  });
+
+  it('reverts the preview when the instant persist fails', async () => {
+    asEditModeWithCandidates();
+    mocks.selectVideoPosterAsync.mockResolvedValue({ success: false, error: 'boom' });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/existing-poster.jpg'
+      )
+    );
+  });
+
+  it('drops a session manual poster so the preview follows the picked frame', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    // A manual upload takes display precedence over the stored strip…
+    await screen.findByRole('radio', { name: 'Frame at 6.5s' });
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    // …until a thumb is picked and persists, which must win the preview back.
+    await user.click(screen.getByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/candidate-3.jpg'
+      )
+    );
+  });
+
+  it('keeps the session manual poster in the preview when the pick fails', async () => {
+    asEditModeWithCandidates();
+    mocks.selectVideoPosterAsync.mockResolvedValue({ success: false, error: 'boom' });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await screen.findByRole('radio', { name: 'Frame at 6.5s' });
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalled());
+    expect(screen.getByAltText('Video poster')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/poster.jpg'
+    );
+  });
+
+  it('renders no strip for a row with no stored candidates', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByRole('radiogroup', { name: 'Captured poster frames' })).toBeNull();
+  });
+});
+
 describe('VideoForm — poster candidate auto-commit on Save', () => {
+  /** What the strip resolves once this session's capture uploaded successfully. */
+  const LANDED_CAPTURE_FIELDS: DraftPosterFields = {
+    posterUrl: 'https://cdn.example.com/media/videos/aaa/poster-candidate-1.jpg',
+    posterCandidates: [
+      {
+        url: 'https://cdn.example.com/media/videos/aaa/poster-candidate-1.jpg',
+        atSeconds: 3.7,
+        score: 1,
+      },
+    ],
+  };
+
   it('uploads the visible candidate frame on Save when no poster is chosen', async () => {
     mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
     const user = setup();
@@ -928,6 +1357,32 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
     await waitFor(() =>
       expect(mocks.createVideoAsync).toHaveBeenCalledWith(
         expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
+  });
+
+  it("prefers the candidate's own uploaded URL over the Save-time re-upload", async () => {
+    // Both paths can land the same frame: the fan-out writes
+    // poster-candidate-N.jpg, the Save-time commit writes poster.jpg. The
+    // candidate URL must win — it is the one the stored candidate list (and so
+    // the strip highlight on revisit) can actually match.
+    const candidateUrl = 'https://cdn.example.com/media/videos/aaa/poster-candidate-1.jpg';
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue({
+      posterUrl: candidateUrl,
+      posterCandidates: [{ url: candidateUrl, atSeconds: 3.7, score: 1 }],
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: candidateUrl })
       )
     );
   });
@@ -979,6 +1434,74 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
     // The 6.5s candidate's blob is 'zzz' — 3 bytes — not the argmax frame's 1.
     const file = mocks.posterUploadImpl.mock.calls[0][0] as File;
     expect(file.size).toBe(3);
+  });
+
+  it('skips the Save-time blob upload when the capture already landed a URL', async () => {
+    // The frame is already durable under its own candidate key; re-committing
+    // it as poster.jpg would PUT an object nothing ever references.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue(LANDED_CAPTURE_FIELDS);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    expect(mocks.posterUploadImpl).not.toHaveBeenCalled();
+  });
+
+  it('still blob-commits the frame when the capture landed candidates but no URL', async () => {
+    // The selected frame's own upload failed while its siblings survived —
+    // the Save-time fallback is the only thing that can persist what's visible.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue({
+      posterCandidates: LANDED_CAPTURE_FIELDS.posterCandidates,
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
+  });
+
+  it('submits the poster uploaded manually after a capture landed, not the frame', async () => {
+    // Preview priority is the session upload first, and the strip is what the
+    // admin is looking at — Save must persist that image, not the frame URL.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue(LANDED_CAPTURE_FIELDS);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
   });
 
   it('does not re-upload a poster on Save when one is already chosen', async () => {

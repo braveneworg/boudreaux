@@ -564,6 +564,20 @@ const createDefaultVideos = async (): Promise<void> => {
           mimeType: 'video/mp4',
           fileSize: BigInt(1048576),
           posterUrl: null,
+          // Stored poster candidates for the poster-select strip (Golf only),
+          // mirroring e2e/helpers/seed-test-db.ts so the dev database exercises
+          // the same hydrate-from-stored path the E2E spec covers. The `.invalid`
+          // host never resolves; the thumbs render `unoptimized`, so next/image
+          // passes the URL through and simply shows a broken image.
+          ...(video.title === 'E2E Video Golf'
+            ? {
+                posterCandidates: [3.7, 6.5, 9.3].map((atSeconds, index) => ({
+                  url: `https://cdn.e2e.invalid/media/videos/e2e/${slug}/poster-candidate-${index + 1}.jpg`,
+                  atSeconds,
+                  score: 10 + index,
+                })),
+              }
+            : {}),
           description: `${video.title} description for E2E.`,
           publishedAt: isDraft
             ? null

@@ -8,6 +8,7 @@ import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { localCompleteUpload, localRecordPart, localStartUpload } from './multipart-local-adapters';
 import {
+  areCandidatesForVideo,
   buildVideoCreateInput,
   buildVideoUpdateInput,
   confirmVideoUpload,
@@ -46,7 +47,8 @@ const currentVideo = {
   id: videoId,
   s3Key: validKey,
   posterUrl: currentPosterUrl,
-} as Video;
+  posterCandidates: [],
+} as unknown as Video;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -95,20 +97,20 @@ describe('confirmVideoUpload', () => {
 
 describe('buildVideoCreateInput', () => {
   it('threads the pre-generated id and stamps createdBy', () => {
-    const input = buildVideoCreateInput(formData, videoId, 'user-1');
+    const input = buildVideoCreateInput(formData, videoId, 'user-1', undefined);
 
     expect(input.id).toBe(videoId);
     expect(input.createdBy).toBe('user-1');
   });
 
   it('omits the id when no pre-generated id is provided', () => {
-    const input = buildVideoCreateInput(formData, undefined, 'user-1');
+    const input = buildVideoCreateInput(formData, undefined, 'user-1', undefined);
 
     expect(input.id).toBeUndefined();
   });
 
   it('coerces numeric-ish string fields', () => {
-    const input = buildVideoCreateInput(formData, videoId, 'user-1');
+    const input = buildVideoCreateInput(formData, videoId, 'user-1', undefined);
 
     expect(input.durationSeconds).toBe(212);
     expect(input.fileSize).toBe(BigInt(2048));
@@ -118,11 +120,26 @@ describe('buildVideoCreateInput', () => {
     const input = buildVideoCreateInput(
       { ...formData, durationSeconds: 212, fileSize: 2048 },
       videoId,
-      'user-1'
+      'user-1',
+      undefined
     );
 
     expect(input.durationSeconds).toBe(212);
     expect(input.fileSize).toBe(BigInt(2048));
+  });
+
+  it('includes posterCandidates when the resolved candidate list is provided', () => {
+    const candidates = [{ url: 'https://cdn/candidate.jpg', atSeconds: 1, score: 0.9 }];
+
+    const input = buildVideoCreateInput(formData, videoId, 'user-1', candidates);
+
+    expect(input.posterCandidates).toEqual(candidates);
+  });
+
+  it('omits posterCandidates when the resolved candidate list is undefined', () => {
+    const input = buildVideoCreateInput(formData, videoId, 'user-1', undefined);
+
+    expect('posterCandidates' in input).toBe(false);
   });
 
   it('maps empty optionals to undefined', () => {
@@ -136,7 +153,8 @@ describe('buildVideoCreateInput', () => {
         publishedAt: '',
       },
       videoId,
-      'user-1'
+      'user-1',
+      undefined
     );
 
     expect(input.description).toBeUndefined();
@@ -243,6 +261,142 @@ describe('deleteReplacedVideoAssets', () => {
     deleteReplacedVideoAssets(currentVideo, { ...formData, posterUrl: currentPosterUrl }, false);
 
     expect(deleteS3Object).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteReplacedVideoAssets — candidate cleanup guards', () => {
+  const candidateUrl = (n: number) =>
+    `https://cdn.example.com/media/videos/vid1/poster-candidate-${n}.jpg`;
+  const manualUrl = (name: string) => `https://cdn.example.com/media/videos/vid1/${name}.jpg`;
+
+  const currentWithCandidates = {
+    ...currentVideo,
+    posterUrl: candidateUrl(1),
+    posterCandidates: [1, 2].map((n) => ({ url: candidateUrl(n), atSeconds: n, score: n })),
+  } as Video;
+
+  beforeEach(() => {
+    // Derive the S3 key from the URL's path (everything from `media/` on),
+    // so distinct candidate/manual URLs resolve to distinct, distinguishable
+    // keys — the fixed single-value mock used elsewhere in this file can't
+    // tell candidates apart.
+    vi.mocked(extractS3KeyFromUrl).mockImplementation((url: string) => {
+      const match = url.match(/\/(media\/videos\/.+)$/);
+      return match ? match[1] : null;
+    });
+  });
+
+  it('does not delete when switching between two stored candidates', () => {
+    deleteReplacedVideoAssets(
+      currentWithCandidates,
+      { ...formData, posterUrl: candidateUrl(2) },
+      false
+    );
+
+    expect(deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it('does not delete the old candidate poster when replaced by a manual upload (still in the list)', () => {
+    deleteReplacedVideoAssets(
+      currentWithCandidates,
+      { ...formData, posterUrl: manualUrl('manual') },
+      false
+    );
+
+    expect(deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it('deletes the old manual poster key when it is not a stored candidate (existing behavior)', () => {
+    const current = { ...currentWithCandidates, posterUrl: manualUrl('old-manual') } as Video;
+
+    deleteReplacedVideoAssets(current, { ...formData, posterUrl: manualUrl('new-manual') }, false);
+
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/old-manual.jpg');
+    expect(deleteS3Object).toHaveBeenCalledTimes(1);
+  });
+
+  /** A file replace shipping a fresh capture; the poster moves unless stated. */
+  const replaceWith = (posterUrl: string): void => {
+    const newCandidates = [3, 4].map((n) => ({ url: candidateUrl(n), atSeconds: n, score: n }));
+
+    deleteReplacedVideoAssets(
+      currentWithCandidates,
+      { ...formData, posterUrl, posterCandidates: newCandidates },
+      true
+    );
+  };
+
+  it('spares the live poster key when a file replace leaves the poster URL unchanged', () => {
+    // The row still points at candidate 1 — deleting its object would leave a
+    // dangling posterUrl (a broken poster on every surface that renders it).
+    replaceWith(candidateUrl(1));
+
+    expect(deleteS3Object).not.toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
+  });
+
+  it('still deletes the old video key and the unreferenced candidates in that case', () => {
+    replaceWith(candidateUrl(1));
+
+    expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+    expect(deleteS3Object).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes the old video key and every old candidate key when the poster moves too', () => {
+    replaceWith(candidateUrl(3));
+
+    expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+    expect(deleteS3Object).toHaveBeenCalledTimes(3);
+  });
+
+  it('leaves old candidates untouched on file replace without a fresh candidate set', () => {
+    deleteReplacedVideoAssets(
+      currentWithCandidates,
+      { ...formData, posterUrl: candidateUrl(1) },
+      true
+    );
+
+    expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
+    expect(deleteS3Object).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('areCandidatesForVideo', () => {
+  const forVideo = (id: string, n: number) => ({
+    url: `https://cdn.example.com/media/videos/${id}/poster-candidate-${n}.jpg`,
+    atSeconds: n,
+    score: 1,
+  });
+
+  beforeEach(() => {
+    // Mock extractS3KeyFromUrl to extract the key from the URL
+    vi.mocked(extractS3KeyFromUrl).mockImplementation((url: string) => {
+      const match = url.match(/\/media\/(videos|releases)\/(.+)\/(.+)/);
+      return match ? `media/${match[1]}/${match[2]}/${match[3]}` : null;
+    });
+  });
+
+  it('accepts candidates namespaced to the video', () => {
+    expect(areCandidatesForVideo([forVideo('vid1', 1), forVideo('vid1', 2)], 'vid1')).toBe(true);
+  });
+
+  it('rejects a candidate namespaced to another video', () => {
+    expect(areCandidatesForVideo([forVideo('vid1', 1), forVideo('vid2', 2)], 'vid1')).toBe(false);
+  });
+
+  it('rejects a candidate outside the video namespace', () => {
+    const foreign = {
+      url: 'https://cdn.example.com/media/releases/r1/a.jpg',
+      atSeconds: 1,
+      score: 1,
+    };
+    expect(areCandidatesForVideo([foreign], 'vid1')).toBe(false);
+  });
+
+  it('accepts an empty list', () => {
+    expect(areCandidatesForVideo([], 'vid1')).toBe(true);
   });
 });
 

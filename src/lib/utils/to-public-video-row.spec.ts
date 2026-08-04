@@ -52,6 +52,13 @@ const fullVideo: Video = {
   enrichmentJobToken: 'secret-job-token',
   enrichmentProgress: { step: 'scraping' },
   enrichedAt: new Date('2024-01-05'),
+  posterCandidates: [
+    {
+      url: 'https://cdn.example.com/media/videos/vid1/poster-candidate-1.jpg',
+      atSeconds: 3.7,
+      score: 12.5,
+    },
+  ],
 };
 
 describe('toPublicVideoRow', () => {
@@ -136,6 +143,10 @@ describe('toPublicVideoRow', () => {
 
     expect(row.streamUrl).toBeNull();
   });
+
+  it('strips posterCandidates from the public row', () => {
+    expect(toPublicVideoRow(fullVideo)).not.toHaveProperty('posterCandidates');
+  });
 });
 
 describe('toAdminVideoDetailRow', () => {
@@ -207,5 +218,9 @@ describe('toAdminVideoDetailRow', () => {
     const row = toAdminVideoDetailRow(fullVideo);
 
     expect(row.streamUrl).toBeNull();
+  });
+
+  it('keeps posterCandidates on the admin detail row', () => {
+    expect(toAdminVideoDetailRow(fullVideo).posterCandidates).toEqual(fullVideo.posterCandidates);
   });
 });

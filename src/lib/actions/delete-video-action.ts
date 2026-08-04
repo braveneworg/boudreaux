@@ -11,9 +11,11 @@ import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity
 
 /**
  * Server action to hard-delete a video. `VideoService.deleteVideo` removes the
- * DB row first, then best-effort deletes the video's S3 objects (the stored
- * `s3Key` plus the poster key derived from `posterUrl`). Returns a plain result
- * the {@link useDeleteVideoMutation} hook maps to a toast.
+ * DB row first, then best-effort deletes the video's S3 objects: the stored
+ * `s3Key`, the poster key derived from `posterUrl`, and every stored
+ * `posterCandidates` frame key (de-duplicated — the live poster is usually one
+ * of them). Returns a plain result the {@link useDeleteVideoMutation} hook maps
+ * to a toast.
  */
 export const deleteVideoAction = async (videoId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({

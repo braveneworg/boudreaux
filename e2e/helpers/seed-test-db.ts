@@ -166,6 +166,39 @@ const REVIEW_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d3a1';
 const REVIEW_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d3b1';
 
 /**
+ * Deterministic id of the published video carrying stored poster candidates
+ * (admin-video-poster-select.spec.ts). It is the existing 'E2E Video Golf' row
+ * — pinning its id lets the spec open the edit page by direct URL, the way the
+ * enrichment and review specs do, instead of paging the admin list (whose
+ * "Load More" footer auto-loads and cannot be clicked reliably).
+ *
+ * Golf is INFORMATIONAL, so its edit page renders no enrichment panel to race,
+ * and it is the OLDEST published video (releasedOn 2026-01-01) — the listing
+ * specs assert only its title, position, and the row counts, never its poster.
+ * The select spec mutates only `posterUrl` and restores it in `finally`.
+ */
+const POSTER_CANDIDATES_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d5b1';
+
+/** Title of the video {@link POSTER_CANDIDATES_VIDEO_ID} pins. */
+const POSTER_CANDIDATES_VIDEO_TITLE = 'E2E Video Golf';
+
+/**
+ * The three stored poster candidates seeded onto {@link
+ * POSTER_CANDIDATES_VIDEO_ID}. Their `atSeconds` drive the strip's radio
+ * accessible names (`Frame at {atSeconds.toFixed(1)}s`) and their urls are what
+ * `VideoService.selectVideoPoster` validates a pick against, so the spec
+ * imports these rather than restating them. The host is a `.invalid` TLD: it
+ * can never resolve, and both the strip thumbs and the preview render with
+ * `unoptimized`, so next/image passes the URL through untouched (no
+ * remotePatterns entry needed) and simply shows a broken image.
+ */
+const POSTER_CANDIDATE_FRAMES = [3.7, 6.5, 9.3].map((atSeconds, index) => ({
+  url: `https://cdn.e2e.invalid/media/videos/e2e/e2e-video-golf/poster-candidate-${index + 1}.jpg`,
+  atSeconds,
+  score: 10 + index,
+}));
+
+/**
  * Insert one extra ArtistBioLink row for the bio-palette artist. The palette
  * delete spec creates its own uniquely-labelled row per run (and per retry)
  * so deleting it can never race the shared seeded rows other tests assert on.
@@ -409,7 +442,11 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
   await prisma.video.createMany({
     data: publishedRows.map(({ title, artist, category, releasedOn, durationSeconds }) => {
       const slug = makeSlug(title);
+      // Golf doubles as the stored-poster-candidate fixture: a pinned id so the
+      // select spec can open its edit page directly.
+      const isPosterFixture = title === POSTER_CANDIDATES_VIDEO_TITLE;
       return {
+        ...(isPosterFixture ? { id: POSTER_CANDIDATES_VIDEO_ID } : {}),
         title,
         artist,
         category,
@@ -420,6 +457,9 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
         mimeType: 'video/mp4',
         fileSize: BigInt(1048576),
         posterUrl: null,
+        // Stored poster candidates for the poster-select spec (Golf only). No
+        // posterUrl points at them yet, so the strip starts with nothing checked.
+        ...(isPosterFixture ? { posterCandidates: POSTER_CANDIDATE_FRAMES } : {}),
         description: `${title} description for E2E.`,
         publishedAt: PUBLISHED_AT,
       };
@@ -1532,6 +1572,8 @@ export {
   E2E_PRODUCER_ONE_ID,
   ENRICH_INFO_VIDEO_ID,
   ENRICH_MUSIC_VIDEO_ID,
+  POSTER_CANDIDATE_FRAMES,
+  POSTER_CANDIDATES_VIDEO_ID,
   PUBLIC_PLAYLIST_SNAPSHOT_TITLE,
   PUBLIC_PLAYLIST_TITLE,
   REVIEW_VIDEO_ID,

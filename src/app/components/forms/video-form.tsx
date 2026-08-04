@@ -37,6 +37,7 @@ import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-
 import { useReleaseDateAutoFill } from './videos/use-release-date-autofill';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoDraft } from './videos/use-video-draft';
+import { useVideoPosterStrip } from './videos/use-video-poster-strip';
 import { useVideoPosterUpload } from './videos/use-video-poster-upload';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoArtistReviewSection } from './videos/video-artist-review-section';
@@ -49,12 +50,12 @@ import {
   mapVideoToFormValues,
   shapePublish,
 } from './videos/video-form-helpers';
-import { bestPosterCandidateIndex, type PosterCandidate } from './videos/video-metadata';
 import { VideoMetadataSection } from './videos/video-metadata-section';
 import { posterCandidateToFile, VideoPosterSection } from './videos/video-poster-section';
 import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
+import type { DraftPosterFields } from './videos/use-video-draft';
 import type { Control, UseFormReturn } from 'react-hook-form';
 
 type SubmitIntent = 'save' | 'publish';
@@ -85,18 +86,27 @@ const mergeArtistDetails = (
 interface ResolveSubmitPosterArgs {
   candidate: Blob | null;
   posterUrl: string | undefined;
+  /** URL this capture's own candidate upload already landed, when it did. */
+  landedCandidateUrl: string | undefined;
   uploadPoster: (file: File) => Promise<void>;
   getPosterUrl: () => string | undefined;
 }
 
-/** Commit the visible candidate frame before submit; '' + ok:false = upload failed. */
+/**
+ * Commit the visible candidate frame before submit; '' + ok:false = upload
+ * failed. Uploads nothing when a poster URL already exists — on the form, or
+ * from this capture's own landed candidate upload, whose durable URL outranks
+ * the commit anyway; a second PUT would only leave an unreferenced poster.jpg.
+ */
 const resolveSubmitPosterUrl = async ({
   candidate,
   posterUrl,
+  landedCandidateUrl,
   uploadPoster,
   getPosterUrl,
 }: ResolveSubmitPosterArgs): Promise<{ ok: boolean; posterUrl: string }> => {
   if (posterUrl) return { ok: true, posterUrl };
+  if (landedCandidateUrl) return { ok: true, posterUrl: landedCandidateUrl };
   if (!candidate) return { ok: true, posterUrl: '' };
   await uploadPoster(posterCandidateToFile(candidate));
   const uploaded = getPosterUrl();
@@ -171,11 +181,18 @@ interface UseVideoFormResetArgs {
 /**
  * Resets the form to the loaded video's values once the query settles.
  * Extracted to keep `VideoForm` under the ESLint complexity cap.
+ *
+ * `keepDirtyValues` because this runs on every new `video` identity, not just
+ * the first load: an instant poster pick invalidates the video query, and the
+ * refetched row would otherwise wipe whatever the admin has typed but not yet
+ * saved. Accepted trade-off — a field written with `shouldDirty: true` before
+ * the query settles (a probe/enrichment prefill) also survives the load reset
+ * instead of taking the server value.
  */
 const useVideoFormReset = ({ isEditMode, video, form }: UseVideoFormResetArgs): void => {
   useEffect(() => {
     if (isEditMode && video) {
-      form.reset(mapVideoToFormValues(video));
+      form.reset(mapVideoToFormValues(video), { keepDirtyValues: true });
     }
   }, [isEditMode, video, form]);
 };
@@ -237,10 +254,6 @@ const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | 
 const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
   uploadStatus === 'uploading' || isPosterUploading;
 
-/** The blob the submit path auto-uploads — the selected candidate's, if any. */
-const selectedCandidateBlob = (candidates: PosterCandidate[], selectedIndex: number): Blob | null =>
-  candidates.at(selectedIndex)?.blob ?? null;
-
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */
   isPersisted: boolean;
@@ -287,11 +300,15 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
   const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
-  const [posterCandidates, setPosterCandidates] = useState<PosterCandidate[]>([]);
-  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
 
   /** Tracks whether the next submit is a Save or a Publish. */
   const submitIntentRef = useRef<SubmitIntent>('save');
+  /**
+   * The draft hook needs the poster strip's fields and the strip needs the
+   * draft's id — a cycle. The draft reads this ref lazily (only once an upload
+   * completes, long after the effect below has run), which breaks it.
+   */
+  const getPosterDraftFieldsRef = useRef<() => Promise<DraftPosterFields>>(async () => ({}));
 
   const { createVideoAsync, isCreatingVideo } = useCreateVideoMutation();
   const { updateVideoAsync, isUpdatingVideo } = useUpdateVideoMutation();
@@ -315,6 +332,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const { entries, updateDraft, buildArtistDetails, primarySplitParts } =
     useVideoArtistReview(artistValue);
 
+  const getPosterFields = useCallback(
+    (): Promise<DraftPosterFields> => getPosterDraftFieldsRef.current(),
+    []
+  );
+
   // The draft hook must sit before the upload hook so its handleUploadComplete
   // is available to wire; it in turn depends on buildArtistDetails above.
   const { draftId, handleUploadComplete } = useVideoDraft({
@@ -322,25 +344,39 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     preGeneratedId,
     isEditMode,
     getArtistDetails: buildArtistDetails,
+    getPosterFields,
   });
-  // Capturing a fresh candidate set pre-selects the sharpest frame, so the
-  // Save auto-upload commits exactly what the old single-winner capture did.
-  const handlePosterCandidates = useCallback((candidates: PosterCandidate[]): void => {
-    setPosterCandidates(candidates);
-    setSelectedCandidateIndex(bestPosterCandidateIndex(candidates));
-  }, []);
-  const upload = useVideoUpload({
-    preGeneratedId,
-    form,
-    onPosterCandidates: handlePosterCandidates,
-    onUploadComplete: handleUploadComplete,
-  });
+
+  const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
   // Owned by the form (not the section) so Save can auto-commit the visible
   // candidate frame before submit and the footer can gate on the in-flight PUT.
   const poster = useVideoPosterUpload({ preGeneratedId, setValue });
+  // Owns the candidate strip: fresh capture this session, else the row's stored
+  // candidates; a pick persists instantly once isPersisted. A persisted pick
+  // drops any poster uploaded this session, so the preview follows the pick
+  // instead of staying on the out-ranking manual image.
+  const posterStrip = useVideoPosterStrip({
+    form,
+    video,
+    isPersisted,
+    effectiveVideoId,
+    preGeneratedId,
+    // Only a draft session has already shipped this session's captured frames
+    // to the row; during an edit-mode replace they land at Save, so a fresh
+    // pick must stay local until then.
+    freshCandidatesPersisted: draftId !== null,
+    onPosterPersisted: poster.clearUploadedPoster,
+  });
+  useEffect(() => {
+    getPosterDraftFieldsRef.current = posterStrip.getPosterDraftFields;
+  }, [posterStrip.getPosterDraftFields]);
 
-  const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
-  const selectedPosterBlob = selectedCandidateBlob(posterCandidates, selectedCandidateIndex);
+  const upload = useVideoUpload({
+    preGeneratedId,
+    form,
+    onPosterCandidates: posterStrip.handlePosterCandidates,
+    onUploadComplete: handleUploadComplete,
+  });
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
   useReleaseDateAutoFill({ uploadStatus: upload.status, form });
@@ -394,11 +430,21 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     async (data: VideoFormData): Promise<void> => {
       const intent = submitIntentRef.current;
       submitIntentRef.current = 'save';
+      // The fresh capture's surviving uploads ride every create/update submit —
+      // the server drops them unless the file is new (resolvePersistableCandidates).
+      const posterFields = await posterStrip.getPosterDraftFields();
+      // A poster uploaded this session is what the preview shows (it out-ranks
+      // everything there), so it must out-rank the capture at submit too. This
+      // is the render-closure value the submit was created with — freshness is
+      // guaranteed by the useCallback dep, and `clearUploadedPoster` nulls it
+      // when an instant pick persists, keeping preview and submit in step.
+      const sessionManualPoster = poster.uploadedPosterUrl;
       // Commit the visible candidate frame before submit so Save (or Publish)
       // persists the poster the admin can see, not the empty default.
       const resolvedPoster = await resolveSubmitPosterUrl({
-        candidate: selectedPosterBlob,
+        candidate: posterStrip.selectedPosterBlob,
         posterUrl: data.posterUrl,
+        landedCandidateUrl: posterFields.posterUrl,
         uploadPoster: poster.uploadPoster,
         getPosterUrl: () => form.getValues('posterUrl'),
       });
@@ -408,7 +454,17 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       }
       const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
       return submitVideo(
-        { ...shaped, posterUrl: resolvedPoster.posterUrl },
+        {
+          ...shaped,
+          // Same precedence as the preview: this session's manual poster, then
+          // the fresh capture's picked frame (on a file replace the poster must
+          // follow the new file, not stay on a frame of the old one), then the
+          // resolved form value / Save-time commit.
+          posterUrl: sessionManualPoster ?? posterFields.posterUrl ?? resolvedPoster.posterUrl,
+          ...(posterFields.posterCandidates
+            ? { posterCandidates: posterFields.posterCandidates }
+            : {}),
+        },
         {
           isPersisted,
           effectiveVideoId,
@@ -421,8 +477,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       );
     },
     [
-      selectedPosterBlob,
+      posterStrip,
       poster.uploadPoster,
+      poster.uploadedPosterUrl,
       isDraft,
       isPersisted,
       effectiveVideoId,
@@ -487,9 +544,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoPosterSection
               control={control}
-              candidates={posterCandidates}
-              selectedIndex={selectedCandidateIndex}
-              onSelectCandidate={setSelectedCandidateIndex}
+              candidates={posterStrip.stripCandidates}
+              selectedIndex={posterStrip.selectedIndex}
+              onSelectCandidate={posterStrip.handleSelectCandidate}
               uploadedPosterUrl={poster.uploadedPosterUrl}
               isUploading={poster.isUploading}
               errorMessage={poster.errorMessage}
