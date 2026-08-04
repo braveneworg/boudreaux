@@ -136,13 +136,14 @@ export const useVideoPosterStrip = ({
   // Capturing a fresh candidate set pre-selects the sharpest frame and kicks
   // the upload fan-out, so the selection has a URL to persist by the time the
   // draft lands (and Save can still commit the blob if every upload failed).
-  // An empty capture (an undecodable file, or E2E's fake capture) still resets
-  // the strip but starts nothing — a presign for zero files is pure noise.
+  // Every capture goes to the fan-out, including an empty one: it owns the
+  // settled/aligned state, so only it can forget the previous file's frames
+  // (it skips the pointless presign for an empty set itself).
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
-      if (candidates.length > 0) startUploads(candidates);
+      startUploads(candidates);
     },
     [startUploads]
   );

@@ -120,6 +120,9 @@ const renderStrip = ({
 
 beforeEach(() => {
   mocks.alignedNow = [];
+  // `clearMocks` drops calls, not implementations — reset the fan-out spy so a
+  // test-local fake never leaks into the next test.
+  mocks.startUploads.mockReset();
   mocks.getSettledAligned.mockResolvedValue([]);
   mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
 });
@@ -158,14 +161,14 @@ describe('useVideoPosterStrip — fresh capture', () => {
     expect(harness.current.strip.selectedPosterBlob).toBe(CAPTURED[2].blob);
   });
 
-  it('starts no upload fan-out when the capture produced no frames', () => {
-    // A failed/unsupported capture must not fire a presign round-trip for an
-    // empty list — the Server Action would only log a warning and refuse.
+  it('forwards an empty capture to the fan-out so it resets too', () => {
+    // The fan-out owns the settled/aligned state, so only it can forget the
+    // previous file's frames; it skips the presign for an empty set itself.
     const harness = renderStrip();
 
     act(() => harness.current.strip.handlePosterCandidates([]));
 
-    expect(mocks.startUploads).not.toHaveBeenCalled();
+    expect(mocks.startUploads).toHaveBeenCalledWith([]);
   });
 
   it('still clears the strip when the capture produced no frames', () => {
@@ -175,6 +178,21 @@ describe('useVideoPosterStrip — fresh capture', () => {
     act(() => harness.current.strip.handlePosterCandidates([]));
 
     expect(harness.current.strip.stripCandidates).toEqual([]);
+  });
+
+  it('drops the previous capture from the draft fields when the next one is empty', async () => {
+    // File A uploads and settles; file B decodes to nothing. A's frames must
+    // not persist for B (spec §9). The fake mirrors the real fan-out's reset.
+    mocks.getSettledAligned.mockResolvedValue(UPLOADED);
+    mocks.startUploads.mockImplementation((candidates: PosterCandidate[]): void => {
+      if (candidates.length === 0) mocks.getSettledAligned.mockResolvedValue([]);
+    });
+    const harness = renderStrip();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    await expect(harness.current.strip.getPosterDraftFields()).resolves.toEqual({});
   });
 });
 

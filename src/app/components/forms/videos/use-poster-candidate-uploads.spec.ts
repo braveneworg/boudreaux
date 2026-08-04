@@ -55,6 +55,24 @@ const renderUploads = (
 ): { current: ReturnType<typeof usePosterCandidateUploads> } =>
   renderHook(() => usePosterCandidateUploads({ preGeneratedId })).result;
 
+/** Land one candidate so the hook holds real settled state to be reset. */
+const runOneSuccessfulFanOut = async (result: {
+  current: ReturnType<typeof usePosterCandidateUploads>;
+}): Promise<void> => {
+  getPresignedUploadUrlsActionMock.mockResolvedValue({
+    success: true,
+    data: [presignedTarget(1)],
+  });
+  uploadFileToS3Mock.mockResolvedValue({ success: true, cdnUrl: 'https://cdn/candidate-1.jpg' });
+
+  act(() => {
+    result.current.startUploads([makeCandidate(0)]);
+  });
+  await act(async () => {
+    await result.current.getSettledAligned();
+  });
+};
+
 describe('usePosterCandidateUploads', () => {
   beforeEach(() => {
     getPresignedUploadUrlsActionMock.mockReset();
@@ -227,6 +245,72 @@ describe('usePosterCandidateUploads', () => {
     });
 
     expect(result.current.alignedNow).toEqual(freshSettled);
+  });
+
+  it('never presigns for an empty candidate set', async () => {
+    // An undecodable file (or E2E's fake capture) yields no frames — a presign
+    // round-trip for zero files is pure noise the Server Action would refuse.
+    const result = renderUploads();
+
+    act(() => {
+      result.current.startUploads([]);
+    });
+
+    expect(getPresignedUploadUrlsActionMock).not.toHaveBeenCalled();
+  });
+
+  it('settles empty when a later capture produces no frames', async () => {
+    // File A's frames must never ride file B's draft/save payload (spec §9):
+    // this reset is the only writer of the settled state the strip reads.
+    const result = renderUploads();
+    await runOneSuccessfulFanOut(result);
+
+    act(() => {
+      result.current.startUploads([]);
+    });
+
+    let settled: (VideoPosterCandidate | null)[] = [];
+    await act(async () => {
+      settled = await result.current.getSettledAligned();
+    });
+
+    expect(settled).toEqual([]);
+  });
+
+  it('clears alignedNow when a later capture produces no frames', async () => {
+    const result = renderUploads();
+    await runOneSuccessfulFanOut(result);
+
+    act(() => {
+      result.current.startUploads([]);
+    });
+
+    expect(result.current.alignedNow).toEqual([]);
+  });
+
+  it('discards an older in-flight run superseded by an empty capture', async () => {
+    const staleUpload = createDeferred<{ success: boolean; cdnUrl?: string }>();
+    getPresignedUploadUrlsActionMock.mockResolvedValue({
+      success: true,
+      data: [presignedTarget(1)],
+    });
+    uploadFileToS3Mock.mockImplementationOnce(() => staleUpload.promise);
+
+    const result = renderUploads();
+
+    act(() => {
+      result.current.startUploads([makeCandidate(0)]);
+    });
+    act(() => {
+      result.current.startUploads([]);
+    });
+
+    await act(async () => {
+      staleUpload.resolve({ success: true, cdnUrl: 'https://cdn/candidate-1.jpg' });
+      await flushMicrotasks();
+    });
+
+    expect(result.current.alignedNow).toEqual([]);
   });
 
   it('settles empty and never lets a thrown presign error escape', async () => {

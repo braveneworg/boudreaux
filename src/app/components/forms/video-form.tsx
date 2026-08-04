@@ -86,18 +86,27 @@ const mergeArtistDetails = (
 interface ResolveSubmitPosterArgs {
   candidate: Blob | null;
   posterUrl: string | undefined;
+  /** URL this capture's own candidate upload already landed, when it did. */
+  landedCandidateUrl: string | undefined;
   uploadPoster: (file: File) => Promise<void>;
   getPosterUrl: () => string | undefined;
 }
 
-/** Commit the visible candidate frame before submit; '' + ok:false = upload failed. */
+/**
+ * Commit the visible candidate frame before submit; '' + ok:false = upload
+ * failed. Uploads nothing when a poster URL already exists — on the form, or
+ * from this capture's own landed candidate upload, whose durable URL outranks
+ * the commit anyway; a second PUT would only leave an unreferenced poster.jpg.
+ */
 const resolveSubmitPosterUrl = async ({
   candidate,
   posterUrl,
+  landedCandidateUrl,
   uploadPoster,
   getPosterUrl,
 }: ResolveSubmitPosterArgs): Promise<{ ok: boolean; posterUrl: string }> => {
   if (posterUrl) return { ok: true, posterUrl };
+  if (landedCandidateUrl) return { ok: true, posterUrl: landedCandidateUrl };
   if (!candidate) return { ok: true, posterUrl: '' };
   await uploadPoster(posterCandidateToFile(candidate));
   const uploaded = getPosterUrl();
@@ -421,11 +430,20 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     async (data: VideoFormData): Promise<void> => {
       const intent = submitIntentRef.current;
       submitIntentRef.current = 'save';
+      // The fresh capture's surviving uploads ride every create/update submit —
+      // the server drops them unless the file is new (resolvePersistableCandidates).
+      const posterFields = await posterStrip.getPosterDraftFields();
+      // Snapshot before any commit: a poster uploaded this session is what the
+      // preview shows (it out-ranks everything there), so it must out-rank the
+      // capture at submit too — and `clearUploadedPoster` already nulls it when
+      // an instant pick persists, keeping the two in step.
+      const sessionManualPoster = poster.uploadedPosterUrl;
       // Commit the visible candidate frame before submit so Save (or Publish)
       // persists the poster the admin can see, not the empty default.
       const resolvedPoster = await resolveSubmitPosterUrl({
         candidate: posterStrip.selectedPosterBlob,
         posterUrl: data.posterUrl,
+        landedCandidateUrl: posterFields.posterUrl,
         uploadPoster: poster.uploadPoster,
         getPosterUrl: () => form.getValues('posterUrl'),
       });
@@ -434,16 +452,14 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         return;
       }
       const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
-      // The fresh capture's surviving uploads ride every create/update submit —
-      // the server drops them unless the file is new (resolvePersistableCandidates).
-      const posterFields = await posterStrip.getPosterDraftFields();
       return submitVideo(
         {
           ...shaped,
-          // A fresh capture's picked frame wins: on a file replace the poster
-          // must follow the new file, not stay on a frame of the old one. With
-          // no capture (or its upload failed) the resolved value stands.
-          posterUrl: posterFields.posterUrl ?? resolvedPoster.posterUrl,
+          // Same precedence as the preview: this session's manual poster, then
+          // the fresh capture's picked frame (on a file replace the poster must
+          // follow the new file, not stay on a frame of the old one), then the
+          // resolved form value / Save-time commit.
+          posterUrl: sessionManualPoster ?? posterFields.posterUrl ?? resolvedPoster.posterUrl,
           ...(posterFields.posterCandidates
             ? { posterCandidates: posterFields.posterCandidates }
             : {}),
@@ -462,6 +478,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     [
       posterStrip,
       poster.uploadPoster,
+      poster.uploadedPosterUrl,
       isDraft,
       isPersisted,
       effectiveVideoId,

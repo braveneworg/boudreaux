@@ -1316,6 +1316,18 @@ describe('VideoForm — stored poster candidates on an edit visit', () => {
 });
 
 describe('VideoForm — poster candidate auto-commit on Save', () => {
+  /** What the strip resolves once this session's capture uploaded successfully. */
+  const LANDED_CAPTURE_FIELDS: DraftPosterFields = {
+    posterUrl: 'https://cdn.example.com/media/videos/aaa/poster-candidate-1.jpg',
+    posterCandidates: [
+      {
+        url: 'https://cdn.example.com/media/videos/aaa/poster-candidate-1.jpg',
+        atSeconds: 3.7,
+        score: 1,
+      },
+    ],
+  };
+
   it('uploads the visible candidate frame on Save when no poster is chosen', async () => {
     mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
     const user = setup();
@@ -1422,6 +1434,74 @@ describe('VideoForm — poster candidate auto-commit on Save', () => {
     // The 6.5s candidate's blob is 'zzz' — 3 bytes — not the argmax frame's 1.
     const file = mocks.posterUploadImpl.mock.calls[0][0] as File;
     expect(file.size).toBe(3);
+  });
+
+  it('skips the Save-time blob upload when the capture already landed a URL', async () => {
+    // The frame is already durable under its own candidate key; re-committing
+    // it as poster.jpg would PUT an object nothing ever references.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue(LANDED_CAPTURE_FIELDS);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    expect(mocks.posterUploadImpl).not.toHaveBeenCalled();
+  });
+
+  it('still blob-commits the frame when the capture landed candidates but no URL', async () => {
+    // The selected frame's own upload failed while its siblings survived —
+    // the Save-time fallback is the only thing that can persist what's visible.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue({
+      posterCandidates: LANDED_CAPTURE_FIELDS.posterCandidates,
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
+  });
+
+  it('submits the poster uploaded manually after a capture landed, not the frame', async () => {
+    // Preview priority is the session upload first, and the strip is what the
+    // admin is looking at — Save must persist that image, not the frame URL.
+    mocks.captureVideoPosterCandidates.mockResolvedValue([singleCandidate()]);
+    mocks.getPosterDraftFields.mockResolvedValue(LANDED_CAPTURE_FIELDS);
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: 'https://cdn.example.com/poster.jpg' })
+      )
+    );
   });
 
   it('does not re-upload a poster on Save when one is already chosen', async () => {

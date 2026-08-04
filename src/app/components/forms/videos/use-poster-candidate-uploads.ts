@@ -12,7 +12,11 @@ import { uploadFileToS3 } from '@/lib/utils/direct-upload';
 import type { PosterCandidate } from './video-metadata';
 
 export interface UsePosterCandidateUploadsResult {
-  /** Kick the parallel presign+PUT fan-out for a fresh candidate set. */
+  /**
+   * Kick the parallel presign+PUT fan-out for a fresh candidate set. An empty
+   * set resets the fan-out state without touching the network — call it for
+   * every capture, including the ones that produced nothing.
+   */
   startUploads: (candidates: PosterCandidate[]) => void;
   /** Index-aligned uploaded candidates (null = that frame's upload failed). Empty until settled. */
   alignedNow: (VideoPosterCandidate | null)[];
@@ -45,7 +49,10 @@ const uploadOne = async (
  *
  * Latest-run-wins: if `startUploads` is called again before an in-flight
  * fan-out settles, the older run's network resolution is discarded rather
- * than clobbering `alignedNow` with stale, index-misaligned candidates.
+ * than clobbering `alignedNow` with stale, index-misaligned candidates. That
+ * holds for a capture that produced nothing too — it resets the state without
+ * a network call, so the previous file's frames can never be persisted for a
+ * new one.
  */
 export const usePosterCandidateUploads = ({
   preGeneratedId,
@@ -92,6 +99,15 @@ export const usePosterCandidateUploads = ({
       // Unconditional: this reset always reflects the newest run, regardless
       // of which run's network settles first.
       setAlignedNow([]);
+      // An empty capture (an undecodable file, or E2E's fake capture) still
+      // resets both halves of the state — the previous file's frames must not
+      // ride the new one's draft/save payload — but presigning zero files is
+      // pure noise the Server Action would only refuse. The generation bump
+      // above still discards any older run in flight.
+      if (candidates.length === 0) {
+        settledRef.current = Promise.resolve([]);
+        return;
+      }
       // Never rejects: presign/PUT failures resolve to []/nulls above; a thrown
       // network error degrades to the legacy Save-time path.
       settledRef.current = runUploads(candidates, generation).catch(() => []);
