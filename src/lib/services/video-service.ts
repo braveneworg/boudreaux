@@ -21,18 +21,24 @@ import type { ServiceResponse } from './service.types';
 /**
  * Collect the S3 keys to remove when a video is hard-deleted:
  * always the stored `s3Key`; plus the key derived from `posterUrl` when set
- * and extractable. URL→key extraction (CDN and S3 styles) is delegated to
- * {@link extractS3KeyFromUrl}.
+ * and extractable; plus every stored candidate frame key. URL→key extraction
+ * (CDN and S3 styles) is delegated to {@link extractS3KeyFromUrl}. `posterUrl`
+ * may itself BE one of the candidates, so keys are deduplicated via a `Set`.
  */
-const collectVideoS3Keys = ({ s3Key, posterUrl }: Video): string[] => {
-  const keys: string[] = [s3Key];
+const collectVideoS3Keys = ({ s3Key, posterUrl, posterCandidates }: Video): string[] => {
+  const keys = new Set<string>([s3Key]);
 
   if (posterUrl) {
     const posterKey = extractS3KeyFromUrl(posterUrl);
-    if (isVideoNamespacedKey(posterKey)) keys.push(posterKey);
+    if (isVideoNamespacedKey(posterKey)) keys.add(posterKey);
   }
 
-  return keys;
+  posterCandidates.forEach((candidate) => {
+    const candidateKey = extractS3KeyFromUrl(candidate.url);
+    if (isVideoNamespacedKey(candidateKey)) keys.add(candidateKey);
+  });
+
+  return [...keys];
 };
 
 export class VideoService {

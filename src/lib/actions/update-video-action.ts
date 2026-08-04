@@ -31,6 +31,7 @@ import {
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
+  resolvePersistableCandidates,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -91,7 +92,11 @@ const runVideoUpdate = async (
     }
   }
 
-  const response = await VideoService.updateVideo(videoId, buildVideoUpdateInput(data, userId));
+  const candidates = resolvePersistableCandidates(data, videoId, s3KeyReplaced);
+  const response = await VideoService.updateVideo(videoId, {
+    ...buildVideoUpdateInput(data, userId),
+    ...(candidates !== undefined ? { posterCandidates: candidates } : {}),
+  });
 
   logSecurityEvent({
     event: 'media.video.updated',

@@ -520,6 +520,44 @@ describe('VideoService', () => {
       expect(deleteS3Object).toHaveBeenCalledWith('videos/video-123/test.mp4');
     });
 
+    it('deletes stored candidate keys alongside the s3Key and poster key, deduplicated', async () => {
+      const { deleteS3Object } = await import('../utils/s3-client');
+      const { extractS3KeyFromUrl } = await import('../utils/s3-key-utils');
+      const candidates: VideoPosterCandidate[] = [
+        {
+          url: 'https://cdn.example.com/media/videos/video-123/candidate-1.jpg',
+          atSeconds: 1,
+          score: 1,
+        },
+        {
+          url: 'https://cdn.example.com/media/videos/video-123/candidate-2.jpg',
+          atSeconds: 2,
+          score: 2,
+        },
+      ];
+      // posterUrl IS one of the candidates — the two must be deduplicated.
+      const withCandidates = {
+        ...mockVideo,
+        posterUrl: candidates[0].url,
+        posterCandidates: candidates,
+      };
+      vi.mocked(VideoRepository.findById).mockResolvedValue(withCandidates);
+      vi.mocked(VideoRepository.delete).mockResolvedValue(withCandidates);
+      vi.mocked(extractS3KeyFromUrl).mockImplementation((url: string) => {
+        const match = url.match(/\/(media\/videos\/.+)$/);
+        return match ? match[1] : null;
+      });
+
+      const result = await VideoService.deleteVideo('video-123');
+
+      expect(result).toMatchObject({ success: true });
+      expect(deleteS3Object).toHaveBeenCalledWith('videos/video-123/test.mp4');
+      expect(deleteS3Object).toHaveBeenCalledWith('media/videos/video-123/candidate-1.jpg');
+      expect(deleteS3Object).toHaveBeenCalledWith('media/videos/video-123/candidate-2.jpg');
+      // s3Key + 2 distinct candidate keys — posterUrl's key duplicates candidate-1's.
+      expect(deleteS3Object).toHaveBeenCalledTimes(3);
+    });
+
     it('returns success even when S3 deletion rejects', async () => {
       const { deleteS3Object } = await import('../utils/s3-client');
       vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);

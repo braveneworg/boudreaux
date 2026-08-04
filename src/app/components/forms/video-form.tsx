@@ -430,8 +430,17 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         return;
       }
       const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
+      // The fresh capture's surviving uploads ride every create/update submit —
+      // the server drops them unless the file is new (resolvePersistableCandidates).
+      const posterFields = await posterStrip.getPosterDraftFields();
       return submitVideo(
-        { ...shaped, posterUrl: resolvedPoster.posterUrl },
+        {
+          ...shaped,
+          posterUrl: resolvedPoster.posterUrl,
+          ...(posterFields.posterCandidates
+            ? { posterCandidates: posterFields.posterCandidates }
+            : {}),
+        },
         {
           isPersisted,
           effectiveVideoId,
@@ -444,7 +453,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       );
     },
     [
-      posterStrip.selectedPosterBlob,
+      posterStrip,
       poster.uploadPoster,
       isDraft,
       isPersisted,

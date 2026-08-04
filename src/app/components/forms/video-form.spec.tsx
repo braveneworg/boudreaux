@@ -875,6 +875,66 @@ describe('VideoForm — draft poster-fields seam', () => {
   });
 });
 
+describe('VideoForm — submit merges surviving uploaded candidates', () => {
+  const posterCandidates = [
+    { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 1, score: 0.9 },
+  ];
+
+  it('includes posterCandidates in the create payload when the strip resolves survivors', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.createVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ posterCandidates })
+      )
+    );
+  });
+
+  it('omits posterCandidates from the create payload when the strip resolves none', async () => {
+    mocks.getPosterDraftFields.mockResolvedValue({});
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+    const payload = mocks.createVideoAsync.mock.calls[0][0];
+    expect(Object.prototype.hasOwnProperty.call(payload, 'posterCandidates')).toBe(false);
+  });
+
+  it('includes posterCandidates in an update (edit save) payload too', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ values: expect.objectContaining({ posterCandidates }) })
+      )
+    );
+  });
+});
+
 describe('VideoForm — reset on a refetched video row', () => {
   const asVideoRow = (video: unknown) =>
     mocks.useVideoQuery.mockReturnValue({

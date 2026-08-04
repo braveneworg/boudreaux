@@ -29,6 +29,7 @@ import { createVideoSchema } from '@/lib/validation/create-video-schema';
 import {
   buildVideoCreateInput,
   confirmVideoUpload,
+  resolvePersistableCandidates,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -85,7 +86,9 @@ const runVideoCreate = async (
       return;
     }
 
-    const input: CreateVideoData = buildVideoCreateInput(data, preGeneratedId, userId);
+    // A create IS a fresh file — s3KeyReplaced is true by definition.
+    const candidates = resolvePersistableCandidates(data, preGeneratedId, true);
+    const input: CreateVideoData = buildVideoCreateInput(data, preGeneratedId, userId, candidates);
     const response = await VideoService.createVideo(input);
 
     logSecurityEvent({

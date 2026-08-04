@@ -132,6 +132,7 @@ describe('createVideoAction', () => {
           'fileSize',
           'mimeType',
           'posterUrl',
+          'posterCandidates',
           'publishedAt',
           'artistDetails',
           'producers',
@@ -594,6 +595,40 @@ describe('createVideoAction', () => {
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'producers')).toBe(false);
+    });
+  });
+
+  describe('Poster candidates', () => {
+    // Real (unmocked) s3-key-utils in this spec file: an S3-style URL lets
+    // extractS3KeyFromUrl resolve a key without a CDN_DOMAIN env var.
+    const s3CandidateUrl = (ownerId: string, n: number) =>
+      `https://my-bucket.s3.us-east-1.amazonaws.com/media/videos/${ownerId}/poster-candidate-${n}.jpg`;
+
+    it('includes candidates namespaced to the pre-generated id in the create payload', async () => {
+      const posterCandidates = [
+        { url: s3CandidateUrl(videoId, 1), atSeconds: 1, score: 0.9 },
+        { url: s3CandidateUrl(videoId, 2), atSeconds: 2, score: 0.8 },
+      ];
+      mockParsedSuccess({ ...parsedData, posterCandidates });
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(VideoService.createVideo).toHaveBeenCalledWith(
+        expect.objectContaining({ posterCandidates })
+      );
+    });
+
+    it('drops candidates namespaced to a foreign video while the create still succeeds', async () => {
+      const posterCandidates = [
+        { url: s3CandidateUrl('other-video', 1), atSeconds: 1, score: 0.9 },
+      ];
+      mockParsedSuccess({ ...parsedData, posterCandidates });
+
+      const result = await createVideoAction(initialFormState, buildFormData());
+
+      const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+      expect(Object.prototype.hasOwnProperty.call(createCall, 'posterCandidates')).toBe(false);
+      expect(result.success).toBe(true);
     });
   });
 });
