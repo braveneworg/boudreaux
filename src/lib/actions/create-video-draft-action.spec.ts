@@ -9,6 +9,7 @@ import type * as VideoPostSaveService from '@/lib/services/video-post-save-servi
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 
 import { createVideoDraftAction } from './create-video-draft-action';
 import { confirmVideoUpload, parseDurationSeconds, parseFileSize } from './video-action-helpers';
@@ -55,6 +56,9 @@ const validInput = {
 
 beforeEach(() => {
   afterCallbacks.length = 0;
+  // areCandidatesForVideo (kept real above) resolves candidate URLs against
+  // this CDN host to derive the S3 key it namespace-checks.
+  vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
   vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(requireRole).mockResolvedValue(mockSession as never);
   vi.mocked(revalidatePath).mockImplementation(() => {});
@@ -65,6 +69,10 @@ beforeEach(() => {
     success: true,
     data: { id: ID },
   } as never);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('createVideoDraftAction', () => {
@@ -305,5 +313,70 @@ describe('createVideoDraftAction', () => {
     await createVideoDraftAction(validInput);
 
     expect(afterCallbacks).toHaveLength(1);
+  });
+
+  const candidate = (n: number) => ({
+    url: `https://cdn.example.com/media/videos/${ID}/poster-candidate-${n}.jpg`,
+    atSeconds: n + 2.7,
+    score: 10 + n,
+  });
+
+  it('persists posterUrl and posterCandidates on the draft', async () => {
+    const result = await createVideoDraftAction({
+      ...validInput,
+      posterUrl: candidate(1).url,
+      posterCandidates: [candidate(1), candidate(2)],
+    });
+
+    expect(result.success).toBe(true);
+    expect(VideoService.createVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        posterUrl: candidate(1).url,
+        posterCandidates: [candidate(1), candidate(2)],
+      })
+    );
+  });
+
+  it('drops poster fields when a candidate is outside the video namespace', async () => {
+    const warnSpy = vi.spyOn(loggers.media, 'warn').mockImplementation(() => {});
+    const foreign = {
+      url: 'https://cdn.example.com/media/videos/other/poster-candidate-1.jpg',
+      atSeconds: 3,
+      score: 1,
+    };
+    const result = await createVideoDraftAction({
+      ...validInput,
+      posterUrl: foreign.url,
+      posterCandidates: [foreign],
+    });
+
+    expect(result.success).toBe(true);
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input).not.toHaveProperty('posterCandidates');
+    expect(input?.posterUrl).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith('video_draft_poster_candidates_rejected', {
+      videoId: ID,
+    });
+  });
+
+  it('drops a posterUrl that is not one of the candidates', async () => {
+    const result = await createVideoDraftAction({
+      ...validInput,
+      posterUrl: candidate(3).url,
+      posterCandidates: [candidate(1)],
+    });
+
+    expect(result.success).toBe(true);
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input?.posterUrl).toBeUndefined();
+    expect(input?.posterCandidates).toEqual([candidate(1)]);
+  });
+
+  it('creates the draft with no poster fields when candidates are absent', async () => {
+    await createVideoDraftAction(validInput);
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input).not.toHaveProperty('posterCandidates');
+    expect(input?.posterUrl).toBeUndefined();
   });
 });

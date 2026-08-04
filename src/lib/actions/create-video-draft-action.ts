@@ -15,14 +15,19 @@ import {
   videoPostSaveHasWork,
 } from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
-import type { CreateVideoData } from '@/lib/types/domain/video';
+import type { CreateVideoData, VideoPosterCandidate } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { videoDraftSchema, type VideoDraftInput } from '@/lib/validation/video-draft-schema';
 import { parseVideoFilename } from '@/utils/parse-video-filename';
 
-import { confirmVideoUpload, parseDurationSeconds, parseFileSize } from './video-action-helpers';
+import {
+  areCandidatesForVideo,
+  confirmVideoUpload,
+  parseDurationSeconds,
+  parseFileSize,
+} from './video-action-helpers';
 
 const logger = loggers.media;
 
@@ -48,6 +53,30 @@ const draftReleasedOn = (value: string | undefined): Date => {
   return new Date(new Date().toISOString().slice(0, 10));
 };
 
+/** Poster fields for the draft — validated to the video's own namespace, else dropped. */
+interface DraftPosterInput {
+  posterUrl?: string;
+  posterCandidates?: VideoPosterCandidate[];
+}
+
+/**
+ * Resolve the poster fields the draft may persist. Candidates must all live
+ * under this video's own S3 namespace and `posterUrl` must be one of them;
+ * anything else is dropped (never blocks the draft) and logged.
+ */
+const resolveDraftPosterInput = (data: VideoDraftInput): DraftPosterInput => {
+  const candidates = data.posterCandidates ?? [];
+  if (candidates.length === 0) return {};
+  if (!areCandidatesForVideo(candidates, data.preGeneratedId)) {
+    logger.warn('video_draft_poster_candidates_rejected', { videoId: data.preGeneratedId });
+    return {};
+  }
+  const posterUrl = candidates.some(({ url }) => url === data.posterUrl)
+    ? data.posterUrl
+    : undefined;
+  return { posterCandidates: candidates, ...(posterUrl ? { posterUrl } : {}) };
+};
+
 /** Repository payload for the draft — `publishedAt` omitted: always a draft. */
 const buildDraftCreateInput = (data: VideoDraftInput, userId: string): CreateVideoData => ({
   id: data.preGeneratedId,
@@ -61,6 +90,7 @@ const buildDraftCreateInput = (data: VideoDraftInput, userId: string): CreateVid
   fileName: data.fileName,
   fileSize: parseFileSize(data.fileSize),
   mimeType: data.mimeType,
+  ...resolveDraftPosterInput(data),
   createdBy: userId,
 });
 
