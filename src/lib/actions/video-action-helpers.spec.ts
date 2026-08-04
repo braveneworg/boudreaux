@@ -8,6 +8,7 @@ import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { localCompleteUpload, localRecordPart, localStartUpload } from './multipart-local-adapters';
 import {
+  areCandidatesForVideo,
   buildVideoCreateInput,
   buildVideoUpdateInput,
   confirmVideoUpload,
@@ -243,6 +244,43 @@ describe('deleteReplacedVideoAssets', () => {
     deleteReplacedVideoAssets(currentVideo, { ...formData, posterUrl: currentPosterUrl }, false);
 
     expect(deleteS3Object).not.toHaveBeenCalled();
+  });
+});
+
+describe('areCandidatesForVideo', () => {
+  const forVideo = (id: string, n: number) => ({
+    url: `https://cdn.example.com/media/videos/${id}/poster-candidate-${n}.jpg`,
+    atSeconds: n,
+    score: 1,
+  });
+
+  beforeEach(() => {
+    // Mock extractS3KeyFromUrl to extract the key from the URL
+    vi.mocked(extractS3KeyFromUrl).mockImplementation((url: string) => {
+      const match = url.match(/\/media\/(videos|releases)\/(.+)\/(.+)/);
+      return match ? `media/${match[1]}/${match[2]}/${match[3]}` : null;
+    });
+  });
+
+  it('accepts candidates namespaced to the video', () => {
+    expect(areCandidatesForVideo([forVideo('vid1', 1), forVideo('vid1', 2)], 'vid1')).toBe(true);
+  });
+
+  it('rejects a candidate namespaced to another video', () => {
+    expect(areCandidatesForVideo([forVideo('vid1', 1), forVideo('vid2', 2)], 'vid1')).toBe(false);
+  });
+
+  it('rejects a candidate outside the video namespace', () => {
+    const foreign = {
+      url: 'https://cdn.example.com/media/releases/r1/a.jpg',
+      atSeconds: 1,
+      score: 1,
+    };
+    expect(areCandidatesForVideo([foreign], 'vid1')).toBe(false);
+  });
+
+  it('accepts an empty list', () => {
+    expect(areCandidatesForVideo([], 'vid1')).toBe(true);
   });
 });
 

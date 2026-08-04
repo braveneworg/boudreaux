@@ -7,6 +7,7 @@ import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import { videoArtistDetailSchema } from './video-artist-detail-schema';
+import { posterCandidatesSchema } from './video-poster-candidate-schema';
 
 /**
  * Lenient payload for the draft row created at upload-complete: only the
@@ -26,6 +27,8 @@ export const videoDraftSchema = z.object({
   durationSeconds: z.union([z.string(), z.number()]).optional(),
   fileSize: z.union([z.string(), z.number()]).optional(),
   artistDetails: z.array(videoArtistDetailSchema).max(20).optional(),
+  posterUrl: z.string().url().max(2048).optional(),
+  posterCandidates: posterCandidatesSchema.optional(),
 });
 
 export type VideoDraftInput = z.infer<typeof videoDraftSchema>;

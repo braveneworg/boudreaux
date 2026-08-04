@@ -4,7 +4,12 @@
 import 'server-only';
 
 import { isVideoNamespacedKey, VIDEO_KEY_PREFIX } from '@/lib/constants/video-uploads';
-import type { CreateVideoData, UpdateVideoData, Video } from '@/lib/types/domain/video';
+import type {
+  CreateVideoData,
+  UpdateVideoData,
+  Video,
+  VideoPosterCandidate,
+} from '@/lib/types/domain/video';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
@@ -122,6 +127,19 @@ export const buildVideoUpdateInput = (data: VideoFormData, userId: string): Upda
  */
 export const isPosterReplaced = (current: Video, data: VideoFormData): boolean =>
   data.posterUrl !== undefined && data.posterUrl !== '' && data.posterUrl !== current.posterUrl;
+
+/**
+ * Whether EVERY candidate URL resolves to an S3 key inside this video's own
+ * namespace (`media/videos/{videoId}/…`) — the write-path injection guard for
+ * admin-supplied candidate lists.
+ */
+export const areCandidatesForVideo = (
+  candidates: VideoPosterCandidate[],
+  videoId: string
+): boolean =>
+  candidates.every((candidate) =>
+    (extractS3KeyFromUrl(candidate.url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`)
+  );
 
 /**
  * Best-effort, fire-and-forget cleanup of S3 objects a successful update
