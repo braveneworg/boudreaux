@@ -37,6 +37,27 @@ export const deleteVideoCascade = async (videoId: string): Promise<void> => {
 };
 
 /**
+ * Clear a seeded video's `posterUrl` back to the null the seed writes. Used by
+ * the poster-select spec in a `finally` so the pick it persists never survives
+ * the test: reruns start from "nothing checked" again and any sibling spec
+ * reading the row sees seeded state.
+ *
+ * Uses an isolated Prisma client pinned to the local Docker Mongo — the same
+ * datasource the seed uses — and disconnects in `finally` so a failed update
+ * can never leak a connection.
+ */
+export const resetVideoPosterUrl = async (videoId: string): Promise<void> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    // updateMany, not update: a no-op is preferable to a P2025 throw masking
+    // the real failure when the test bailed before the row existed.
+    await prisma.video.updateMany({ where: { id: videoId }, data: { posterUrl: null } });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/**
  * Hard-delete a spec-created Artist shell — but only when it has no remaining
  * VideoArtist join rows. Guards against accidentally removing a shell that a
  * parallel spec or seed row still references. Safe to call even if the artist
