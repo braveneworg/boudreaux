@@ -42,6 +42,10 @@ const uploadOne = async (
  * the moment capture finishes — one presign batch, parallel PUTs,
  * skip-and-continue per frame. Zero successes degrades to the legacy
  * Save-time blob upload; nothing here ever blocks the video upload.
+ *
+ * Latest-run-wins: if `startUploads` is called again before an in-flight
+ * fan-out settles, the older run's network resolution is discarded rather
+ * than clobbering `alignedNow` with stale, index-misaligned candidates.
  */
 export const usePosterCandidateUploads = ({
   preGeneratedId,
@@ -50,9 +54,13 @@ export const usePosterCandidateUploads = ({
 }): UsePosterCandidateUploadsResult => {
   const [alignedNow, setAlignedNow] = useState<(VideoPosterCandidate | null)[]>([]);
   const settledRef = useRef<Promise<(VideoPosterCandidate | null)[]>>(Promise.resolve([]));
+  const generationRef = useRef<number>(0);
 
   const runUploads = useCallback(
-    async (candidates: PosterCandidate[]): Promise<(VideoPosterCandidate | null)[]> => {
+    async (
+      candidates: PosterCandidate[],
+      generation: number
+    ): Promise<(VideoPosterCandidate | null)[]> => {
       const presigned = await getPresignedUploadUrlsAction(
         'videos',
         preGeneratedId,
@@ -67,7 +75,12 @@ export const usePosterCandidateUploads = ({
       const aligned = await Promise.all(
         candidates.map((candidate, index) => uploadOne(candidate, index, targets.at(index)))
       );
-      setAlignedNow(aligned);
+      // Only the newest run may publish to alignedNow — an older run that
+      // resolves after a newer one started would otherwise overwrite it with
+      // stale, index-misaligned data.
+      if (generationRef.current === generation) {
+        setAlignedNow(aligned);
+      }
       return aligned;
     },
     [preGeneratedId]
@@ -75,10 +88,13 @@ export const usePosterCandidateUploads = ({
 
   const startUploads = useCallback(
     (candidates: PosterCandidate[]): void => {
+      const generation = (generationRef.current += 1);
+      // Unconditional: this reset always reflects the newest run, regardless
+      // of which run's network settles first.
       setAlignedNow([]);
       // Never rejects: presign/PUT failures resolve to []/nulls above; a thrown
       // network error degrades to the legacy Save-time path.
-      settledRef.current = runUploads(candidates).catch(() => []);
+      settledRef.current = runUploads(candidates, generation).catch(() => []);
     },
     [runUploads]
   );

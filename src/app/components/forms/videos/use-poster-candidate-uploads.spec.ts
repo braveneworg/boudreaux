@@ -34,6 +34,22 @@ const presignedTarget = (n: number): { uploadUrl: string; s3Key: string; cdnUrl:
   cdnUrl: `https://cdn/candidate-${n}.jpg`,
 });
 
+/** A promise whose resolution is controlled from outside, for interleaving async fan-outs. */
+const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolveDeferred: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolveDeferred = resolve;
+  });
+  return { promise, resolve: resolveDeferred };
+};
+
+/** Drain the microtask queue several times over, without relying on fake/real timers. */
+const flushMicrotasks = async (): Promise<void> => {
+  for (let tick = 0; tick < 10; tick += 1) {
+    await Promise.resolve();
+  }
+};
+
 const renderUploads = (
   preGeneratedId = 'vid1'
 ): { current: ReturnType<typeof usePosterCandidateUploads> } =>
@@ -161,5 +177,74 @@ describe('usePosterCandidateUploads', () => {
 
     expect(settled).toEqual([]);
     expect(getPresignedUploadUrlsActionMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps alignedNow at the newer run when an older stale run settles last', async () => {
+    const staleCandidates = [makeCandidate(0)];
+    const freshCandidates = [makeCandidate(9)];
+
+    getPresignedUploadUrlsActionMock
+      .mockResolvedValueOnce({ success: true, data: [presignedTarget(1)] })
+      .mockResolvedValueOnce({ success: true, data: [presignedTarget(9)] });
+
+    const staleUpload = createDeferred<{ success: boolean; cdnUrl?: string }>();
+    uploadFileToS3Mock
+      .mockImplementationOnce(() => staleUpload.promise)
+      .mockResolvedValueOnce({ success: true, cdnUrl: 'https://cdn/candidate-9.jpg' });
+
+    const result = renderUploads();
+
+    // Older run starts first and stalls on its S3 PUT.
+    act(() => {
+      result.current.startUploads(staleCandidates);
+    });
+    // Newer run starts before the older run's fan-out has settled.
+    act(() => {
+      result.current.startUploads(freshCandidates);
+    });
+
+    const freshSettled = [
+      {
+        url: 'https://cdn/candidate-9.jpg',
+        atSeconds: freshCandidates[0].atSeconds,
+        score: freshCandidates[0].score,
+      },
+    ];
+
+    let settled: (VideoPosterCandidate | null)[] = [];
+    await act(async () => {
+      settled = await result.current.getSettledAligned();
+    });
+
+    expect(settled).toEqual(freshSettled);
+    expect(result.current.alignedNow).toEqual(freshSettled);
+
+    // The stale (first) run's network call resolves AFTER the newer run has
+    // already settled and applied its aligned state to alignedNow.
+    await act(async () => {
+      staleUpload.resolve({ success: true, cdnUrl: 'https://cdn/candidate-1.jpg' });
+      await flushMicrotasks();
+    });
+
+    expect(result.current.alignedNow).toEqual(freshSettled);
+  });
+
+  it('settles empty and never lets a thrown presign error escape', async () => {
+    const candidates = [makeCandidate(0), makeCandidate(1)];
+    getPresignedUploadUrlsActionMock.mockRejectedValue(new Error('network'));
+
+    const result = renderUploads();
+
+    act(() => {
+      result.current.startUploads(candidates);
+    });
+
+    let settled: (VideoPosterCandidate | null)[] = [];
+    await act(async () => {
+      settled = await result.current.getSettledAligned();
+    });
+
+    expect(settled).toEqual([]);
+    expect(uploadFileToS3Mock).not.toHaveBeenCalled();
   });
 });
