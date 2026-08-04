@@ -71,6 +71,12 @@ interface RenderStripOptions {
   posterUrl?: string;
   storedCandidates?: VideoPosterCandidate[];
   onPosterPersisted?: () => void;
+  /**
+   * Defaults to the draft session — this session's capture went to the server
+   * with the draft, so a fresh pick is persistable. An edit-mode replace passes
+   * `false`: those frames only reach the row at Save.
+   */
+  freshCandidatesPersisted?: boolean;
 }
 
 interface StripHarness {
@@ -94,6 +100,7 @@ const renderStrip = ({
   posterUrl,
   storedCandidates,
   onPosterPersisted,
+  freshCandidatesPersisted = true,
 }: RenderStripOptions = {}): { current: StripHarness } => {
   const { result } = renderHook(() => {
     const form = useForm<VideoFormData>({ defaultValues: { posterUrl } });
@@ -104,6 +111,7 @@ const renderStrip = ({
       effectiveVideoId,
       preGeneratedId: VIDEO_ID,
       onPosterPersisted,
+      freshCandidatesPersisted,
     });
     return { form, strip, isDirty: form.formState.isDirty };
   });
@@ -148,6 +156,25 @@ describe('useVideoPosterStrip — fresh capture', () => {
     act(() => harness.current.strip.handleSelectCandidate(2));
 
     expect(harness.current.strip.selectedPosterBlob).toBe(CAPTURED[2].blob);
+  });
+
+  it('starts no upload fan-out when the capture produced no frames', () => {
+    // A failed/unsupported capture must not fire a presign round-trip for an
+    // empty list — the Server Action would only log a warning and refuse.
+    const harness = renderStrip();
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(mocks.startUploads).not.toHaveBeenCalled();
+  });
+
+  it('still clears the strip when the capture produced no frames', () => {
+    const harness = renderStrip();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.strip.stripCandidates).toEqual([]);
   });
 });
 
@@ -288,6 +315,100 @@ describe('useVideoPosterStrip — selecting after a row exists', () => {
     await act(async () => harness.current.strip.handleSelectCandidate(2));
 
     expect(harness.current.form.getValues('posterUrl')).toBe(MANUAL_POSTER_URL);
+  });
+});
+
+describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', () => {
+  /**
+   * A row exists (edit mode) but this session's captured frames are not on it
+   * until Save — `selectVideoPosterAction` only moves the poster between the
+   * row's OWN candidates, so persisting here would be refused and the pick
+   * would visibly snap back.
+   */
+  const renderEditReplace = (): { current: StripHarness } =>
+    renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      freshCandidatesPersisted: false,
+      storedCandidates: UPLOADED,
+      posterUrl: MANUAL_POSTER_URL,
+    });
+
+  it('moves the local selection', async () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderEditReplace();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(harness.current.strip.selectedIndex).toBe(2);
+  });
+
+  it('previews the picked frame through the Save-time blob', async () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderEditReplace();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(harness.current.strip.selectedPosterBlob).toBe(CAPTURED[2].blob);
+  });
+
+  it('never calls the select-poster mutation', async () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderEditReplace();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(mocks.selectVideoPosterAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows no error toast', async () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderEditReplace();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
+  it('still persists a STORED pick in the same session', async () => {
+    // Only the fresh frames are unpersistable; the row's own candidates are
+    // unaffected by the guard.
+    const harness = renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      freshCandidatesPersisted: false,
+      storedCandidates: UPLOADED,
+      posterUrl: UPLOADED[1].url,
+    });
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+      videoId: VIDEO_ID,
+      candidateUrl: UPLOADED[2].url,
+    });
+  });
+
+  it('persists a fresh pick once this session’s candidates are on the row', async () => {
+    // The draft session: the draft create already wrote these very candidates.
+    mocks.alignedNow = UPLOADED;
+    const harness = renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      freshCandidatesPersisted: true,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+      videoId: VIDEO_ID,
+      candidateUrl: UPLOADED[2].url,
+    });
   });
 });
 

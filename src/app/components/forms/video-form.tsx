@@ -352,6 +352,10 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     isPersisted,
     effectiveVideoId,
     preGeneratedId,
+    // Only a draft session has already shipped this session's captured frames
+    // to the row; during an edit-mode replace they land at Save, so a fresh
+    // pick must stay local until then.
+    freshCandidatesPersisted: draftId !== null,
     onPosterPersisted: poster.clearUploadedPoster,
   });
   useEffect(() => {
@@ -436,7 +440,10 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       return submitVideo(
         {
           ...shaped,
-          posterUrl: resolvedPoster.posterUrl,
+          // A fresh capture's picked frame wins: on a file replace the poster
+          // must follow the new file, not stay on a frame of the old one. With
+          // no capture (or its upload failed) the resolved value stands.
+          posterUrl: posterFields.posterUrl ?? resolvedPoster.posterUrl,
           ...(posterFields.posterCandidates
             ? { posterCandidates: posterFields.posterCandidates }
             : {}),

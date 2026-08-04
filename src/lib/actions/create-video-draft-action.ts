@@ -61,8 +61,10 @@ interface DraftPosterInput {
 
 /**
  * Resolve the poster fields the draft may persist. Candidates must all live
- * under this video's own S3 namespace and `posterUrl` must be one of them;
- * anything else is dropped (never blocks the draft) and logged.
+ * under this video's own S3 namespace — a namespace violation drops the whole
+ * set and is logged. `posterUrl` must additionally be one of those candidates;
+ * a non-member is dropped silently (the frame's own upload simply lost the
+ * race). Neither drop ever blocks the draft.
  */
 const resolveDraftPosterInput = (data: VideoDraftInput): DraftPosterInput => {
   const candidates = data.posterCandidates ?? [];

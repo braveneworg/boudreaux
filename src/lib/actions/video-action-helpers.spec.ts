@@ -315,18 +315,35 @@ describe('deleteReplacedVideoAssets — candidate cleanup guards', () => {
     expect(deleteS3Object).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes the old video key and every old candidate key on file replace with a fresh candidate set', () => {
+  /** A file replace shipping a fresh capture; the poster moves unless stated. */
+  const replaceWith = (posterUrl: string): void => {
     const newCandidates = [3, 4].map((n) => ({ url: candidateUrl(n), atSeconds: n, score: n }));
 
     deleteReplacedVideoAssets(
       currentWithCandidates,
-      {
-        ...formData,
-        posterUrl: candidateUrl(1),
-        posterCandidates: newCandidates,
-      },
+      { ...formData, posterUrl, posterCandidates: newCandidates },
       true
     );
+  };
+
+  it('spares the live poster key when a file replace leaves the poster URL unchanged', () => {
+    // The row still points at candidate 1 — deleting its object would leave a
+    // dangling posterUrl (a broken poster on every surface that renders it).
+    replaceWith(candidateUrl(1));
+
+    expect(deleteS3Object).not.toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
+  });
+
+  it('still deletes the old video key and the unreferenced candidates in that case', () => {
+    replaceWith(candidateUrl(1));
+
+    expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+    expect(deleteS3Object).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes the old video key and every old candidate key when the poster moves too', () => {
+    replaceWith(candidateUrl(3));
 
     expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
     expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');

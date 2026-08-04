@@ -29,6 +29,14 @@ export interface UseVideoPosterStripArgs {
   effectiveVideoId: string | undefined;
   preGeneratedId: string;
   /**
+   * Whether THIS session's captured frames already reached the row — true in a
+   * draft session (the draft create persisted them), false during an edit-mode
+   * file replace, where they only land at Save. `selectVideoPosterAction`
+   * accepts only the row's own candidates, so a fresh pick must stay local
+   * until then or the server refuses it and the pick snaps back.
+   */
+  freshCandidatesPersisted: boolean;
+  /**
    * Called only after a pick has actually persisted. `VideoForm` uses it to
    * forget a poster uploaded this session, whose display precedence would
    * otherwise keep the preview on the manual image the pick just replaced.
@@ -93,10 +101,12 @@ const didPersistPoster = async (
  * edit page still offers the frames (and highlights none when a manual poster
  * is live).
  *
- * A click is local-only until a row exists; once one does (edit mode, or the
- * draft created at upload) the pick is written into the form optimistically
- * and persisted instantly, reverting with an error toast if the server refuses
- * it. Before that, the selection rides along into the draft payload via
+ * A click is local-only until a row exists AND holds the clicked candidate;
+ * then the pick is written into the form optimistically and persisted
+ * instantly, reverting with an error toast if the server refuses it. A stored
+ * pick qualifies as soon as a row exists; a fresh one needs
+ * `freshCandidatesPersisted`. Otherwise the selection stays local and rides
+ * along into the draft/save payload via
  * {@link UseVideoPosterStripResult.getPosterDraftFields}.
  */
 export const useVideoPosterStrip = ({
@@ -105,6 +115,7 @@ export const useVideoPosterStrip = ({
   isPersisted,
   effectiveVideoId,
   preGeneratedId,
+  freshCandidatesPersisted,
   onPosterPersisted,
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
@@ -125,11 +136,13 @@ export const useVideoPosterStrip = ({
   // Capturing a fresh candidate set pre-selects the sharpest frame and kicks
   // the upload fan-out, so the selection has a URL to persist by the time the
   // draft lands (and Save can still commit the blob if every upload failed).
+  // An empty capture (an undecodable file, or E2E's fake capture) still resets
+  // the strip but starts nothing — a presign for zero files is pure noise.
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
-      startUploads(candidates);
+      if (candidates.length > 0) startUploads(candidates);
     },
     [startUploads]
   );
@@ -153,12 +166,14 @@ export const useVideoPosterStrip = ({
   const handleSelectCandidate = useCallback(
     (index: number): void => {
       if (isFreshMode) setFreshSelectedIndex(index);
-      // A fresh frame is only persistable once its own upload has landed;
-      // until then the pick stays local and the draft payload carries it.
+      // A fresh frame is only persistable once its own upload has landed AND
+      // the row already carries this session's candidates; until then the pick
+      // stays local and the draft/save payload carries it.
       const candidateUrl = isFreshMode ? alignedNow.at(index)?.url : stored.at(index)?.url;
-      if (isPersisted && candidateUrl) void persistPick(candidateUrl);
+      const isPersistable = isPersisted && (isFreshMode ? freshCandidatesPersisted : true);
+      if (isPersistable && candidateUrl) void persistPick(candidateUrl);
     },
-    [isFreshMode, alignedNow, stored, isPersisted, persistPick]
+    [isFreshMode, alignedNow, stored, isPersisted, freshCandidatesPersisted, persistPick]
   );
 
   const getPosterDraftFields = useCallback(async (): Promise<DraftPosterFields> => {

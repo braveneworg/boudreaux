@@ -168,24 +168,41 @@ export const resolvePersistableCandidates = (
 const isStoredCandidateUrl = (current: Video, url: string | null): boolean =>
   url !== null && current.posterCandidates.some((candidate) => candidate.url === url);
 
-/** Old candidate keys freed when a file replace ships a fresh candidate set. */
+/**
+ * The old candidate key the live poster still points at, or `null`. Only an
+ * UNCHANGED `posterUrl` retains one: a replace that ships its own new poster
+ * (the normal path — spec §7 replaces both halves) leaves nothing behind.
+ */
+const retainedPosterKey = (current: Video, data: VideoFormData): string | null =>
+  current.posterUrl && data.posterUrl === current.posterUrl
+    ? extractS3KeyFromUrl(current.posterUrl)
+    : null;
+
+/**
+ * Old candidate keys freed when a file replace ships a fresh candidate set —
+ * except the object an unchanged `posterUrl` still references. Deleting that
+ * one would leave the row pointing at a 404 poster on every surface.
+ */
 const replacedCandidateKeys = (
   current: Video,
   data: VideoFormData,
   s3KeyReplaced: boolean
-): string[] =>
-  s3KeyReplaced && data.posterCandidates !== undefined
-    ? current.posterCandidates
-        .map((candidate) => extractS3KeyFromUrl(candidate.url))
-        .filter(isVideoNamespacedKey)
-    : [];
+): string[] => {
+  if (!s3KeyReplaced || data.posterCandidates === undefined) return [];
+  const retained = retainedPosterKey(current, data);
+  return current.posterCandidates
+    .map((candidate) => extractS3KeyFromUrl(candidate.url))
+    .filter(isVideoNamespacedKey)
+    .filter((key) => key !== retained);
+};
 
 /**
  * Best-effort, fire-and-forget cleanup of S3 objects a successful update
  * orphaned: the old video key (file replaced), the old poster key (poster
  * replaced — unless it is a stored candidate, which must survive a
  * candidate-to-candidate switch), and the old candidate set (file replaced
- * with a fresh capture). Failures are swallowed by {@link deleteS3Object}.
+ * with a fresh capture, minus whichever frame an unchanged poster still
+ * points at). Failures are swallowed by {@link deleteS3Object}.
  */
 export const deleteReplacedVideoAssets = (
   current: Video,
