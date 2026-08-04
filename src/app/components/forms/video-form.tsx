@@ -37,6 +37,7 @@ import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-
 import { useReleaseDateAutoFill } from './videos/use-release-date-autofill';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoDraft } from './videos/use-video-draft';
+import { useVideoPosterStrip } from './videos/use-video-poster-strip';
 import { useVideoPosterUpload } from './videos/use-video-poster-upload';
 import { useVideoUpload } from './videos/use-video-upload';
 import { VideoArtistReviewSection } from './videos/video-artist-review-section';
@@ -49,12 +50,12 @@ import {
   mapVideoToFormValues,
   shapePublish,
 } from './videos/video-form-helpers';
-import { bestPosterCandidateIndex, type PosterCandidate } from './videos/video-metadata';
 import { VideoMetadataSection } from './videos/video-metadata-section';
 import { posterCandidateToFile, VideoPosterSection } from './videos/video-poster-section';
 import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
+import type { DraftPosterFields } from './videos/use-video-draft';
 import type { Control, UseFormReturn } from 'react-hook-form';
 
 type SubmitIntent = 'save' | 'publish';
@@ -237,10 +238,6 @@ const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | 
 const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
   uploadStatus === 'uploading' || isPosterUploading;
 
-/** The blob the submit path auto-uploads — the selected candidate's, if any. */
-const selectedCandidateBlob = (candidates: PosterCandidate[], selectedIndex: number): Blob | null =>
-  candidates.at(selectedIndex)?.blob ?? null;
-
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */
   isPersisted: boolean;
@@ -287,11 +284,15 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
   const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
-  const [posterCandidates, setPosterCandidates] = useState<PosterCandidate[]>([]);
-  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
 
   /** Tracks whether the next submit is a Save or a Publish. */
   const submitIntentRef = useRef<SubmitIntent>('save');
+  /**
+   * The draft hook needs the poster strip's fields and the strip needs the
+   * draft's id — a cycle. The draft reads this ref lazily (only once an upload
+   * completes, long after the effect below has run), which breaks it.
+   */
+  const getPosterDraftFieldsRef = useRef<() => Promise<DraftPosterFields>>(async () => ({}));
 
   const { createVideoAsync, isCreatingVideo } = useCreateVideoMutation();
   const { updateVideoAsync, isUpdatingVideo } = useUpdateVideoMutation();
@@ -315,6 +316,11 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   const { entries, updateDraft, buildArtistDetails, primarySplitParts } =
     useVideoArtistReview(artistValue);
 
+  const getPosterFields = useCallback(
+    (): Promise<DraftPosterFields> => getPosterDraftFieldsRef.current(),
+    []
+  );
+
   // The draft hook must sit before the upload hook so its handleUploadComplete
   // is available to wire; it in turn depends on buildArtistDetails above.
   const { draftId, handleUploadComplete } = useVideoDraft({
@@ -322,28 +328,32 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     preGeneratedId,
     isEditMode,
     getArtistDetails: buildArtistDetails,
-    // TODO(Task 7): wire to usePosterCandidateUploads().getSettledAligned() +
-    // the selected-candidate index instead of this always-empty stub.
-    getPosterFields: async () => ({}),
+    getPosterFields,
   });
-  // Capturing a fresh candidate set pre-selects the sharpest frame, so the
-  // Save auto-upload commits exactly what the old single-winner capture did.
-  const handlePosterCandidates = useCallback((candidates: PosterCandidate[]): void => {
-    setPosterCandidates(candidates);
-    setSelectedCandidateIndex(bestPosterCandidateIndex(candidates));
-  }, []);
+
+  const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
+  // Owns the candidate strip: fresh capture this session, else the row's stored
+  // candidates; a pick persists instantly once isPersisted.
+  const posterStrip = useVideoPosterStrip({
+    form,
+    video,
+    isPersisted,
+    effectiveVideoId,
+    preGeneratedId,
+  });
+  useEffect(() => {
+    getPosterDraftFieldsRef.current = posterStrip.getPosterDraftFields;
+  }, [posterStrip.getPosterDraftFields]);
+
   const upload = useVideoUpload({
     preGeneratedId,
     form,
-    onPosterCandidates: handlePosterCandidates,
+    onPosterCandidates: posterStrip.handlePosterCandidates,
     onUploadComplete: handleUploadComplete,
   });
   // Owned by the form (not the section) so Save can auto-commit the visible
   // candidate frame before submit and the footer can gate on the in-flight PUT.
   const poster = useVideoPosterUpload({ preGeneratedId, setValue });
-
-  const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);
-  const selectedPosterBlob = selectedCandidateBlob(posterCandidates, selectedCandidateIndex);
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
   useReleaseDateAutoFill({ uploadStatus: upload.status, form });
@@ -400,7 +410,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       // Commit the visible candidate frame before submit so Save (or Publish)
       // persists the poster the admin can see, not the empty default.
       const resolvedPoster = await resolveSubmitPosterUrl({
-        candidate: selectedPosterBlob,
+        candidate: posterStrip.selectedPosterBlob,
         posterUrl: data.posterUrl,
         uploadPoster: poster.uploadPoster,
         getPosterUrl: () => form.getValues('posterUrl'),
@@ -424,7 +434,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
       );
     },
     [
-      selectedPosterBlob,
+      posterStrip.selectedPosterBlob,
       poster.uploadPoster,
       isDraft,
       isPersisted,
@@ -490,9 +500,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             />
             <VideoPosterSection
               control={control}
-              candidates={posterCandidates}
-              selectedIndex={selectedCandidateIndex}
-              onSelectCandidate={setSelectedCandidateIndex}
+              candidates={posterStrip.stripCandidates}
+              selectedIndex={posterStrip.selectedIndex}
+              onSelectCandidate={posterStrip.handleSelectCandidate}
               uploadedPosterUrl={poster.uploadedPosterUrl}
               isUploading={poster.isUploading}
               errorMessage={poster.errorMessage}

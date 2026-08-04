@@ -29,6 +29,7 @@ const singleCandidate = (): PosterCandidate => posterCandidate('jpeg', 1);
 const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
   updateVideoAsync: vi.fn(),
+  selectVideoPosterAsync: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
   useVideoProducersQuery: vi.fn(),
@@ -71,6 +72,10 @@ vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   useUnpublishVideoMutation: () => ({
     unpublishVideoAsync: vi.fn().mockResolvedValue({ success: true }),
     isUnpublishingVideo: false,
+  }),
+  useSelectVideoPosterMutation: () => ({
+    selectVideoPosterAsync: mocks.selectVideoPosterAsync,
+    isSelectingVideoPoster: false,
   }),
 }));
 
@@ -324,6 +329,7 @@ beforeEach(() => {
     data: { videoId: 'created-video-id' },
   });
   mocks.updateVideoAsync.mockResolvedValue({ success: true, fields: {}, data: { videoId: 'v1' } });
+  mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
   mocks.uploadVideoMultipart.mockResolvedValue({
     success: true,
     s3Key: 'media/videos/aaa/clip.mp4',
@@ -895,6 +901,99 @@ describe('VideoForm — poster', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
+  });
+});
+
+describe('VideoForm — stored poster candidates on an edit visit', () => {
+  const storedCandidates = [
+    { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 3.7, score: 4 },
+    { url: 'https://cdn.example.com/existing-poster.jpg', atSeconds: 5.1, score: 9 },
+    { url: 'https://cdn.example.com/candidate-3.jpg', atSeconds: 6.5, score: 2 },
+  ];
+
+  const asEditModeWithCandidates = () =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: { ...editVideo, posterCandidates: storedCandidates },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  it('hydrates the strip from the row when no capture happened this session', async () => {
+    asEditModeWithCandidates();
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findAllByRole('radio', { name: /^Frame at/ })).toHaveLength(3);
+  });
+
+  it('highlights the stored frame the live poster points at', async () => {
+    asEditModeWithCandidates();
+    render(<VideoForm videoId="v1" />);
+
+    expect(
+      await screen.findByRole('radio', { name: 'Frame at 5.1s', checked: true })
+    ).toBeInTheDocument();
+  });
+
+  it('persists a stored frame pick instantly', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+        videoId: 'v1',
+        candidateUrl: 'https://cdn.example.com/candidate-3.jpg',
+      })
+    );
+  });
+
+  it('moves the preview to the picked frame', async () => {
+    asEditModeWithCandidates();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/candidate-3.jpg'
+      )
+    );
+  });
+
+  it('reverts the preview when the instant persist fails', async () => {
+    asEditModeWithCandidates();
+    mocks.selectVideoPosterAsync.mockResolvedValue({ success: false, error: 'boom' });
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('radio', { name: 'Frame at 6.5s' }));
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/existing-poster.jpg'
+      )
+    );
+  });
+
+  it('renders no strip for a row with no stored candidates', async () => {
+    mocks.useVideoQuery.mockReturnValue({
+      data: editVideo,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    expect(screen.queryByRole('radiogroup', { name: 'Captured poster frames' })).toBeNull();
   });
 });
 

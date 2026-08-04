@@ -13,14 +13,17 @@ import { useWatch } from 'react-hook-form';
 
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import type { PosterCandidate } from './video-metadata';
+import type { StripCandidate } from './use-video-poster-strip';
 import type { Control } from 'react-hook-form';
 
 interface VideoPosterSectionProps {
   control: Control<VideoFormData>;
-  /** Scored candidate frames captured from a freshly-selected video, in time order. */
-  candidates: PosterCandidate[];
-  /** Index of the candidate currently offered as the pending poster. */
+  /**
+   * Scored candidate frames in time order — freshly captured blobs this
+   * session, or the row's stored (already uploaded) candidates on a revisit.
+   */
+  candidates: StripCandidate[];
+  /** Index of the highlighted candidate; `-1` highlights none. */
   selectedIndex: number;
   /** Swap the pending candidate (and the big preview) to another frame. */
   onSelectCandidate: (index: number) => void;
@@ -50,7 +53,7 @@ const PosterPreview = ({ src }: { src: string | null }): React.ReactElement =>
   );
 
 interface PosterCandidateStripProps {
-  candidates: PosterCandidate[];
+  candidates: StripCandidate[];
   candidateUrls: string[];
   selectedIndex: number;
   isUploading: boolean;
@@ -58,8 +61,11 @@ interface PosterCandidateStripProps {
 }
 
 /**
- * Radio strip of the captured frames. Selecting a thumb swaps the big preview
- * and the frame Save auto-commits — there is no explicit "use this frame" step.
+ * Radio strip of the poster frames — the ones captured this session, or the
+ * row's stored candidates on a later edit visit. Selecting a thumb swaps the
+ * big preview; there is no explicit "use this frame" step, because the parent
+ * either persists the pick instantly (a row exists) or auto-commits it on Save.
+ * `selectedIndex` of `-1` (a manual poster is live) checks no thumb.
  */
 const PosterCandidateStrip = ({
   candidates,
@@ -98,12 +104,15 @@ const PosterCandidateStrip = ({
 
 /**
  * Poster capture/upload — replace-only (no clear). Priority: a poster uploaded
- * this session → the selected captured-frame candidate → the existing
- * `posterUrl` → an empty placeholder. With two or more captured frames a radio
- * strip lets the admin pick the frame; Save auto-commits the visible candidate
- * (the parent uploads it before submitting), so there is no explicit commit
- * button. The manual picker shares the same presign + PUT path and overrides
- * the strip once used. The form submits fine without any poster.
+ * this session → the selected candidate frame → the existing `posterUrl` → an
+ * empty placeholder. With two or more candidates a radio strip lets the admin
+ * pick the frame — freshly captured blobs this session, or the row's stored
+ * candidates on a later edit visit. Picking is instant: the parent persists
+ * the choice as soon as a row exists, and otherwise Save auto-commits the
+ * visible candidate, so there is no explicit commit button. The manual picker
+ * shares the same presign + PUT path and hides the strip for the rest of the
+ * session once used (a stored strip returns on the next visit, with no thumb
+ * highlighted). The form submits fine without any poster.
  */
 export const VideoPosterSection = ({
   control,
@@ -118,22 +127,34 @@ export const VideoPosterSection = ({
   const inputId = useId();
   const existingPosterUrl = useWatch({ control, name: 'posterUrl' });
 
-  // Create + revoke every thumb's object URL in a single effect keyed on the
-  // candidates array, so StrictMode's dev double-render can't leak orphans.
+  // Create + revoke every blob thumb's object URL in a single effect keyed on
+  // the candidates array, so StrictMode's dev double-render can't leak orphans.
+  // Stored candidates already have a CDN URL — only what was created here is
+  // ever revoked.
   const [candidateUrls, setCandidateUrls] = useState<string[]>([]);
   useEffect(() => {
     if (!candidates.length) {
       setCandidateUrls([]);
       return;
     }
-    const urls = candidates.map((candidate) => URL.createObjectURL(candidate.blob));
+    const created: string[] = [];
+    const urls = candidates.map((candidate) => {
+      if ('url' in candidate) return candidate.url;
+      const objectUrl = URL.createObjectURL(candidate.blob);
+      created.push(objectUrl);
+      return objectUrl;
+    });
     setCandidateUrls(urls);
-    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+    return () => created.forEach((url) => URL.revokeObjectURL(url));
   }, [candidates]);
 
-  const selectedCandidateUrl = candidateUrls.at(selectedIndex);
+  // `.at(-1)` would wrap to the last thumb — a `-1` index means "none".
+  const selectedCandidateUrl = selectedIndex >= 0 ? candidateUrls.at(selectedIndex) : undefined;
   const previewSrc = uploadedPosterUrl ?? selectedCandidateUrl ?? existingPosterUrl ?? null;
-  const showStrip = candidates.length > 1 && uploadedPosterUrl === null;
+  // A poster uploaded this session replaces the freshly captured strip, but a
+  // stored strip stays visible so a manual poster can still be swapped back.
+  const hasFreshCapture = candidates.some((candidate) => 'blob' in candidate);
+  const showStrip = candidates.length > 1 && (!hasFreshCapture || uploadedPosterUrl === null);
 
   const onManualPick = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];

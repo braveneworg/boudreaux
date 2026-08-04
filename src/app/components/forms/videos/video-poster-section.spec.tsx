@@ -3,14 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 
+import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { posterCandidateToFile, VideoPosterSection } from './video-poster-section';
 
+import type { StripCandidate } from './use-video-poster-strip';
 import type { PosterCandidate } from './video-metadata';
 import type { Control } from 'react-hook-form';
 
@@ -21,8 +23,21 @@ const candidateAt = (atSeconds: number): PosterCandidate => ({
   score: atSeconds,
 });
 
+/** Build a stored (already uploaded) candidate — the edit-visit arm of the union. */
+const storedAt = (atSeconds: number): VideoPosterCandidate => ({
+  url: `https://cdn.example.com/media/videos/v1/candidate-${atSeconds}.jpg`,
+  atSeconds,
+  score: atSeconds,
+});
+
+/** The `src` of each thumb image, in strip order. */
+const thumbSources = (): (string | null)[] =>
+  screen
+    .getAllByRole('radio')
+    .map((radio) => within(radio).getByRole('presentation').getAttribute('src'));
+
 interface HarnessProps {
-  candidates?: PosterCandidate[];
+  candidates?: StripCandidate[];
   selectedIndex?: number;
   onSelectCandidate?: (index: number) => void;
   uploadedPosterUrl?: string | null;
@@ -178,6 +193,79 @@ describe('VideoPosterSection — candidate strip', () => {
 
     expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:candidate-0');
     expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:candidate-1');
+  });
+});
+
+describe('VideoPosterSection — stored candidate strip', () => {
+  const stored = [storedAt(3.7), storedAt(5.1), storedAt(6.5)];
+
+  it('renders one radio per stored candidate', async () => {
+    render(<Harness candidates={stored} existingPosterUrl={stored[0].url} />);
+
+    expect(
+      await screen.findByRole('radiogroup', { name: 'Captured poster frames' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  it('renders each stored thumb from its own CDN URL', async () => {
+    render(<Harness candidates={stored} existingPosterUrl={stored[0].url} />);
+
+    await waitFor(() =>
+      expect(thumbSources()).toEqual([stored[0].url, stored[1].url, stored[2].url])
+    );
+  });
+
+  it('creates no object URL for stored candidates', async () => {
+    render(<Harness candidates={stored} existingPosterUrl={stored[0].url} />);
+
+    await screen.findByRole('radiogroup', { name: 'Captured poster frames' });
+
+    expect(globalThis.URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('renders the strip on a revisit with an existing poster and no session upload', () => {
+    render(
+      <Harness
+        candidates={stored}
+        existingPosterUrl="https://cdn.example.com/manual-poster.jpg"
+        selectedIndex={-1}
+        uploadedPosterUrl={null}
+      />
+    );
+
+    expect(screen.getByRole('radiogroup', { name: 'Captured poster frames' })).toBeInTheDocument();
+  });
+
+  it('checks no frame when the selected index is -1', () => {
+    render(<Harness candidates={stored} selectedIndex={-1} />);
+
+    screen.getAllByRole('radio').forEach((radio) => expect(radio).not.toBeChecked());
+  });
+
+  it('previews the existing poster rather than a thumb when nothing is selected', async () => {
+    render(
+      <Harness
+        candidates={stored}
+        selectedIndex={-1}
+        existingPosterUrl="https://cdn.example.com/manual-poster.jpg"
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/manual-poster.jpg'
+      )
+    );
+  });
+
+  it('shows the selected stored frame in the big preview', async () => {
+    render(<Harness candidates={stored} selectedIndex={1} />);
+
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute('src', stored[1].url)
+    );
   });
 });
 
