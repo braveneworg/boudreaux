@@ -408,10 +408,19 @@ export const VideoEnrichmentPanel = ({
 
   // The fetched release date should be used automatically — apply the suggestion
   // into the form the moment it appears, unless the admin has edited the field.
+  // The auto-apply also resolves the suggestion server-side (same mutation as
+  // the explicit Apply button, sans expectedCurrent — the form was just filled
+  // with this exact value): left `pending`, it would re-apply over the admin's
+  // saved date on every later visit.
+  const resolveAutoAppliedSuggestion = useCallback(
+    (suggestionId: string): void => applyVideoSuggestion({ suggestionId, op: 'apply' }),
+    [applyVideoSuggestion]
+  );
   useAutoApplyReleaseDateSuggestion({
     suggestions: data?.suggestions ?? [],
     control,
     onApply: onApplyVideoSuggestion,
+    onResolve: resolveAutoAppliedSuggestion,
   });
 
   // Last-resort client stop: if a run never reaches a terminal status, stop

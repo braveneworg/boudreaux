@@ -35,6 +35,7 @@ const releaseDateSuggestion = (
 
 const renderHarness = (initial: EnrichmentSuggestion[], releasedOn = '2020-01-01') => {
   const onApply = vi.fn();
+  const onResolve = vi.fn();
   let formRef: UseFormReturn<VideoFormData> | undefined;
   const { rerender } = renderHook(
     ({ suggestions }: { suggestions: EnrichmentSuggestion[] }) => {
@@ -42,7 +43,7 @@ const renderHarness = (initial: EnrichmentSuggestion[], releasedOn = '2020-01-01
         defaultValues: { title: 't', artist: 'a', releasedOn },
       });
       formRef = form;
-      useAutoApplyReleaseDateSuggestion({ suggestions, control: form.control, onApply });
+      useAutoApplyReleaseDateSuggestion({ suggestions, control: form.control, onApply, onResolve });
     },
     { initialProps: { suggestions: initial } }
   );
@@ -50,7 +51,7 @@ const renderHarness = (initial: EnrichmentSuggestion[], releasedOn = '2020-01-01
     if (!formRef) throw new Error('form not rendered');
     return formRef;
   };
-  return { onApply, rerender, getForm };
+  return { onApply, onResolve, rerender, getForm };
 };
 
 describe('findReleaseDateSuggestion', () => {
@@ -111,5 +112,48 @@ describe('useAutoApplyReleaseDateSuggestion', () => {
     await act(async () => {});
 
     expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('resolves the auto-applied suggestion server-side', async () => {
+    const { onResolve } = renderHarness([releaseDateSuggestion('2019-05-01')]);
+
+    await act(async () => {});
+
+    expect(onResolve).toHaveBeenCalledWith('sug-1');
+  });
+
+  it('does not resolve when the admin has edited the date', async () => {
+    const { onResolve, rerender, getForm } = renderHarness([]);
+
+    await act(async () => {
+      getForm().setValue('releasedOn', '2001-01-01', { shouldDirty: true });
+    });
+    await act(async () => {
+      rerender({ suggestions: [releaseDateSuggestion('2019-05-01')] });
+    });
+
+    expect(onResolve).not.toHaveBeenCalled();
+  });
+
+  it('resolves at most once for the same suggestion across refetches', async () => {
+    const suggestion = releaseDateSuggestion('2019-05-01');
+    const { onResolve, rerender } = renderHarness([suggestion]);
+
+    await act(async () => {});
+    await act(async () => {
+      rerender({ suggestions: [suggestion] });
+    });
+
+    expect(onResolve).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resolve a dismissed suggestion', async () => {
+    const { onResolve } = renderHarness([
+      releaseDateSuggestion('2019-05-01', { status: 'dismissed' }),
+    ]);
+
+    await act(async () => {});
+
+    expect(onResolve).not.toHaveBeenCalled();
   });
 });

@@ -41,10 +41,11 @@ client-only choice.
    panel to the existing mutation — match the panel's current wiring style).
    On fire: client `onApply` first (the field populates regardless of network),
    then resolve server-side.
-2. Failure handling: a failed server resolve is silent + logged by the action;
-   the client fill stands, `appliedIds` still guards the session, and the next
-   visit may re-apply — acceptable degraded mode (strictly no worse than
-   today), no retry loop.
+2. Failure handling: a failed server resolve surfaces the shared apply
+   mutation's error toast (deviation from the earlier "silent" draft — the
+   toast is more honest and reuses the existing path); the client fill stands,
+   `appliedIds` still guards the session, and the next visit may re-apply —
+   acceptable degraded mode (strictly no worse than today), no retry loop.
 3. The suggestion-status poll invalidation already refreshes the panel; the
    applied suggestion renders via the existing applied/muted row states (#698
    pattern). No schema, wire, or action changes.
