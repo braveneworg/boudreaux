@@ -89,6 +89,68 @@ describe('VideoPlayerSurface', () => {
     expect(player.play).toHaveBeenCalledTimes(1);
   });
 
+  // The facade primes a media element during the play click (autoplay blessing
+  // is per element in Safari/iOS and Firefox), so the surface must hand that
+  // exact element to video.js — a self-created replacement would be unprimed
+  // and the deferred play() would be rejected again.
+  describe('primed element handoff', () => {
+    it('initializes video.js on the takeMediaEl-provided element', () => {
+      const primed = document.createElement('video');
+
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          takeMediaEl={() => primed}
+        />
+      );
+
+      expect(vi.mocked(videojs)).toHaveBeenCalledWith(primed, expect.anything());
+    });
+
+    it('mounts the primed element under a data-vjs-player parent', () => {
+      // Without this attribute video.js clones (and thereby unprimes) the
+      // element on iOS instead of ingesting it in place.
+      const primed = document.createElement('video');
+
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          takeMediaEl={() => primed}
+        />
+      );
+
+      expect(primed.parentElement?.hasAttribute('data-vjs-player')).toBe(true);
+    });
+
+    it('labels the primed element with the video title', () => {
+      const primed = document.createElement('video');
+
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          takeMediaEl={() => primed}
+        />
+      );
+
+      expect(primed.getAttribute('aria-label')).toBe('Live');
+    });
+
+    it('creates its own element when the primed one was already taken', () => {
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          takeMediaEl={() => null}
+        />
+      );
+
+      expect(vi.mocked(videojs).mock.calls[0]?.[0]).toBeInstanceOf(HTMLVideoElement);
+    });
+  });
+
   it('pauses the first surface when a second surface starts playing', () => {
     render(
       <>

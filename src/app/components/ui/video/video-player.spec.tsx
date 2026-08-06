@@ -18,9 +18,14 @@ vi.mock('next/image', () => ({
 // The lazily-loaded surface is the ONLY place video.js is reachable. Mocking it
 // to a sentinel proves activation without pulling video.js into the facade's
 // module graph — the facade file itself must never import video.js.
+const surfaceProps = vi.hoisted((): { takeMediaEl?: () => HTMLVideoElement | null } => ({
+  takeMediaEl: undefined,
+}));
 vi.mock('./lazy-video-surface', () => ({
-  LazyVideoSurface: ({ title }: { title: string }) =>
-    createElement('div', { 'data-testid': 'video-surface' }, `surface:${title}`),
+  LazyVideoSurface: (props: { title: string; takeMediaEl?: () => HTMLVideoElement | null }) => {
+    surfaceProps.takeMediaEl = props.takeMediaEl;
+    return createElement('div', { 'data-testid': 'video-surface' }, `surface:${props.title}`);
+  },
 }));
 
 describe('VideoPlayer', () => {
@@ -61,5 +66,60 @@ describe('VideoPlayer', () => {
     await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
 
     expect(screen.getByTestId('video-surface')).toBeInTheDocument();
+  });
+
+  // Deferred playback only works cross-browser when the media element is
+  // load()ed/play()ed synchronously inside the click's user gesture —
+  // Safari/iOS and Firefox reject a later programmatic play() on an unprimed
+  // element, which is exactly the "click play twice" bug.
+  describe('gesture-time media element priming', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('primes a media element inside the play click gesture', async () => {
+      const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
+      const loadSpy = vi.spyOn(HTMLMediaElement.prototype, 'load');
+      const user = userEvent.setup();
+      render(<VideoPlayer title="Live Set" src="/clip.mp4" posterUrl={null} />);
+
+      await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
+
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+      expect(playSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands the surface a primed inline-playback video element', async () => {
+      const user = userEvent.setup();
+      render(<VideoPlayer title="Live Set" src="/clip.mp4" posterUrl={null} />);
+
+      await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
+
+      const primed = surfaceProps.takeMediaEl?.();
+      expect(primed).toBeInstanceOf(HTMLVideoElement);
+      expect(primed?.getAttribute('playsinline')).toBe('');
+    });
+
+    it('hands the primed element over only once', async () => {
+      const user = userEvent.setup();
+      render(<VideoPlayer title="Live Set" src="/clip.mp4" posterUrl={null} />);
+
+      await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
+      surfaceProps.takeMediaEl?.();
+
+      expect(surfaceProps.takeMediaEl?.()).toBeNull();
+    });
+
+    it('swallows a rejected priming play() so the click never throws', async () => {
+      vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() =>
+        Promise.reject(new Error('no source'))
+      );
+      const user = userEvent.setup();
+      render(<VideoPlayer title="Live Set" src="/clip.mp4" posterUrl={null} />);
+
+      await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
+
+      expect(screen.getByTestId('video-surface')).toBeInTheDocument();
+    });
   });
 });

@@ -22,36 +22,52 @@ export interface VideoPlayerSurfaceProps {
   posterUrl?: string | null;
   /** Fired when playback reaches the end of the source (e.g. queue advance). */
   onEnded?: () => void;
+  /**
+   * One-shot supplier of a media element primed (load()/play()) during the
+   * user's play gesture. Safari/iOS and Firefox bless autoplay per element, so
+   * playing THAT element is what lets the deferred autoplay succeed; returns
+   * null once taken, and the surface then falls back to a fresh element.
+   */
+  takeMediaEl?: () => HTMLVideoElement | null;
 }
 
 /**
- * Owns the video.js lifecycle. Mounting IS the user gesture (the facade's play
- * click), so it autoplays once ready. Registers with the playback coordinator on
- * 'play' so only one surface plays at a time, and disposes cleanly on unmount
- * (list virtualization / refetch). A player 'error' swaps in an inline fallback.
- * An optional `onEnded` callback fires when playback finishes (queue advance).
+ * Owns the video.js lifecycle. Mounted by the facade's play click, so it
+ * autoplays once ready — playing the gesture-primed element from `takeMediaEl`
+ * when provided, since browsers with per-element autoplay blessing would
+ * reject a deferred play() on any other element. Registers with the playback
+ * coordinator on 'play' so only one surface plays at a time, and disposes
+ * cleanly on unmount (list virtualization / refetch). A player 'error' swaps
+ * in an inline fallback. An optional `onEnded` callback fires when playback
+ * finishes (queue advance).
  */
 export const VideoPlayerSurface = ({
   title,
   src,
   posterUrl,
   onEnded,
+  takeMediaEl,
 }: VideoPlayerSurfaceProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceId = useId();
   const [hasError, setHasError] = useState(false);
   // Ref-carried so callback identity changes never tear down the player.
   const onEndedRef = useRef(onEnded);
+  const takeMediaElRef = useRef(takeMediaEl);
 
   useEffect(() => {
     onEndedRef.current = onEnded;
-  }, [onEnded]);
+    takeMediaElRef.current = takeMediaEl;
+  }, [onEnded, takeMediaEl]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const videoEl = document.createElement('video');
+    // The primed element must reach video.js as-is, inside the
+    // data-vjs-player container: that parent turns on player-element ingest,
+    // without which iOS video.js clones the element and drops the blessing.
+    const videoEl = takeMediaElRef.current?.() ?? document.createElement('video');
     videoEl.className = 'video-js vjs-default-skin';
     videoEl.setAttribute('playsinline', '');
     videoEl.setAttribute('aria-label', title);
