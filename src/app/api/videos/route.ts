@@ -63,8 +63,14 @@ const pageResponse = (videos: Video[], skip: number, take: number): NextResponse
 const handlePublishedListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
   const { skip, take } = parsePagination(searchParams);
   const sort = parseSort(searchParams);
+  const search = searchParams.get('search') ?? undefined;
 
-  const result = await VideoService.getPublishedVideos({ sort, skip, take });
+  const result = await VideoService.getPublishedVideos({
+    sort,
+    skip,
+    take,
+    ...(search && { search }),
+  });
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
@@ -111,7 +117,8 @@ const handleAdminListing = async (
  *
  * Query params:
  *   listing   – When "published", returns published, non-archived videos for
- *               any signed-in user via `getPublishedVideos()`.
+ *               any signed-in user via `getPublishedVideos()`; honors `skip`,
+ *               `take`, `sort`, and a title/artist `search`.
  *   skip, take, search, published, archived, sort – Pagination/filter params
  *               for the admin listing mode (requires the admin role).
  */

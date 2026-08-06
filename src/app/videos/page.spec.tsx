@@ -162,7 +162,7 @@ describe('VideosPage', () => {
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['videos', 'publishedInfinite', 'desc'],
+        queryKey: ['videos', 'publishedInfinite', 'desc', ''],
         initialPageParam: 0,
       })
     );

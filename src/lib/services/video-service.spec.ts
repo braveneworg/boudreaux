@@ -221,6 +221,14 @@ describe('VideoService', () => {
       });
     });
 
+    it('forwards the search filter to the repository', async () => {
+      vi.mocked(VideoRepository.findPublished).mockResolvedValue([]);
+
+      await VideoService.getPublishedVideos({ search: 'blues' });
+
+      expect(VideoRepository.findPublished).toHaveBeenCalledWith({ search: 'blues' });
+    });
+
     it('maps a DataError to a failure response', async () => {
       vi.mocked(VideoRepository.findPublished).mockRejectedValue(
         new DataError('UNAVAILABLE', 'Connection failed')

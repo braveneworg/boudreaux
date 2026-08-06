@@ -287,6 +287,24 @@ describe('queryKeys', () => {
       expect(queryKeys.videos.all).toEqual(['videos']);
     });
 
+    it('should return publishedInfinite key with sort and normalized search', () => {
+      expect(queryKeys.videos.publishedInfinite('asc', '  Rock  ')).toEqual([
+        'videos',
+        'publishedInfinite',
+        'asc',
+        'rock',
+      ]);
+    });
+
+    it('should default the publishedInfinite search segment to empty', () => {
+      expect(queryKeys.videos.publishedInfinite('desc')).toEqual([
+        'videos',
+        'publishedInfinite',
+        'desc',
+        '',
+      ]);
+    });
+
     it('should return detail key with id', () => {
       const key = queryKeys.videos.detail('v-123');
       expect(key).toEqual(['videos', 'detail', 'v-123']);
