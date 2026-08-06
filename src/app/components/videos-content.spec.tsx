@@ -17,6 +17,12 @@ vi.mock('@/hooks/use-infinite-scroll', () => ({
   useInfiniteScroll: vi.fn(),
 }));
 
+// Pass-through debounce: the component's wiring is under test here; the
+// debounce timing itself is covered by use-debounce's own spec.
+vi.mock('@/hooks/use-debounce', () => ({
+  useDebounce: <T,>(value: T) => value,
+}));
+
 vi.mock('./video-card', () => ({
   VideoCard: ({ video }: { video: { id: string; title: string } }) => (
     <div data-testid="video-card">{video.title}</div>
@@ -56,7 +62,7 @@ describe('VideosContent sorting', () => {
   it('defaults to newest-first sort', () => {
     render(<VideosContent />);
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
   });
 
   it('sorts oldest first when that toggle is selected', async () => {
@@ -64,7 +70,7 @@ describe('VideosContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('asc');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('asc', '');
   });
 
   it('returns to newest first when that toggle is reselected', async () => {
@@ -73,7 +79,7 @@ describe('VideosContent sorting', () => {
     await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
   });
 
   it('keeps the current sort when the selection is cleared', async () => {
@@ -81,7 +87,48 @@ describe('VideosContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
+  });
+});
+
+describe('VideosContent search', () => {
+  it('renders a labelled search input', () => {
+    render(<VideosContent />);
+
+    expect(screen.getByRole('searchbox', { name: /search videos/i })).toBeInTheDocument();
+  });
+
+  it('places the search input before the sort toggle', () => {
+    render(<VideosContent />);
+
+    const search = screen.getByRole('searchbox', { name: /search videos/i });
+    const toggle = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+
+    expect(search.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('forwards the typed search term to the query', async () => {
+    render(<VideosContent />);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: /search videos/i }), 'basement');
+
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'basement');
+  });
+
+  it('trims the search term before querying', async () => {
+    render(<VideosContent />);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: /search videos/i }), '  Rock ');
+
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'Rock');
+  });
+
+  it('shows a no-match message when a search returns nothing', async () => {
+    render(<VideosContent />);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: /search videos/i }), 'zzz');
+
+    expect(screen.getByText(/no videos match/i)).toBeInTheDocument();
   });
 });
 

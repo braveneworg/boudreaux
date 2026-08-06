@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 
 import Image from 'next/image';
 
 import { Film, Play } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
+import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
 import { cn } from '@/lib/utils';
 
 import { LazyVideoSurface } from './lazy-video-surface';
@@ -36,28 +37,13 @@ export const VideoPlayer = ({
   className,
 }: VideoPlayerProps): ReactElement => {
   const [activated, setActivated] = useState(false);
-  const primedElRef = useRef<HTMLVideoElement | null>(null);
+  const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff();
 
   const activatePlayback = (): void => {
-    // The surface arrives long after this click (lazy chunk + video.js init),
-    // outside the gesture's activation window — Safari/iOS and Firefox then
-    // reject its deferred play(), stranding the player paused behind a second
-    // play button. Autoplay blessing is per media element in those browsers,
-    // so create the element the surface will play NOW and prime it while the
-    // gesture is live: load() blesses WebKit, a gestured play() blesses
-    // Firefox (it rejects for lack of a source — irrelevant, blessing sticks).
-    const el = document.createElement('video');
-    el.setAttribute('playsinline', '');
-    el.load();
-    el.play().catch(() => {});
-    primedElRef.current = el;
+    // Prime inside the click gesture so the surface's deferred autoplay
+    // survives per-element autoplay policies (see usePrimedMediaHandoff).
+    primeMediaEl();
     setActivated(true);
-  };
-
-  const takeMediaEl = (): HTMLVideoElement | null => {
-    const el = primedElRef.current;
-    primedElRef.current = null;
-    return el;
   };
 
   if (activated && src) {
