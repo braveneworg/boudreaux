@@ -21,6 +21,11 @@ interface UseAutoApplyReleaseDateSuggestionArgs {
   control: Control<VideoFormData>;
   /** The parent form-writer (writes the value into the mounted RHF form). */
   onApply: (field: VideoLevelSuggestionField, value: string) => void;
+  /**
+   * Resolves the suggestion server-side (marks it applied) so it cannot
+   * re-apply over the admin's date on a later visit — see the hook JSDoc.
+   */
+  onResolve: (suggestionId: string) => void;
 }
 
 /** The one still-pending, video-level release-date suggestion (or undefined). */
@@ -37,14 +42,22 @@ export const findReleaseDateSuggestion = (
 /**
  * Auto-applies the enrichment's release-date suggestion into the form as soon
  * as it appears — the corrected date the run fetched should be used without a
- * manual click. Guarded two ways: it never overwrites a date the admin has
- * hand-edited (a dirty `releasedOn`), and it applies each suggestion at most
- * once, so a later manual change is never re-clobbered by a status poll.
+ * manual click. Guarded two ways in-session: it never overwrites a date the
+ * admin has hand-edited (a dirty `releasedOn`), and it applies each suggestion
+ * at most once, so a later manual change is never re-clobbered by a status
+ * poll. The apply is ALSO resolved server-side via `onResolve` (marks the
+ * suggestion applied, same as the explicit Apply button): the in-session
+ * guards reset on every mount, and a saved date reads clean after the form
+ * resets to row values — a suggestion left `pending` would silently re-apply
+ * over the admin's chosen date on every later visit. A failed resolve
+ * degrades to exactly that old behavior for one more visit; the client fill
+ * stands either way.
  */
 export const useAutoApplyReleaseDateSuggestion = ({
   suggestions,
   control,
   onApply,
+  onResolve,
 }: UseAutoApplyReleaseDateSuggestionArgs): void => {
   const { dirtyFields } = useFormState({ control, name: 'releasedOn' });
   const appliedIds = useRef<Set<string>>(new Set());
@@ -55,5 +68,6 @@ export const useAutoApplyReleaseDateSuggestion = ({
     if (dirtyFields.releasedOn) return;
     appliedIds.current.add(suggestion.id);
     onApply('releasedOn', suggestion.value);
-  }, [suggestions, dirtyFields.releasedOn, onApply]);
+    onResolve(suggestion.id);
+  }, [suggestions, dirtyFields.releasedOn, onApply, onResolve]);
 };

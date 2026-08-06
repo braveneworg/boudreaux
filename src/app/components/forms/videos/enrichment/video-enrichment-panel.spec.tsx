@@ -344,13 +344,19 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     });
   });
 
-  it('auto-applies the release-date suggestion into the form, never the server', async () => {
+  it('auto-applies the release-date suggestion into the form and resolves it server-side', async () => {
     const onApply = vi.fn();
     setStatus(succeededStatus);
     render(<Harness onApply={onApply} />);
 
-    // No click: the fetched date is applied automatically on arrival.
+    // No click: the fetched date is applied automatically on arrival, and the
+    // suggestion is marked applied so it cannot re-apply over the admin's date
+    // on a later visit (a pending suggestion re-fires every mount).
     await waitFor(() => expect(onApply).toHaveBeenCalledWith('releasedOn', '2020-06-01'));
+    expect(mocks.applyVideoSuggestion).toHaveBeenCalledWith({
+      suggestionId: 's3',
+      op: 'apply',
+    });
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
   });
 
