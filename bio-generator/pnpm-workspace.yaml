@@ -6,4 +6,4 @@ allowBuilds:
   esbuild: true
 overrides:
   esbuild@<0.28.1: ^0.28.1
-  postcss@>=8.0.0 <8.5.18: ^8.5.18
+  postcss@>=8.0.0 <8.5.23: ^8.5.23

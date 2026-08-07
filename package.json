@@ -151,7 +151,7 @@
     "sonner": "^2.0.7",
     "stripe": "^21.0.1",
     "tailwind-merge": "^3.6.0",
-    "undici": "^7.28.0",
+    "undici": "^7.29.0",
     "unique-username-generator": "^1.5.1",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
