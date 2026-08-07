@@ -207,5 +207,8 @@ export const Controls = ({
     }
   }, [audioSrc, autoPlay]);
 
-  return <div ref={containerRef} className="audio-player-wrapper min-h-16" data-vjs-player />;
+  // The data-vjs-player container lives INSIDE this host div and is created
+  // per init by the initializer — video.js dispose() removes it, so it must
+  // never be a React-rendered node.
+  return <div ref={containerRef} className="audio-player-wrapper min-h-16" />;
 };

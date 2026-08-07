@@ -18,9 +18,13 @@ import type * as PlaybackSession from '../../playback-session';
 // cannot reference spec-module-scope let/const directly; use vi.hoisted).
 const playerVolumeState = vi.hoisted(() => ({ volume: 1, muted: false }));
 
-// Mock video.js - factory function must not use variables defined outside
+// Mock video.js - factory function must not use variables defined outside.
+// One player per videojs() call (matching real video.js), each closing over
+// its element so dispose() is DOM-faithful: real video.js adopts the
+// data-vjs-player parent as the player root and dispose() removes THAT parent
+// from the DOM — an inert fake dispose hides remount-after-dispose bugs.
 vi.mock('video.js', () => {
-  const mockPlayer = {
+  const makePlayer = (el?: HTMLElement) => ({
     addClass: vi.fn(),
     removeClass: vi.fn(),
     ready: vi.fn((callback: () => void) => callback()),
@@ -32,7 +36,7 @@ vi.mock('video.js', () => {
     pause: vi.fn(),
     src: vi.fn(),
     load: vi.fn(),
-    dispose: vi.fn(),
+    dispose: vi.fn(() => el?.closest('[data-vjs-player]')?.remove()),
     userActive: vi.fn(),
     error: vi.fn().mockReturnValue(null),
     el: vi.fn().mockReturnValue(document.createElement('div')),
@@ -50,12 +54,12 @@ vi.mock('video.js', () => {
       }
       return playerVolumeState.muted;
     }),
-  };
+  });
 
   const componentRegistry = new Map<string, unknown>([['Button', () => null]]);
 
   const mockVideojs = Object.assign(
-    vi.fn(() => mockPlayer),
+    vi.fn((el?: HTMLElement) => makePlayer(el)),
     {
       registerComponent: vi.fn((name: string, component: unknown) => {
         componentRegistry.set(name, component);
@@ -421,10 +425,9 @@ describe('MediaPlayer', () => {
    */
   describe('shared playback session', () => {
     /**
-     * The video.js mock hands every instance the same player object, so
-     * `on` accumulates handlers from earlier renders in this file. Take the
-     * most recently registered one — it belongs to the player just rendered,
-     * whatever ran before.
+     * The video.js mock builds one player per call, so grab the most recent
+     * instance and its most recently registered handler — they belong to the
+     * player just rendered, whatever ran before.
      */
     const getPlayHandler = (): (() => void) => {
       const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
@@ -487,6 +490,24 @@ describe('MediaPlayer', () => {
 
       expect(player.dispose).toHaveBeenCalledTimes(1);
     });
+
+    // Real video.js adopts the data-vjs-player parent as the player root and
+    // dispose() removes it from the DOM, so that parent must be created fresh
+    // per init. With it rendered by React, StrictMode's dev double-mount left
+    // the second player initializing into a detached tree — an invisible
+    // player, and the local-dev failure behind player-volume-persistence.
+    it('keeps the player element attached under StrictMode double-mount', () => {
+      render(
+        <React.StrictMode>
+          <MediaPlayer>
+            <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+          </MediaPlayer>
+        </React.StrictMode>
+      );
+
+      const el = vi.mocked(videojs).mock.calls.at(-1)?.[0] as HTMLElement;
+      expect(el.isConnected).toBe(true);
+    });
   });
 
   describe('Controls component', () => {
@@ -499,7 +520,9 @@ describe('MediaPlayer', () => {
 
       const controlsWrapper = container.querySelector('.audio-player-wrapper');
       expect(controlsWrapper).toBeInTheDocument();
-      expect(controlsWrapper).toHaveAttribute('data-vjs-player');
+      // The data-vjs-player container is created by the initializer INSIDE
+      // the React host (dispose removes it, so React must not render it).
+      expect(controlsWrapper?.querySelector('[data-vjs-player]')).toBeInTheDocument();
     });
 
     it('should suppress transient corruption/decode errors', () => {

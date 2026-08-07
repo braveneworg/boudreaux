@@ -200,11 +200,21 @@ export const createPlayerInitializer = (
 
     if (!containerRef.current) return false;
 
+    // video.js adopts the data-vjs-player parent as the player root
+    // (playerElIngest) and dispose() removes that parent from the DOM — so
+    // the parent is created here, fresh per init, inside the React-owned
+    // host div: otherwise the init after a dispose (StrictMode remount in
+    // dev) would append into a node the prior dispose already detached,
+    // leaving the player invisible.
+    const playerContainer = document.createElement('div');
+    playerContainer.setAttribute('data-vjs-player', '');
+
     const audioEl = document.createElement('audio');
     audioEl.className = 'video-js vjs-default-skin';
     audioEl.setAttribute('playsinline', '');
     audioEl.setAttribute('webkit-playsinline', '');
-    containerRef.current.appendChild(audioEl);
+    playerContainer.appendChild(audioEl);
+    containerRef.current.appendChild(playerContainer);
     audioElRef.current = audioEl;
 
     const player = videojs(audioEl, {
