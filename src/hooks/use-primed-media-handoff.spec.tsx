@@ -27,6 +27,18 @@ describe('usePrimedMediaHandoff', () => {
     expect(playSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('hands the element off paused so the deferred play() fires a play event', () => {
+    const { result } = renderHook(() => usePrimedMediaHandoff());
+
+    result.current.primeMediaEl();
+    const primed = result.current.takeMediaEl();
+
+    // A sourceless gestured play() flips paused to false and fires the
+    // element's ONLY play event before video.js attaches — leaving it unpaused
+    // strands the player UI on the poster while audio plays underneath.
+    expect(primed?.paused).toBe(true);
+  });
+
   it('hands off a primed inline-playback video element', () => {
     const { result } = renderHook(() => usePrimedMediaHandoff());
 
