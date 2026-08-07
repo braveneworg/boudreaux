@@ -7,9 +7,10 @@ dispose — a StrictMode remount in dev, or a prod `src` change (e.g. a playlist
 advancing between videos) — appends the new player into a detached node: the
 player initializes, logs only `VIDEOJS: WARN: The element supplied is not
 included in the DOM`, and renders nothing. Create the `data-vjs-player`
-container inside the effect, fresh per run, under a React-owned host div
-(`video-player-surface.tsx`), so dispose only removes video.js-owned DOM. Keep
-fake players in specs DOM-faithful (dispose removes the ingest parent) or unit
-tests can't see this class of bug. `media-player-controls.tsx` (audio) still
-has the React-rendered pattern — the local-dev failure of
-`player-volume-persistence.spec.ts` is this bug, not a spec problem.
+container inside the effect/init, fresh per run, under a React-owned host div
+(`video-player-surface.tsx`, `create-player-initializer.tsx` for audio), so
+dispose only removes video.js-owned DOM. Keep fake players in specs
+DOM-faithful (dispose removes the ingest parent) or unit tests can't see this
+class of bug — it was exactly the local-dev failure of
+`player-volume-persistence.spec.ts` (audio) and the invisible modal player
+(video) before both surfaces were fixed.
