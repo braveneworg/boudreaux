@@ -15,6 +15,20 @@ export type PublishedVideosPaginatedResponse = PaginatedResponse<VideoRow>;
 /** Page size requested per fetch — kept in sync with the SSR prefetch and service. */
 export const PUBLISHED_VIDEOS_PAGE_SIZE = 5;
 
+/** Request parameters for one `/api/videos?listing=published` page fetch. */
+interface FetchPublishedVideosParams {
+  /** Release-date sort direction applied server-side. */
+  sort: 'asc' | 'desc';
+  /** Server-side title/artist search term (empty fetches all). */
+  search: string;
+  /** Offset of the page to fetch. */
+  skip: number;
+  /** Page size to request. */
+  take: number;
+  /** The query's abort signal. */
+  signal?: AbortSignal;
+}
+
 /**
  * Fetches one page of published, non-archived videos from the
  * `/api/videos?listing=published` route handler.
@@ -22,25 +36,24 @@ export const PUBLISHED_VIDEOS_PAGE_SIZE = 5;
  * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
  *
- * @param sort - Release-date sort direction applied server-side.
- * @param skip - Offset of the page to fetch.
- * @param take - Page size to request.
- * @param signal - The query's abort signal.
+ * @param params - Sort/search/pagination inputs plus the abort signal.
  * @returns The page of videos plus the `nextSkip` cursor.
  * @throws If the response status is not OK.
  */
-const fetchPublishedVideos = async (
-  sort: 'asc' | 'desc',
-  skip: number,
-  take: number,
-  signal?: AbortSignal
-): Promise<PublishedVideosPaginatedResponse> => {
+const fetchPublishedVideos = async ({
+  sort,
+  search,
+  skip,
+  take,
+  signal,
+}: FetchPublishedVideosParams): Promise<PublishedVideosPaginatedResponse> => {
   const params = new URLSearchParams({
     listing: 'published',
     skip: String(skip),
     take: String(take),
     sort,
   });
+  if (search) params.set('search', search);
 
   return fetchAndParse(`/api/videos?${params.toString()}`, videoPageSchema, {
     signal,
@@ -52,23 +65,32 @@ const fetchPublishedVideos = async (
  * React Query infinite hook for the signed-in public videos listing.
  *
  * Pages through the published-videos endpoint via skip/offset, accumulating
- * results for infinite scroll. `sort` is applied server-side and is part of the
- * query key, so changing it resets pagination; `keepPreviousData` keeps the
- * current results visible during a sort transition.
+ * results for infinite scroll. `sort` and `search` are applied server-side and
+ * are part of the query key, so changing either resets pagination;
+ * `keepPreviousData` keeps the current results visible during a sort or search
+ * transition.
  *
  * @param sort - Release-date sort direction (defaults to newest first).
+ * @param search - Debounced title/artist search term (defaults to all videos).
  * @param options - Caller overrides spread into the `useInfiniteQuery` call
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
 export const useInfinitePublishedVideosQuery = (
   sort: 'asc' | 'desc' = 'desc',
+  search = '',
   options: InfiniteQueryOptionsOverride<PublishedVideosPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
-    queryKey: queryKeys.videos.publishedInfinite(sort),
+    queryKey: queryKeys.videos.publishedInfinite(sort, search),
     queryFn: ({ pageParam, signal }) =>
-      fetchPublishedVideos(sort, pageParam, PUBLISHED_VIDEOS_PAGE_SIZE, signal),
+      fetchPublishedVideos({
+        sort,
+        search,
+        skip: pageParam,
+        take: PUBLISHED_VIDEOS_PAGE_SIZE,
+        signal,
+      }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,

@@ -241,6 +241,32 @@ describe('VideoRepository', () => {
       expect(arg?.skip).toBe(5);
       expect(arg?.take).toBe(2);
     });
+
+    it('adds a title/artist search OR alongside the visibility clauses', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      await VideoRepository.findPublished({ search: 'basement' });
+
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }],
+        OR: [
+          { title: { contains: 'basement', mode: 'insensitive' } },
+          { artist: { contains: 'basement', mode: 'insensitive' } },
+        ],
+      });
+    });
+
+    it('adds no search clause for an empty search', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValue([] as never);
+
+      await VideoRepository.findPublished({ search: '' });
+
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }],
+      });
+    });
   });
 
   // The lean projection pinned for the playlist lookup/search reads.

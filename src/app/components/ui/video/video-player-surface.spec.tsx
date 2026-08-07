@@ -24,8 +24,11 @@ interface FakePlayer {
 // A fresh fake player per videojs() call so multi-instance coordinator tests get
 // distinct pause spies. play() rejects to exercise the autoplay-swallow path on
 // every mount; a missing .catch would surface as an unhandled rejection.
+// dispose() is DOM-faithful: real video.js adopts the data-vjs-player parent as
+// the player root (playerElIngest) and dispose() removes THAT parent from the
+// DOM — the fake must too, or remount-after-dispose bugs stay invisible here.
 vi.mock('video.js', () => {
-  const makePlayer = (): FakePlayer => {
+  const makePlayer = (el?: HTMLElement): FakePlayer => {
     const handlers = new Map<string, Array<() => void>>();
     let currentVolume = 1;
     let currentMuted = false;
@@ -38,7 +41,7 @@ vi.mock('video.js', () => {
       }),
       play: vi.fn(() => Promise.reject(new Error('autoplay-blocked'))),
       pause: vi.fn(),
-      dispose: vi.fn(),
+      dispose: vi.fn(() => el?.parentElement?.remove()),
       volume: vi.fn((value?: number) => {
         if (value !== undefined) {
           currentVolume = value;
@@ -56,7 +59,7 @@ vi.mock('video.js', () => {
       trigger: (event: string) => handlers.get(event)?.forEach((callback) => callback()),
     };
   };
-  return { default: vi.fn(() => makePlayer()) };
+  return { default: vi.fn((el: HTMLElement) => makePlayer(el)) };
 });
 
 const getPlayers = (): FakePlayer[] =>
@@ -164,6 +167,22 @@ describe('VideoPlayerSurface', () => {
     act(() => second.trigger('play'));
 
     expect(first.pause).toHaveBeenCalledTimes(1);
+  });
+
+  // Real video.js dispose() removes the data-vjs-player parent from the DOM,
+  // so that parent must be created per effect run — if React rendered it, the
+  // run after a dispose (StrictMode remount in dev, a src change in prod, e.g.
+  // a playlist advancing between videos) would append into a detached node and
+  // the player would be invisible.
+  it('mounts a live, document-attached player after a source change re-init', () => {
+    const { rerender } = render(
+      <VideoPlayerSurface title="Live" src="https://cdn.example.com/a.mp4" />
+    );
+
+    rerender(<VideoPlayerSurface title="Live" src="https://cdn.example.com/b.mp4" />);
+
+    const el = vi.mocked(videojs).mock.calls[1]?.[0] as HTMLVideoElement;
+    expect(el.isConnected).toBe(true);
   });
 
   it('disposes the player on unmount', () => {

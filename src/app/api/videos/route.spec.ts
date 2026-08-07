@@ -123,6 +123,22 @@ describe('GET /api/videos', () => {
     });
   });
 
+  it('forwards the search param to the published listing', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [] as never,
+    });
+
+    await call('?listing=published&search=blues');
+
+    expect(VideoService.getPublishedVideos).toHaveBeenCalledWith({
+      sort: 'desc',
+      skip: 0,
+      take: 5,
+      search: 'blues',
+    });
+  });
+
   it('clamps take=500 to 50 on the admin listing', async () => {
     vi.mocked(VideoService.getVideos).mockResolvedValue({ success: true, data: [] as never });
 

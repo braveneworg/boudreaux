@@ -56,10 +56,11 @@ const videoRowResponse = {
 
 const getOptions = (
   sort: 'asc' | 'desc' = 'desc',
+  search = '',
   overrides: InfiniteQueryOptionsOverride<PublishedVideosPaginatedResponse> = {}
 ): PublishedVideosQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useInfinitePublishedVideosQuery(sort, overrides));
+  renderHook(() => useInfinitePublishedVideosQuery(sort, search, overrides));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as PublishedVideosQueryOptions;
 };
 
@@ -71,13 +72,19 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('keys the query by the published-infinite sort', () => {
     const opts = getOptions('asc');
 
-    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'asc']);
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'asc', '']);
   });
 
   it('defaults the sort to desc', () => {
     const opts = getOptions();
 
-    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc']);
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', '']);
+  });
+
+  it('keys the query by the normalized search term', () => {
+    const opts = getOptions('desc', '  Rock  ');
+
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', 'rock']);
   });
 
   it('starts pagination at skip 0', () => {
@@ -109,6 +116,23 @@ describe('useInfinitePublishedVideosQuery', () => {
     );
   });
 
+  it('appends the search param to the listing request when set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions('desc', 'Rock');
+    const { signal } = new AbortController();
+
+    await opts.queryFn({ pageParam: 0, signal });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/videos?listing=published&skip=0&take=${PUBLISHED_VIDEOS_PAGE_SIZE}&sort=desc&search=Rock`,
+      { signal }
+    );
+  });
+
   it('parses the wire row back into coerced Date and bigint fields', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -130,7 +154,7 @@ describe('useInfinitePublishedVideosQuery', () => {
   });
 
   it('lets a caller override enabled via the trailing options', () => {
-    const opts = getOptions('desc', { enabled: false });
+    const opts = getOptions('desc', '', { enabled: false });
 
     expect(opts.enabled).toBe(false);
   });

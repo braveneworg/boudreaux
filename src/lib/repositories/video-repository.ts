@@ -177,16 +177,24 @@ export class VideoRepository {
 
   /**
    * Fetch a page of published and visible (publishedAt ≤ now), non-archived
-   * videos for the public `/videos` listing. Ordered by `releasedOn` (default
-   * desc). Defaults: skip 0, take 5.
+   * videos for the public `/videos` listing. An optional `search` narrows by
+   * title/artist (case-insensitive substring) — the OR sits at the top level
+   * beside `buildListWhere`'s `AND` so the clauses never collide (same shape
+   * as `searchPublished`). Ordered by `releasedOn` (default desc). Defaults:
+   * skip 0, take 5.
    */
   static async findPublished(
-    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take'>
+    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search'>
   ): Promise<Video[]> {
-    const { sort = 'desc', skip = 0, take = 5 } = filters;
+    const { sort = 'desc', skip = 0, take = 5, search } = filters;
     return runQuery(() =>
       prisma.video.findMany({
-        where: buildListWhere({ visibleAt: new Date() }),
+        where: {
+          ...buildListWhere({ visibleAt: new Date() }),
+          ...(search && {
+            OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
+          }),
+        },
         orderBy: { releasedOn: sort },
         skip,
         take,

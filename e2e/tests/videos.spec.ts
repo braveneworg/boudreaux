@@ -60,7 +60,7 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(userPage.getByText('E2E Video Golf')).toHaveCount(0);
   });
 
-  test('a card renders its title, artist, category badge, date, duration, and description', async ({
+  test('a card renders its title, artist, labeled date, duration, and description', async ({
     userPage,
   }) => {
     await userPage.goto('/videos');
@@ -69,21 +69,23 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(alpha).toHaveCount(1);
 
     await expect(alpha.getByText('E2E Artist One')).toBeVisible();
-    await expect(alpha.getByText('Music', { exact: true })).toBeVisible();
-    // 125s → "2:05" (timezone-independent, unlike the release date).
-    await expect(alpha.getByText('2:05')).toBeVisible();
-    await expect(alpha.getByText('E2E Video Alpha description for E2E.')).toBeVisible();
+    await expect(alpha.getByText('Release date:')).toBeVisible();
     // The formatted release date renders as "MMM D, 2026"; assert the shape,
     // not the exact day, since toLocaleDateString depends on the runner's TZ.
     await expect(alpha.getByText(/[A-Z][a-z]{2} \d{1,2}, 2026/)).toBeVisible();
+    // 125s → "2:05" (timezone-independent, unlike the release date).
+    await expect(alpha.getByText('Duration:')).toBeVisible();
+    await expect(alpha.getByText('2:05')).toBeVisible();
+    await expect(alpha.getByText('E2E Video Alpha description for E2E.')).toBeVisible();
 
-    // An INFORMATIONAL video carries the "Informational" badge instead.
+    // Category labels are gone from the public listing.
+    await expect(alpha.getByText('Music', { exact: true })).toHaveCount(0);
     await expect(
       cardByTitle(userPage, 'E2E Video Bravo').getByText('Informational', { exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
-  test('pressing play swaps the poster facade for the lazy video.js surface', async ({
+  test('clicking the poster opens the modal player and mounts the video.js surface', async ({
     userPage,
   }) => {
     await userPage.goto('/videos');
@@ -92,23 +94,72 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(alpha).toHaveCount(1);
 
     const play = alpha.getByRole('button', { name: 'Play E2E Video Alpha' });
-    const surfaceError = alpha.getByText(/This video can.t be played right now\./);
-    // Nothing from the video.js surface exists until the play facade is pressed.
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Video Alpha' });
+    // Nothing from the modal or video.js exists until the poster is pressed.
     await expect(play).toBeVisible();
-    await expect(alpha.locator('.video-js')).toHaveCount(0);
-    await expect(surfaceError).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
+    await expect(userPage.locator('.video-js')).toHaveCount(0);
 
     await play.click();
 
-    // The facade is replaced by the lazily-imported video.js surface. Whether
+    // The modal opens and mounts the lazily-imported video.js surface. Whether
     // the H.264 fixture then decodes depends on the Chromium build's codec
     // support: builds without it (e.g. macOS Playwright) reach the surface's
     // inline error fallback and video.js tears its element down, while builds
     // with it (CI's Linux Chromium) render a live `.video-js` player. The two
     // terminal states are mutually exclusive; either one proves the lazy
     // surface mounted and ran video.js.
-    await expect(play).toHaveCount(0);
-    await expect(surfaceError.or(alpha.locator('.video-js'))).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toBeVisible();
+    const surfaceError = dialog.getByText(/This video can.t be played right now\./);
+    await expect(surfaceError.or(dialog.locator('.video-js'))).toBeVisible({ timeout: 15_000 });
+
+    // Closing the modal unmounts the surface and disposes the player.
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(userPage.locator('.video-js')).toHaveCount(0);
+  });
+
+  test('searching by title narrows the listing across pages', async ({ userPage }) => {
+    await userPage.goto('/videos');
+
+    await expect(cardTitles(userPage)).toHaveCount(PAGE_ONE_TITLES.length);
+
+    // Golf normally sits on page 2 — matching it proves the search is
+    // server-side, not a client filter over the loaded rows.
+    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('Golf');
+
+    await expect(cardTitles(userPage)).toHaveText(['E2E Video Golf']);
+  });
+
+  test('searching by artist narrows to that artist and keeps newest-first order', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/videos');
+
+    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('E2E Artist Two');
+
+    await expect(cardTitles(userPage)).toHaveText(['E2E Video Bravo', 'E2E Video Echo']);
+  });
+
+  test('clearing the search restores the full listing', async ({ userPage }) => {
+    await userPage.goto('/videos');
+
+    const search = userPage.getByRole('searchbox', { name: 'Search videos' });
+    await search.fill('Golf');
+    await expect(cardTitles(userPage)).toHaveText(['E2E Video Golf']);
+
+    await search.fill('');
+
+    await expect(cardTitles(userPage)).toHaveText([...PAGE_ONE_TITLES]);
+  });
+
+  test('a search with no matches shows the no-match message', async ({ userPage }) => {
+    await userPage.goto('/videos');
+
+    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('zzz-no-such-video');
+
+    await expect(userPage.getByText(/No videos match/)).toBeVisible();
+    await expect(cardTitles(userPage)).toHaveCount(0);
   });
 
   test('infinite scroll loads Foxtrot and Golf for 7 total cards', async ({ userPage }) => {

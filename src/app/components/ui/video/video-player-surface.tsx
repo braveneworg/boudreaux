@@ -61,8 +61,17 @@ export const VideoPlayerSurface = ({
   }, [onEnded, takeMediaEl]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const host = containerRef.current;
+    if (!host) return;
+
+    // video.js adopts the data-vjs-player parent as the player root
+    // (playerElIngest) and dispose() removes that parent from the DOM — so
+    // the parent must be created here, fresh per effect run, never rendered
+    // by React: otherwise the run after a dispose (StrictMode remount in
+    // dev, a src change in prod) appends into a detached node and the
+    // player is invisible.
+    const container = document.createElement('div');
+    container.setAttribute('data-vjs-player', '');
 
     // The primed element must reach video.js as-is, inside the
     // data-vjs-player container: that parent turns on player-element ingest,
@@ -72,6 +81,7 @@ export const VideoPlayerSurface = ({
     videoEl.setAttribute('playsinline', '');
     videoEl.setAttribute('aria-label', title);
     container.appendChild(videoEl);
+    host.appendChild(container);
 
     const player = videojs(videoEl, {
       controls: true,
@@ -109,7 +119,7 @@ export const VideoPlayerSurface = ({
 
   return (
     <div className="relative w-full">
-      <div ref={containerRef} data-vjs-player className={cn('w-full', hasError && 'hidden')} />
+      <div ref={containerRef} className={cn('w-full', hasError && 'hidden')} />
       {hasError ? (
         <div className="bg-muted text-muted-foreground flex aspect-video w-full items-center justify-center border-2 border-black p-4 text-center text-sm">
           This video can’t be played right now.

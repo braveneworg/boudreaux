@@ -49,8 +49,8 @@ export const queryKeys = {
   },
   videos: {
     all: ['videos'] as const,
-    publishedInfinite: (sort: 'asc' | 'desc') =>
-      [...queryKeys.videos.all, 'publishedInfinite', sort] as const,
+    publishedInfinite: (sort: 'asc' | 'desc', search = '') =>
+      [...queryKeys.videos.all, 'publishedInfinite', sort, search.trim().toLowerCase()] as const,
     adminInfinite: (params: {
       search: string;
       published: boolean | null;
