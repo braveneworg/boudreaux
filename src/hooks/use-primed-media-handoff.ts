@@ -10,8 +10,10 @@ export interface PrimedMediaHandoff {
   /**
    * Call synchronously inside the user's play gesture. Creates the `<video>`
    * element the surface will later play and primes it while the gesture is
-   * live: `load()` blesses WebKit, a gestured `play()` blesses Firefox (it
-   * rejects for lack of a source — irrelevant, the blessing sticks).
+   * live: `load()` blesses WebKit, a gestured `play()` blesses Firefox — then
+   * an immediate `pause()` (which the blessings survive) so the element is
+   * handed off paused and the surface's deferred play() still fires a real
+   * play event for video.js.
    */
   primeMediaEl: () => void;
   /**
@@ -39,6 +41,14 @@ export const usePrimedMediaHandoff = (): PrimedMediaHandoff => {
     el.setAttribute('playsinline', '');
     el.load();
     el.play().catch(() => {});
+    // A sourceless play() doesn't reject — it flips `paused` to false, fires
+    // the element's ONLY play event now (before video.js attaches a listener),
+    // and playback then auto-resumes when the source arrives: the player UI
+    // stays on the poster + big play button while audio runs underneath.
+    // Pausing re-arms the play event for the surface's deferred play(); the
+    // gesture blessings survive it (verified: Chromium, Firefox strictest
+    // autoplay policy, WebKit).
+    el.pause();
     primedElRef.current = el;
   };
 
