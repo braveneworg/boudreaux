@@ -104,6 +104,15 @@ vi.mock('./_hooks/use-release-date-lookup-query', () => ({
   }),
 }));
 
+vi.mock('./_hooks/use-video-description-lookup-query', () => ({
+  useVideoDescriptionLookupQuery: () => ({
+    isFetching: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/utils/multipart-upload', () => ({
   uploadVideoMultipart: mocks.uploadVideoMultipart,
 }));

@@ -10,9 +10,9 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
-import { Textarea } from '@/app/components/ui/textarea';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
+import { DescriptionField } from './description-field';
 import { ReleaseDateField } from './release-date-field';
 import { useVideoArtistFields } from './use-video-artist-fields';
 
@@ -126,19 +126,7 @@ export const VideoMetadataSection = ({
         />
       </div>
 
-      <FormField
-        control={control}
-        name="description"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Description</FormLabel>
-            <FormControl>
-              <Textarea placeholder="Video description" className="min-h-24" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <DescriptionField control={control} setValue={setValue} />
     </section>
   );
 };
