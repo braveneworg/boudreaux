@@ -265,4 +265,37 @@ test.describe('Admin video form — create', () => {
     // Verify it is exactly the fixture date (locale-independent input value).
     await expect(dateInput).toHaveValue('06/01/2020');
   });
+
+  test('Generate description fills the field when BIO_GENERATOR_FAKE is true', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/videos/new');
+
+    // Disabled until BOTH title and artist are present — the synthesized
+    // prose must name the artist, so a title alone is not enough.
+    const generateBtn = adminPage.getByRole('button', { name: 'Generate description' });
+    await expect(generateBtn).toBeDisabled();
+
+    await adminPage.getByLabel('Title').fill('Test Video Title');
+    await expect(generateBtn).toBeDisabled();
+
+    // Pick the seeded primary artist through the combobox (stable accessible
+    // name via the <label htmlFor> linkage — see the combobox test above).
+    await adminPage.getByRole('combobox', { name: 'Artist / Creator' }).click();
+    await adminPage.getByPlaceholder('Search artists…').first().fill('Test Artist');
+    const artistOption = adminPage.getByRole('option', { name: 'Test Artist One' });
+    await expect(artistOption).toBeVisible({ timeout: 5_000 });
+    await artistOption.click();
+    await expect(generateBtn).toBeEnabled();
+
+    const description = adminPage.getByLabel('Description', { exact: true });
+    await expect(description).toHaveValue('');
+
+    // With BIO_GENERATOR_FAKE=true the fake lookup interpolates the title and
+    // artist into deterministic ~500-char prose with attributed quotes.
+    await generateBtn.click();
+    await expect(description).toHaveValue(/Test Video Title/, { timeout: 10_000 });
+    await expect(description).toHaveValue(/Test Artist One/);
+    await expect(description).toHaveValue(/Indie Sleeves/);
+  });
 });

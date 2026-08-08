@@ -5,7 +5,7 @@
 import { resolveDescriptionSuggestion } from './video-description.js';
 
 import type { SerperWebResult } from './serper.js';
-import type { VideoDescriptionArgs } from './video-description.js';
+import type { VideoDescriptionDeps, VideoDescriptionArgs } from './video-description.js';
 
 const evidence: SerperWebResult[] = [
   {
@@ -38,6 +38,13 @@ const baseArgs: VideoDescriptionArgs = {
   model: 'gemini-2.5-flash',
 };
 
+/** Deps with the page reader stubbed out so no test can touch the network. */
+const withReader = (deps: VideoDescriptionDeps): VideoDescriptionDeps => ({
+  readPage: vi.fn().mockResolvedValue(null),
+  getScrapeKey: vi.fn().mockResolvedValue(null),
+  ...deps,
+});
+
 describe('resolveDescriptionSuggestion', () => {
   it('synthesizes a suggestion with subset-enforced sources', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
@@ -48,10 +55,10 @@ describe('resolveDescriptionSuggestion', () => {
       })
     );
 
-    const result = await resolveDescriptionSuggestion(baseArgs, {
-      searchWeb,
-      fetchOptions: { fetchFn },
-    });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
 
     expect(result).toEqual({
       value: 'Bite Through Stone is a single by Ceschi from Broken Bone Ballads.',
@@ -61,12 +68,17 @@ describe('resolveDescriptionSuggestion', () => {
     });
   });
 
-  it('runs both queries', async () => {
+  it('sweeps three queries, including a review search for quotable press', async () => {
     const searchWeb = vi.fn().mockResolvedValue([]);
 
-    await resolveDescriptionSuggestion(baseArgs, { searchWeb });
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb }));
 
-    expect(searchWeb).toHaveBeenCalledTimes(2);
+    expect(searchWeb).toHaveBeenCalledTimes(3);
+    expect(searchWeb.mock.calls.map(([query]) => query)).toEqual([
+      '"Ceschi" "Bite Through Stone"',
+      'Ceschi Bite Through Stone song',
+      'Ceschi Bite Through Stone review',
+    ]);
   });
 
   it('returns null when Gemini returns a null description', async () => {
@@ -75,10 +87,10 @@ describe('resolveDescriptionSuggestion', () => {
       .fn()
       .mockResolvedValue(geminiResponse({ ...adjudication, description: null }));
 
-    const result = await resolveDescriptionSuggestion(baseArgs, {
-      searchWeb,
-      fetchOptions: { fetchFn },
-    });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
 
     expect(result).toBeNull();
   });
@@ -89,10 +101,10 @@ describe('resolveDescriptionSuggestion', () => {
       .fn()
       .mockResolvedValue(geminiResponse({ ...adjudication, description: '   ' }));
 
-    const result = await resolveDescriptionSuggestion(baseArgs, {
-      searchWeb,
-      fetchOptions: { fetchFn },
-    });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
 
     expect(result).toBeNull();
   });
@@ -100,7 +112,7 @@ describe('resolveDescriptionSuggestion', () => {
   it('returns null when the web search finds no evidence', async () => {
     const searchWeb = vi.fn().mockResolvedValue([]);
 
-    const result = await resolveDescriptionSuggestion(baseArgs, { searchWeb });
+    const result = await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb }));
 
     expect(result).toBeNull();
   });
@@ -113,10 +125,10 @@ describe('resolveDescriptionSuggestion', () => {
         geminiResponse({ ...adjudication, sourceUrls: ['https://fabricated.example.com/'] })
       );
 
-    const result = await resolveDescriptionSuggestion(baseArgs, {
-      searchWeb,
-      fetchOptions: { fetchFn },
-    });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
 
     expect(result).toBeNull();
   });
@@ -125,7 +137,10 @@ describe('resolveDescriptionSuggestion', () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue({ ...adjudication, confidence: 'high' });
 
-    const result = await resolveDescriptionSuggestion(baseArgs, { searchWeb, requestJson });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, requestJson })
+    );
 
     expect(result?.confidence).toBe('medium');
   });
@@ -134,10 +149,10 @@ describe('resolveDescriptionSuggestion', () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const fetchFn = vi.fn().mockRejectedValue(new Error('gemini down'));
 
-    const result = await resolveDescriptionSuggestion(baseArgs, {
-      searchWeb,
-      fetchOptions: { fetchFn, retries: 0 },
-    });
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn, retries: 0 } })
+    );
 
     expect(result).toBeNull();
   });
@@ -146,7 +161,7 @@ describe('resolveDescriptionSuggestion', () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue(adjudication);
 
-    await resolveDescriptionSuggestion(baseArgs, { searchWeb, requestJson });
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
 
     const [, options] = requestJson.mock.calls[0];
     expect(options.userPrompt).toContain('- Credited artists: Ceschi.');
@@ -157,9 +172,77 @@ describe('resolveDescriptionSuggestion', () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue(adjudication);
 
-    await resolveDescriptionSuggestion(baseArgs, { searchWeb, requestJson });
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
 
     const [, options] = requestJson.mock.calls[0];
     expect(options.systemPrompt).toContain('NEVER describe visuals or events in the video itself.');
+  });
+
+  it('targets about 500 characters and requires the artist name in the prose', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
+
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.systemPrompt).toContain('about 500 characters');
+    expect(options.systemPrompt).toContain("mention the artist's name");
+  });
+
+  it('demands verbatim quotes with inline source attribution, never fabricated', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
+
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.systemPrompt).toContain('verbatim');
+    expect(options.systemPrompt).toContain('attributed inline');
+    expect(options.systemPrompt).toMatch(/never invent, alter/i);
+  });
+
+  it('feeds top-page excerpts into the prompt as quote material', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+    const readPage = vi.fn().mockResolvedValue({
+      content: 'Pitchfork called the single "a jagged little miracle".',
+      images: [],
+    });
+    const getScrapeKey = vi.fn().mockResolvedValue('jina-key');
+
+    await resolveDescriptionSuggestion(baseArgs, {
+      searchWeb,
+      requestJson,
+      readPage,
+      getScrapeKey,
+    });
+
+    expect(readPage).toHaveBeenCalledWith(
+      'https://example.com/song',
+      'jina-key',
+      undefined,
+      expect.anything()
+    );
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.userPrompt).toContain('PAGE EXCERPTS');
+    expect(options.userPrompt).toContain('[https://example.com/song]');
+    expect(options.userPrompt).toContain('a jagged little miracle');
+  });
+
+  it('caps page reads at two and drops the block when every read fails', async () => {
+    const threeResults: SerperWebResult[] = [
+      evidence[0],
+      { title: 'Review', link: 'https://example.com/review', snippet: 'Review page.' },
+      { title: 'Interview', link: 'https://example.com/interview', snippet: 'Interview page.' },
+    ];
+    const searchWeb = vi.fn().mockResolvedValue(threeResults);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+    const readPage = vi.fn().mockResolvedValue(null);
+
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson, readPage }));
+
+    expect(readPage).toHaveBeenCalledTimes(2);
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.userPrompt).not.toContain('PAGE EXCERPTS');
   });
 });

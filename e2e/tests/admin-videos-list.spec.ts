@@ -130,6 +130,44 @@ test.describe('Admin videos — filters', () => {
   });
 });
 
+test.describe('Admin videos — long description clamp', () => {
+  test('a >500-char description collapses behind the gradient and expands on the arrow', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/videos');
+
+    // Golf (the seeded long-description fixture) leads the oldest-first
+    // published-only view — no paging needed to reach it.
+    await adminPage.getByRole('switch', { name: 'Show unpublished' }).click();
+    await adminPage.getByRole('radio', { name: 'Oldest first' }).click();
+
+    const golfCard = cardByTitle(adminPage, 'E2E Video Golf');
+    await expect(golfCard).toHaveCount(1);
+
+    // Collapsed: the down-arrow control is present and unexpanded.
+    const expand = golfCard.getByRole('button', { name: 'Show full description' });
+    await expect(expand).toBeVisible();
+    await expect(expand).toHaveAttribute('aria-expanded', 'false');
+
+    // Expanding flips the control to a collapse affordance.
+    await expand.click();
+    const collapse = golfCard.getByRole('button', { name: 'Collapse description' });
+    await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+
+    // And collapsing restores the clamped state.
+    await collapse.click();
+    await expect(golfCard.getByRole('button', { name: 'Show full description' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+
+    // A short-description card renders its prose with no expand control.
+    const foxtrotCard = cardByTitle(adminPage, 'E2E Video Foxtrot');
+    await expect(foxtrotCard.getByText('E2E Video Foxtrot description for E2E.')).toBeVisible();
+    await expect(foxtrotCard.getByRole('button', { name: 'Show full description' })).toHaveCount(0);
+  });
+});
+
 test.describe('Admin videos — lifecycle dialogs (read-only)', () => {
   test('the delete dialog opens with its permanent-removal warning and cancels cleanly', async ({
     adminPage,

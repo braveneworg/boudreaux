@@ -111,7 +111,13 @@ export interface AdjudicationRun<T> {
   schema: AdjudicationSchema<T>;
   systemPrompt: string;
   /** Builds the user prompt from the (non-empty) numbered evidence block. */
-  buildUserPrompt: (evidence: string) => string;
+  buildUserPrompt: (evidence: string, extra?: string | null) => string;
+  /**
+   * Optional second evidence tier gathered from the search results (e.g. page
+   * excerpts for quote material) and handed to `buildUserPrompt` as `extra`.
+   * Best-effort by contract: implementations resolve null, never throw.
+   */
+  augmentEvidence?: (evidence: SerperWebResult[]) => Promise<string | null>;
 }
 
 /** The parsed adjudication plus the evidence-link allowlist for subset checks. */
@@ -121,11 +127,12 @@ export interface AdjudicationOutcome<T> {
 }
 
 /**
- * Shared adjudication core: gather two-query evidence, and — when any exists —
- * run one low-temperature Gemini JSON call against the supplied schema. Returns
- * the parsed body plus the evidence-link allowlist, or `null` when no evidence
- * was found. Keeps the endpoint/auth/retry/JSON parsing identical across both
- * adjudications and holds each public entry point under the complexity cap.
+ * Shared adjudication core: gather the multi-query evidence, and — when any
+ * exists — run one low-temperature Gemini JSON call against the supplied
+ * schema. Returns the parsed body plus the evidence-link allowlist, or `null`
+ * when no evidence was found. Keeps the endpoint/auth/retry/JSON parsing
+ * identical across the adjudications and holds each public entry point under
+ * the complexity cap.
  */
 export const adjudicate = async <T>(
   run: AdjudicationRun<T>,
@@ -134,12 +141,13 @@ export const adjudicate = async <T>(
   const evidence = await gatherEvidence(run.queries, run.serperKey, searchWeb);
   if (evidence.length === 0) return null;
 
+  const extra = run.augmentEvidence ? await run.augmentEvidence(evidence) : null;
   const provided = new Set(evidence.map((result) => result.link));
   const parsed = await requestJson(
     run.schema,
     {
       systemPrompt: run.systemPrompt,
-      userPrompt: run.buildUserPrompt(evidenceLines(evidence)),
+      userPrompt: run.buildUserPrompt(evidenceLines(evidence), extra),
       apiKey: run.geminiKey,
       model: run.model,
       temperature: ADJUDICATION_TEMPERATURE,

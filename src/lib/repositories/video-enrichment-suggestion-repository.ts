@@ -60,6 +60,27 @@ export class VideoEnrichmentSuggestionRepository {
     );
   }
 
+  /**
+   * Insert a suggestion row already applied by the SYSTEM (no admin user):
+   * auto-applied enrichment facts land resolved, so they fence re-runs (see
+   * `findExistingFacts`) and surface as provenance in the panel. `appliedBy`
+   * stays null — the column holds a user ObjectId and no user acted here.
+   */
+  static async createApplied(videoId: string, row: CreateSuggestionRow): Promise<void> {
+    await runQuery(() =>
+      prisma.videoEnrichmentSuggestion.create({
+        data: {
+          ...row,
+          sources: toPrismaSources(row.sources),
+          videoId,
+          status: 'applied',
+          appliedAt: new Date(),
+          appliedBy: null,
+        },
+      })
+    );
+  }
+
   /** All suggestion rows for a video, oldest first. */
   static async findByVideoId(videoId: string): Promise<VideoEnrichmentSuggestionRecord[]> {
     return runQuery(() =>

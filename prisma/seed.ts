@@ -578,7 +578,20 @@ const createDefaultVideos = async (): Promise<void> => {
                 })),
               }
             : {}),
-          description: `${video.title} description for E2E.`,
+          // Golf's long description mirrors e2e/helpers/seed-test-db.ts
+          // byte-for-byte (admin clamp coverage) — keep both in sync.
+          description:
+            video.title === 'E2E Video Golf'
+              ? 'E2E Video Golf is an informational feature from E2E Artist Three, produced ' +
+                'for the E2E catalogue to exercise long-description layouts end to end. ' +
+                'Reviewers called it "a remarkably thorough walkthrough of the label\'s ' +
+                'process" — E2E Weekly — and praised its pacing across every chapter of the ' +
+                'runtime. E2E Artist Three assembled the piece from studio footage, tour ' +
+                'archives, and interview fragments, and its closing segment was described ' +
+                'as "the most honest minute the channel has published" — E2E Quarterly. ' +
+                'This seeded prose intentionally runs past five hundred characters so the ' +
+                'admin listing clamps it behind the gradient and expand arrow.'
+              : `${video.title} description for E2E.`,
           publishedAt: isDraft
             ? null
             : 'publishedAt' in video

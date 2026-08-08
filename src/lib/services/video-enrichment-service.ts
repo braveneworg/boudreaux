@@ -420,6 +420,26 @@ const buildFeaturedArtistRows = ({
 };
 
 /**
+ * Split the description row out of the pending batch when it should
+ * auto-apply: a video with no stored description (upload, or a replace that
+ * cleared it) takes the synthesized prose directly instead of parking it for
+ * review. A non-blank description is never overwritten — the row stays
+ * pending for the admin to apply or dismiss.
+ */
+const takeAutoApplyDescription = (
+  state: VideoEnrichmentState,
+  pending: CreateSuggestionRow[]
+): { autoApply: CreateSuggestionRow | null; remaining: CreateSuggestionRow[] } => {
+  if (state.description?.trim()) return { autoApply: null, remaining: pending };
+  const autoApply =
+    pending.find((row) => row.artistId === null && row.field === 'description') ?? null;
+  return {
+    autoApply,
+    remaining: autoApply ? pending.filter((row) => row !== autoApply) : pending,
+  };
+};
+
+/**
  * Convert the Lambda's validated payload into pending suggestion rows:
  * drop facts equal to current values, fence facts already applied/dismissed,
  * pre-merge akaNames, and emit the video-level release date only when it
@@ -707,8 +727,9 @@ export class VideoEnrichmentService {
   /**
    * Complete a claimed job: a non-ok result flips to `failed`; an ok result
    * filters/fences/merges the suggestions (see {@link buildPendingRows}),
-   * replaces the pending rows, and flips to `succeeded`. Never throws — it
-   * runs post-response via `after()`.
+   * replaces the pending rows, auto-applies the synthesized description when
+   * the video has none (see {@link takeAutoApplyDescription}), and flips to
+   * `succeeded`. Never throws — it runs post-response via `after()`.
    */
   static async completeCallback(videoId: string, result: VideoEnrichmentResult): Promise<void> {
     if (!result.ok) {
@@ -721,7 +742,12 @@ export class VideoEnrichmentService {
       const rows = await VideoArtistRepository.findByVideoId(videoId);
       const facts = await VideoEnrichmentSuggestionRepository.findExistingFacts(videoId);
       const pending = buildPendingRows({ data: result.data, state, rows, facts });
-      await VideoEnrichmentSuggestionRepository.replacePending(videoId, pending);
+      const { autoApply, remaining } = takeAutoApplyDescription(state, pending);
+      await VideoEnrichmentSuggestionRepository.replacePending(videoId, remaining);
+      if (autoApply) {
+        await VideoRepository.update(videoId, { description: autoApply.value });
+        await VideoEnrichmentSuggestionRepository.createApplied(videoId, autoApply);
+      }
       await VideoRepository.setEnrichmentStatus(videoId, 'succeeded', { error: null });
     } catch (error) {
       const message =
