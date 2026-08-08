@@ -1,9 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import md5 from 'crypto-js/md5';
+'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useGravatarHash } from '@/hooks/use-gravatar-hash';
 import { cn } from '@/lib/utils';
 
 export type GravatarDefaultStyle =
@@ -18,7 +19,7 @@ export type GravatarDefaultStyle =
 interface GravatarAvatarProps {
   /** Gravatar source. Either `email` (hashed client-side) or `hash` (precomputed server-side). */
   email?: string;
-  /** Precomputed MD5 hash. Preferred for peer avatars so emails are not exposed. */
+  /** Precomputed Gravatar hash. Preferred for peer avatars so emails are not exposed. */
   hash?: string;
   firstName?: string;
   surname?: string;
@@ -38,7 +39,8 @@ export const GravatarAvatar = ({
   defaultStyle = 'retro',
   className,
 }: GravatarAvatarProps) => {
-  const resolvedHash = hash ?? (email ? md5(email.trim().toLowerCase()).toString() : '');
+  const computedHash = useGravatarHash(hash ? undefined : email);
+  const resolvedHash = hash ?? computedHash;
   const gravatarUrl = `https://www.gravatar.com/avatar/${resolvedHash}?s=${size}&d=${defaultStyle}`;
 
   const fallbackInitials =
