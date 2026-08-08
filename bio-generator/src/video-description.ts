@@ -4,15 +4,18 @@
 
 import { z } from 'zod';
 
+import { readUrl } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
+import { getScrapeApiKey } from './lib/secrets.js';
 import { adjudicate, enforceSourceSubset } from './release-date.js';
 import { DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { AdjudicationDeps } from './release-date.js';
+import type { SerperWebResult } from './serper.js';
 import type { VideoSuggestion } from './types.js';
 
 /**
- * Gemini's JSON synthesis of a short editorial description. No confidence field
+ * Gemini's JSON synthesis of an editorial description. No confidence field
  * exists here — description prose is always emitted at fixed medium confidence.
  */
 export const descriptionAdjudicationSchema = z.object({
@@ -33,41 +36,87 @@ export interface VideoDescriptionArgs {
   model?: string;
 }
 
+/** Description deps: the shared adjudication seams plus the page reader tier. */
+export interface VideoDescriptionDeps extends AdjudicationDeps {
+  readPage?: typeof readUrl;
+  getScrapeKey?: typeof getScrapeApiKey;
+}
+
+/** How many top evidence pages are read for verbatim quote material. */
+const MAX_EXCERPT_PAGES = 2;
+/** Per-page excerpt cap, bounding the prompt size. */
+const MAX_EXCERPT_CHARS = 2000;
+
 const descriptionSystemPrompt = [
-  'You write a short, factual editorial description (2-4 sentences) of a music',
-  'video page from web search evidence and verified facts.',
+  'You write a factual editorial description of a music video page from web',
+  'search evidence, page excerpts, and verified facts.',
+  'Aim for about 500 characters of prose (roughly 450-550; never exceed 900).',
+  "Always mention the artist's name in the description.",
   'Describe the song, its artists, and its release context only.',
   'NEVER describe visuals or events in the video itself.',
-  'Use ONLY the evidence and facts provided; never invent facts, dates, or URLs.',
+  'When the evidence or excerpts contain a short, notable direct quote about',
+  'the song or artist, include the best one or two, copied verbatim inside',
+  'double quotation marks and attributed inline to the named publication or',
+  'speaker (for example: "…" — Pitchfork). Never invent, alter, or extend a',
+  'quote; omit quotes entirely when the material offers none.',
+  'Use ONLY the evidence, excerpts, and facts provided; never invent facts,',
+  'dates, or URLs.',
   'sourceUrls MUST be copied verbatim from the evidence links.',
   'Respond with a single JSON object and nothing else.',
 ].join(' ');
 
-/** Builds the description user prompt from the numbered evidence block. */
+/** Builds the description user prompt from the evidence block (+ excerpts). */
 const buildDescriptionPrompt =
   ({ title, artistDisplay, releasedOn, facts }: VideoDescriptionArgs) =>
-  (evidence: string): string =>
+  (evidence: string, excerpts?: string | null): string =>
     [
       `Video: "${title}" by ${artistDisplay}.`,
       releasedOn ? `Release date: ${releasedOn}.` : '',
       facts.length > 0 ? `VERIFIED FACTS:\n${facts.map((fact) => `- ${fact}`).join('\n')}` : '',
       'EVIDENCE:',
       evidence,
+      excerpts
+        ? `PAGE EXCERPTS (quote ONLY from this verbatim page text or the evidence snippets):\n${excerpts}`
+        : '',
       '',
-      'Return JSON: {"description": "2-4 sentences" or null,',
+      'Return JSON: {"description": "about 500 characters" or null,',
       '"sourceUrls": [evidence links used], "rationale": "<= 300 chars"}',
     ]
       .filter(Boolean)
       .join('\n');
 
 /**
- * Synthesizes a short editorial description from gathered facts + two web
- * searches. Confidence is FIXED at medium (LLM-synthesized prose). Never
- * throws — failures degrade to null and the run continues.
+ * Best-effort read of the top evidence pages (Jina Reader) for verbatim quote
+ * material. A failed key lookup or page read skips that page; returns null
+ * when nothing readable survived so the prompt omits the block entirely.
+ */
+const gatherQuoteExcerpts = async (
+  evidence: SerperWebResult[],
+  deps: VideoDescriptionDeps
+): Promise<string | null> => {
+  const readPage = deps.readPage ?? readUrl;
+  const getKey = deps.getScrapeKey ?? getScrapeApiKey;
+  const apiKey = await getKey().catch(() => null);
+
+  const blocks: string[] = [];
+  for (const { link } of evidence.slice(0, MAX_EXCERPT_PAGES)) {
+    const page = await readPage(link, apiKey, undefined, deps.fetchOptions ?? {}).catch(() => null);
+    if (page?.content) blocks.push(`[${link}]\n${page.content.slice(0, MAX_EXCERPT_CHARS)}`);
+  }
+  return blocks.length > 0 ? blocks.join('\n---\n') : null;
+};
+
+/**
+ * Synthesizes an editorial description (~500 characters, always naming the
+ * artist, weaving in verbatim press quotes with inline attribution when the
+ * material offers them) from gathered facts, three web searches, and a
+ * best-effort read of the top result pages. Confidence is FIXED at medium
+ * (LLM-synthesized prose). Never throws — failures degrade to null and the
+ * run continues.
  */
 export const resolveDescriptionSuggestion = async (
   args: VideoDescriptionArgs,
-  deps: AdjudicationDeps = {}
+  deps: VideoDescriptionDeps = {}
 ): Promise<Omit<VideoSuggestion, 'field'> | null> => {
   try {
     const outcome = await adjudicate(
@@ -75,6 +124,7 @@ export const resolveDescriptionSuggestion = async (
         queries: [
           `"${args.artistDisplay}" "${args.title}"`,
           `${args.artistDisplay} ${args.title} song`,
+          `${args.artistDisplay} ${args.title} review`,
         ],
         serperKey: args.serperKey,
         geminiKey: args.geminiKey,
@@ -82,6 +132,7 @@ export const resolveDescriptionSuggestion = async (
         schema: descriptionAdjudicationSchema,
         systemPrompt: descriptionSystemPrompt,
         buildUserPrompt: buildDescriptionPrompt(args),
+        augmentEvidence: (evidence) => gatherQuoteExcerpts(evidence, deps),
       },
       deps
     );
