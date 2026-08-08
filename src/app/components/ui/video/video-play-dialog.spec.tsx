@@ -39,7 +39,6 @@ const renderDialog = (open: boolean, onOpenChange = vi.fn()) => {
       title="Live at the Basement"
       artist="The Band"
       src="https://cdn.example.com/clip.mp4"
-      posterUrl="https://cdn.example.com/poster.jpg"
       open={open}
       onOpenChange={onOpenChange}
       takeMediaEl={takeMediaEl}
@@ -79,11 +78,13 @@ describe('VideoPlayDialog', () => {
     expect(screen.getByTestId('video-surface')).toBeInTheDocument();
   });
 
-  it('hands the surface the stream url and poster', () => {
+  it('hands the surface the stream url and never a poster', () => {
     renderDialog(true);
 
+    // The modal must show only the playing video — no poster image may ever
+    // overlay it, not even as video.js's loading placeholder.
     expect(surfaceProps.src).toBe('https://cdn.example.com/clip.mp4');
-    expect(surfaceProps.posterUrl).toBe('https://cdn.example.com/poster.jpg');
+    expect(surfaceProps.posterUrl).toBeUndefined();
   });
 
   it('forwards the one-shot primed-element supplier to the surface', () => {
