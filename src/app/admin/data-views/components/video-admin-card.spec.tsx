@@ -251,4 +251,23 @@ describe('VideoAdminCard', () => {
 
     expect(onDelete).toHaveBeenCalledWith('video-1');
   });
+
+  it('renders the description when the video has one', () => {
+    renderCard({ ...baseVideo, description: 'A concise synthesized description.' });
+
+    expect(screen.getByText('A concise synthesized description.')).toBeInTheDocument();
+  });
+
+  it('renders no description block when the description is null or blank', () => {
+    renderCard({ ...baseVideo, description: '   ' });
+
+    expect(screen.queryByRole('button', { name: 'Show full description' })).not.toBeInTheDocument();
+    expect(screen.queryByText('   ')).not.toBeInTheDocument();
+  });
+
+  it('collapses a long description behind the expand control', () => {
+    renderCard({ ...baseVideo, description: 'Long prose. '.repeat(50).trim() });
+
+    expect(screen.getByRole('button', { name: 'Show full description' })).toBeInTheDocument();
+  });
 });

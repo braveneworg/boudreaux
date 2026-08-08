@@ -19,6 +19,7 @@ import { formatVideoDuration } from '@/lib/utils/format-duration';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
 import { formatFieldDate } from '../data-view-utils';
+import { ExpandableDescription } from './expandable-description';
 import { VideoArchiveDialog } from './video-archive-dialog';
 import { VideoPublishDialog } from './video-publish-dialog';
 
@@ -127,6 +128,8 @@ export const VideoAdminCard = ({
           <h3 className="font-fake-four-cutout text-lg break-words">{video.title}</h3>
           <VideoStatusBadges publishState={publishState} isArchived={isArchived} />
         </div>
+
+        {video.description?.trim() ? <ExpandableDescription text={video.description} /> : null}
 
         <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
           {metadata.map((row) => (
