@@ -42,6 +42,7 @@ vi.mock('@/lib/repositories/video-repository', () => ({
     setEnrichmentJobToken: vi.fn(),
     claimEnrichmentJobToken: vi.fn(),
     setEnrichmentProgress: vi.fn(),
+    update: vi.fn(),
   },
 }));
 vi.mock('@/lib/repositories/video-artist-repository', () => ({
@@ -54,6 +55,7 @@ vi.mock('@/lib/repositories/video-artist-repository', () => ({
 vi.mock('@/lib/repositories/video-enrichment-suggestion-repository', () => ({
   VideoEnrichmentSuggestionRepository: {
     replacePending: vi.fn(),
+    createApplied: vi.fn(),
     findByVideoId: vi.fn(),
     findById: vi.fn(),
     markApplied: vi.fn(),
@@ -1154,6 +1156,11 @@ describe('completeCallback', () => {
 
   it('persists description and featuredArtist rows from the callback', async () => {
     vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
+    // A stored description keeps the fresh one as a reviewable pending row
+    // (auto-apply only ever fills a blank description).
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ description: 'The admin wrote this earlier.' })
+    );
 
     await VideoEnrichmentService.completeCallback(VIDEO_ID, {
       ok: true,
@@ -1185,6 +1192,117 @@ describe('completeCallback', () => {
       }),
       expect.objectContaining({ artistId: null, field: 'featuredArtist', value: 'New Name' }),
     ]);
+  });
+
+  it('auto-applies the description to a video without one', async () => {
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'Fresh prose naming the artist.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/review' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoRepository.update).toHaveBeenCalledWith(VIDEO_ID, {
+      description: 'Fresh prose naming the artist.',
+    });
+    expect(VideoEnrichmentSuggestionRepository.createApplied).toHaveBeenCalledWith(
+      VIDEO_ID,
+      expect.objectContaining({
+        artistId: null,
+        field: 'description',
+        value: 'Fresh prose naming the artist.',
+      })
+    );
+    // The applied row never enters the pending batch.
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
+      error: null,
+    });
+  });
+
+  it('treats a whitespace-only stored description as blank for auto-apply', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ description: '   ' })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'Fresh prose naming the artist.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/review' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoRepository.update).toHaveBeenCalledWith(VIDEO_ID, {
+      description: 'Fresh prose naming the artist.',
+    });
+  });
+
+  it('never auto-applies over an existing description', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ description: 'Handwritten by the admin.' })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'Fresh prose naming the artist.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/review' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoRepository.update).not.toHaveBeenCalled();
+    expect(VideoEnrichmentSuggestionRepository.createApplied).not.toHaveBeenCalled();
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({ field: 'description', value: 'Fresh prose naming the artist.' }),
+    ]);
+  });
+
+  it('flips to failed when the auto-apply description write fails', async () => {
+    // Once-mock: tests shuffle within the file and clearMocks does not reset
+    // implementations, so a persistent rejection would poison other tests.
+    vi.mocked(VideoRepository.update).mockRejectedValueOnce(new Error('db down'));
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          description: {
+            value: 'Fresh prose naming the artist.',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/review' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
+      error: 'db down',
+    });
   });
 
   it('drops a description equal to the stored one (case-insensitive)', async () => {

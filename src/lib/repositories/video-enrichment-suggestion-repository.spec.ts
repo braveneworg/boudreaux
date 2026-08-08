@@ -12,6 +12,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/prisma', () => {
   const videoEnrichmentSuggestion = {
     deleteMany: vi.fn(),
+    create: vi.fn(),
     createMany: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
@@ -107,6 +108,34 @@ describe('VideoEnrichmentSuggestionRepository', () => {
       const result = await VideoEnrichmentSuggestionRepository.findById(SUGGESTION_ID);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('createApplied', () => {
+    it('inserts the row already applied with a system audit stamp (no user)', async () => {
+      vi.mocked(prisma.videoEnrichmentSuggestion.create).mockResolvedValue({} as never);
+
+      await VideoEnrichmentSuggestionRepository.createApplied(VIDEO_ID, {
+        ...row,
+        artistId: null,
+        field: 'description',
+        value: 'Prose naming the artist.',
+      });
+
+      expect(prisma.videoEnrichmentSuggestion.create).toHaveBeenCalledWith({
+        data: {
+          artistId: null,
+          field: 'description',
+          value: 'Prose naming the artist.',
+          confidence: 'high',
+          sources: [{ url: 'https://musicbrainz.org/artist/x' }],
+          note: null,
+          videoId: VIDEO_ID,
+          status: 'applied',
+          appliedAt: expect.any(Date),
+          appliedBy: null,
+        },
+      });
     });
   });
 

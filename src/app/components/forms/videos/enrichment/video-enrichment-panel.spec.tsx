@@ -376,6 +376,24 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     });
   });
 
+  it('fills a blank form description from a server-auto-applied suggestion', async () => {
+    const onApply = vi.fn();
+    setStatus({
+      ...succeededStatus,
+      suggestions: [{ ...descriptionSuggestion, status: 'applied' as const }],
+    });
+    render(<Harness onApply={onApply} />);
+
+    // No click: the server auto-applied the description onto the (blank) video
+    // row while this form was open; the panel mirrors it into the form so a
+    // Save cannot wipe it back to ''.
+    await waitFor(() =>
+      expect(onApply).toHaveBeenCalledWith('description', descriptionSuggestion.value)
+    );
+    // Already resolved server-side — no apply round-trip.
+    expect(mocks.applyVideoSuggestion).not.toHaveBeenCalled();
+  });
+
   it('routes the description apply into the form callback, never the server', async () => {
     const onApply = vi.fn();
     setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });

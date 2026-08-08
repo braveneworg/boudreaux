@@ -45,6 +45,7 @@ import {
 
 import { EditableDescriptionSuggestion } from './editable-description-suggestion';
 import { useAutoApplyReleaseDateSuggestion } from './use-autoapply-release-date';
+import { useAutofillAppliedDescription } from './use-autofill-applied-description';
 import { VideoArtistSuggestionCard } from './video-artist-suggestion-card';
 import { VideoEnrichmentProgressTimeline } from './video-enrichment-progress-timeline';
 import { VideoEnrichmentStatusChip } from './video-enrichment-status-chip';
@@ -421,6 +422,15 @@ export const VideoEnrichmentPanel = ({
     control,
     onApply: onApplyVideoSuggestion,
     onResolve: resolveAutoAppliedSuggestion,
+  });
+
+  // A blank-description video takes the synthesized prose server-side at
+  // enrichment completion; mirror that applied row into a form that was open
+  // while it happened, so Save cannot wipe the description back to ''.
+  useAutofillAppliedDescription({
+    suggestions: data?.suggestions ?? [],
+    control,
+    onApply: onApplyVideoSuggestion,
   });
 
   // Last-resort client stop: if a run never reaches a terminal status, stop
