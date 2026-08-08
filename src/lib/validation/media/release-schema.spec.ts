@@ -66,6 +66,26 @@ describe('publishedReleaseListingSchema', () => {
     const { coverArt: _omit, ...invalid } = publishedReleaseListing;
     expect(() => publishedReleaseListingSchema.parse(invalid)).toThrow();
   });
+
+  it('preserves the description, formats, and catalog number for the row info column', () => {
+    const parsed = publishedReleaseListingSchema.parse(publishedReleaseListing);
+    expect(parsed.description).toBe('A midnight zine-core classic.');
+    expect(parsed.formats).toEqual(['DIGITAL', 'MP3_320KBPS']);
+    expect(parsed.catalogNumber).toBe('FF4-042');
+  });
+
+  it('preserves the first-track digital format projection for gesture priming', () => {
+    const parsed = publishedReleaseListingSchema.parse(publishedReleaseListing);
+    expect(parsed.digitalFormats).toEqual([
+      { files: [{ s3Key: 'releases/r1/digital-formats/MP3_320KBPS/tracks/01.mp3' }] },
+    ]);
+  });
+
+  it('rejects a listing with an unknown format enum value', () => {
+    expect(() =>
+      publishedReleaseListingSchema.parse({ ...publishedReleaseListing, formats: ['NOT_A_FORMAT'] })
+    ).toThrow();
+  });
 });
 
 describe('publishedReleaseDetailSchema', () => {

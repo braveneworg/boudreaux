@@ -34,6 +34,13 @@ interface ReleasePlayerProps {
   autoPlay?: boolean;
   releaseId: string;
   releaseTitle?: string;
+  /**
+   * One-shot supplier of an audio element primed (and usually already playing)
+   * during the opening play gesture — see `usePrimedAudioHandoff`. Forwarded
+   * to the audio controls so they adopt it in place and the gesture's
+   * autoplay blessing survives (release play modal).
+   */
+  takeMediaEl?: () => HTMLAudioElement | null;
 }
 
 type ReleasePrimaryArtist = NonNullable<PublishedReleaseDetail['artistReleases'][number]['artist']>;
@@ -93,6 +100,7 @@ interface ReleasePlayerControlsProps {
   onPreviousTrack: (wasPlaying: boolean) => void;
   onNextTrack: (wasPlaying: boolean) => void;
   setPlayerControls: (controls: MediaPlayerControls | null) => void;
+  takeMediaEl?: () => HTMLAudioElement | null;
 }
 
 /** Audio controls + info ticker shown when a playable track + source are ready. */
@@ -109,6 +117,7 @@ const ReleasePlayerControls = ({
   onPreviousTrack,
   onNextTrack,
   setPlayerControls,
+  takeMediaEl,
 }: ReleasePlayerControlsProps) => (
   <>
     <div className="w-full bg-zinc-900">
@@ -122,6 +131,7 @@ const ReleasePlayerControls = ({
         onNextTrack={onNextTrack}
         autoPlay={shouldAutoPlay}
         controlsRef={setPlayerControls}
+        takeMediaEl={takeMediaEl}
       />
     </div>
     <MediaPlayer.InfoTickerTape
@@ -190,6 +200,7 @@ interface ReleasePlayerBodyProps {
   onNextTrack: (wasPlaying: boolean) => void;
   onFileSelect: (fileId: string) => void;
   setPlayerControls: (controls: MediaPlayerControls | null) => void;
+  takeMediaEl?: () => HTMLAudioElement | null;
 }
 
 /**
@@ -218,6 +229,7 @@ const ReleasePlayerBody = ({
   onNextTrack,
   onFileSelect,
   setPlayerControls,
+  takeMediaEl,
 }: ReleasePlayerBodyProps) => (
   <MediaPlayer className="mb-2">
     <div className="mt-2 space-y-2">
@@ -269,6 +281,7 @@ const ReleasePlayerBody = ({
               onPreviousTrack={onPreviousTrack}
               onNextTrack={onNextTrack}
               setPlayerControls={setPlayerControls}
+              takeMediaEl={takeMediaEl}
             />
           ) : (
             <div className="flex items-center justify-center py-8 text-zinc-500">
@@ -291,6 +304,7 @@ export const ReleasePlayer = ({
   autoPlay = false,
   releaseId,
   releaseTitle,
+  takeMediaEl,
 }: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
@@ -368,6 +382,7 @@ export const ReleasePlayer = ({
       onNextTrack={handleNextTrack}
       onFileSelect={handleFileSelect}
       setPlayerControls={setPlayerControls}
+      takeMediaEl={takeMediaEl}
     />
   );
 };

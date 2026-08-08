@@ -202,6 +202,9 @@ export const publishedReleaseListing = {
   title: 'Midnight',
   coverArt: 'cover.jpg',
   releasedOn: ISO,
+  description: 'A midnight zine-core classic.',
+  formats: ['DIGITAL', 'MP3_320KBPS'],
+  catalogNumber: 'FF4-042',
   images: [{ src: null, altText: null }],
   artistReleases: [
     {
@@ -209,6 +212,7 @@ export const publishedReleaseListing = {
     },
   ],
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://bc' } }],
+  digitalFormats: [{ files: [{ s3Key: 'releases/r1/digital-formats/MP3_320KBPS/tracks/01.mp3' }] }],
 };
 
 /** Narrowed artist projection on the media-player release-detail page. */

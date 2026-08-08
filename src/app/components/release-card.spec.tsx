@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ReleaseCard } from './release-card';
 
@@ -84,6 +84,51 @@ vi.mock('./deferred-download-dialog', () => ({
   ),
 }));
 
+// Spy on the audio priming hook — the card must source-prime INSIDE the Play
+// click gesture (see usePrimedAudioHandoff); the hook itself has its own spec.
+const primeMediaEl = vi.fn();
+const takeMediaEl = vi.fn((): HTMLAudioElement | null => null);
+const discardMediaEl = vi.fn();
+vi.mock('@/hooks/use-primed-audio-handoff', () => ({
+  usePrimedAudioHandoff: () => ({ primeMediaEl, takeMediaEl, discardMediaEl }),
+}));
+
+// Stub the play dialog — covered by release-play-dialog.spec. The stub echoes
+// the wiring props and exposes a close trigger for the discard-on-close test.
+vi.mock('./release-play-dialog', () => ({
+  ReleasePlayDialog: ({
+    releaseId,
+    title,
+    artistName,
+    open,
+    onOpenChange,
+    takeMediaEl: dialogTakeMediaEl,
+    prefetch,
+  }: {
+    releaseId: string;
+    title: string;
+    artistName: string | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    takeMediaEl: () => HTMLAudioElement | null;
+    prefetch?: boolean;
+  }) => (
+    <div
+      data-testid="release-play-dialog"
+      data-release-id={releaseId}
+      data-title={title}
+      data-artist={artistName ?? ''}
+      data-open={open.toString()}
+      data-prefetch={(prefetch ?? false).toString()}
+      data-has-take-media-el={(dialogTakeMediaEl !== undefined).toString()}
+    >
+      <button type="button" data-testid="close-play-dialog" onClick={() => onOpenChange(false)}>
+        Close
+      </button>
+    </div>
+  ),
+}));
+
 describe('ReleaseCard', () => {
   const defaultProps = {
     id: 'release-1',
@@ -95,6 +140,7 @@ describe('ReleaseCard', () => {
     },
     releasedOn: new Date(2024, 0, 2),
     bandcampUrl: 'https://label.bandcamp.com/album/midnight',
+    playSrc: 'https://cdn.example.com/releases/release-1/tracks/01.mp3',
   };
 
   it('should delegate cover art to ReleaseCoverModal with the release details', () => {
@@ -143,29 +189,67 @@ describe('ReleaseCard', () => {
   it('should render Play button with Music2 icon', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const playButton = screen.getByRole('link', { name: /play midnight serenade/i });
+    const playButton = screen.getByRole('button', { name: /play midnight serenade/i });
     expect(playButton).toBeInTheDocument();
     expect(screen.getByTestId('music2-icon')).toBeInTheDocument();
   });
 
-  it('should link Play button to /releases/{releaseId}?autoplay=true', () => {
+  it('primes the first track and opens the play modal inside the Play click', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const playLink = screen.getByRole('link', { name: /play midnight serenade/i });
-    expect(playLink).toHaveAttribute('href', '/releases/release-1?autoplay=true');
+    fireEvent.click(screen.getByRole('button', { name: /play midnight serenade/i }));
+
+    expect(primeMediaEl).toHaveBeenCalledWith(defaultProps.playSrc);
+    expect(screen.getByTestId('release-play-dialog')).toHaveAttribute('data-open', 'true');
+  });
+
+  it('wires the play dialog to this release and the primed element supplier', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const dialog = screen.getByTestId('release-play-dialog');
+    expect(dialog).toHaveAttribute('data-release-id', 'release-1');
+    expect(dialog).toHaveAttribute('data-title', 'Midnight Serenade');
+    expect(dialog).toHaveAttribute('data-artist', 'John Doe');
+    expect(dialog).toHaveAttribute('data-has-take-media-el', 'true');
+  });
+
+  it('discards the primed element when the modal closes', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /play midnight serenade/i }));
+    fireEvent.click(screen.getByTestId('close-play-dialog'));
+
+    expect(discardMediaEl).toHaveBeenCalled();
+    expect(screen.getByTestId('release-play-dialog')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('disables Play and skips the dialog when the release has no playable track', () => {
+    render(<ReleaseCard {...defaultProps} playSrc={null} />);
+
+    expect(screen.getByRole('button', { name: /play midnight serenade/i })).toBeDisabled();
+    expect(screen.queryByTestId('release-play-dialog')).not.toBeInTheDocument();
+  });
+
+  it('warms the release detail fetch when Play gains focus', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    expect(screen.getByTestId('release-play-dialog')).toHaveAttribute('data-prefetch', 'false');
+    fireEvent.focus(screen.getByRole('button', { name: /play midnight serenade/i }));
+
+    expect(screen.getByTestId('release-play-dialog')).toHaveAttribute('data-prefetch', 'true');
   });
 
   it('should have aria-label on Play button', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const playButton = screen.getByRole('link', { name: /play midnight serenade/i });
+    const playButton = screen.getByRole('button', { name: /play midnight serenade/i });
     expect(playButton).toHaveAttribute('aria-label', 'Play Midnight Serenade');
   });
 
   it('should render Download button to the right of the Play button', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const playButton = screen.getByRole('link', { name: /play midnight serenade/i });
+    const playButton = screen.getByRole('button', { name: /play midnight serenade/i });
     const downloadButton = screen.getByTestId('deferred-download-dialog');
 
     expect(downloadButton).toBeInTheDocument();
@@ -198,12 +282,19 @@ describe('ReleaseCard', () => {
     );
   });
 
-  it('should style the Play link as a square ink-stamp', () => {
+  it('should style the Play button as a square ink-stamp', () => {
     render(<ReleaseCard {...defaultProps} />);
 
-    const playLink = screen.getByRole('link', { name: /play midnight serenade/i });
-    expect(playLink).toHaveClass('shadow-zine-ink');
-    expect(playLink).not.toHaveClass('rounded-md');
+    const playButton = screen.getByRole('button', { name: /play midnight serenade/i });
+    expect(playButton).toHaveClass('shadow-zine-ink');
+    expect(playButton).not.toHaveClass('rounded-md');
+  });
+
+  it('lets the action row wrap inside a narrow column', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const playButton = screen.getByRole('button', { name: /play midnight serenade/i });
+    expect(playButton.parentElement).toHaveClass('flex-wrap');
   });
 
   it('should stamp the download trigger with the punk frame', () => {

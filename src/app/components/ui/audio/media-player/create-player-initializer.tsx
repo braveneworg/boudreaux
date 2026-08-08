@@ -122,6 +122,18 @@ export interface PlayerInitializerRefs {
   instanceIdRef: MutableRefObject<string>;
   containerRef: MutableRefObject<HTMLDivElement | null>;
   audioElRef: MutableRefObject<HTMLAudioElement | null>;
+  /**
+   * One-shot supplier of an audio element primed (and usually already
+   * playing) inside the user's play gesture — see `usePrimedAudioHandoff`.
+   * When absent or exhausted, the initializer creates its own element.
+   */
+  takeMediaElRef: MutableRefObject<(() => HTMLAudioElement | null) | undefined>;
+  /**
+   * Set when a pre-sourced element was adopted, so the source-change effect
+   * skips its mount-time re-set of the same src (which would rerun the media
+   * load algorithm and kill the gesture-started playback).
+   */
+  adoptedInitialSrcRef: MutableRefObject<boolean>;
   playerRef: MutableRefObject<Player | null>;
   isInitializedRef: MutableRefObject<boolean>;
   isSwitchingSourceRef: MutableRefObject<boolean>;
@@ -145,6 +157,31 @@ export interface PlayerInitializerConstants {
   REWIND_THRESHOLD: number;
 }
 
+interface AcquiredAudioElement {
+  audioEl: HTMLAudioElement;
+  /** True when the adopted element already carries the current src. */
+  isPreSourced: boolean;
+}
+
+/**
+ * Adopts the gesture-primed element when one is available — autoplay blessings
+ * are per element, so only playing THAT element survives strict policies —
+ * falling back to a fresh `<audio>` otherwise. The adoption is "pre-sourced"
+ * when the element already carries the current src (and is usually still
+ * playing from the click gesture): re-setting the same source would rerun the
+ * media load algorithm and kill that playback, so the initializer must skip
+ * its `sources` option and the mount-time re-set in that case.
+ */
+const acquireAudioElement = (
+  takeMediaEl: (() => HTMLAudioElement | null) | undefined,
+  currentSrc: string
+): AcquiredAudioElement => {
+  const adopted = takeMediaEl?.() ?? null;
+  const audioEl = adopted ?? document.createElement('audio');
+  const isPreSourced = adopted !== null && adopted.getAttribute('src') === currentSrc;
+  return { audioEl, isPreSourced };
+};
+
 /**
  * Returns an `initPlayer` function that, when called, attempts to create and
  * configure a Video.js player using the supplied ref container. Returns `true`
@@ -158,6 +195,8 @@ export const createPlayerInitializer = (
     instanceIdRef,
     containerRef,
     audioElRef,
+    takeMediaElRef,
+    adoptedInitialSrcRef,
     playerRef,
     isInitializedRef,
     isSwitchingSourceRef,
@@ -209,13 +248,23 @@ export const createPlayerInitializer = (
     const playerContainer = document.createElement('div');
     playerContainer.setAttribute('data-vjs-player', '');
 
-    const audioEl = document.createElement('audio');
+    // The adopted (or fresh) element must sit inside the data-vjs-player
+    // container when videojs() is called (player-element ingest) or the
+    // gesture's autoplay blessing is lost.
+    const { audioEl, isPreSourced } = acquireAudioElement(
+      takeMediaElRef.current,
+      audioSrcRef.current
+    );
     audioEl.className = 'video-js vjs-default-skin';
     audioEl.setAttribute('playsinline', '');
     audioEl.setAttribute('webkit-playsinline', '');
     playerContainer.appendChild(audioEl);
     containerRef.current.appendChild(playerContainer);
     audioElRef.current = audioEl;
+
+    if (isPreSourced) {
+      adoptedInitialSrcRef.current = true;
+    }
 
     const player = videojs(audioEl, {
       controls: true,
@@ -225,7 +274,9 @@ export const createPlayerInitializer = (
       responsive: true,
       inactivityTimeout: 0,
       userActions: { hotkeys: true },
-      sources: [{ src: audioSrcRef.current, type: getAudioMimeType(audioSrcRef.current) }],
+      ...(isPreSourced
+        ? {}
+        : { sources: [{ src: audioSrcRef.current, type: getAudioMimeType(audioSrcRef.current) }] }),
       fluid: false,
       fill: false,
       controlBar: {
@@ -347,6 +398,18 @@ export const createPlayerInitializer = (
       const wasPlaying = !player.paused();
       onNextTrackRef.current?.(wasPlaying);
     });
+
+    if (isPreSourced && !audioEl.paused) {
+      // Playing since the gesture: video.js attached after the element's only
+      // play event, so re-fire it once ready — after the handlers above are
+      // registered — to sync the control bar, claim the shared session, and
+      // notify the parent's isPlaying state.
+      player.ready(() => {
+        player.removeClass('vjs-paused');
+        player.addClass('vjs-playing');
+        player.trigger('play');
+      });
+    }
 
     return true;
   };

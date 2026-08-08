@@ -17,6 +17,9 @@ const mockReleases = [
     title: 'Midnight Serenade',
     coverArt: 'https://example.com/cover1.jpg',
     releasedOn: '2024-01-01T00:00:00.000Z',
+    description: null,
+    formats: [],
+    catalogNumber: null,
     images: [],
     artistReleases: [
       {
@@ -30,12 +33,16 @@ const mockReleases = [
       },
     ],
     releaseUrls: [],
+    digitalFormats: [],
   },
   {
     id: 'release-2',
     title: 'Morning Glory',
     coverArt: 'https://example.com/cover2.jpg',
     releasedOn: '2024-02-01T00:00:00.000Z',
+    description: null,
+    formats: [],
+    catalogNumber: null,
     images: [],
     artistReleases: [
       {
@@ -49,6 +56,7 @@ const mockReleases = [
       },
     ],
     releaseUrls: [],
+    digitalFormats: [],
   },
 ] as unknown as PublishedReleaseListing[];
 

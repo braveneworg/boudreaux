@@ -89,6 +89,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     onNextTrack,
     autoPlay,
     controlsRef,
+    takeMediaEl,
   }: {
     audioSrc: string;
     onPlay?: () => void;
@@ -104,6 +105,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
         toggle: () => void;
       } | null
     ) => void;
+    takeMediaEl?: () => HTMLAudioElement | null;
   }) => {
     useEffect(() => {
       if (controlsRef) {
@@ -122,6 +124,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
         data-testid="media-controls"
         data-audio-src={audioSrc}
         data-auto-play={autoPlay?.toString()}
+        data-has-take-media-el={(takeMediaEl !== undefined).toString()}
       >
         <button data-testid="play-button" onClick={onPlay}>
           Play
@@ -311,6 +314,13 @@ describe('ReleasePlayer', () => {
     expect(screen.getByTestId('media-controls')).toBeInTheDocument();
     expect(screen.getByTestId('info-ticker-tape')).toBeInTheDocument();
     expect(screen.getByTestId('format-file-list-drawer')).toBeInTheDocument();
+  });
+
+  it('forwards takeMediaEl to the audio controls for gesture-primed adoption', () => {
+    const takeMediaEl = (): HTMLAudioElement | null => null;
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" takeMediaEl={takeMediaEl} />);
+
+    expect(screen.getByTestId('media-controls')).toHaveAttribute('data-has-take-media-el', 'true');
   });
 
   it('should frame the player unit with a black border and zine shadow', () => {

@@ -104,15 +104,21 @@ const releaseListItemInclude = {
 } as const satisfies Prisma.ReleaseInclude;
 
 /**
- * Projection for the public releases grid page. Only the fields the listing UI
- * consumes (release cards + search combobox) are selected, keeping both the
- * Mongo read and the API payload small.
+ * Projection for the public releases page. Only the fields the listing UI
+ * consumes (release rows + search combobox) are selected, keeping both the
+ * Mongo read and the API payload small. `description`/`formats`/`catalogNumber`
+ * feed the row info column; `digitalFormats` is narrowed to the first MP3
+ * track's key so the Play button can source-prime playback inside the click
+ * gesture (MP3 320 is the public unsigned CDN format).
  */
 const publishedReleaseListingSelect = {
   id: true,
   title: true,
   coverArt: true,
   releasedOn: true,
+  description: true,
+  formats: true,
+  catalogNumber: true,
   images: {
     orderBy: { sortOrder: 'asc' },
     take: 1,
@@ -129,6 +135,12 @@ const publishedReleaseListingSelect = {
   releaseUrls: {
     select: {
       url: { select: { platform: true, url: true } },
+    },
+  },
+  digitalFormats: {
+    where: { formatType: 'MP3_320KBPS' },
+    select: {
+      files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
     },
   },
 } as const satisfies Prisma.ReleaseSelect;

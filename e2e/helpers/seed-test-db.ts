@@ -1196,6 +1196,12 @@ const seedTestDatabase = async () => {
         coverArt: PLACEHOLDER_COVER_ART,
         publishedAt: new Date(),
         suggestedPrice: 799,
+        // Listing-row info column fixtures (description text deliberately does
+        // NOT contain the title — unscoped getByText('E2E Album One') locators
+        // elsewhere would otherwise go strict-mode ambiguous).
+        description: 'Pressed loud and mastered hot for the E2E stacks.',
+        catalogNumber: 'E2E-001',
+        formats: ['MP3_320KBPS', 'VINYL_12_INCH'],
       },
     });
 

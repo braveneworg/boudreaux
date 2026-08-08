@@ -70,6 +70,9 @@ describe('ReleaseRepository', () => {
     title: true,
     coverArt: true,
     releasedOn: true,
+    description: true,
+    formats: true,
+    catalogNumber: true,
     images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
     artistReleases: {
       select: {
@@ -79,6 +82,12 @@ describe('ReleaseRepository', () => {
       },
     },
     releaseUrls: { select: { url: { select: { platform: true, url: true } } } },
+    digitalFormats: {
+      where: { formatType: 'MP3_320KBPS' },
+      select: {
+        files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
+      },
+    },
   };
 
   const detailSelect = {

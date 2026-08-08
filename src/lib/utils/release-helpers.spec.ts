@@ -6,10 +6,37 @@ import {
   buildReleaseSearchValue,
   getArtistDisplayNameForRelease,
   getBandcampUrl,
+  getFirstTrackStreamSource,
   getReleaseCoverArt,
 } from './release-helpers';
 
+// Deterministic CDN resolution — the real util reads env vars.
+vi.mock('@/lib/utils/cdn-url', () => ({
+  resolveStreamUrl: (file: { s3Key?: string | null; streamUrl?: string | null }) =>
+    file.streamUrl ?? (file.s3Key ? `https://cdn.example.com/${file.s3Key}` : null),
+}));
+
 describe('release-helpers', () => {
+  describe('getFirstTrackStreamSource', () => {
+    it('resolves the first MP3 track of the listing projection to a stream URL', () => {
+      const release = {
+        digitalFormats: [{ files: [{ s3Key: 'releases/r1/tracks/01.mp3' }] }],
+      };
+
+      expect(getFirstTrackStreamSource(release)).toBe(
+        'https://cdn.example.com/releases/r1/tracks/01.mp3'
+      );
+    });
+
+    it('returns null when the release has no digital formats', () => {
+      expect(getFirstTrackStreamSource({ digitalFormats: [] })).toBeNull();
+    });
+
+    it('returns null when the first format has no files', () => {
+      expect(getFirstTrackStreamSource({ digitalFormats: [{ files: [] }] })).toBeNull();
+    });
+  });
+
   describe('getArtistDisplayNameForRelease', () => {
     it('should return displayName when present', () => {
       const artist = {

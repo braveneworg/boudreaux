@@ -8,6 +8,7 @@
  * PublishedReleaseListing and related types, distinct from the admin-level
  * utilities that use the full Artist/Release Prisma types.
  */
+import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 
 // =============================================================================
 // Types for the lightweight shapes used by these helpers
@@ -39,6 +40,11 @@ interface ReleaseBandcampSource {
       url: string;
     };
   }>;
+}
+
+/** Minimal release shape for first-track stream resolution */
+interface ReleaseFirstTrackSource {
+  digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
 }
 
 /** Minimal release shape for building search values */
@@ -114,6 +120,22 @@ export const getReleaseCoverArt = (
 
   // 3. No cover art available
   return null;
+};
+
+/**
+ * Resolve the playable URL of a release's first MP3 track from the listing
+ * projection (`digitalFormats` is pre-filtered to MP3_320KBPS with files
+ * capped to the first by track number). Used to source-prime a media element
+ * inside the Play click gesture; MP3 320 is the public unsigned CDN format,
+ * so this URL matches the one the release player itself resolves for track 1.
+ *
+ * @param release - Release with the narrow first-track digitalFormats projection
+ * @returns The playable stream URL, or `null` when the release has no MP3 track
+ */
+export const getFirstTrackStreamSource = (release: ReleaseFirstTrackSource): string | null => {
+  const firstFile = release.digitalFormats[0]?.files[0];
+  if (!firstFile) return null;
+  return resolveStreamUrl(firstFile);
 };
 
 /**
