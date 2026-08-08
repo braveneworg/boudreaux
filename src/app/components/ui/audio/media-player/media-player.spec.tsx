@@ -24,37 +24,48 @@ const playerVolumeState = vi.hoisted(() => ({ volume: 1, muted: false }));
 // data-vjs-player parent as the player root and dispose() removes THAT parent
 // from the DOM — an inert fake dispose hides remount-after-dispose bugs.
 vi.mock('video.js', () => {
-  const makePlayer = (el?: HTMLElement) => ({
-    addClass: vi.fn(),
-    removeClass: vi.fn(),
-    ready: vi.fn((callback: () => void) => callback()),
-    on: vi.fn(),
-    off: vi.fn(),
-    currentTime: vi.fn().mockReturnValue(0),
-    paused: vi.fn().mockReturnValue(true),
-    play: vi.fn(),
-    pause: vi.fn(),
-    src: vi.fn(),
-    load: vi.fn(),
-    dispose: vi.fn(() => el?.closest('[data-vjs-player]')?.remove()),
-    userActive: vi.fn(),
-    error: vi.fn().mockReturnValue(null),
-    el: vi.fn().mockReturnValue(document.createElement('div')),
-    volume: vi.fn((value?: number) => {
-      if (value !== undefined) {
-        playerVolumeState.volume = value;
-        return undefined;
-      }
-      return playerVolumeState.volume;
-    }),
-    muted: vi.fn((value?: boolean) => {
-      if (value !== undefined) {
-        playerVolumeState.muted = value;
-        return undefined;
-      }
-      return playerVolumeState.muted;
-    }),
-  });
+  const makePlayer = (el?: HTMLElement) => {
+    // Real handler registry so production code can re-fire events through
+    // `trigger` (the adopted-element sync path) and reach handlers that specs
+    // still also inspect via `player.on.mock.calls`.
+    const handlers = new Map<string, Array<() => void>>();
+    return {
+      addClass: vi.fn(),
+      removeClass: vi.fn(),
+      ready: vi.fn((callback: () => void) => callback()),
+      on: vi.fn((event: string, callback: () => void) => {
+        handlers.set(event, [...(handlers.get(event) ?? []), callback]);
+      }),
+      off: vi.fn(),
+      trigger: vi.fn((event: string) => {
+        for (const callback of handlers.get(event) ?? []) callback();
+      }),
+      currentTime: vi.fn().mockReturnValue(0),
+      paused: vi.fn().mockReturnValue(true),
+      play: vi.fn(),
+      pause: vi.fn(),
+      src: vi.fn(),
+      load: vi.fn(),
+      dispose: vi.fn(() => el?.closest('[data-vjs-player]')?.remove()),
+      userActive: vi.fn(),
+      error: vi.fn().mockReturnValue(null),
+      el: vi.fn().mockReturnValue(document.createElement('div')),
+      volume: vi.fn((value?: number) => {
+        if (value !== undefined) {
+          playerVolumeState.volume = value;
+          return undefined;
+        }
+        return playerVolumeState.volume;
+      }),
+      muted: vi.fn((value?: boolean) => {
+        if (value !== undefined) {
+          playerVolumeState.muted = value;
+          return undefined;
+        }
+        return playerVolumeState.muted;
+      }),
+    };
+  };
 
   const componentRegistry = new Map<string, unknown>([['Button', () => null]]);
 
@@ -595,6 +606,118 @@ describe('MediaPlayer', () => {
 
       expect(player.error).not.toHaveBeenCalledWith(null);
       expect(player.load).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Controls gesture-primed element adoption', () => {
+    const PRIMED_SRC = 'https://cdn.example.com/releases/r1/tracks/01.mp3';
+    const NEXT_SRC = 'https://cdn.example.com/releases/r1/tracks/02.mp3';
+
+    /** Build the playing element the audio priming hook would hand off. */
+    const makePlayingAudioEl = (): HTMLAudioElement => {
+      const el = document.createElement('audio');
+      el.src = PRIMED_SRC;
+      void el.play()?.catch(() => {});
+      return el;
+    };
+
+    it('adopts the gesture-primed element into the player container', () => {
+      const primedEl = makePlayingAudioEl();
+      const { container } = render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => primedEl} />
+        </MediaPlayer>
+      );
+
+      expect(container.querySelector('[data-vjs-player]')?.contains(primedEl)).toBe(true);
+      expect(vi.mocked(videojs)).toHaveBeenLastCalledWith(primedEl, expect.any(Object));
+    });
+
+    it('skips the initial sources option for a pre-sourced adopted element', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => makePlayingAudioEl()} />
+        </MediaPlayer>
+      );
+
+      // Re-setting the same source reruns the media load algorithm and kills
+      // the gesture-started playback.
+      const options = vi.mocked(videojs).mock.calls.at(-1)?.[1] as Record<string, unknown>;
+      expect(options).not.toHaveProperty('sources');
+    });
+
+    it('does not re-set the source on mount after adopting a pre-sourced element', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => makePlayingAudioEl()} />
+        </MediaPlayer>
+      );
+
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        src: ReturnType<typeof vi.fn>;
+      };
+      expect(player.src).not.toHaveBeenCalled();
+    });
+
+    it('claims the session and notifies onPlay for an adopted playing element', () => {
+      const onPlay = vi.fn();
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls
+            audioSrc={PRIMED_SRC}
+            takeMediaEl={() => makePlayingAudioEl()}
+            onPlay={onPlay}
+          />
+        </MediaPlayer>
+      );
+
+      expect(vi.mocked(claimPlayback)).toHaveBeenCalled();
+      expect(onPlay).toHaveBeenCalled();
+    });
+
+    it('marks the adopted playing element as playing in the player skin', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => makePlayingAudioEl()} />
+        </MediaPlayer>
+      );
+
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        addClass: ReturnType<typeof vi.fn>;
+      };
+      expect(player.addClass).toHaveBeenCalledWith('vjs-playing');
+    });
+
+    it('falls back to a self-created element when the primed element was already taken', () => {
+      const { container } = render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => null} />
+        </MediaPlayer>
+      );
+
+      const options = vi.mocked(videojs).mock.calls.at(-1)?.[1] as Record<string, unknown>;
+      expect(container.querySelector('[data-vjs-player] audio')).toBeInTheDocument();
+      expect(options).toHaveProperty('sources');
+    });
+
+    it('switches sources normally after the adopted initial source', () => {
+      const primedEl = makePlayingAudioEl();
+      const { rerender } = render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={PRIMED_SRC} takeMediaEl={() => primedEl} />
+        </MediaPlayer>
+      );
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        src: ReturnType<typeof vi.fn>;
+      };
+
+      rerender(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc={NEXT_SRC} takeMediaEl={() => null} />
+        </MediaPlayer>
+      );
+
+      expect(player.src).toHaveBeenCalledWith({ src: NEXT_SRC, type: 'audio/mpeg' });
     });
   });
 

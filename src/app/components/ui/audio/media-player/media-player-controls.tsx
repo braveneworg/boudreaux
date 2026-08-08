@@ -4,6 +4,7 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
+import type { MutableRefObject } from 'react';
 
 import {
   createPlayerInitializer,
@@ -43,7 +44,41 @@ interface MediaControlsProps {
   onEnded?: () => void;
   autoPlay?: boolean;
   controlsRef?: (controls: MediaPlayerControls | null) => void;
+  /**
+   * One-shot supplier of an audio element primed (and usually already
+   * playing) during the user's play gesture — see `usePrimedAudioHandoff`.
+   * The initializer adopts it in place so the gesture's autoplay blessing
+   * survives; returns null once taken, and a fresh element is created.
+   */
+  takeMediaEl?: () => HTMLAudioElement | null;
 }
+
+/**
+ * Consumes the one-shot adopted-initial-source marker. Returns true when the
+ * source-change effect must skip re-setting the source: the adopted element is
+ * already playing it, and a same-src re-assign reruns the media load
+ * algorithm, killing the gesture-started playback.
+ */
+const consumeAdoptedInitialSource = (
+  isInitialSource: boolean,
+  adoptedInitialSrcRef: MutableRefObject<boolean>,
+  initialSourceRef: MutableRefObject<string>
+): boolean => {
+  if (!isInitialSource || !adoptedInitialSrcRef.current) return false;
+  adoptedInitialSrcRef.current = false;
+  initialSourceRef.current = '';
+  return true;
+};
+
+/** Starts playback after a source change, swallowing iOS autoplay rejections. */
+const attemptPlayAfterSourceChange = (player: Player): void => {
+  const playPromise = player.play();
+  if (playPromise !== undefined) {
+    (playPromise as Promise<void>).catch(() => {
+      // iOS may reject autoplay after source change
+    });
+  }
+};
 
 /**
  * Controls component for the media player.
@@ -59,6 +94,7 @@ export const Controls = ({
   onEnded,
   autoPlay = false,
   controlsRef,
+  takeMediaEl,
 }: MediaControlsProps) => {
   const instanceId = useId();
   const instanceIdRef = useRef(instanceId);
@@ -82,6 +118,10 @@ export const Controls = ({
   const onPreviousTrackRef = useRef(onPreviousTrack);
   const onNextTrackRef = useRef(onNextTrack);
   const controlsRefCallback = useRef(controlsRef);
+  const takeMediaElRef = useRef(takeMediaEl);
+  // Set by the initializer when it adopts a pre-sourced primed element; the
+  // source-change effect consumes it to skip the mount-time same-src re-set.
+  const adoptedInitialSrcRef = useRef(false);
 
   // Use a ref for the source prop so the mount-once init effect can read the
   // latest value (initial source + error-recovery fallback) without listing it
@@ -97,8 +137,9 @@ export const Controls = ({
     onPreviousTrackRef.current = onPreviousTrack;
     onNextTrackRef.current = onNextTrack;
     controlsRefCallback.current = controlsRef;
+    takeMediaElRef.current = takeMediaEl;
     audioSrcRef.current = audioSrc;
-  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef, audioSrc]);
+  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef, takeMediaEl, audioSrc]);
 
   // Initialize player once
   useEffect(() => {
@@ -109,6 +150,8 @@ export const Controls = ({
         instanceIdRef,
         containerRef,
         audioElRef,
+        takeMediaElRef,
+        adoptedInitialSrcRef,
         playerRef,
         isInitializedRef,
         isSwitchingSourceRef,
@@ -179,6 +222,9 @@ export const Controls = ({
   useEffect(() => {
     if (playerRef.current && isInitializedRef.current) {
       const isInitialSource = audioSrc === initialSourceRef.current;
+      if (consumeAdoptedInitialSource(isInitialSource, adoptedInitialSrcRef, initialSourceRef)) {
+        return;
+      }
       const wasPlayingBeforeSourceChange = !playerRef.current.paused();
       isSwitchingSourceRef.current = true;
       transientErrorRecoveryAttemptedRef.current = false;
@@ -193,12 +239,7 @@ export const Controls = ({
 
       // Auto-play if enabled and this is not the initial source
       if (autoPlay && !isInitialSource) {
-        const playPromise = playerRef.current.play();
-        if (playPromise !== undefined) {
-          (playPromise as Promise<void>).catch(() => {
-            // iOS may reject autoplay after source change
-          });
-        }
+        attemptPlayAfterSourceChange(playerRef.current);
       }
       // Update initial source ref after first change
       if (isInitialSource) {
