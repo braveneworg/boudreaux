@@ -68,6 +68,7 @@ subdirectories:
 | `e2e-playwright/` | writing, running, or debugging E2E specs; changing the seed |
 | `react-nextjs/`   | UI components, dynamic imports, Radix, bundling             |
 | `prisma-mongo/`   | schema, seed, or query changes                              |
+| `testing/`        | writing or debugging unit tests, vitest mocks               |
 | `tooling/`        | shell-heavy work, lint config, stress-repro runs            |
 | `validation/`     | Zod schemas, validating external input                      |
 

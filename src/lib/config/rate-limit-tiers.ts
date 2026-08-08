@@ -147,3 +147,15 @@ export const releaseDateLookupLimiter = rateLimit({
   uniqueTokenPerInterval: 500,
 });
 export const RELEASE_DATE_LOOKUP_LIMIT = 10;
+
+/**
+ * Description web synthesis (admin video form) — 5 requests per minute.
+ * The most expensive lookup: three Serper searches, up to two Jina page
+ * reads, and a Gemini call per press, so the cap sits below the
+ * release-date lookup's.
+ */
+export const descriptionLookupLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const DESCRIPTION_LOOKUP_LIMIT = 5;

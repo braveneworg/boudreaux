@@ -81,6 +81,15 @@ export const queryKeys = {
         title.trim().toLowerCase(),
         artist.trim().toLowerCase(),
       ] as const,
+    /** Description web synthesis keyed by normalised title + artist + date. */
+    descriptionLookup: (title: string, artist: string, releasedOn = '') =>
+      [
+        ...queryKeys.videos.all,
+        'descriptionLookup',
+        title.trim().toLowerCase(),
+        artist.trim().toLowerCase(),
+        releasedOn,
+      ] as const,
   },
   artists: {
     all: ['artists'] as const,

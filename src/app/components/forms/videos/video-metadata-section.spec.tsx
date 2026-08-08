@@ -28,6 +28,16 @@ vi.mock('../_hooks/use-release-date-lookup-query', () => ({
   }),
 }));
 
+// Mock: useVideoDescriptionLookupQuery — idle (not fetching, no data)
+vi.mock('../_hooks/use-video-description-lookup-query', () => ({
+  useVideoDescriptionLookupQuery: () => ({
+    isFetching: false,
+    error: null,
+    data: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock: useArtistListQuery — return empty list so comboboxes stay idle
 // ---------------------------------------------------------------------------

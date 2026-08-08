@@ -182,6 +182,27 @@ const POSTER_CANDIDATES_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d5b1';
 /** Title of the video {@link POSTER_CANDIDATES_VIDEO_ID} pins. */
 const POSTER_CANDIDATES_VIDEO_TITLE = 'E2E Video Golf';
 
+/** Golf also carries the long-description fixture (admin clamp coverage). */
+const LONG_DESCRIPTION_VIDEO_TITLE = 'E2E Video Golf';
+
+/**
+ * A >500-character description seeded onto {@link
+ * LONG_DESCRIPTION_VIDEO_TITLE} so the admin listing's gradient clamp +
+ * expand arrow have real material to collapse (admin-videos-list.spec.ts).
+ * Mirrors the synthesized-description contract: names the artist and carries
+ * attributed quotes. Byte-identical in prisma/seed.ts — keep both in sync.
+ */
+const LONG_VIDEO_DESCRIPTION =
+  'E2E Video Golf is an informational feature from E2E Artist Three, produced ' +
+  'for the E2E catalogue to exercise long-description layouts end to end. ' +
+  'Reviewers called it "a remarkably thorough walkthrough of the label\'s ' +
+  'process" — E2E Weekly — and praised its pacing across every chapter of the ' +
+  'runtime. E2E Artist Three assembled the piece from studio footage, tour ' +
+  'archives, and interview fragments, and its closing segment was described ' +
+  'as "the most honest minute the channel has published" — E2E Quarterly. ' +
+  'This seeded prose intentionally runs past five hundred characters so the ' +
+  'admin listing clamps it behind the gradient and expand arrow.';
+
 /**
  * The three stored poster candidates seeded onto {@link
  * POSTER_CANDIDATES_VIDEO_ID}. Their `atSeconds` drive the strip's radio
@@ -460,7 +481,10 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
         // Stored poster candidates for the poster-select spec (Golf only). No
         // posterUrl points at them yet, so the strip starts with nothing checked.
         ...(isPosterFixture ? { posterCandidates: POSTER_CANDIDATE_FRAMES } : {}),
-        description: `${title} description for E2E.`,
+        description:
+          title === LONG_DESCRIPTION_VIDEO_TITLE
+            ? LONG_VIDEO_DESCRIPTION
+            : `${title} description for E2E.`,
         publishedAt: PUBLISHED_AT,
       };
     }),
