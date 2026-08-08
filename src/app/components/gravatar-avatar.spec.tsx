@@ -5,6 +5,11 @@ import { render, screen } from '@testing-library/react';
 
 import { GravatarAvatar } from './gravatar-avatar';
 
+const useGravatarHashMock = vi.fn();
+vi.mock('@/hooks/use-gravatar-hash', () => ({
+  useGravatarHash: (email?: string) => useGravatarHashMock(email) as string,
+}));
+
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="avatar" className={className}>
@@ -24,16 +29,43 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 describe('GravatarAvatar', () => {
-  it('renders avatar with gravatar URL from email hash', () => {
+  beforeEach(() => {
+    useGravatarHashMock.mockReturnValue('computed-hash-hex');
+  });
+
+  it('renders avatar with gravatar URL from the client-computed email hash', () => {
     render(<GravatarAvatar email="test@example.com" />);
 
     const img = screen.getByTestId('avatar-image');
     expect(img).toHaveAttribute(
       'data-src',
-      expect.stringContaining('https://www.gravatar.com/avatar/')
+      expect.stringContaining('https://www.gravatar.com/avatar/computed-hash-hex')
     );
     expect(img).toHaveAttribute('data-src', expect.stringContaining('d=retro'));
     expect(img).toHaveAttribute('data-src', expect.stringContaining('s=48'));
+    expect(useGravatarHashMock).toHaveBeenCalledWith('test@example.com');
+  });
+
+  it('prefers a precomputed hash prop over client-side hashing', () => {
+    render(<GravatarAvatar hash="server-hash" email="test@example.com" />);
+
+    const img = screen.getByTestId('avatar-image');
+    expect(img).toHaveAttribute(
+      'data-src',
+      expect.stringContaining('https://www.gravatar.com/avatar/server-hash')
+    );
+    expect(useGravatarHashMock).toHaveBeenCalledWith(undefined);
+  });
+
+  it('renders an empty-hash URL while the client hash is still resolving', () => {
+    useGravatarHashMock.mockReturnValue('');
+
+    render(<GravatarAvatar email="test@example.com" />);
+
+    expect(screen.getByTestId('avatar-image')).toHaveAttribute(
+      'data-src',
+      'https://www.gravatar.com/avatar/?s=48&d=retro'
+    );
   });
 
   it('renders with default size-13 class', () => {
@@ -66,15 +98,5 @@ describe('GravatarAvatar', () => {
     render(<GravatarAvatar email="admin@example.com" />);
 
     expect(screen.getByTestId('avatar-fallback')).toHaveTextContent('A');
-  });
-
-  it('normalizes email for hash (trims and lowercases)', () => {
-    const { rerender } = render(<GravatarAvatar email="Test@Example.com" />);
-    const src1 = screen.getByTestId('avatar-image').getAttribute('data-src');
-
-    rerender(<GravatarAvatar email="  test@example.com  " />);
-    const src2 = screen.getByTestId('avatar-image').getAttribute('data-src');
-
-    expect(src1).toBe(src2);
   });
 });

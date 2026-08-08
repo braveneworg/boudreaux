@@ -6,11 +6,11 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
-import md5 from 'crypto-js/md5';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useFingerprint } from '@/hooks/use-fingerprint';
+import { useGravatarHash } from '@/hooks/use-gravatar-hash';
 import type { ClientSessionData } from '@/hooks/use-session';
 import {
   deleteChatMessageAction,
@@ -203,14 +203,15 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
 
   const isAdmin = role === 'admin';
 
+  const gravatarHash = useGravatarHash(email);
   const currentUser = useMemo(
     () => ({
       id: currentUserId,
       username,
-      gravatarHash: email ? md5(email.trim().toLowerCase()).toString() : '',
+      gravatarHash,
       role,
     }),
-    [currentUserId, username, email, role]
+    [currentUserId, username, gravatarHash, role]
   );
 
   const handleSendTyping = useCallback(() => {

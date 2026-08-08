@@ -68,7 +68,7 @@ const call = (query = ''): ReturnType<typeof GET> =>
   GET(new NextRequest(`http://localhost:3000/api/videos${query}`), emptyContext);
 
 describe('GET /api/videos', () => {
-  it('returns 401 when the request is unauthenticated', async () => {
+  it('returns 401 for an unauthenticated admin listing', async () => {
     vi.mocked(auth).mockResolvedValueOnce(null as never);
 
     const response = await call();
@@ -76,6 +76,19 @@ describe('GET /api/videos', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Authentication required' });
+  });
+
+  it('serves the published listing without consulting auth at all', async () => {
+    vi.mocked(auth).mockClear();
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
+      success: true,
+      data: [mockVideo] as never,
+    });
+
+    const response = await call('?listing=published');
+
+    expect(response.status).toBe(200);
+    expect(auth).not.toHaveBeenCalled();
   });
 
   it('returns 403 for a signed-in non-admin on the admin listing', async () => {
@@ -94,18 +107,6 @@ describe('GET /api/videos', () => {
     await call();
 
     expect(VideoService.getVideos).not.toHaveBeenCalled();
-  });
-
-  it('returns 200 for a signed-in non-admin on the published listing', async () => {
-    vi.mocked(auth).mockResolvedValueOnce({ user: { id: 'user-1', role: 'user' } } as never);
-    vi.mocked(VideoService.getPublishedVideos).mockResolvedValue({
-      success: true,
-      data: [mockVideo] as never,
-    });
-
-    const response = await call('?listing=published');
-
-    expect(response.status).toBe(200);
   });
 
   it('calls getPublishedVideos with default skip 0 / take 5 and desc sort', async () => {
