@@ -6,17 +6,24 @@
 import { useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { Loader2, Search } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
 import { useInfinitePublishedVideosQuery } from '@/hooks/queries/use-infinite-published-videos-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
+import { resolveStreamUrl } from '@/lib/utils/cdn-url';
+import type { VideoRow } from '@/lib/validation/video-schema';
 
 import { VideoCard } from './video-card';
+import { VideoSearchCombobox } from './video-search-combobox';
+
+/** How many rows the search dropdown suggests at most. */
+const MAX_SUGGESTIONS = 8;
 
 /** Release-date sort directions offered by the listing toggle. */
 type VideoSort = 'asc' | 'desc';
@@ -52,6 +59,32 @@ const VideosSkeleton = (): ReactElement => (
   </div>
 );
 
+/** Play modal for a suggestion picked from the search dropdown. */
+const SuggestionPlayDialog = ({
+  video,
+  open,
+  onOpenChange,
+  takeMediaEl,
+}: {
+  video: VideoRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  takeMediaEl: () => HTMLVideoElement | null;
+}): ReactElement | null => {
+  const src = video ? resolveStreamUrl(video) : null;
+  if (!video || !src) return null;
+  return (
+    <VideoPlayDialog
+      title={video.title}
+      artist={video.artist}
+      src={src}
+      open={open}
+      onOpenChange={onOpenChange}
+      takeMediaEl={takeMediaEl}
+    />
+  );
+};
+
 /** Error state with a retry that refetches the listing in place. */
 const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
   <div role="alert" className="flex flex-col items-center gap-4 py-12 text-center">
@@ -67,22 +100,55 @@ const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
  *
  * Pages through published videos with infinite scroll (the first page is
  * hydrated from the SSR prefetch). A toolbar pairs a debounced title/artist
- * search with the release-date sort toggle; both are part of the query key,
- * so changing either resets pagination while `keepPreviousData` keeps the
- * current rows on screen during the transition.
+ * search combobox — whose dropdown prepopulates with the matching videos and
+ * opens the play modal for a picked suggestion — with the release-date sort
+ * toggle; the query and sort are part of the query key, so changing either
+ * resets pagination while `keepPreviousData` keeps the current rows on screen
+ * during the transition.
  */
 export const VideosContent = (): ReactElement => {
   const [sort, setSort] = useState<VideoSort>('desc');
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, 300).trim();
-  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfinitePublishedVideosQuery(sort, search);
+  const {
+    data,
+    isPending,
+    isFetching,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfinitePublishedVideosQuery(sort, search);
+
+  // Play modal for a suggestion picked from the search dropdown; the cards
+  // carry their own dialogs, this one belongs to the combobox selection.
+  const [selected, setSelected] = useState<VideoRow | null>(null);
+  const [playerOpen, setPlayerOpen] = useState(false);
+  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff();
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
   const handleSortChange = (value: string): void => {
     if (value === 'asc' || value === 'desc') setSort(value);
+  };
+
+  const handleSuggestionSelect = (video: VideoRow): void => {
+    // Start playback of the real source inside the selection gesture — allowed
+    // by every autoplay policy (see usePrimedMediaHandoff).
+    primeMediaEl(resolveStreamUrl(video) ?? undefined);
+    setSelected(video);
+    setPlayerOpen(true);
+  };
+
+  const handlePlayerOpenChange = (open: boolean): void => {
+    if (!open) {
+      // Closed before the lazy surface adopted the element — stop it, or the
+      // gesture-started audio keeps playing with no UI attached.
+      discardMediaEl();
+    }
+    setPlayerOpen(open);
   };
 
   if (isPending) {
@@ -98,20 +164,14 @@ export const VideosContent = (): ReactElement => {
   return (
     <div className="flex flex-col gap-6 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-xs">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-500"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search by title or artist"
-            aria-label="Search videos"
-            className="pl-9"
-          />
-        </div>
+        <VideoSearchCombobox
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          results={videos.slice(0, MAX_SUGGESTIONS)}
+          isFetching={isFetching}
+          onSelect={handleSuggestionSelect}
+          className="sm:max-w-xs"
+        />
 
         <ToggleGroup
           type="single"
@@ -154,6 +214,13 @@ export const VideosContent = (): ReactElement => {
           </>
         ) : null}
       </div>
+
+      <SuggestionPlayDialog
+        video={selected}
+        open={playerOpen}
+        onOpenChange={handlePlayerOpenChange}
+        takeMediaEl={takeMediaEl}
+      />
     </div>
   );
 };
