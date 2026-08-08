@@ -21,7 +21,7 @@ importers:
         specifier: ^3.1053.0
         version: 3.1073.0
       '@prisma/client':
-        specifier: ^6.16.3
+        specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       ipaddr.js:
         specifier: ^2.2.0
@@ -46,7 +46,7 @@ importers:
         specifier: ^0.28.1
         version: 0.28.1
       prisma:
-        specifier: ^6.16.3
+        specifier: ^6.19.3
         version: 6.19.3(typescript@5.9.3)
       typescript:
         specifier: ^5.0.0
