@@ -15,6 +15,7 @@ import { digitalFormatWithFilesSchema } from './digital-format-schema';
 import {
   artistScalarSchema,
   date,
+  formatSchema,
   imageSchema,
   nullableString,
   platformSchema,
@@ -66,12 +67,15 @@ export const releaseCarouselItemSchema = releaseScalarSchema.extend({
   images: z.array(imageSchema),
 }) satisfies z.ZodType<ReleaseCarouselItem>;
 
-/** Published release listing projection for the public releases grid. */
+/** Published release listing projection for the public releases page rows. */
 export const publishedReleaseListingSchema = z.object({
   id: z.string(),
   title: z.string(),
   coverArt: z.string(),
   releasedOn: date,
+  description: nullableString,
+  formats: z.array(formatSchema),
+  catalogNumber: nullableString,
   images: z.array(z.object({ src: nullableString, altText: nullableString })),
   artistReleases: z.array(
     z.object({
@@ -85,6 +89,7 @@ export const publishedReleaseListingSchema = z.object({
     })
   ),
   releaseUrls: z.array(z.object({ url: z.object({ platform: platformSchema, url: z.string() }) })),
+  digitalFormats: z.array(z.object({ files: z.array(z.object({ s3Key: z.string() })) })),
 }) satisfies z.ZodType<PublishedReleaseListing>;
 
 /** Published release detail (media player page) — the `withTracks` release payload. */

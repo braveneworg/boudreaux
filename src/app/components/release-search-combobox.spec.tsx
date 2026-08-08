@@ -38,6 +38,9 @@ const mockReleases = [
     title: 'Midnight Serenade',
     coverArt: 'https://example.com/cover1.jpg',
     releasedOn: '2024-01-01T00:00:00.000Z',
+    description: null,
+    formats: [],
+    catalogNumber: null,
     images: [],
     artistReleases: [
       {
@@ -54,12 +57,16 @@ const mockReleases = [
       },
     ],
     releaseUrls: [],
+    digitalFormats: [],
   },
   {
     id: 'release-2',
     title: 'Morning Glory',
     coverArt: 'https://example.com/cover2.jpg',
     releasedOn: '2024-02-01T00:00:00.000Z',
+    description: null,
+    formats: [],
+    catalogNumber: null,
     images: [],
     artistReleases: [
       {
@@ -76,6 +83,7 @@ const mockReleases = [
       },
     ],
     releaseUrls: [],
+    digitalFormats: [],
   },
 ] as unknown as PublishedReleaseListing[];
 
@@ -255,6 +263,9 @@ describe('ReleaseSearchCombobox', () => {
         title: 'No Cover Album',
         coverArt: '',
         releasedOn: '2024-03-01T00:00:00.000Z',
+        description: null,
+        formats: [],
+        catalogNumber: null,
         images: [],
         artistReleases: [
           {
@@ -271,6 +282,7 @@ describe('ReleaseSearchCombobox', () => {
           },
         ],
         releaseUrls: [],
+        digitalFormats: [],
       },
     ] as unknown as PublishedReleaseListing[]);
     const user = setupUser();
@@ -293,9 +305,13 @@ describe('ReleaseSearchCombobox', () => {
         title: 'Mystery Album',
         coverArt: 'https://example.com/cover.jpg',
         releasedOn: '2024-04-01T00:00:00.000Z',
+        description: null,
+        formats: [],
+        catalogNumber: null,
         images: [],
         artistReleases: [],
         releaseUrls: [],
+        digitalFormats: [],
       },
     ] as unknown as PublishedReleaseListing[]);
     const user = setupUser();

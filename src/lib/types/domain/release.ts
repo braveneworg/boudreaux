@@ -158,20 +158,31 @@ export type PublishedReleaseListingUrl = {
   url: { platform: Platform; url: string };
 };
 
+/** First playable track file projected for gesture-time priming on the listing. */
+export type PublishedReleaseListingTrack = {
+  s3Key: string;
+};
+
 /**
- * Published release listing for the public releases grid page. Only the fields
- * the listing UI consumes (release cards + search combobox) are projected,
- * keeping both the Mongo read and the API payload small. Mirrors
- * `publishedReleaseListingSelect`.
+ * Published release listing for the public releases page. Only the fields the
+ * listing UI consumes (release rows + search combobox) are projected, keeping
+ * both the Mongo read and the API payload small: the row info column reads
+ * `description`/`formats`/`catalogNumber`, and `digitalFormats` is narrowed to
+ * the first MP3 track so the Play button can source-prime a media element
+ * inside the click gesture. Mirrors `publishedReleaseListingSelect`.
  */
 export type PublishedReleaseListing = {
   id: string;
   title: string;
   coverArt: string;
   releasedOn: Date;
+  description: string | null;
+  formats: Format[];
+  catalogNumber: string | null;
   images: PublishedReleaseListingImage[];
   artistReleases: Array<{ artist: PublishedReleaseListingArtist }>;
   releaseUrls: PublishedReleaseListingUrl[];
+  digitalFormats: Array<{ files: PublishedReleaseListingTrack[] }>;
 };
 
 /** Narrow artist name-part projection for the media-player detail page. */
