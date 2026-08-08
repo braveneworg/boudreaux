@@ -22,6 +22,10 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_PRO_MODEL,
 } from './types.js';
+import {
+  isVideoDescriptionLookupTask,
+  runVideoDescriptionLookupLambda,
+} from './video-description-lookup.js';
 import { isVideoEnrichmentTask, runVideoEnrichmentLambda } from './video-enrichment.js';
 import { verifyScrapedImages } from './vision.js';
 import { getWikidataData } from './wikidata.js';
@@ -40,6 +44,7 @@ import type {
   BioLink,
   ProgressStage,
   ReleaseDateLookupResult,
+  VideoDescriptionLookupResult,
   VideoEnrichmentResult,
 } from './types.js';
 import type { VerifiedScrapedImage, VisionContext } from './vision.js';
@@ -916,12 +921,20 @@ const runToResult = async (
 export const runLambda = async (
   event: unknown,
   deps: BioGeneratorDeps = defaultDeps
-): Promise<BioGenerationResult | VideoEnrichmentResult | ReleaseDateLookupResult> => {
+): Promise<
+  | BioGenerationResult
+  | VideoEnrichmentResult
+  | ReleaseDateLookupResult
+  | VideoDescriptionLookupResult
+> => {
   // Route on the task discriminator FIRST so the bio path below stays
   // byte-identical for every existing event shape (bio events carry no
   // `task` field).
   if (isReleaseDateLookupTask(event)) {
     return runReleaseDateLookupLambda(event);
+  }
+  if (isVideoDescriptionLookupTask(event)) {
+    return runVideoDescriptionLookupLambda(event);
   }
   if (isVideoEnrichmentTask(event)) {
     return runVideoEnrichmentLambda(event);
@@ -970,5 +983,9 @@ export const runLambda = async (
 export const lambdaHandler = async (
   event: unknown,
   _context?: unknown
-): Promise<BioGenerationResult | VideoEnrichmentResult | ReleaseDateLookupResult> =>
-  runLambda(event);
+): Promise<
+  | BioGenerationResult
+  | VideoEnrichmentResult
+  | ReleaseDateLookupResult
+  | VideoDescriptionLookupResult
+> => runLambda(event);

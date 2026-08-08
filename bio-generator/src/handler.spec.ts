@@ -17,6 +17,7 @@ import {
 import type { BioGeneratorDeps } from './handler.js';
 import type * as ReleaseDateLookupModule from './release-date-lookup.js';
 import type { ArtistFacts, BioImage } from './types.js';
+import type * as VideoDescriptionLookupModule from './video-description-lookup.js';
 import type * as VideoEnrichmentModule from './video-enrichment.js';
 import type { VerifiedScrapedImage } from './vision.js';
 
@@ -33,6 +34,14 @@ vi.mock('./video-enrichment.js', async (importOriginal) => {
   return {
     ...actual,
     runVideoEnrichmentLambda: vi.fn().mockResolvedValue({ ok: false, error: 'stubbed' }),
+  };
+});
+
+vi.mock('./video-description-lookup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof VideoDescriptionLookupModule>();
+  return {
+    ...actual,
+    runVideoDescriptionLookupLambda: vi.fn().mockResolvedValue({ ok: true, result: null }),
   };
 });
 
@@ -2098,6 +2107,25 @@ describe('runLambda task routing', () => {
     expect(vi.mocked(runReleaseDateLookupLambda)).toHaveBeenCalledWith({
       task: 'release-date-lookup',
       title: 'Song',
+    });
+    expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, result: null });
+  });
+
+  it('routes a video-description-lookup event to its lookup task', async () => {
+    const { runVideoDescriptionLookupLambda } = await import('./video-description-lookup.js');
+    const { runVideoEnrichmentLambda } = await import('./video-enrichment.js');
+
+    const result = await runLambda({
+      task: 'video-description-lookup',
+      title: 'Song',
+      artist: 'Band',
+    });
+
+    expect(vi.mocked(runVideoDescriptionLookupLambda)).toHaveBeenCalledWith({
+      task: 'video-description-lookup',
+      title: 'Song',
+      artist: 'Band',
     });
     expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, result: null });
