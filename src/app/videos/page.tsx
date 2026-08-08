@@ -3,13 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Signed-in videos page at `/videos`.
- * Server Component that gates on auth, prefetches the first page of published
- * videos for SSR, then hydrates the client content island for playback and
- * infinite scroll.
+ * Public videos page at `/videos`.
+ * Server Component that prefetches the first page of published videos for
+ * SSR, then hydrates the client content island for playback and infinite
+ * scroll. No sign-in is required — the listing (like `/releases`) is open to
+ * anonymous visitors.
  */
-import { redirect } from 'next/navigation';
-
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ContentContainer } from '@/app/components/ui/content-container';
@@ -17,7 +16,6 @@ import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { VideosContent } from '@/app/components/videos-content';
-import { auth } from '@/auth';
 import { PUBLISHED_VIDEOS_PAGE_SIZE } from '@/hooks/queries/use-infinite-published-videos-query';
 import { queryKeys } from '@/lib/query-keys';
 import { VideoService } from '@/lib/services/video-service';
@@ -36,12 +34,6 @@ export const metadata: Metadata = {
 const breadcrumbItems = [{ anchorText: 'Videos', url: '/videos', isActive: true }];
 
 export default async function VideosPage() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect('/signin');
-  }
-
   const queryClient = getQueryClient();
 
   // Prefetch the first page as an infinite query. The query key and

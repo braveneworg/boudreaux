@@ -210,22 +210,9 @@ describe('proxy middleware', () => {
       expect(result).toEqual({ type: 'next' });
     });
 
-    it('redirects unauthenticated users from videos to signin', async () => {
-      signedOut();
-      const request = createMockRequest('/videos');
-
-      const result = await middleware(request as unknown as NextRequest);
-
-      expect(NextResponse.redirect).toHaveBeenCalled();
-      const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
-      expect(redirectCall.pathname).toBe('/signin');
-      expect(redirectCall.searchParams.get('callbackUrl')).toBe('/videos');
-      expect(result).toMatchObject({ type: 'redirect' });
-    });
-
-    it('allows authenticated users to access videos', async () => {
+    it('allows authenticated users to access profile sub-routes', async () => {
       signedIn();
-      const request = createMockRequest('/videos');
+      const request = createMockRequest('/profile/settings');
 
       const result = await middleware(request as unknown as NextRequest);
 
@@ -506,8 +493,8 @@ describe('proxy config', () => {
     expect(config.matcher).toContain('/api/admin/:path*');
   });
 
-  it('covers the videos routes so the private-route guard runs', () => {
-    expect(config.matcher).toContain('/videos');
-    expect(config.matcher).toContain('/videos/:path*');
+  it('excludes the public videos routes so the proxy never gates them', () => {
+    expect(config.matcher).not.toContain('/videos');
+    expect(config.matcher).not.toContain('/videos/:path*');
   });
 });

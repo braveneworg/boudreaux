@@ -11,12 +11,6 @@ import VideosPage from './page';
 
 vi.mock('server-only', () => ({}));
 
-// Mock auth — the server-side session gate.
-const mockAuth = vi.fn();
-vi.mock('@/auth', () => ({
-  auth: () => mockAuth(),
-}));
-
 // Mock next/navigation — redirect must throw to halt execution like the real one.
 const mockRedirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -132,28 +126,16 @@ const mockVideo: Video = {
 
 describe('VideosPage', () => {
   beforeEach(() => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     mockGetPublishedVideos.mockResolvedValue({ success: true, data: [] });
   });
 
-  it('should redirect to signin when there is no session', async () => {
-    mockAuth.mockResolvedValue(null);
+  // The page is public: no session is mocked anywhere in this spec, and the
+  // page must never redirect an anonymous visitor.
+  it('should never redirect to signin', async () => {
+    const Page = await VideosPage();
+    render(Page);
 
-    await expect(VideosPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
-    expect(mockRedirect).toHaveBeenCalledWith('/signin');
-  });
-
-  it('should redirect to signin when the user has no id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
-
-    await expect(VideosPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
-  });
-
-  it('should not reach the prefetch when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    await expect(VideosPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
-    expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
+    expect(mockRedirect).not.toHaveBeenCalled();
   });
 
   it('should prefetch the first published-videos page as an infinite query', async () => {

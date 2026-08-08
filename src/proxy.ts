@@ -27,7 +27,6 @@ const PUBLIC_ROUTES = [
 
 const PRIVATE_ROUTES = [
   /^\/profile/, // /profile and sub-routes
-  /^\/videos/, // /videos and sub-routes — signed-in-only listing
 ];
 
 const isPublicRoute = (pathname: string): boolean =>
@@ -164,16 +163,14 @@ export default async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match authentication-protected routes explicitly.
+     * Match authentication-protected routes explicitly. /videos is public
+     * (like /releases) and deliberately unmatched.
      * - /profile and all sub-routes
-     * - /videos and all sub-routes
      * - /admin and all sub-routes
      * - /api/admin and all sub-routes
      */
     '/profile',
     '/profile/:path*',
-    '/videos',
-    '/videos/:path*',
     '/admin',
     '/admin/:path*',
     '/api/admin/:path*',

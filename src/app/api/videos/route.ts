@@ -4,8 +4,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
-import { withAuth } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { VideoService } from '@/lib/services/video-service';
 import type { Video, VideoListFilters } from '@/lib/types/domain/video';
@@ -59,7 +59,7 @@ const pageResponse = (videos: Video[], skip: number, take: number): NextResponse
   );
 };
 
-/** Handle the `listing=published` branch — available to any signed-in user. */
+/** Handle the public `listing=published` branch — no sign-in required. */
 const handlePublishedListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
   const { skip, take } = parsePagination(searchParams);
   const sort = parseSort(searchParams);
@@ -79,12 +79,13 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   return pageResponse(result.data, skip, take);
 };
 
-/** Handle the admin (default) branch — gated on the caller's admin role. */
-const handleAdminListing = async (
-  searchParams: URLSearchParams,
-  role: string
-): Promise<NextResponse> => {
-  if (role !== 'admin') {
+/** Handle the admin (default) branch — gated on a signed-in admin session. */
+const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  if (session.user.role !== 'admin') {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
 
@@ -112,12 +113,12 @@ const handleAdminListing = async (
 /**
  * GET /api/videos
  *
- * Signed-in-only listing (unlike the public `/api/releases`) — the whole
- * surface is gated behind `withAuth`, then rate-limited.
+ * Rate-limited; auth is per branch (like `/api/releases`): the published
+ * listing is public, the admin listing checks its own session.
  *
  * Query params:
  *   listing   – When "published", returns published, non-archived videos for
- *               any signed-in user via `getPublishedVideos()`; honors `skip`,
+ *               any visitor via `getPublishedVideos()`; honors `skip`,
  *               `take`, `sort`, and a title/artist `search`.
  *   skip, take, search, published, archived, sort – Pagination/filter params
  *               for the admin listing mode (requires the admin role).
@@ -125,17 +126,15 @@ const handleAdminListing = async (
 export const GET = withRateLimit(
   publicLimiter,
   PUBLIC_LIMIT
-)(
-  withAuth(async (request: NextRequest, _context, session) => {
-    try {
-      const searchParams = request.nextUrl.searchParams;
+)(async (request: NextRequest) => {
+  try {
+    const searchParams = request.nextUrl.searchParams;
 
-      return searchParams.get('listing') === 'published'
-        ? await handlePublishedListing(searchParams)
-        : await handleAdminListing(searchParams, session.user.role);
-    } catch (error) {
-      loggers.media.error('Video GET error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  })
-);
+    return searchParams.get('listing') === 'published'
+      ? await handlePublishedListing(searchParams)
+      : await handleAdminListing(searchParams);
+  } catch (error) {
+    loggers.media.error('Video GET error', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+});
