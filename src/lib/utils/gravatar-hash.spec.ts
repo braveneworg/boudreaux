@@ -7,9 +7,11 @@ import { gravatarHash } from './gravatar-hash';
 vi.mock('server-only', () => ({}));
 
 describe('gravatarHash', () => {
-  it('returns the Gravatar-documented hash for a canonical email', () => {
-    // Reference: https://gravatar.com/site/implement/hash/
-    expect(gravatarHash('MyEmailAddress@example.com ')).toBe('0bc83cb571cd1c50ba6f3e8a78ef1346');
+  it('returns the Gravatar-documented SHA-256 hash for a canonical email', () => {
+    // Reference: https://docs.gravatar.com/api/avatars/hash/
+    expect(gravatarHash('MyEmailAddress@example.com ')).toBe(
+      '84059b07d4be67b806386c0aad8070a23f18836bbaae342275dc0a83414c32ee'
+    );
   });
 
   it('lowercases the address before hashing', () => {
@@ -20,8 +22,8 @@ describe('gravatarHash', () => {
     expect(gravatarHash('  person@example.com  ')).toBe(gravatarHash('person@example.com'));
   });
 
-  it('produces a 32-character lowercase hex digest', () => {
-    expect(gravatarHash('test@example.com')).toMatch(/^[a-f0-9]{32}$/);
+  it('produces a 64-character lowercase hex digest', () => {
+    expect(gravatarHash('test@example.com')).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('produces distinct hashes for distinct addresses', () => {

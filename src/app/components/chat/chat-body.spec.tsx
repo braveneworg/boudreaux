@@ -49,6 +49,9 @@ vi.mock('./_hooks/use-chat-typing', () => ({
 vi.mock('@/hooks/use-fingerprint', () => ({
   useFingerprint: (...args: unknown[]) => useFingerprintMock(...args),
 }));
+vi.mock('@/hooks/use-gravatar-hash', () => ({
+  useGravatarHash: (email?: string) => (email ? 'session-user-hash' : ''),
+}));
 vi.mock('./_hooks/use-chat-channel', () => ({
   useChatChannel: (params: Parameters<typeof useChatChannelMock>[0]) => useChatChannelMock(params),
 }));
@@ -805,6 +808,12 @@ describe('ChatBody — session fallbacks', () => {
     render(<ChatBody session={{ user: undefined } as unknown as ClientSessionData} enabled />);
     expect(lastInputProps).not.toBeNull();
     expect(lastInputProps?.currentUser.id).toBe('');
+  });
+
+  it('passes the useGravatarHash result to ChatInput as currentUser.gravatarHash', () => {
+    render(<ChatBody session={buildSession()} enabled />);
+
+    expect(lastInputProps?.currentUser.gravatarHash).toBe('session-user-hash');
   });
 
   it('passes a null username to sendTyping when the session has no name', () => {
