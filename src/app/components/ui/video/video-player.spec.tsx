@@ -77,16 +77,19 @@ describe('VideoPlayer', () => {
       vi.restoreAllMocks();
     });
 
-    it('primes a media element inside the play click gesture', async () => {
+    it('starts gesture playback of the source inside the play click', async () => {
       const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
-      const loadSpy = vi.spyOn(HTMLMediaElement.prototype, 'load');
       const user = userEvent.setup();
       render(<VideoPlayer title="Live Set" src="/clip.mp4" posterUrl={null} />);
 
       await user.click(screen.getByRole('button', { name: 'Play Live Set' }));
 
-      expect(loadSpy).toHaveBeenCalledTimes(1);
+      // The real source must be playing from the gesture itself — the surface
+      // adopts it mid-playback instead of issuing a deferred play() that
+      // strict autoplay profiles can reject.
       expect(playSpy).toHaveBeenCalledTimes(1);
+      const primedEl = playSpy.mock.instances[0] as HTMLVideoElement;
+      expect(primedEl.getAttribute('src')).toBe('/clip.mp4');
     });
 
     it('hands the surface a primed inline-playback video element', async () => {
