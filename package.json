@@ -58,9 +58,6 @@
     "postinstall": "prisma generate",
     "stripe:forward": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"
   },
-  "prisma": {
-    "seed": "pnpm exec tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.1071.0",
     "@aws-sdk/client-s3": "^3.1064.0",
