@@ -34,7 +34,7 @@ interface VideoCardProps {
  */
 export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   const [playerOpen, setPlayerOpen] = useState(false);
-  const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff();
+  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff();
   const src = resolveStreamUrl(video);
   const mediaItem = videoMediaItem({
     videoId: video.id,
@@ -45,10 +45,20 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   });
 
   const openPlayer = (): void => {
-    // Prime inside the click gesture so the modal surface's deferred autoplay
-    // survives per-element autoplay policies (see usePrimedMediaHandoff).
-    primeMediaEl();
+    // Start playback of the real source inside the click gesture — allowed by
+    // every autoplay policy, unlike a deferred play(), which strict profiles
+    // and extensions can reject (see usePrimedMediaHandoff).
+    primeMediaEl(src ?? undefined);
     setPlayerOpen(true);
+  };
+
+  const handlePlayerOpenChange = (open: boolean): void => {
+    if (!open) {
+      // Closed before the lazy surface adopted the element — stop it, or the
+      // gesture-started audio keeps playing with no UI attached.
+      discardMediaEl();
+    }
+    setPlayerOpen(open);
   };
 
   return (
@@ -115,7 +125,7 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
           artist={video.artist}
           src={src}
           open={playerOpen}
-          onOpenChange={setPlayerOpen}
+          onOpenChange={handlePlayerOpenChange}
           takeMediaEl={takeMediaEl}
         />
       ) : null}

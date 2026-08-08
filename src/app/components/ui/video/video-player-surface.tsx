@@ -83,19 +83,36 @@ export const VideoPlayerSurface = ({
     container.appendChild(videoEl);
     host.appendChild(container);
 
+    // A source-primed element already carries this src (and is usually already
+    // playing from the click gesture). Re-setting the same source would rerun
+    // the media load algorithm and kill that playback.
+    const isPreSourced = videoEl.getAttribute('src') === src;
+
     const player = videojs(videoEl, {
       controls: true,
       fluid: true,
       playsinline: true,
       preload: 'auto',
       poster: posterUrl ?? undefined,
-      sources: [{ src, type: getVideoMimeType(src) }],
+      ...(isPreSourced ? {} : { sources: [{ src, type: getVideoMimeType(src) }] }),
     });
 
     bindPlayerVolumePersistence(player);
 
     player.ready(() => {
-      // Autoplay policies can reject play() even after a gesture — swallow it.
+      if (!videoEl.paused) {
+        // Playing since the gesture: video.js attached after the element's
+        // only play event, so replicate what handleTechPlay_ would have done
+        // (UI state + session claim) or the controls stay stuck not-started.
+        player.hasStarted(true);
+        player.removeClass('vjs-paused');
+        player.addClass('vjs-playing');
+        claimPlayback(instanceId, () => player.pause());
+        return;
+      }
+      // Fresh element, or the gestured play() was rejected — try the deferred
+      // play. Autoplay policies can reject it even now; swallow, and video.js
+      // keeps its big play button as the direct-gesture recovery.
       player.play()?.catch(() => {});
     });
 

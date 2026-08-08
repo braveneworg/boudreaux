@@ -40,9 +40,10 @@ export const VideoPlayer = ({
   const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff();
 
   const activatePlayback = (): void => {
-    // Prime inside the click gesture so the surface's deferred autoplay
-    // survives per-element autoplay policies (see usePrimedMediaHandoff).
-    primeMediaEl();
+    // Start playback of the real source inside the click gesture — allowed by
+    // every autoplay policy, unlike a deferred play(), which strict profiles
+    // and extensions can reject (see usePrimedMediaHandoff).
+    primeMediaEl(src ?? undefined);
     setActivated(true);
   };
 

@@ -257,16 +257,32 @@ describe('VideoCard', () => {
       expect(dialogProps.posterUrl).toBeUndefined();
     });
 
-    it('primes a media element inside the poster click gesture', async () => {
+    it('starts gesture playback of the resolved stream inside the poster click', async () => {
       const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
-      const loadSpy = vi.spyOn(HTMLMediaElement.prototype, 'load');
       const user = userEvent.setup();
       render(<VideoCard video={baseVideo} />);
 
       await user.click(screen.getByRole('button', { name: 'Play Live at the Basement' }));
 
-      expect(loadSpy).toHaveBeenCalledTimes(1);
+      // The real source must be playing from the gesture itself — the modal
+      // surface adopts it mid-playback instead of issuing a deferred play()
+      // that strict autoplay profiles can reject.
       expect(playSpy).toHaveBeenCalledTimes(1);
+      const primedEl = playSpy.mock.instances[0] as HTMLVideoElement;
+      expect(primedEl.getAttribute('src')).toBe('https://cdn.example.com/resolved.mp4');
+    });
+
+    it('stops an unclaimed primed element when the modal closes', async () => {
+      const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+      const user = userEvent.setup();
+      render(<VideoCard video={baseVideo} />);
+      await user.click(screen.getByRole('button', { name: 'Play Live at the Basement' }));
+      pauseSpy.mockClear();
+
+      act(() => dialogProps.onOpenChange?.(false));
+
+      // Closing before the lazy surface mounted must not leak ghost audio.
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
     });
 
     it('hands the modal a supplier holding the primed element', async () => {

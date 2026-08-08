@@ -15,6 +15,9 @@ interface FakePlayer {
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
+  hasStarted: ReturnType<typeof vi.fn>;
+  addClass: ReturnType<typeof vi.fn>;
+  removeClass: ReturnType<typeof vi.fn>;
   volume: (value?: number) => number | undefined;
   muted: (value?: boolean) => boolean | undefined;
   /** Test-only helper to fire a registered video.js event handler. */
@@ -42,6 +45,9 @@ vi.mock('video.js', () => {
       play: vi.fn(() => Promise.reject(new Error('autoplay-blocked'))),
       pause: vi.fn(),
       dispose: vi.fn(() => el?.parentElement?.remove()),
+      hasStarted: vi.fn(),
+      addClass: vi.fn(),
+      removeClass: vi.fn(),
       volume: vi.fn((value?: number) => {
         if (value !== undefined) {
           currentVolume = value;
@@ -139,6 +145,70 @@ describe('VideoPlayerSurface', () => {
       );
 
       expect(primed.getAttribute('aria-label')).toBe('Live');
+    });
+
+    // A source-primed element (see usePrimedMediaHandoff) arrives ALREADY
+    // PLAYING from the click gesture. Re-setting the same source would rerun
+    // the media load algorithm and kill that playback, and video.js never saw
+    // the element's play event, so the surface must sync the player state.
+    describe('gesture-playing element adoption', () => {
+      const SRC = 'https://cdn.example.com/clip.mp4?sig=abc';
+
+      const makePlayingEl = (): HTMLVideoElement => {
+        const primed = document.createElement('video');
+        primed.src = SRC;
+        Object.defineProperty(primed, 'paused', { value: false, configurable: true });
+        return primed;
+      };
+
+      it('adopts the element without re-setting its source', () => {
+        render(<VideoPlayerSurface title="Live" src={SRC} takeMediaEl={makePlayingEl} />);
+
+        const options = vi.mocked(videojs).mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(options).not.toHaveProperty('sources');
+      });
+
+      it('does not call play() on an element already playing', () => {
+        render(<VideoPlayerSurface title="Live" src={SRC} takeMediaEl={makePlayingEl} />);
+
+        const [player] = getPlayers();
+        expect(player.play).not.toHaveBeenCalled();
+      });
+
+      it('syncs the started/playing UI state video.js missed', () => {
+        render(<VideoPlayerSurface title="Live" src={SRC} takeMediaEl={makePlayingEl} />);
+
+        const [player] = getPlayers();
+        expect(player.hasStarted).toHaveBeenCalledWith(true);
+        expect(player.removeClass).toHaveBeenCalledWith('vjs-paused');
+        expect(player.addClass).toHaveBeenCalledWith('vjs-playing');
+      });
+
+      it('claims the playback session immediately for a playing element', () => {
+        render(
+          <>
+            <VideoPlayerSurface title="First" src={SRC} takeMediaEl={makePlayingEl} />
+            <VideoPlayerSurface title="Second" src="https://cdn.example.com/b.mp4" />
+          </>
+        );
+
+        const [first, second] = getPlayers();
+        act(() => second.trigger('play'));
+
+        expect(first.pause).toHaveBeenCalledTimes(1);
+      });
+
+      it('falls back to the deferred play() for a pre-sourced but paused element', () => {
+        // The gestured play() was rejected (e.g. by an autoplay-blocking
+        // extension) — the element hands off with its source but paused.
+        const paused = document.createElement('video');
+        paused.src = SRC;
+
+        render(<VideoPlayerSurface title="Live" src={SRC} takeMediaEl={() => paused} />);
+
+        const [player] = getPlayers();
+        expect(player.play).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('creates its own element when the primed one was already taken', () => {
