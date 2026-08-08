@@ -122,6 +122,15 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(userPage.locator('.video-js')).toHaveCount(0);
   });
 
+  // The search is a combobox: a trigger button opens the dropdown whose input
+  // drives both the suggestion list and the listing behind it.
+  const openSearch = async (page: Page): Promise<Locator> => {
+    await page.getByRole('button', { name: 'Search videos' }).click();
+    const input = page.getByPlaceholder('Search by title or artist');
+    await expect(input).toBeVisible();
+    return input;
+  };
+
   test('searching by title narrows the listing across pages', async ({ userPage }) => {
     await userPage.goto('/videos');
 
@@ -129,7 +138,7 @@ test.describe('Videos page — signed-in listing', () => {
 
     // Golf normally sits on page 2 — matching it proves the search is
     // server-side, not a client filter over the loaded rows.
-    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('Golf');
+    await (await openSearch(userPage)).fill('Golf');
 
     await expect(cardTitles(userPage)).toHaveText(['E2E Video Golf']);
   });
@@ -139,7 +148,7 @@ test.describe('Videos page — signed-in listing', () => {
   }) => {
     await userPage.goto('/videos');
 
-    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('E2E Artist Two');
+    await (await openSearch(userPage)).fill('E2E Artist Two');
 
     await expect(cardTitles(userPage)).toHaveText(['E2E Video Bravo', 'E2E Video Echo']);
   });
@@ -147,7 +156,7 @@ test.describe('Videos page — signed-in listing', () => {
   test('clearing the search restores the full listing', async ({ userPage }) => {
     await userPage.goto('/videos');
 
-    const search = userPage.getByRole('searchbox', { name: 'Search videos' });
+    const search = await openSearch(userPage);
     await search.fill('Golf');
     await expect(cardTitles(userPage)).toHaveText(['E2E Video Golf']);
 
@@ -156,12 +165,42 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(cardTitles(userPage)).toHaveText([...PAGE_ONE_TITLES]);
   });
 
+  test('typing prepopulates the dropdown with the matching videos', async ({ userPage }) => {
+    await userPage.goto('/videos');
+
+    await (await openSearch(userPage)).fill('E2E Artist Two');
+
+    // Suggestions carry the artist line; Golf (Artist Three) must not appear.
+    const options = userPage.getByRole('option');
+    await expect(options).toHaveCount(2);
+    await expect(options.filter({ hasText: 'E2E Video Bravo' })).toHaveCount(1);
+    await expect(options.filter({ hasText: 'E2E Video Echo' })).toHaveCount(1);
+  });
+
+  test('selecting a suggestion opens the modal player', async ({ userPage }) => {
+    await userPage.goto('/videos');
+
+    await (await openSearch(userPage)).fill('Golf');
+    await userPage.getByRole('option').filter({ hasText: 'E2E Video Golf' }).click();
+
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Video Golf' });
+    await expect(dialog).toBeVisible();
+    // Whether the H.264 fixture decodes depends on the Chromium build (see the
+    // poster-click modal test above) — either terminal state proves the
+    // surface mounted for the picked suggestion.
+    const surfaceError = dialog.getByText(/This video can.t be played right now\./);
+    await expect(surfaceError.or(dialog.locator('.video-js'))).toBeVisible({ timeout: 15_000 });
+
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('a search with no matches shows the no-match message', async ({ userPage }) => {
     await userPage.goto('/videos');
 
-    await userPage.getByRole('searchbox', { name: 'Search videos' }).fill('zzz-no-such-video');
+    await (await openSearch(userPage)).fill('zzz-no-such-video');
 
-    await expect(userPage.getByText(/No videos match/)).toBeVisible();
+    await expect(userPage.getByText(/No videos match/).first()).toBeVisible();
     await expect(cardTitles(userPage)).toHaveCount(0);
   });
 
