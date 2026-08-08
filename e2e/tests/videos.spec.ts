@@ -6,7 +6,8 @@ import { expect, test } from '../fixtures/auth.fixture';
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * E2E coverage for the signed-in `/videos` listing (Task 12).
+ * E2E coverage for the public `/videos` listing (Task 12). The page needs no
+ * sign-in; the signed-in describe block below just reuses the session fixture.
  *
  * Asserts against the deterministic seed (e2e/helpers/seed-test-db.ts): 7
  * PUBLISHED videos newest→oldest by `releasedOn` — Alpha (2026-01-07) → Bravo →
@@ -33,12 +34,14 @@ const cardTitles = (page: Page): Locator => page.getByRole('heading', { level: 2
 const cardByTitle = (page: Page, title: string): Locator =>
   page.getByRole('article').filter({ has: page.getByRole('heading', { level: 2, name: title }) });
 
-test.describe('Videos page — auth gate', () => {
-  test('redirects an anonymous visitor to sign in with a /videos callbackUrl', async ({ page }) => {
+test.describe('Videos page — public access', () => {
+  test('renders the listing for an anonymous visitor', async ({ page }) => {
     await page.goto('/videos');
 
-    await page.waitForURL(/\/signin/, { timeout: 10_000 });
-    expect(new URL(page.url()).searchParams.get('callbackUrl')).toBe('/videos');
+    await expect(page.getByRole('heading', { level: 1, name: /videos/i })).toBeVisible();
+    const alpha = cardByTitle(page, 'E2E Video Alpha');
+    await expect(alpha).toHaveCount(1);
+    await expect(alpha.getByRole('button', { name: 'Play E2E Video Alpha' })).toBeVisible();
   });
 });
 
