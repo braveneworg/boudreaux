@@ -6,9 +6,12 @@ import { PrismaClient } from '@prisma/client';
 import { expect, test } from '../fixtures/base.fixture';
 
 /**
- * E2E coverage for the public releases enhancements on this branch:
+ * E2E coverage for the public releases listing + detail:
+ *  - Releases list rows: the sleeve card sits beside an info column
+ *    (release date, catalog number, format tags, description).
  *  - Releases list: clicking an album cover opens a dialog with the release
- *    info and a link through to the detail page.
+ *    info and a link through to the detail page; clicking Play opens the
+ *    listening modal with the release audio player.
  *  - Release detail: the "Release Notes" section renders (cutout heading +
  *    floated summary card + notes copy).
  *
@@ -73,5 +76,49 @@ test.describe('Releases — cover dialog + release notes', () => {
     await expect(notes).toContainText(RELEASE_TITLE);
     await expect(notes).toContainText(/Released/);
     await expect(notes).toContainText(/Lorem ipsum/i);
+  });
+});
+
+test.describe('Releases — listing rows + play modal', () => {
+  test('a release row shows the info column beside the sleeve card', async ({ page }) => {
+    await page.goto('/releases');
+
+    const row = page
+      .locator('li')
+      .filter({ has: page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }) });
+    await expect(row.getByText('Release date:')).toBeVisible();
+    await expect(row.getByText('Pressed loud and mastered hot for the E2E stacks.')).toBeVisible();
+    await expect(row.getByText('Catalog no.:')).toBeVisible();
+    await expect(row.getByText('E2E-001')).toBeVisible();
+    await expect(row.getByRole('list', { name: 'Available formats' })).toContainText('MP3 320KBPS');
+  });
+
+  test('Play opens the listening modal with the release player', async ({ page }) => {
+    await page.goto('/releases');
+
+    await page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: RELEASE_TITLE })).toBeVisible();
+    // The player mounts once the withTracks payload lands. Codec-agnostic:
+    // assert either terminal state (video.js audio surface or the player's
+    // no-tracks fallback), never a single path (see
+    // docs/lessons/e2e-playwright/codec-agnostic-media-assertions.md).
+    await expect(
+      dialog.locator('.video-js').or(dialog.getByText(/no playable tracks/i))
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('closing the listening modal unmounts the player', async ({ page }) => {
+    await page.goto('/releases');
+
+    await page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    await expect(dialog).not.toBeVisible();
+    await expect(page.locator('.video-js')).toHaveCount(0);
   });
 });
