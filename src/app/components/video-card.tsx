@@ -114,7 +114,6 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
           title={video.title}
           artist={video.artist}
           src={src}
-          posterUrl={video.posterUrl}
           open={playerOpen}
           onOpenChange={setPlayerOpen}
           takeMediaEl={takeMediaEl}

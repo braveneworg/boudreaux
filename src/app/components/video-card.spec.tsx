@@ -242,17 +242,19 @@ describe('VideoCard', () => {
       expect(screen.getByTestId('play-dialog')).toBeInTheDocument();
     });
 
-    it('hands the modal the resolved stream url, artist, and poster', async () => {
+    it('hands the modal the resolved stream url and artist — never a poster', async () => {
       const user = userEvent.setup();
       render(<VideoCard video={baseVideo} />);
 
       await user.click(screen.getByRole('button', { name: 'Play Live at the Basement' }));
 
+      // The enlarged modal shows only the playing video; the poster stays on
+      // the card. A forwarded poster would overlay the video while it buffers.
       expect(dialogProps).toMatchObject({
         src: 'https://cdn.example.com/resolved.mp4',
         artist: 'The Band',
-        posterUrl: 'https://cdn.example.com/poster.jpg',
       });
+      expect(dialogProps.posterUrl).toBeUndefined();
     });
 
     it('primes a media element inside the poster click gesture', async () => {

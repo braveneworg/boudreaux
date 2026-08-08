@@ -19,7 +19,6 @@ export interface VideoPlayDialogProps {
   title: string;
   artist: string;
   src: string;
-  posterUrl?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /**
@@ -34,14 +33,15 @@ export interface VideoPlayDialogProps {
 /**
  * Enlarged modal player for the `/videos` listing. Opened by a poster click,
  * it mounts the lazy video.js surface immediately — mounting IS the user
- * gesture, so playback starts as soon as the player is ready. Closing the
+ * gesture, so playback starts as soon as the player is ready. No poster is
+ * handed to the surface: the modal shows only the playing video, never a
+ * still image overlaying it (the poster belongs to the card). Closing the
  * dialog unmounts the surface, which disposes the player and stops playback.
  */
 export const VideoPlayDialog = ({
   title,
   artist,
   src,
-  posterUrl,
   open,
   onOpenChange,
   takeMediaEl,
@@ -54,7 +54,7 @@ export const VideoPlayDialog = ({
         </DialogTitle>
         <DialogDescription className="text-zinc-600">{artist}</DialogDescription>
       </DialogHeader>
-      <LazyVideoSurface title={title} src={src} posterUrl={posterUrl} takeMediaEl={takeMediaEl} />
+      <LazyVideoSurface title={title} src={src} takeMediaEl={takeMediaEl} />
     </DialogContent>
   </Dialog>
 );
