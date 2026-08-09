@@ -7,6 +7,17 @@ import { resolveDescriptionSuggestion } from './video-description.js';
 import type { SerperWebResult } from './serper.js';
 import type { VideoDescriptionDeps, VideoDescriptionArgs } from './video-description.js';
 
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+
+vi.mock('./lib/log.js', () => ({
+  logEvent,
+  toErrorMessage: (err: unknown) => String(err),
+}));
+
+beforeEach(() => {
+  logEvent.mockClear();
+});
+
 const evidence: SerperWebResult[] = [
   {
     title: 'Ceschi — Bite Through Stone',
@@ -312,6 +323,79 @@ describe('resolveDescriptionSuggestion', () => {
     );
 
     expect(result?.value).toBe('D'.repeat(900));
+  });
+
+  it('logs how much prose a truncation discarded', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: 'D'.repeat(1000) }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'description_truncated',
+      expect.objectContaining({ length: 1000, cap: 900, kept: 900 })
+    );
+  });
+
+  it('logs the shorter kept length when a sentence backoff drops a quote', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const opening = `${'A'.repeat(600)}.`;
+    const quoted = 'Critics called it "a jagged little miracle." — Pitchfork';
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        ...adjudication,
+        description: `${opening} ${quoted} ${'B'.repeat(400)}`,
+      })
+    );
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'description_truncated',
+      expect.objectContaining({ kept: 601 })
+    );
+  });
+
+  it('logs nothing when the description already fits the cap', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: `${'A'.repeat(899)}.` }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).not.toHaveBeenCalledWith('warn', 'description_truncated', expect.anything());
+  });
+
+  it('labels a truncated rationale with the description adjudication', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'adjudication_rationale_truncated',
+      expect.objectContaining({ adjudication: 'description', length: 400, cap: 300 })
+    );
   });
 
   it('keeps the synthesis when the rationale overruns 300 chars, truncating the note', async () => {

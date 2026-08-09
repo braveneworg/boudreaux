@@ -38,7 +38,15 @@ const truncateDescription = (value: string): string => {
     const end = (match.index ?? 0) + match[0].length;
     if (!LEADS_ATTRIBUTION.test(window.slice(end))) cut = end;
   }
-  return cut > 0 ? window.slice(0, cut) : window;
+  const kept = cut > 0 ? window.slice(0, cut) : window;
+  // `kept` can fall well short of the cap when the backoff drops a quote —
+  // routine truncation means the prompt, not the schema, needs the fix.
+  logEvent('warn', 'description_truncated', {
+    length: value.length,
+    cap: MAX_DESCRIPTION_CHARS,
+    kept: kept.length,
+  });
+  return kept;
 };
 
 /**
@@ -50,7 +58,7 @@ const truncateDescription = (value: string): string => {
 export const descriptionAdjudicationSchema = z.object({
   description: z.string().transform(truncateDescription).nullable(),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: boundedRationale,
+  rationale: boundedRationale('description'),
 });
 
 /** Arguments for {@link resolveDescriptionSuggestion}. */

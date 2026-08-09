@@ -22,17 +22,28 @@ const MAX_RATIONALE_CHARS = 300;
  * Gemini treats the prompt's "<= 300 chars" as advisory and overruns it in
  * production; the rationale is a note, so an overrun truncates rather than
  * voiding the whole adjudication (a hard `.max()` here nulled real lookups).
+ * Truncation is logged — a cap that fires routinely means the prompt, not the
+ * schema, needs the fix.
+ *
+ * @param adjudication - Which adjudication's rationale this bounds, for the log.
  */
-export const boundedRationale = z
-  .string()
-  .transform((value) => value.slice(0, MAX_RATIONALE_CHARS));
+export const boundedRationale = (adjudication: string) =>
+  z.string().transform((value) => {
+    if (value.length <= MAX_RATIONALE_CHARS) return value;
+    logEvent('warn', 'adjudication_rationale_truncated', {
+      adjudication,
+      length: value.length,
+      cap: MAX_RATIONALE_CHARS,
+    });
+    return value.slice(0, MAX_RATIONALE_CHARS);
+  });
 
 /** Gemini's JSON adjudication of the web evidence for a release date. */
 export const releaseDateAdjudicationSchema = z.object({
   releaseDate: isoDay.nullable(),
   confidence: z.enum(['high', 'medium', 'low']),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: boundedRationale,
+  rationale: boundedRationale('release-date'),
 });
 export type ReleaseDateAdjudication = z.infer<typeof releaseDateAdjudicationSchema>;
 
@@ -43,7 +54,7 @@ export const identityFallbackSchema = z.object({
   surname: z.string().nullable(),
   bornOn: isoDay.nullable(),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: boundedRationale,
+  rationale: boundedRationale('identity-fallback'),
 });
 
 /** Identity facts recovered from the web when structured sources miss. */
