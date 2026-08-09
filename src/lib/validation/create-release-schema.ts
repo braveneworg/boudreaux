@@ -43,7 +43,8 @@ export const releaseBaseSchema = z.object({
     .or(z.literal('')),
   notes: z
     .string()
-    .max(2000, { message: 'Notes must be less than 2000 characters' })
+    // Generated release notes run to three or four paragraphs of ~600 chars.
+    .max(4000, { message: 'Notes must be less than 4000 characters' })
     .optional()
     .or(z.literal('')),
   executiveProducedBy: z

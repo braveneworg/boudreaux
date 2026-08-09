@@ -261,7 +261,7 @@ describe('updateReleaseAction', () => {
             labels: 'Label 1, Label 2',
             catalogNumber: 'CAT-001',
             description: 'Updated description',
-            notes: 'Note 1, Note 2',
+            notes: 'Note 1\n\nNote 2',
             executiveProducedBy: 'Producer A',
             masteredBy: 'Engineer B',
             publishedAt: '2024-01-20T00:00:00.000Z',
@@ -303,6 +303,64 @@ describe('updateReleaseAction', () => {
 
       expect(result.success).toBe(true);
       expect(result.data?.releaseId).toBe(mockReleaseId);
+    });
+
+    it('should keep a comma-bearing note as a single paragraph', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            notes: 'Recorded in Brooklyn, mixed in Los Angeles, mastered at home.',
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        mockReleaseId,
+        expect.objectContaining({
+          notes: ['Recorded in Brooklyn, mixed in Los Angeles, mastered at home.'],
+        })
+      );
+    });
+
+    it('should drop blank lines between note paragraphs', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            notes: '  First paragraph.  \n\n\n   \nSecond paragraph.\n',
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        mockReleaseId,
+        expect.objectContaining({ notes: ['First paragraph.', 'Second paragraph.'] })
+      );
     });
 
     it('should convert suggestedPrice to cents when a non-empty value is provided', async () => {

@@ -33,6 +33,8 @@ interface ReleaseFormContentProps {
   existingFormats: ExistingFormat[];
   formats: string[] | undefined;
   watchedArtistIds: string[] | undefined;
+  /** Album-artist display name; the notes generator needs one to run. */
+  albumArtistName: string | null;
   images: ImageItem[];
   onSelectDate: (dateString: string, fieldName: string) => void;
   onCoverArtUploadComplete: ((cdnUrl: string) => Promise<void>) | undefined;
@@ -55,6 +57,7 @@ export const ReleaseFormContent = ({
   existingFormats,
   formats,
   watchedArtistIds,
+  albumArtistName,
   images,
   onSelectDate,
   onCoverArtUploadComplete,
@@ -109,7 +112,7 @@ export const ReleaseFormContent = ({
 
     <Separator />
 
-    <ReleaseCreditsSection control={control} />
+    <ReleaseCreditsSection control={control} setValue={setValue} artistName={albumArtistName} />
 
     <Separator />
 

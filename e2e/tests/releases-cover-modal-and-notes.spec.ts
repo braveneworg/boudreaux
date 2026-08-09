@@ -71,11 +71,19 @@ test.describe('Releases — cover dialog + release notes', () => {
 
     await expect(page.getByRole('heading', { name: /release notes/i })).toBeVisible();
 
-    // The notes section holds the floated summary card + the notes copy.
+    // The notes section holds the floated summary card + the authored copy.
     const notes = page.locator('section[aria-labelledby="release-notes-heading"]');
     await expect(notes).toContainText(RELEASE_TITLE);
     await expect(notes).toContainText(/Released/);
-    await expect(notes).toContainText(/Lorem ipsum/i);
+    await expect(notes).toContainText('Hand-numbered edition of 300.');
+    await expect(notes).toContainText('Ships with a risograph insert.');
+  });
+
+  test('the detail page never renders placeholder copy', async ({ page }) => {
+    await page.goto(`/releases/${releaseId}`);
+
+    const notes = page.locator('section[aria-labelledby="release-notes-heading"]');
+    await expect(notes).not.toContainText(/Lorem ipsum/i);
   });
 });
 
