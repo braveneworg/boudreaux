@@ -107,7 +107,7 @@ const releaseListItemInclude = {
  * Projection for the public releases page. Only the fields the listing UI
  * consumes (release rows + search combobox) are selected, keeping both the
  * Mongo read and the API payload small.
- * `description`/`notes`/`formats`/`catalogNumber` feed the row info column;
+ * `description`/`formats`/`catalogNumber` feed the row info column;
  * `digitalFormats` is narrowed to the first MP3 track's key so the Play button
  * can source-prime playback inside the click gesture (MP3 320 is the public
  * unsigned CDN format).
@@ -118,7 +118,6 @@ const publishedReleaseListingSelect = {
   coverArt: true,
   releasedOn: true,
   description: true,
-  notes: true,
   formats: true,
   catalogNumber: true,
   images: {

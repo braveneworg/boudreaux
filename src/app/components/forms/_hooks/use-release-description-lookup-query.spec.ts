@@ -8,7 +8,7 @@ import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 
-import { useReleaseNotesLookupQuery } from './use-release-notes-lookup-query';
+import { useReleaseDescriptionLookupQuery } from './use-release-description-lookup-query';
 
 const mockFetchAndParse = vi.hoisted(() => vi.fn());
 
@@ -26,19 +26,19 @@ const buildHarness = (): {
 };
 
 const LOOKUP_RESULT = {
-  notes: ['The record.', 'Its reception.'],
+  description: 'A blurb about the record and its reception.',
   confidence: 'medium',
   sources: ['https://example.com/review'],
 };
 
-describe('useReleaseNotesLookupQuery', () => {
+describe('useReleaseDescriptionLookupQuery', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
   it('does not fetch until refetch is called', async () => {
     const { wrapper } = buildHarness();
-    renderHook(() => useReleaseNotesLookupQuery('Album', 'Band'), { wrapper });
+    renderHook(() => useReleaseDescriptionLookupQuery('Album', 'Band'), { wrapper });
     expect(mockFetchAndParse).not.toHaveBeenCalled();
   });
 
@@ -46,7 +46,7 @@ describe('useReleaseNotesLookupQuery', () => {
     const { wrapper } = buildHarness();
     mockFetchAndParse.mockResolvedValue({ result: LOOKUP_RESULT });
 
-    const { result } = renderHook(() => useReleaseNotesLookupQuery('Album', 'Band'), {
+    const { result } = renderHook(() => useReleaseDescriptionLookupQuery('Album', 'Band'), {
       wrapper,
     });
 
@@ -60,7 +60,7 @@ describe('useReleaseNotesLookupQuery', () => {
     const { wrapper } = buildHarness();
     mockFetchAndParse.mockResolvedValue({ result: null });
 
-    const { result } = renderHook(() => useReleaseNotesLookupQuery('Album', 'Band'), {
+    const { result } = renderHook(() => useReleaseDescriptionLookupQuery('Album', 'Band'), {
       wrapper,
     });
 
@@ -69,7 +69,7 @@ describe('useReleaseNotesLookupQuery', () => {
     });
 
     const [url] = mockFetchAndParse.mock.calls[0] as [string, unknown, unknown];
-    expect(url).toContain('/api/releases/notes-lookup?');
+    expect(url).toContain('/api/releases/description-lookup?');
     expect(url).toContain('title=Album');
     expect(url).toContain('artist=Band');
   });
@@ -79,7 +79,7 @@ describe('useReleaseNotesLookupQuery', () => {
     mockFetchAndParse.mockResolvedValue({ result: null });
 
     const { result, rerender } = renderHook(
-      (context: OptionalContext) => useReleaseNotesLookupQuery('Album', 'Band', context),
+      (context: OptionalContext) => useReleaseDescriptionLookupQuery('Album', 'Band', context),
       { wrapper, initialProps: {} as OptionalContext }
     );
 
@@ -110,7 +110,7 @@ describe('useReleaseNotesLookupQuery', () => {
     mockFetchAndParse.mockResolvedValue({ result: null });
 
     const { result } = renderHook(
-      () => useReleaseNotesLookupQuery('Album', 'Band', { formats: [] }),
+      () => useReleaseDescriptionLookupQuery('Album', 'Band', { formats: [] }),
       { wrapper }
     );
 
@@ -119,6 +119,45 @@ describe('useReleaseNotesLookupQuery', () => {
     });
 
     expect((mockFetchAndParse.mock.calls[0] as [string])[0]).not.toContain('formats=');
+  });
+
+  it('sends the label notes so the blurb is grounded in them', async () => {
+    const { wrapper } = buildHarness();
+    mockFetchAndParse.mockResolvedValue({ result: null });
+
+    const { result } = renderHook(
+      () =>
+        useReleaseDescriptionLookupQuery('Album', 'Band', {
+          labelNotes: 'Cut live to tape.\nSleeve screened by hand.',
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    const [url] = mockFetchAndParse.mock.calls[0] as [string];
+    // URLSearchParams encodes spaces as "+", so normalise before matching.
+    const decoded = decodeURIComponent(url).replace(/\+/g, ' ');
+    expect(decoded).toContain('labelNotes=Cut live to tape.');
+    expect(decoded).toContain('Sleeve screened by hand.');
+  });
+
+  it('omits blank label notes from the query string', async () => {
+    const { wrapper } = buildHarness();
+    mockFetchAndParse.mockResolvedValue({ result: null });
+
+    const { result } = renderHook(
+      () => useReleaseDescriptionLookupQuery('Album', 'Band', { labelNotes: '   \n ' }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect((mockFetchAndParse.mock.calls[0] as [string])[0]).not.toContain('labelNotes=');
   });
 });
 

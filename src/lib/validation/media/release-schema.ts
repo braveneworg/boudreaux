@@ -74,7 +74,6 @@ export const publishedReleaseListingSchema = z.object({
   coverArt: z.string(),
   releasedOn: date,
   description: nullableString,
-  notes: z.array(z.string()),
   formats: z.array(formatSchema),
   catalogNumber: nullableString,
   images: z.array(z.object({ src: nullableString, altText: nullableString })),

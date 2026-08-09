@@ -24,10 +24,10 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   DESCRIPTION_LOOKUP_LIMIT: 5,
 }));
 
-// ReleaseNotesLookupService.lookup is the seam: route.ts maps its outcome.
+// ReleaseDescriptionLookupService.lookup is the seam: route.ts maps its outcome.
 const lookupMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/services/release-notes-lookup-service', () => ({
-  ReleaseNotesLookupService: { lookup: lookupMock },
+vi.mock('@/lib/services/release-description-lookup-service', () => ({
+  ReleaseDescriptionLookupService: { lookup: lookupMock },
 }));
 
 vi.mock('server-only', () => ({}));
@@ -50,7 +50,7 @@ vi.mock('next/server', async (importOriginal) => {
 const dummyContext = { params: Promise.resolve({}) };
 
 const createRequest = (params?: Record<string, string>): NextRequest => {
-  const url = new URL('http://localhost:3000/api/releases/notes-lookup');
+  const url = new URL('http://localhost:3000/api/releases/description-lookup');
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, v);
@@ -60,12 +60,12 @@ const createRequest = (params?: Record<string, string>): NextRequest => {
 };
 
 const LOOKUP_RESULT = {
-  notes: ['The record, in two paragraphs.', 'And how the press received it.'],
+  description: 'A ~500-char blurb naming the artist, built on the label notes.',
   confidence: 'medium' as const,
   sources: ['https://example.com/review'],
 };
 
-describe('GET /api/releases/notes-lookup', () => {
+describe('GET /api/releases/description-lookup', () => {
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -97,7 +97,7 @@ describe('GET /api/releases/notes-lookup', () => {
     expect(data.error).toMatch(/title/i);
   });
 
-  it('returns 400 when artist is missing (the notes must name one)', async () => {
+  it('returns 400 when artist is missing (the blurb must name one)', async () => {
     const response = await GET(createRequest({ title: 'Album' }), dummyContext);
     const data = await response.json();
 
@@ -146,6 +146,32 @@ describe('GET /api/releases/notes-lookup', () => {
 
   it('omits formats when the parameter is blank', async () => {
     await GET(createRequest({ title: 'Album', artist: 'Band', formats: ' , ' }), dummyContext);
+
+    expect(lookupMock).toHaveBeenCalledWith({ title: 'Album', artist: 'Band' });
+  });
+
+  it('forwards the label notes as one entry per non-blank line', async () => {
+    await GET(
+      createRequest({
+        title: 'Album',
+        artist: 'Band',
+        labelNotes: '  Cut live to tape.  \n\n\nSleeve screened by hand.\n',
+      }),
+      dummyContext
+    );
+
+    expect(lookupMock).toHaveBeenCalledWith({
+      title: 'Album',
+      artist: 'Band',
+      labelNotes: ['Cut live to tape.', 'Sleeve screened by hand.'],
+    });
+  });
+
+  it('omits the label notes when the parameter is blank', async () => {
+    await GET(
+      createRequest({ title: 'Album', artist: 'Band', labelNotes: '  \n \n' }),
+      dummyContext
+    );
 
     expect(lookupMock).toHaveBeenCalledWith({ title: 'Album', artist: 'Band' });
   });

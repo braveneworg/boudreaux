@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { ReleaseNotesLookupService } from './release-notes-lookup-service';
+import { ReleaseDescriptionLookupService } from './release-description-lookup-service';
 
 vi.mock('server-only', () => ({}));
 
@@ -36,52 +36,86 @@ beforeEach(() => {
   sendMock.mockReset();
 });
 
-describe('ReleaseNotesLookupService.lookup', () => {
-  it('returns a deterministic multi-paragraph fixture on the fake path', async () => {
+describe('ReleaseDescriptionLookupService.lookup', () => {
+  it('returns a deterministic ~500-char fixture on the fake path', async () => {
     vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
 
-    const result = await ReleaseNotesLookupService.lookup({
+    const result = await ReleaseDescriptionLookupService.lookup({
       title: 'Broken Bone Ballads',
       artist: 'Ceschi',
     });
 
-    expect(result?.notes.length).toBeGreaterThan(1);
-    expect(result?.notes.join(' ')).toContain('Broken Bone Ballads');
-    expect(result?.notes.join(' ')).toContain('Ceschi');
+    expect(result?.description).toContain('Broken Bone Ballads');
+    expect(result?.description).toContain('Ceschi');
+    expect(result?.description.length).toBeGreaterThan(400);
+    expect(result?.description.length).toBeLessThan(700);
+    expect(result?.description).toContain('— ');
     expect(result?.sources.length).toBeGreaterThan(0);
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('invokes the Lambda task with the full release context', async () => {
+  it('leads the fake fixture with the label note when one is supplied', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    const result = await ReleaseDescriptionLookupService.lookup({
+      title: 'Broken Bone Ballads',
+      artist: 'Ceschi',
+      labelNotes: ['Cut live to tape in New Haven'],
+    });
+
+    expect(result?.description.startsWith('Cut live to tape in New Haven.')).toBe(true);
+  });
+
+  it('invokes the Lambda task with the full release context and label notes', async () => {
     delete process.env.BIO_GENERATOR_FAKE;
     vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
     sendMock.mockResolvedValue(
       payload({
         ok: true,
-        result: { notes: ['One.', 'Two.'], confidence: 'medium', sources: ['https://x'] },
+        result: { description: 'A blurb.', confidence: 'medium', sources: ['https://x'] },
       })
     );
 
-    const result = await ReleaseNotesLookupService.lookup({
+    const result = await ReleaseDescriptionLookupService.lookup({
       title: 'Album',
       artist: 'Band',
       releasedOn: '2015-03-03',
       catalogNumber: 'FF4-042',
       formats: ['VINYL_12_INCH'],
+      labelNotes: ['Cut live to tape.'],
     });
 
     expect(result).toEqual({
-      notes: ['One.', 'Two.'],
+      description: 'A blurb.',
       confidence: 'medium',
       sources: ['https://x'],
     });
     expect(readSentPayload()).toEqual({
-      task: 'release-notes-lookup',
+      task: 'release-description-lookup',
       title: 'Album',
       artist: 'Band',
       releasedOn: '2015-03-03',
       catalogNumber: 'FF4-042',
       formats: ['VINYL_12_INCH'],
+      labelNotes: ['Cut live to tape.'],
+    });
+  });
+
+  it('omits an empty label-notes array from the payload', async () => {
+    delete process.env.BIO_GENERATOR_FAKE;
+    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
+    sendMock.mockResolvedValue(payload({ ok: true, result: null }));
+
+    await ReleaseDescriptionLookupService.lookup({
+      title: 'Album',
+      artist: 'Band',
+      labelNotes: [],
+    });
+
+    expect(readSentPayload()).toEqual({
+      task: 'release-description-lookup',
+      title: 'Album',
+      artist: 'Band',
     });
   });
 
@@ -90,10 +124,10 @@ describe('ReleaseNotesLookupService.lookup', () => {
     vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
     sendMock.mockResolvedValue(payload({ ok: true, result: null }));
 
-    await ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band' });
+    await ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band' });
 
     expect(readSentPayload()).toEqual({
-      task: 'release-notes-lookup',
+      task: 'release-description-lookup',
       title: 'Album',
       artist: 'Band',
     });
@@ -104,10 +138,10 @@ describe('ReleaseNotesLookupService.lookup', () => {
     vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
     sendMock.mockResolvedValue(payload({ ok: true, result: null }));
 
-    await ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band', formats: [] });
+    await ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band', formats: [] });
 
     expect(readSentPayload()).toEqual({
-      task: 'release-notes-lookup',
+      task: 'release-description-lookup',
       title: 'Album',
       artist: 'Band',
     });
@@ -118,7 +152,9 @@ describe('ReleaseNotesLookupService.lookup', () => {
     vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
     sendMock.mockResolvedValue(payload({ ok: true, result: null }));
 
-    expect(await ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band' })).toBeNull();
+    expect(
+      await ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band' })
+    ).toBeNull();
   });
 
   it('throws when the Lambda payload is ok:false', async () => {
@@ -127,7 +163,7 @@ describe('ReleaseNotesLookupService.lookup', () => {
     sendMock.mockResolvedValue(payload({ ok: false, error: 'boom' }));
 
     await expect(
-      ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band' })
+      ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band' })
     ).rejects.toThrow('boom');
   });
 
@@ -135,7 +171,7 @@ describe('ReleaseNotesLookupService.lookup', () => {
     delete process.env.BIO_GENERATOR_FAKE;
     delete process.env.BIO_GENERATOR_LAMBDA_NAME;
 
-    const result = await ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band' });
+    const result = await ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band' });
 
     expect(result).toBeNull();
     expect(sendMock).not.toHaveBeenCalled();
@@ -147,7 +183,7 @@ describe('ReleaseNotesLookupService.lookup', () => {
     sendMock.mockResolvedValue({ Payload: undefined });
 
     await expect(
-      ReleaseNotesLookupService.lookup({ title: 'Album', artist: 'Band' })
-    ).rejects.toThrow('Release notes lookup returned no payload');
+      ReleaseDescriptionLookupService.lookup({ title: 'Album', artist: 'Band' })
+    ).rejects.toThrow('Release description lookup returned no payload');
   });
 });

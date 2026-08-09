@@ -8,7 +8,7 @@ import { expect, test } from '../fixtures/base.fixture';
 /**
  * E2E coverage for the public releases listing + detail:
  *  - Releases list rows: the sleeve card sits beside an info column
- *    (release date, catalog number, format tags, description, release notes).
+ *    (release date, catalog number, format tags, and the short blurb).
  *  - Releases list: clicking an album cover opens a dialog with the release
  *    info and a link through to the detail page; clicking Play opens the
  *    listening modal with the release audio player.
@@ -101,14 +101,15 @@ test.describe('Releases — listing rows + play modal', () => {
     await expect(row.getByRole('list', { name: 'Available formats' })).toContainText('MP3 320KBPS');
   });
 
-  test('a release row shows each authored release note', async ({ page }) => {
+  test('a release row shows the blurb, not the long-form label notes', async ({ page }) => {
     await page.goto('/releases');
 
     const row = page
       .locator('li')
       .filter({ has: page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }) });
-    await expect(row.getByText('Hand-numbered edition of 300.')).toBeVisible();
-    await expect(row.getByText('Ships with a risograph insert.')).toBeVisible();
+    await expect(row.getByText('Pressed loud and mastered hot for the E2E stacks.')).toBeVisible();
+    // The label's own notes belong to the detail page's Release Notes section.
+    await expect(row.getByText('Hand-numbered edition of 300.')).toHaveCount(0);
   });
 
   test('Play opens the listening modal with the release player', async ({ page }) => {

@@ -196,7 +196,6 @@ const makeListing = (id: string, title: string): PublishedReleaseListing => ({
   coverArt: `https://cdn.test/covers/${id}.jpg`,
   releasedOn: NOW,
   description: null,
-  notes: [],
   formats: [],
   catalogNumber: null,
   digitalFormats: [],

@@ -16,7 +16,7 @@ import {
 
 import type { BioGeneratorDeps } from './handler.js';
 import type * as ReleaseDateLookupModule from './release-date-lookup.js';
-import type * as ReleaseNotesLookupModule from './release-notes-lookup.js';
+import type * as ReleaseDescriptionLookupModule from './release-description-lookup.js';
 import type { ArtistFacts, BioImage } from './types.js';
 import type * as VideoDescriptionLookupModule from './video-description-lookup.js';
 import type * as VideoEnrichmentModule from './video-enrichment.js';
@@ -46,11 +46,11 @@ vi.mock('./video-description-lookup.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./release-notes-lookup.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReleaseNotesLookupModule>();
+vi.mock('./release-description-lookup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReleaseDescriptionLookupModule>();
   return {
     ...actual,
-    runReleaseNotesLookupLambda: vi.fn().mockResolvedValue({ ok: true, result: null }),
+    runReleaseDescriptionLookupLambda: vi.fn().mockResolvedValue({ ok: true, result: null }),
   };
 });
 
@@ -2140,18 +2140,18 @@ describe('runLambda task routing', () => {
     expect(result).toEqual({ ok: true, result: null });
   });
 
-  it('routes a release-notes-lookup event to its lookup task', async () => {
-    const { runReleaseNotesLookupLambda } = await import('./release-notes-lookup.js');
+  it('routes a release-description-lookup event to its lookup task', async () => {
+    const { runReleaseDescriptionLookupLambda } = await import('./release-description-lookup.js');
     const { runVideoDescriptionLookupLambda } = await import('./video-description-lookup.js');
 
     const result = await runLambda({
-      task: 'release-notes-lookup',
+      task: 'release-description-lookup',
       title: 'Album',
       artist: 'Band',
     });
 
-    expect(vi.mocked(runReleaseNotesLookupLambda)).toHaveBeenCalledWith({
-      task: 'release-notes-lookup',
+    expect(vi.mocked(runReleaseDescriptionLookupLambda)).toHaveBeenCalledWith({
+      task: 'release-description-lookup',
       title: 'Album',
       artist: 'Band',
     });

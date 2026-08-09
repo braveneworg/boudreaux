@@ -6,7 +6,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { DESCRIPTION_LOOKUP_LIMIT, descriptionLookupLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { ReleaseNotesLookupService } from '@/lib/services/release-notes-lookup-service';
+import { ReleaseDescriptionLookupService } from '@/lib/services/release-description-lookup-service';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -24,11 +24,21 @@ const parseFormats = (raw: string | null): string[] =>
         .filter(Boolean)
     : [];
 
+/** The label's authored notes arrive newline-delimited, one per paragraph. */
+const parseLabelNotes = (raw: string | null): string[] =>
+  raw
+    ? raw
+        .split(/\r?\n/)
+        .map((note) => note.trim())
+        .filter(Boolean)
+    : [];
+
 /** The optional release facts, already normalised for the service call. */
 interface ReleaseContext {
   releasedOn?: string;
   catalogNumber?: string;
   formats?: string[];
+  labelNotes?: string[];
 }
 
 /**
@@ -39,11 +49,13 @@ const readContext = (searchParams: URLSearchParams): ReleaseContext => {
   const releasedOn = searchParams.get('releasedOn')?.trim();
   const catalogNumber = searchParams.get('catalogNumber')?.trim();
   const formats = parseFormats(searchParams.get('formats'));
+  const labelNotes = parseLabelNotes(searchParams.get('labelNotes'));
 
   return {
     ...(releasedOn && ISO_DATE_PATTERN.test(releasedOn) ? { releasedOn } : {}),
     ...(catalogNumber ? { catalogNumber } : {}),
     ...(formats.length > 0 ? { formats } : {}),
+    ...(labelNotes.length > 0 ? { labelNotes } : {}),
   };
 };
 
@@ -61,21 +73,21 @@ export const GET = withRateLimit(
     }
     if (!artist) {
       return NextResponse.json(
-        { error: 'A non-empty artist is required — the notes must name one' },
+        { error: 'A non-empty artist is required — the blurb must name one' },
         { status: 400 }
       );
     }
 
     try {
-      const result = await ReleaseNotesLookupService.lookup({
+      const result = await ReleaseDescriptionLookupService.lookup({
         title,
         artist,
         ...readContext(searchParams),
       });
       return NextResponse.json({ result }, { headers: { 'Cache-Control': 'private, no-store' } });
     } catch (error) {
-      logger.error('Release notes lookup route failed', { error });
-      return NextResponse.json({ error: 'Release notes lookup failed' }, { status: 502 });
+      logger.error('Release description lookup route failed', { error });
+      return NextResponse.json({ error: 'Release description lookup failed' }, { status: 502 });
     }
   })
 );
