@@ -246,6 +246,74 @@ describe('resolveDescriptionSuggestion', () => {
     expect(options.userPrompt).not.toContain('PAGE EXCERPTS');
   });
 
+  it('keeps a description at the 900-char cap untouched', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const atCap = `${'A'.repeat(899)}.`;
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: atCap }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(atCap);
+  });
+
+  it('truncates an overlong description at the last whole sentence', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const first = `${'A'.repeat(500)}.`;
+    const second = `${'B'.repeat(300)}.`;
+    const third = `${'C'.repeat(200)}.`;
+    const fetchFn = vi.fn().mockResolvedValue(
+      // 1005 chars — the third sentence pushes it past the 900-char cap.
+      geminiResponse({ ...adjudication, description: `${first} ${second} ${third}` })
+    );
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(`${first} ${second}`);
+  });
+
+  it('drops a trailing quote rather than orphaning it from its attribution', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const opening = `${'A'.repeat(600)}.`;
+    // The sentence ends inside the quote, but " — Pitchfork" continues it —
+    // cutting at that terminator would publish the quote with no source.
+    const quoted = 'Critics called it "a jagged little miracle." — Pitchfork';
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        ...adjudication,
+        description: `${opening} ${quoted} ${'B'.repeat(400)}`,
+      })
+    );
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(opening);
+  });
+
+  it('hard-cuts an overlong description that offers no sentence boundary', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: 'D'.repeat(1000) }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe('D'.repeat(900));
+  });
+
   it('keeps the synthesis when the rationale overruns 300 chars, truncating the note', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const fetchFn = vi
