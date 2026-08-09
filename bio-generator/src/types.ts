@@ -213,3 +213,33 @@ export type VideoDescriptionLookupResult =
       } | null;
     }
   | { ok: false; error: string };
+
+/**
+ * Synchronous release-notes invoke from the admin release form. Like the video
+ * description lookup the artist is required — the notes must name one. The
+ * remaining release facts are optional context for the prose.
+ */
+export const releaseNotesLookupInputSchema = z.object({
+  task: z.literal('release-notes-lookup'),
+  title: z.string().min(1),
+  artist: z.string().min(1),
+  releasedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+    .optional(),
+  catalogNumber: z.string().min(1).optional(),
+  formats: z.array(z.string().min(1)).optional(),
+});
+
+export type ReleaseNotesLookupInput = z.infer<typeof releaseNotesLookupInputSchema>;
+
+export type ReleaseNotesLookupResult =
+  | {
+      ok: true;
+      result: {
+        notes: string[];
+        confidence: 'high' | 'medium' | 'low';
+        sources: string[];
+      } | null;
+    }
+  | { ok: false; error: string };

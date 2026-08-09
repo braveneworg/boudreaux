@@ -18,30 +18,21 @@ interface ReleaseNotesProps {
     releasedOn: Date;
     formats: Format[];
     description: string | null;
+    notes: string[];
   };
   /** Resolved artist display name, or null if unresolvable */
   artistName: string | null;
 }
 
 /**
- * Placeholder release-notes copy shown until real per-release notes are authored.
- * Kept as a single constant so it is trivial to remove once notes go live.
- */
-const RELEASE_NOTES_PLACEHOLDER = [
-  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-  'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-  'Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus temporibus autem.',
-];
-
-/**
  * The "Release Notes" section on the release detail page: a zine cutout heading
  * over a floated {@link ReleaseSummaryCard} that the notes copy wraps around.
- * For now the body is the release's own description (when present) followed by a
- * detail-seeded lead and placeholder lorem ipsum, combining real release details
- * with filler until authored notes exist.
+ * The body is a one-line factual lead, the release's own description when set,
+ * then each authored note paragraph — generated in admin from web evidence.
+ * A release with neither still reads as the lead rather than filler.
  */
 export const ReleaseNotes = ({ release, artistName }: ReleaseNotesProps): ReactElement => {
-  const { title, coverArt, releasedOn, formats, description } = release;
+  const { title, coverArt, releasedOn, formats, description, notes } = release;
   const resolvedCover = coverArt ? { src: coverArt, alt: `${title} cover art` } : null;
   const lead = `${title}${artistName ? ` by ${artistName}` : ''} was released on ${formatTourDate(releasedOn)}.`;
 
@@ -60,10 +51,10 @@ export const ReleaseNotes = ({ release, artistName }: ReleaseNotesProps): ReactE
           formats={formats}
           className="mb-4 w-full sm:float-left sm:mr-6 sm:w-56"
         />
-        {description && <p className="mb-4 break-words whitespace-pre-line">{description}</p>}
         <p className="mb-4">{lead}</p>
-        {RELEASE_NOTES_PLACEHOLDER.map((paragraph) => (
-          <p key={paragraph} className="mb-4">
+        {description && <p className="mb-4 break-words whitespace-pre-line">{description}</p>}
+        {notes.map((paragraph) => (
+          <p key={paragraph} className="mb-4 break-words whitespace-pre-line">
             {paragraph}
           </p>
         ))}

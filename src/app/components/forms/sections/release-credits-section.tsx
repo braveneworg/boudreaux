@@ -4,19 +4,24 @@
 'use client';
 
 import { TextField } from '@/app/components/forms/fields';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { Separator } from '@/app/components/ui/separator';
-import { Textarea } from '@/app/components/ui/textarea';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
-import type { Control } from 'react-hook-form';
+import { ReleaseNotesField } from './release-notes-field';
+
+import type { Control, UseFormSetValue } from 'react-hook-form';
 
 interface ReleaseCreditsSectionProps {
   control: Control<ReleaseFormData>;
+  setValue: UseFormSetValue<ReleaseFormData>;
+  /** Album-artist display name; the notes generator needs one to run. */
+  artistName: string | null;
 }
 
 export const ReleaseCreditsSection = ({
   control,
+  setValue,
+  artistName,
 }: ReleaseCreditsSectionProps): React.ReactElement => (
   <>
     {/* Credits Section */}
@@ -98,23 +103,7 @@ export const ReleaseCreditsSection = ({
     {/* Notes Section */}
     <section className="space-y-4">
       <h2 className="font-semibold">Notes</h2>
-      <FormField
-        control={control}
-        name="notes"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Release Notes</FormLabel>
-            <FormControl>
-              <Textarea
-                placeholder="Additional notes (comma-separated for multiple)"
-                className="min-h-20"
-                {...field}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <ReleaseNotesField control={control} setValue={setValue} artistName={artistName} />
     </section>
   </>
 );

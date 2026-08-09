@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { useAlbumArtistName } from '@/app/components/forms/_hooks/use-album-artist-name';
 import { useEntitySubmit } from '@/app/components/forms/_hooks/use-entity-submit';
 import type {
   ExistingFormat,
@@ -89,7 +90,7 @@ const mapReleaseToFormValues = (release: ReleaseDetail, userId?: string): Releas
   labels: release.labels.join(', '),
   catalogNumber: release.catalogNumber || '',
   description: release.description || '',
-  notes: release.notes.join(', '),
+  notes: release.notes.join('\n\n'),
   executiveProducedBy: release.executiveProducedBy.join(', '),
   coProducedBy: release.coProducedBy.join(', '),
   masteredBy: release.masteredBy.join(', '),
@@ -454,6 +455,9 @@ export const ReleaseForm = ({
   const formats = useWatch({ control, name: 'formats' });
   const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
 
+  // The notes generator must name an artist; resolve the first credited one.
+  const albumArtistName = useAlbumArtistName(watchedArtistIds);
+
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {
       releaseForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
@@ -539,6 +543,7 @@ export const ReleaseForm = ({
               existingFormats={existingFormats}
               formats={formats}
               watchedArtistIds={watchedArtistIds}
+              albumArtistName={albumArtistName}
               images={images.images}
               onSelectDate={handleSelectDate}
               onCoverArtUploadComplete={onCoverArtUploadComplete}

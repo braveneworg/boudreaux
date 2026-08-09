@@ -302,10 +302,10 @@ describe('create-release-schema', () => {
       expect(errors[0].message).toBe('Description must be less than 5000 characters');
     });
 
-    it('should reject notes exceeding 2000 characters', () => {
+    it('should reject notes exceeding 4000 characters', () => {
       const result = createReleaseSchema.safeParse({
         ...validData,
-        notes: 'a'.repeat(2001),
+        notes: 'a'.repeat(4001),
       });
       expect(result.success).toBe(false);
       const errorResult = result as {
@@ -314,7 +314,16 @@ describe('create-release-schema', () => {
       };
       const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'notes');
       expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].message).toBe('Notes must be less than 2000 characters');
+      expect(errors[0].message).toBe('Notes must be less than 4000 characters');
+    });
+
+    it('should accept a full set of generated note paragraphs', () => {
+      const paragraph = 'a'.repeat(600);
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        notes: [paragraph, paragraph, paragraph, paragraph].join('\n\n'),
+      });
+      expect(result.success).toBe(true);
     });
   });
 

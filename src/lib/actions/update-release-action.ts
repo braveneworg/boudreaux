@@ -54,6 +54,19 @@ const parseToArray = (value: string | undefined): string[] =>
         .filter(Boolean)
     : [];
 
+/**
+ * Splits free prose into one entry per non-blank line. Release notes are
+ * paragraphs, not a comma list — splitting them on commas would shred any
+ * sentence containing one (and every generated note contains several).
+ */
+const parseToParagraphs = (value: string | undefined): string[] =>
+  value
+    ? value
+        .split(/\r?\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+    : [];
+
 const buildReleaseUpdateInput = (data: {
   title: string;
   releasedOn: string;
@@ -91,7 +104,7 @@ const buildReleaseUpdateInput = (data: {
     labels: parseToArray(data.labels),
     catalogNumber: data.catalogNumber || undefined,
     description: data.description || undefined,
-    notes: parseToArray(data.notes),
+    notes: parseToParagraphs(data.notes),
     executiveProducedBy: parseToArray(data.executiveProducedBy),
     coProducedBy: parseToArray(data.coProducedBy),
     masteredBy: parseToArray(data.masteredBy),
