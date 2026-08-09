@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { readUrl } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getScrapeApiKey } from './lib/secrets.js';
-import { adjudicate, boundedRationale, enforceSourceSubset } from './release-date.js';
+import { adjudicate, boundedProse, boundedRationale, enforceSourceSubset } from './release-date.js';
 import { DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { AdjudicationDeps } from './release-date.js';
@@ -17,38 +17,6 @@ import type { VideoSuggestion } from './types.js';
 /** The hard ceiling the system prompt states; enforced here by truncation. */
 const MAX_DESCRIPTION_CHARS = 900;
 
-/** A sentence terminator, optionally inside a closing quote or bracket. */
-const SENTENCE_END = /[.!?]["'’”)\]]?(?=\s|$)/g;
-
-/** A dash-led inline attribution ("…" — Pitchfork) continuing the sentence. */
-const LEADS_ATTRIBUTION = /^\s*[—–-]/;
-
-/**
- * Trims an overlong description back to the last whole sentence within the
- * cap. A terminator followed by a dash attribution is not a cut point —
- * stopping there would publish a quote stripped of its source — so the whole
- * quote is dropped instead. Prose offering no boundary at all is hard-cut.
- */
-const truncateDescription = (value: string): string => {
-  if (value.length <= MAX_DESCRIPTION_CHARS) return value;
-  const window = value.slice(0, MAX_DESCRIPTION_CHARS);
-
-  let cut = 0;
-  for (const match of window.matchAll(SENTENCE_END)) {
-    const end = (match.index ?? 0) + match[0].length;
-    if (!LEADS_ATTRIBUTION.test(window.slice(end))) cut = end;
-  }
-  const kept = cut > 0 ? window.slice(0, cut) : window;
-  // `kept` can fall well short of the cap when the backoff drops a quote —
-  // routine truncation means the prompt, not the schema, needs the fix.
-  logEvent('warn', 'description_truncated', {
-    length: value.length,
-    cap: MAX_DESCRIPTION_CHARS,
-    kept: kept.length,
-  });
-  return kept;
-};
-
 /**
  * Gemini's JSON synthesis of an editorial description. No confidence field
  * exists here — description prose is always emitted at fixed medium confidence.
@@ -56,8 +24,11 @@ const truncateDescription = (value: string): string => {
  * sound, only its length overshoots what the prompt asked for.
  */
 export const descriptionAdjudicationSchema = z.object({
-  description: z.string().transform(truncateDescription).nullable(),
-  sourceUrls: z.array(z.string().url()).max(10),
+  description: boundedProse({
+    cap: MAX_DESCRIPTION_CHARS,
+    event: 'description_truncated',
+  }).nullable(),
+  sourceUrls: z.array(z.string().url()),
   rationale: boundedRationale('description'),
 });
 

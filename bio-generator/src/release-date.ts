@@ -38,11 +38,48 @@ export const boundedRationale = (adjudication: string) =>
     return value.slice(0, MAX_RATIONALE_CHARS);
   });
 
+/** A sentence terminator, optionally inside a closing quote or bracket. */
+const SENTENCE_END = /[.!?]["'’”)\]]?(?=\s|$)/g;
+
+/** A dash-led inline attribution ("…" — Pitchfork) continuing the sentence. */
+const LEADS_ATTRIBUTION = /^\s*[—–-]/;
+
+/**
+ * Bounds synthesized prose to `cap` by trimming back to the last whole
+ * sentence — never by rejecting it. Gemini treats the prompt's ceiling as
+ * advisory, and a hard `.max()` here discards a sound blurb over a length the
+ * prompt only advised (this voided real release blurbs in production). A
+ * terminator followed by a dash attribution is not a cut point — stopping
+ * there would publish a quote stripped of its source — so the whole quote is
+ * dropped instead. Prose offering no boundary at all is hard-cut.
+ *
+ * Truncation is logged: a cap that fires routinely means the prompt, not the
+ * schema, needs the fix.
+ *
+ * @param cap - Maximum characters to keep.
+ * @param event - Log event name identifying which prose this bounds.
+ */
+export const boundedProse = ({ cap, event }: { cap: number; event: string }) =>
+  z.string().transform((value) => {
+    if (value.length <= cap) return value;
+    const window = value.slice(0, cap);
+
+    let cut = 0;
+    for (const match of window.matchAll(SENTENCE_END)) {
+      const end = (match.index ?? 0) + match[0].length;
+      if (!LEADS_ATTRIBUTION.test(window.slice(end))) cut = end;
+    }
+    const kept = cut > 0 ? window.slice(0, cut) : window;
+    // `kept` can fall well short of the cap when the backoff drops a quote.
+    logEvent('warn', event, { length: value.length, cap, kept: kept.length });
+    return kept;
+  });
+
 /** Gemini's JSON adjudication of the web evidence for a release date. */
 export const releaseDateAdjudicationSchema = z.object({
   releaseDate: isoDay.nullable(),
   confidence: z.enum(['high', 'medium', 'low']),
-  sourceUrls: z.array(z.string().url()).max(10),
+  sourceUrls: z.array(z.string().url()),
   rationale: boundedRationale('release-date'),
 });
 export type ReleaseDateAdjudication = z.infer<typeof releaseDateAdjudicationSchema>;
@@ -53,7 +90,7 @@ export const identityFallbackSchema = z.object({
   middleName: z.string().nullable(),
   surname: z.string().nullable(),
   bornOn: isoDay.nullable(),
-  sourceUrls: z.array(z.string().url()).max(10),
+  sourceUrls: z.array(z.string().url()),
   rationale: boundedRationale('identity-fallback'),
 });
 
@@ -110,9 +147,21 @@ const evidenceLines = (results: SerperWebResult[]): string =>
     )
     .join('\n');
 
-/** Keep only URLs Gemini was actually shown (subset enforcement, post-parse). */
+/** How many verified source links an adjudication keeps. */
+const MAX_SOURCE_URLS = 10;
+
+/**
+ * Keep only URLs Gemini was actually shown (subset enforcement, post-parse),
+ * capped at {@link MAX_SOURCE_URLS}.
+ *
+ * The cap lives here rather than on the schema deliberately: a run sweeps four
+ * queries of ten results each, so a sound synthesis can cite more links than
+ * the cap, and a schema-level `.max()` rejected the whole adjudication instead
+ * of trimming the list. Capping after filtering also spends the ten slots on
+ * verified links rather than on fabricated ones that would be filtered anyway.
+ */
 export const enforceSourceSubset = (urls: string[], provided: Set<string>): string[] =>
-  urls.filter((url) => provided.has(url));
+  urls.filter((url) => provided.has(url)).slice(0, MAX_SOURCE_URLS);
 
 const SHARED_SYSTEM_LINES = [
   'Use ONLY the evidence provided; never invent facts, dates, or URLs.',

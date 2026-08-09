@@ -7,20 +7,29 @@ import { z } from 'zod';
 import { readUrl } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getScrapeApiKey } from './lib/secrets.js';
-import { adjudicate, enforceSourceSubset } from './release-date.js';
+import { adjudicate, boundedProse, boundedRationale, enforceSourceSubset } from './release-date.js';
 import { DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { AdjudicationDeps } from './release-date.js';
 import type { SerperWebResult } from './serper.js';
 
+/** The ceiling the system prompt states; enforced here by truncation. */
+const MAX_BLURB_CHARS = 900;
+
 /**
  * Gemini's JSON synthesis of a release blurb. Like the video description
  * schema there is no confidence field — synthesized prose is always medium.
+ * Both prose fields truncate rather than reject: a hard `.max()` here threw
+ * away finished blurbs in production whenever the model's own rationale ran
+ * long, surfacing to the admin as "No blurb could be generated".
  */
 export const releaseDescriptionAdjudicationSchema = z.object({
-  description: z.string().max(1200).nullable(),
-  sourceUrls: z.array(z.string().url()).max(10),
-  rationale: z.string().max(300),
+  description: boundedProse({
+    cap: MAX_BLURB_CHARS,
+    event: 'release_description_truncated',
+  }).nullable(),
+  sourceUrls: z.array(z.string().url()),
+  rationale: boundedRationale('release-description'),
 });
 
 /** Arguments for {@link resolveReleaseDescriptionSuggestion}. */
