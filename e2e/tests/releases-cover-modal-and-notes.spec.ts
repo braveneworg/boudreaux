@@ -8,7 +8,7 @@ import { expect, test } from '../fixtures/base.fixture';
 /**
  * E2E coverage for the public releases listing + detail:
  *  - Releases list rows: the sleeve card sits beside an info column
- *    (release date, catalog number, format tags, description).
+ *    (release date, catalog number, format tags, description, release notes).
  *  - Releases list: clicking an album cover opens a dialog with the release
  *    info and a link through to the detail page; clicking Play opens the
  *    listening modal with the release audio player.
@@ -91,6 +91,16 @@ test.describe('Releases — listing rows + play modal', () => {
     await expect(row.getByText('Catalog no.:')).toBeVisible();
     await expect(row.getByText('E2E-001')).toBeVisible();
     await expect(row.getByRole('list', { name: 'Available formats' })).toContainText('MP3 320KBPS');
+  });
+
+  test('a release row shows each authored release note', async ({ page }) => {
+    await page.goto('/releases');
+
+    const row = page
+      .locator('li')
+      .filter({ has: page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }) });
+    await expect(row.getByText('Hand-numbered edition of 300.')).toBeVisible();
+    await expect(row.getByText('Ships with a risograph insert.')).toBeVisible();
   });
 
   test('Play opens the listening modal with the release player', async ({ page }) => {

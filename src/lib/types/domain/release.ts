@@ -167,9 +167,9 @@ export type PublishedReleaseListingTrack = {
  * Published release listing for the public releases page. Only the fields the
  * listing UI consumes (release rows + search combobox) are projected, keeping
  * both the Mongo read and the API payload small: the row info column reads
- * `description`/`formats`/`catalogNumber`, and `digitalFormats` is narrowed to
- * the first MP3 track so the Play button can source-prime a media element
- * inside the click gesture. Mirrors `publishedReleaseListingSelect`.
+ * `description`/`notes`/`formats`/`catalogNumber`, and `digitalFormats` is
+ * narrowed to the first MP3 track so the Play button can source-prime a media
+ * element inside the click gesture. Mirrors `publishedReleaseListingSelect`.
  */
 export type PublishedReleaseListing = {
   id: string;
@@ -177,6 +177,7 @@ export type PublishedReleaseListing = {
   coverArt: string;
   releasedOn: Date;
   description: string | null;
+  notes: string[];
   formats: Format[];
   catalogNumber: string | null;
   images: PublishedReleaseListingImage[];

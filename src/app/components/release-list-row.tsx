@@ -15,6 +15,9 @@ import {
 
 import { ReleaseCard } from './release-card';
 
+/** Shared typography for the info column's prose: the description and each note. */
+const PROSE_CLASS = 'text-sm break-words whitespace-pre-line text-zinc-950';
+
 interface ReleaseListRowProps {
   /** Raw published-listing row; the row derives every display value itself. */
   release: PublishedReleaseListing;
@@ -23,9 +26,11 @@ interface ReleaseListRowProps {
 /**
  * Public listing row for a single release, laid out zine-paste-up style like
  * the `/videos` rows: the sleeve card on the left (~1/3 width; stacked on
- * mobile) with the release info and description typeset beside it. The card
- * keeps its own border/shadow as a discrete "physical object"; the info
- * column carries the labeled metadata and prose.
+ * mobile) with the release info typeset beside it. The card keeps its own
+ * border/shadow as a discrete "physical object"; the info column carries the
+ * labeled metadata, then the prose — the description (when set) followed by
+ * each authored release note, so a release with only one of the two still
+ * reads as a filled column.
  */
 export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement => {
   const artistName = release.artistReleases[0]
@@ -71,11 +76,13 @@ export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement =
           </ul>
         ) : null}
 
-        {release.description ? (
-          <p className="text-sm break-words whitespace-pre-line text-zinc-950">
-            {release.description}
+        {release.description ? <p className={PROSE_CLASS}>{release.description}</p> : null}
+
+        {release.notes.map((note) => (
+          <p key={note} className={PROSE_CLASS}>
+            {note}
           </p>
-        ) : null}
+        ))}
       </div>
     </article>
   );

@@ -203,6 +203,7 @@ export const publishedReleaseListing = {
   coverArt: 'cover.jpg',
   releasedOn: ISO,
   description: 'A midnight zine-core classic.',
+  notes: ['Pressed on 180g wax.'],
   formats: ['DIGITAL', 'MP3_320KBPS'],
   catalogNumber: 'FF4-042',
   images: [{ src: null, altText: null }],
