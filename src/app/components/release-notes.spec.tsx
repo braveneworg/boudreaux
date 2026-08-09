@@ -47,6 +47,7 @@ describe('ReleaseNotes', () => {
     releasedOn: new Date(2024, 0, 2),
     formats: [FORMATS.DIGITAL],
     description: 'A real description of the album.',
+    notes: ['Cut live to tape in one weekend.', 'The press called it a slow burn.'],
   };
 
   it('should render a "Release Notes" heading', () => {
@@ -61,10 +62,29 @@ describe('ReleaseNotes', () => {
     expect(screen.getByText('A real description of the album.')).toBeInTheDocument();
   });
 
-  it('should render placeholder lorem ipsum notes', () => {
+  it('should render each authored note paragraph', () => {
     render(<ReleaseNotes release={release} artistName="John Doe" />);
 
-    expect(screen.getByTestId('release-notes-body')).toHaveTextContent(/Lorem ipsum/i);
+    expect(screen.getByText('Cut live to tape in one weekend.')).toBeInTheDocument();
+    expect(screen.getByText('The press called it a slow burn.')).toBeInTheDocument();
+  });
+
+  it('should never render placeholder copy', () => {
+    render(
+      <ReleaseNotes release={{ ...release, notes: [], description: null }} artistName="John Doe" />
+    );
+
+    expect(screen.getByTestId('release-notes-body')).not.toHaveTextContent(/Lorem ipsum/i);
+  });
+
+  it('should still anchor the section with the release facts when no copy exists', () => {
+    render(
+      <ReleaseNotes release={{ ...release, notes: [], description: null }} artistName="John Doe" />
+    );
+
+    const body = screen.getByTestId('release-notes-body');
+    expect(body).toHaveTextContent('Midnight Serenade');
+    expect(body).toHaveTextContent(/Jan 2, 2024/);
   });
 
   it('should weave real release details into the notes', () => {
@@ -97,7 +117,7 @@ describe('ReleaseNotes', () => {
     render(<ReleaseNotes release={{ ...release, description: null }} artistName="John Doe" />);
 
     expect(screen.queryByText('A real description of the album.')).not.toBeInTheDocument();
-    expect(screen.getByTestId('release-notes-body')).toHaveTextContent(/Lorem ipsum/i);
+    expect(screen.getByText('Cut live to tape in one weekend.')).toBeInTheDocument();
   });
 
   it('should resolve a null cover when coverArt is empty', () => {
