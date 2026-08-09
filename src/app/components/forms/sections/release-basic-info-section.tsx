@@ -6,6 +6,7 @@
 import { TextField } from '@/app/components/forms/fields';
 import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
 import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
+import { ReleaseDescriptionField } from '@/app/components/forms/sections/release-description-field';
 import {
   FormControl,
   FormDescription,
@@ -15,7 +16,6 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
-import { Textarea } from '@/app/components/ui/textarea';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 import { DatePicker } from '@/ui/datepicker';
 
@@ -28,6 +28,8 @@ interface ReleaseBasicInfoSectionProps {
   releaseId: string | null;
   preGeneratedId: string;
   watchedArtistIds: string[];
+  /** Album-artist display name; the blurb generator needs one to run. */
+  artistName: string | null;
   onSelectDate: (dateString: string, fieldName: string) => void;
   onCoverArtUploadComplete: ((cdnUrl: string) => Promise<void>) | undefined;
 }
@@ -39,6 +41,7 @@ export const ReleaseBasicInfoSection = ({
   releaseId,
   preGeneratedId,
   watchedArtistIds,
+  artistName,
   onSelectDate,
   onCoverArtUploadComplete,
 }: ReleaseBasicInfoSectionProps): React.ReactElement => (
@@ -117,18 +120,6 @@ export const ReleaseBasicInfoSection = ({
       entityId={preGeneratedId}
       onUploadComplete={onCoverArtUploadComplete}
     />
-    <FormField
-      control={control}
-      name="description"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Description</FormLabel>
-          <FormControl>
-            <Textarea placeholder="Release description" className="min-h-24" {...field} />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
+    <ReleaseDescriptionField control={control} setValue={setValue} artistName={artistName} />
   </section>
 );

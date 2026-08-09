@@ -28,9 +28,8 @@ interface ReleaseListRowProps {
  * the `/videos` rows: the sleeve card on the left (~1/3 width; stacked on
  * mobile) with the release info typeset beside it. The card keeps its own
  * border/shadow as a discrete "physical object"; the info column carries the
- * labeled metadata, then the prose — the description (when set) followed by
- * each authored release note, so a release with only one of the two still
- * reads as a filled column.
+ * labeled metadata and then the blurb — the short listing copy. The label's
+ * long-form release notes belong to the detail page, not this row.
  */
 export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement => {
   const artistName = release.artistReleases[0]
@@ -77,12 +76,6 @@ export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement =
         ) : null}
 
         {release.description ? <p className={PROSE_CLASS}>{release.description}</p> : null}
-
-        {release.notes.map((note) => (
-          <p key={note} className={PROSE_CLASS}>
-            {note}
-          </p>
-        ))}
       </div>
     </article>
   );

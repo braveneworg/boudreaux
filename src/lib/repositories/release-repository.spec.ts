@@ -71,7 +71,6 @@ describe('ReleaseRepository', () => {
     coverArt: true,
     releasedOn: true,
     description: true,
-    notes: true,
     formats: true,
     catalogNumber: true,
     images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },

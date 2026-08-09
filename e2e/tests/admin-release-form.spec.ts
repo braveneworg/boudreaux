@@ -5,8 +5,8 @@ import { expect, test } from '../fixtures/auth.fixture';
 
 /**
  * E2E coverage for the release create/edit form views, reached from the
- * releases list, plus the "Generate notes" button — which fills the notes
- * field from the fake release-notes lookup when BIO_GENERATOR_FAKE=true
+ * releases list, plus the "Generate blurb" button — which fills the description
+ * from the fake blurb lookup when BIO_GENERATOR_FAKE=true
  * (see playwright.config.ts).
  */
 
@@ -39,12 +39,14 @@ test.describe('Admin release form', () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test('Generate notes fills the field when BIO_GENERATOR_FAKE is true', async ({ adminPage }) => {
+  test('Generate blurb fills the description when BIO_GENERATOR_FAKE is true', async ({
+    adminPage,
+  }) => {
     await adminPage.goto('/admin/releases/new');
 
     // Disabled until BOTH a title and a credited artist exist — the
-    // synthesized notes must name the artist, so a title alone is not enough.
-    const generateBtn = adminPage.getByRole('button', { name: 'Generate notes' });
+    // synthesized blurb must name the artist, so a title alone is not enough.
+    const generateBtn = adminPage.getByRole('button', { name: 'Generate blurb' });
     await expect(generateBtn).toBeVisible({ timeout: 15_000 });
     await expect(generateBtn).toBeDisabled();
 
@@ -62,16 +64,22 @@ test.describe('Admin release form', () => {
     // enables once that lands.
     await expect(generateBtn).toBeEnabled({ timeout: 10_000 });
 
+    // The label's own notes are the generator's grounding, so write them first.
     const notes = adminPage.getByLabel('Release Notes');
-    await expect(notes).toHaveValue('');
+    await notes.fill('Hand-numbered edition of 300');
 
-    // With BIO_GENERATOR_FAKE=true the fake lookup interpolates the title and
-    // artist into deterministic paragraphs carrying an attributed quote.
+    const description = adminPage.getByLabel('Description');
+    await expect(description).toHaveValue('');
+
+    // With BIO_GENERATOR_FAKE=true the fake lookup leads with the label note,
+    // then interpolates the title and artist into ~500 deterministic chars.
     await generateBtn.click();
-    await expect(notes).toHaveValue(/Test Release Title/, { timeout: 10_000 });
-    await expect(notes).toHaveValue(/Test Artist One/);
-    await expect(notes).toHaveValue(/Tape Deck Quarterly/);
-    // Paragraphs round-trip blank-line separated, one note per line on save.
-    await expect(notes).toHaveValue(/\n\n/);
+    await expect(description).toHaveValue(/Hand-numbered edition of 300\./, { timeout: 10_000 });
+    await expect(description).toHaveValue(/Test Release Title/);
+    await expect(description).toHaveValue(/Test Artist One/);
+    await expect(description).toHaveValue(/Tape Deck Quarterly/);
+
+    // Generating must never touch the label's own writing.
+    await expect(notes).toHaveValue('Hand-numbered edition of 300');
   });
 });

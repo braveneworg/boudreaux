@@ -215,12 +215,14 @@ export type VideoDescriptionLookupResult =
   | { ok: false; error: string };
 
 /**
- * Synchronous release-notes invoke from the admin release form. Like the video
- * description lookup the artist is required — the notes must name one. The
- * remaining release facts are optional context for the prose.
+ * Synchronous blurb invoke from the admin release form. Like the video
+ * description lookup the artist is required — the prose must name one. The
+ * remaining release facts are optional context, and `labelNotes` carries the
+ * label's own authored notes: authoritative context the blurb is built from
+ * and must not contradict.
  */
-export const releaseNotesLookupInputSchema = z.object({
-  task: z.literal('release-notes-lookup'),
+export const releaseDescriptionLookupInputSchema = z.object({
+  task: z.literal('release-description-lookup'),
   title: z.string().min(1),
   artist: z.string().min(1),
   releasedOn: z
@@ -229,15 +231,16 @@ export const releaseNotesLookupInputSchema = z.object({
     .optional(),
   catalogNumber: z.string().min(1).optional(),
   formats: z.array(z.string().min(1)).optional(),
+  labelNotes: z.array(z.string().min(1)).optional(),
 });
 
-export type ReleaseNotesLookupInput = z.infer<typeof releaseNotesLookupInputSchema>;
+export type ReleaseDescriptionLookupInput = z.infer<typeof releaseDescriptionLookupInputSchema>;
 
-export type ReleaseNotesLookupResult =
+export type ReleaseDescriptionLookupResult =
   | {
       ok: true;
       result: {
-        notes: string[];
+        description: string;
         confidence: 'high' | 'medium' | 'low';
         sources: string[];
       } | null;

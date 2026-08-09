@@ -88,6 +88,7 @@ export const ReleaseFormContent = ({
       releaseId={releaseId}
       preGeneratedId={preGeneratedId}
       watchedArtistIds={watchedArtistIds ?? []}
+      artistName={albumArtistName}
       onSelectDate={onSelectDate}
       onCoverArtUploadComplete={onCoverArtUploadComplete}
     />
@@ -112,7 +113,7 @@ export const ReleaseFormContent = ({
 
     <Separator />
 
-    <ReleaseCreditsSection control={control} setValue={setValue} artistName={albumArtistName} />
+    <ReleaseCreditsSection control={control} />
 
     <Separator />
 

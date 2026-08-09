@@ -15,7 +15,10 @@ import { listReleaseGroups, lookupArtist } from './musicbrainz.js';
 import { postBioProgress } from './progress.js';
 import { annotateFaces, fetchReferenceBytes } from './rekognition.js';
 import { isReleaseDateLookupTask, runReleaseDateLookupLambda } from './release-date-lookup.js';
-import { isReleaseNotesLookupTask, runReleaseNotesLookupLambda } from './release-notes-lookup.js';
+import {
+  isReleaseDescriptionLookupTask,
+  runReleaseDescriptionLookupLambda,
+} from './release-description-lookup.js';
 import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
@@ -45,7 +48,7 @@ import type {
   BioLink,
   ProgressStage,
   ReleaseDateLookupResult,
-  ReleaseNotesLookupResult,
+  ReleaseDescriptionLookupResult,
   VideoDescriptionLookupResult,
   VideoEnrichmentResult,
 } from './types.js';
@@ -928,7 +931,7 @@ export const runLambda = async (
   | VideoEnrichmentResult
   | ReleaseDateLookupResult
   | VideoDescriptionLookupResult
-  | ReleaseNotesLookupResult
+  | ReleaseDescriptionLookupResult
 > => {
   // Route on the task discriminator FIRST so the bio path below stays
   // byte-identical for every existing event shape (bio events carry no
@@ -939,8 +942,8 @@ export const runLambda = async (
   if (isVideoDescriptionLookupTask(event)) {
     return runVideoDescriptionLookupLambda(event);
   }
-  if (isReleaseNotesLookupTask(event)) {
-    return runReleaseNotesLookupLambda(event);
+  if (isReleaseDescriptionLookupTask(event)) {
+    return runReleaseDescriptionLookupLambda(event);
   }
   if (isVideoEnrichmentTask(event)) {
     return runVideoEnrichmentLambda(event);
@@ -994,5 +997,5 @@ export const lambdaHandler = async (
   | VideoEnrichmentResult
   | ReleaseDateLookupResult
   | VideoDescriptionLookupResult
-  | ReleaseNotesLookupResult
+  | ReleaseDescriptionLookupResult
 > => runLambda(event);

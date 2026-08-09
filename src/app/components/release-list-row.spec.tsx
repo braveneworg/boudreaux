@@ -54,7 +54,6 @@ const baseRelease: PublishedReleaseListing = {
   coverArt: 'https://cdn.example.com/cover.jpg',
   releasedOn,
   description: 'Recorded in a basement over one hot weekend.',
-  notes: ['Pressed on 180g wax.', 'Includes a hand-screened insert.'],
   formats: ['VINYL_12_INCH', 'MP3_320KBPS'],
   catalogNumber: 'FF4-042',
   images: [],
@@ -155,28 +154,9 @@ describe('ReleaseListRow', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders each release note as its own paragraph', () => {
-    render(<ReleaseListRow release={baseRelease} />);
-
-    expect(screen.getByText('Pressed on 180g wax.')).toBeInTheDocument();
-    expect(screen.getByText('Includes a hand-screened insert.')).toBeInTheDocument();
-  });
-
-  it('renders the notes when the release has no description', () => {
-    render(<ReleaseListRow release={{ ...baseRelease, description: null }} />);
-
-    expect(screen.getByText('Pressed on 180g wax.')).toBeInTheDocument();
-  });
-
-  it('renders the description when the release has no notes', () => {
-    render(<ReleaseListRow release={{ ...baseRelease, notes: [] }} />);
-
-    expect(screen.getByText('Recorded in a basement over one hot weekend.')).toBeInTheDocument();
-  });
-
-  it('omits the prose block entirely when the release has no notes or description', () => {
+  it('renders no prose block at all when the release has no description', () => {
     const { container } = render(
-      <ReleaseListRow release={{ ...baseRelease, description: null, notes: [] }} />
+      <ReleaseListRow release={{ ...baseRelease, description: null }} />
     );
 
     expect(container.querySelector('p.whitespace-pre-line')).not.toBeInTheDocument();

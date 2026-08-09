@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import { Form } from '@/app/components/ui/form';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
-import { ReleaseNotesField } from './release-notes-field';
-import { useReleaseNotesLookupQuery } from '../_hooks/use-release-notes-lookup-query';
+import { ReleaseDescriptionField } from './release-description-field';
+import { useReleaseDescriptionLookupQuery } from '../_hooks/use-release-description-lookup-query';
 
 import type { UseFormSetValue } from 'react-hook-form';
 
@@ -18,8 +18,8 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-vi.mock('../_hooks/use-release-notes-lookup-query', () => ({
-  useReleaseNotesLookupQuery: vi.fn(),
+vi.mock('../_hooks/use-release-description-lookup-query', () => ({
+  useReleaseDescriptionLookupQuery: vi.fn(),
 }));
 
 type SetValueRef = React.MutableRefObject<UseFormSetValue<ReleaseFormData> | null>;
@@ -33,6 +33,7 @@ const Wrapper = ({ setValueRef, artistName = 'Ceschi' }: WrapperProps): React.Re
   const form = useForm<ReleaseFormData>({
     defaultValues: {
       title: '',
+      description: '',
       notes: '',
       releasedOn: '',
       catalogNumber: '',
@@ -44,7 +45,11 @@ const Wrapper = ({ setValueRef, artistName = 'Ceschi' }: WrapperProps): React.Re
 
   return (
     <Form {...form}>
-      <ReleaseNotesField control={form.control} setValue={form.setValue} artistName={artistName} />
+      <ReleaseDescriptionField
+        control={form.control}
+        setValue={form.setValue}
+        artistName={artistName}
+      />
     </Form>
   );
 };
@@ -60,32 +65,33 @@ const renderReady = (artistName: string | null = 'Ceschi'): SetValueRef => {
     setValueRef.current?.('releasedOn', '2015-03-03');
     setValueRef.current?.('catalogNumber', 'FF4-042');
     setValueRef.current?.('formats', ['VINYL_12_INCH']);
+    setValueRef.current?.('notes', 'Cut live to tape.\nSleeve screened by hand.');
   });
   return setValueRef;
 };
 
 const mockLookup = (overrides: Record<string, unknown> = {}): void => {
-  vi.mocked(useReleaseNotesLookupQuery).mockReturnValue({
+  vi.mocked(useReleaseDescriptionLookupQuery).mockReturnValue({
     isFetching: false,
     error: undefined,
     data: undefined,
     refetch: vi.fn().mockResolvedValue({ data: undefined }),
     ...overrides,
-  } as unknown as ReturnType<typeof useReleaseNotesLookupQuery>);
+  } as unknown as ReturnType<typeof useReleaseDescriptionLookupQuery>);
 };
 
-const generateButton = () => screen.getByRole('button', { name: 'Generate notes' });
+const generateButton = () => screen.getByRole('button', { name: 'Generate blurb' });
 
-describe('ReleaseNotesField', () => {
+describe('ReleaseDescriptionField', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLookup();
   });
 
-  it('renders the notes textarea with a generate button', () => {
+  it('renders the description textarea with a generate button', () => {
     renderReady();
 
-    expect(screen.getByLabelText('Release Notes')).toBeInTheDocument();
+    expect(screen.getByLabelText('Description')).toBeInTheDocument();
     expect(generateButton()).toBeEnabled();
   });
 
@@ -95,7 +101,7 @@ describe('ReleaseNotesField', () => {
     expect(generateButton()).toBeDisabled();
   });
 
-  it('disables the button without a resolvable artist (the notes must name one)', () => {
+  it('disables the button without a resolvable artist (the blurb must name one)', () => {
     renderReady(null);
 
     expect(generateButton()).toBeDisabled();
@@ -108,27 +114,40 @@ describe('ReleaseNotesField', () => {
     expect(screen.getByRole('button', { name: 'Generating…' })).toBeDisabled();
   });
 
-  it('writes the generated paragraphs into the field, blank-line separated', async () => {
+  it('writes the generated blurb into the description field', async () => {
     const user = userEvent.setup();
     mockLookup({
       refetch: vi.fn().mockResolvedValue({
-        data: { notes: ['First paragraph.', 'Second paragraph.'], sources: ['https://x'] },
+        data: { description: 'A short blurb.', sources: ['https://x'] },
       }),
     });
     renderReady();
 
     await user.click(generateButton());
 
-    expect(screen.getByLabelText('Release Notes')).toHaveValue(
-      'First paragraph.\n\nSecond paragraph.'
-    );
+    expect(screen.getByLabelText('Description')).toHaveValue('A short blurb.');
+  });
+
+  it('leaves the label notes untouched when generating', async () => {
+    const user = userEvent.setup();
+    mockLookup({
+      refetch: vi.fn().mockResolvedValue({
+        data: { description: 'A short blurb.', sources: ['https://x'] },
+      }),
+    });
+    const setValueRef = renderReady();
+
+    await user.click(generateButton());
+
+    expect(setValueRef.current).not.toBeNull();
+    expect(screen.getByLabelText('Description')).toHaveValue('A short blurb.');
   });
 
   it('reports the first source on success', async () => {
     const user = userEvent.setup();
     mockLookup({
       refetch: vi.fn().mockResolvedValue({
-        data: { notes: ['Paragraph.'], sources: ['https://example.com/review'] },
+        data: { description: 'A blurb.', sources: ['https://example.com/review'] },
       }),
     });
     renderReady();
@@ -147,8 +166,8 @@ describe('ReleaseNotesField', () => {
 
     await user.click(generateButton());
 
-    expect(toast.info).toHaveBeenCalledWith('No release notes could be generated');
-    expect(screen.getByLabelText('Release Notes')).toHaveValue('');
+    expect(toast.info).toHaveBeenCalledWith('No blurb could be generated');
+    expect(screen.getByLabelText('Description')).toHaveValue('');
   });
 
   it('surfaces a lookup error without touching the field', async () => {
@@ -158,13 +177,13 @@ describe('ReleaseNotesField', () => {
     });
     const setValueRef = renderReady();
     act(() => {
-      setValueRef.current?.('notes', 'Existing note.');
+      setValueRef.current?.('description', 'Existing blurb.');
     });
 
     await user.click(generateButton());
 
-    expect(toast.error).toHaveBeenCalledWith('Release notes generation failed');
-    expect(screen.getByLabelText('Release Notes')).toHaveValue('Existing note.');
+    expect(toast.error).toHaveBeenCalledWith('Blurb generation failed');
+    expect(screen.getByLabelText('Description')).toHaveValue('Existing blurb.');
   });
 
   it('surfaces a thrown lookup failure', async () => {
@@ -174,16 +193,27 @@ describe('ReleaseNotesField', () => {
 
     await user.click(generateButton());
 
-    expect(toast.error).toHaveBeenCalledWith('Release notes generation failed');
+    expect(toast.error).toHaveBeenCalledWith('Blurb generation failed');
   });
 
-  it('passes the release context to the lookup hook', () => {
+  it('passes the release context AND the label notes to the lookup hook', () => {
     renderReady();
 
-    expect(useReleaseNotesLookupQuery).toHaveBeenLastCalledWith('Broken Bone Ballads', 'Ceschi', {
-      releasedOn: '2015-03-03',
-      catalogNumber: 'FF4-042',
-      formats: ['VINYL_12_INCH'],
-    });
+    expect(useReleaseDescriptionLookupQuery).toHaveBeenLastCalledWith(
+      'Broken Bone Ballads',
+      'Ceschi',
+      {
+        releasedOn: '2015-03-03',
+        catalogNumber: 'FF4-042',
+        formats: ['VINYL_12_INCH'],
+        labelNotes: 'Cut live to tape.\nSleeve screened by hand.',
+      }
+    );
+  });
+
+  it('tells the admin the blurb builds on the notes below', () => {
+    renderReady();
+
+    expect(screen.getByText(/builds on the Release Notes below/i)).toBeInTheDocument();
   });
 });

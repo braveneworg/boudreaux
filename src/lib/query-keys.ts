@@ -25,20 +25,26 @@ export const queryKeys = {
       ] as const,
     detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
     adminDetail: (id: string) => [...queryKeys.releases.all, 'adminDetail', id] as const,
-    /** Release-notes web synthesis keyed by normalised title + artist + context. */
-    notesLookup: (
+    /** Blurb web synthesis keyed by normalised title + artist + grounding context. */
+    descriptionLookup: (
       title: string,
       artist: string,
-      context: { releasedOn?: string; catalogNumber?: string; formats?: string[] } = {}
+      context: {
+        releasedOn?: string;
+        catalogNumber?: string;
+        formats?: string[];
+        labelNotes?: string;
+      } = {}
     ) =>
       [
         ...queryKeys.releases.all,
-        'notesLookup',
+        'descriptionLookup',
         title.trim().toLowerCase(),
         artist.trim().toLowerCase(),
         context.releasedOn ?? '',
         context.catalogNumber ?? '',
         (context.formats ?? []).join(','),
+        context.labelNotes?.trim() ?? '',
       ] as const,
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
     related: (id: string, artistId?: string | null) =>
