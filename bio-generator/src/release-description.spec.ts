@@ -7,6 +7,17 @@ import { resolveReleaseDescriptionSuggestion } from './release-description.js';
 import type { ReleaseDescriptionArgs, ReleaseDescriptionDeps } from './release-description.js';
 import type { SerperWebResult } from './serper.js';
 
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+
+vi.mock('./lib/log.js', () => ({
+  logEvent,
+  toErrorMessage: (err: unknown) => String(err),
+}));
+
+beforeEach(() => {
+  logEvent.mockClear();
+});
+
 const evidence: SerperWebResult[] = [
   {
     title: 'Ceschi — Broken Bone Ballads',
@@ -273,5 +284,82 @@ describe('resolveReleaseDescriptionSuggestion', () => {
     const [, options] = requestJson.mock.calls[0];
     expect(options.userPrompt).toContain('PAGE EXCERPTS');
     expect(options.userPrompt).toContain('a jagged little miracle');
+  });
+
+  it('keeps the blurb when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    const result = await resolveReleaseDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(adjudication.description);
+  });
+
+  it('labels a truncated rationale with the release-description adjudication', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    await resolveReleaseDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'adjudication_rationale_truncated',
+      expect.objectContaining({ adjudication: 'release-description', length: 400, cap: 300 })
+    );
+  });
+
+  it('keeps the blurb when Gemini cites more evidence links than the cap', async () => {
+    // Four queries return up to ten results each, so a blurb can legitimately
+    // cite more than ten links. Rejecting the parse there voided the whole
+    // synthesis; the list is capped after subset enforcement instead.
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      title: `Source ${i}`,
+      link: `https://example.com/source-${i}`,
+      snippet: 'Coverage of the record.',
+      date: 'Mar 3, 2015',
+    }));
+    const searchWeb = vi.fn().mockResolvedValue(many);
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        ...adjudication,
+        sourceUrls: many.map(({ link }) => link),
+      })
+    );
+
+    const result = await resolveReleaseDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.sources).toHaveLength(10);
+  });
+
+  it('truncates an overlong blurb at the last whole sentence', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const first = `${'A'.repeat(500)}.`;
+    const second = `${'B'.repeat(300)}.`;
+    const third = `${'C'.repeat(200)}.`;
+    const fetchFn = vi.fn().mockResolvedValue(
+      // 1005 chars — the third sentence pushes it past the 900-char ceiling the
+      // prompt states, which the schema used to reject outright.
+      geminiResponse({ ...adjudication, description: `${first} ${second} ${third}` })
+    );
+
+    const result = await resolveReleaseDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(`${first} ${second}`);
   });
 });
