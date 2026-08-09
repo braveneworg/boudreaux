@@ -15,12 +15,24 @@ import type { VideoSuggestion } from './types.js';
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
+/** Rationale cap the prompts ask for and the schema enforces by truncation. */
+const MAX_RATIONALE_CHARS = 300;
+
+/**
+ * Gemini treats the prompt's "<= 300 chars" as advisory and overruns it in
+ * production; the rationale is a note, so an overrun truncates rather than
+ * voiding the whole adjudication (a hard `.max()` here nulled real lookups).
+ */
+export const boundedRationale = z
+  .string()
+  .transform((value) => value.slice(0, MAX_RATIONALE_CHARS));
+
 /** Gemini's JSON adjudication of the web evidence for a release date. */
 export const releaseDateAdjudicationSchema = z.object({
   releaseDate: isoDay.nullable(),
   confidence: z.enum(['high', 'medium', 'low']),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: z.string().max(300),
+  rationale: boundedRationale,
 });
 export type ReleaseDateAdjudication = z.infer<typeof releaseDateAdjudicationSchema>;
 
@@ -31,7 +43,7 @@ export const identityFallbackSchema = z.object({
   surname: z.string().nullable(),
   bornOn: isoDay.nullable(),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: z.string().max(300),
+  rationale: boundedRationale,
 });
 
 /** Identity facts recovered from the web when structured sources miss. */

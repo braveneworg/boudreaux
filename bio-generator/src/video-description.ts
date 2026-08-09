@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { readUrl } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getScrapeApiKey } from './lib/secrets.js';
-import { adjudicate, enforceSourceSubset } from './release-date.js';
+import { adjudicate, boundedRationale, enforceSourceSubset } from './release-date.js';
 import { DEFAULT_GEMINI_MODEL } from './types.js';
 
 import type { AdjudicationDeps } from './release-date.js';
@@ -21,7 +21,7 @@ import type { VideoSuggestion } from './types.js';
 export const descriptionAdjudicationSchema = z.object({
   description: z.string().max(1200).nullable(),
   sourceUrls: z.array(z.string().url()).max(10),
-  rationale: z.string().max(300),
+  rationale: boundedRationale,
 });
 
 /** Arguments for {@link resolveDescriptionSuggestion}. */

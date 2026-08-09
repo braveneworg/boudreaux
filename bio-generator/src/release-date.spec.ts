@@ -191,6 +191,20 @@ describe('resolveReleaseDateSuggestion', () => {
       {}
     );
   });
+
+  it('keeps the date when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    const result = await resolveReleaseDateSuggestion(baseArgs, {
+      searchWeb,
+      fetchOptions: { fetchFn },
+    });
+
+    expect(result?.note).toBe('r'.repeat(300));
+  });
 });
 
 describe('resolveIdentityFallback', () => {
@@ -255,6 +269,27 @@ describe('resolveIdentityFallback', () => {
     const result = await resolveIdentityFallback(fallbackArgs, { searchWeb });
 
     expect(result).toBeNull();
+  });
+
+  it('keeps the facts when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        firstName: 'Francisco',
+        middleName: null,
+        surname: 'Ramos',
+        bornOn: null,
+        sourceUrls: ['https://example.com/premiere'],
+        rationale: 'r'.repeat(400),
+      })
+    );
+
+    const result = await resolveIdentityFallback(fallbackArgs, {
+      searchWeb,
+      fetchOptions: { fetchFn },
+    });
+
+    expect(result?.note).toBe('r'.repeat(300));
   });
 
   it('returns null instead of throwing when the adjudication call fails', async () => {

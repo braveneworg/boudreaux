@@ -245,4 +245,18 @@ describe('resolveDescriptionSuggestion', () => {
     const [, options] = requestJson.mock.calls[0];
     expect(options.userPrompt).not.toContain('PAGE EXCERPTS');
   });
+
+  it('keeps the synthesis when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.note).toBe('r'.repeat(300));
+  });
 });
