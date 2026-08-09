@@ -7,6 +7,17 @@ import { resolveDescriptionSuggestion } from './video-description.js';
 import type { SerperWebResult } from './serper.js';
 import type { VideoDescriptionDeps, VideoDescriptionArgs } from './video-description.js';
 
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+
+vi.mock('./lib/log.js', () => ({
+  logEvent,
+  toErrorMessage: (err: unknown) => String(err),
+}));
+
+beforeEach(() => {
+  logEvent.mockClear();
+});
+
 const evidence: SerperWebResult[] = [
   {
     title: 'Ceschi — Bite Through Stone',
@@ -244,5 +255,160 @@ describe('resolveDescriptionSuggestion', () => {
     expect(readPage).toHaveBeenCalledTimes(2);
     const [, options] = requestJson.mock.calls[0];
     expect(options.userPrompt).not.toContain('PAGE EXCERPTS');
+  });
+
+  it('keeps a description at the 900-char cap untouched', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const atCap = `${'A'.repeat(899)}.`;
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: atCap }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(atCap);
+  });
+
+  it('truncates an overlong description at the last whole sentence', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const first = `${'A'.repeat(500)}.`;
+    const second = `${'B'.repeat(300)}.`;
+    const third = `${'C'.repeat(200)}.`;
+    const fetchFn = vi.fn().mockResolvedValue(
+      // 1005 chars — the third sentence pushes it past the 900-char cap.
+      geminiResponse({ ...adjudication, description: `${first} ${second} ${third}` })
+    );
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(`${first} ${second}`);
+  });
+
+  it('drops a trailing quote rather than orphaning it from its attribution', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const opening = `${'A'.repeat(600)}.`;
+    // The sentence ends inside the quote, but " — Pitchfork" continues it —
+    // cutting at that terminator would publish the quote with no source.
+    const quoted = 'Critics called it "a jagged little miracle." — Pitchfork';
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        ...adjudication,
+        description: `${opening} ${quoted} ${'B'.repeat(400)}`,
+      })
+    );
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe(opening);
+  });
+
+  it('hard-cuts an overlong description that offers no sentence boundary', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: 'D'.repeat(1000) }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.value).toBe('D'.repeat(900));
+  });
+
+  it('logs how much prose a truncation discarded', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: 'D'.repeat(1000) }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'description_truncated',
+      expect.objectContaining({ length: 1000, cap: 900, kept: 900 })
+    );
+  });
+
+  it('logs the shorter kept length when a sentence backoff drops a quote', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const opening = `${'A'.repeat(600)}.`;
+    const quoted = 'Critics called it "a jagged little miracle." — Pitchfork';
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        ...adjudication,
+        description: `${opening} ${quoted} ${'B'.repeat(400)}`,
+      })
+    );
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'description_truncated',
+      expect.objectContaining({ kept: 601 })
+    );
+  });
+
+  it('logs nothing when the description already fits the cap', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, description: `${'A'.repeat(899)}.` }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).not.toHaveBeenCalledWith('warn', 'description_truncated', expect.anything());
+  });
+
+  it('labels a truncated rationale with the description adjudication', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'adjudication_rationale_truncated',
+      expect.objectContaining({ adjudication: 'description', length: 400, cap: 300 })
+    );
+  });
+
+  it('keeps the synthesis when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    const result = await resolveDescriptionSuggestion(
+      baseArgs,
+      withReader({ searchWeb, fetchOptions: { fetchFn } })
+    );
+
+    expect(result?.note).toBe('r'.repeat(300));
   });
 });

@@ -6,6 +6,17 @@ import { resolveIdentityFallback, resolveReleaseDateSuggestion } from './release
 
 import type { SerperWebResult } from './serper.js';
 
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+
+vi.mock('./lib/log.js', () => ({
+  logEvent,
+  toErrorMessage: (err: unknown) => String(err),
+}));
+
+beforeEach(() => {
+  logEvent.mockClear();
+});
+
 const evidence: SerperWebResult[] = [
   {
     title: 'Ceschi — Bite Through Stone premiere',
@@ -191,6 +202,35 @@ describe('resolveReleaseDateSuggestion', () => {
       {}
     );
   });
+
+  it('keeps the date when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    const result = await resolveReleaseDateSuggestion(baseArgs, {
+      searchWeb,
+      fetchOptions: { fetchFn },
+    });
+
+    expect(result?.note).toBe('r'.repeat(300));
+  });
+
+  it('labels a truncated rationale with the release-date adjudication', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(geminiResponse({ ...adjudication, rationale: 'r'.repeat(400) }));
+
+    await resolveReleaseDateSuggestion(baseArgs, { searchWeb, fetchOptions: { fetchFn } });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'adjudication_rationale_truncated',
+      expect.objectContaining({ adjudication: 'release-date', length: 400, cap: 300 })
+    );
+  });
 });
 
 describe('resolveIdentityFallback', () => {
@@ -255,6 +295,49 @@ describe('resolveIdentityFallback', () => {
     const result = await resolveIdentityFallback(fallbackArgs, { searchWeb });
 
     expect(result).toBeNull();
+  });
+
+  it('keeps the facts when the rationale overruns 300 chars, truncating the note', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        firstName: 'Francisco',
+        middleName: null,
+        surname: 'Ramos',
+        bornOn: null,
+        sourceUrls: ['https://example.com/premiere'],
+        rationale: 'r'.repeat(400),
+      })
+    );
+
+    const result = await resolveIdentityFallback(fallbackArgs, {
+      searchWeb,
+      fetchOptions: { fetchFn },
+    });
+
+    expect(result?.note).toBe('r'.repeat(300));
+  });
+
+  it('labels a truncated rationale with the identity-fallback adjudication', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const fetchFn = vi.fn().mockResolvedValue(
+      geminiResponse({
+        firstName: 'Francisco',
+        middleName: null,
+        surname: 'Ramos',
+        bornOn: null,
+        sourceUrls: ['https://example.com/premiere'],
+        rationale: 'r'.repeat(400),
+      })
+    );
+
+    await resolveIdentityFallback(fallbackArgs, { searchWeb, fetchOptions: { fetchFn } });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      'warn',
+      'adjudication_rationale_truncated',
+      expect.objectContaining({ adjudication: 'identity-fallback', length: 400, cap: 300 })
+    );
   });
 
   it('returns null instead of throwing when the adjudication call fails', async () => {
