@@ -17,7 +17,7 @@ this guide is the developer-focused, day-to-day version.
 > **TL;DR — run it locally with zero AWS:**
 >
 > ```bash
-> mise install && corepack enable && corepack prepare pnpm@11.15.1 --activate
+> mise install
 > pnpm install
 > pnpm exec prisma db push
 > BIO_GENERATOR_FAKE=true pnpm run dev
@@ -50,7 +50,7 @@ fake mode.
 | Tool                 | Version                    | How                                                                                                                                                                      |
 | -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Node.js              | **v24.18.0** (`mise.toml`) | `mise install` (once); `mise` then activates it automatically on `cd`. **Always run this before `pnpm` and `git push`** — the pre-push hook's `tsc` fails on older Node. |
-| pnpm                 | **11.15.1**                | `corepack enable && corepack prepare pnpm@11.15.1 --activate`                                                                                                            |
+| pnpm                 | **11.15.1** (`mise.toml`)  | Installed by the same `mise install` — no corepack, no global pnpm.                                                                                                      |
 | Docker               | any recent                 | Only for E2E (isolated MongoDB on `localhost:27018`)                                                                                                                     |
 | AWS CLI v2 + SAM CLI | latest                     | Only if you deploy the Lambda manually (CI does it for you)                                                                                                              |
 
@@ -129,8 +129,7 @@ BIO_GENERATOR_LAMBDA_NAME="fakefour-bio-generator"
 
 ```bash
 # 1. Toolchain
-mise install                                     # Node v24.18.0 from mise.toml
-corepack enable && corepack prepare pnpm@11.15.1 --activate
+mise install                                     # Node 24.18.0 + pnpm 11.15.1 from mise.toml
 
 # 2. Install (postinstall runs `prisma generate`)
 pnpm install

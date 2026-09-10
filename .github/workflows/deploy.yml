@@ -143,8 +143,14 @@ jobs:
 
             # Build for linux/amd64 only (most EC2 instances) for faster builds (~3-4 min vs 8-12 min)
             # Change to linux/arm64 if using ARM-based EC2 instances (Graviton)
+            # Node version comes from mise.toml — the single source of truth for
+            # the toolchain. Never hardcode it here or in the Dockerfile.
+            NODE_VERSION=$(sed -n 's/^node = "\(.*\)"$/\1/p' mise.toml)
+            echo "Building on node:${NODE_VERSION}-alpine (from mise.toml)"
+
             if docker buildx build \
               --platform linux/amd64 \
+              --build-arg NODE=node:${NODE_VERSION}-alpine \
               --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
               --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY} \
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${NEXT_PUBLIC_STRIPE_PRICE_MINIMUM} \

@@ -133,7 +133,7 @@ editor** rather than a plain textarea.
 **Web app** (repo root):
 
 - **Node** `v24.18.0` (from `mise.toml` — use `mise install`, never a global install)
-- **pnpm** `11.x` (via `corepack`)
+- **pnpm** `11.15.1` (from `mise.toml`, same `mise install`)
 - **MongoDB** with a replica set (Prisma transactions in `replaceBioContent` require it)
 - AWS account/credentials only for **real** generation (S3 re-hosting + Lambda invoke). Local
   dev and E2E run fully offline with `BIO_GENERATOR_FAKE=true`.
@@ -179,8 +179,7 @@ For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entire
 
 ```bash
 # --- Web app (repo root) ---
-mise install                  # Node 24.18.0 from mise.toml
-corepack enable
+mise install                  # Node 24.18.0 + pnpm 11.15.1 from mise.toml
 pnpm install                  # pulls @aws-sdk/client-lambda, @tiptap/*, html-react-parser
 pnpm exec prisma generate     # regenerate client for the new models/fields
 pnpm exec prisma db push      # push ArtistBioImage / ArtistBioLink + Artist fields to MongoDB

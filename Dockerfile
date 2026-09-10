@@ -1,9 +1,18 @@
+# Fallback for ad-hoc local builds only. CI passes --build-arg NODE=... derived
+# from mise.toml, which is the single source of truth for the Node version.
 ARG NODE=node:24.18.0-alpine
 FROM ${NODE} AS dependencies
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
 
 WORKDIR /app
+# pnpm's version is read out of mise.toml so the toolchain has exactly one
+# source of truth. mise itself is deliberately NOT installed in the image: its
+# pnpm is a glibc-linked binary and this base is Alpine/musl. Node is pinned by
+# the ${NODE} base image above.
+COPY mise.toml ./
+RUN npm i -g "pnpm@$(sed -n 's/^pnpm = "\(.*\)"$/\1/p' mise.toml)" \
+    && pnpm --version
+
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 # Prisma schema is needed because the `postinstall` script runs `prisma generate`
 COPY prisma ./prisma

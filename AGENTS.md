@@ -80,7 +80,8 @@ before continuing, so it never happens again.
 
 Versions track `package.json` — update this block when they change.
 
-- TypeScript 6 (strict), Node 24 (from `mise.toml`, never global), pnpm 11 —
+- TypeScript 6 (strict), Node 24 + pnpm 11 (both from `mise.toml`, never
+  global) —
   `pnpm exec` for CLI tools (`prisma`, `tsx`, …).
 - Next.js 16 (App Router, Turbopack dev, webpack build), React 19.
 - Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min
