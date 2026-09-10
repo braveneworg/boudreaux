@@ -71,6 +71,29 @@ export const buildMediaS3Key = ({
 };
 
 /**
+ * A virtual-hosted S3 endpoint: `{bucket}.s3.{region}.amazonaws.com`, or the
+ * legacy region-less `{bucket}.s3.amazonaws.com`. Anchored to
+ * `amazonaws.com` — a bare `.s3.` test also matched hosts like
+ * `bucket.s3.attacker.example.com`, and the namespace guards downstream only
+ * inspect the KEY, so any host that yields `media/videos/{id}/…` passed them.
+ */
+const S3_VIRTUAL_HOST =
+  /^([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/;
+
+/**
+ * The S3 key of an S3-hosted URL, or `null` when the host is not our bucket's
+ * own S3 endpoint. When no bucket is configured the endpoint shape is still
+ * required — that alone rejects look-alike hosts — but the bucket identity
+ * cannot be checked, so a real S3 host is accepted.
+ */
+const extractKeyFromS3Host = (host: string, key: string): string | null => {
+  const bucket = S3_VIRTUAL_HOST.exec(host)?.[1];
+  if (!bucket || !key) return null;
+  const ourBucket = process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET;
+  return !ourBucket || bucket === ourBucket ? key : null;
+};
+
+/**
  * Extract the S3 key from a CDN or S3 URL
  *
  * Supports:
@@ -93,13 +116,7 @@ export const extractS3KeyFromUrl = (url: string): string | null => {
     return url.replace(/^(?:https:\/\/|http:\/\/)+/, '').replace(`${cdnDomain}/`, '');
   }
 
-  if (url.includes('.s3.')) {
-    // Extract key from S3 URL: https://{bucket}.s3.{region}.amazonaws.com/{s3Key}
-    const urlParts = url.split('.s3.');
-    if (urlParts[1]) {
-      return urlParts[1].split('/').slice(1).join('/');
-    }
-  }
-
-  return null;
+  // Extract key from S3 URL: https://{bucket}.s3.{region}.amazonaws.com/{s3Key}
+  const [host = '', ...keySegments] = url.replace(/^(?:https?:\/\/)+/, '').split('/');
+  return extractKeyFromS3Host(host.toLowerCase(), keySegments.join('/'));
 };
