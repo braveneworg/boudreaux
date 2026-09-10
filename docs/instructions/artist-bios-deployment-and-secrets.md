@@ -60,16 +60,16 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 
 ## 3. Prerequisites
 
-| Requirement    | Version / Source                                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Node.js        | **24** (`.nvmrc`; the web app's pre-push hook and the Lambda runtime both need 24 — `nvm use` before any `pnpm`/`git push`) |
-| pnpm           | **11.15.1** (`corepack prepare pnpm@11.15.1 --activate`)                                                                    |
-| AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                       |
-| AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                       |
-| AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                             |
-| Gemini account | <https://aistudio.google.com> (free tier sufficient for testing)                                                            |
-| Docker         | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                             |
-| MongoDB        | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                   |
+| Requirement    | Version / Source                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js        | **24** (`mise.toml`; the web app's pre-push hook and the Lambda runtime both need 24 — `mise install` before any `pnpm`/`git push`) |
+| pnpm           | **11.15.1** (`corepack prepare pnpm@11.15.1 --activate`)                                                                            |
+| AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                               |
+| AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                               |
+| AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                                     |
+| Gemini account | <https://aistudio.google.com> (free tier sufficient for testing)                                                                    |
+| Docker         | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                                     |
+| MongoDB        | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                           |
 
 ---
 
@@ -306,7 +306,7 @@ aws ssm put-parameter \
 
 ```bash
 # 0. Toolchain
-nvm use                                   # Node 24 from .nvmrc
+mise install                              # Node 24 from mise.toml
 corepack enable && corepack prepare pnpm@11.15.1 --activate
 
 # 1. Web app deps + Prisma client (adds the new bio fields/models)
@@ -454,6 +454,6 @@ editors; generation is routed through `useGenerateArtistBioMutation`.
 | App `AccessDenied` invoking Lambda / `PutObject`                             | App IAM missing perms                                         | Attach the policy in 4.4                                                                                                           |
 | `Invalid src prop … hostname not configured`                                 | New image host not allow-listed                               | The custom `loaderFile` normally bypasses this; add the host to `next.config.ts` `remotePatterns` if using the default loader      |
 | Bio images 403 on the CDN                                                    | Requested width has no `_w{width}` variant                    | Ensure `images.imageSizes`/`deviceSizes` match `IMAGE_VARIANT_DEVICE_SIZES`; variants are written by `image-variants.ts`           |
-| `git push` fails pre-push `tsc` under Node v22                               | Hook ran with system Node                                     | `nvm use` (Node 24) **before** `git push`                                                                                          |
+| `git push` fails pre-push `tsc` under Node v22                               | Hook ran with system Node                                     | `mise install` (Node 24) **before** `git push`                                                                                     |
 | MusicBrainz lookups return nothing / 503                                     | Missing `User-Agent` or 1 req/s rate limit                    | `User-Agent` is set in `types.ts`; the handler degrades to prose-only on failure                                                   |
 | E2E hits real S3/Gemini                                                      | Fake mode not set                                             | Ensure `BIO_GENERATOR_FAKE=true` (Playwright web server sets it)                                                                   |
