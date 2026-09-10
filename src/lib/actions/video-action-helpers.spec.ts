@@ -14,6 +14,8 @@ import {
   confirmVideoUpload,
   deleteReplacedVideoAssets,
   isPosterReplaced,
+  resolveUpdatedCandidates,
+  resolveUpdatedPosterUrl,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -180,7 +182,6 @@ describe('buildVideoUpdateInput', () => {
         description: '',
         durationSeconds: '',
         fileSize: '',
-        posterUrl: '',
         publishedAt: '',
       },
       'user-2'
@@ -189,8 +190,15 @@ describe('buildVideoUpdateInput', () => {
     expect(input.description).toBeUndefined();
     expect(input.durationSeconds).toBeUndefined();
     expect(input.fileSize).toBeUndefined();
-    expect(input.posterUrl).toBeUndefined();
     expect(input.publishedAt).toBeUndefined();
+  });
+
+  it('leaves the poster to resolveUpdatedPosterUrl', () => {
+    // An empty `posterUrl` means "clear it" on a file replace and "leave it"
+    // otherwise — a distinction only the caller can make.
+    const input = buildVideoUpdateInput(formData, 'user-2');
+
+    expect('posterUrl' in input).toBe(false);
   });
 });
 
@@ -351,7 +359,13 @@ describe('deleteReplacedVideoAssets — candidate cleanup guards', () => {
     expect(deleteS3Object).toHaveBeenCalledTimes(3);
   });
 
-  it('leaves old candidates untouched on file replace without a fresh candidate set', () => {
+  /**
+   * A file replace invalidates the outgoing file's frames whether or not a
+   * fresh set arrives — the row's candidate list is cleared either way (see
+   * {@link resolveUpdatedCandidates}), so leaving the objects behind would
+   * orphan them.
+   */
+  it('frees the unreferenced old candidates on a replace that brings none', () => {
     deleteReplacedVideoAssets(
       currentWithCandidates,
       { ...formData, posterUrl: candidateUrl(1) },
@@ -359,7 +373,80 @@ describe('deleteReplacedVideoAssets — candidate cleanup guards', () => {
     );
 
     expect(deleteS3Object).toHaveBeenCalledWith(currentWithCandidates.s3Key);
-    expect(deleteS3Object).toHaveBeenCalledTimes(1);
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+    expect(deleteS3Object).toHaveBeenCalledTimes(2);
+  });
+
+  it('still spares the candidate an unchanged posterUrl points at', () => {
+    deleteReplacedVideoAssets(
+      currentWithCandidates,
+      { ...formData, posterUrl: candidateUrl(1) },
+      true
+    );
+
+    expect(deleteS3Object).not.toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
+  });
+
+  it('frees every old candidate when the replacement clears the poster too', () => {
+    deleteReplacedVideoAssets(currentWithCandidates, { ...formData, posterUrl: '' }, true);
+
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+  });
+});
+
+describe('resolveUpdatedCandidates', () => {
+  const candidatesFor = (id: string) => [
+    {
+      url: `https://cdn.example.com/media/videos/${id}/poster-candidate-1.jpg`,
+      atSeconds: 1,
+      score: 1,
+    },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(extractS3KeyFromUrl).mockImplementation((url: string) => {
+      const match = url.match(/\/(media\/videos\/.+)$/);
+      return match ? match[1] : null;
+    });
+  });
+
+  it('leaves the field alone when the file was not replaced', () => {
+    const data = { ...formData, posterCandidates: candidatesFor(videoId) };
+
+    expect(resolveUpdatedCandidates(data, videoId, false)).toBeUndefined();
+  });
+
+  it('writes the fresh set on a file replace', () => {
+    const candidates = candidatesFor(videoId);
+
+    expect(resolveUpdatedCandidates({ ...formData, posterCandidates: candidates }, videoId, true)) //
+      .toEqual(candidates);
+  });
+
+  it('clears the outgoing set when a replace brings no candidates', () => {
+    expect(resolveUpdatedCandidates(formData, videoId, true)).toEqual([]);
+  });
+
+  it('clears rather than persists a foreign-namespaced set', () => {
+    const data = { ...formData, posterCandidates: candidatesFor('other-video') };
+
+    expect(resolveUpdatedCandidates(data, videoId, true)).toEqual([]);
+  });
+});
+
+describe('resolveUpdatedPosterUrl', () => {
+  it('writes whatever the payload supplies', () => {
+    expect(resolveUpdatedPosterUrl({ ...formData, posterUrl: 'https://cdn/p.jpg' }, true)) //
+      .toBe('https://cdn/p.jpg');
+  });
+
+  it('clears the poster when a file replace brings none', () => {
+    expect(resolveUpdatedPosterUrl({ ...formData, posterUrl: '' }, true)).toBeNull();
+  });
+
+  it('leaves the poster alone when the file was not replaced', () => {
+    expect(resolveUpdatedPosterUrl({ ...formData, posterUrl: '' }, false)).toBeUndefined();
   });
 });
 

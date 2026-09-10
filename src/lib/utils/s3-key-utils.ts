@@ -70,24 +70,41 @@ export const buildMediaS3Key = ({
   return `media/${entityType}/${entityId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
 };
 
+/** The endpoint label of a virtual-hosted S3 host: `s3`, or legacy `s3-{region}`. */
+const isS3EndpointLabel = (label: string | undefined): boolean =>
+  label === 's3' || (label?.startsWith('s3-') ?? false);
+
+const S3_HOST_SUFFIX = '.amazonaws.com';
+
 /**
- * A virtual-hosted S3 endpoint: `{bucket}.s3.{region}.amazonaws.com`, or the
- * legacy region-less `{bucket}.s3.amazonaws.com`. Anchored to
- * `amazonaws.com` — a bare `.s3.` test also matched hosts like
+ * The bucket a virtual-hosted S3 host names — `{bucket}.s3.{region}`,
+ * `{bucket}.s3`, or the legacy `{bucket}.s3-{region}`, all under
+ * `amazonaws.com` — or `null` when the host is not one of those. Anchoring to
+ * `amazonaws.com` is the point: a bare `.s3.` test also matched hosts like
  * `bucket.s3.attacker.example.com`, and the namespace guards downstream only
- * inspect the KEY, so any host that yields `media/videos/{id}/…` passed them.
+ * inspect the KEY, so any host yielding `media/videos/{id}/…` passed them.
  */
-const S3_VIRTUAL_HOST =
-  /^([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/;
+const s3HostBucket = (host: string): string | null => {
+  if (!host.endsWith(S3_HOST_SUFFIX)) return null;
+  const labels = host.slice(0, -S3_HOST_SUFFIX.length).split('.');
+  // The endpoint label is last (`{bucket}.s3`) or second-to-last, with the
+  // region behind it (`{bucket}.s3.{region}`); anything before it is the
+  // bucket, and there must be something — path-style `s3.amazonaws.com` names
+  // no bucket in the host.
+  const endpointIndex = [labels.length - 1, labels.length - 2].find(
+    (index) => index > 0 && isS3EndpointLabel(labels.at(index))
+  );
+  return endpointIndex === undefined ? null : labels.slice(0, endpointIndex).join('.');
+};
 
 /**
  * The S3 key of an S3-hosted URL, or `null` when the host is not our bucket's
- * own S3 endpoint. When no bucket is configured the endpoint shape is still
+ * own S3 endpoint. With no bucket configured the endpoint shape is still
  * required — that alone rejects look-alike hosts — but the bucket identity
  * cannot be checked, so a real S3 host is accepted.
  */
 const extractKeyFromS3Host = (host: string, key: string): string | null => {
-  const bucket = S3_VIRTUAL_HOST.exec(host)?.[1];
+  const bucket = s3HostBucket(host);
   if (!bucket || !key) return null;
   const ourBucket = process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET;
   return !ourBucket || bucket === ourBucket ? key : null;
@@ -117,6 +134,6 @@ export const extractS3KeyFromUrl = (url: string): string | null => {
   }
 
   // Extract key from S3 URL: https://{bucket}.s3.{region}.amazonaws.com/{s3Key}
-  const [host = '', ...keySegments] = url.replace(/^(?:https?:\/\/)+/, '').split('/');
+  const [host = '', ...keySegments] = url.replace(/^(?:https:\/\/|http:\/\/)+/, '').split('/');
   return extractKeyFromS3Host(host.toLowerCase(), keySegments.join('/'));
 };

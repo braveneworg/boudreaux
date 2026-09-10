@@ -339,7 +339,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
 
   // The draft hook must sit before the upload hook so its handleUploadComplete
   // is available to wire; it in turn depends on buildArtistDetails above.
-  const { draftId, handleUploadComplete } = useVideoDraft({
+  const { draftId, handleUploadComplete, draftCandidateUrls } = useVideoDraft({
     form,
     preGeneratedId,
     isEditMode,
@@ -361,10 +361,10 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     isPersisted,
     effectiveVideoId,
     preGeneratedId,
-    // Only a draft session has already shipped this session's captured frames
-    // to the row; during an edit-mode replace they land at Save, so a fresh
-    // pick must stay local until then.
-    freshCandidatesPersisted: draftId !== null,
+    // The frames the draft create actually shipped to the row — the only fresh
+    // ones a pick may persist. Empty during an edit-mode replace (they land at
+    // Save), and stale-free after a SECOND replace, whose frames are not in it.
+    draftCandidateUrls,
     onPosterPersisted: poster.clearUploadedPoster,
   });
   useEffect(() => {

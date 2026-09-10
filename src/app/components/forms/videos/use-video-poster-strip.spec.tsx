@@ -63,6 +63,11 @@ const uploaded = (index: number, atSeconds: number, score: number): VideoPosterC
 
 const CAPTURED = [captured(3.7, 4), captured(5.1, 9), captured(6.5, 2)];
 const UPLOADED = [uploaded(1, 3.7, 4), uploaded(2, 5.1, 9), uploaded(3, 6.5, 2)];
+/**
+ * What a LATER capture uploads — a replacement file's frames are new S3
+ * objects, so they never share a URL with the outgoing file's candidates.
+ */
+const REPLACED = [uploaded(4, 2.2, 3), uploaded(5, 4.4, 8), uploaded(6, 9.9, 1)];
 
 interface RenderStripOptions {
   isPersisted?: boolean;
@@ -72,11 +77,13 @@ interface RenderStripOptions {
   storedCandidates?: VideoPosterCandidate[];
   onPosterPersisted?: () => void;
   /**
-   * Defaults to the draft session — this session's capture went to the server
-   * with the draft, so a fresh pick is persistable. An edit-mode replace passes
-   * `false`: those frames only reach the row at Save.
+   * Defaults to the draft session — the draft create wrote exactly this
+   * capture's frames onto the row, so a fresh pick is persistable. An
+   * edit-mode replace, and a SECOND replace inside a draft session, pass a set
+   * that does not contain the live capture's URLs: those frames only reach the
+   * row at Save.
    */
-  freshCandidatesPersisted?: boolean;
+  draftCandidateUrls?: string[];
 }
 
 interface StripHarness {
@@ -100,7 +107,7 @@ const renderStrip = ({
   posterUrl,
   storedCandidates,
   onPosterPersisted,
-  freshCandidatesPersisted = true,
+  draftCandidateUrls = UPLOADED.map(({ url }) => url),
 }: RenderStripOptions = {}): { current: StripHarness } => {
   const { result } = renderHook(() => {
     const form = useForm<VideoFormData>({ defaultValues: { posterUrl } });
@@ -111,7 +118,7 @@ const renderStrip = ({
       effectiveVideoId,
       preGeneratedId: VIDEO_ID,
       onPosterPersisted,
-      freshCandidatesPersisted,
+      draftCandidateUrls,
     });
     return { form, strip, isDirty: form.formState.isDirty };
   });
@@ -336,6 +343,134 @@ describe('useVideoPosterStrip — selecting after a row exists', () => {
   });
 });
 
+describe('useVideoPosterStrip — a SECOND replace in the same session', () => {
+  /**
+   * A draft session whose FIRST capture the draft create persisted. Replacing
+   * the file again captures frames the row has never seen, so an instant pick
+   * would call `selectVideoPosterAction` with a non-member URL — a guaranteed
+   * refusal, revert and error toast.
+   */
+  const renderSecondReplace = (): { current: StripHarness } => {
+    const harness = renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      draftCandidateUrls: UPLOADED.map(({ url }) => url),
+      posterUrl: UPLOADED[1].url,
+    });
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    mocks.alignedNow = REPLACED;
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    return harness;
+  };
+
+  it('never persists a frame of the second file', async () => {
+    const harness = renderSecondReplace();
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(mocks.selectVideoPosterAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows no error toast', async () => {
+    const harness = renderSecondReplace();
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
+  it('still moves the local selection', async () => {
+    const harness = renderSecondReplace();
+
+    await act(async () => harness.current.strip.handleSelectCandidate(2));
+
+    expect(harness.current.strip.selectedIndex).toBe(2);
+  });
+});
+
+describe('useVideoPosterStrip — a capture that yields nothing', () => {
+  /**
+   * Spec §9: zero candidates persists nothing. The outgoing file's frame is
+   * still on the form (the draft wrote it, or the row hydrated it), and with
+   * no new capture to out-rank it, Save would hand file A's poster to file B.
+   */
+  it('clears a poster the draft wrote from the outgoing capture', () => {
+    const harness = renderStrip({
+      draftCandidateUrls: UPLOADED.map(({ url }) => url),
+      posterUrl: UPLOADED[1].url,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe('');
+  });
+
+  it('clears a poster pointing at one of the row’s stored candidates', () => {
+    const harness = renderStrip({
+      storedCandidates: UPLOADED,
+      draftCandidateUrls: [],
+      posterUrl: UPLOADED[0].url,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe('');
+  });
+
+  it('dirties the cleared field so the form reset cannot restore it', () => {
+    // `VideoForm`'s reset runs `keepDirtyValues: true` on every new `video`
+    // identity — a pristine clear would be overwritten by the refetched row.
+    const harness = renderStrip({
+      storedCandidates: UPLOADED,
+      draftCandidateUrls: [],
+      posterUrl: UPLOADED[0].url,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.isDirty).toBe(true);
+  });
+
+  it('leaves a manually uploaded poster alone', () => {
+    // Not a frame of the outgoing file — the admin chose that image, and it
+    // still out-ranks everything in the preview and at submit.
+    const harness = renderStrip({
+      storedCandidates: UPLOADED,
+      draftCandidateUrls: [],
+      posterUrl: MANUAL_POSTER_URL,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe(MANUAL_POSTER_URL);
+  });
+
+  it('leaves the form pristine when there was nothing stale to clear', () => {
+    const harness = renderStrip({
+      storedCandidates: UPLOADED,
+      draftCandidateUrls: [],
+      posterUrl: MANUAL_POSTER_URL,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates([]));
+
+    expect(harness.current.isDirty).toBe(false);
+  });
+
+  it('keeps the outgoing frame while the NEW capture has frames of its own', () => {
+    // The new capture owns the preview and out-ranks the field at submit; only
+    // an empty one leaves the stale value exposed.
+    const harness = renderStrip({
+      draftCandidateUrls: UPLOADED.map(({ url }) => url),
+      posterUrl: UPLOADED[1].url,
+    });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe(UPLOADED[1].url);
+  });
+});
+
 describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', () => {
   /**
    * A row exists (edit mode) but this session's captured frames are not on it
@@ -347,13 +482,13 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
     renderStrip({
       isPersisted: true,
       effectiveVideoId: VIDEO_ID,
-      freshCandidatesPersisted: false,
+      draftCandidateUrls: [],
       storedCandidates: UPLOADED,
       posterUrl: MANUAL_POSTER_URL,
     });
 
   it('moves the local selection', async () => {
-    mocks.alignedNow = UPLOADED;
+    mocks.alignedNow = REPLACED;
     const harness = renderEditReplace();
 
     act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
@@ -363,7 +498,7 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
   });
 
   it('previews the picked frame through the Save-time blob', async () => {
-    mocks.alignedNow = UPLOADED;
+    mocks.alignedNow = REPLACED;
     const harness = renderEditReplace();
 
     act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
@@ -373,7 +508,7 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
   });
 
   it('never calls the select-poster mutation', async () => {
-    mocks.alignedNow = UPLOADED;
+    mocks.alignedNow = REPLACED;
     const harness = renderEditReplace();
 
     act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
@@ -383,7 +518,7 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
   });
 
   it('shows no error toast', async () => {
-    mocks.alignedNow = UPLOADED;
+    mocks.alignedNow = REPLACED;
     const harness = renderEditReplace();
 
     act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
@@ -398,7 +533,7 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
     const harness = renderStrip({
       isPersisted: true,
       effectiveVideoId: VIDEO_ID,
-      freshCandidatesPersisted: false,
+      draftCandidateUrls: [],
       storedCandidates: UPLOADED,
       posterUrl: UPLOADED[1].url,
     });
@@ -417,7 +552,7 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
     const harness = renderStrip({
       isPersisted: true,
       effectiveVideoId: VIDEO_ID,
-      freshCandidatesPersisted: true,
+      draftCandidateUrls: UPLOADED.map(({ url }) => url),
     });
 
     act(() => harness.current.strip.handlePosterCandidates(CAPTURED));

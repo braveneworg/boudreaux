@@ -29,13 +29,15 @@ export interface UseVideoPosterStripArgs {
   effectiveVideoId: string | undefined;
   preGeneratedId: string;
   /**
-   * Whether THIS session's captured frames already reached the row — true in a
-   * draft session (the draft create persisted them), false during an edit-mode
-   * file replace, where they only land at Save. `selectVideoPosterAction`
-   * accepts only the row's own candidates, so a fresh pick must stay local
-   * until then or the server refuses it and the pick snaps back.
+   * Candidate URLs a draft create wrote onto the row this session (empty in
+   * edit mode, where the row's own `posterCandidates` cover it).
+   * `selectVideoPosterAction` accepts only the row's own candidates, so a
+   * fresh pick must stay local until one of these URLs is what it points at —
+   * otherwise the server refuses it and the pick visibly snaps back. Tracked
+   * as URLs rather than a per-session flag because a SECOND file replace
+   * captures frames the row has never seen while the draft still exists.
    */
-  freshCandidatesPersisted: boolean;
+  draftCandidateUrls: string[];
   /**
    * Called only after a pick has actually persisted. `VideoForm` uses it to
    * forget a poster uploaded this session, whose display precedence would
@@ -147,12 +149,11 @@ const usePersistPosterPick = ({
  * edit page still offers the frames (and highlights none when a manual poster
  * is live).
  *
- * A click is local-only until a row exists AND holds the clicked candidate;
- * then the pick is written into the form optimistically and persisted
- * instantly, reverting with an error toast if the server refuses it. A stored
- * pick qualifies as soon as a row exists; a fresh one needs
- * `freshCandidatesPersisted`. Otherwise the selection stays local and rides
- * along into the draft/save payload via
+ * A click is local-only until a row exists AND holds the clicked candidate —
+ * the row's stored set, plus whatever a draft create wrote this session; then
+ * the pick is written into the form optimistically and persisted instantly,
+ * reverting with an error toast if the server refuses it. Otherwise the
+ * selection stays local and rides along into the draft/save payload via
  * {@link UseVideoPosterStripResult.getPosterDraftFields}.
  */
 export const useVideoPosterStrip = ({
@@ -161,7 +162,7 @@ export const useVideoPosterStrip = ({
   isPersisted,
   effectiveVideoId,
   preGeneratedId,
-  freshCandidatesPersisted,
+  draftCandidateUrls,
   onPosterPersisted,
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
@@ -174,6 +175,11 @@ export const useVideoPosterStrip = ({
 
   const isFreshMode = freshCandidates.length > 0;
   const stored = useMemo<VideoPosterCandidate[]>(() => video?.posterCandidates ?? [], [video]);
+  /** Every candidate URL the row is known to carry — the only persistable picks. */
+  const rowCandidateUrls = useMemo(
+    () => new Set([...stored.map(({ url }) => url), ...draftCandidateUrls]),
+    [stored, draftCandidateUrls]
+  );
   const stripCandidates: StripCandidate[] = isFreshMode ? freshCandidates : stored;
   const selectedIndex = isFreshMode
     ? freshSelectedIndex
@@ -187,24 +193,37 @@ export const useVideoPosterStrip = ({
   // (it skips the pointless presign for an empty set itself).
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
+      // A capture that yields nothing (an undecodable replacement) leaves the
+      // OUTGOING file's frame on the form — the draft wrote it, or the row
+      // hydrated it — and with no new frames to out-rank it, Save would hand
+      // file A's poster to file B (spec §9: zero candidates persists
+      // nothing). A manual poster is not a frame of the outgoing file and
+      // stays. `shouldDirty` so `VideoForm`'s `keepDirtyValues` reset cannot
+      // restore the row's value over the clear.
+      const posterUrl = form.getValues('posterUrl');
+      if (candidates.length === 0 && posterUrl && rowCandidateUrls.has(posterUrl)) {
+        form.setValue('posterUrl', '', { shouldDirty: true });
+      }
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
       startUploads(candidates);
     },
-    [startUploads]
+    [startUploads, form, rowCandidateUrls]
   );
 
   const handleSelectCandidate = useCallback(
     (index: number): void => {
       if (isFreshMode) setFreshSelectedIndex(index);
-      // A fresh frame is only persistable once its own upload has landed AND
-      // the row already carries this session's candidates; until then the pick
-      // stays local and the draft/save payload carries it.
+      // Only a URL the row already carries is persistable — a fresh frame
+      // needs its own upload to have landed AND the draft create to have put
+      // it there. Until then the pick stays local and the draft/save payload
+      // carries it.
       const candidateUrl = isFreshMode ? alignedNow.at(index)?.url : stored.at(index)?.url;
-      const isPersistable = isPersisted && (isFreshMode ? freshCandidatesPersisted : true);
-      if (isPersistable && candidateUrl) void persistPick(candidateUrl);
+      if (isPersisted && candidateUrl && rowCandidateUrls.has(candidateUrl)) {
+        void persistPick(candidateUrl);
+      }
     },
-    [isFreshMode, alignedNow, stored, isPersisted, freshCandidatesPersisted, persistPick]
+    [isFreshMode, alignedNow, stored, isPersisted, rowCandidateUrls, persistPick]
   );
 
   const getPosterDraftFields = useCallback(async (): Promise<DraftPosterFields> => {
