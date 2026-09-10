@@ -1,6 +1,6 @@
 # Fallback for ad-hoc local builds only. CI passes --build-arg NODE=... derived
 # from mise.toml, which is the single source of truth for the Node version.
-ARG NODE=node:24.18.0-alpine
+ARG NODE=node:24.21.0-alpine
 FROM ${NODE} AS dependencies
 RUN apk add --no-cache libc6-compat
 
