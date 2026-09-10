@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -90,6 +90,52 @@ const didPersistPoster = async (
   }
 };
 
+interface UsePersistPosterPickArgs {
+  form: UseFormReturn<VideoFormData>;
+  effectiveVideoId: string | undefined;
+  onPosterPersisted?: () => void;
+}
+
+/**
+ * One pick's optimistic write + instant persist, latest-pick-wins. A newer
+ * click always owns `posterUrl`, so an older attempt's outcome neither writes
+ * nor toasts: without that guard a first pick failing AFTER a second one
+ * succeeded reverts the preview to a value two picks old (until the video
+ * refetch lands) and reports an error for a poster that is in fact set. Same
+ * generation guard `usePosterCandidateUploads` uses for its upload fan-out.
+ */
+const usePersistPosterPick = ({
+  form,
+  effectiveVideoId,
+  onPosterPersisted,
+}: UsePersistPosterPickArgs): ((candidateUrl: string) => Promise<void>) => {
+  const { selectVideoPosterAsync } = useSelectVideoPosterMutation();
+  const pickGenerationRef = useRef(0);
+
+  return useCallback(
+    async (candidateUrl: string): Promise<void> => {
+      if (!effectiveVideoId) return;
+      const generation = (pickGenerationRef.current += 1);
+      const previousPosterUrl = form.getValues('posterUrl') ?? '';
+      form.setValue('posterUrl', candidateUrl, { shouldDirty: false });
+      const persisted = await didPersistPoster(
+        selectVideoPosterAsync,
+        effectiveVideoId,
+        candidateUrl
+      );
+      if (pickGenerationRef.current !== generation) return;
+      if (persisted) {
+        onPosterPersisted?.();
+        toast.success('Poster updated.');
+        return;
+      }
+      form.setValue('posterUrl', previousPosterUrl, { shouldDirty: false });
+      toast.error('Could not set the poster — try again.');
+    },
+    [effectiveVideoId, form, selectVideoPosterAsync, onPosterPersisted]
+  );
+};
+
 /**
  * Owns the poster candidate strip: what it shows, which thumb is highlighted,
  * and what a click does.
@@ -123,7 +169,7 @@ export const useVideoPosterStrip = ({
   const { startUploads, alignedNow, getSettledAligned } = usePosterCandidateUploads({
     preGeneratedId,
   });
-  const { selectVideoPosterAsync } = useSelectVideoPosterMutation();
+  const persistPick = usePersistPosterPick({ form, effectiveVideoId, onPosterPersisted });
   const watchedPosterUrl = useWatch({ control: form.control, name: 'posterUrl' });
 
   const isFreshMode = freshCandidates.length > 0;
@@ -146,22 +192,6 @@ export const useVideoPosterStrip = ({
       startUploads(candidates);
     },
     [startUploads]
-  );
-
-  const persistPick = useCallback(
-    async (candidateUrl: string): Promise<void> => {
-      if (!effectiveVideoId) return;
-      const previousPosterUrl = form.getValues('posterUrl') ?? '';
-      form.setValue('posterUrl', candidateUrl, { shouldDirty: false });
-      if (await didPersistPoster(selectVideoPosterAsync, effectiveVideoId, candidateUrl)) {
-        onPosterPersisted?.();
-        toast.success('Poster updated.');
-        return;
-      }
-      form.setValue('posterUrl', previousPosterUrl, { shouldDirty: false });
-      toast.error('Could not set the poster — try again.');
-    },
-    [effectiveVideoId, form, selectVideoPosterAsync, onPosterPersisted]
   );
 
   const handleSelectCandidate = useCallback(

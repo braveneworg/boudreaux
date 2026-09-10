@@ -430,6 +430,80 @@ describe('useVideoPosterStrip — fresh pick during an edit-mode file replace', 
   });
 });
 
+describe('useVideoPosterStrip — racing picks', () => {
+  /** A persist call the test resolves by hand, to order two picks' outcomes. */
+  const deferred = (): {
+    promise: Promise<{ success: boolean }>;
+    settle: (success: boolean) => void;
+  } => {
+    let settle: (success: boolean) => void = () => undefined;
+    const promise = new Promise<{ success: boolean }>((resolve) => {
+      settle = (success) => resolve({ success });
+    });
+    return { promise, settle };
+  };
+
+  /** Two rapid thumb clicks, both in flight, neither settled yet. */
+  const renderTwoPicksInFlight = (): {
+    harness: { current: StripHarness };
+    first: ReturnType<typeof deferred>;
+    second: ReturnType<typeof deferred>;
+  } => {
+    const first = deferred();
+    const second = deferred();
+    mocks.selectVideoPosterAsync
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const harness = renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      storedCandidates: UPLOADED,
+      posterUrl: UPLOADED[0].url,
+    });
+
+    act(() => harness.current.strip.handleSelectCandidate(1));
+    act(() => harness.current.strip.handleSelectCandidate(2));
+    return { harness, first, second };
+  };
+
+  it('keeps the newest pick when an older one fails late', async () => {
+    const { harness, first, second } = renderTwoPicksInFlight();
+
+    await act(async () => second.settle(true));
+    await act(async () => first.settle(false));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe(UPLOADED[2].url);
+  });
+
+  it('shows no error toast for a superseded failure', async () => {
+    // The poster IS set — to the newer pick — so an error would misreport it.
+    const { first, second } = renderTwoPicksInFlight();
+
+    await act(async () => second.settle(true));
+    await act(async () => first.settle(false));
+
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
+  it('shows no second success toast for a superseded success', async () => {
+    const { first, second } = renderTwoPicksInFlight();
+
+    await act(async () => second.settle(true));
+    await act(async () => first.settle(true));
+
+    expect(vi.mocked(toast.success)).toHaveBeenCalledTimes(1);
+  });
+
+  it('still reverts and toasts when the NEWEST pick is the one that fails', async () => {
+    const { harness, first, second } = renderTwoPicksInFlight();
+
+    await act(async () => first.settle(true));
+    await act(async () => second.settle(false));
+
+    expect(harness.current.form.getValues('posterUrl')).toBe(UPLOADED[1].url);
+  });
+});
+
 describe('useVideoPosterStrip — stored candidates on revisit', () => {
   it('shows the stored candidates as the strip candidates', () => {
     const harness = renderStrip({ storedCandidates: UPLOADED, posterUrl: UPLOADED[1].url });
