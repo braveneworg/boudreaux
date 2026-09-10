@@ -60,16 +60,16 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 
 ## 3. Prerequisites
 
-| Requirement    | Version / Source                                                                                                                    |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Node.js        | **24** (`mise.toml`; the web app's pre-push hook and the Lambda runtime both need 24 — `mise install` before any `pnpm`/`git push`) |
-| pnpm           | **11.15.1** (`mise.toml`; installed by the same `mise install`)                                                                     |
-| AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                               |
-| AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                               |
-| AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                                     |
-| Gemini account | <https://aistudio.google.com> (free tier sufficient for testing)                                                                    |
-| Docker         | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                                     |
-| MongoDB        | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                           |
+| Requirement    | Version / Source                                                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js        | pinned in `mise.toml` (the web app's pre-push hook and the Lambda runtime share it — `mise install` before any `pnpm`/`git push`) |
+| pnpm           | pinned in `mise.toml` (installed by the same `mise install`)                                                                      |
+| AWS account    | S3, CloudFront, Lambda, SSM Parameter Store, IAM/OIDC, CloudWatch/SNS                                                             |
+| AWS SAM CLI    | <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html>                             |
+| AWS CLI v2     | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>                                                   |
+| Gemini account | <https://aistudio.google.com> (free tier sufficient for testing)                                                                  |
+| Docker         | E2E isolated MongoDB (`pnpm run e2e:docker:up`)                                                                                   |
+| MongoDB        | Existing app DB (Prisma 6 + MongoDB) — no new connection, only new fields                                                         |
 
 ---
 
@@ -306,7 +306,7 @@ aws ssm put-parameter \
 
 ```bash
 # 0. Toolchain
-mise install                              # Node 24 + pnpm 11.15.1 from mise.toml
+mise install                              # Node + pnpm from mise.toml
 
 # 1. Web app deps + Prisma client (adds the new bio fields/models)
 pnpm install
