@@ -4,14 +4,22 @@ description: 'Install pnpm and Node.js only — no dependency install. Use when 
 runs:
   using: 'composite'
   steps:
-    - name: Install pnpm
-      # No `version:` here — pnpm/action-setup reads the version from the
-      # `packageManager` field in package.json. Pinning it in both places
-      # causes ERR_PNPM_BAD_PM_VERSION when they drift.
-      uses: pnpm/action-setup@v5
+    # Node and pnpm versions both come from mise.toml — the single source of
+    # truth for the toolchain. Do not pin either version here; a second pin
+    # drifts from mise.toml and silently installs the wrong toolchain.
+    - name: Install Node.js + pnpm via mise
+      uses: jdx/mise-action@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v6
+    - name: Resolve pnpm store path
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    # Replaces actions/setup-node's `cache: pnpm`, which is unavailable now
+    # that mise installs Node.
+    - name: Cache pnpm store
+      uses: actions/cache@v4
       with:
-        node-version: '24.18.0'
-        cache: 'pnpm'
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: ${{ runner.os }}-pnpm-store-

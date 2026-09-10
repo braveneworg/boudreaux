@@ -80,8 +80,11 @@ before continuing, so it never happens again.
 
 Versions track `package.json` — update this block when they change.
 
-- TypeScript 6 (strict), Node 24 (from `.nvmrc`, never global), pnpm 11 —
-  `pnpm exec` for CLI tools (`prisma`, `tsx`, …).
+- TypeScript 6 (strict), Node 24 + pnpm 12 (both from `mise.toml`, never
+  global) — `pnpm exec` for CLI tools (`prisma`, `tsx`, …). CI enforces that
+  every other declared version agrees with `mise.toml`
+  (`scripts/check-toolchain-pins.sh`), so bump the pin there and nowhere
+  else.
 - Next.js 16 (App Router, Turbopack dev, webpack build), React 19.
 - Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min
   upload); better-auth (magic-link + social OAuth, admin plugin); Stripe 21
@@ -124,7 +127,9 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
   autonomously.
 - Husky: **pre-commit** blocks `main`, runs gitleaks, lint-staged, and
   `vitest --changed`; **pre-push** requires up-to-date with `origin/main`,
-  rejects WIP/`fixup!` commits, runs `tsc --noEmit`, lint, and
+  rejects WIP/`fixup!` commits, asserts Node/pnpm match `mise.toml`
+  (`scripts/assert-toolchain.sh` — fast local feedback, but `--no-verify`
+  skips it; CI is the unskippable check), runs `tsc --noEmit`, lint, and
   `test:coverage:check`; **post-merge** reinstalls deps / regenerates Prisma
   when the lockfile or schema changed.
 

@@ -23,8 +23,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # Pure shell, no toolchain needed, so it runs in seconds before anything
+      # is installed. Branch protection makes this unskippable, unlike the
+      # pre-push hook that --no-verify bypasses.
+      - name: Check toolchain pins agree with mise.toml
+        run: sh scripts/check-toolchain-pins.sh .
+
       - name: Setup environment
         uses: ./.github/actions/setup
+
+      # Proves mise-action actually installed what mise.toml declares.
+      - name: Assert installed toolchain matches mise.toml
+        run: sh scripts/assert-toolchain.sh
 
       - name: Run ESLint
         run: pnpm run lint

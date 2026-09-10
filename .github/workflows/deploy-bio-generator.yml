@@ -24,13 +24,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24.18.0"
-
-      - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      # Node and pnpm versions both come from the repo-root mise.toml — the
+      # single source of truth for the toolchain. Do not pin either here.
+      - name: Set up Node.js + pnpm via mise
+        uses: jdx/mise-action@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6

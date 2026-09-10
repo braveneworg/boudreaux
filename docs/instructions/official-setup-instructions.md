@@ -17,7 +17,7 @@ this guide is the developer-focused, day-to-day version.
 > **TL;DR — run it locally with zero AWS:**
 >
 > ```bash
-> nvm use && corepack enable && corepack prepare pnpm@11.15.1 --activate
+> mise install
 > pnpm install
 > pnpm exec prisma db push
 > BIO_GENERATOR_FAKE=true pnpm run dev
@@ -47,12 +47,12 @@ fake mode.
 
 ## 2. Toolchain
 
-| Tool                 | Version                 | How                                                                                                                             |
-| -------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Node.js              | **v24.18.0** (`.nvmrc`) | `nvm use` (or `nvm install`). **Always run this before `pnpm` and `git push`** — the pre-push hook's `tsc` fails on older Node. |
-| pnpm                 | **11.15.1**             | `corepack enable && corepack prepare pnpm@11.15.1 --activate`                                                                   |
-| Docker               | any recent              | Only for E2E (isolated MongoDB on `localhost:27018`)                                                                            |
-| AWS CLI v2 + SAM CLI | latest                  | Only if you deploy the Lambda manually (CI does it for you)                                                                     |
+| Tool                 | Version               | How                                                                                                                                                              |
+| -------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js              | pinned in `mise.toml` | `mise install` (once); `mise` then activates it automatically on `cd`. **Always run this before `pnpm` and `git push`** — the pre-push hook asserts the version. |
+| pnpm                 | pinned in `mise.toml` | Installed by the same `mise install` — no corepack, no global pnpm.                                                                                              |
+| Docker               | any recent            | Only for E2E (isolated MongoDB on `localhost:27018`)                                                                                                             |
+| AWS CLI v2 + SAM CLI | latest                | Only if you deploy the Lambda manually (CI does it for you)                                                                                                      |
 
 ---
 
@@ -129,8 +129,7 @@ BIO_GENERATOR_LAMBDA_NAME="fakefour-bio-generator"
 
 ```bash
 # 1. Toolchain
-nvm use                                          # Node v24.18.0 from .nvmrc
-corepack enable && corepack prepare pnpm@11.15.1 --activate
+mise install                                     # Node + pnpm from mise.toml
 
 # 2. Install (postinstall runs `prisma generate`)
 pnpm install
@@ -208,11 +207,15 @@ These run automatically via Husky:
 
 - Blocks pushing to `main`/`master`; requires the branch be up to date with
   `origin/main`; rejects `WIP`/`fixup!`/`squash!` commits.
+- Asserts the Node and pnpm on `PATH` match `mise.toml`
+  (`scripts/assert-toolchain.sh`) before running the gate.
 - `pnpm exec tsc --noEmit`, `pnpm run lint`, `pnpm run test:coverage:check`.
 
-> 🟡 **Most common gotcha:** `git push` fails the pre-push `tsc` step with a Node
-> version error. The hook inherits whatever Node is on your `PATH`. Run **`nvm use`**
-> (Node 24) in the same shell before `git push`. Do **not** use `--no-verify`.
+> 🟡 **Most common gotcha:** `git push` fails the toolchain check because the
+> hook inherits whatever Node is on your `PATH` and mise is not activated in
+> that shell. Run **`mise install`**, and if you have ever run `corepack enable`
+> against a mise-managed Node, run **`corepack disable`** — its pnpm shim
+> shadows mise's pnpm. Do **not** use `--no-verify`.
 
 ---
 
@@ -313,7 +316,7 @@ aws cloudformation describe-stacks \
 | App: `Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)` | Real invoke without the env var                | Set `BIO_GENERATOR_LAMBDA_NAME=fakefour-bio-generator`, or use `BIO_GENERATOR_FAKE=true` for local dev |
 | Startup: env validation fails on `BIO_GENERATOR_LAMBDA_NAME`             | It's a required var                            | Add it to `.env`, or run with `SKIP_ENV_VALIDATION=true`                                               |
 | Lambda: `SSM parameter /fakefour/gemini/api-key returned no value`       | Gemini key not stored / wrong region           | Re-run the `aws ssm put-parameter` in `us-east-1` (§3.1)                                               |
-| `git push` fails on `tsc` with a Node version error                      | Hook ran under the wrong Node                  | `nvm use` (Node 24) before `git push` — never `--no-verify`                                            |
+| `git push` fails on `tsc` with a Node version error                      | Hook ran under the wrong Node                  | `mise install` (Node 24) before `git push` — never `--no-verify`                                       |
 | gitleaks blocks a commit on a `bio-generator` test                       | False positive on a placeholder key            | Already handled by `.gitleaks.toml`; add new fixture paths there if needed                             |
 | Spec crashes at import with a `domhandler` ESM error                     | A new `<BioHtml>` consumer spec on `vmThreads` | `vi.mock('./bio-html', …)` in that spec (see §6)                                                       |
 | E2E unexpectedly hits real AWS/Gemini                                    | Fake mode not set                              | Ensure `BIO_GENERATOR_FAKE=true` (the Playwright web server sets it; CI sets it in `ci.yml`)           |

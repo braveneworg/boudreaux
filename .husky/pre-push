@@ -229,6 +229,21 @@ elif [ -z "$TS_CHANGED" ]; then
   exit 0
 fi
 
+# Everything below runs whatever node/pnpm is on $PATH. mise only activates for
+# people who have hooked their shell, so assert the pins before burning several
+# minutes on a gate that would fail confusingly under the wrong Node.
+echo "🧰 Checking Node and pnpm match mise.toml..."
+stage="toolchain assertion (scripts/assert-toolchain.sh)"
+
+sh scripts/assert-toolchain.sh
+
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+echo "✅ Toolchain matches mise.toml"
+echo ""
+
 echo "🔍 Running TypeScript type-check before push..."
 stage="TypeScript type-check (pnpm exec tsc --noEmit)"
 
