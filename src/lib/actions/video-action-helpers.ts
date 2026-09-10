@@ -134,17 +134,22 @@ export const isPosterReplaced = (current: Video, data: VideoFormData): boolean =
   data.posterUrl !== undefined && data.posterUrl !== '' && data.posterUrl !== current.posterUrl;
 
 /**
+ * Whether `url` resolves to an S3 key inside this video's own namespace
+ * (`media/videos/{videoId}/…`) — the write-path injection guard for every
+ * admin-supplied poster URL, frame or manual upload alike.
+ */
+export const isVideoOwnedUrl = (url: string, videoId: string): boolean =>
+  (extractS3KeyFromUrl(url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`);
+
+/**
  * Whether EVERY candidate URL resolves to an S3 key inside this video's own
- * namespace (`media/videos/{videoId}/…`) — the write-path injection guard for
- * admin-supplied candidate lists.
+ * namespace — the write-path injection guard for admin-supplied candidate
+ * lists.
  */
 export const areCandidatesForVideo = (
   candidates: VideoPosterCandidate[],
   videoId: string
-): boolean =>
-  candidates.every((candidate) =>
-    (extractS3KeyFromUrl(candidate.url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`)
-  );
+): boolean => candidates.every((candidate) => isVideoOwnedUrl(candidate.url, videoId));
 
 /**
  * Candidate list an action may persist: present, namespaced to THIS video, and

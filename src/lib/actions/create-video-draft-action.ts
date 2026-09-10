@@ -25,6 +25,7 @@ import { parseVideoFilename } from '@/utils/parse-video-filename';
 import {
   areCandidatesForVideo,
   confirmVideoUpload,
+  isVideoOwnedUrl,
   parseDurationSeconds,
   parseFileSize,
 } from './video-action-helpers';
@@ -60,23 +61,30 @@ interface DraftPosterInput {
 }
 
 /**
- * Resolve the poster fields the draft may persist. Candidates must all live
- * under this video's own S3 namespace — a namespace violation drops the whole
- * set and is logged. `posterUrl` must additionally be one of those candidates;
- * a non-member is dropped silently (the frame's own upload simply lost the
- * race). Neither drop ever blocks the draft.
+ * Resolve the poster fields the draft may persist. Both halves are guarded the
+ * same way — every URL must live under this video's own S3 namespace — and are
+ * dropped independently: a namespace violation in the candidate list drops the
+ * whole set and is logged, a foreign `posterUrl` drops just the poster. The
+ * poster need NOT be one of the candidates: the admin can upload their own
+ * image while the video multipart is still running, and an abandoned draft
+ * must keep that upload rather than a captured frame. Neither drop ever blocks
+ * the draft.
  */
 const resolveDraftPosterInput = (data: VideoDraftInput): DraftPosterInput => {
   const candidates = data.posterCandidates ?? [];
-  if (candidates.length === 0) return {};
-  if (!areCandidatesForVideo(candidates, data.preGeneratedId)) {
+  const keepCandidates =
+    candidates.length > 0 && areCandidatesForVideo(candidates, data.preGeneratedId);
+  if (candidates.length > 0 && !keepCandidates) {
     logger.warn('video_draft_poster_candidates_rejected', { videoId: data.preGeneratedId });
-    return {};
   }
-  const posterUrl = candidates.some(({ url }) => url === data.posterUrl)
-    ? data.posterUrl
-    : undefined;
-  return { posterCandidates: candidates, ...(posterUrl ? { posterUrl } : {}) };
+  const posterUrl =
+    data.posterUrl && isVideoOwnedUrl(data.posterUrl, data.preGeneratedId)
+      ? data.posterUrl
+      : undefined;
+  return {
+    ...(keepCandidates ? { posterCandidates: candidates } : {}),
+    ...(posterUrl ? { posterUrl } : {}),
+  };
 };
 
 /** Repository payload for the draft — `publishedAt` omitted: always a draft. */
