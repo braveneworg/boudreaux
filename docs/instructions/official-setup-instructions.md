@@ -207,11 +207,15 @@ These run automatically via Husky:
 
 - Blocks pushing to `main`/`master`; requires the branch be up to date with
   `origin/main`; rejects `WIP`/`fixup!`/`squash!` commits.
+- Asserts the Node and pnpm on `PATH` match `mise.toml`
+  (`scripts/assert-toolchain.sh`) before running the gate.
 - `pnpm exec tsc --noEmit`, `pnpm run lint`, `pnpm run test:coverage:check`.
 
-> 🟡 **Most common gotcha:** `git push` fails the pre-push `tsc` step with a Node
-> version error. The hook inherits whatever Node is on your `PATH`. Run **`mise install`**
-> (Node 24) in the same shell before `git push`. Do **not** use `--no-verify`.
+> 🟡 **Most common gotcha:** `git push` fails the toolchain check because the
+> hook inherits whatever Node is on your `PATH` and mise is not activated in
+> that shell. Run **`mise install`**, and if you have ever run `corepack enable`
+> against a mise-managed Node, run **`corepack disable`** — its pnpm shim
+> shadows mise's pnpm. Do **not** use `--no-verify`.
 
 ---
 

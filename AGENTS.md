@@ -81,8 +81,7 @@ before continuing, so it never happens again.
 Versions track `package.json` — update this block when they change.
 
 - TypeScript 6 (strict), Node 24 + pnpm 11 (both from `mise.toml`, never
-  global) —
-  `pnpm exec` for CLI tools (`prisma`, `tsx`, …).
+  global) — `pnpm exec` for CLI tools (`prisma`, `tsx`, …).
 - Next.js 16 (App Router, Turbopack dev, webpack build), React 19.
 - Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min
   upload); better-auth (magic-link + social OAuth, admin plugin); Stripe 21
@@ -125,7 +124,8 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
   autonomously.
 - Husky: **pre-commit** blocks `main`, runs gitleaks, lint-staged, and
   `vitest --changed`; **pre-push** requires up-to-date with `origin/main`,
-  rejects WIP/`fixup!` commits, runs `tsc --noEmit`, lint, and
+  rejects WIP/`fixup!` commits, asserts Node/pnpm match `mise.toml`
+  (`scripts/assert-toolchain.sh`), runs `tsc --noEmit`, lint, and
   `test:coverage:check`; **post-merge** reinstalls deps / regenerates Prisma
   when the lockfile or schema changed.
 
