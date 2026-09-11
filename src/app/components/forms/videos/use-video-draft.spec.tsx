@@ -262,6 +262,147 @@ describe('useVideoDraft', () => {
     });
   });
 
+  describe('a poster uploaded before the draft lands', () => {
+    /**
+     * Only the manual upload can have written `posterUrl` before a row exists
+     * — an instant candidate pick needs one — so a value there is the admin's
+     * own image and must outrank the captured frame, in the draft payload as
+     * well as in the preview.
+     */
+    const MANUAL = `https://cdn.example.com/media/videos/${ID}/poster-1756000000-ab12cd.jpg`;
+
+    it('sends the manual poster as the draft poster instead of the frame', async () => {
+      vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+      const form = buildForm({ posterUrl: MANUAL });
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(result.current.draftId).toBe(ID));
+      expect(createVideoDraftAction).toHaveBeenCalledWith(
+        expect.objectContaining({ posterUrl: MANUAL })
+      );
+    });
+
+    it('still sends the captured candidates alongside it', async () => {
+      vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+      const form = buildForm({ posterUrl: MANUAL });
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(result.current.draftId).toBe(ID));
+      expect(createVideoDraftAction).toHaveBeenCalledWith(
+        expect.objectContaining({ posterCandidates: posterFields.posterCandidates })
+      );
+    });
+
+    it('leaves the manual poster in the form', async () => {
+      vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+      const form = buildForm({ posterUrl: MANUAL });
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(result.current.draftId).toBe(ID));
+      expect(form.current.getValues('posterUrl')).toBe(MANUAL);
+    });
+
+    it('leaves a manual poster that lands while the draft is in flight', async () => {
+      const form = buildForm();
+      vi.mocked(createVideoDraftAction).mockImplementation(async () => {
+        form.current.setValue('posterUrl', MANUAL);
+        return { success: true, videoId: ID };
+      });
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(result.current.draftId).toBe(ID));
+      expect(form.current.getValues('posterUrl')).toBe(MANUAL);
+    });
+  });
+
+  describe('candidate URLs the draft persisted', () => {
+    it('exposes them so the strip knows which fresh picks the row accepts', async () => {
+      vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+      const form = buildForm();
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(result.current.draftId).toBe(ID));
+      expect(result.current.draftCandidateUrls).toEqual(
+        posterFields.posterCandidates.map(({ url }) => url)
+      );
+    });
+
+    it('stays empty when the draft create failed', async () => {
+      vi.mocked(createVideoDraftAction).mockResolvedValue({ success: false, error: 'boom' });
+      const form = buildForm();
+
+      const { result } = renderHook(() =>
+        useVideoDraft({
+          form: form.current,
+          preGeneratedId: ID,
+          isEditMode: false,
+          getArtistDetails: () => [],
+          getPosterFields: async () => posterFields,
+        })
+      );
+
+      act(() => result.current.handleUploadComplete());
+
+      await waitFor(() => expect(createVideoDraftAction).toHaveBeenCalledTimes(1));
+      expect(result.current.draftCandidateUrls).toEqual([]);
+    });
+  });
+
   it('sends no poster fields and never touches posterUrl when getPosterFields resolves empty', async () => {
     vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
     const form = buildForm();

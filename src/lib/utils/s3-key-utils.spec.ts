@@ -38,6 +38,60 @@ describe('extractS3KeyFromUrl', () => {
       const url = 'https://bucket.s3.eu-west-1.amazonaws.com/a/b/c/d.flac';
       expect(extractS3KeyFromUrl(url)).toBe('a/b/c/d.flac');
     });
+
+    it('should extract S3 key from the legacy region-less endpoint', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      const url = 'https://bucket.s3.amazonaws.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBe('media/videos/v1/poster.jpg');
+    });
+
+    it('should extract S3 key from the configured bucket', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      vi.stubEnv('AWS_S3_BUCKET_NAME', 'ours');
+      const url = 'https://ours.s3.us-east-1.amazonaws.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBe('media/videos/v1/poster.jpg');
+    });
+  });
+
+  describe('foreign hosts', () => {
+    /**
+     * The namespace guards downstream (`areCandidatesForVideo`,
+     * `isVideoNamespacedKey`) only check the KEY, so a host that yields a
+     * plausible key passes them. The host is the only place that can be
+     * checked.
+     */
+    it('should return null for a look-alike host that merely contains .s3.', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      const url = 'https://bucket.s3.attacker.example.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
+
+    it('should return null for an amazonaws.com host that is not an S3 endpoint', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      const url = 'https://evil.execute-api.us-east-1.amazonaws.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
+
+    it('should return null for a foreign bucket when ours is configured', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      vi.stubEnv('AWS_S3_BUCKET_NAME', 'ours');
+      const url = 'https://theirs.s3.us-east-1.amazonaws.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
+
+    it('should honour the S3_BUCKET fallback name', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      vi.stubEnv('AWS_S3_BUCKET_NAME', '');
+      vi.stubEnv('S3_BUCKET', 'ours');
+      const url = 'https://theirs.s3.us-east-1.amazonaws.com/media/videos/v1/poster.jpg';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
+
+    it('should return null for an S3 URL carrying no key', () => {
+      vi.stubEnv('CDN_DOMAIN', '');
+      const url = 'https://bucket.s3.us-east-1.amazonaws.com/';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
   });
 
   describe('edge cases', () => {

@@ -109,7 +109,12 @@ export const buildVideoCreateInput = (
   createdBy: userId,
 });
 
-/** Build the repository update payload from parsed form data, stamping `updatedBy`. */
+/**
+ * Build the repository update payload from parsed form data, stamping
+ * `updatedBy`. `posterUrl` is deliberately absent — only
+ * {@link resolveUpdatedPosterUrl} knows whether an empty one means "leave it"
+ * or "a file replace cleared it", and it must not be overwritten here.
+ */
 export const buildVideoUpdateInput = (data: VideoFormData, userId: string): UpdateVideoData => ({
   title: data.title,
   artist: data.artist,
@@ -121,7 +126,6 @@ export const buildVideoUpdateInput = (data: VideoFormData, userId: string): Upda
   fileName: data.fileName,
   fileSize: parseFileSize(data.fileSize),
   mimeType: data.mimeType,
-  posterUrl: data.posterUrl || undefined,
   publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
   updatedBy: userId,
 });
@@ -134,21 +138,26 @@ export const isPosterReplaced = (current: Video, data: VideoFormData): boolean =
   data.posterUrl !== undefined && data.posterUrl !== '' && data.posterUrl !== current.posterUrl;
 
 /**
+ * Whether `url` resolves to an S3 key inside this video's own namespace
+ * (`media/videos/{videoId}/…`) — the write-path injection guard for every
+ * admin-supplied poster URL, frame or manual upload alike.
+ */
+export const isVideoOwnedUrl = (url: string, videoId: string): boolean =>
+  (extractS3KeyFromUrl(url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`);
+
+/**
  * Whether EVERY candidate URL resolves to an S3 key inside this video's own
- * namespace (`media/videos/{videoId}/…`) — the write-path injection guard for
- * admin-supplied candidate lists.
+ * namespace — the write-path injection guard for admin-supplied candidate
+ * lists.
  */
 export const areCandidatesForVideo = (
   candidates: VideoPosterCandidate[],
   videoId: string
-): boolean =>
-  candidates.every((candidate) =>
-    (extractS3KeyFromUrl(candidate.url) ?? '').startsWith(`${VIDEO_KEY_PREFIX}${videoId}/`)
-  );
+): boolean => candidates.every((candidate) => isVideoOwnedUrl(candidate.url, videoId));
 
 /**
- * Candidate list an action may persist: present, namespaced to THIS video, and
- * — for updates — only alongside an actual file replace (`s3KeyReplaced`).
+ * Candidate list a CREATE may persist: present, namespaced to THIS video, and
+ * accompanied by an actual file (`s3KeyReplaced`, always true on a create).
  * Anything else resolves to `undefined` (field omitted; never blocks the save).
  */
 export const resolvePersistableCandidates = (
@@ -163,6 +172,32 @@ export const resolvePersistableCandidates = (
   areCandidatesForVideo(data.posterCandidates, videoId)
     ? data.posterCandidates
     : undefined;
+
+/**
+ * Candidate list an UPDATE writes. Poster frames belong to the file they were
+ * captured from (spec §7), so a file replace ALWAYS settles the field: the
+ * fresh set when the payload carries a valid one, else `[]` — the outgoing
+ * file's frames must not become the new file's strip (spec §9: zero candidates
+ * persists nothing). Without a replace the field is left alone (`undefined`).
+ */
+export const resolveUpdatedCandidates = (
+  data: VideoFormData,
+  videoId: string,
+  s3KeyReplaced: boolean
+): VideoPosterCandidate[] | undefined =>
+  s3KeyReplaced ? (resolvePersistableCandidates(data, videoId, true) ?? []) : undefined;
+
+/**
+ * Poster URL an update writes: whatever the payload supplies, or `null` when a
+ * file replace supplies none — the outgoing file's frame must not stay on as
+ * the new file's poster. Only a replace can clear it: the poster section is
+ * replace-only, so an empty field on a plain save just means the video never
+ * had a poster, and `undefined` leaves the column untouched.
+ */
+export const resolveUpdatedPosterUrl = (
+  data: VideoFormData,
+  s3KeyReplaced: boolean
+): string | null | undefined => data.posterUrl || (s3KeyReplaced ? null : undefined);
 
 /** Whether `url` is one of the video's stored candidate frames. */
 const isStoredCandidateUrl = (current: Video, url: string | null): boolean =>
@@ -179,16 +214,18 @@ const retainedPosterKey = (current: Video, data: VideoFormData): string | null =
     : null;
 
 /**
- * Old candidate keys freed when a file replace ships a fresh candidate set —
- * except the object an unchanged `posterUrl` still references. Deleting that
- * one would leave the row pointing at a 404 poster on every surface.
+ * Old candidate keys freed by a file replace — except the object an unchanged
+ * `posterUrl` still references. Deleting that one would leave the row pointing
+ * at a 404 poster on every surface. A replace frees them whether or not a
+ * fresh set arrives, because {@link resolveUpdatedCandidates} clears the row's
+ * list either way.
  */
 const replacedCandidateKeys = (
   current: Video,
   data: VideoFormData,
   s3KeyReplaced: boolean
 ): string[] => {
-  if (!s3KeyReplaced || data.posterCandidates === undefined) return [];
+  if (!s3KeyReplaced) return [];
   const retained = retainedPosterKey(current, data);
   return current.posterCandidates
     .map((candidate) => extractS3KeyFromUrl(candidate.url))
@@ -200,9 +237,9 @@ const replacedCandidateKeys = (
  * Best-effort, fire-and-forget cleanup of S3 objects a successful update
  * orphaned: the old video key (file replaced), the old poster key (poster
  * replaced — unless it is a stored candidate, which must survive a
- * candidate-to-candidate switch), and the old candidate set (file replaced
- * with a fresh capture, minus whichever frame an unchanged poster still
- * points at). Failures are swallowed by {@link deleteS3Object}.
+ * candidate-to-candidate switch), and the old candidate set (file replaced,
+ * minus whichever frame an unchanged poster still points at). Failures are
+ * swallowed by {@link deleteS3Object}.
  */
 export const deleteReplacedVideoAssets = (
   current: Video,

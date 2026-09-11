@@ -202,6 +202,37 @@ describe('create-video-schema', () => {
       const result = createVideoSchema.safeParse({ ...validData, posterUrl: 'not-a-url' });
       expect(result.success).toBe(false);
     });
+
+    it('should reject a javascript: poster url', () => {
+      // `z.string().url()` admits it; the repo's `isHttpUrl` refinement is the
+      // fix for that class (docs/lessons/validation).
+      const result = createVideoSchema.safeParse({
+        ...validData,
+        posterUrl: 'javascript:alert(1)',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject a data: poster url', () => {
+      const result = createVideoSchema.safeParse({
+        ...validData,
+        posterUrl: 'data:image/jpeg;base64,AAAA',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject a poster url with no host', () => {
+      const result = createVideoSchema.safeParse({ ...validData, posterUrl: 'https://' });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject a poster url beyond the length cap', () => {
+      const result = createVideoSchema.safeParse({
+        ...validData,
+        posterUrl: `https://cdn.example.com/${'a'.repeat(2048)}.jpg`,
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('publishedAt validation', () => {
