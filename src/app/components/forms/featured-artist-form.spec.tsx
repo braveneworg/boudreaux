@@ -37,8 +37,7 @@ const render = (ui: React.ReactElement) => {
 
 // Capture props passed to mocked ReleaseSelect
 let capturedReleaseSelectSetValue:
-  | ((name: string, value: string, options?: Record<string, boolean>) => void)
-  | undefined;
+  ((name: string, value: string, options?: Record<string, boolean>) => void) | undefined;
 
 // Spy for react-hook-form setValue
 const mockSetValue = vi.fn();

@@ -223,8 +223,7 @@ export type BioStatus = AsyncJobStatus;
  * status, and the client polls {@link BioGenerationStatusResult} for completion.
  */
 export type GenerateArtistBioActionResult =
-  | { success: true; status: BioStatus }
-  | { success: false; error: string };
+  { success: true; status: BioStatus } | { success: false; error: string };
 
 /** Polled status of an artist's async bio generation. */
 export interface BioGenerationStatusResult {

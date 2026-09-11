@@ -102,8 +102,7 @@ it).
 export type VettedAddress = { address: string; family: number };
 
 type VetResult =
-  | ({ ok: true } & VettedAddress)
-  | { ok: false; reason: 'disallowed' | 'dns_failure' };
+  ({ ok: true } & VettedAddress) | { ok: false; reason: 'disallowed' | 'dns_failure' };
 
 /** DNS-resolve `hostname` and vet the result against the SSRF blocklist
  *  (`isDisallowedAddress`). Never returns a framework Response — callers map

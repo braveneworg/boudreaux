@@ -1301,8 +1301,7 @@ const checkAacQuota = async (
 
 /** Either the chargeable release set or an early quota/lock response. */
 type QuotaGate =
-  | { kind: 'ok'; chargeableReleaseIds: string[] }
-  | { kind: 'response'; response: NextResponse };
+  { kind: 'ok'; chargeableReleaseIds: string[] } | { kind: 'response'; response: NextResponse };
 
 /**
  * AAC gate: acquire the per-(user, playlist, format) collision lock around

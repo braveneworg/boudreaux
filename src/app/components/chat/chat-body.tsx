@@ -45,8 +45,7 @@ interface SessionUser {
 
 const extractSessionUser = (session: ClientSessionData): SessionUser => {
   const user = session.user as
-    | { id?: string; name?: string | null; email?: string | null; role?: string | null }
-    | undefined;
+    { id?: string; name?: string | null; email?: string | null; role?: string | null } | undefined;
   return {
     id: user?.id ?? '',
     username: user?.name ?? null,

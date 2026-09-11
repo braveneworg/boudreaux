@@ -362,12 +362,7 @@ const recoverArtistFromDuplicate = async (
 
 /** The artist fields a video-enrichment suggestion may apply. */
 export type ArtistEnrichedField =
-  | 'firstName'
-  | 'middleName'
-  | 'surname'
-  | 'akaNames'
-  | 'displayName'
-  | 'bornOn';
+  'firstName' | 'middleName' | 'surname' | 'akaNames' | 'displayName' | 'bornOn';
 
 /**
  * Explicit whitelist switch mapping a suggestion field onto a typed one-field

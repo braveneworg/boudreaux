@@ -172,10 +172,8 @@ export type ApplyVideoSuggestionInput = z.infer<typeof applyVideoSuggestionInput
 
 /** Result of triggering async enrichment (mirrors GenerateArtistBioActionResult). */
 export type RunVideoEnrichmentActionResult =
-  | { success: true; status: EnrichmentStatus }
-  | { success: false; error: string };
+  { success: true; status: EnrichmentStatus } | { success: false; error: string };
 
 /** Result of applying/dismissing one suggestion. */
 export type ApplyVideoSuggestionActionResult =
-  | { success: true; op: 'apply' | 'dismiss' }
-  | { success: false; error: string };
+  { success: true; op: 'apply' | 'dismiss' } | { success: false; error: string };

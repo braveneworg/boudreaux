@@ -137,8 +137,7 @@ const resolveCheckoutEmail = (
 
 /** Discriminated result of validating the premium amount the user submitted. */
 type PremiumAmountResult =
-  | { ok: true; cents: number }
-  | { ok: false; field: 'finalAmount'; message: string };
+  { ok: true; cents: number } | { ok: false; field: 'finalAmount'; message: string };
 
 /**
  * Validate and convert the submitted premium amount into integer cents. Returns a

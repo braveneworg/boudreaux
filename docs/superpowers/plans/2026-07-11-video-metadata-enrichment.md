@@ -4730,13 +4730,11 @@ Part B builds the server spine of the video-enrichment pipeline by cloning the p
 
   /** Result of triggering async enrichment (mirrors GenerateArtistBioActionResult). */
   export type RunVideoEnrichmentActionResult =
-    | { success: true; status: EnrichmentStatus }
-    | { success: false; error: string };
+    { success: true; status: EnrichmentStatus } | { success: false; error: string };
 
   /** Result of applying/dismissing one suggestion. */
   export type ApplyVideoSuggestionActionResult =
-    | { success: true; op: 'apply' | 'dismiss' }
-    | { success: false; error: string };
+    { success: true; op: 'apply' | 'dismiss' } | { success: false; error: string };
 
   export { STALE_JOB_MS } from './bio-generation-schema';
   ```
@@ -7549,12 +7547,7 @@ Part B builds the server spine of the video-enrichment pipeline by cloning the p
   ```ts
   /** The artist fields a video-enrichment suggestion may apply. */
   export type ArtistEnrichedField =
-    | 'firstName'
-    | 'middleName'
-    | 'surname'
-    | 'akaNames'
-    | 'displayName'
-    | 'bornOn';
+    'firstName' | 'middleName' | 'surname' | 'akaNames' | 'displayName' | 'bornOn';
 
   /**
    * Explicit whitelist switch mapping a suggestion field onto a typed one-field

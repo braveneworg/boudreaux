@@ -121,13 +121,9 @@ describe('ComponentName', () => {
 **Before**: Multiple conflicting mocks
 
 ```typescript
-vi.mock('react-hook-form', () => ({
-  /* mock 1 */
-}));
+vi.mock('react-hook-form', () => ({/* mock 1 */}));
 // ... other code ...
-vi.mock('react-hook-form', () => ({
-  /* mock 2 - overwrites */
-}));
+vi.mock('react-hook-form', () => ({/* mock 2 - overwrites */}));
 ```
 
 **After**: Single unified mock

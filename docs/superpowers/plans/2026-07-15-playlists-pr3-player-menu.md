@@ -56,8 +56,7 @@ export interface PlaylistItemSourceRef {
 
 // src/lib/validation/playlist-schema.ts (existing)
 export type AddPlaylistItemInput = (
-  | { itemType: 'track'; trackFileId: string }
-  | { itemType: 'video'; videoId: string }
+  { itemType: 'track'; trackFileId: string } | { itemType: 'video'; videoId: string }
 ) & { playlistId: string; force: boolean };
 
 // src/lib/constants/playlists.ts (existing)

@@ -21,8 +21,7 @@ interface ConfirmRequestBody {
 }
 
 type FormatsResult =
-  | { ok: true; formats: DigitalFormatType[] }
-  | { ok: false; response: NextResponse };
+  { ok: true; formats: DigitalFormatType[] } | { ok: false; response: NextResponse };
 
 interface LogEventsArgs {
   repo: DownloadEventRepository;

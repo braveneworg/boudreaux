@@ -39,8 +39,7 @@ The failure arm of `ServiceResponse<T>` carries the code:
 
 ```ts
 export type ServiceResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; code: DataErrorCode };
+  { success: true; data: T } | { success: false; error: string; code: DataErrorCode };
 ```
 
 `code` is **required**, not optional. An optional field would let call sites

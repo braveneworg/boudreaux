@@ -15,8 +15,7 @@ export interface NavMenuGroup {
 }
 
 export type NavMenuEntry =
-  | { kind: 'link'; item: NavMenuItem }
-  | { kind: 'group'; group: NavMenuGroup };
+  { kind: 'link'; item: NavMenuItem } | { kind: 'group'; group: NavMenuGroup };
 
 // Drawer membership by href (spec order). Hrefs are stabler than display names.
 const MUSIC_HREFS = ['/releases', '/artists', '/playlists', '/videos'] as const;

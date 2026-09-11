@@ -58,8 +58,7 @@ describe('SnsSmsService', () => {
     await service.send('+15551234567', 'hi', { transactional: false });
 
     const lastCallInput = PublishCommandCtor.mock.calls[0]?.[0] as
-      | { MessageAttributes: Record<string, { StringValue: string }> }
-      | undefined;
+      { MessageAttributes: Record<string, { StringValue: string }> } | undefined;
     expect(lastCallInput?.MessageAttributes['AWS.SNS.SMS.SMSType']?.StringValue).toBe(
       'Promotional'
     );
@@ -75,8 +74,7 @@ describe('SnsSmsService', () => {
     await service.send('+15551234567', 'hi');
 
     const lastCallInput = PublishCommandCtor.mock.calls[0]?.[0] as
-      | { MessageAttributes: Record<string, { StringValue: string }> }
-      | undefined;
+      { MessageAttributes: Record<string, { StringValue: string }> } | undefined;
     expect(lastCallInput?.MessageAttributes['AWS.MM.SMS.OriginationNumber']?.StringValue).toBe(
       '+18005551212'
     );

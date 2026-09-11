@@ -683,9 +683,7 @@ for (const query of queries) {
   if (!found) continue;
   acc.facts.sourceText = appendSourceText(acc.facts.sourceText, found.sourceText);
   acc.scrapedImages.push(...found.images);
-  acc.facts.sourceUrls = [
-    /* existing union, plus found.sourceUrls */
-  ];
+  acc.facts.sourceUrls = [/* existing union, plus found.sourceUrls */];
   for (const ref of found.references) {
     acc.links.push({ label: ref.title ?? 'Reference', url: ref.url, kind: 'other' });
   }
