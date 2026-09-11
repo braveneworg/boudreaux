@@ -14,6 +14,7 @@ import {
   confirmVideoUpload,
   deleteReplacedVideoAssets,
   isPosterReplaced,
+  isVideoOwnedUrl,
   resolveUpdatedCandidates,
   resolveUpdatedPosterUrl,
   VIDEO_PERMITTED_FIELD_NAMES,
@@ -447,6 +448,26 @@ describe('resolveUpdatedPosterUrl', () => {
 
   it('leaves the poster alone when the file was not replaced', () => {
     expect(resolveUpdatedPosterUrl({ ...formData, posterUrl: '' }, false)).toBeUndefined();
+  });
+});
+
+describe('isVideoOwnedUrl', () => {
+  it('accepts a URL under the video’s own namespace', () => {
+    vi.mocked(extractS3KeyFromUrl).mockReturnValue(`media/videos/${videoId}/poster.jpg`);
+
+    expect(isVideoOwnedUrl('https://cdn.example.com/whatever.jpg', videoId)).toBe(true);
+  });
+
+  it('rejects a URL under another video’s namespace', () => {
+    vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/videos/other/poster.jpg');
+
+    expect(isVideoOwnedUrl('https://cdn.example.com/whatever.jpg', videoId)).toBe(false);
+  });
+
+  it('rejects a URL no key can be extracted from', () => {
+    vi.mocked(extractS3KeyFromUrl).mockReturnValue(null);
+
+    expect(isVideoOwnedUrl('https://elsewhere.example.com/poster.jpg', videoId)).toBe(false);
   });
 });
 
