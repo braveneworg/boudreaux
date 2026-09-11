@@ -14,7 +14,7 @@ overrides:
   '@typescript-eslint/project-service': ^8.58.0
   '@xmldom/xmldom': ^0.9.10
   lodash: 4.18.1
-  vite: ~7.3.2
+  vite: ^7.3.2
   defu: ^6.1.5
   picomatch: ^4.0.4
   effect: ^3.20.0
@@ -507,7 +507,7 @@ importers:
         specifier: ^8.58.0
         version: 8.61.1(eslint@10.5.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       vite:
-        specifier: ~7.3.2
+        specifier: ^7.3.2
         version: 7.3.5(@types/node@25.9.6)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0)
       vitest:
         specifier: ^4.1.11
@@ -3376,7 +3376,7 @@ packages:
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      vite: ~7.3.2
+      vite: ^7.3.2
 
   '@vitest/coverage-v8@4.1.11':
     resolution: {integrity: sha512-8MVGEFnJIcdGjcbfKmeq8z0pZHH0JlVtoVZH9Q/qwUp6wyFnEJUBMrw9DCaj+ra3vShGmhavjalMIhPNxZAUcw==}
@@ -3410,7 +3410,7 @@ packages:
     resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
     peerDependencies:
       msw: ^2.4.9
-      vite: ~7.3.2
+      vite: ^7.3.2
     peerDependenciesMeta:
       msw:
         optional: true
@@ -7063,7 +7063,7 @@ packages:
       '@vitest/ui': 4.1.11
       happy-dom: '*'
       jsdom: '*'
-      vite: ~7.3.2
+      vite: ^7.3.2
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
