@@ -734,5 +734,69 @@ describe('updateVideoAction', () => {
       const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'posterCandidates')).toBe(false);
     });
+
+    /**
+     * Candidates belong to the file they were captured from (spec §7), so a
+     * replacement arriving without a fresh set must not inherit the outgoing
+     * file's frames — nor the poster that pointed into them (spec §9: zero
+     * candidates persists nothing). The client empties `posterUrl` for exactly
+     * that case; a poster it still supplies is the admin's own image.
+     */
+    it('clears the outgoing candidates when a replacement brings none', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: '' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterCandidates: [] })
+      );
+    });
+
+    it('clears the outgoing poster when a replacement brings none', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: '' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterUrl: null })
+      );
+    });
+
+    it('keeps a poster the replacement does supply', async () => {
+      const manual = 'https://cdn.example.com/manual-poster.jpg';
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: manual });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterUrl: manual })
+      );
+    });
+
+    it('never clears the poster on a save that does not replace the file', async () => {
+      mockParsedSuccess({ ...parsedData, posterUrl: '' });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterUrl: undefined })
+      );
+    });
+
+    it('drops a foreign-namespaced candidate set rather than persisting it', async () => {
+      vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/videos/other-video/candidate.jpg');
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterCandidates });
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.updateVideo).toHaveBeenCalledWith(
+        videoId,
+        expect.objectContaining({ posterCandidates: [] })
+      );
+    });
   });
 });

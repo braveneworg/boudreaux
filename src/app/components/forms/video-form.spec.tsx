@@ -364,7 +364,11 @@ beforeEach(() => {
     updateDraft: mocks.updateDraft,
     buildArtistDetails: mocks.buildArtistDetails,
   });
-  mocks.useVideoDraft.mockReturnValue({ draftId: null, handleUploadComplete: vi.fn() });
+  mocks.useVideoDraft.mockReturnValue({
+    draftId: null,
+    handleUploadComplete: vi.fn(),
+    draftCandidateUrls: [],
+  });
   mocks.getPosterDraftFields.mockResolvedValue(NO_POSTER_DRAFT_FIELDS);
   mocks.createVideoAsync.mockResolvedValue({
     success: true,
@@ -753,6 +757,7 @@ describe('VideoForm — draft-mode submit', () => {
     mocks.useVideoDraft.mockReturnValue({
       draftId: 'draft-video-id',
       handleUploadComplete: vi.fn(),
+      draftCandidateUrls: [],
     });
     const user = setup();
     render(<VideoForm />);
@@ -1727,6 +1732,7 @@ describe('VideoForm — enrichment panel mount gating', () => {
     mocks.useVideoDraft.mockReturnValue({
       draftId: 'draft-video-id',
       handleUploadComplete: vi.fn(),
+      draftCandidateUrls: [],
     });
     render(<VideoForm />);
 

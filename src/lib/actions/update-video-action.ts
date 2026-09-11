@@ -31,7 +31,8 @@ import {
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
-  resolvePersistableCandidates,
+  resolveUpdatedCandidates,
+  resolveUpdatedPosterUrl,
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
@@ -92,9 +93,12 @@ const runVideoUpdate = async (
     }
   }
 
-  const candidates = resolvePersistableCandidates(data, videoId, s3KeyReplaced);
+  const candidates = resolveUpdatedCandidates(data, videoId, s3KeyReplaced);
   const response = await VideoService.updateVideo(videoId, {
     ...buildVideoUpdateInput(data, userId),
+    // A file replace settles both poster halves — the outgoing file's frames
+    // (and the poster pointing into them) never carry over to the new file.
+    posterUrl: resolveUpdatedPosterUrl(data, s3KeyReplaced),
     ...(candidates !== undefined ? { posterCandidates: candidates } : {}),
   });
 

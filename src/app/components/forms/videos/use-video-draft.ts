@@ -29,7 +29,28 @@ interface UseVideoDraftArgs {
 export interface UseVideoDraftResult {
   draftId: string | null;
   handleUploadComplete: () => void;
+  /**
+   * Candidate URLs a successful draft create wrote onto the row. The poster
+   * strip persists a fresh pick only for one of these —
+   * `selectVideoPosterAction` accepts only the row's own candidates — and a
+   * second file replace in the same session leaves the set behind, so it can
+   * no longer be mistaken for the new capture's frames.
+   */
+  draftCandidateUrls: string[];
 }
+
+/**
+ * The poster fields the draft persists. Before a row exists only the manual
+ * poster upload can have written `posterUrl` (an instant candidate pick needs
+ * a row), so a value on the form is the admin's own image and outranks the
+ * captured frame here exactly as it does in the preview and at submit —
+ * otherwise an abandoned draft keeps a frame the admin already replaced.
+ */
+const resolveDraftPoster = (
+  manualPosterUrl: string | undefined,
+  posterFields: DraftPosterFields
+): DraftPosterFields =>
+  manualPosterUrl ? { ...posterFields, posterUrl: manualPosterUrl } : posterFields;
 
 /** Poster subset of the draft payload — each field spread only when present. */
 const buildPosterDraftFields = (posterFields: DraftPosterFields): Record<string, unknown> => ({
@@ -69,9 +90,11 @@ const buildDraftInput = (
  * (history.replaceState keeps the mounted form alive; a refresh resumes on
  * the edit page). On success, a resolved `posterUrl` is written back into RHF
  * with `shouldDirty: false` so the Save-time fallback sees the field as
- * already-set and never re-uploads the blob. A failed draft leaves `draftId`
- * null and the form silently falls back to create-on-submit — the upload is
- * never blocked, and abandoning after upload leaves a poster-bearing draft.
+ * already-set and never re-uploads the blob — unless a manual poster upload
+ * owns the field, which outranks the frame both in the payload and on the
+ * form (see {@link resolveDraftPoster}). A failed draft leaves `draftId` null
+ * and the form silently falls back to create-on-submit — the upload is never
+ * blocked, and abandoning after upload leaves a poster-bearing draft.
  */
 export const useVideoDraft = ({
   form,
@@ -81,31 +104,37 @@ export const useVideoDraft = ({
   getPosterFields,
 }: UseVideoDraftArgs): UseVideoDraftResult => {
   const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftCandidateUrls, setDraftCandidateUrls] = useState<string[]>([]);
   const inFlightRef = useRef(false);
+
+  const createDraft = useCallback(async (): Promise<void> => {
+    const posterFields = await getPosterFields();
+    const draftPoster = resolveDraftPoster(form.getValues('posterUrl'), posterFields);
+    const result = await createVideoDraftAction(
+      buildDraftInput(form.getValues(), preGeneratedId, getArtistDetails(), draftPoster)
+    );
+    if (!result.success) return;
+    // Re-read rather than reuse the value above: a manual poster upload may
+    // have landed while the action was in flight, and it owns the field.
+    if (posterFields.posterUrl && !form.getValues('posterUrl')) {
+      form.setValue('posterUrl', posterFields.posterUrl, { shouldDirty: false });
+    }
+    setDraftCandidateUrls((posterFields.posterCandidates ?? []).map(({ url }) => url));
+    setDraftId(result.videoId);
+    globalThis.history.replaceState(null, '', `/admin/videos/${result.videoId}`);
+  }, [form, preGeneratedId, getArtistDetails, getPosterFields]);
 
   const handleUploadComplete = useCallback((): void => {
     if (isEditMode || draftId !== null || inFlightRef.current) return;
     inFlightRef.current = true;
-    void (async () => {
-      try {
-        const posterFields = await getPosterFields();
-        const result = await createVideoDraftAction(
-          buildDraftInput(form.getValues(), preGeneratedId, getArtistDetails(), posterFields)
-        );
-        if (result.success) {
-          if (posterFields.posterUrl) {
-            form.setValue('posterUrl', posterFields.posterUrl, { shouldDirty: false });
-          }
-          setDraftId(result.videoId);
-          globalThis.history.replaceState(null, '', `/admin/videos/${result.videoId}`);
-        }
-      } catch {
+    void createDraft()
+      .catch(() => {
         // Degrade silently — the server action logs; create-on-submit still works.
-      } finally {
+      })
+      .finally(() => {
         inFlightRef.current = false;
-      }
-    })();
-  }, [isEditMode, draftId, form, preGeneratedId, getArtistDetails, getPosterFields]);
+      });
+  }, [isEditMode, draftId, createDraft]);
 
-  return { draftId, handleUploadComplete };
+  return { draftId, handleUploadComplete, draftCandidateUrls };
 };
