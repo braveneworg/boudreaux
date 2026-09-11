@@ -43,8 +43,9 @@ export default defineConfig((): ViteUserConfig => {
     // Cache directory for faster subsequent builds
     cacheDir: 'node_modules/.vite',
 
-    // Optimize build for faster test startup
-    esbuild: {
+    // Optimize build for faster test startup. Vite 8 transforms with Oxc; the
+    // old `esbuild` option is deprecated and only converted internally.
+    oxc: {
       target: 'node24', // Use latest Node.js target for faster builds in test environment
     },
 
@@ -53,7 +54,7 @@ export default defineConfig((): ViteUserConfig => {
       silent: withCoverage ? false : 'passed-only', // Silence test output when not collecting coverage
       name: packageJson.name,
       environment: 'jsdom',
-      // Use Vitest 4 workspace projects to split .spec.ts (node) and .spec.tsx
+      // Use Vitest projects to split .spec.ts (node) and .spec.tsx
       // (happy-dom). Pure TypeScript spec files run in the lightweight Node
       // environment; skipping DOM init saves 1–3s wall clock. The .spec.ts files
       // that DO need DOM opt back in via a `// @vitest-environment jsdom` comment

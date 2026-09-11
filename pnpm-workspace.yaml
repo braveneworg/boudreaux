@@ -13,6 +13,9 @@ peerDependencyRules:
     # Transitive only: eslint-import-resolver-typescript pulls in the legacy
     # eslint-plugin-import (we lint with eslint-plugin-import-x). Cosmetic peer.
     'eslint-plugin-import>eslint': '10'
+    # better-auth lists vitest (^2 || ^3 || ^4) as an OPTIONAL peer for its own
+    # test utilities, which this repo never imports. Vitest 5 is safe here.
+    'better-auth>vitest': '5'
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
@@ -32,7 +35,7 @@ overrides:
   '@typescript-eslint/project-service': ^8.58.0
   '@xmldom/xmldom': ^0.9.10
   lodash: 4.18.1
-  vite: ^7.3.2
+  vite: ^8.0.16
   defu: ^6.1.5
   picomatch: ^4.0.4
   effect: ^3.20.0
